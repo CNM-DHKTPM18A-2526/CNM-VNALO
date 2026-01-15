@@ -11,6 +11,8 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](CONTRIBUTING.md)
 [![Build Status](https://img.shields.io/badge/build-passing-success.svg?style=flat-square)](https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO)
 
+**[English](README.md)** | **[Tiếng Việt](README.vi.md)**
+
 [📖 Documentation](docs/OTT_AI_Agent_Project_Docs.md) • [🚀 Quick Start](#-quick-start) • [🏗️ Architecture](#-architecture) • [🤝 Contributing](#-contributing)
 
 ---
