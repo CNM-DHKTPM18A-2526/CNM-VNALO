@@ -2,6 +2,8 @@
 # Operating System Files
 # ===========================
 
+*.vpp
+
 .DS_Store
 .DS_Store?
 ._*
