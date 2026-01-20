@@ -2,7 +2,10 @@
 # Operating System Files
 # ===========================
 
+# Visual Paradigm files
 *.vpp
+*.vpp.bak
+*.vpp.bak_*
 
 .DS_Store
 .DS_Store?
