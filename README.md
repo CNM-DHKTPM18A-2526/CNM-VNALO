@@ -1,29 +1,75 @@
 <div align="center">
 
-# 💬 CNM Zalo Clone
+# 💬 VNALO
 
 ### Enterprise-Grade Real-Time Messaging Platform
 
-*Building the next generation of instant messaging with microservices architecture*
+*Building the next generation of instant messaging with modern microservices architecture*
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg?style=flat-square)](https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO)
-[![License](https://img.shields.io/badge/license-MIT-green.svg?style=flat-square)](LICENSE)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](CONTRIBUTING.md)
-[![Build Status](https://img.shields.io/badge/build-passing-success.svg?style=flat-square)](https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO)
+<p align="center">
+  <a href="https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO">
+    <img src="https://img.shields.io/badge/version-1.0.0--SNAPSHOT-blue.svg?style=for-the-badge" alt="Version">
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge" alt="License">
+  </a>
+  <a href="https://openjdk.org/">
+    <img src="https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white" alt="Java">
+  </a>
+  <a href="https://spring.io/projects/spring-boot">
+    <img src="https://img.shields.io/badge/Spring_Boot-3.2+-6DB33F?style=for-the-badge&logo=spring-boot&logoColor=white" alt="Spring Boot">
+  </a>
+</p>
 
-**[English](README.md)** | **[Tiếng Việt](README.vi.md)**
+<p align="center">
+  <a href="https://nodejs.org/">
+    <img src="https://img.shields.io/badge/Node.js-20+-339933?style=for-the-badge&logo=node.js&logoColor=white" alt="Node.js">
+  </a>
+  <a href="https://www.postgresql.org/">
+    <img src="https://img.shields.io/badge/PostgreSQL-15+-316192?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL">
+  </a>
+  <a href="https://redis.io/">
+    <img src="https://img.shields.io/badge/Redis-7+-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Redis">
+  </a>
+  <a href="https://www.docker.com/">
+    <img src="https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker">
+  </a>
+</p>
 
-[📖 Documentation](docs/OTT_AI_Agent_Project_Docs.md) • [🚀 Quick Start](#-quick-start) • [🏗️ Architecture](#-architecture) • [🤝 Contributing](#-contributing)
+<p align="center">
+  <strong><a href="README.md">English</a></strong> • 
+  <strong><a href="README.vi.md">Tiếng Việt</a></strong>
+</p>
+
+<p align="center">
+  <a href="docs/">📖 Documentation</a> •
+  <a href="#-quick-start">🚀 Quick Start</a> •
+  <a href="#️-architecture">🏗️ Architecture</a> •
+  <a href="#-team">👥 Team</a> •
+  <a href="#-contributing">🤝 Contributing</a>
+</p>
 
 ---
 
 ### 🎯 Core Features
 
-```
-🔐 Phone Authentication    💬 Real-time Messaging    👥 Social Graph
-📱 Multi-device Sync       🎥 Media Sharing          🔔 Push Notifications  
-🤖 AI Assistant            📊 Analytics Dashboard    🌐 Cloud-Native
-```
+<table>
+<tr>
+<td align="center">🔐<br/><strong>Authentication</strong><br/>Phone-based Auth</td>
+<td align="center">💬<br/><strong>Real-time Chat</strong><br/>WebSocket Messaging</td>
+<td align="center">👥<br/><strong>Social Network</strong><br/>Friends & Groups</td>
+</tr>
+<tr>
+<td align="center">📱<br/><strong>Cross-platform</strong><br/>iOS & Android</td>
+<td align="center">🎥<br/><strong>Media Sharing</strong><br/>Images & Videos</td>
+<td align="center">🔔<br/><strong>Push Notifications</strong><br/>Real-time Alerts</td>
+</tr>
+<tr>
+<td align="center">⚡<br/><strong>WebSocket</strong><br/>Sub-second Delivery</td>
+<td align="center">📊<br/><strong>Analytics</strong><br/>Insights & Metrics</td>
+<td align="center">🌐<br/><strong>Microservices</strong><br/>Scalable Architecture</td>
+</tr>
+</table>
 
 </div>
 
@@ -73,38 +119,36 @@
 
 ### Backend Architecture
 
-![Java](https://img.shields.io/badge/Java_21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
-![Spring Boot](https://img.shields.io/badge/Spring_Boot_3-6DB33F?style=for-the-badge&logo=spring&logoColor=white)
-![Netty](https://img.shields.io/badge/Netty-4.1-009688?style=for-the-badge)
-![Kafka](https://img.shields.io/badge/Apache_Kafka-231F20?style=for-the-badge&logo=apachekafka&logoColor=white)
+<p>
+<img src="https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white" alt="Java">
+<img src="https://img.shields.io/badge/Spring_Boot-3.2-6DB33F?style=for-the-badge&logo=spring-boot&logoColor=white" alt="Spring Boot">
+<img src="https://img.shields.io/badge/Node.js-20-339933?style=for-the-badge&logo=node.js&logoColor=white" alt="Node.js">
+<img src="https://img.shields.io/badge/NestJS-10-E0234E?style=for-the-badge&logo=nestjs&logoColor=white" alt="NestJS">
+</p>
 
 ### Data Layer
 
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL_16-316192?style=for-the-badge&logo=postgresql&logoColor=white)
-![Cassandra](https://img.shields.io/badge/Cassandra-1287B1?style=for-the-badge&logo=apache-cassandra&logoColor=white)
-![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white)
-![AWS S3](https://img.shields.io/badge/AWS_S3-569A31?style=for-the-badge&logo=amazons3&logoColor=white)
+<p>
+<img src="https://img.shields.io/badge/PostgreSQL-15-316192?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL">
+<img src="https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Redis">
+<img src="https://img.shields.io/badge/RabbitMQ-3-FF6600?style=for-the-badge&logo=rabbitmq&logoColor=white" alt="RabbitMQ">
+</p>
 
 ### Frontend & Mobile
 
-![React Native](https://img.shields.io/badge/React_Native-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
-![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
-![Zustand](https://img.shields.io/badge/Zustand-000000?style=for-the-badge)
-![TailwindCSS](https://img.shields.io/badge/TailwindCSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
+<p>
+<img src="https://img.shields.io/badge/React_Native-0.76-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React Native">
+<img src="https://img.shields.io/badge/TypeScript-5.0-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
+<img src="https://img.shields.io/badge/TailwindCSS-3.0-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="TailwindCSS">
+</p>
 
 ### DevOps & Infrastructure
 
-![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
-![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white)
-![AWS](https://img.shields.io/badge/AWS-232F3E?style=for-the-badge&logo=amazon-aws&logoColor=white)
-![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=github-actions&logoColor=white)
-
-### Monitoring & AI
-
-![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?style=for-the-badge&logo=prometheus&logoColor=white)
-![Grafana](https://img.shields.io/badge/Grafana-F46800?style=for-the-badge&logo=grafana&logoColor=white)
-![Gemini](https://img.shields.io/badge/Gemini_AI-8E75B2?style=for-the-badge&logo=google&logoColor=white)
-![Ollama](https://img.shields.io/badge/Ollama-000000?style=for-the-badge)
+<p>
+<img src="https://img.shields.io/badge/Docker-24.0-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker">
+<img src="https://img.shields.io/badge/GitHub_Actions-CI/CD-2088FF?style=for-the-badge&logo=github-actions&logoColor=white" alt="GitHub Actions">
+<img src="https://img.shields.io/badge/AWS-Cloud-FF9900?style=for-the-badge&logo=amazon-aws&logoColor=white" alt="AWS">
+</p>
 
 </div>
 
@@ -142,6 +186,18 @@
 ---
 
 ## 🏗️ Architecture
+
+<div align="center">
+
+### 🎨 System Architecture Diagram
+
+![VNALO System Architecture](./assets/SA-VNALO_lightver.png)
+
+*Comprehensive microservices architecture with Spring Boot, Node.js, and cloud-native infrastructure*
+
+</div>
+
+---
 
 <div align="center">
 
@@ -206,18 +262,18 @@ graph TB
 
 ### 🎯 Microservices Overview
 
-| Service | Responsibility | Port | Database |
-|---------|---------------|------|----------|
-| 🔐 **Auth Service** | Firebase verification, JWT issuance | 8081 | PostgreSQL |
-| 👤 **User Service** | Profile management, privacy settings | 8082 | PostgreSQL |
-| 👥 **Social Service** | Friends, contacts, blocking | 8083 | PostgreSQL |
-| 💬 **Conversation Service** | Chat rooms, participants, groups | 8084 | PostgreSQL |
-| 📨 **Message Service** | Message persistence, history | 8085 | Cassandra |
-| 📎 **Media Service** | File uploads, presigned URLs | 8086 | PostgreSQL + S3 |
-| 🔔 **Notification Service** | Push notifications (FCM) | 8087 | PostgreSQL |
-| 📊 **Analytics Service** | Metrics, usage tracking | 8088 | PostgreSQL |
-| 🤖 **AI Service** | Assistant, quick reply, summary | 8089 | - |
-| ⚡ **Realtime Gateway** | WebSocket connections, routing | 8090 | Redis |
+| Service | Responsibility | Port | Technology | Database |
+|---------|---------------|------|------------|----------|
+| 🔐 **core-service** | Auth, Users, Social Features | 8081 | Spring Boot | PostgreSQL (auth, users, social) |
+| 💬 **messaging-service** | Conversations, Messages, Chat | 8082 | Spring Boot | PostgreSQL (messaging) |
+| 📎 **media-service** | File Upload, Cloudinary, Stickers | 8083 | Spring Boot | PostgreSQL (media) |
+| 📰 **content-service** | Stories, Timeline Posts | 8084 | Spring Boot | PostgreSQL (content) |
+| ⚡ **realtime-gateway** | WebSocket, Real-time Delivery | 8085 | Node.js/NestJS | Redis |
+| 🔔 **notification-service** | Push Notifications (FCM) | 8086 | Spring Boot | PostgreSQL |
+| 🛡️ **moderation-service** | Reports, Content Moderation | 8087 | Spring Boot | PostgreSQL |
+| 📊 **analytics-service** | Metrics, Logs, Analytics | 8088 | Spring Boot | PostgreSQL |
+
+**Status**: ✅ Infrastructure Ready | 🚧 core-service In Development | ⏳ Others Planned
 
 ### 🔄 Message Flow
 
@@ -561,12 +617,88 @@ git push origin feature/amazing-feature
 
 ### 👥 Team Structure
 
-| Role | Responsibilities | Members |
-|------|-----------------|---------|
-| **Backend Lead** | Auth, User, Social Services | TBD |
-| **Backend Dev** | Message, Media, Notification | TBD |
-| **Fullstack** | Realtime Gateway, Infrastructure | TBD |
-| **Frontend Lead** | React Native, UI/UX | TBD |
+<div align="center">
+
+#### CNM-DHKTPM18A-2526 Development Team
+
+<table>
+<tr>
+<td align="center">
+<a href="https://github.com/iamnguyenvu">
+<img src="https://github.com/iamnguyenvu.png" width="100px;" alt="Nguyễn Hoàng Nguyên Vũ"/>
+<br />
+<sub><b>Nguyễn Hoàng Nguyên Vũ</b></sub>
+</a>
+<br />
+<sub>👑 Team Leader</sub>
+<br />
+<sub>📋 22003185</sub>
+<br />
+<a href="https://github.com/iamnguyenvu">
+<img src="https://img.shields.io/badge/GitHub-iamnguyenvu-181717?style=flat-square&logo=github" alt="GitHub">
+</a>
+<br />
+<a href="mailto:iamnguyenvu.gm@gmail.com">
+<img src="https://img.shields.io/badge/Email-Contact-EA4335?style=flat-square&logo=gmail&logoColor=white" alt="Email">
+</a>
+</td>
+<td align="center">
+<a href="https://github.com/datle0910">
+<img src="https://github.com/datle0910.png" width="100px;" alt="Lê Văn Đạt"/>
+<br />
+<sub><b>Lê Văn Đạt</b></sub>
+</a>
+<br />
+<sub>💻 Developer</sub>
+<br />
+<sub>📋 22001605</sub>
+<br />
+<a href="https://github.com/datle0910">
+<img src="https://img.shields.io/badge/GitHub-datle0910-181717?style=flat-square&logo=github" alt="GitHub">
+</a>
+</td>
+<td align="center">
+<a href="https://github.com/pnwang1704">
+<img src="https://github.com/pnwang1704.png" width="100px;" alt="Phan Nhật Quang"/>
+<br />
+<sub><b>Phan Nhật Quang</b></sub>
+</a>
+<br />
+<sub>💻 Developer</sub>
+<br />
+<sub>📋 22684961</sub>
+<br />
+<a href="https://github.com/pnwang1704">
+<img src="https://img.shields.io/badge/GitHub-pnwang1704-181717?style=flat-square&logo=github" alt="GitHub">
+</a>
+</td>
+<td align="center">
+<a href="https://github.com/thaibaotb">
+<img src="https://github.com/thaibaotb.png" width="100px;" alt="Đặng Thái Bảo"/>
+<br />
+<sub><b>Đặng Thái Bảo</b></sub>
+</a>
+<br />
+<sub>💻 Developer</sub>
+<br />
+<sub>📋 22686331</sub>
+<br />
+<a href="https://github.com/thaibaotb">
+<img src="https://img.shields.io/badge/GitHub-thaibaotb-181717?style=flat-square&logo=github" alt="GitHub">
+</a>
+</td>
+</tr>
+</table>
+
+**Organization**: [CNM-DHKTPM18A-2526](https://github.com/CNM-DHKTPM18A-2526) | **Course**: Công Nghệ Mới - DHKTPM18A
+
+</div>
+
+**Project Responsibilities**:
+- **Nguyễn Hoàng Nguyên Vũ** (Team Leader): Architecture, core-service, Project Management
+- **Lê Văn Đạt**: messaging-service, Database Design
+- **Phan Nhật Quang**: media-service, Cloud Integration
+- **Đặng Thái Bảo**: realtime-gateway, Frontend Integration
 
 ---
 
@@ -574,13 +706,41 @@ git push origin feature/amazing-feature
 
 <div align="center">
 
-![GitHub stars](https://img.shields.io/github/stars/CNM-DHKTPM18A-2526/CNM-ZALO?style=social)
-![GitHub forks](https://img.shields.io/github/forks/CNM-DHKTPM18A-2526/CNM-ZALO?style=social)
-![GitHub watchers](https://img.shields.io/github/watchers/CNM-DHKTPM18A-2526/CNM-ZALO?style=social)
+<p>
+<a href="https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO/stargazers">
+<img src="https://img.shields.io/github/stars/CNM-DHKTPM18A-2526/CNM-ZALO?style=for-the-badge&logo=github&color=yellow" alt="Stars">
+</a>
+<a href="https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO/network/members">
+<img src="https://img.shields.io/github/forks/CNM-DHKTPM18A-2526/CNM-ZALO?style=for-the-badge&logo=github&color=blue" alt="Forks">
+</a>
+<a href="https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO/watchers">
+<img src="https://img.shields.io/github/watchers/CNM-DHKTPM18A-2526/CNM-ZALO?style=for-the-badge&logo=github&color=green" alt="Watchers">
+</a>
+</p>
 
-![GitHub issues](https://img.shields.io/github/issues/CNM-DHKTPM18A-2526/CNM-ZALO)
-![GitHub pull requests](https://img.shields.io/github/issues-pr/CNM-DHKTPM18A-2526/CNM-ZALO)
-![GitHub last commit](https://img.shields.io/github/last-commit/CNM-DHKTPM18A-2526/CNM-ZALO)
+<p>
+<a href="https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO/issues">
+<img src="https://img.shields.io/github/issues/CNM-DHKTPM18A-2526/CNM-ZALO?style=for-the-badge&logo=github&color=red" alt="Issues">
+</a>
+<a href="https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO/pulls">
+<img src="https://img.shields.io/github/issues-pr/CNM-DHKTPM18A-2526/CNM-ZALO?style=for-the-badge&logo=github&color=purple" alt="Pull Requests">
+</a>
+<a href="https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO/commits">
+<img src="https://img.shields.io/github/last-commit/CNM-DHKTPM18A-2526/CNM-ZALO?style=for-the-badge&logo=github&color=orange" alt="Last Commit">
+</a>
+</p>
+
+<p>
+<a href="https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO/graphs/contributors">
+<img src="https://img.shields.io/github/contributors/CNM-DHKTPM18A-2526/CNM-ZALO?style=for-the-badge&logo=github&color=cyan" alt="Contributors">
+</a>
+<a href="https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO">
+<img src="https://img.shields.io/github/repo-size/CNM-DHKTPM18A-2526/CNM-ZALO?style=for-the-badge&logo=github&color=lightgrey" alt="Repo Size">
+</a>
+<a href="LICENSE">
+<img src="https://img.shields.io/github/license/CNM-DHKTPM18A-2526/CNM-ZALO?style=for-the-badge&logo=github&color=brightgreen" alt="License">
+</a>
+</p>
 
 </div>
 
@@ -618,269 +778,6 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 <sub>Made with ❤️ by the CNM-DHKTPM18A-2526 Team | January 2026</sub>
 
-**[⬆ Back to Top](#-cnm-zalo-clone)**
+**[⬆ Back to Top](#-vnalo)**
 
 </div>
-      </ul>
-    </td>
-    <td>
-      <h3>👥 Social</h3>
-      <ul>
-        <li>Phone number authentication</li>
-        <li>Friend requests</li>
-        <li>User profiles</li>
-        <li>Online/Offline status</li>
-        <li>Block/Unblock users</li>
-        <li>Contact sync</li>
-      </ul>
-    </td>
-  </tr>
-  <tr>
-    <td>
-      <h3>👨‍👩‍👧‍👦 Groups</h3>
-      <ul>
-        <li>Create groups</li>
-        <li>Add/Remove members</li>
-        <li>Admin roles</li>
-        <li>Group settings</li>
-        <li>@Mention members</li>
-      </ul>
-    </td>
-    <td>
-      <h3>🔔 Notifications</h3>
-      <ul>
-        <li>Push notifications (FCM)</li>
-        <li>Mute conversations</li>
-        <li>Unread badges</li>
-        <li>Sound settings</li>
-      </ul>
-    </td>
-  </tr>
-</table>
-
----
-
-## 🛠 Tech Stack
-
-### Backend
-| Technology | Purpose |
-|------------|---------|
-| **Java 21** | Core language |
-| **Spring Boot 3.x** | Microservices framework |
-| **Spring Security** | Authentication & Authorization |
-| **Netty** | WebSocket realtime gateway |
-| **Apache Kafka** | Event streaming |
-| **PostgreSQL** | Primary database |
-| **Apache Cassandra** | Message storage |
-| **Redis** | Caching & Presence |
-| **Firebase Admin** | Phone OTP verification |
-| **AWS S3** | Media storage |
-
-### Frontend
-| Technology | Purpose |
-|------------|---------|
-| **React Native 0.76+** | Cross-platform mobile |
-| **TypeScript** | Type safety |
-| **Zustand** | State management |
-| **React Query** | Server state |
-| **React Navigation** | Navigation |
-| **NativeWind** | Styling (TailwindCSS) |
-
-### DevOps
-| Technology | Purpose |
-|------------|---------|
-| **Docker** | Containerization |
-| **Kubernetes (EKS)** | Orchestration |
-| **GitHub Actions** | CI/CD |
-| **Terraform** | Infrastructure as Code |
-| **Prometheus + Grafana** | Monitoring |
-
----
-
-## 🏗 Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         CLIENTS                                  │
-│              iOS    Android    Web (Future)                     │
-└───────────────────────────┬─────────────────────────────────────┘
-                            │
-              ┌─────────────┴─────────────┐
-              │      AWS Cloud            │
-              │  ┌─────────┐ ┌─────────┐  │
-              │  │   ALB   │ │   NLB   │  │
-              │  │ (REST)  │ │  (WS)   │  │
-              │  └────┬────┘ └────┬────┘  │
-              │       │           │       │
-              │  ┌────┴───────────┴────┐  │
-              │  │   Kubernetes (EKS)  │  │
-              │  │                     │  │
-              │  │  ┌──────────────┐   │  │
-              │  │  │ API Gateway  │   │  │
-              │  │  └──────┬───────┘   │  │
-              │  │         │           │  │
-              │  │  ┌──────┴───────┐   │  │
-              │  │  │ Microservices│   │  │
-              │  │  │ • Auth       │   │  │
-              │  │  │ • User       │   │  │
-              │  │  │ • Social     │   │  │
-              │  │  │ • Message    │   │  │
-              │  │  │ • Media      │   │  │
-              │  │  │ • Notify     │   │  │
-              │  │  └──────────────┘   │  │
-              │  │                     │  │
-              │  │  ┌──────────────┐   │  │
-              │  │  │Realtime GW   │   │  │
-              │  │  │  (Netty)     │   │  │
-              │  │  └──────────────┘   │  │
-              │  └─────────────────────┘  │
-              │                           │
-              │  ┌─────┐ ┌─────┐ ┌─────┐  │
-              │  │ RDS │ │Redis│ │Kafka│  │
-              │  └─────┘ └─────┘ └─────┘  │
-              │                           │
-              │  ┌─────────┐ ┌─────────┐  │
-              │  │Cassandra│ │   S3    │  │
-              │  └─────────┘ └─────────┘  │
-              └───────────────────────────┘
-```
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- Java 21+
-- Node.js 20+
-- Docker & Docker Compose
-- Android Studio / Xcode (for mobile development)
-
-### Quick Start
-
-```bash
-# Clone the repository
-git clone https://github.com/your-username/cnm-zalo-clone.git
-cd cnm-zalo-clone
-
-# Start infrastructure services
-docker compose up -d
-
-# Backend (coming soon)
-cd backend
-./gradlew bootRun
-
-# Mobile app (coming soon)
-cd frontend/mobile
-npm install
-npm run android  # or npm run ios
-```
-
----
-
-## 📁 Project Structure
-
-```
-cnm-zalo-clone/
-├── 📂 docs/                    # Documentation
-│   └── OTT_AI_Agent_Project_Docs.md
-├── 📂 backend/                 # Backend services
-│   ├── services/               # Microservices
-│   ├── realtime-gateway/       # Netty WebSocket server
-│   └── shared/                 # Shared libraries
-├── 📂 frontend/                # Frontend applications
-│   ├── mobile/                 # React Native app
-│   └── web/                    # Web app (future)
-├── 📂 k8s/                     # Kubernetes manifests
-├── 📂 terraform/               # Infrastructure as Code
-├── 📂 scripts/                 # Utility scripts
-├── 📄 docker-compose.yml       # Local development
-├── 📄 .gitignore
-└── 📄 README.md
-```
-
----
-
-## 📖 Documentation
-
-| Document | Description |
-|----------|-------------|
-| [Project Documentation](docs/OTT_AI_Agent_Project_Docs.md) | Comprehensive project documentation |
-| API Reference | Coming soon |
-| Mobile App Guide | Coming soon |
-| Deployment Guide | Coming soon |
-
----
-
-## 🗺 Roadmap
-
-- [x] Project setup & documentation
-- [ ] **Phase 1**: Authentication & User Profile
-- [ ] **Phase 2**: Social Graph (Friends, Contacts)
-- [ ] **Phase 3**: 1:1 Chat with realtime messaging
-- [ ] **Phase 4**: Group Chat
-- [ ] **Phase 5**: Media sharing (Images, Videos, Files)
-- [ ] **Phase 6**: Push Notifications
-- [ ] **Phase 7**: Polish & Performance
-- [ ] **Future**: Voice/Video calls, AI Assistant
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please read our contributing guidelines before submitting a PR.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Commit Convention
-
-We use [Conventional Commits](https://www.conventionalcommits.org/):
-
-```
-feat:     New feature
-fix:      Bug fix
-docs:     Documentation changes
-style:    Code style changes (formatting, etc)
-refactor: Code refactoring
-test:     Adding tests
-chore:    Maintenance tasks
-```
-
----
-
-## 👥 Team
-
-| Role | Responsibility |
-|------|----------------|
-| **Backend Lead** | Auth, User, Social Services |
-| **Backend Dev** | Message, Media, Notification Services |
-| **Fullstack/Realtime** | Netty Gateway, WebSocket, Infrastructure |
-| **Frontend Lead** | React Native App, UI/UX |
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🙏 Acknowledgments
-
-- Inspired by [Zalo](https://zalo.me)
-- Built with modern technologies and best practices
-- Special thanks to all contributors
-
----
-
-<p align="center">
-  Made with ❤️ by the ZaloClone Team
-</p>
-
-<p align="center">
-  <a href="#top">⬆️ Back to Top</a>
-</p>
