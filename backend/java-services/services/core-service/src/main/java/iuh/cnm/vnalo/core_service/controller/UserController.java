@@ -1,0 +1,82 @@
+package iuh.cnm.vnalo.core_service.controller;
+
+import iuh.cnm.vnalo.core_service.model.dto.response.ApiResponse;
+import iuh.cnm.vnalo.core_service.model.dto.response.UserInfoResponse;
+import iuh.cnm.vnalo.core_service.model.entity.user.UserPrivacySetting;
+import iuh.cnm.vnalo.core_service.security.UserPrincipal;
+import iuh.cnm.vnalo.core_service.service.UserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/users")
+@RequiredArgsConstructor
+@Tag(name = "Users", description = "User profile management")
+public class UserController {
+
+    private final UserService userService;
+
+    @GetMapping("/me")
+    @Operation(summary = "Get current user profile")
+    public ResponseEntity<ApiResponse<UserInfoResponse>> getCurrentUser(
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+
+        UserInfoResponse response = userService.getCurrentUserProfile(currentUser.getId());
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/{userId}")
+    @Operation(summary = "Get user profile by ID")
+    public ResponseEntity<ApiResponse<UserInfoResponse>> getUserById(@PathVariable UUID userId) {
+        UserInfoResponse response = userService.getUserProfile(userId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PatchMapping("/me")
+    @Operation(summary = "Update current user profile")
+    public ResponseEntity<ApiResponse<UserInfoResponse>> updateProfile(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @RequestBody UserService.UpdateProfileRequest request) {
+
+        UserInfoResponse response = userService.updateProfile(currentUser.getId(), request);
+        return ResponseEntity.ok(ApiResponse.success("Profile updated", response));
+    }
+
+    @GetMapping("/search")
+    @Operation(summary = "Search users")
+    public ResponseEntity<ApiResponse<Page<UserInfoResponse>>> searchUsers(
+            @RequestParam String keyword,
+            @PageableDefault(size = 20) Pageable pageable) {
+
+        Page<UserInfoResponse> response = userService.searchUsers(keyword, pageable);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/me/privacy")
+    @Operation(summary = "Get privacy settings")
+    public ResponseEntity<ApiResponse<UserPrivacySetting>> getPrivacySettings(
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+
+        UserPrivacySetting settings = userService.getPrivacySettings(currentUser.getId());
+        return ResponseEntity.ok(ApiResponse.success(settings));
+    }
+
+    @PutMapping("/me/privacy")
+    @Operation(summary = "Update privacy settings")
+    public ResponseEntity<ApiResponse<UserPrivacySetting>> updatePrivacySettings(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @RequestBody UserPrivacySetting settings) {
+
+        UserPrivacySetting updated = userService.updatePrivacySettings(currentUser.getId(), settings);
+        return ResponseEntity.ok(ApiResponse.success("Privacy settings updated", updated));
+    }
+}
