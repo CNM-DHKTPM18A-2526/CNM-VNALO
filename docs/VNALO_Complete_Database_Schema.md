@@ -1,9 +1,9 @@
-# Complete Database Schema - OTT Zalo Clone
+# Complete Database Schema - VNALO
 
-> **Version**: 5.0 - Aligned with Class Diagrams  
-> **Last Updated**: January 19, 2026  
+> **Version**: 1.0 - Aligned with Class Diagrams  
+> **Last Updated**: January 29, 2026  
 > **Database**: PostgreSQL (metadata) + Cassandra (messages) + Redis (cache/realtime)  
-> **Reference**: Zalo 2024/2025 - 77.8M MAU, 2B messages/day, Kubernetes, AI-first
+> **Project**: VNALO - Modern messaging platform with microservices architecture
 
 ---
 
