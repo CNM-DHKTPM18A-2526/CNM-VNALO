@@ -1,0 +1,123 @@
+spring:
+  application:
+    name: core-service
+  profiles:
+    active: dev
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:vnalo_core}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASS:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+  kafka:
+    bootstrap-servers: ${KAFKA_SERVERS:localhost:9092}
+    consumer:
+      group-id: core-service
+
+server:
+  port: 8081
+  servlet:
+    context-path: /api/v1
+
+jwt:
+  secret: ${JWT_SECRET:dGhpcyBpcyBhIHZlcnkgc2VjdXJlIHNlY3JldCBrZXkgdGhhdCBpcyBhdCBsZWFzdCA1MTIgYml0cyBsb25nIGZvciBIUzUxMiBhbGdvcml0aG0gYW5kIHNob3VsZCBiZSBrZXB0IHNlY3JldA==}
+  issuer: vnalo
+  access-token-expiration: 86400000
+  refresh-token-expiration: 604800000
+
+logging:
+  level:
+    iuh.cnm.vnalo: DEBUG
+
+firebase:
+  credentials:
+    path: iuh-cnm-vnalo-firebase-adminsdk-fbsvc-5008b7c5eb.json
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+# OTP Configuration
+otp:
+  enabled: ${OTP_ENABLED:true}                    # Set to false to skip OTP verification
+  expiration-minutes: ${OTP_EXPIRATION:5}         # OTP validity duration
+  max-attempts: ${OTP_MAX_ATTEMPTS:3}             # Max wrong attempts before invalidation
+  length: 6                                       # OTP code length
+  rate-limit:
+    requests-per-hour: 5                          # Max OTP requests per phone per hour
+    cooldown-seconds: 60                          # Min wait time between requests
+  test-mode:
+    enabled: ${OTP_TEST_MODE:false}               # Use mock OTP for testing
+    mock-otp: "123456"                            # Always-accepted OTP in test mode
+    log-otp: true                                 # Log OTP to console in test mode
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+  flyway:
+    enabled: false
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+
+# Dev profile: OTP disabled for faster development
+otp:
+  enabled: false
+
+---
+spring:
+  config:
+    activate:
+      on-profile: test
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  flyway:
+    enabled: false
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration

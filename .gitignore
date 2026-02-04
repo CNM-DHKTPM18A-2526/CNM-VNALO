@@ -2,7 +2,10 @@
 # Operating System Files
 # ===========================
 
+# Visual Paradigm files
 *.vpp
+*.vpp.bak
+*.vpp.bak_*
 
 .DS_Store
 .DS_Store?
@@ -152,6 +155,8 @@ credentials/
 google-services.json
 GoogleService-Info.plist
 firebase-adminsdk*.json
+*-firebase-adminsdk*.json
+*firebase*.json
 
 # ===========================
 # Docker

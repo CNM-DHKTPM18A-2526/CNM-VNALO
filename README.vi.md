@@ -1,28 +1,29 @@
 <div align="center">
 
-# 💬 CNM Zalo Clone
+# 💬 VNALO
 
 ### Nền Tảng Nhắn Tin Thời Gian Thực Cấp Doanh Nghiệp
 
 *Xây dựng thế hệ mới của ứng dụng nhắn tin tức thời với kiến trúc microservices*
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg?style=flat-square)](https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO)
+[![Version](https://img.shields.io/badge/version-1.0.0--SNAPSHOT-blue.svg?style=flat-square)](https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO)
 [![License](https://img.shields.io/badge/license-MIT-green.svg?style=flat-square)](LICENSE)
+[![Java](https://img.shields.io/badge/Java-21-orange.svg?style=flat-square&logo=openjdk)](https://openjdk.org/)
+[![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.2+-green.svg?style=flat-square&logo=spring)](https://spring.io/projects/spring-boot)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](CONTRIBUTING.md)
-[![Build Status](https://img.shields.io/badge/build-passing-success.svg?style=flat-square)](https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO)
 
 **[English](README.md)** | **[Tiếng Việt](README.vi.md)**
 
-[📖 Tài Liệu](docs/OTT_AI_Agent_Project_Docs.md) • [🚀 Bắt Đầu Nhanh](#-bắt-đầu-nhanh) • [🏗️ Kiến Trúc](#️-kiến-trúc) • [🤝 Đóng Góp](#-đóng-góp)
+[📖 Tài Liệu](docs/) • [🚀 Bắt Đầu Nhanh](#-bắt-đầu-nhanh) • [🏗️ Kiến Trúc](#️-kiến-trúc) • [🤝 Đóng Góp](#-đóng-góp)
 
 ---
 
 ### 🎯 Tính Năng Cốt Lõi
 
 ```
-🔐 Xác Thực Số Điện Thoại    💬 Nhắn Tin Thời Gian Thực    👥 Mạng Xã Hội
-📱 Đồng Bộ Đa Thiết Bị       🎥 Chia Sẻ Media             🔔 Thông Báo Push  
-🤖 Trợ Lý AI                 📊 Bảng Điều Khiển           🌐 Cloud-Native
+🔐 Xác Thực Số Điện Thoại    💬 Chat Thời Gian Thực       👥 Mạng Xã Hội
+📱 Mobile Đa Nền Tảng        🎥 Chia Sẻ Media             🔔 Thông Báo Push  
+⚡ WebSocket Real-time        📊 Phân Tích & Insights      🌐 Microservices
 ```
 
 </div>
@@ -141,7 +142,19 @@
 
 ---
 
-## 🏗️ Kiến Trúc
+## 🏗 ️ Kiến Trúc
+
+<div align="center">
+
+### 🎨 Sơ Đồ Kiến Trúc Hệ Thống
+
+![VNALO System Architecture](./assets/SA-VNALO_lightver.png)
+
+*Kiến trúc microservices toàn diện với Spring Boot, Node.js và hạ tầng cloud-native*
+
+</div>
+
+---
 
 <div align="center">
 
@@ -206,18 +219,18 @@ graph TB
 
 ### 🎯 Tổng Quan Microservices
 
-| Service | Trách Nhiệm | Port | Cơ Sở Dữ Liệu |
-|---------|-------------|------|----------------|
-| 🔐 **Auth Service** | Xác thực Firebase, cấp JWT | 8081 | PostgreSQL |
-| 👤 **User Service** | Quản lý hồ sơ, cài đặt riêng tư | 8082 | PostgreSQL |
-| 👥 **Social Service** | Bạn bè, liên hệ, chặn | 8083 | PostgreSQL |
-| 💬 **Conversation Service** | Phòng chat, thành viên, nhóm | 8084 | PostgreSQL |
-| 📨 **Message Service** | Lưu trữ tin nhắn, lịch sử | 8085 | Cassandra |
-| 📎 **Media Service** | Tải file, URL có chữ ký | 8086 | PostgreSQL + S3 |
-| 🔔 **Notification Service** | Thông báo đẩy (FCM) | 8087 | PostgreSQL |
-| 📊 **Analytics Service** | Số liệu, theo dõi sử dụng | 8088 | PostgreSQL |
-| 🤖 **AI Service** | Trợ lý, trả lời nhanh, tóm tắt | 8089 | - |
-| ⚡ **Realtime Gateway** | Kết nối WebSocket, định tuyến | 8090 | Redis |
+| Service | Trách Nhiệm | Port | Công Nghệ | Cơ Sở Dữ Liệu |
+|---------|-------------|------|-----------|----------------|
+| 🔐 **core-service** | Auth, Users, Tính Năng Xã Hội | 8081 | Spring Boot | PostgreSQL (auth, users, social) |
+| 💬 **messaging-service** | Hội Thoại, Tin Nhắn, Chat | 8082 | Spring Boot | PostgreSQL (messaging) |
+| 📎 **media-service** | Tải File, Cloudinary, Stickers | 8083 | Spring Boot | PostgreSQL (media) |
+| 📰 **content-service** | Stories, Bài Đăng Timeline | 8084 | Spring Boot | PostgreSQL (content) |
+| ⚡ **realtime-gateway** | WebSocket, Gửi Thời Gian Thực | 8085 | Node.js/NestJS | Redis |
+| 🔔 **notification-service** | Thông Báo Push (FCM) | 8086 | Spring Boot | PostgreSQL |
+| 🛡️ **moderation-service** | Báo Cáo, Kiểm Duyệt Nội Dung | 8087 | Spring Boot | PostgreSQL |
+| 📊 **analytics-service** | Số Liệu, Logs, Phân Tích | 8088 | Spring Boot | PostgreSQL |
+
+**Trạng Thái**: ✅ Hạ Tầng Sẵn Sàng | 🚧 core-service Đang Phát Triển | ⏳ Các Service Khác Đã Lên Kế Hoạch
 
 ### 🔄 Luồng Tin Nhắn
 
