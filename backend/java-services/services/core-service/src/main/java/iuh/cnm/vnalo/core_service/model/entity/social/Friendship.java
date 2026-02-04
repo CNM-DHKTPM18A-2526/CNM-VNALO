@@ -45,6 +45,22 @@ public class Friendship {
     @Column(name = "nickname_to", length = 50)
     private String nicknameTo;
 
+    @Column(name = "is_favorite_from")
+    @Builder.Default
+    private Boolean isFavoriteFrom = false;
+
+    @Column(name = "is_favorite_to")
+    @Builder.Default
+    private Boolean isFavoriteTo = false;
+
+    @Column(name = "is_hidden_from")
+    @Builder.Default
+    private Boolean isHiddenFrom = false;
+
+    @Column(name = "is_hidden_to")
+    @Builder.Default
+    private Boolean isHiddenTo = false;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
