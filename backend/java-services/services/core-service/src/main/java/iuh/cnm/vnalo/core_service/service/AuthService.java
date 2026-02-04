@@ -1,5 +1,6 @@
 package iuh.cnm.vnalo.core_service.service;
 
+import iuh.cnm.vnalo.core_service.config.OtpConfig;
 import iuh.cnm.vnalo.core_service.exception.ApiException;
 import iuh.cnm.vnalo.core_service.exception.ErrorCode;
 import iuh.cnm.vnalo.core_service.model.dto.request.LoginRequest;
@@ -12,6 +13,7 @@ import iuh.cnm.vnalo.core_service.model.entity.auth.AuthRefreshToken;
 import iuh.cnm.vnalo.core_service.model.entity.user.UserPrivacySetting;
 import iuh.cnm.vnalo.core_service.model.entity.user.UserProfile;
 import iuh.cnm.vnalo.core_service.model.enums.AccountStatus;
+import iuh.cnm.vnalo.core_service.model.enums.OtpPurpose;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthAccountRepository;
 import iuh.cnm.vnalo.core_service.repository.auth.RefreshTokenRepository;
 import iuh.cnm.vnalo.core_service.repository.user.UserPrivacySettingRepository;
@@ -47,13 +49,30 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
+    private final OtpConfig otpConfig;
+    private final OtpService otpService;
 
     @Transactional
     public AuthResponse register(RegisterRequest request, HttpServletRequest httpRequest) {
+        // Check if phone already registered
         if (authAccountRepository.existsByPhone(request.getPhone())) {
             throw new ApiException(ErrorCode.AUTH_PHONE_ALREADY_EXISTS);
         }
 
+        // Verify OTP if enabled
+        if (!otpConfig.shouldSkipOtp()) {
+            // OTP is required when enabled
+            if (request.getOtp() == null || request.getOtp().isBlank()) {
+                throw new ApiException(ErrorCode.AUTH_OTP_REQUIRED);
+            }
+            // Verify OTP
+            otpService.verifyOtp(request.getPhone(), request.getOtp(), OtpPurpose.REGISTER);
+            log.info("OTP verified for phone: ****{}", request.getPhone().substring(request.getPhone().length() - 4));
+        } else {
+            log.info("OTP verification skipped (disabled in config)");
+        }
+
+        // Create account
         AuthAccount account = AuthAccount.builder()
                 .phone(request.getPhone())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
@@ -62,19 +81,23 @@ public class AuthService {
                 .build();
         account = authAccountRepository.save(account);
 
+        // Create profile
         UserProfile profile = UserProfile.builder()
                 .displayName(request.getDisplayName())
                 .build();
         profile.setId(account.getId());
         profile = userProfileRepository.save(profile);
 
+        // Create default privacy settings
         UserPrivacySetting privacySetting = UserPrivacySetting.createDefault(profile.getId());
         userPrivacySettingRepository.save(privacySetting);
 
+        // Generate tokens
         UserPrincipal userPrincipal = UserPrincipal.create(account);
         String accessToken = jwtTokenProvider.generateAccessToken(userPrincipal);
         String refreshToken = generateAndSaveRefreshToken(account.getId(), httpRequest, null);
 
+        log.info("User registered successfully: {}", account.getId());
         return buildAuthResponse(accessToken, refreshToken, account, profile);
     }
 

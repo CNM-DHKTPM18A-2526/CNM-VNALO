@@ -27,4 +27,12 @@ public class RegisterRequest {
     @NotBlank(message = "Display name is required")
     @Size(min = 2, max = 100, message = "Display name must be between 2 and 100 characters")
     private String displayName;
+    
+    /**
+     * OTP code for phone verification.
+     * Required when OTP verification is enabled.
+     */
+    @Size(min = 6, max = 6, message = "OTP must be 6 digits")
+    @Pattern(regexp = "^\\d{6}$", message = "OTP must be 6 digits")
+    private String otp;
 }

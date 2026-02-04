@@ -52,6 +52,10 @@ logging:
   level:
     iuh.cnm.vnalo: DEBUG
 
+firebase:
+  credentials:
+    path: iuh-cnm-vnalo-firebase-adminsdk-fbsvc-5008b7c5eb.json
+
 management:
   endpoints:
     web:
@@ -63,6 +67,20 @@ springdoc:
     path: /v3/api-docs
   swagger-ui:
     path: /swagger-ui.html
+
+# OTP Configuration
+otp:
+  enabled: ${OTP_ENABLED:true}                    # Set to false to skip OTP verification
+  expiration-minutes: ${OTP_EXPIRATION:5}         # OTP validity duration
+  max-attempts: ${OTP_MAX_ATTEMPTS:3}             # Max wrong attempts before invalidation
+  length: 6                                       # OTP code length
+  rate-limit:
+    requests-per-hour: 5                          # Max OTP requests per phone per hour
+    cooldown-seconds: 60                          # Min wait time between requests
+  test-mode:
+    enabled: ${OTP_TEST_MODE:false}               # Use mock OTP for testing
+    mock-otp: "123456"                            # Always-accepted OTP in test mode
+    log-otp: true                                 # Log OTP to console in test mode
 
 ---
 spring:
@@ -79,6 +97,10 @@ spring:
     exclude:
       - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
       - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+
+# Dev profile: OTP disabled for faster development
+otp:
+  enabled: false
 
 ---
 spring:

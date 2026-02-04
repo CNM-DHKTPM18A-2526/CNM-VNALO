@@ -1,12 +1,20 @@
 package iuh.cnm.vnalo.core_service.controller;
 
+import iuh.cnm.vnalo.core_service.config.OtpConfig;
+import iuh.cnm.vnalo.core_service.exception.ApiException;
+import iuh.cnm.vnalo.core_service.exception.ErrorCode;
 import iuh.cnm.vnalo.core_service.model.dto.request.LoginRequest;
 import iuh.cnm.vnalo.core_service.model.dto.request.RefreshTokenRequest;
 import iuh.cnm.vnalo.core_service.model.dto.request.RegisterRequest;
+import iuh.cnm.vnalo.core_service.model.dto.request.SendOtpRequest;
 import iuh.cnm.vnalo.core_service.model.dto.response.ApiResponse;
 import iuh.cnm.vnalo.core_service.model.dto.response.AuthResponse;
+import iuh.cnm.vnalo.core_service.model.dto.response.OtpResponse;
+import iuh.cnm.vnalo.core_service.model.enums.OtpPurpose;
+import iuh.cnm.vnalo.core_service.repository.auth.AuthAccountRepository;
 import iuh.cnm.vnalo.core_service.security.UserPrincipal;
 import iuh.cnm.vnalo.core_service.service.AuthService;
+import iuh.cnm.vnalo.core_service.service.OtpService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,16 +31,52 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
-@Tag(name = "Authentication", description = "Authentication endpoints (login, register, refresh token)")
+@Tag(name = "Authentication", description = "Authentication endpoints (login, register, OTP, refresh token)")
 public class AuthController {
 
     private final AuthService authService;
+    private final OtpService otpService;
+    private final OtpConfig otpConfig;
+    private final AuthAccountRepository authAccountRepository;
+
+    /**
+     * Send OTP for registration.
+     * Call this before /register to get OTP sent to phone.
+     */
+    @PostMapping("/register/send-otp")
+    @Operation(summary = "Send OTP for registration", 
+               description = "Send OTP to phone number for registration verification. Skip if OTP is disabled.")
+    public ResponseEntity<ApiResponse<OtpResponse>> sendRegistrationOtp(
+            @Valid @RequestBody SendOtpRequest request) {
+        
+        // Check if phone already registered
+        if (authAccountRepository.existsByPhone(request.getPhone())) {
+            throw new ApiException(ErrorCode.AUTH_PHONE_ALREADY_EXISTS);
+        }
+        
+        // Check if OTP is disabled
+        if (otpConfig.shouldSkipOtp()) {
+            return ResponseEntity.ok(ApiResponse.success(
+                "OTP verification is disabled",
+                OtpResponse.skipped("OTP verification is disabled in current environment")
+            ));
+        }
+        
+        OtpService.OtpSendResult result = otpService.sendOtp(request.getPhone(), OtpPurpose.REGISTER);
+        
+        return ResponseEntity.ok(ApiResponse.success(
+            result.getMessage(),
+            OtpResponse.success(result.getExpiresInSeconds(), otpConfig.getRateLimit().getCooldownSeconds())
+        ));
+    }
 
     /**
      * Register a new user account.
+     * Requires OTP verification if enabled.
      */
     @PostMapping("/register")
-    @Operation(summary = "Register new account", description = "Create a new user account with phone number")
+    @Operation(summary = "Register new account", 
+               description = "Create a new user account with phone number. Include OTP if verification is enabled.")
     public ResponseEntity<ApiResponse<AuthResponse>> register(
             @Valid @RequestBody RegisterRequest request,
             HttpServletRequest httpRequest) {
@@ -98,4 +142,33 @@ public class AuthController {
         
         return ResponseEntity.ok(ApiResponse.success("Logged out from all devices"));
     }
+    
+    /**
+     * Check OTP configuration status.
+     * Useful for frontend to know if OTP verification is required.
+     */
+    @GetMapping("/otp/status")
+    @Operation(summary = "Check OTP status", description = "Check if OTP verification is enabled")
+    public ResponseEntity<ApiResponse<OtpStatusResponse>> getOtpStatus() {
+        return ResponseEntity.ok(ApiResponse.success(
+            "OTP status retrieved",
+            new OtpStatusResponse(
+                otpConfig.isEnabled(),
+                otpConfig.isTestMode(),
+                otpConfig.getExpirationMinutes(),
+                otpConfig.getRateLimit().getCooldownSeconds()
+            )
+        ));
+    }
+    
+    /**
+     * Response for OTP status check.
+     */
+    public record OtpStatusResponse(
+        boolean enabled,
+        boolean testMode,
+        int expirationMinutes,
+        int cooldownSeconds
+    ) {}
 }
+
