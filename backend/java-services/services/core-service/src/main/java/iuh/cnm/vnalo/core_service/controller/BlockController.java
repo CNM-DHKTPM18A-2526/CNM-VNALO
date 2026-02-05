@@ -1,6 +1,8 @@
 package iuh.cnm.vnalo.core_service.controller;
 
 import iuh.cnm.vnalo.core_service.model.dto.response.ApiResponse;
+import iuh.cnm.vnalo.core_service.model.dto.response.BlockedUserResponse;
+import iuh.cnm.vnalo.core_service.model.dto.response.BlockStatusResponse;
 import iuh.cnm.vnalo.core_service.security.UserPrincipal;
 import iuh.cnm.vnalo.core_service.service.BlockService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -48,11 +50,11 @@ public class BlockController {
 
     @GetMapping
     @Operation(summary = "Get blocked users")
-    public ResponseEntity<ApiResponse<Page<BlockService.BlockedUserResponse>>> getBlockedUsers(
+    public ResponseEntity<ApiResponse<Page<BlockedUserResponse>>> getBlockedUsers(
             @AuthenticationPrincipal UserPrincipal currentUser,
             @PageableDefault(size = 20) Pageable pageable) {
 
-        Page<BlockService.BlockedUserResponse> response = blockService.getBlockedUsers(currentUser.getId(), pageable);
+        Page<BlockedUserResponse> response = blockService.getBlockedUsers(currentUser.getId(), pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -66,6 +68,4 @@ public class BlockController {
         boolean isBlockedBy = blockService.isBlocked(userId, currentUser.getId());
         return ResponseEntity.ok(ApiResponse.success(new BlockStatusResponse(isBlocked, isBlockedBy)));
     }
-
-    public record BlockStatusResponse(boolean youBlocked, boolean blockedYou) {}
 }

@@ -1,5 +1,6 @@
 package iuh.cnm.vnalo.core_service.model.entity.auth;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import iuh.cnm.vnalo.core_service.model.entity.base.BaseEntity;
 import iuh.cnm.vnalo.core_service.model.enums.AccountStatus;
 import jakarta.persistence.*;
@@ -25,6 +26,7 @@ public class AuthAccount extends BaseEntity {
     @Column(name = "firebase_uid", unique = true, length = 128)
     private String firebaseUid;
 
+    @JsonIgnore
     @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash;
 
