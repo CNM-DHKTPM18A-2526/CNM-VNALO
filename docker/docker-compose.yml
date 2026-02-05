@@ -2,10 +2,10 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:15-alpine
-    container_name: ott-postgres
+    image: postgres:16-alpine
+    container_name: vnalo-postgres
     environment:
-      POSTGRES_DB: ott_zalo
+      POSTGRES_DB: vnalo_core
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
@@ -14,7 +14,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
-      - ott-network
+      - vnalo-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -23,47 +23,55 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: ott-redis
+    container_name: vnalo-redis
     ports:
       - "6379:6379"
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
     networks:
-      - ott-network
+      - vnalo-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 3s
       retries: 5
 
-  rabbitmq:
-    image: rabbitmq:3-management-alpine
-    container_name: ott-rabbitmq
+  # Kafka for event streaming (used in production)
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: vnalo-zookeeper
     environment:
-      RABBITMQ_DEFAULT_USER: admin
-      RABBITMQ_DEFAULT_PASS: admin
-    ports:
-      - "5672:5672"   # AMQP port
-      - "15672:15672" # Management UI
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
     networks:
-      - ott-network
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - vnalo-network
+    profiles:
+      - kafka
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: vnalo-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - vnalo-network
+    profiles:
+      - kafka
 
 volumes:
   postgres_data:
     driver: local
   redis_data:
     driver: local
-  rabbitmq_data:
-    driver: local
 
 networks:
-  ott-network:
+  vnalo-network:
     driver: bridge
