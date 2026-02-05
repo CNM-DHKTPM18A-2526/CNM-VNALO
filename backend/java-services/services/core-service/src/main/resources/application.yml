@@ -2,7 +2,7 @@ spring:
   application:
     name: core-service
   profiles:
-    active: local
+    active: dev  # Default to dev profile (requires Docker)
 
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:vnalo_core}
@@ -42,10 +42,7 @@ server:
   servlet:
     context-path: /api/v1
 
-# JWT Configuration
-# REQUIRED: Set JWT_SECRET environment variable!
-# Generate: openssl rand -base64 64 OR run scripts/generate-jwt-secret.ps1
-# For development, use .env file in project root
+# JWT Configuration - REQUIRED for all profiles
 jwt:
   secret: ${JWT_SECRET}
   issuer: ${JWT_ISSUER:vnalo}
@@ -57,7 +54,7 @@ logging:
     iuh.cnm.vnalo: ${LOG_LEVEL:INFO}
     org.springframework.security.config.annotation.authentication.configuration: ERROR
 
-# Firebase Configuration - Set FIREBASE_CREDENTIALS_PATH in production
+# Firebase Configuration
 firebase:
   credentials:
     path: ${FIREBASE_CREDENTIALS_PATH:iuh-cnm-vnalo-firebase-adminsdk-fbsvc-5008b7c5eb.json}
@@ -79,19 +76,24 @@ springdoc:
 
 # OTP Configuration
 otp:
-  enabled: ${OTP_ENABLED:true}                    # Set to false to skip OTP verification
-  expiration-minutes: ${OTP_EXPIRATION:5}         # OTP validity duration
-  max-attempts: ${OTP_MAX_ATTEMPTS:3}             # Max wrong attempts before invalidation
-  length: 6                                       # OTP code length
+  enabled: ${OTP_ENABLED:true}
+  expiration-minutes: ${OTP_EXPIRATION:5}
+  max-attempts: ${OTP_MAX_ATTEMPTS:3}
+  length: 6
   rate-limit:
-    requests-per-hour: 5                          # Max OTP requests per phone per hour
-    cooldown-seconds: 60                          # Min wait time between requests
+    requests-per-hour: 5
+    cooldown-seconds: 60
   test-mode:
-    enabled: ${OTP_TEST_MODE:false}               # Use mock OTP for testing
-    mock-otp: "123456"                            # Always-accepted OTP in test mode
-    log-otp: true                                 # Log OTP to console in test mode
+    enabled: ${OTP_TEST_MODE:false}
+    mock-otp: "123456"
+    log-otp: true
 
 ---
+# =============================================================================
+# DEV PROFILE - Development with Docker (PostgreSQL + Redis required)
+# =============================================================================
+# Usage: docker-compose up -d && mvnw spring-boot:run
+# =============================================================================
 spring:
   config:
     activate:
@@ -104,73 +106,26 @@ spring:
     enabled: false
   autoconfigure:
     exclude:
-      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
       - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
 
-# Dev profile: OTP disabled for faster development
+# Dev: OTP disabled for faster development
 otp:
   enabled: false
+
+# Dev: Default JWT secret (only for development!)
+jwt:
+  secret: ZGV2ZWxvcG1lbnQtb25seS1zZWNyZXQta2V5LWRvLW5vdC11c2UtaW4tcHJvZHVjdGlvbi10aGlzLWlzLWF0LWxlYXN0LTUxMi1iaXRzLWxvbmc=
 
 logging:
   level:
     iuh.cnm.vnalo: DEBUG
 
 ---
-# Local profile: Use H2 in-memory database (no Docker required)
-spring:
-  config:
-    activate:
-      on-profile: local
-  datasource:
-    url: jdbc:h2:mem:vnalo_local;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE
-    username: sa
-    password:
-    driver-class-name: org.h2.Driver
-  jpa:
-    hibernate:
-      ddl-auto: create
-    show-sql: true
-  flyway:
-    enabled: false
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
-      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
-
-otp:
-  enabled: false
-
-logging:
-  level:
-    iuh.cnm.vnalo: DEBUG
-    org.hibernate.SQL: DEBUG
-
----
-spring:
-  config:
-    activate:
-      on-profile: test
-  datasource:
-    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
-    username: sa
-    password: 
-    driver-class-name: org.h2.Driver
-  jpa:
-    hibernate:
-      ddl-auto: create-drop
-  flyway:
-    enabled: false
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
-      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
-
----
-# Production profile: Hardened security settings
+# =============================================================================
+# PROD PROFILE - Production deployment with hardened security
+# =============================================================================
+# Usage: Set all environment variables and run with -Dspring.profiles.active=prod
+# =============================================================================
 spring:
   config:
     activate:
@@ -179,9 +134,6 @@ spring:
     hibernate:
       ddl-auto: validate
     show-sql: false
-  h2:
-    console:
-      enabled: false
 
 # Production: Disable Swagger UI
 springdoc:
@@ -207,4 +159,3 @@ logging:
   level:
     iuh.cnm.vnalo: INFO
     org.springframework.security: WARN
-

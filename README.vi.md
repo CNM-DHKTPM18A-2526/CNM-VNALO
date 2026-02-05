@@ -262,41 +262,47 @@ graph TB
 
 ```bash
 # Bắt buộc
-☑️  Java 21+
-☑️  Node.js 20+
+☑️  Java 21+ (JDK)
 ☑️  Docker & Docker Compose
 ☑️  Git
 
 # Tùy chọn (cho phát triển mobile)
+📱  Node.js 20+
 📱  Android Studio (cho Android)
 🍎  Xcode (cho iOS - chỉ macOS)
 ```
 
-### ⚡ Cài Đặt
+### ⚡ Thiết Lập Backend (core-service)
 
 ```bash
 # 1. Clone repository
 git clone https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO.git
 cd CNM-ZALO
 
-# 2. Khởi động các dịch vụ hạ tầng
-docker compose up -d
+# 2. Lấy file Firebase credentials từ team lead
+# Đặt file vào: backend/java-services/services/core-service/src/main/resources/
+# Tên file: iuh-cnm-vnalo-firebase-adminsdk-fbsvc-5008b7c5eb.json
 
-# 3. Thiết lập Backend (sắp ra mắt)
-cd backend
-./gradlew clean build
-./gradlew bootRun
+# 3. Khởi động Docker containers
+cd docker
+docker-compose up -d postgres redis
 
-# 4. Thiết lập ứng dụng Mobile (sắp ra mắt)
-cd frontend/mobile
-npm install
+# 4. Build và chạy core-service
+cd ../backend/java-services/services/core-service
 
-# Chạy trên Android
-npm run android
+# Windows
+.\mvnw.cmd clean install -DskipTests
+.\mvnw.cmd spring-boot:run
 
-# Chạy trên iOS (chỉ macOS)
-npm run ios
+# Linux/Mac
+./mvnw clean install -DskipTests
+./mvnw spring-boot:run
+
+# 5. Truy cập Swagger UI
+# http://localhost:8081/api/v1/swagger-ui.html
 ```
+
+> **Lưu ý:** Profile dev có sẵn JWT secret mặc định, OTP đã tắt. Chỉ cần file Firebase là chạy được!
 
 ### 🐳 Dịch Vụ Docker
 
@@ -315,89 +321,77 @@ docker compose down -v && docker compose up -d
 ```
 
 **Dịch Vụ Có Sẵn:**
-- PostgreSQL: `localhost:5432`
+- PostgreSQL: `localhost:5432` (database: vnalo_core)
 - Redis: `localhost:6379`
-- Kafka: `localhost:9092`
-- MinIO (S3): `localhost:9000`
 
 ---
 
 ## 📁 Cấu Trúc Dự Án
 
 ```
-cnm-zalo-clone/
+CNM-ZALO/
 ├── 📄 README.md                    # Tài liệu tiếng Anh
 ├── 📄 README.vi.md                 # Bạn đang ở đây
-├── 📄 docker-compose.yml           # Stack phát triển local
+├── 📄 CONTRIBUTING.md              # Hướng dẫn đóng góp
 ├── 📄 .gitignore
 │
 ├── 📂 docs/                        # Tài liệu
-│   ├── OTT_AI_Agent_Project_Docs.md         # Tài liệu kiến trúc chính
-│   └── OTT_Zalo_Database_Design_By_Service.md
+│   ├── VNALO_Project_Docs.md            # Tài liệu dự án chính
+│   ├── VNALO_Complete_Database_Schema.md # Schema database
+│   ├── PROJECT_STRUCTURE_STANDARD.md    # Quy ước code
+│   ├── TEAM_WORKLOAD_DISTRIBUTION.md    # Phân công nhóm
+│   └── PROJECT_SUMMARY.md               # Tổng quan dự án
 │
-├── 📂 backend/                     # Backend services
-│   ├── services/
-│   │   ├── auth-service/           # Xác thực & JWT
-│   │   ├── user-service/           # Hồ sơ người dùng
-│   │   ├── social-service/         # Bạn bè & liên hệ
-│   │   ├── conversation-service/   # Phòng chat
-│   │   ├── message-service/        # Lưu trữ tin nhắn
-│   │   ├── media-service/          # Tải file
-│   │   ├── notification-service/   # Thông báo đẩy
-│   │   ├── analytics-service/      # Số liệu & theo dõi
-│   │   └── ai-service/             # Trợ lý AI
-│   ├── realtime-gateway/           # Netty WebSocket server
-│   ├── shared/                     # Thư viện dùng chung
-│   │   ├── common-dto/
-│   │   ├── common-security/
-│   │   └── common-kafka/
-│   └── build.gradle
+├── 📂 backend/
+│   ├── java-services/               # Spring Boot microservices
+│   │   ├── pom.xml                      # Parent POM
+│   │   ├── common/                      # Module dùng chung
+│   │   │   └── common-domain/           # Entity dùng chung
+│   │   └── services/
+│   │       └── core-service/            # ✅ Auth, Users, Social (SẴN SÀNG)
+│   │           ├── src/main/java/
+│   │           ├── src/main/resources/
+│   │           └── pom.xml
+│   └── node-services/               # NestJS services (tương lai)
+│       └── (realtime-gateway dự kiến)
 │
-├── 📂 frontend/                    # Ứng dụng Frontend
-│   ├── mobile/                     # React Native app
-│   │   ├── src/
-│   │   │   ├── screens/            # Màn hình ứng dụng
-│   │   │   ├── components/         # Component tái sử dụng
-│   │   │   ├── navigation/         # Thiết lập điều hướng
-│   │   │   ├── stores/             # Zustand stores
-│   │   │   ├── services/           # API clients
-│   │   │   ├── hooks/              # Custom hooks
-│   │   │   └── utils/              # Tiện ích
-│   │   ├── android/
-│   │   ├── ios/
-│   │   └── package.json
-│   └── web/                        # Web app (tương lai)
+├── 📂 docker/
+│   ├── docker-compose.yml           # PostgreSQL + Redis
+│   └── init-db.sql                  # Khởi tạo database
 │
-├── 📂 k8s/                         # Kubernetes manifests
-│   ├── base/
-│   ├── staging/
-│   └── production/
+├── 📂 frontend/
+│   └── mobile/                      # 📦 Flutter mobile app
+│       ├── lib/                     # Mã nguồn Dart
+│       ├── android/                 # Nền tảng Android
+│       ├── ios/                     # Nền tảng iOS
+│       ├── web/                     # Nền tảng Web
+│       └── pubspec.yaml             # Dependencies
 │
-├── 📂 terraform/                   # Infrastructure as Code
-│   ├── modules/
-│   └── environments/
+├── 📂 assets/                      # Hình ảnh dự án
 │
-└── 📂 scripts/                     # Script tiện ích
-    ├── setup-local.sh
-    └── seed-data.sh
+└── 📂 config/                      # Cấu hình
 ```
 
 ---
 
 ## 🔧 Phát Triển
 
-### Phát Triển Backend
+### Phát Triển Backend (core-service)
 
 ```bash
-# Chạy một service
-cd backend/services/auth-service
-./gradlew bootRun
+cd backend/java-services/services/core-service
+
+# Build
+./mvnw clean install -DskipTests
+
+# Chạy (dev profile - mặc định)
+./mvnw spring-boot:run
 
 # Chạy tests
-./gradlew test
+./mvnw test
 
 # Build Docker image
-docker build -t cnm-zalo/auth-service .
+docker build -t vnalo/core-service .
 ```
 
 ### Phát Triển Frontend
@@ -486,56 +480,21 @@ OLLAMA_BASE_URL=http://localhost:11434
 
 | Tài Liệu | Mô Tả |
 |----------|-------|
-| [📘 Tài Liệu Dự Án](docs/OTT_AI_Agent_Project_Docs.md) | Hướng dẫn kiến trúc & triển khai đầy đủ |
-| [🗄️ Thiết Kế Database](docs/OTT_Zalo_Database_Design_By_Service.md) | Thiết kế schema theo từng service |
-| [🔌 Tài Liệu API](docs/API_REFERENCE.md) | Đặc tả REST & WebSocket API (sắp ra mắt) |
-| [📱 Hướng Dẫn Mobile](docs/MOBILE_GUIDE.md) | Hướng dẫn phát triển React Native (sắp ra mắt) |
-| [🚀 Hướng Dẫn Triển Khai](docs/DEPLOYMENT.md) | Các bước triển khai AWS EKS (sắp ra mắt) |
+| [📘 Tài Liệu Dự Án](docs/VNALO_Project_Docs.md) | Hướng dẫn kiến trúc & triển khai đầy đủ |
+| [🗄️ Schema Database](docs/VNALO_Complete_Database_Schema.md) | Thiết kế schema database hoàn chỉnh |
+| [📁 Cấu Trúc Dự Án](docs/PROJECT_STRUCTURE_STANDARD.md) | Quy ước code & cấu trúc |
+| [👥 Phân Công Nhóm](docs/TEAM_WORKLOAD_DISTRIBUTION.md) | Phân công công việc |
 
 ---
 
-## 🗺️ Lộ Trình
+## ✅ Trạng Thái Hiện Tại
 
-<div align="center">
-
-### Tiến Độ Phát Triển
-
-| Giai Đoạn | Thời Gian | Trạng Thái | Tính Năng |
-|-----------|-----------|------------|-----------|
-| **Giai đoạn 1** | Tuần 1-4 | ✅ Hoàn thành | Thiết lập dự án, Auth, Hồ sơ người dùng |
-| **Giai đoạn 2** | Tuần 5-8 | 🔄 Đang tiến hành | Mạng xã hội, Hội thoại |
-| **Giai đoạn 3** | Tuần 9-12 | 📅 Đã lên kế hoạch | Nhắn tin thời gian thực, WebSocket |
-| **Giai đoạn 4** | Tuần 13-16 | 📅 Đã lên kế hoạch | Chia sẻ media, Nhóm |
-| **Giai đoạn 5** | Tuần 17-20 | 📅 Đã lên kế hoạch | Thông báo, Trợ lý AI |
-| **Giai đoạn 6** | Tuần 21-24 | 📅 Đã lên kế hoạch | Kiểm thử, Triển khai sản xuất |
-
-</div>
-
-### 🎯 Tiến Độ Tính Năng
-
-- [x] Kiến trúc & tài liệu dự án
-- [x] Thiết kế schema cơ sở dữ liệu
-- [ ] **Giai đoạn 2** (Hiện tại)
-  - [ ] Auth Service (Firebase + JWT)
-  - [ ] User Service (CRUD hồ sơ)
-  - [ ] Social Service (Bạn bè, Liên hệ)
-  - [ ] Conversation Service
-- [ ] **Giai đoạn 3**
-  - [ ] Netty WebSocket Gateway
-  - [ ] Message Service (Cassandra)
-  - [ ] Chat 1:1 thời gian thực
-- [ ] **Giai đoạn 4**
-  - [ ] Chức năng nhóm chat
-  - [ ] Media Service (S3 uploads)
-  - [ ] Chia sẻ hình ảnh/video
-- [ ] **Giai đoạn 5**
-  - [ ] Thông báo đẩy (FCM)
-  - [ ] Trợ lý AI (Gemini + Ollama)
-  - [ ] Bảng điều khiển phân tích
-- [ ] **Tương lai**
-  - [ ] Gọi thoại/video (WebRTC)
-  - [ ] Mã hóa end-to-end
-  - [ ] Tính năng Stories
+| Service | Trạng Thái | Tính Năng |
+|---------|------------|------------|
+| **core-service** | ✅ Sẵn sàng | Auth (đăng ký, đăng nhập, đăng xuất), Hồ sơ người dùng, Quản lý bạn bè, Danh sách chặn |
+| **messaging-service** | 🚧 Tiếp theo | Hội thoại, Tin nhắn |
+| **media-service** | 📅 Đã lên kế hoạch | Upload file, Cloudinary |
+| **realtime-gateway** | 📅 Đã lên kế hoạch | WebSocket, Gửi tin real-time |
 
 ---
 
