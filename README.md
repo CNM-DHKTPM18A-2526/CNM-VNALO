@@ -402,6 +402,14 @@ CNM-ZALO/
 │   ├── docker-compose.yml           # PostgreSQL + Redis
 │   └── init-db.sql                  # Database initialization
 │
+├── 📂 frontend/
+│   └── mobile/                      # 📦 Flutter mobile app
+│       ├── lib/                     # Dart source code
+│       ├── android/                 # Android platform
+│       ├── ios/                     # iOS platform
+│       ├── web/                     # Web platform
+│       └── pubspec.yaml             # Dependencies
+│
 ├── 📂 assets/                      # Project images
 │
 └── 📂 config/                      # Configuration files

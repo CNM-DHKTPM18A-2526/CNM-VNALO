@@ -359,6 +359,14 @@ CNM-ZALO/
 │   ├── docker-compose.yml           # PostgreSQL + Redis
 │   └── init-db.sql                  # Khởi tạo database
 │
+├── 📂 frontend/
+│   └── mobile/                      # 📦 Flutter mobile app
+│       ├── lib/                     # Mã nguồn Dart
+│       ├── android/                 # Nền tảng Android
+│       ├── ios/                     # Nền tảng iOS
+│       ├── web/                     # Nền tảng Web
+│       └── pubspec.yaml             # Dependencies
+│
 ├── 📂 assets/                      # Hình ảnh dự án
 │
 └── 📂 config/                      # Cấu hình
