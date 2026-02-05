@@ -42,10 +42,12 @@ server:
   servlet:
     context-path: /api/v1
 
-# JWT Configuration - IMPORTANT: Set JWT_SECRET environment variable in production!
-# Generate a secure key: openssl rand -base64 64
+# JWT Configuration
+# REQUIRED: Set JWT_SECRET environment variable!
+# Generate: openssl rand -base64 64 OR run scripts/generate-jwt-secret.ps1
+# For development, use .env file in project root
 jwt:
-  secret: ${JWT_SECRET:}
+  secret: ${JWT_SECRET}
   issuer: ${JWT_ISSUER:vnalo}
   access-token-expiration: ${JWT_ACCESS_EXPIRATION:86400000}   # 24 hours
   refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:604800000} # 7 days
@@ -109,10 +111,6 @@ spring:
 otp:
   enabled: false
 
-# Dev profile: Use a default JWT secret (only for development!)
-jwt:
-  secret: ZGV2ZWxvcG1lbnQtb25seS1zZWNyZXQta2V5LWRvLW5vdC11c2UtaW4tcHJvZHVjdGlvbi10aGlzLWlzLWF0LWxlYXN0LTUxMi1iaXRzLWxvbmc=
-
 logging:
   level:
     iuh.cnm.vnalo: DEBUG
@@ -146,9 +144,6 @@ spring:
 otp:
   enabled: false
 
-jwt:
-  secret: bG9jYWwtZGV2ZWxvcG1lbnQtb25seS1zZWNyZXQta2V5LWRvLW5vdC11c2UtaW4tcHJvZHVjdGlvbi10aGlzLWlzLWF0LWxlYXN0LTUxMi1iaXRzLWxvbmc=
-
 logging:
   level:
     iuh.cnm.vnalo: DEBUG
@@ -173,3 +168,43 @@ spring:
     exclude:
       - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
       - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+
+---
+# Production profile: Hardened security settings
+spring:
+  config:
+    activate:
+      on-profile: prod
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  h2:
+    console:
+      enabled: false
+
+# Production: Disable Swagger UI
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+# Production: Hide health details
+management:
+  endpoint:
+    health:
+      show-details: never
+
+# Production: OTP enabled, test mode disabled
+otp:
+  enabled: true
+  test-mode:
+    enabled: false
+    log-otp: false
+
+logging:
+  level:
+    iuh.cnm.vnalo: INFO
+    org.springframework.security: WARN
+

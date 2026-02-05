@@ -1,5 +1,6 @@
 package iuh.cnm.vnalo.core_service.model.entity.auth;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import iuh.cnm.vnalo.core_service.model.enums.OtpPurpose;
 import jakarta.persistence.*;
 import lombok.*;
@@ -37,6 +38,7 @@ public class AuthOtp {
     @Column(name = "purpose", nullable = false, length = 30)
     private OtpPurpose purpose;
 
+    @JsonIgnore
     @Column(name = "otp_hash", nullable = false, length = 255)
     private String otpHash;
 
