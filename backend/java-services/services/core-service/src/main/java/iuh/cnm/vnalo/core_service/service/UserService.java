@@ -2,11 +2,11 @@ package iuh.cnm.vnalo.core_service.service;
 
 import iuh.cnm.vnalo.core_service.exception.ApiException;
 import iuh.cnm.vnalo.core_service.exception.ErrorCode;
+import iuh.cnm.vnalo.core_service.model.dto.request.UpdateProfileRequest;
 import iuh.cnm.vnalo.core_service.model.dto.response.UserInfoResponse;
 import iuh.cnm.vnalo.core_service.model.entity.auth.AuthAccount;
 import iuh.cnm.vnalo.core_service.model.entity.user.UserPrivacySetting;
 import iuh.cnm.vnalo.core_service.model.entity.user.UserProfile;
-import iuh.cnm.vnalo.core_service.model.enums.Gender;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthAccountRepository;
 import iuh.cnm.vnalo.core_service.repository.user.UserPrivacySettingRepository;
 import iuh.cnm.vnalo.core_service.repository.user.UserProfileRepository;
@@ -99,14 +99,4 @@ public class UserService {
                 .isVerified(profile.getIsVerified())
                 .build();
     }
-
-    public record UpdateProfileRequest(
-            String displayName,
-            String avatarUrl,
-            String coverUrl,
-            String bio,
-            Gender gender,
-            LocalDate dob,
-            String statusMessage
-    ) {}
 }

@@ -2,6 +2,7 @@ package iuh.cnm.vnalo.core_service.service;
 
 import iuh.cnm.vnalo.core_service.exception.ApiException;
 import iuh.cnm.vnalo.core_service.exception.ErrorCode;
+import iuh.cnm.vnalo.core_service.model.dto.response.BlockedUserResponse;
 import iuh.cnm.vnalo.core_service.model.entity.social.BlockList;
 import iuh.cnm.vnalo.core_service.model.entity.user.UserProfile;
 import iuh.cnm.vnalo.core_service.repository.social.BlockListRepository;
@@ -14,7 +15,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.util.UUID;
 
 @Service
@@ -87,14 +87,4 @@ public class BlockService {
     public boolean hasBlockBetween(UUID userA, UUID userB) {
         return blockListRepository.existsBlockBetween(userA, userB);
     }
-
-    public record BlockedUserResponse(
-            UUID userId,
-            String displayName,
-            String avatarUrl,
-            Boolean blockMessages,
-            Boolean blockCalls,
-            Boolean blockAndHideLogs,
-            Instant blockedAt
-    ) {}
 }

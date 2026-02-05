@@ -81,11 +81,8 @@ public class AuthService {
                 .build();
         account = authAccountRepository.save(account);
 
-        // Create profile
-        UserProfile profile = UserProfile.builder()
-                .displayName(request.getDisplayName())
-                .build();
-        profile.setId(account.getId());
+        // Create profile with same ID as account (1:1 relationship)
+        UserProfile profile = UserProfile.createWithAccountId(account.getId(), request.getDisplayName());
         profile = userProfileRepository.save(profile);
 
         // Create default privacy settings

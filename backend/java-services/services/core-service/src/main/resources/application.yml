@@ -2,7 +2,7 @@ spring:
   application:
     name: core-service
   profiles:
-    active: dev
+    active: local
 
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:vnalo_core}
@@ -42,25 +42,32 @@ server:
   servlet:
     context-path: /api/v1
 
+# JWT Configuration - IMPORTANT: Set JWT_SECRET environment variable in production!
+# Generate a secure key: openssl rand -base64 64
 jwt:
-  secret: ${JWT_SECRET:dGhpcyBpcyBhIHZlcnkgc2VjdXJlIHNlY3JldCBrZXkgdGhhdCBpcyBhdCBsZWFzdCA1MTIgYml0cyBsb25nIGZvciBIUzUxMiBhbGdvcml0aG0gYW5kIHNob3VsZCBiZSBrZXB0IHNlY3JldA==}
-  issuer: vnalo
-  access-token-expiration: 86400000
-  refresh-token-expiration: 604800000
+  secret: ${JWT_SECRET:}
+  issuer: ${JWT_ISSUER:vnalo}
+  access-token-expiration: ${JWT_ACCESS_EXPIRATION:86400000}   # 24 hours
+  refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:604800000} # 7 days
 
 logging:
   level:
-    iuh.cnm.vnalo: DEBUG
+    iuh.cnm.vnalo: ${LOG_LEVEL:INFO}
+    org.springframework.security.config.annotation.authentication.configuration: ERROR
 
+# Firebase Configuration - Set FIREBASE_CREDENTIALS_PATH in production
 firebase:
   credentials:
-    path: iuh-cnm-vnalo-firebase-adminsdk-fbsvc-5008b7c5eb.json
+    path: ${FIREBASE_CREDENTIALS_PATH:iuh-cnm-vnalo-firebase-adminsdk-fbsvc-5008b7c5eb.json}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
 
 springdoc:
   api-docs:
@@ -101,6 +108,51 @@ spring:
 # Dev profile: OTP disabled for faster development
 otp:
   enabled: false
+
+# Dev profile: Use a default JWT secret (only for development!)
+jwt:
+  secret: ZGV2ZWxvcG1lbnQtb25seS1zZWNyZXQta2V5LWRvLW5vdC11c2UtaW4tcHJvZHVjdGlvbi10aGlzLWlzLWF0LWxlYXN0LTUxMi1iaXRzLWxvbmc=
+
+logging:
+  level:
+    iuh.cnm.vnalo: DEBUG
+
+---
+# Local profile: Use H2 in-memory database (no Docker required)
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: jdbc:h2:mem:vnalo_local;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create
+    show-sql: true
+  flyway:
+    enabled: false
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+otp:
+  enabled: false
+
+jwt:
+  secret: bG9jYWwtZGV2ZWxvcG1lbnQtb25seS1zZWNyZXQta2V5LWRvLW5vdC11c2UtaW4tcHJvZHVjdGlvbi10aGlzLWlzLWF0LWxlYXN0LTUxMi1iaXRzLWxvbmc=
+
+logging:
+  level:
+    iuh.cnm.vnalo: DEBUG
+    org.hibernate.SQL: DEBUG
 
 ---
 spring:

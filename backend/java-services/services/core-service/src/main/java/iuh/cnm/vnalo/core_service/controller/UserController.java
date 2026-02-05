@@ -1,5 +1,6 @@
 package iuh.cnm.vnalo.core_service.controller;
 
+import iuh.cnm.vnalo.core_service.model.dto.request.UpdateProfileRequest;
 import iuh.cnm.vnalo.core_service.model.dto.response.ApiResponse;
 import iuh.cnm.vnalo.core_service.model.dto.response.UserInfoResponse;
 import iuh.cnm.vnalo.core_service.model.entity.user.UserPrivacySetting;
@@ -7,6 +8,7 @@ import iuh.cnm.vnalo.core_service.security.UserPrincipal;
 import iuh.cnm.vnalo.core_service.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -45,7 +47,7 @@ public class UserController {
     @Operation(summary = "Update current user profile")
     public ResponseEntity<ApiResponse<UserInfoResponse>> updateProfile(
             @AuthenticationPrincipal UserPrincipal currentUser,
-            @RequestBody UserService.UpdateProfileRequest request) {
+            @Valid @RequestBody UpdateProfileRequest request) {
 
         UserInfoResponse response = userService.updateProfile(currentUser.getId(), request);
         return ResponseEntity.ok(ApiResponse.success("Profile updated", response));
