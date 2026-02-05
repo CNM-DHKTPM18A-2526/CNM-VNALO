@@ -305,41 +305,47 @@ graph TB
 
 ```bash
 # Required
-☑️  Java 21+
-☑️  Node.js 20+
+☑️  Java 21+ (JDK)
 ☑️  Docker & Docker Compose
 ☑️  Git
 
 # Optional (for mobile development)
+📱  Node.js 20+
 📱  Android Studio (for Android)
 🍎  Xcode (for iOS - macOS only)
 ```
 
-### ⚡ Installation
+### ⚡ Backend Setup (core-service)
 
 ```bash
 # 1. Clone the repository
 git clone https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO.git
 cd CNM-ZALO
 
-# 2. Start infrastructure services
-docker compose up -d
+# 2. Get Firebase credentials from team lead
+# Place file: backend/java-services/services/core-service/src/main/resources/
+# Filename: iuh-cnm-vnalo-firebase-adminsdk-fbsvc-5008b7c5eb.json
 
-# 3. Backend setup (coming soon)
-cd backend
-./gradlew clean build
-./gradlew bootRun
+# 3. Start Docker containers
+cd docker
+docker-compose up -d postgres redis
 
-# 4. Mobile app setup (coming soon)
-cd frontend/mobile
-npm install
+# 4. Build and run core-service
+cd ../backend/java-services/services/core-service
 
-# Run on Android
-npm run android
+# Windows
+.\mvnw.cmd clean install -DskipTests
+.\mvnw.cmd spring-boot:run
 
-# Run on iOS (macOS only)
-npm run ios
+# Linux/Mac
+./mvnw clean install -DskipTests
+./mvnw spring-boot:run
+
+# 5. Access Swagger UI
+# http://localhost:8081/api/v1/swagger-ui.html
 ```
+
+> **Note:** Dev profile có sẵn JWT secret mặc định, OTP disabled. Chỉ cần Firebase file là chạy được!
 
 ### 🐳 Docker Services
 
@@ -358,88 +364,69 @@ docker compose down -v && docker compose up -d
 ```
 
 **Available Services:**
-- PostgreSQL: `localhost:5432`
+- PostgreSQL: `localhost:5432` (database: vnalo_core)
 - Redis: `localhost:6379`
-- Kafka: `localhost:9092`
-- MinIO (S3): `localhost:9000`
 
 ---
 
 ## 📁 Project Structure
 
 ```
-cnm-zalo-clone/
-├── 📄 README.md                    # You are here
-├── 📄 docker-compose.yml           # Local development stack
+CNM-ZALO/
+├── 📄 README.md                    # English documentation
+├── 📄 README.vi.md                 # Vietnamese documentation
+├── 📄 CONTRIBUTING.md              # Contribution guidelines
 ├── 📄 .gitignore
 │
 ├── 📂 docs/                        # Documentation
-│   ├── OTT_AI_Agent_Project_Docs.md         # Main architecture docs
-│   └── OTT_Zalo_Database_Design_By_Service.md
+│   ├── VNALO_Project_Docs.md            # Main project documentation
+│   ├── VNALO_Complete_Database_Schema.md # Database schema
+│   ├── PROJECT_STRUCTURE_STANDARD.md    # Code conventions
+│   ├── TEAM_WORKLOAD_DISTRIBUTION.md    # Team assignments
+│   └── PROJECT_SUMMARY.md               # Project overview
 │
-├── 📂 backend/                     # Backend services
-│   ├── services/
-│   │   ├── auth-service/           # Authentication & JWT
-│   │   ├── user-service/           # User profiles
-│   │   ├── social-service/         # Friends & contacts
-│   │   ├── conversation-service/   # Chat rooms
-│   │   ├── message-service/        # Message persistence
-│   │   ├── media-service/          # File uploads
-│   │   ├── notification-service/   # Push notifications
-│   │   ├── analytics-service/      # Metrics & tracking
-│   │   └── ai-service/             # AI assistant
-│   ├── realtime-gateway/           # Netty WebSocket server
-│   ├── shared/                     # Shared libraries
-│   │   ├── common-dto/
-│   │   ├── common-security/
-│   │   └── common-kafka/
-│   └── build.gradle
+├── 📂 backend/
+│   ├── java-services/               # Spring Boot microservices
+│   │   ├── pom.xml                      # Parent POM
+│   │   ├── common/                      # Shared modules
+│   │   │   └── common-domain/           # Common entities
+│   │   └── services/
+│   │       └── core-service/            # ✅ Auth, Users, Social (READY)
+│   │           ├── src/main/java/
+│   │           ├── src/main/resources/
+│   │           └── pom.xml
+│   └── node-services/               # NestJS services (future)
+│       └── (realtime-gateway planned)
 │
-├── 📂 frontend/                    # Frontend applications
-│   ├── mobile/                     # React Native app
-│   │   ├── src/
-│   │   │   ├── screens/            # App screens
-│   │   │   ├── components/         # Reusable components
-│   │   │   ├── navigation/         # Navigation setup
-│   │   │   ├── stores/             # Zustand stores
-│   │   │   ├── services/           # API clients
-│   │   │   ├── hooks/              # Custom hooks
-│   │   │   └── utils/              # Utilities
-│   │   ├── android/
-│   │   ├── ios/
-│   │   └── package.json
-│   └── web/                        # Web app (future)
+├── 📂 docker/
+│   ├── docker-compose.yml           # PostgreSQL + Redis
+│   └── init-db.sql                  # Database initialization
 │
-├── 📂 k8s/                         # Kubernetes manifests
-│   ├── base/
-│   ├── staging/
-│   └── production/
+├── 📂 assets/                      # Project images
 │
-├── 📂 terraform/                   # Infrastructure as Code
-│   ├── modules/
-│   └── environments/
-│
-└── 📂 scripts/                     # Utility scripts
-    ├── setup-local.sh
-    └── seed-data.sh
+└── 📂 config/                      # Configuration files
 ```
 
 ---
 
 ## 🔧 Development
 
-### Backend Development
+### Backend Development (core-service)
 
 ```bash
-# Run single service
-cd backend/services/auth-service
-./gradlew bootRun
+cd backend/java-services/services/core-service
+
+# Build
+./mvnw clean install -DskipTests
+
+# Run (dev profile - default)
+./mvnw spring-boot:run
 
 # Run tests
-./gradlew test
+./mvnw test
 
 # Build Docker image
-docker build -t cnm-zalo/auth-service .
+docker build -t vnalo/core-service .
 ```
 
 ### Frontend Development
@@ -528,56 +515,21 @@ OLLAMA_BASE_URL=http://localhost:11434
 
 | Document | Description |
 |----------|-------------|
-| [📘 Project Documentation](docs/OTT_AI_Agent_Project_Docs.md) | Complete architecture & implementation guide |
-| [🗄️ Database Design](docs/OTT_Zalo_Database_Design_By_Service.md) | Schema design per service |
-| [🔌 API Reference](docs/API_REFERENCE.md) | REST & WebSocket API specs (coming soon) |
-| [📱 Mobile Guide](docs/MOBILE_GUIDE.md) | React Native development guide (coming soon) |
-| [🚀 Deployment Guide](docs/DEPLOYMENT.md) | AWS EKS deployment steps (coming soon) |
+| [📘 Project Documentation](docs/VNALO_Project_Docs.md) | Complete architecture & implementation guide |
+| [🗄️ Database Schema](docs/VNALO_Complete_Database_Schema.md) | Complete database schema design |
+| [📁 Project Structure](docs/PROJECT_STRUCTURE_STANDARD.md) | Code conventions & structure |
+| [👥 Team Workload](docs/TEAM_WORKLOAD_DISTRIBUTION.md) | Team assignments |
 
 ---
 
-## 🗺️ Roadmap
+## ✅ Current Status
 
-<div align="center">
-
-### Development Timeline
-
-| Phase | Timeline | Status | Features |
-|-------|----------|--------|----------|
-| **Phase 1** | Weeks 1-4 | ✅ Completed | Project setup, Auth, User profiles |
-| **Phase 2** | Weeks 5-8 | 🔄 In Progress | Social graph, Conversations |
-| **Phase 3** | Weeks 9-12 | 📅 Planned | Real-time messaging, WebSocket |
-| **Phase 4** | Weeks 13-16 | 📅 Planned | Media sharing, Groups |
-| **Phase 5** | Weeks 17-20 | 📅 Planned | Notifications, AI assistant |
-| **Phase 6** | Weeks 21-24 | 📅 Planned | Testing, Production deployment |
-
-</div>
-
-### 🎯 Feature Progress
-
-- [x] Project architecture & documentation
-- [x] Database schema design
-- [ ] **Phase 2** (Current)
-  - [ ] Auth Service (Firebase + JWT)
-  - [ ] User Service (Profile CRUD)
-  - [ ] Social Service (Friends, Contacts)
-  - [ ] Conversation Service
-- [ ] **Phase 3**
-  - [ ] Netty WebSocket Gateway
-  - [ ] Message Service (Cassandra)
-  - [ ] Real-time 1:1 chat
-- [ ] **Phase 4**
-  - [ ] Group chat functionality
-  - [ ] Media Service (S3 uploads)
-  - [ ] Image/Video sharing
-- [ ] **Phase 5**
-  - [ ] Push notifications (FCM)
-  - [ ] AI assistant (Gemini + Ollama)
-  - [ ] Analytics dashboard
-- [ ] **Future**
-  - [ ] Voice/Video calls (WebRTC)
-  - [ ] End-to-end encryption
-  - [ ] Stories feature
+| Service | Status | Features |
+|---------|--------|----------|
+| **core-service** | ✅ Ready | Auth (register, login, logout), User profiles, Friend management, Block list |
+| **messaging-service** | 🚧 Next | Conversations, Messages |
+| **media-service** | 📅 Planned | File uploads, Cloudinary |
+| **realtime-gateway** | 📅 Planned | WebSocket, Real-time delivery |
 
 ---
 
