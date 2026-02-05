@@ -46,6 +46,12 @@ public class BlockList {
     @Builder.Default
     private Boolean blockAndHideLogs = false;
 
+    @Column(name = "reason", length = 30)
+    private String reason;
+
+    @Column(name = "note", length = 200)
+    private String note;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

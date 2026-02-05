@@ -49,9 +49,20 @@ public class UserProfile extends BaseEntity {
     @Column(name = "qr_code_url", length = 500)
     private String qrCodeUrl;
 
+    @Column(name = "region", length = 100)
+    private String region;
+
     @Column(name = "is_verified")
     @Builder.Default
     private Boolean isVerified = false;
+
+    @Column(name = "is_official_account")
+    @Builder.Default
+    private Boolean isOfficialAccount = false;
+
+    @Column(name = "follower_count")
+    @Builder.Default
+    private Integer followerCount = 0;
 
     public String getAvatarUrlOrDefault() {
         return avatarUrl != null ? avatarUrl : "/assets/default-avatar.png";

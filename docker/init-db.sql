@@ -19,4 +19,4 @@ GRANT ALL PRIVILEGES ON SCHEMA moderation TO postgres;
 GRANT ALL PRIVILEGES ON SCHEMA analytics TO postgres;
 
 -- Set default schema search path
-ALTER DATABASE ott_zalo SET search_path TO auth, users, social, messaging, media, content, moderation, analytics, public;
+ALTER DATABASE vnalo_core SET search_path TO auth, users, social, messaging, media, content, moderation, analytics, public;

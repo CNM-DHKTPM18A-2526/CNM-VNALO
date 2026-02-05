@@ -1,7 +1,7 @@
 # VNALO - AI Agent Project Documentation
 
-> **Version**: 2.1  
-> **Last Updated**: February 4, 2026  
+> **Version**: 2.2  
+> **Last Updated**: February 5, 2026  
 > **Project**: VNALO - Enterprise Real-Time Messaging Platform  
 > **Package**: `iuh.cnm.vnalo`
 
@@ -399,6 +399,16 @@ http://localhost:8081/api/v1/swagger-ui.html
 
 ## Changelog
 
+### v2.2 (February 5, 2026)
+- ✅ Added Flyway migrations V3-V6:
+  - V3: auth_account enhancements (firebase_uid, locked_until, failed_login_count)
+  - V4: auth_refresh_token device info (platform, ip_address, user_agent)
+  - V5: social enhancements (block reason/note, friendship favorites/hidden)
+  - V6: user_profile enhancements (region, is_official_account, follower_count)
+- ✅ Updated Docker to VNALO naming convention
+- ✅ Replaced RabbitMQ with Kafka in docker-compose.yml
+- ✅ Updated VNALO_Complete_Database_Schema.md with Option A (current implementation)
+
 ### v2.1 (February 4, 2026)
 - ✅ Added OTP system with toggle feature (OtpConfig, OtpService)
 - ✅ Added 2 new auth endpoints (/register/send-otp, /otp/status)
@@ -414,4 +424,4 @@ http://localhost:8081/api/v1/swagger-ui.html
 
 **End of Document**
 
-> Version: 2.1 | Last Updated: February 4, 2026
+> Version: 2.2 | Last Updated: February 5, 2026

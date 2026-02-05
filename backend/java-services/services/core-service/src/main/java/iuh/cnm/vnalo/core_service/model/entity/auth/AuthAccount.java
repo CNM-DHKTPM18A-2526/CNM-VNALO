@@ -9,7 +9,8 @@ import java.time.Instant;
 
 @Entity
 @Table(name = "auth_account", indexes = {
-    @Index(name = "idx_auth_account_phone", columnList = "phone")
+    @Index(name = "idx_auth_account_phone", columnList = "phone"),
+    @Index(name = "idx_auth_account_status", columnList = "status")
 })
 @Getter
 @Setter
@@ -20,6 +21,9 @@ public class AuthAccount extends BaseEntity {
 
     @Column(name = "phone", unique = true, nullable = false, length = 20)
     private String phone;
+
+    @Column(name = "firebase_uid", unique = true, length = 128)
+    private String firebaseUid;
 
     @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash;
@@ -32,18 +36,51 @@ public class AuthAccount extends BaseEntity {
     @Builder.Default
     private AccountStatus status = AccountStatus.PENDING_VERIFICATION;
 
+    @Column(name = "locked_until")
+    private Instant lockedUntil;
+
+    @Column(name = "failed_login_count")
+    @Builder.Default
+    private Integer failedLoginCount = 0;
+
     @Column(name = "last_login_at")
     private Instant lastLoginAt;
 
+    @Column(name = "last_login_device_id", length = 100)
+    private String lastLoginDeviceId;
+
     public boolean isLocked() {
-        return status == AccountStatus.LOCKED || status == AccountStatus.DISABLED;
+        if (status == AccountStatus.LOCKED || status == AccountStatus.DISABLED) {
+            return true;
+        }
+        // Check if temporary lock is still active
+        if (lockedUntil != null && Instant.now().isBefore(lockedUntil)) {
+            return true;
+        }
+        return false;
     }
 
     public boolean isActive() {
-        return status == AccountStatus.ACTIVE;
+        return status == AccountStatus.ACTIVE && !isLocked();
     }
 
     public void onLoginSuccess() {
         this.lastLoginAt = Instant.now();
+        this.failedLoginCount = 0;
+    }
+
+    public void onLoginSuccess(String deviceId) {
+        this.lastLoginAt = Instant.now();
+        this.lastLoginDeviceId = deviceId;
+        this.failedLoginCount = 0;
+    }
+
+    public void onLoginFailed() {
+        this.failedLoginCount = (failedLoginCount == null ? 0 : failedLoginCount) + 1;
+    }
+
+    public void lock(Instant until) {
+        this.status = AccountStatus.LOCKED;
+        this.lockedUntil = until;
     }
 }

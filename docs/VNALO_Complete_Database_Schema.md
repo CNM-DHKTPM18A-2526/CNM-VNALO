@@ -131,20 +131,23 @@ CREATE INDEX idx_profile_verified ON user_profile(is_verified) WHERE is_verified
 ```
 
 ### 2.2 `user_privacy_setting`
+
+> **Note**: Updated to match core-service implementation (Option A - Zalo-like granular controls)
+
 ```sql
 CREATE TABLE user_privacy_setting (
     user_id UUID PRIMARY KEY,
-    allow_search_by_phone BOOLEAN DEFAULT TRUE,
-    allow_search_by_qr BOOLEAN DEFAULT TRUE,
-    allow_stranger_message BOOLEAN DEFAULT FALSE,
-    allow_friend_request BOOLEAN DEFAULT TRUE,
+    display_birthday VARCHAR(20) DEFAULT 'DAY_MONTH',
+    birthday_notification_enabled BOOLEAN DEFAULT TRUE,
     show_online_status BOOLEAN DEFAULT TRUE,
-    last_seen_visibility VARCHAR(20) DEFAULT 'FRIENDS' CHECK (last_seen_visibility IN ('EVERYONE', 'FRIENDS', 'NOBODY')),
-    story_visibility VARCHAR(20) DEFAULT 'FRIENDS' CHECK (story_visibility IN ('EVERYONE', 'FRIENDS', 'CUSTOM', 'CLOSE_FRIENDS')),
-    timeline_visibility VARCHAR(20) DEFAULT 'FRIENDS' CHECK (timeline_visibility IN ('EVERYONE', 'FRIENDS', 'ONLY_ME')),
-    allow_add_to_group VARCHAR(20) DEFAULT 'FRIENDS' CHECK (allow_add_to_group IN ('EVERYONE', 'FRIENDS', 'NOBODY')),
-    allow_voice_call VARCHAR(20) DEFAULT 'FRIENDS' CHECK (allow_voice_call IN ('EVERYONE', 'FRIENDS', 'NOBODY')),
-    allow_video_call VARCHAR(20) DEFAULT 'FRIENDS' CHECK (allow_video_call IN ('EVERYONE', 'FRIENDS', 'NOBODY')),
+    allow_messaging BOOLEAN DEFAULT TRUE,
+    allow_calling VARCHAR(20) DEFAULT 'EVERYONE',
+    allow_seen_and_comment VARCHAR(20) DEFAULT 'EVERYONE',
+    allow_friend_request_by_phone BOOLEAN DEFAULT TRUE,
+    allow_friend_request_by_qr_code BOOLEAN DEFAULT TRUE,
+    allow_friend_request_by_shared_group BOOLEAN DEFAULT TRUE,
+    allow_friend_request_by_bio BOOLEAN DEFAULT TRUE,
+    allow_friend_request_by_suggestion BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
