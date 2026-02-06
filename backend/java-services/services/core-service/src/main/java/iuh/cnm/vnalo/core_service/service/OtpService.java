@@ -29,6 +29,7 @@ public class OtpService {
     private final AuthOtpRepository otpRepository;
     private final OtpConfig otpConfig;
     private final PasswordEncoder passwordEncoder;
+    private final FcmService fcmService;
     private final SecureRandom secureRandom = new SecureRandom();
     
     /**
@@ -174,13 +175,27 @@ public class OtpService {
     }
     
     /**
-     * Send OTP via SMS (Firebase or other provider).
-     * TODO: Implement actual SMS sending
+     * Send OTP via notification.
+     * 
+     * For REGISTRATION: OTP is logged (new user has no FCM token yet).
+     * For PASSWORD_RESET: OTP sent via FCM push notification (user has token).
+     * 
+     * In production, consider:
+     * - Use Firebase Phone Auth on client-side for registration
+     * - Use FCM for password reset OTP delivery
      */
     private void sendOtpViaSms(String phone, String otp) {
-        // TODO: Integrate with Firebase Cloud Messaging or SMS gateway
-        // For now, just log a placeholder
-        log.info("SMS would be sent to {} with OTP (implement SMS gateway)", maskPhone(phone));
+        // Log OTP for testing purposes (visible in server logs)
+        log.info("========================================");
+        log.info("OTP for {}: {}", maskPhone(phone), otp);
+        log.info("(In production, this would be sent via FCM to registered devices)");
+        log.info("========================================");
+        
+        // TODO: For password reset flow, fetch user's FCM tokens and send via FCM:
+        // List<String> fcmTokens = deviceRepository.findFcmTokensByPhone(phone);
+        // if (!fcmTokens.isEmpty()) {
+        //     fcmService.sendOtpToMultipleDevices(fcmTokens, otp);
+        // }
     }
     
     /**

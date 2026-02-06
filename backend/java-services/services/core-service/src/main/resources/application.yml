@@ -108,9 +108,13 @@ spring:
     exclude:
       - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
 
-# Dev: OTP disabled for faster development
+# Dev: OTP disabled for faster development (set OTP_ENABLED=true to test)
 otp:
   enabled: false
+  test-mode:
+    enabled: true      # Use mock OTP "123456" when testing
+    mock-otp: "123456"
+    log-otp: true
 
 # Dev: Default JWT secret (only for development!)
 jwt:
