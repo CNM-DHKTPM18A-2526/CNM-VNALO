@@ -57,6 +57,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getServletPath();
+        // /auth/logout-all requires authentication, so do NOT skip JWT filter for it
+        if (path.equals("/auth/logout-all")) {
+            return false;
+        }
         return path.startsWith("/auth/") || path.startsWith("/swagger-ui")
                || path.startsWith("/v3/api-docs") || path.startsWith("/actuator/health");
     }

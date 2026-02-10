@@ -27,6 +27,12 @@ public interface FriendRequestRepository extends JpaRepository<FriendRequest, UU
 
     Page<FriendRequest> findByUserIdFromOrderByCreatedAtDesc(UUID userIdFrom, Pageable pageable);
 
+    Page<FriendRequest> findByUserIdFromAndStatusOrderByCreatedAtDesc(UUID userIdFrom, FriendRequestStatus status, Pageable pageable);
+
+    default Page<FriendRequest> findPendingSentRequests(UUID userId, Pageable pageable) {
+        return findByUserIdFromAndStatusOrderByCreatedAtDesc(userId, FriendRequestStatus.PENDING, pageable);
+    }
+
     default Page<FriendRequest> findPendingRequestsToUser(UUID userId, Pageable pageable) {
         return findByUserIdToAndStatusOrderByCreatedAtDesc(userId, FriendRequestStatus.PENDING, pageable);
     }

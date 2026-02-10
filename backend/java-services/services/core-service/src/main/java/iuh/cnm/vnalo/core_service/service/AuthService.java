@@ -72,12 +72,16 @@ public class AuthService {
             log.info("OTP verification skipped (disabled in config)");
         }
 
-        // Create account
+        // Create account - status depends on OTP verification
+        AccountStatus initialStatus = otpConfig.shouldSkipOtp() 
+                ? AccountStatus.ACTIVE 
+                : AccountStatus.ACTIVE; // OTP already verified at this point
+        
         AuthAccount account = AuthAccount.builder()
                 .phone(request.getPhone())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .passwordUpdatedAt(Instant.now())
-                .status(AccountStatus.ACTIVE)
+                .status(initialStatus)
                 .build();
         account = authAccountRepository.save(account);
 
@@ -100,16 +104,26 @@ public class AuthService {
 
     @Transactional
     public AuthResponse login(LoginRequest request, HttpServletRequest httpRequest) {
+        // Pre-check: find account and check lock status
+        AuthAccount account = authAccountRepository.findByPhone(request.getIdentifier())
+                .orElseThrow(() -> new ApiException(ErrorCode.AUTH_INVALID_CREDENTIALS));
+
+        if (account.isLocked()) {
+            throw new ApiException(ErrorCode.AUTH_ACCOUNT_LOCKED);
+        }
+
+        if (!account.isActive()) {
+            throw new ApiException(ErrorCode.AUTH_ACCOUNT_DISABLED);
+        }
+
         try {
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.getIdentifier(), request.getPassword())
             );
 
             UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
-            AuthAccount account = authAccountRepository.findById(userPrincipal.getId())
-                    .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
 
-            account.onLoginSuccess();
+            account.onLoginSuccess(request.getDeviceId());
             authAccountRepository.save(account);
 
             UserProfile profile = userProfileRepository.findById(account.getId())
@@ -124,6 +138,14 @@ public class AuthService {
 
             return buildAuthResponse(accessToken, refreshToken, account, profile);
         } catch (BadCredentialsException e) {
+            // Track failed login attempt
+            account.onLoginFailed();
+            // Auto-lock after 5 consecutive failures
+            if (account.getFailedLoginCount() >= 5) {
+                account.lock(Instant.now().plusSeconds(1800)); // Lock for 30 minutes
+                log.warn("Account {} locked after {} failed attempts", account.getId(), account.getFailedLoginCount());
+            }
+            authAccountRepository.save(account);
             throw new ApiException(ErrorCode.AUTH_INVALID_CREDENTIALS);
         }
     }
