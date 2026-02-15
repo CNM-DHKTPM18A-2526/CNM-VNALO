@@ -1,0 +1,8 @@
+package iuh.cnm.vnalo.messagingservice.model.enums.notification;
+
+public enum NotificationType {
+    MESSAGE, FRIEND_REQUEST, FRIEND_ACCEPTED, GROUP_INVITE,
+    MENTION, REACTION, STORY_VIEW, STORY_REACTION, STORY_REPLY,
+    CALL_MISSED, TIMELINE_LIKE, TIMELINE_COMMENT, TIMELINE_TAG,
+    SYSTEM, PROMOTION
+}
