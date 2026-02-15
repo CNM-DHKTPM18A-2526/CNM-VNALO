@@ -70,5 +70,5 @@
 
 | Service | Suites | Tests | Status |
 |---------|--------|-------|--------|
-| core-service | 4 | ~20 | ✅ Pass |
+| core-service | 5 | 44 | ✅ Pass |
 | message-service | 2 | 18 | ✅ Pass (verified 2026-02-15) |

@@ -131,17 +131,37 @@ Base path: `/api/v1`
 
 ## WebSocket Events (Socket.IO)
 
-Connection: `ws://localhost:8082` with JWT in handshake auth.
+Connection: `ws://localhost:8082/chat` with JWT in handshake `auth.token`.
 
-| Event | Direction | Payload |
-|-------|-----------|---------|
-| `send_message` | Client → Server | `{ conversationId, content, messageType, clientMessageId }` |
-| `new_message` | Server → Client | Full message object |
-| `typing_start` | Client → Server | `{ conversationId }` |
-| `typing_stop` | Client → Server | `{ conversationId }` |
-| `user_typing` | Server → Client | `{ conversationId, userId, isTyping }` |
-| `join_conversation` | Client → Server | `{ conversationId }` |
-| `presence` | Server → Client | `{ userId, status }` |
+Namespace: `/chat` — Transports: `websocket`, `polling`
+
+### Client → Server Events
+
+| Event | Payload | Response Event | Description |
+|-------|---------|---------------|-------------|
+| `conversation.join` | `{ conversationId }` | `conversation.joined` | Join a conversation room |
+| `conversation.leave` | `{ conversationId }` | — | Leave a conversation room |
+| `message.send` | `{ conversationId, content, messageType, clientMessageId }` | `message.sent` / `message.error` | Send message (persisted + broadcast) |
+| `message.typing` | `{ conversationId, isTyping }` | — | Typing indicator (broadcast to room) |
+| `message.read` | `{ conversationId, lastReadSeq }` | — | Mark messages as read |
+
+### Server → Client Events
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `message.received` | Full message object | New message in a joined room |
+| `message.typing` | `{ userId, conversationId, isTyping }` | Someone is typing |
+| `message.read` | `{ userId, conversationId, lastReadSeq }` | Read receipt from another user |
+| `presence.changed` | `{ userId, status: 'online'/'offline' }` | User presence change |
+
+### Connection Flow
+
+1. Client connects to `/chat` namespace with `auth: { token: '<JWT>' }`
+2. Server verifies JWT, tracks socket per userId (multi-device support)
+3. Server broadcasts `presence.changed` with `status: 'online'`
+4. Client emits `conversation.join` for each active conversation
+5. Client sends/receives messages via room-scoped events
+6. On disconnect, server broadcasts `presence.changed` with `status: 'offline'`
 
 ---
 

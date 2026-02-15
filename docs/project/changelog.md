@@ -12,6 +12,31 @@ _No unreleased changes._
 
 ---
 
+## [2026-02-16] — Documentation Audit & Corrections
+
+### Fixed
+- **README.md**: Complete rewrite — fixed 30+ discrepancies between documentation and actual project
+  - messaging-service: "Spring Boot" → NestJS 11 (TypeScript)
+  - Frontend: "React Native 0.76+" → Flutter 3.x / Dart 3.x
+  - WebSocket: "Netty 4.1" → Socket.IO via NestJS
+  - Database: Removed non-existent Cassandra/ScyllaDB references → PostgreSQL only
+  - Removed non-existent services: AI, Spring Cloud Gateway, Elasticsearch
+  - Kafka: "Core event streaming" → optional Docker profile only
+  - Version badges: Spring Boot 3.2→3.4, NestJS 10→11, PostgreSQL 15→16
+  - Status: messaging-service "🚧 Next" → ✅ Complete
+  - Environment variables: Removed non-existent KAFKA/S3/GEMINI/OLLAMA vars
+  - Database name: "cnm_zalo" → "vnalo_core"
+  - Documentation links: Updated from deleted files to new `docs/` structure
+  - Architecture diagrams: Replaced incorrect Netty/Kafka/Cassandra flow with accurate Socket.IO/PostgreSQL flow
+- **api-reference.md**: Corrected WebSocket events to match actual ChatGateway implementation
+  - `send_message` → `message.send`, `new_message` → `message.received`, etc.
+  - Added connection flow documentation and namespace info (`/chat`)
+- **status.md**: Fixed core-service test count from "~20" to 44 (5 suites)
+- **README.md**: Added missing content-service, moderation-service, analytics-service to service tables
+- **README.md**: Fixed team member responsibilities to match team-assignment.md
+
+---
+
 ## [2026-02-15] — QR Module, Contact Sync, Message Search
 
 ### Added
