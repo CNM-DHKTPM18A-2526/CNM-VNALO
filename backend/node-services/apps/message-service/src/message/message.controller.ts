@@ -9,6 +9,7 @@ import { EditMessageDto } from '../dto/edit-message.dto';
 import { MessageReactionDto } from '../dto/message-reaction.dto';
 import { MarkReadDto } from '../dto/mark-read.dto';
 import { PaginationDto } from '../dto/pagination.dto';
+import { SearchMessagesDto } from '../dto/search-messages.dto';
 
 @Controller()
 @UseGuards(JwtAuthGuard)
@@ -29,6 +30,18 @@ export class MessageController {
     @Query() pagination: PaginationDto,
   ) {
     return this.messageService.getMessages(id, user.userId, pagination.before, pagination.limit);
+  }
+
+  /** Search messages in a conversation by keyword and/or media type. */
+  @Get('conversations/:id/messages/search')
+  searchMessages(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Query() search: SearchMessagesDto,
+  ) {
+    return this.messageService.searchMessages(
+      id, user.userId, search.keyword, search.messageType, search.limit, search.offset,
+    );
   }
 
   @Patch('messages/:id')

@@ -118,6 +118,42 @@ export class MessageService {
     });
   }
 
+  /**
+   * Search messages in a conversation by keyword and/or media type.
+   * Supports text content search (case-insensitive) and message type filtering.
+   */
+  async searchMessages(
+    conversationId: string,
+    userId: string,
+    keyword?: string,
+    messageType?: MessageType,
+    limit = 50,
+    offset = 0,
+  ) {
+    await this.conversationService.assertMember(conversationId, userId);
+
+    const qb = this.messageRepo
+      .createQueryBuilder('m')
+      .where('m.conversation_id = :cid', { cid: conversationId })
+      .andWhere('m.status != :recalled', { recalled: MessageStatus.RECALLED });
+
+    if (keyword) {
+      qb.andWhere('m.content ILIKE :keyword', { keyword: `%${keyword}%` });
+    }
+
+    if (messageType) {
+      qb.andWhere('m.message_type = :type', { type: messageType });
+    }
+
+    qb.orderBy('m.server_seq', 'DESC')
+      .skip(offset)
+      .take(Math.min(limit, 100));
+
+    const [items, total] = await qb.getManyAndCount();
+    return { items, total, limit, offset };
+  }
+
+
   /** Edit a message. Only the sender can edit, and only text content. */
   async editMessage(userId: string, messageId: string, content: string): Promise<Message> {
     const message = await this.findMessageOrFail(messageId);
