@@ -518,10 +518,14 @@ OLLAMA_BASE_URL=http://localhost:11434
 
 | Document | Description |
 |----------|-------------|
-| [📘 Project Documentation](docs/VNALO_Project_Docs.md) | Complete architecture & implementation guide |
-| [🗄️ Database Schema](docs/VNALO_Complete_Database_Schema.md) | Complete database schema design |
-| [📁 Project Structure](docs/PROJECT_STRUCTURE_STANDARD.md) | Code conventions & structure |
-| [👥 Team Workload](docs/TEAM_WORKLOAD_DISTRIBUTION.md) | Team assignments |
+| [📘 Documentation Index](docs/README.md) | Complete documentation index |
+| [🏗️ Architecture](docs/system/architecture.md) | System architecture & service map |
+| [🗄️ Database Schema](docs/system/database-schema.md) | Complete database schema design |
+| [📡 API Reference](docs/system/api-reference.md) | All REST endpoints & WebSocket events |
+| [📋 Changelog](docs/project/changelog.md) | Version history & notable changes |
+| [📊 Status](docs/project/status.md) | Current implementation status |
+| [👥 Team Assignment](docs/project/team-assignment.md) | Team task distribution |
+| [📝 Contributing](docs/contributing.md) | Code standards & conventions |
 
 ---
 

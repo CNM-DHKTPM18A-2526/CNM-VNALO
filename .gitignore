@@ -1,9 +1,19 @@
 # ===========================
 # Operating System Files
 # ===========================
-docs/
 
-.md
+# Documentation structure:
+# docs/system/   → tracked (architecture, schema, api reference)
+# docs/project/  → tracked (team assignment, changelog, status)
+# docs/guides/   → local only (learning materials, implementation guides)
+# docs/mobile/   → local only
+# docs/diagrams/ → local only
+docs/guides/
+docs/mobile/
+docs/diagrams/
+docs/*.md
+!docs/README.md
+!docs/contributing.md
 
 # Visual Paradigm files
 *.vpp
