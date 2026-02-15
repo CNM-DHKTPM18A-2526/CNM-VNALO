@@ -155,7 +155,7 @@ public class FriendService {
                 .orElseThrow(() -> new ApiException(ErrorCode.SOCIAL_REQUEST_NOT_FOUND));
 
         if (!request.getUserIdFrom().equals(userId)) {
-            throw new ApiException(ErrorCode.SOCIAL_NOT_REQUEST_RECIPIENT);
+            throw new ApiException(ErrorCode.SOCIAL_NOT_REQUEST_SENDER);
         }
 
         if (!request.isPending()) {
@@ -174,7 +174,7 @@ public class FriendService {
 
     @Transactional(readOnly = true)
     public Page<FriendRequestResponse> getSentRequests(UUID userId, Pageable pageable) {
-        return friendRequestRepository.findByUserIdFromOrderByCreatedAtDesc(userId, pageable)
+        return friendRequestRepository.findPendingSentRequests(userId, pageable)
                 .map(this::mapToFriendRequestResponse);
     }
 
@@ -220,6 +220,7 @@ public class FriendService {
                 .toUserDisplayName(toUser != null ? toUser.getDisplayName() : null)
                 .toUserAvatarUrl(toUser != null ? toUser.getAvatarUrl() : null)
                 .message(request.getMessage())
+                .source(request.getSource())
                 .status(request.getStatus())
                 .createdAt(request.getCreatedAt())
                 .respondedAt(request.getRespondedAt())

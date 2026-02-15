@@ -179,10 +179,10 @@ class AuthServiceTest {
             UserPrincipal userPrincipal = UserPrincipal.create(testAccount);
             Authentication authentication = mock(Authentication.class);
             
+            when(authAccountRepository.findByPhone("+84912345678")).thenReturn(Optional.of(testAccount));
             when(authentication.getPrincipal()).thenReturn(userPrincipal);
             when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
                 .thenReturn(authentication);
-            when(authAccountRepository.findById(testAccountId)).thenReturn(Optional.of(testAccount));
             when(userProfileRepository.findById(testAccountId)).thenReturn(Optional.of(testProfile));
             when(authAccountRepository.save(any(AuthAccount.class))).thenReturn(testAccount);
             when(jwtTokenProvider.generateAccessToken(any(UserPrincipal.class))).thenReturn("accessToken");
@@ -209,14 +209,17 @@ class AuthServiceTest {
                     .password("wrongPassword")
                     .build();
             
+            when(authAccountRepository.findByPhone("+84912345678")).thenReturn(Optional.of(testAccount));
             when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
                 .thenThrow(new BadCredentialsException("Bad credentials"));
+            when(authAccountRepository.save(any(AuthAccount.class))).thenReturn(testAccount);
 
             // When & Then
             ApiException exception = assertThrows(ApiException.class, 
                 () -> authService.login(request, httpRequest));
             
             assertEquals(ErrorCode.AUTH_INVALID_CREDENTIALS, exception.getErrorCode());
+            verify(authAccountRepository).save(any(AuthAccount.class)); // saves failed login count
         }
     }
 

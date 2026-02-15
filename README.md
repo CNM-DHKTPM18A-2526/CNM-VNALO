@@ -137,9 +137,8 @@
 ### Frontend & Mobile
 
 <p>
-<img src="https://img.shields.io/badge/React_Native-0.76-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React Native">
-<img src="https://img.shields.io/badge/TypeScript-5.0-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
-<img src="https://img.shields.io/badge/TailwindCSS-3.0-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="TailwindCSS">
+<img src="https://img.shields.io/badge/Flutter-3.0-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter">
+<img src="https://img.shields.io/badge/Dart-3.0-0175C2?style=for-the-badge&logo=dart&logoColor=white" alt="Dart">
 </p>
 
 ### DevOps & Infrastructure
@@ -378,12 +377,7 @@ CNM-ZALO/
 ├── 📄 CONTRIBUTING.md              # Contribution guidelines
 ├── 📄 .gitignore
 │
-├── 📂 docs/                        # Documentation
-│   ├── VNALO_Project_Docs.md            # Main project documentation
-│   ├── VNALO_Complete_Database_Schema.md # Database schema
-│   ├── PROJECT_STRUCTURE_STANDARD.md    # Code conventions
-│   ├── TEAM_WORKLOAD_DISTRIBUTION.md    # Team assignments
-│   └── PROJECT_SUMMARY.md               # Project overview
+├── 📂 docs/                        # Project documentation
 │
 ├── 📂 backend/
 │   ├── java-services/               # Spring Boot microservices
@@ -392,11 +386,13 @@ CNM-ZALO/
 │   │   │   └── common-domain/           # Common entities
 │   │   └── services/
 │   │       └── core-service/            # ✅ Auth, Users, Social (READY)
-│   │           ├── src/main/java/
-│   │           ├── src/main/resources/
-│   │           └── pom.xml
-│   └── node-services/               # NestJS services (future)
-│       └── (realtime-gateway planned)
+│   │           └── src/main/
+│   │
+│   └── node-services/               # NestJS services
+│       └── messaging-workspace/     # NestJS monorepo
+│           ├── apps/
+│           │   └── message-service/ # 🔧 Real-time messaging (IN PROGRESS)
+│           └── package.json
 │
 ├── 📂 docker/
 │   ├── docker-compose.yml           # PostgreSQL + Redis
@@ -407,7 +403,6 @@ CNM-ZALO/
 │       ├── lib/                     # Dart source code
 │       ├── android/                 # Android platform
 │       ├── ios/                     # iOS platform
-│       ├── web/                     # Web platform
 │       └── pubspec.yaml             # Dependencies
 │
 ├── 📂 assets/                      # Project images
@@ -437,22 +432,22 @@ cd backend/java-services/services/core-service
 docker build -t vnalo/core-service .
 ```
 
-### Frontend Development
+### Frontend Development (Flutter)
 
 ```bash
 cd frontend/mobile
 
-# Start Metro bundler
-npm start
+# Get dependencies
+flutter pub get
+
+# Run on Android/iOS
+flutter run
 
 # Run on specific device
-npm run android -- --deviceId=<device_id>
+flutter run -d <device_id>
 
-# Debug mode
-npm run android -- --variant=debug
-
-# Build release
-npm run android -- --variant=release
+# Build APK
+flutter build apk --release
 ```
 
 ### Database Migrations
@@ -523,10 +518,14 @@ OLLAMA_BASE_URL=http://localhost:11434
 
 | Document | Description |
 |----------|-------------|
-| [📘 Project Documentation](docs/VNALO_Project_Docs.md) | Complete architecture & implementation guide |
-| [🗄️ Database Schema](docs/VNALO_Complete_Database_Schema.md) | Complete database schema design |
-| [📁 Project Structure](docs/PROJECT_STRUCTURE_STANDARD.md) | Code conventions & structure |
-| [👥 Team Workload](docs/TEAM_WORKLOAD_DISTRIBUTION.md) | Team assignments |
+| [📘 Documentation Index](docs/README.md) | Complete documentation index |
+| [🏗️ Architecture](docs/system/architecture.md) | System architecture & service map |
+| [🗄️ Database Schema](docs/system/database-schema.md) | Complete database schema design |
+| [📡 API Reference](docs/system/api-reference.md) | All REST endpoints & WebSocket events |
+| [📋 Changelog](docs/project/changelog.md) | Version history & notable changes |
+| [📊 Status](docs/project/status.md) | Current implementation status |
+| [👥 Team Assignment](docs/project/team-assignment.md) | Team task distribution |
+| [📝 Contributing](docs/contributing.md) | Code standards & conventions |
 
 ---
 

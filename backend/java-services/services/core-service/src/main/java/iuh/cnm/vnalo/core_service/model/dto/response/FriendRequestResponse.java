@@ -1,6 +1,7 @@
 package iuh.cnm.vnalo.core_service.model.dto.response;
 
 import iuh.cnm.vnalo.core_service.model.enums.FriendRequestStatus;
+import iuh.cnm.vnalo.core_service.model.enums.FriendshipSource;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -26,6 +27,7 @@ public class FriendRequestResponse {
     private String toUserDisplayName;
     private String toUserAvatarUrl;
     private String message;
+    private FriendshipSource source;
     private FriendRequestStatus status;
     private Instant createdAt;
     private Instant respondedAt;
