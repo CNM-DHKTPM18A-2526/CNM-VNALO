@@ -3,7 +3,7 @@ import {
   BadRequestException, ConflictException, Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, IsNull } from 'typeorm';
 import { Conversation, ConversationType, ConversationStatus } from '../entities/conversation.entity';
 import { ConversationMember, MemberRole } from '../entities/conversation-member.entity';
 import { ConversationDirectMap } from '../entities/conversation-direct-map.entity';
@@ -118,7 +118,7 @@ export class ConversationService {
     await this.assertMember(conversationId, userId);
 
     const members = await this.memberRepo.find({
-      where: { conversationId, leftAt: undefined },
+      where: { conversationId, leftAt: IsNull() },
     });
 
     return { ...conversation, members };
@@ -156,7 +156,7 @@ export class ConversationService {
     for (const memberId of memberIds) {
       // Skip if already a member
       const exists = await this.memberRepo.findOne({
-        where: { conversationId, userId: memberId, leftAt: undefined },
+        where: { conversationId, userId: memberId, leftAt: IsNull() },
       });
       if (!exists) {
         newMembers.push({
@@ -205,7 +205,7 @@ export class ConversationService {
   /** Get active members of a conversation. */
   async getMembers(conversationId: string) {
     return this.memberRepo.find({
-      where: { conversationId, leftAt: undefined },
+      where: { conversationId, leftAt: IsNull() },
       order: { joinedAt: 'ASC' },
     });
   }
@@ -213,7 +213,7 @@ export class ConversationService {
   /** Verify user is an active member. Throws if not. */
   async assertMember(conversationId: string, userId: string): Promise<ConversationMember> {
     const member = await this.memberRepo.findOne({
-      where: { conversationId, userId, leftAt: undefined },
+      where: { conversationId, userId, leftAt: IsNull() },
     });
     if (!member) throw new ForbiddenException('You are not a member of this conversation');
     return member;

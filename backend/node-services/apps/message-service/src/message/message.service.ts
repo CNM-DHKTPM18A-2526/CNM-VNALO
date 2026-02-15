@@ -3,7 +3,7 @@ import {
   BadRequestException, Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan, DataSource } from 'typeorm';
+import { Repository, LessThan, DataSource, IsNull } from 'typeorm';
 import { Message, MessageType, MessageStatus } from '../entities/message.entity';
 import { MessageReaction } from '../entities/message-reaction.entity';
 import { PinnedMessage } from '../entities/pinned-message.entity';
@@ -276,7 +276,7 @@ export class MessageService {
    */
   private async updateInboxForMembers(conversationId: string, message: Message, senderId: string) {
     const members = await this.memberRepo.find({
-      where: { conversationId, leftAt: undefined },
+      where: { conversationId, leftAt: IsNull() },
     });
 
     const preview = message.content?.substring(0, 200) ?? `[${message.messageType}]`;

@@ -72,10 +72,8 @@ public class AuthService {
             log.info("OTP verification skipped (disabled in config)");
         }
 
-        // Create account - status depends on OTP verification
-        AccountStatus initialStatus = otpConfig.shouldSkipOtp() 
-                ? AccountStatus.ACTIVE 
-                : AccountStatus.ACTIVE; // OTP already verified at this point
+        // Create account - OTP already verified at this point, so status is ACTIVE
+        AccountStatus initialStatus = AccountStatus.ACTIVE;
         
         AuthAccount account = AuthAccount.builder()
                 .phone(request.getPhone())

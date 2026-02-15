@@ -52,10 +52,21 @@ public class AuthAccount extends BaseEntity {
     private String lastLoginDeviceId;
 
     public boolean isLocked() {
-        if (status == AccountStatus.LOCKED || status == AccountStatus.DISABLED) {
+        if (status == AccountStatus.DISABLED) {
             return true;
         }
-        // Check if temporary lock is still active
+        // For LOCKED status, check if the lock has expired
+        if (status == AccountStatus.LOCKED) {
+            if (lockedUntil != null && Instant.now().isAfter(lockedUntil)) {
+                // Lock expired — auto-unlock
+                this.status = AccountStatus.ACTIVE;
+                this.lockedUntil = null;
+                this.failedLoginCount = 0;
+                return false;
+            }
+            return true;
+        }
+        // Check if temporary lock is still active (belt-and-suspenders)
         if (lockedUntil != null && Instant.now().isBefore(lockedUntil)) {
             return true;
         }
@@ -69,12 +80,22 @@ public class AuthAccount extends BaseEntity {
     public void onLoginSuccess() {
         this.lastLoginAt = Instant.now();
         this.failedLoginCount = 0;
+        // Ensure status is active on successful login
+        if (this.status == AccountStatus.LOCKED) {
+            this.status = AccountStatus.ACTIVE;
+            this.lockedUntil = null;
+        }
     }
 
     public void onLoginSuccess(String deviceId) {
         this.lastLoginAt = Instant.now();
         this.lastLoginDeviceId = deviceId;
         this.failedLoginCount = 0;
+        // Ensure status is active on successful login
+        if (this.status == AccountStatus.LOCKED) {
+            this.status = AccountStatus.ACTIVE;
+            this.lockedUntil = null;
+        }
     }
 
     public void onLoginFailed() {
