@@ -1,0 +1,33 @@
+# Build output
+target/
+
+# Maven wrapper (included in image via COPY)
+# Keep .mvn/ — needed for build
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# Git
+.git/
+.gitignore
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+docker-compose*.yml
+
+# Docs
+*.md
+LICENSE
+
+# Test reports
+surefire-reports/

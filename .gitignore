@@ -8,10 +8,13 @@
 # docs/guides/   → local only (learning materials, implementation guides)
 # docs/mobile/   → local only
 # docs/diagrams/ → local only
+docs/feedback
 docs/guides/
 docs/mobile/
 docs/diagrams/
 docs/*.md
+!docs/project
+!docs/system
 !docs/README.md
 !docs/contributing.md
 
