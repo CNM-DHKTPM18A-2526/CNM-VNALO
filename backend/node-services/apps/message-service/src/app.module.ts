@@ -41,9 +41,10 @@ import { HealthController } from './health.controller';
       global: true,
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.get('jwt.secret'),
+        secret: Buffer.from(config.get<string>('jwt.secret') ?? '', 'base64'),
         verifyOptions: {
-          issuer: config.get('jwt.issuer'),
+          issuer: config.get<string>('jwt.issuer'),
+          algorithms: ['HS512'] as const,
         },
       }),
     }),
