@@ -97,7 +97,7 @@ public class QrService {
         }
 
         UserProfile targetProfile = userProfileRepository.findById(targetUserId).orElse(null);
-        String displayName = targetProfile != null ? targetProfile.getFullName() : targetAccount.getPhone();
+        String displayName = targetProfile != null ? targetProfile.getDisplayName() : targetAccount.getPhone();
 
         // Check if already friends
         boolean alreadyFriends = friendService.areFriends(scannerId, targetUserId);

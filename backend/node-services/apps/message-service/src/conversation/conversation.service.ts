@@ -46,7 +46,7 @@ export class ConversationService {
     }
 
     // Create within a transaction
-    return this.dataSource.transaction(async (manager) => {
+    const conversationId = await this.dataSource.transaction(async (manager) => {
       const conversation = manager.create(Conversation, {
         type: ConversationType.DIRECT,
         createdBy: userId,
@@ -68,13 +68,15 @@ export class ConversationService {
       });
 
       this.logger.log(`Direct conversation created: ${saved.id} between ${uid1} and ${uid2}`);
-      return this.getConversation(saved.id, userId);
+      return saved.id;
     });
+
+    return this.getConversation(conversationId, userId);
   }
 
   /** Create a group conversation with initial members. Creator becomes OWNER. */
   async createGroup(userId: string, dto: CreateGroupConversationDto) {
-    return this.dataSource.transaction(async (manager) => {
+    const conversationId = await this.dataSource.transaction(async (manager) => {
       const conversation = manager.create(Conversation, {
         type: ConversationType.GROUP,
         title: dto.title,
@@ -105,8 +107,10 @@ export class ConversationService {
       await manager.save(ConversationMember, members);
       this.logger.log(`Group created: ${saved.id} "${dto.title}" with ${members.length} members`);
 
-      return this.getConversation(saved.id, userId);
+      return saved.id;
     });
+
+    return this.getConversation(conversationId, userId);
   }
 
   /** Get conversation with active member list. Verifies user has access. */

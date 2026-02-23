@@ -19,11 +19,13 @@ export interface JwtPayload {
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(config: ConfigService) {
+    const secret = config.get<string>('jwt.secret')!;
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: config.get<string>('jwt.secret')!,
+      secretOrKey: Buffer.from(secret, 'base64'),
       issuer: config.get<string>('jwt.issuer'),
+      algorithms: ['HS512'],
     });
   }
 
