@@ -9,6 +9,7 @@ import { MessageModule } from './message/message.module';
 import { InboxModule } from './inbox/inbox.module';
 import { GatewayModule } from './gateway/gateway.module';
 import { HealthController } from './health.controller';
+import { RedisModule } from '@nestjs-modules/ioredis';
 
 @Module({
   imports: [
@@ -17,6 +18,15 @@ import { HealthController } from './health.controller';
       isGlobal: true,
       load: [databaseConfig, redisConfig, jwtConfig],
       envFilePath: ['.env'],
+    }),
+
+    // Redis module
+    RedisModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        type: 'single',
+        url: `redis://${config.get('redis.host')}:${config.get('redis.port')}`,
+      }),
     }),
 
     // PostgreSQL via TypeORM
@@ -33,6 +43,12 @@ import { HealthController } from './health.controller';
         synchronize: config.get('NODE_ENV') === 'development', // Auto-sync in dev only
         schema: 'public',
         logging: config.get('NODE_ENV') === 'development' ? ['error'] : false,
+        // Connection pool tuning (default was 10)
+        extra: {
+          max: 50,
+          idleTimeoutMillis: 30000,
+          connectionTimeoutMillis: 5000,
+        },
       }),
     }),
 
@@ -58,4 +74,4 @@ import { HealthController } from './health.controller';
   ],
   controllers: [HealthController],
 })
-export class AppModule {}
+export class AppModule { }

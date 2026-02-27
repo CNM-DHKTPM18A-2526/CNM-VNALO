@@ -1,5 +1,6 @@
 import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index,
+  Unique,
 } from 'typeorm';
 
 export enum MessageType {
@@ -21,6 +22,8 @@ export enum MessageStatus {
 }
 
 @Entity('message')
+@Unique('uq_msg_conv_seq', ['conversationId', 'serverSeq'])
+@Unique('uq_msg_sender_client_id', ['senderId', 'clientMessageId'])
 @Index('idx_msg_conv_seq', ['conversationId', 'serverSeq'])
 @Index('idx_msg_sender', ['senderId', 'createdAt'])
 export class Message {

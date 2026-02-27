@@ -22,7 +22,7 @@ export class ConversationService {
     @InjectRepository(ConversationDirectMap)
     private readonly directMapRepo: Repository<ConversationDirectMap>,
     private readonly dataSource: DataSource,
-  ) {}
+  ) { }
 
   /**
    * Create or retrieve a direct (1:1) conversation.
@@ -156,6 +156,11 @@ export class ConversationService {
       throw new ForbiddenException('You do not have permission to add members');
     }
 
+    // Enforce member limit
+    const currentMemberCount = await this.memberRepo.count({
+      where: { conversationId, leftAt: IsNull() },
+    });
+
     const newMembers: Partial<ConversationMember>[] = [];
     for (const memberId of memberIds) {
       // Skip if already a member
@@ -170,6 +175,12 @@ export class ConversationService {
           joinedBy: userId,
         });
       }
+    }
+
+    if (currentMemberCount + newMembers.length > conversation.memberLimit) {
+      throw new BadRequestException(
+        `Cannot exceed member limit of ${conversation.memberLimit}. Current: ${currentMemberCount}, adding: ${newMembers.length}`,
+      );
     }
 
     if (newMembers.length > 0) {

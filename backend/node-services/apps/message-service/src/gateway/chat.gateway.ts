@@ -37,7 +37,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly jwtService: JwtService,
     private readonly messageService: MessageService,
-  ) {}
+  ) { }
 
   // ─── Connection Lifecycle ─────────────────────────────────
 
@@ -127,6 +127,32 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return { event: 'message.sent', data: message };
     } catch (err) {
       this.logger.error(`Send message failed: ${err.message}`);
+      return { event: 'message.error', data: { error: err.message } };
+    }
+  }
+
+  /** Recall a message and broadcast to conversation room. */
+  @SubscribeMessage('message.recall')
+  async handleRecallMessage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { messageId: string; conversationId: string },
+  ) {
+    const userId = client.data.user.userId;
+
+    try {
+      const recalled = await this.messageService.recallMessage(userId, data.messageId);
+
+      // Broadcast recall event to all clients in the room
+      const room = `conversation:${data.conversationId}`;
+      this.server.to(room).emit('message.recalled', {
+        messageId: recalled.id,
+        conversationId: data.conversationId,
+        recalledBy: userId,
+      });
+
+      return { event: 'message.recalled', data: recalled };
+    } catch (err) {
+      this.logger.error(`Recall message failed: ${err.message}`);
       return { event: 'message.error', data: { error: err.message } };
     }
   }
