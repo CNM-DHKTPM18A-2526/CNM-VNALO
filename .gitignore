@@ -2,22 +2,6 @@
 # Operating System Files
 # ===========================
 
-# Documentation structure:
-# docs/system/   → tracked (architecture, schema, api reference)
-# docs/project/  → tracked (team assignment, changelog, status)
-# docs/guides/   → local only (learning materials, implementation guides)
-# docs/mobile/   → local only
-# docs/diagrams/ → local only
-docs/feedback
-docs/guides/
-docs/mobile/
-docs/diagrams/
-docs/*.md
-!docs/project
-!docs/system
-!docs/README.md
-!docs/contributing.md
-
 # Visual Paradigm files
 *.vpp
 *.vpp.bak
@@ -210,6 +194,7 @@ coverage/
 *.lcov
 test-results/
 junit.xml
+compile_result.txt
 
 # ===========================
 # Build & Distribution

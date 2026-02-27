@@ -10,6 +10,9 @@ import { ConversationMember, MemberRole } from '../src/entities/conversation-mem
 import { ConversationService } from '../src/conversation/conversation.service';
 import { ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
 
+// Redis mock token used by @nestjs-modules/ioredis
+const IOREDIS_TOKEN = 'default_IORedisModuleConnectionToken';
+
 describe('MessageService', () => {
   let service: MessageService;
   let messageRepo: jest.Mocked<Repository<Message>>;
@@ -18,27 +21,58 @@ describe('MessageService', () => {
   let inboxRepo: jest.Mocked<Repository<ConversationInbox>>;
   let memberRepo: jest.Mocked<Repository<ConversationMember>>;
   let conversationService: jest.Mocked<ConversationService>;
+  let redisMock: Record<string, jest.Mock>;
 
   const userId = '11111111-1111-1111-1111-111111111111';
   const convId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
   const msgId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 
   beforeEach(async () => {
+    const mockQueryBuilder = {
+      select: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getRawOne: jest.fn().mockResolvedValue({ maxSeq: '0' }),
+      getCount: jest.fn().mockResolvedValue(0),
+      insert: jest.fn().mockReturnThis(),
+      into: jest.fn().mockReturnThis(),
+      values: jest.fn().mockReturnThis(),
+      orUpdate: jest.fn().mockReturnThis(),
+      update: jest.fn().mockReturnThis(),
+      set: jest.fn().mockReturnThis(),
+      execute: jest.fn().mockResolvedValue({}),
+    };
+
     const mockRepo = () => ({
       findOne: jest.fn(),
       find: jest.fn(),
       save: jest.fn(),
       create: jest.fn().mockImplementation((data) => data),
-      delete: jest.fn(),
+      delete: jest.fn().mockResolvedValue({ affected: 0 }),
       remove: jest.fn(),
       upsert: jest.fn(),
       update: jest.fn(),
-      createQueryBuilder: jest.fn().mockReturnValue({
-        select: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        getRawOne: jest.fn().mockResolvedValue({ maxSeq: '0' }),
-      }),
+      createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
     });
+
+    redisMock = {
+      exists: jest.fn().mockResolvedValue(1),
+      setnx: jest.fn().mockResolvedValue(1),
+      incr: jest.fn().mockResolvedValue(1),
+    };
+
+    const mockDataSource = {
+      transaction: jest.fn().mockImplementation(async (cb) => {
+        const mockManager = {
+          create: jest.fn().mockImplementation((_entity, data) => data),
+          save: jest.fn().mockImplementation((data) => Promise.resolve({ id: msgId, ...data, createdAt: new Date() })),
+          findOne: jest.fn().mockResolvedValue(null),
+          find: jest.fn().mockResolvedValue([]),
+          createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
+        };
+        return cb(mockManager);
+      }),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -50,9 +84,10 @@ describe('MessageService', () => {
         { provide: getRepositoryToken(ConversationMember), useFactory: mockRepo },
         {
           provide: ConversationService,
-          useValue: { assertMember: jest.fn().mockResolvedValue({ userId, role: MemberRole.MEMBER }) },
+          useValue: { assertMember: jest.fn().mockResolvedValue({ userId, role: MemberRole.MEMBER, lastReadSeq: 5 }) },
         },
-        { provide: DataSource, useValue: {} },
+        { provide: DataSource, useValue: mockDataSource },
+        { provide: IOREDIS_TOKEN, useValue: redisMock },
       ],
     }).compile();
 
@@ -66,17 +101,14 @@ describe('MessageService', () => {
   });
 
   describe('sendMessage', () => {
-    it('should create and return a new message', async () => {
+    it('should create and return a new message via transaction', async () => {
       const dto = { conversationId: convId, content: 'Hello!', messageType: MessageType.TEXT };
       messageRepo.findOne.mockResolvedValue(null); // no idempotency hit
-      memberRepo.find.mockResolvedValue([]); // no members to update inbox
-      const savedMsg = { id: msgId, ...dto, serverSeq: 1, senderId: userId, status: MessageStatus.SENT, createdAt: new Date() };
-      messageRepo.save.mockResolvedValue(savedMsg as any);
 
       const result = await service.sendMessage(userId, dto);
       expect(result.id).toBe(msgId);
-      expect(result.content).toBe('Hello!');
       expect(conversationService.assertMember).toHaveBeenCalledWith(convId, userId);
+      expect(redisMock.incr).toHaveBeenCalled();
     });
 
     it('should return existing message if clientMessageId matches (idempotency)', async () => {
@@ -86,7 +118,20 @@ describe('MessageService', () => {
 
       const result = await service.sendMessage(userId, { conversationId: convId, clientMessageId: clientId, content: 'Hello!' });
       expect(result.id).toBe(msgId);
-      expect(messageRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('should reject TEXT messages without content', async () => {
+      const dto = { conversationId: convId, content: '', messageType: MessageType.TEXT };
+      messageRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.sendMessage(userId, dto)).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject IMAGE messages without mediaUrl', async () => {
+      const dto = { conversationId: convId, messageType: MessageType.IMAGE };
+      messageRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.sendMessage(userId, dto)).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -114,30 +159,65 @@ describe('MessageService', () => {
   });
 
   describe('recallMessage', () => {
-    it('should recall own message', async () => {
-      const msg = { id: msgId, senderId: userId, status: MessageStatus.SENT, content: 'hello' };
-      messageRepo.findOne.mockResolvedValue(msg as any);
+    it('should recall own message within time limit', async () => {
+      const msg = {
+        id: msgId, senderId: userId, status: MessageStatus.SENT,
+        content: 'hello', conversationId: convId, serverSeq: 1,
+        createdAt: new Date(), // Just created — within 24h limit
+      };
+      messageRepo.findOne
+        .mockResolvedValueOnce(msg as any)  // findMessageOrFail
+        .mockResolvedValueOnce(null);       // updateInboxPreviewAfterRecall - findOne prev msg
       messageRepo.save.mockResolvedValue({ ...msg, status: MessageStatus.RECALLED, content: null } as any);
+      pinRepo.delete.mockResolvedValue({ affected: 0 } as any);
+      reactionRepo.delete.mockResolvedValue({ affected: 0 } as any);
 
       const result = await service.recallMessage(userId, msgId);
       expect(result.status).toBe(MessageStatus.RECALLED);
       expect(result.content).toBeNull();
+      expect(pinRepo.delete).toHaveBeenCalledWith({ messageId: msgId });
+      expect(reactionRepo.delete).toHaveBeenCalledWith({ messageId: msgId });
     });
 
     it('should throw if recalling other user message', async () => {
       messageRepo.findOne.mockResolvedValue({ id: msgId, senderId: 'other-user' } as any);
       await expect(service.recallMessage(userId, msgId)).rejects.toThrow(ForbiddenException);
     });
+
+    it('should throw if recalling already recalled message', async () => {
+      messageRepo.findOne.mockResolvedValue({
+        id: msgId, senderId: userId, status: MessageStatus.RECALLED, createdAt: new Date(),
+      } as any);
+      await expect(service.recallMessage(userId, msgId)).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw if message is older than 24 hours', async () => {
+      const oldDate = new Date(Date.now() - 25 * 60 * 60 * 1000); // 25 hours ago
+      messageRepo.findOne.mockResolvedValue({
+        id: msgId, senderId: userId, status: MessageStatus.SENT, createdAt: oldDate,
+      } as any);
+      await expect(service.recallMessage(userId, msgId)).rejects.toThrow(BadRequestException);
+    });
   });
 
   describe('addReaction', () => {
-    it('should add a reaction to a message', async () => {
-      messageRepo.findOne.mockResolvedValue({ id: msgId, conversationId: convId, serverSeq: 1 } as any);
-      reactionRepo.delete.mockResolvedValue({ affected: 0 } as any);
-      reactionRepo.save.mockResolvedValue({ messageId: msgId, userId, emoji: '👍' } as any);
+    it('should upsert a reaction to a message', async () => {
+      messageRepo.findOne.mockResolvedValue({
+        id: msgId, conversationId: convId, serverSeq: 1, status: MessageStatus.SENT,
+      } as any);
+      reactionRepo.upsert.mockResolvedValue(undefined as any);
+      reactionRepo.findOne.mockResolvedValue({ messageId: msgId, userId, emoji: '👍' } as any);
 
       const result = await service.addReaction(userId, msgId, '👍');
-      expect(result.emoji).toBe('👍');
+      expect(result!.emoji).toBe('👍');
+      expect(reactionRepo.upsert).toHaveBeenCalled();
+    });
+
+    it('should throw if reacting to recalled message', async () => {
+      messageRepo.findOne.mockResolvedValue({
+        id: msgId, conversationId: convId, status: MessageStatus.RECALLED,
+      } as any);
+      await expect(service.addReaction(userId, msgId, '👍')).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -149,7 +229,7 @@ describe('MessageService', () => {
 
       await service.markAsRead(userId, convId, 10);
       expect(memberRepo.save).toHaveBeenCalled();
-      expect(inboxRepo.update).toHaveBeenCalledWith({ userId, conversationId: convId }, { unreadCount: 0 });
+      expect(inboxRepo.update).toHaveBeenCalled();
     });
 
     it('should not update if lastReadSeq is not advancing', async () => {

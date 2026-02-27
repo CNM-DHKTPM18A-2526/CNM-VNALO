@@ -3,7 +3,7 @@ import {
   BadRequestException, Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan, DataSource, IsNull } from 'typeorm';
+import { Repository, LessThan, DataSource, IsNull, type EntityManager } from 'typeorm';
 import { Message, MessageType, MessageStatus } from '../entities/message.entity';
 import { MessageReaction } from '../entities/message-reaction.entity';
 import { PinnedMessage } from '../entities/pinned-message.entity';
@@ -11,16 +11,15 @@ import { ConversationInbox } from '../entities/conversation-inbox.entity';
 import { ConversationMember } from '../entities/conversation-member.entity';
 import { ConversationService } from '../conversation/conversation.service';
 import { SendMessageDto } from '../dto/send-message.dto';
+import { InjectRedis } from '@nestjs-modules/ioredis';
+import type Redis from 'ioredis';
 
 @Injectable()
 export class MessageService {
   private readonly logger = new Logger(MessageService.name);
 
-  /**
-   * In-memory sequence counters per conversation.
-   * In production, this should use Redis INCR for distributed safety.
-   */
-  private seqCounters = new Map<string, number>();
+  /** Maximum recall window: 24 hours */
+  private static readonly RECALL_TIME_LIMIT_MS = 24 * 60 * 60 * 1000;
 
   constructor(
     @InjectRepository(Message)
@@ -35,18 +34,23 @@ export class MessageService {
     private readonly memberRepo: Repository<ConversationMember>,
     private readonly conversationService: ConversationService,
     private readonly dataSource: DataSource,
-  ) {}
+    @InjectRedis()
+    private readonly redis: Redis,
+  ) { }
 
   /**
    * Send a message to a conversation.
-   * - Validates membership
-   * - Assigns monotonic server_seq
+   * - Validates membership and content
+   * - Assigns monotonic server_seq via Redis INCR
    * - Handles reply/forward denormalization
-   * - Updates inbox for all active members (CQRS)
+   * - Updates inbox for all active members within a transaction (CQRS)
    */
   async sendMessage(userId: string, dto: SendMessageDto): Promise<Message> {
     // Verify sender is a member
     await this.conversationService.assertMember(dto.conversationId, userId);
+
+    // Validate content based on message type
+    this.validateMessageContent(dto);
 
     // Idempotency: check if message with same clientMessageId already exists
     if (dto.clientMessageId) {
@@ -56,47 +60,55 @@ export class MessageService {
       if (existing) return existing;
     }
 
+    // Cross-conversation auth check for forwarded messages
+    if (dto.forwardFromMessageId && dto.forwardFromConversationId) {
+      await this.conversationService.assertMember(dto.forwardFromConversationId, userId);
+    }
+
     const serverSeq = await this.getNextSeq(dto.conversationId);
 
-    // Build message entity
-    const message = this.messageRepo.create({
-      conversationId: dto.conversationId,
-      serverSeq,
-      senderId: userId,
-      clientMessageId: dto.clientMessageId ?? null,
-      messageType: dto.messageType ?? MessageType.TEXT,
-      content: dto.content ?? null,
-      mediaUrl: dto.mediaUrl ?? null,
-      mediaThumbnailUrl: dto.mediaThumbnailUrl ?? null,
-      mediaMimeType: dto.mediaMimeType ?? null,
-      mediaSizeBytes: dto.mediaSizeBytes ?? null,
-      status: MessageStatus.SENT,
-    });
+    // Wrap message save + inbox update in a single DB transaction
+    const saved = await this.dataSource.transaction(async (manager) => {
+      // Build message entity
+      const message = manager.create(Message, {
+        conversationId: dto.conversationId,
+        serverSeq,
+        senderId: userId,
+        clientMessageId: dto.clientMessageId ?? null,
+        messageType: dto.messageType ?? MessageType.TEXT,
+        content: dto.content ?? null,
+        mediaUrl: dto.mediaUrl ?? null,
+        mediaThumbnailUrl: dto.mediaThumbnailUrl ?? null,
+        mediaMimeType: dto.mediaMimeType ?? null,
+        mediaSizeBytes: dto.mediaSizeBytes ?? null,
+        status: MessageStatus.SENT,
+      });
 
-    // Denormalize reply info for fast rendering
-    if (dto.replyToMessageId) {
-      const original = await this.messageRepo.findOne({ where: { id: dto.replyToMessageId } });
-      if (original) {
-        message.replyToMessageId = original.id;
-        message.replyToSenderId = original.senderId;
-        message.replyToContent = original.content?.substring(0, 200) ?? null;
-        message.messageType = MessageType.REPLY;
+      // Denormalize reply info for fast rendering
+      if (dto.replyToMessageId) {
+        const original = await manager.findOne(Message, { where: { id: dto.replyToMessageId } });
+        if (original) {
+          message.replyToMessageId = original.id;
+          message.replyToSenderId = original.senderId;
+          message.replyToContent = original.content?.substring(0, 200) ?? null;
+          message.messageType = MessageType.REPLY;
+        }
       }
-    }
 
-    // Handle forward
-    if (dto.forwardFromMessageId) {
-      message.forwardFromMessageId = dto.forwardFromMessageId;
-      message.forwardFromConversationId = dto.forwardFromConversationId ?? null;
-      message.messageType = MessageType.FORWARD;
-    }
+      // Handle forward
+      if (dto.forwardFromMessageId) {
+        message.forwardFromMessageId = dto.forwardFromMessageId;
+        message.forwardFromConversationId = dto.forwardFromConversationId ?? null;
+        message.messageType = MessageType.FORWARD;
+      }
 
-    const saved = await this.messageRepo.save(message);
+      const savedMsg = await manager.save(message);
 
-    // Update inbox for all active members (async, non-blocking)
-    this.updateInboxForMembers(dto.conversationId, saved, userId).catch((err) =>
-      this.logger.error(`Failed to update inbox: ${err.message}`),
-    );
+      // Update inbox for all active members (batch, within transaction)
+      await this.updateInboxForMembersWithManager(manager, dto.conversationId, savedMsg, userId);
+
+      return savedMsg;
+    });
 
     this.logger.log(`Message sent: ${saved.id} in ${dto.conversationId} seq=${serverSeq}`);
     return saved;
@@ -153,7 +165,6 @@ export class MessageService {
     return { items, total, limit, offset };
   }
 
-
   /** Edit a message. Only the sender can edit, and only text content. */
   async editMessage(userId: string, messageId: string, content: string): Promise<Message> {
     const message = await this.findMessageOrFail(messageId);
@@ -172,7 +183,13 @@ export class MessageService {
     return this.messageRepo.save(message);
   }
 
-  /** Recall (soft-delete) a message. Only the sender can recall. */
+  /**
+   * Recall (soft-delete) a message. Only the sender can recall.
+   * - Enforces 24-hour time limit
+   * - Clears content and media URLs
+   * - Removes associated pins and reactions
+   * - Updates inbox preview if this was the latest message
+   */
   async recallMessage(userId: string, messageId: string): Promise<Message> {
     const message = await this.findMessageOrFail(messageId);
 
@@ -180,10 +197,35 @@ export class MessageService {
       throw new ForbiddenException('You can only recall your own messages');
     }
 
-    message.status = MessageStatus.RECALLED;
-    message.content = null; // Clear content for recalled messages
+    if (message.status === MessageStatus.RECALLED) {
+      throw new BadRequestException('Message is already recalled');
+    }
 
-    return this.messageRepo.save(message);
+    // Enforce 24-hour recall time limit
+    const timeSinceSent = Date.now() - message.createdAt.getTime();
+    if (timeSinceSent > MessageService.RECALL_TIME_LIMIT_MS) {
+      throw new BadRequestException('Cannot recall messages older than 24 hours');
+    }
+
+    message.status = MessageStatus.RECALLED;
+    message.content = null;
+    message.mediaUrl = null;
+    message.mediaThumbnailUrl = null;
+    message.mediaMimeType = null;
+    message.mediaSizeBytes = null;
+
+    const saved = await this.messageRepo.save(message);
+
+    // Cleanup: remove any pin for this message
+    await this.pinRepo.delete({ messageId: message.id });
+
+    // Cleanup: remove all reactions for this message
+    await this.reactionRepo.delete({ messageId: message.id });
+
+    // Update inbox preview if this was the latest message in the conversation
+    await this.updateInboxPreviewAfterRecall(message);
+
+    return saved;
   }
 
   /** Pin a message in a conversation. Requires admin/owner or allowMemberPin. */
@@ -193,6 +235,10 @@ export class MessageService {
 
     if (message.conversationId !== conversationId) {
       throw new BadRequestException('Message does not belong to this conversation');
+    }
+
+    if (message.status === MessageStatus.RECALLED) {
+      throw new BadRequestException('Cannot pin a recalled message');
     }
 
     // Check if already pinned
@@ -226,21 +272,28 @@ export class MessageService {
     });
   }
 
-  /** Add an emoji reaction to a message. Replaces existing reaction from same user. */
+  /** Add an emoji reaction to a message. Uses upsert to replace existing reaction. */
   async addReaction(userId: string, messageId: string, emoji: string) {
     const message = await this.findMessageOrFail(messageId);
     await this.conversationService.assertMember(message.conversationId, userId);
 
-    // Upsert: remove old reaction if exists, then add new
-    await this.reactionRepo.delete({ messageId, userId });
+    if (message.status === MessageStatus.RECALLED) {
+      throw new BadRequestException('Cannot react to a recalled message');
+    }
 
-    return this.reactionRepo.save({
-      conversationId: message.conversationId,
-      messageId,
-      serverSeq: message.serverSeq,
-      userId,
-      emoji,
-    });
+    // Upsert: replace existing reaction from this user in a single operation
+    await this.reactionRepo.upsert(
+      {
+        conversationId: message.conversationId,
+        messageId,
+        serverSeq: message.serverSeq,
+        userId,
+        emoji,
+      },
+      ['messageId', 'userId'],
+    );
+
+    return this.reactionRepo.findOne({ where: { messageId, userId } });
   }
 
   /** Remove user's reaction from a message. */
@@ -259,7 +312,7 @@ export class MessageService {
 
   /**
    * Mark messages as read up to a given sequence number.
-   * Updates the member's last_read_seq and decrements inbox unread count.
+   * Updates the member's last_read_seq and computes accurate unread count.
    */
   async markAsRead(userId: string, conversationId: string, lastReadSeq: number) {
     const member = await this.conversationService.assertMember(conversationId, userId);
@@ -271,10 +324,18 @@ export class MessageService {
     member.lastReadAt = new Date();
     await this.memberRepo.save(member);
 
-    // Reset unread count in inbox
+    // Compute accurate unread count instead of blindly setting to 0
+    const unreadCount = await this.messageRepo
+      .createQueryBuilder('m')
+      .where('m.conversation_id = :cid', { cid: conversationId })
+      .andWhere('m.server_seq > :seq', { seq: lastReadSeq })
+      .andWhere('m.sender_id != :uid', { uid: userId })
+      .andWhere('m.status != :recalled', { recalled: MessageStatus.RECALLED })
+      .getCount();
+
     await this.inboxRepo.update(
       { userId, conversationId },
-      { unreadCount: 0 },
+      { unreadCount },
     );
   }
 
@@ -286,54 +347,141 @@ export class MessageService {
     return message;
   }
 
+  /** Validate message content based on type. */
+  private validateMessageContent(dto: SendMessageDto): void {
+    const effectiveType = dto.messageType ?? MessageType.TEXT;
+
+    if (effectiveType === MessageType.TEXT && !dto.content?.trim()) {
+      throw new BadRequestException('Text messages must have content');
+    }
+
+    const mediaTypes = [MessageType.IMAGE, MessageType.VIDEO, MessageType.FILE, MessageType.AUDIO];
+    if (mediaTypes.includes(effectiveType) && !dto.mediaUrl) {
+      throw new BadRequestException(`${effectiveType} messages must have a mediaUrl`);
+    }
+  }
+
   /**
-   * Generate next sequence number for a conversation.
-   * Uses in-memory counter for dev; should use Redis INCR in production.
+   * Generate next sequence number for a conversation using Redis INCR.
+   * Atomic operation — safe for concurrent and multi-instance use.
    */
   private async getNextSeq(conversationId: string): Promise<number> {
-    if (!this.seqCounters.has(conversationId)) {
+    const key = `conv:${conversationId}:seq`;
+
+    // Check if key exists in Redis
+    const exists = await this.redis.exists(key);
+
+    if (!exists) {
       // Initialize from database: find the max seq for this conversation
       const result = await this.messageRepo
         .createQueryBuilder('m')
         .select('COALESCE(MAX(m.server_seq), 0)', 'maxSeq')
         .where('m.conversation_id = :cid', { cid: conversationId })
         .getRawOne();
-      this.seqCounters.set(conversationId, parseInt(result?.maxSeq ?? '0', 10));
+
+      const currentMax = parseInt(result?.maxSeq ?? '0', 10);
+
+      // SETNX: only set if key doesn't exist (prevents race condition)
+      await this.redis.setnx(key, currentMax);
     }
 
-    const next = (this.seqCounters.get(conversationId) ?? 0) + 1;
-    this.seqCounters.set(conversationId, next);
+    // INCR is atomic — guarantees unique sequence across all instances
+    const next = await this.redis.incr(key);
     return next;
   }
 
   /**
    * Update conversation_inbox for all active members after a new message.
-   * Increments unread_count for everyone except the sender.
+   * Uses batch INSERT ... ON CONFLICT for efficiency (1 query instead of N).
+   * Runs within the caller's transaction manager.
    */
-  private async updateInboxForMembers(conversationId: string, message: Message, senderId: string) {
-    const members = await this.memberRepo.find({
+  private async updateInboxForMembersWithManager(
+    manager: EntityManager,
+    conversationId: string,
+    message: Message,
+    senderId: string,
+  ) {
+    const members = await manager.find(ConversationMember, {
       where: { conversationId, leftAt: IsNull() },
+      select: ['userId'],
     });
+
+    if (!members.length) return;
 
     const preview = message.content?.substring(0, 200) ?? `[${message.messageType}]`;
 
-    for (const member of members) {
-      const isOwn = member.userId === senderId;
+    // Build inbox rows for all members
+    const inboxRows = members.map((member) => ({
+      userId: member.userId,
+      conversationId,
+      lastMessageSeq: message.serverSeq,
+      lastMessageAt: message.createdAt,
+      lastMessagePreview: preview,
+      lastMessageSenderId: message.senderId,
+      lastMessageType: message.messageType,
+      unreadCount: member.userId === senderId ? 0 : () => '"unread_count" + 1',
+      isHidden: false,
+    }));
 
-      await this.inboxRepo.upsert(
-        {
-          userId: member.userId,
-          conversationId,
-          lastMessageSeq: message.serverSeq,
-          lastMessageAt: message.createdAt,
-          lastMessagePreview: preview,
-          lastMessageSenderId: message.senderId,
-          lastMessageType: message.messageType,
-          unreadCount: isOwn ? 0 : () => '"unread_count" + 1',
-          isHidden: false, // Unhide on new message
-        } as any,
-        ['userId', 'conversationId'],
-      );
-    }
+    // Single batch upsert for all inbox entries
+    await manager
+      .createQueryBuilder()
+      .insert()
+      .into(ConversationInbox)
+      .values(inboxRows as any)
+      .orUpdate(
+        [
+          'last_message_seq',
+          'last_message_at',
+          'last_message_preview',
+          'last_message_sender_id',
+          'last_message_type',
+          'unread_count',
+          'is_hidden',
+        ],
+        ['user_id', 'conversation_id'],
+      )
+      .execute();
+  }
+
+  /**
+   * After recalling a message, update inbox preview if the recalled message
+   * was the latest message in the conversation.
+   */
+  private async updateInboxPreviewAfterRecall(recalledMessage: Message) {
+    // Find the previous non-recalled message
+    const prevMessage = await this.messageRepo.findOne({
+      where: {
+        conversationId: recalledMessage.conversationId,
+        status: MessageStatus.SENT,
+      },
+      order: { serverSeq: 'DESC' },
+    });
+
+    const newPreview = prevMessage
+      ? prevMessage.content?.substring(0, 200) ?? `[${prevMessage.messageType}]`
+      : null;
+
+    const newSeq = prevMessage?.serverSeq ?? 0;
+    const newSenderId = prevMessage?.senderId ?? null;
+    const newType = prevMessage?.messageType ?? null;
+    const newAt = prevMessage?.createdAt ?? null;
+
+    // Update all inbox entries for this conversation where the recalled message was the latest
+    await this.inboxRepo
+      .createQueryBuilder()
+      .update(ConversationInbox)
+      .set({
+        lastMessagePreview: newPreview,
+        lastMessageSeq: newSeq,
+        lastMessageSenderId: newSenderId,
+        lastMessageType: newType,
+        lastMessageAt: newAt,
+      })
+      .where('conversation_id = :cid AND last_message_seq = :seq', {
+        cid: recalledMessage.conversationId,
+        seq: recalledMessage.serverSeq,
+      })
+      .execute();
   }
 }

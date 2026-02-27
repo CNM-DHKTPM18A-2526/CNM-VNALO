@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { ConversationInbox } from '../entities/conversation-inbox.entity';
 import { Conversation } from '../entities/conversation.entity';
 
@@ -13,11 +13,11 @@ export class InboxService {
     private readonly inboxRepo: Repository<ConversationInbox>,
     @InjectRepository(Conversation)
     private readonly conversationRepo: Repository<Conversation>,
-  ) {}
+  ) { }
 
   /**
    * Get user's conversation inbox: sorted by pinned first, then by latest message.
-   * Joins conversation details for display (title, avatar, type).
+   * Uses batch query (IN clause) instead of N+1 pattern for conversation details.
    */
   async getInbox(userId: string, limit = 50, offset = 0) {
     const inbox = await this.inboxRepo.find({
@@ -27,28 +27,33 @@ export class InboxService {
       skip: offset,
     });
 
-    // Enrich with conversation details
-    const result = await Promise.all(
-      inbox.map(async (entry) => {
-        const conversation = await this.conversationRepo.findOne({
-          where: { id: entry.conversationId },
-        });
-        return {
-          ...entry,
-          conversation: conversation
-            ? {
-                id: conversation.id,
-                type: conversation.type,
-                title: conversation.title,
-                avatarUrl: conversation.avatarUrl,
-                status: conversation.status,
-              }
-            : null,
-        };
-      }),
-    );
+    if (inbox.length === 0) return [];
 
-    return result;
+    // Batch fetch all conversation details in a single query (fixes N+1)
+    const convIds = inbox.map((e) => e.conversationId);
+    const conversations = await this.conversationRepo.find({
+      where: { id: In(convIds) },
+    });
+
+    // Build O(1) lookup map
+    const convMap = new Map(conversations.map((c) => [c.id, c]));
+
+    // Enrich inbox entries with conversation details
+    return inbox.map((entry) => {
+      const conv = convMap.get(entry.conversationId);
+      return {
+        ...entry,
+        conversation: conv
+          ? {
+            id: conv.id,
+            type: conv.type,
+            title: conv.title,
+            avatarUrl: conv.avatarUrl,
+            status: conv.status,
+          }
+          : null,
+      };
+    });
   }
 
   /** Get total unread message count across all conversations. */
