@@ -1,0 +1,53 @@
+# =============================================================================
+# VNALO — Infrastructure Only (PostgreSQL + Redis)
+# Use this for local development when running services outside Docker.
+#
+# Usage:
+#   docker compose -f docker/docker-compose.infra.yml up -d
+#   docker compose -f docker/docker-compose.infra.yml down
+# =============================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: vnalo-postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-vnalo_core}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASS:-postgres}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - vnalo-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: vnalo-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - vnalo-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+networks:
+  vnalo-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
