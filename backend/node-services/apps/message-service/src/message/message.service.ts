@@ -410,38 +410,56 @@ export class MessageService {
 
     const preview = message.content?.substring(0, 200) ?? `[${message.messageType}]`;
 
-    // Build inbox rows for all members
-    const inboxRows = members.map((member) => ({
-      userId: member.userId,
-      conversationId,
-      lastMessageSeq: message.serverSeq,
-      lastMessageAt: message.createdAt,
-      lastMessagePreview: preview,
-      lastMessageSenderId: message.senderId,
-      lastMessageType: message.messageType,
-      unreadCount: member.userId === senderId ? 0 : () => '"unread_count" + 1',
-      isHidden: false,
-    }));
+    // Build values and parameters for raw SQL batch upsert
+    const params: any[] = [];
+    const valueSets: string[] = [];
+    let paramIdx = 1;
 
-    // Single batch upsert for all inbox entries
-    await manager
-      .createQueryBuilder()
-      .insert()
-      .into(ConversationInbox)
-      .values(inboxRows as any)
-      .orUpdate(
-        [
-          'last_message_seq',
-          'last_message_at',
-          'last_message_preview',
-          'last_message_sender_id',
-          'last_message_type',
-          'unread_count',
-          'is_hidden',
-        ],
-        ['user_id', 'conversation_id'],
-      )
-      .execute();
+    for (const member of members) {
+      const isSender = member.userId === senderId;
+      valueSets.push(
+        `($${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, $${paramIdx++}, false, NOW())`,
+      );
+      params.push(
+        member.userId,
+        conversationId,
+        message.serverSeq,
+        message.createdAt,
+        preview,
+        message.senderId,
+        message.messageType,
+        isSender ? 0 : 1, // Initial value for new inbox entries
+      );
+    }
+
+    // Sender ID as the last parameter for CASE expression
+    params.push(senderId);
+    const senderParamIdx = paramIdx;
+
+    // Single batch upsert with proper unread_count handling:
+    // - INSERT (new row): 0 for sender, 1 for non-sender
+    // - ON CONFLICT (existing row): 0 for sender, increment by 1 for non-sender
+    const sql = `
+      INSERT INTO conversation_inbox (
+        user_id, conversation_id, last_message_seq, last_message_at,
+        last_message_preview, last_message_sender_id, last_message_type,
+        unread_count, is_hidden, updated_at
+      ) VALUES ${valueSets.join(', ')}
+      ON CONFLICT (user_id, conversation_id) DO UPDATE SET
+        last_message_seq = EXCLUDED.last_message_seq,
+        last_message_at = EXCLUDED.last_message_at,
+        last_message_preview = EXCLUDED.last_message_preview,
+        last_message_sender_id = EXCLUDED.last_message_sender_id,
+        last_message_type = EXCLUDED.last_message_type,
+        unread_count = CASE
+          WHEN conversation_inbox.user_id = $${senderParamIdx} THEN 0
+          ELSE conversation_inbox.unread_count + 1
+        END,
+        is_hidden = false,
+        updated_at = NOW()
+    `;
+
+    await manager.query(sql, params);
   }
 
   /**
