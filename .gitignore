@@ -181,6 +181,9 @@ cassandra-data/
 logs/
 *.log
 npm-debug.log*
+# JVM crash dumps
+hs_err_pid*.log
+replay_pid*.log
 .cache/
 .temp/
 .tmp/
