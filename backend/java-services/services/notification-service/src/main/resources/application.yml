@@ -1,0 +1,168 @@
+vnalo:
+  kafka:
+    topics:
+      notifications: vnalo.notifications
+spring:
+  application:
+    name: notification-service
+  profiles:
+    active: dev  # Default to dev profile (requires Docker)
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:vnalo_core}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASS:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        default_schema: notification
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+    default-schema: notification
+    schemas: notification
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+  kafka:
+    bootstrap-servers: ${KAFKA_SERVERS:localhost:9092}
+    consumer:
+      group-id: notification-service
+
+server:
+  port: 8086
+  servlet:
+    context-path: /api/v1
+
+# JWT Configuration - REQUIRED for all profiles
+jwt:
+  secret: ${JWT_SECRET}
+  issuer: ${JWT_ISSUER:vnalo}
+  access-token-expiration: ${JWT_ACCESS_EXPIRATION:86400000}   # 24 hours
+  refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:604800000} # 7 days
+
+logging:
+  level:
+    iuh.cnm.vnalo: ${LOG_LEVEL:INFO}
+    org.springframework.security.config.annotation.authentication.configuration: ERROR
+
+# Firebase Configuration
+firebase:
+  credentials:
+    path: ${FIREBASE_CREDENTIALS_PATH:iuh-cnm-vnalo-firebase-adminsdk-fbsvc-5008b7c5eb.json}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+# OTP Configuration
+otp:
+  enabled: ${OTP_ENABLED:true}
+  expiration-minutes: ${OTP_EXPIRATION:5}
+  max-attempts: ${OTP_MAX_ATTEMPTS:3}
+  length: 6
+  rate-limit:
+    requests-per-hour: 5
+    cooldown-seconds: 60
+  test-mode:
+    enabled: ${OTP_TEST_MODE:false}
+    mock-otp: "123456"
+    log-otp: true
+
+---
+# =============================================================================
+# DEV PROFILE - Development with Docker (PostgreSQL + Redis required)
+# =============================================================================
+# Usage: docker-compose up -d && mvnw spring-boot:run
+# =============================================================================
+spring:
+  config:
+    activate:
+      on-profile: dev
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+  flyway:
+    enabled: true
+  # autoconfigure:
+  #   exclude:
+  #     - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+
+# Dev: OTP disabled for faster development
+otp:
+  enabled: false
+
+# Dev: Default JWT secret (only for development!)
+jwt:
+  secret: ZGV2ZWxvcG1lbnQtb25seS1zZWNyZXQta2V5LWRvLW5vdC11c2UtaW4tcHJvZHVjdGlvbi10aGlzLWlzLWF0LWxlYXN0LTUxMi1iaXRzLWxvbmc=
+
+logging:
+  level:
+    iuh.cnm.vnalo: DEBUG
+
+---
+# =============================================================================
+# PROD PROFILE - Production deployment with hardened security
+# =============================================================================
+# Usage: Set all environment variables and run with -Dspring.profiles.active=prod
+# =============================================================================
+spring:
+  config:
+    activate:
+      on-profile: prod
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+# Production: Disable Swagger UI
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+# Production: Hide health details
+management:
+  endpoint:
+    health:
+      show-details: never
+
+# Production: OTP enabled, test mode disabled
+otp:
+  enabled: true
+  test-mode:
+    enabled: false
+    log-otp: false
+
+logging:
+  level:
+    iuh.cnm.vnalo: INFO
+    org.springframework.security: WARN
