@@ -122,6 +122,50 @@ services:
           memory: 512M
           cpus: '0.5'
 
+  notification-service:
+    build:
+      context: ../backend/java-services/services/notification-service
+      dockerfile: Dockerfile
+    container_name: vnalo-notification-service
+    ports:
+      - "8087:8087"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-vnalo_core}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASS: ${DB_PASS:-postgres}
+
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+
+      KAFKA_SERVERS: kafka:9092
+
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_ISSUER: ${JWT_ISSUER:-vnalo}
+
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+
+      FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:-iuh-cnm-vnalo-firebase-adminsdk-fbsvc-5008b7c5eb.json}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - vnalo-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8087/api/v1/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+
   # ---------------------------------------------------------------------------
   # Optional: Kafka (activate with --profile kafka)
   # NOTE: Kafka is currently unused in application code. Kept for future use.
