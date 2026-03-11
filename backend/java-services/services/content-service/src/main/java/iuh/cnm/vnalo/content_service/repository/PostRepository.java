@@ -12,4 +12,6 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
     Page<Post> findByStatusOrderByCreatedAtDesc(String status, Pageable pageable);
 
     boolean existsByPostIdAndStatus(UUID postId, String status);
+
+    java.util.Optional<Post> findByPostIdAndStatus(UUID postId, String status);
 }

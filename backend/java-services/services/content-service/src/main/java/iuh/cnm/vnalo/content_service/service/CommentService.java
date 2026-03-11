@@ -6,6 +6,8 @@ import iuh.cnm.vnalo.content_service.model.dto.CreateCommentRequest;
 import iuh.cnm.vnalo.content_service.model.entity.Comment;
 import iuh.cnm.vnalo.content_service.repository.CommentRepository;
 import iuh.cnm.vnalo.content_service.repository.PostRepository;
+import iuh.cnm.vnalo.content_service.exception.ApiException;
+import iuh.cnm.vnalo.content_service.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -26,7 +28,7 @@ public class CommentService {
     public CommentResponse createComment(UUID postId, UUID authorId, CreateCommentRequest request) {
         boolean postExists = postRepository.existsByPostIdAndStatus(postId, "ACTIVE");
         if (!postExists) {
-            throw new IllegalArgumentException("Post not found");
+            throw new ApiException(ErrorCode.POST_NOT_FOUND);
         }
 
         Comment comment = Comment.builder()
