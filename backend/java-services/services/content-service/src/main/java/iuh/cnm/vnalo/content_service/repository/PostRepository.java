@@ -10,4 +10,6 @@ import java.util.UUID;
 public interface PostRepository extends JpaRepository<Post, UUID> {
 
     Page<Post> findByStatusOrderByCreatedAtDesc(String status, Pageable pageable);
+
+    boolean existsByPostIdAndStatus(UUID postId, String status);
 }
