@@ -1,0 +1,45 @@
+server:
+  port: 8086
+  servlet:
+    context-path: /api/v1
+
+spring:
+  application:
+    name: content-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/vnalo_core
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        default_schema: content
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+
+  flyway:
+    enabled: true
+    schemas: content
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+logging:
+  level:
+    org.hibernate.SQL: debug
+    org.hibernate.type.descriptor.sql.BasicBinder: trace
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
