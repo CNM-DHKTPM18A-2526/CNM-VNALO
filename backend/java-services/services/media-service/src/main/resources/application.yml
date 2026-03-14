@@ -1,0 +1,95 @@
+server:
+  port: ${SERVER_PORT:8083}
+
+spring:
+  application:
+    name: media-service
+
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:vnalo_media}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASS:sapassword}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:update}
+    show-sql: ${JPA_SHOW_SQL:false}
+    properties:
+      hibernate:
+        format_sql: true
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    admin:
+      fail-fast: false          # Không throw exception nếu Kafka chưa sẵn sàng lúc startup
+    consumer:
+      group-id: media-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    listener:
+      auto-startup: false       # Consumer không tự start nếu Kafka chưa có — tránh WARN spam
+
+  flyway:
+    enabled: false
+
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+
+# AWS S3
+application:
+  s3:
+    endpoint: ${AWS_S3_ENDPOINT:}
+    # ⚠️ TRƯỚC KHI PUSH: xóa key mặc định → thay bằng ${AWS_ACCESS_KEY_ID:}
+    # Lấy key tại: AWS Console → IAM → Users → Security credentials → Create access key
+    access-key: ${AWS_ACCESS_KEY_ID:}
+    # ⚠️ TRƯỚC KHI PUSH: xóa key mặc định → thay bằng ${AWS_SECRET_ACCESS_KEY:}
+    # Lấy key tại: AWS Console → IAM → Users → Security credentials → Create access key (cùng lúc với Access Key ID)
+    secret-key: ${AWS_SECRET_ACCESS_KEY:}
+    # Tên S3 bucket — lấy tại: AWS Console → S3 → tên bucket của bạn
+    bucket: ${AWS_BUCKET_NAME:vnalo-media}
+    region: ${AWS_REGION:ap-southeast-1}
+    # nếu tên bucket s3 khác thì thay vnalo-media bằng tên bucket của bạn
+    public-endpoint: ${AWS_S3_PUBLIC_ENDPOINT:https://vnalo-media.s3.amazonaws.com}
+
+# JWT
+jwt:
+  # Key này chỉ dùng để dev local. Khi deploy: set biến môi trường JWT_SECRET thật (≥ 512 bit, base64)
+  # Tạo key mới: openssl rand -base64 64
+  secret: ${JWT_SECRET:ZGV2ZWxvcG1lbnQtb25seS1zZWNyZXQta2V5LWRvLW5vdC11c2UtaW4tcHJvZHVjdGlvbi10aGlzLWlzLWF0LWxlYXN0LTUxMi1iaXRzLWxvbmc=}
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+  health:
+    diskspace:
+      enabled: true
+    db:
+      enabled: true
+
+logging:
+  level:
+    root: WARN
+    iuh.cnm.vnalo: ${LOG_LEVEL:INFO}
+    org.flywaydb.core.internal.database: WARN
