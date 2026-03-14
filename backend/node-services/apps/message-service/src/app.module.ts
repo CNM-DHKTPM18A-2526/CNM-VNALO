@@ -40,7 +40,7 @@ import { RedisModule } from '@nestjs-modules/ioredis';
         password: config.get('database.password'),
         database: config.get('database.database'),
         autoLoadEntities: true,
-        synchronize: config.get('NODE_ENV') === 'development', // Auto-sync in dev only
+        synchronize: false,
         schema: 'public',
         logging: config.get('NODE_ENV') === 'development' ? ['error'] : false,
         // Connection pool tuning (default was 10)
