@@ -164,7 +164,7 @@ class BlockServiceTest {
             ApiException exception = assertThrows(ApiException.class,
                     () -> blockService.unblockUser(blockerId, blockedId));
 
-            assertEquals(ErrorCode.USER_NOT_FOUND, exception.getErrorCode());
+            assertEquals(ErrorCode.SOCIAL_NOT_BLOCKED, exception.getErrorCode());
         }
     }
 

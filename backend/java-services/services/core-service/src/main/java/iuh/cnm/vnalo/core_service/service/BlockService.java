@@ -57,7 +57,7 @@ public class BlockService {
     @Transactional
     public void unblockUser(UUID blockerId, UUID blockedId) {
         BlockList block = blockListRepository.findByBlockerIdAndBlockedId(blockerId, blockedId)
-                .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
+                .orElseThrow(() -> new ApiException(ErrorCode.SOCIAL_NOT_BLOCKED));
         blockListRepository.delete(block);
     }
 

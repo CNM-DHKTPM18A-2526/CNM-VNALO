@@ -2,6 +2,7 @@ package iuh.cnm.vnalo.core_service.model.dto.request;
 
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import iuh.cnm.vnalo.core_service.model.enums.FriendshipSource;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -29,4 +30,10 @@ public class FriendRequestDto {
      */
     @Size(max = 200, message = "Message cannot exceed 200 characters")
     private String message;
+
+    /**
+     * Source of friend request (SEARCH, QR, CONTACT_IMPORT, etc.).
+     * Defaults to SEARCH if not specified.
+     */
+    private FriendshipSource source;
 }

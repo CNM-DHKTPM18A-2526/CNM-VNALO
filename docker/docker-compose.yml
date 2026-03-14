@@ -1,22 +1,29 @@
-version: '3.8'
+# =============================================================================
+# VNALO — Docker Compose (Development)
+# Usage: docker-compose up --build
+# Profiles: default (infra + services), kafka (adds Kafka + Zookeeper)
+# =============================================================================
 
 services:
+  # ---------------------------------------------------------------------------
+  # Infrastructure
+  # ---------------------------------------------------------------------------
   postgres:
     image: postgres:16-alpine
     container_name: vnalo-postgres
     environment:
-      POSTGRES_DB: vnalo_core
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${DB_NAME:-vnalo_core}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASS:-postgres}
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - vnalo-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,8 +32,8 @@ services:
     image: redis:7-alpine
     container_name: vnalo-redis
     ports:
-      - "6379:6379"
-    command: redis-server --appendonly yes
+      - "${REDIS_PORT:-6379}:6379"
+    command: redis-server --appendonly yes ${REDIS_PASSWORD:+--requirepass $REDIS_PASSWORD}
     volumes:
       - redis_data:/data
     networks:
@@ -37,7 +44,6 @@ services:
       timeout: 3s
       retries: 5
 
-  # Kafka for event streaming (used in production)
   # ---------------------------------------------------------------------------
   # Application Services
   # ---------------------------------------------------------------------------
@@ -152,7 +158,6 @@ services:
         limits:
           memory: 1G
           cpus: '1.0'
-
   # ---------------------------------------------------------------------------
   # Optional: Kafka (activate with --profile kafka)
   # NOTE: Kafka is currently unused in application code. Kept for future use.

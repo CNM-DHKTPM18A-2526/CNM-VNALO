@@ -3,8 +3,8 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>vn.edu.hcmuaf.fit.ott</groupId>
-        <artifactId>cnm-zalo-backend</artifactId>
+        <groupId>iuh.cnm.vnalo</groupId>
+        <artifactId>vnalo-backend</artifactId>
         <version>1.0.0-SNAPSHOT</version>
         <relativePath>../../pom.xml</relativePath>
     </parent>

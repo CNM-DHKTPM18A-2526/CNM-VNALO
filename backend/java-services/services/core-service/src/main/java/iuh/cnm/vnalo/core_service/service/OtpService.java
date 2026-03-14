@@ -185,11 +185,10 @@ public class OtpService {
      * - Use FCM for password reset OTP delivery
      */
     private void sendOtpViaSms(String phone, String otp) {
-        // Log OTP for testing purposes (visible in server logs)
-        log.info("========================================");
-        log.info("OTP for {}: {}", maskPhone(phone), otp);
-        log.info("(In production, this would be sent via FCM to registered devices)");
-        log.info("========================================");
+        // In production, integrate with SMS provider (Firebase Phone Auth recommended for client-side)
+        log.info("OTP delivery requested for {}", maskPhone(phone));
+        log.info("(SMS provider not configured - OTP logged for development only)");
+        log.debug("DEV ONLY - OTP for {}: {}", maskPhone(phone), otp);
         
         // TODO: For password reset flow, fetch user's FCM tokens and send via FCM:
         // List<String> fcmTokens = deviceRepository.findFcmTokensByPhone(phone);

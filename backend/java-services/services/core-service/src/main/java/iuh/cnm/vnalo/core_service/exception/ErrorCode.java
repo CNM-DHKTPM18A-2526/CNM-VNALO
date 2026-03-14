@@ -40,7 +40,9 @@ public enum ErrorCode {
     SOCIAL_USER_BLOCKED("SOCIAL_007", "You have blocked this user"),
     SOCIAL_BLOCKED_BY_USER("SOCIAL_008", "You are blocked by this user"),
     SOCIAL_ALREADY_BLOCKED("SOCIAL_009", "User is already blocked"),
-    SOCIAL_PRIVACY_RESTRICTION("SOCIAL_010", "Cannot perform action due to privacy settings");
+    SOCIAL_PRIVACY_RESTRICTION("SOCIAL_010", "Cannot perform action due to privacy settings"),
+    SOCIAL_NOT_BLOCKED("SOCIAL_011", "User is not blocked"),
+    SOCIAL_NOT_REQUEST_SENDER("SOCIAL_012", "You are not the sender of this request");
 
     private final String code;
     private final String message;

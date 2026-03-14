@@ -38,7 +38,8 @@ public class FriendController {
             @Valid @RequestBody FriendRequestDto request) {
 
         FriendRequest result = friendService.sendFriendRequest(
-                currentUser.getId(), request.getToUserId(), request.getMessage(), FriendshipSource.SEARCH);
+                currentUser.getId(), request.getToUserId(), request.getMessage(),
+                request.getSource() != null ? request.getSource() : FriendshipSource.SEARCH);
 
         FriendRequestResponse response = FriendRequestResponse.builder()
                 .id(result.getRequestId())
