@@ -5,6 +5,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Optional;
 import java.util.UUID;
 
 public interface PostRepository extends JpaRepository<Post, UUID> {
@@ -13,5 +14,7 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
 
     boolean existsByPostIdAndStatus(UUID postId, String status);
 
-    java.util.Optional<Post> findByPostIdAndStatus(UUID postId, String status);
+    Optional<Post> findByPostIdAndStatus(UUID postId, String status);
+
+    Optional<Post> findByPostId(UUID postId);
 }

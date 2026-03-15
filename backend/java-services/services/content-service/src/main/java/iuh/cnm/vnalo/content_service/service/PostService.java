@@ -1,8 +1,11 @@
 package iuh.cnm.vnalo.content_service.service;
 
+import iuh.cnm.vnalo.content_service.exception.ApiException;
+import iuh.cnm.vnalo.content_service.exception.ErrorCode;
 import iuh.cnm.vnalo.content_service.model.dto.CreatePostRequest;
 import iuh.cnm.vnalo.content_service.model.dto.PostResponse;
 import iuh.cnm.vnalo.content_service.model.dto.TimelineResponse;
+import iuh.cnm.vnalo.content_service.model.dto.UpdatePostRequest;
 import iuh.cnm.vnalo.content_service.model.entity.Post;
 import iuh.cnm.vnalo.content_service.repository.PostRepository;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +37,7 @@ public class PostService {
                 .status("ACTIVE")
                 .build();
 
-Post saved = postRepository.saveAndFlush(post);
+        Post saved = postRepository.saveAndFlush(post);
         return toResponse(saved);
     }
 
@@ -59,6 +62,52 @@ Post saved = postRepository.saveAndFlush(post);
                 .totalPages(result.getTotalPages())
                 .last(result.isLast())
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public PostResponse getPostById(UUID postId) {
+        Post post = postRepository.findByPostIdAndStatus(postId, "ACTIVE")
+                .orElseThrow(() -> new ApiException(ErrorCode.POST_NOT_FOUND));
+
+        return toResponse(post);
+    }
+
+    @Transactional
+    public PostResponse updatePost(UUID postId, UUID userId, UpdatePostRequest request) {
+        Post post = postRepository.findByPostIdAndStatus(postId, "ACTIVE")
+                .orElseThrow(() -> new ApiException(ErrorCode.POST_NOT_FOUND));
+
+        if (!post.getAuthorId().equals(userId)) {
+            throw new ApiException(ErrorCode.FORBIDDEN);
+        }
+
+        if (request.getContentText() != null) {
+            post.setContentText(request.getContentText());
+        }
+
+        if (request.getMediaUrls() != null) {
+            post.setMediaUrls(request.getMediaUrls());
+        }
+
+        if (request.getVisibility() != null && !request.getVisibility().isBlank()) {
+            post.setVisibility(normalizeVisibility(request.getVisibility()));
+        }
+
+        Post saved = postRepository.saveAndFlush(post);
+        return toResponse(saved);
+    }
+
+    @Transactional
+    public void deletePost(UUID postId, UUID userId) {
+        Post post = postRepository.findByPostIdAndStatus(postId, "ACTIVE")
+                .orElseThrow(() -> new ApiException(ErrorCode.POST_NOT_FOUND));
+
+        if (!post.getAuthorId().equals(userId)) {
+            throw new ApiException(ErrorCode.FORBIDDEN);
+        }
+
+        post.setStatus("DELETED");
+        postRepository.save(post);
     }
 
     private String normalizeVisibility(String visibility) {
