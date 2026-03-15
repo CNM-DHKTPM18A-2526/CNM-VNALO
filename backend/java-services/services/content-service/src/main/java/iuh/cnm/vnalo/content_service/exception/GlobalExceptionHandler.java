@@ -42,13 +42,15 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(body);
     }
 
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<?> handleException(Exception ex) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("timestamp", OffsetDateTime.now());
-        body.put("code", ErrorCode.INTERNAL_ERROR.getCode());
-        body.put("message", ErrorCode.INTERNAL_ERROR.getMessage());
+   @ExceptionHandler(Exception.class)
+public ResponseEntity<?> handleException(Exception ex) {
+    ex.printStackTrace();
 
-        return ResponseEntity.status(ErrorCode.INTERNAL_ERROR.getStatus()).body(body);
-    }
+    Map<String, Object> body = new HashMap<>();
+    body.put("timestamp", OffsetDateTime.now());
+    body.put("code", ErrorCode.INTERNAL_ERROR.getCode());
+    body.put("message", ex.getMessage());
+
+    return ResponseEntity.status(ErrorCode.INTERNAL_ERROR.getStatus()).body(body);
+}
 }
