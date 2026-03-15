@@ -94,7 +94,7 @@ Both services share a single **PostgreSQL** database and communicate via shared 
 | Primary | PostgreSQL 16 | All persistent data (users, messages, conversations) |
 | Cache | Redis 7 | Session store, presence, rate limiting |
 
-Migrations: Flyway (V1–V9), managed in `core-service/src/main/resources/db/migration/`
+Migrations: Flyway (V1–V10), managed in `core-service/src/main/resources/db/migration/`
 
 ---
 

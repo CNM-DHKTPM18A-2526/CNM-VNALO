@@ -12,6 +12,28 @@ _No unreleased changes._
 
 ---
 
+## [2026-03-15] — V10 Migration, Mobile Fixes, Docs Cleanup
+
+### Added
+- **V10 migration**: Schema hardening — idempotent guards for V9 column renames, uniqueness constraints (`uq_msg_conv_seq`, `uq_msg_sender_client_id`), FK integrity for inbox/member → user_profile, performance indexes
+- **Mobile implementation guides**: Parts 1–4 now fully self-contained (~3,730 lines total). Restored 5 placeholder sections with complete code (services, providers, screens, navigation, testing)
+
+### Fixed
+- **Mobile `main.dart`**: Added `ChangeNotifierProvider<ThemeProvider>` wrapper; removed leftover counter template code
+- **Mobile `theme_provider.dart`**: Fixed swapped dark/light labels
+- **Mobile `app_typography.dart`**: Removed references to non-existent `AppColors.textPrimary/textSecondary`
+
+### Removed
+- **Mobile `app_color_light.dart`**: Deleted empty 0-byte duplicate file
+- **Docs cleanup**: Removed `VNALO_Complete_Database_Schema.md` (duplicate), `VNALO_Project_Docs.md` (superseded), `SYSTEM_TEST_REPORT.md` (superseded by newer reports), empty `architecture/` directory
+
+### Changed
+- **`docs/system/architecture.md`**: Updated migration ref V1–V9 → V1–V10
+- **`docs/project/status.md`**: Added V10 migration, mobile frontend section, updated test counts
+- **`docs/README.md`**: Updated structure table to match actual files
+
+---
+
 ## [2026-02-16] — Documentation Audit & Corrections
 
 ### Fixed
