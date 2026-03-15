@@ -1,6 +1,5 @@
 package iuh.cnm.vnalo.content_service.service;
 
-import iuh.cnm.vnalo.content_service.repository.StoryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -11,13 +10,13 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class StoryExpirationJob {
 
-    private final StoryRepository storyRepository;
+    private final StoryService storyService;
 
     @Scheduled(fixedRate = 600000)
-    public void cleanupExpiredStories() {
-
-        log.info("Checking expired stories...");
-
-        // có thể update status expired
+    public void expireStories() {
+        int count = storyService.expireStories();
+        if (count > 0) {
+            log.info("Expired {} stories", count);
+        }
     }
 }

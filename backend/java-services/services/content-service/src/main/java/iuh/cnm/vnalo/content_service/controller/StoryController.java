@@ -2,6 +2,7 @@ package iuh.cnm.vnalo.content_service.controller;
 
 import iuh.cnm.vnalo.content_service.model.dto.CreateStoryRequest;
 import iuh.cnm.vnalo.content_service.model.dto.StoryResponse;
+import iuh.cnm.vnalo.content_service.model.dto.StoryViewResponse;
 import iuh.cnm.vnalo.content_service.service.StoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -39,5 +40,19 @@ public class StoryController {
             @RequestHeader("X-User-Id") UUID userId
     ) {
         storyService.deleteStory(storyId, userId);
+    }
+
+    @PostMapping("/{storyId}/view")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void markViewed(
+            @PathVariable UUID storyId,
+            @RequestHeader("X-User-Id") UUID userId
+    ) {
+        storyService.markViewed(storyId, userId);
+    }
+
+    @GetMapping("/{storyId}/views")
+    public List<StoryViewResponse> getStoryViews(@PathVariable UUID storyId) {
+        return storyService.getStoryViews(storyId);
     }
 }
