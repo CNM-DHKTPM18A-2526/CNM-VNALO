@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import iuh.cnm.vnalo.notification_service.kafka.dto.NotificationEvent;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -69,4 +70,31 @@ public class NotificationService {
         pushService.sendToUser(req.getUserId(), req.getTitle(), req.getBody(), req.getData());
         return saved;
     }
+
+    @Transactional
+    public Notification sendFromEvent(NotificationEvent event) {
+        return notificationRepo.findByEventId(event.eventId())
+            .orElseGet(() -> {
+                Notification n = Notification.builder()
+                        .eventId(event.eventId())
+                        .userId(event.userId())
+                        .type(event.eventType())
+                        .title(event.title())
+                        .body(event.body())
+                        .data(event.data())
+                        .isRead(false)
+                        .build();
+
+                Notification saved = notificationRepo.save(n);
+
+                pushService.sendToUser(
+                        event.userId(),
+                        event.title(),
+                        event.body(),
+                        event.data()
+                );
+
+                return saved;
+            });
+}
 }

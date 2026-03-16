@@ -9,9 +9,12 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface NotificationRepository extends JpaRepository<Notification, UUID> {
+
     Page<Notification> findByUserIdOrderByCreatedAtDesc(UUID userId, Pageable pageable);
 
     long countByUserIdAndIsReadFalse(UUID userId);
 
     Optional<Notification> findByNotificationIdAndUserId(UUID notificationId, UUID userId);
+
+    Optional<Notification> findByEventId(UUID eventId);
 }

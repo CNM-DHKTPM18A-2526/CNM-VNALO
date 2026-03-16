@@ -16,13 +16,22 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "notification", schema = "notification")
+@Table(
+        name = "notification",
+        schema = "notification",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_notification_event_id", columnNames = "event_id")
+        }
+)
 public class Notification {
 
     @Id
     @GeneratedValue
     @Column(name = "notification_id")
     private UUID notificationId;
+
+    @Column(name = "event_id", unique = true)
+    private UUID eventId;
 
     @Column(name = "user_id", nullable = false)
     private UUID userId;
@@ -40,6 +49,7 @@ public class Notification {
     @Column(columnDefinition = "jsonb")
     private JsonNode data;
 
+    @Builder.Default
     @Column(name = "is_read")
     private Boolean isRead = false;
 

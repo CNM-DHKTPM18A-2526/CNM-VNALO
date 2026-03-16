@@ -25,20 +25,11 @@ public void consume(NotificationEvent event, Acknowledgment ack) {
         log.info("Consume NotificationEvent eventId={} type={} userId={}",
                 event.eventId(), event.eventType(), event.userId());
 
-        CreateNotificationRequest req = new CreateNotificationRequest();
-        req.setUserId(event.userId());
-        req.setType(event.eventType());
-        req.setTitle(event.title());
-        req.setBody(event.body());
-        req.setData(event.data());
+        notificationService.sendFromEvent(event);
 
-        notificationService.send(req);
-
-        // ✅ chỉ ACK khi xử lý thành công
         ack.acknowledge();
     } catch (Exception e) {
         log.error("Consume failed eventId={} error={}", event.eventId(), e.getMessage(), e);
-        // ❌ không ACK -> để Kafka retry/DLT
         throw e;
     }
 }
