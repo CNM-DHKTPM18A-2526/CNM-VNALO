@@ -269,7 +269,7 @@ CREATE TABLE conversation (
     created_by UUID NOT NULL,
     status VARCHAR(20) DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'ARCHIVED', 'DISABLED')),
     join_mode VARCHAR(20) DEFAULT 'INVITE_ONLY' CHECK (join_mode IN ('OPEN', 'APPROVAL', 'INVITE_ONLY')),
-    member_limit INT DEFAULT 1000,
+    member_limit INT DEFAULT 100,
     invite_link VARCHAR(100) UNIQUE,
     invite_link_expires_at TIMESTAMPTZ,
     is_encrypted BOOLEAN DEFAULT FALSE,

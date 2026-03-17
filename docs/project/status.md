@@ -64,6 +64,7 @@
 | V8 | ✅ Applied | conversation, conversation_member, message, conversation_inbox |
 | V9 | ✅ Applied | message_reaction, pinned_message, message_receipt |
 | V10 | ✅ Applied | Schema hardening, idempotent guards, uniqueness constraints, FK integrity, performance indexes |
+| V11 | ✅ Applied | Group member_limit default 1000→100, backfill existing groups |
 
 ---
 

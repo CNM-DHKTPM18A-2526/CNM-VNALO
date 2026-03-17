@@ -49,7 +49,7 @@ export class Conversation {
   @Column({ name: 'join_mode', type: 'varchar', length: 20, enum: JoinMode, default: JoinMode.INVITE_ONLY })
   joinMode: JoinMode;
 
-  @Column({ name: 'member_limit', type: 'int', default: 1000 })
+  @Column({ name: 'member_limit', type: 'int', default: 100 })
   memberLimit: number;
 
   @Column({ name: 'invite_link', type: 'varchar', length: 100, nullable: true, unique: true })
