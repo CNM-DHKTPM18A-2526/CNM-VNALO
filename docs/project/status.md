@@ -15,7 +15,7 @@
 | QR Module | ✅ Complete | 3 | — |
 | Contact Sync | ✅ Complete | 4 | — |
 | Conversations | ✅ Complete | 6 | ✅ conversation.service.spec |
-| Messages (CRUD + Search) | ✅ Complete | 5 | ✅ message.service.spec |
+| Messages (CRUD + Delete for Me) | ✅ Complete | 6 | ✅ message.service.spec |
 | Reactions | ✅ Complete | 3 | — |
 | Pins | ✅ Complete | 3 | — |
 | Read Receipts | ✅ Complete | 1 | — |
@@ -65,6 +65,7 @@
 | V9 | ✅ Applied | message_reaction, pinned_message, message_receipt |
 | V10 | ✅ Applied | Schema hardening, idempotent guards, uniqueness constraints, FK integrity, performance indexes |
 | V11 | ✅ Applied | Group member_limit default 1000→100, backfill existing groups |
+| V12 | ✅ Applied | Thêm cột hidden_by_users cho tính năng Delete For Me |
 
 ---
 

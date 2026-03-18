@@ -104,7 +104,14 @@ _No unreleased changes._
 
 ---
 
-## [2026-02-12] — Node Services Restructure
+## [Unreleased]
+
+### Added
+- **V12 Migration**: Added `hidden_by_users` array (UUID[]) to `message` table.
+- **Delete For Me Feature** (Xóa ở máy tôi): Implemented new endpoint `DELETE /messages/:id/for-me`. Messages are efficiently hidden from the requesting user using the new V12 column, keeping read queries at O(1) without slow join mapping tables.
+- **Admin Recall** (Xóa cho cả nhóm): Group `OWNER` and `ADMIN` can now successfully hit `DELETE /messages/:id` to recall messages sent by any member in their conversation.
+
+## [2026-03-04] — V11 Migration & Performance Tune
 
 ### Changed
 - Restructured `node-services` from multi-app workspace to flat NestJS monorepo

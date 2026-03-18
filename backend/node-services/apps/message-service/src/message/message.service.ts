@@ -3,12 +3,12 @@ import {
   BadRequestException, Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan, DataSource, IsNull, type EntityManager } from 'typeorm';
+import { Repository, LessThan, DataSource, IsNull, type EntityManager, Raw } from 'typeorm';
 import { Message, MessageType, MessageStatus } from '../entities/message.entity';
 import { MessageReaction } from '../entities/message-reaction.entity';
 import { PinnedMessage } from '../entities/pinned-message.entity';
 import { ConversationInbox } from '../entities/conversation-inbox.entity';
-import { ConversationMember } from '../entities/conversation-member.entity';
+import { ConversationMember, MemberRole } from '../entities/conversation-member.entity';
 import { ConversationService } from '../conversation/conversation.service';
 import { SendMessageDto } from '../dto/send-message.dto';
 import { InjectRedis } from '@nestjs-modules/ioredis';
@@ -122,6 +122,8 @@ export class MessageService {
     if (before !== undefined) {
       where.serverSeq = LessThan(before);
     }
+    // Exclude messages hidden by this user
+    where.hiddenByUsers = Raw((alias) => `NOT ('${userId}'::uuid = ANY(${alias}))`);
 
     return this.messageRepo.find({
       where,
@@ -147,7 +149,8 @@ export class MessageService {
     const qb = this.messageRepo
       .createQueryBuilder('m')
       .where('m.conversation_id = :cid', { cid: conversationId })
-      .andWhere('m.status != :recalled', { recalled: MessageStatus.RECALLED });
+      .andWhere('m.status != :recalled', { recalled: MessageStatus.RECALLED })
+      .andWhere(`NOT (:userId = ANY(m.hidden_by_users))`, { userId });
 
     if (keyword) {
       qb.andWhere('m.content ILIKE :keyword', { keyword: `%${keyword}%` });
@@ -194,7 +197,12 @@ export class MessageService {
     const message = await this.findMessageOrFail(messageId);
 
     if (message.senderId !== userId) {
-      throw new ForbiddenException('You can only recall your own messages');
+      const member = await this.memberRepo.findOne({
+        where: { conversationId: message.conversationId, userId }
+      });
+      if (!member || (member.role !== MemberRole.OWNER && member.role !== MemberRole.ADMIN)) {
+        throw new ForbiddenException('You can only recall your own messages or you must be an Admin');
+      }
     }
 
     if (message.status === MessageStatus.RECALLED) {
@@ -501,5 +509,21 @@ export class MessageService {
         seq: recalledMessage.serverSeq,
       })
       .execute();
+  }
+
+  /**
+   * Hide a message for the user ("Xóa ở máy tôi").
+   * Appends the userId to the hiddenByUsers array in the database.
+   */
+  async deleteForMe(userId: string, messageId: string): Promise<void> {
+    await this.findMessageOrFail(messageId); // ensure it exists
+    
+    // Use raw query for efficiently appending to the array without fetching it
+    await this.dataSource.query(
+      `UPDATE message SET hidden_by_users = array_append(hidden_by_users, $1::uuid) WHERE id = $2::uuid AND NOT ($1::uuid = ANY(hidden_by_users))`,
+      [userId, messageId]
+    );
+
+    this.logger.log(`Message ${messageId} deleted for me by user ${userId}`);
   }
 }

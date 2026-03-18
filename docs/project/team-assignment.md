@@ -11,7 +11,7 @@
 | **Dev 1** (Leader) | Tech Lead, Critical Path | core-service, message-service | 🔴 Very High |
 | **Dev 2** | Real-time & Infrastructure | realtime-gateway, media-service | 🔴 High |
 | **Dev 3** | User Features | content-service, notification-service | 🟡 Medium |
-| **Dev 4** | Admin & Support | moderation-service, analytics-service | 🟢 Low-Medium |
+| **Dev 4** | Admin & Support | moderation-service, analytics-service, ai-service | 🟡 Medium |
 
 ---
 
@@ -67,6 +67,10 @@
 - Logging: activity, API requests, errors
 - Stats: DAU, message count, storage
 
+### ai-service (Python / FastAPI or Node.js)
+- Chatbots: Answer user queries, provide support, guide usage
+- Knowledge bounds: Limit answers to permitted scope (FAQs, System rules)
+
 ---
 
 ## Critical Path
@@ -86,6 +90,6 @@ Week 4:   realtime-gateway (WebSocket scaling)
 | 1 | Setup + Auth | Docker/Redis | DB Schema | CI/CD |
 | 2 | User + Social | Media Upload | Story | Analytics |
 | 3 | Messaging | Realtime GW | Timeline | Moderation |
-| 4 | Search, QR | Stickers | Notifications | Auto-mod |
+| 4 | Search, QR | Stickers | Notifications | AI Chatbot |
 | 5 | Testing | Load Testing | API Docs | Monitoring |
 | 6 | Deployment | Infrastructure | Mobile Test | Documentation |
