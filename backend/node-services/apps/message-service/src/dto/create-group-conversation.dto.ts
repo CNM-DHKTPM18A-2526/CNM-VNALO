@@ -23,6 +23,6 @@ export class CreateGroupConversationDto {
   @IsArray()
   @IsUUID('4', { each: true })
   @ArrayMinSize(1)
-  @ArrayMaxSize(999)
+  @ArrayMaxSize(99)
   memberIds: string[];
 }

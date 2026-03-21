@@ -4,9 +4,10 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, IsNull } from 'typeorm';
-import { Conversation, ConversationType, ConversationStatus } from '../entities/conversation.entity';
+import { Conversation, ConversationType, ConversationStatus, JoinMode } from '../entities/conversation.entity';
 import { ConversationMember, MemberRole } from '../entities/conversation-member.entity';
 import { ConversationDirectMap } from '../entities/conversation-direct-map.entity';
+import { ConversationJoinRequest } from '../entities/conversation-join-request.entity';
 import { CreateGroupConversationDto } from '../dto/create-group-conversation.dto';
 import { UpdateConversationDto } from '../dto/update-conversation.dto';
 
@@ -21,6 +22,8 @@ export class ConversationService {
     private readonly memberRepo: Repository<ConversationMember>,
     @InjectRepository(ConversationDirectMap)
     private readonly directMapRepo: Repository<ConversationDirectMap>,
+    @InjectRepository(ConversationJoinRequest)
+    private readonly joinRequestRepo: Repository<ConversationJoinRequest>,
     private readonly dataSource: DataSource,
   ) { }
 
@@ -84,6 +87,7 @@ export class ConversationService {
         avatarUrl: dto.avatarUrl ?? null,
         joinMode: dto.joinMode,
         createdBy: userId,
+        status: ConversationStatus.ACTIVE,
       });
       const saved = await manager.save(conversation);
 
@@ -92,16 +96,22 @@ export class ConversationService {
         { conversationId: saved.id, userId, role: MemberRole.OWNER },
       ];
 
+      const uniqueInitialMembers = [...new Set(dto.memberIds)].filter((memberId) => memberId !== userId);
+      const effectiveMemberLimit = saved.memberLimit ?? 100;
+      if (uniqueInitialMembers.length + 1 > effectiveMemberLimit) {
+        throw new BadRequestException(
+          `Cannot exceed member limit of ${effectiveMemberLimit}. Initial members: ${uniqueInitialMembers.length + 1}`,
+        );
+      }
+
       // Add initial members
-      for (const memberId of dto.memberIds) {
-        if (memberId !== userId) {
-          members.push({
-            conversationId: saved.id,
-            userId: memberId,
-            role: MemberRole.MEMBER,
-            joinedBy: userId,
-          });
-        }
+      for (const memberId of uniqueInitialMembers) {
+        members.push({
+          conversationId: saved.id,
+          userId: memberId,
+          role: MemberRole.MEMBER,
+          joinedBy: userId,
+        });
       }
 
       await manager.save(ConversationMember, members);
@@ -156,18 +166,35 @@ export class ConversationService {
       throw new ForbiddenException('You do not have permission to add members');
     }
 
-    // Enforce member limit
-    const currentMemberCount = await this.memberRepo.count({
-      where: { conversationId, leftAt: IsNull() },
-    });
+    if (conversation.joinMode === JoinMode.INVITE_ONLY && membership.role === MemberRole.MEMBER) {
+      throw new ForbiddenException('Only admin or owner can add members in invite-only groups');
+    }
 
     const newMembers: Partial<ConversationMember>[] = [];
+    const pendingApprovals: string[] = [];
     for (const memberId of memberIds) {
+      if (memberId === userId) {
+        continue;
+      }
+
       // Skip if already a member
       const exists = await this.memberRepo.findOne({
         where: { conversationId, userId: memberId, leftAt: IsNull() },
       });
-      if (!exists) {
+
+      if (exists) {
+        continue;
+      }
+
+      if (conversation.joinMode === JoinMode.APPROVAL && membership.role === MemberRole.MEMBER) {
+        await this.joinRequestRepo
+          .createQueryBuilder()
+          .insert()
+          .values({ conversationId, userId: memberId, requestedBy: userId })
+          .orIgnore()
+          .execute();
+        pendingApprovals.push(memberId);
+      } else {
         newMembers.push({
           conversationId,
           userId: memberId,
@@ -177,18 +204,18 @@ export class ConversationService {
       }
     }
 
-    if (currentMemberCount + newMembers.length > conversation.memberLimit) {
-      throw new BadRequestException(
-        `Cannot exceed member limit of ${conversation.memberLimit}. Current: ${currentMemberCount}, adding: ${newMembers.length}`,
-      );
-    }
-
     if (newMembers.length > 0) {
+      await this.ensureUnderMemberLimit(conversationId, conversation.memberLimit, newMembers.length);
       await this.memberRepo.save(newMembers);
       this.logger.log(`Added ${newMembers.length} members to ${conversationId}`);
     }
 
-    return this.getMembers(conversationId);
+    const members = await this.getMembers(conversationId, userId);
+    if (pendingApprovals.length > 0) {
+      return { members, pendingApprovals, status: 'PENDING_APPROVAL' };
+    }
+
+    return { members, pendingApprovals, status: 'ADDED' };
   }
 
   /** Remove a member or leave conversation. OWNER cannot leave without transfer. */
@@ -218,11 +245,118 @@ export class ConversationService {
   }
 
   /** Get active members of a conversation. */
-  async getMembers(conversationId: string) {
+  async getMembers(conversationId: string, userId: string) {
+    await this.assertMember(conversationId, userId);
     return this.memberRepo.find({
       where: { conversationId, leftAt: IsNull() },
       order: { joinedAt: 'ASC' },
     });
+  }
+
+  /** Join a group by QR/invite link. */
+  async requestJoin(conversationId: string, userId: string) {
+    const conversation = await this.getConversationOrFail(conversationId);
+    if (conversation.type !== ConversationType.GROUP) {
+      throw new BadRequestException('Can only join group conversations');
+    }
+
+    const existingMember = await this.memberRepo.findOne({
+      where: { conversationId, userId, leftAt: IsNull() },
+    });
+    if (existingMember) {
+      return { status: 'ALREADY_MEMBER', conversationId, userId };
+    }
+
+    if (conversation.joinMode === JoinMode.INVITE_ONLY) {
+      throw new ForbiddenException('Group is invite-only');
+    }
+
+    if (conversation.joinMode === JoinMode.OPEN) {
+      await this.ensureUnderMemberLimit(conversationId, conversation.memberLimit, 1);
+      await this.memberRepo.save({
+        conversationId,
+        userId,
+        role: MemberRole.MEMBER,
+        joinedBy: null,
+      });
+      return { status: 'JOINED', conversationId, userId };
+    }
+
+    await this.joinRequestRepo
+      .createQueryBuilder()
+      .insert()
+      .values({ conversationId, userId, requestedBy: userId })
+      .orIgnore()
+      .execute();
+
+    return { status: 'PENDING_APPROVAL', conversationId, userId };
+  }
+
+  /** Get pending requests. Only ADMIN/OWNER. */
+  async getJoinRequests(conversationId: string, userId: string) {
+    await this.assertAdminOrOwner(conversationId, userId);
+    return this.joinRequestRepo.find({
+      where: { conversationId },
+      order: { requestedAt: 'ASC' },
+    });
+  }
+
+  /** Approve a join request and add member. */
+  async approveJoinRequest(conversationId: string, approverId: string, targetUserId: string) {
+    const conversation = await this.getConversationOrFail(conversationId);
+    if (conversation.type !== ConversationType.GROUP) {
+      throw new BadRequestException('Can only approve for group conversations');
+    }
+
+    await this.assertAdminOrOwner(conversationId, approverId);
+
+    const request = await this.joinRequestRepo.findOne({
+      where: { conversationId, userId: targetUserId },
+    });
+    if (!request) {
+      throw new NotFoundException('Join request not found');
+    }
+
+    const existingMember = await this.memberRepo.findOne({
+      where: { conversationId, userId: targetUserId, leftAt: IsNull() },
+    });
+    if (existingMember) {
+      await this.joinRequestRepo.delete({ conversationId, userId: targetUserId });
+      return { status: 'ALREADY_MEMBER', conversationId, userId: targetUserId };
+    }
+
+    await this.ensureUnderMemberLimit(conversationId, conversation.memberLimit, 1);
+
+    await this.dataSource.transaction(async (manager) => {
+      await manager.save(ConversationMember, {
+        conversationId,
+        userId: targetUserId,
+        role: MemberRole.MEMBER,
+        joinedBy: approverId,
+      });
+      await manager.delete(ConversationJoinRequest, { conversationId, userId: targetUserId });
+    });
+
+    return { status: 'APPROVED', conversationId, userId: targetUserId };
+  }
+
+  /** Reject a pending join request. */
+  async rejectJoinRequest(conversationId: string, approverId: string, targetUserId: string) {
+    await this.assertAdminOrOwner(conversationId, approverId);
+    const result = await this.joinRequestRepo.delete({ conversationId, userId: targetUserId });
+    if ((result.affected ?? 0) === 0) {
+      throw new NotFoundException('Join request not found');
+    }
+    return { status: 'REJECTED', conversationId, userId: targetUserId };
+  }
+
+  /** Verify role/setting policy for pin/unpin actions. */
+  async assertCanPinMessage(conversationId: string, userId: string): Promise<void> {
+    const conversation = await this.getConversationOrFail(conversationId);
+    const member = await this.assertMember(conversationId, userId);
+    if (member.role === MemberRole.MEMBER && !conversation.allowMemberPin) {
+      throw new ForbiddenException('Only admin/owner can pin in this group');
+    }
   }
 
   /** Verify user is an active member. Throws if not. */
@@ -241,5 +375,29 @@ export class ConversationService {
       throw new ForbiddenException('Admin or owner access required');
     }
     return member;
+  }
+
+  private async getConversationOrFail(conversationId: string): Promise<Conversation> {
+    const conversation = await this.conversationRepo.findOne({ where: { id: conversationId } });
+    if (!conversation) {
+      throw new NotFoundException('Conversation not found');
+    }
+    return conversation;
+  }
+
+  private async ensureUnderMemberLimit(
+    conversationId: string,
+    memberLimit: number,
+    addingCount: number,
+  ): Promise<void> {
+    const currentMemberCount = await this.memberRepo.count({
+      where: { conversationId, leftAt: IsNull() },
+    });
+
+    if (currentMemberCount + addingCount > memberLimit) {
+      throw new BadRequestException(
+        `Cannot exceed member limit of ${memberLimit}. Current: ${currentMemberCount}, adding: ${addingCount}`,
+      );
+    }
   }
 }

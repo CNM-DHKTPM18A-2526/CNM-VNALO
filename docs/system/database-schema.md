@@ -1,9 +1,11 @@
 # Complete Database Schema - VNALO
 
-> **Version**: 1.0 - Aligned with Class Diagrams  
-> **Last Updated**: January 29, 2026  
-> **Database**: PostgreSQL (metadata) + Cassandra (messages) + Redis (cache/realtime)  
+> **Version**: 1.1 - Reconciled with current runtime  
+> **Last Updated**: March 20, 2026  
+> **Database (current runtime)**: PostgreSQL + Redis  
 > **Project**: VNALO - Modern messaging platform with microservices architecture
+
+> Reconcile note: Một số phần phía dưới mô tả thiết kế mở rộng/historical (ví dụ Cassandra, media/story/timeline tables). Phần đang vận hành thực tế của repository hiện tại tập trung vào PostgreSQL + Redis, với migration Flyway đến `V13`.
 
 ---
 
@@ -14,8 +16,8 @@
 │                         DATABASE ARCHITECTURE                                │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
-│   PostgreSQL (RDS)             Cassandra (Keyspaces)        Redis (Elc.)    │
-│   ────────────────             ─────────────────────        ─────────────   │
+│   PostgreSQL (runtime)         Cassandra (historical)       Redis (runtime) │
+│   ───────────────────          ─────────────────────        ─────────────── │
 │   • Auth (3 tables)            • messages_by_conversation   • Sessions      │
 │   • User Profile (3)           • message_idempotency        • Presence      │
 │   • Social Graph (4)           • messages_by_user           • Rate Limit    │
@@ -32,10 +34,16 @@
 │   • Event Outbox (1)                                                        │
 │   • Backup (2)                                                              │
 │                                                                              │
-│   Total: 71 tables (PostgreSQL: 68, Cassandra: 3)                           │
+│   Note: "Total 71 tables" is historical design scope, not current runtime. │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
+
+## Current Runtime Scope (Reconciled)
+
+- Authoritative schema for current backend runtime: Flyway `V1` to `V13` in `core-service`.
+- Message-service data is persisted in PostgreSQL entities/tables (not Cassandra in current repo runtime).
+- Redis is used for sequence generation and cache/presence support.
 
 ---
 
@@ -268,7 +276,7 @@ CREATE TABLE conversation (
     description VARCHAR(500),
     created_by UUID NOT NULL,
     status VARCHAR(20) DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'ARCHIVED', 'DISABLED')),
-    join_mode VARCHAR(20) DEFAULT 'INVITE_ONLY' CHECK (join_mode IN ('OPEN', 'APPROVAL', 'INVITE_ONLY')),
+    join_mode VARCHAR(20) DEFAULT 'OPEN' CHECK (join_mode IN ('OPEN', 'APPROVAL', 'INVITE_ONLY')),
     member_limit INT DEFAULT 100,
     invite_link VARCHAR(100) UNIQUE,
     invite_link_expires_at TIMESTAMPTZ,
@@ -324,20 +332,18 @@ CREATE TABLE conversation_direct_map (
 CREATE INDEX idx_direct_map_conv ON conversation_direct_map(conversation_id);
 ```
 
-### 4.4 `group_join_request`
+### 4.4 `conversation_join_request`
 ```sql
-CREATE TABLE group_join_request (
-    request_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+CREATE TABLE conversation_join_request (
     conversation_id UUID NOT NULL,
     user_id UUID NOT NULL,
-    message VARCHAR(200),
-    status VARCHAR(20) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')),
-    reviewed_by UUID,
-    reviewed_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    requested_by UUID NOT NULL,
+    requested_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (conversation_id, user_id)
 );
 
-CREATE INDEX idx_group_join_conv ON group_join_request(conversation_id, status);
+CREATE INDEX idx_conv_join_request_conversation ON conversation_join_request(conversation_id);
+CREATE INDEX idx_conv_join_request_requested_by ON conversation_join_request(requested_by);
 ```
 
 ### 4.5 `group_banned_member`
@@ -378,6 +384,8 @@ CREATE INDEX idx_inbox_unread ON conversation_inbox(user_id, unread_count) WHERE
 ---
 
 ## 5. Message Service Database (Cassandra)
+
+> Historical/Planned: Không phải datastore đang chạy trong codebase hiện tại. Message-service hiện dùng PostgreSQL (TypeORM entities + Flyway migrations ở core-service) và Redis cho sequence/cache.
 
 > ✅ **Status**: Matched with Class Diagram (with denormalization for Cassandra)
 

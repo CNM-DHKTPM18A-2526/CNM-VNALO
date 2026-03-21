@@ -8,7 +8,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
-_No unreleased changes._
+### Added
+- **V13 migration**: Added `conversation_join_request` table and indexes for group join approval flow.
+- **Group join approval APIs**: `POST /conversations/{id}/join`, `GET /conversations/{id}/join-requests`, `POST /conversations/{id}/join-requests/{uid}/approve`, `DELETE /conversations/{id}/join-requests/{uid}`.
+
+### Fixed
+- **WebSocket room authorization**: `conversation.join` now verifies membership before room join.
+- **Conversation members endpoint**: `GET /conversations/{id}/members` now enforces requester membership.
+- **Pin/Unpin policy**: Members can pin/unpin only when `allowMemberPin=true`; otherwise admin/owner only.
+- **Recall integrity**: WS `message.recalled` now emits to the real message conversation, not client-provided `conversationId`.
+- **Delete for me authorization**: `DELETE /messages/{id}/for-me` now validates conversation membership.
+- **CORS hardening**: Node and Java services now use configurable explicit origin allow-lists instead of wildcard origins.
+
+### Changed
+- **Group default join mode**: changed to `OPEN` (Zalo-like default), while `APPROVAL` remains configurable.
 
 ---
 
@@ -104,12 +117,10 @@ _No unreleased changes._
 
 ---
 
-## [Unreleased]
-
-### Added
+### Historical Notes (already shipped in earlier milestones)
 - **V12 Migration**: Added `hidden_by_users` array (UUID[]) to `message` table.
-- **Delete For Me Feature** (Xóa ở máy tôi): Implemented new endpoint `DELETE /messages/:id/for-me`. Messages are efficiently hidden from the requesting user using the new V12 column, keeping read queries at O(1) without slow join mapping tables.
-- **Admin Recall** (Xóa cho cả nhóm): Group `OWNER` and `ADMIN` can now successfully hit `DELETE /messages/:id` to recall messages sent by any member in their conversation.
+- **Delete For Me Feature** (Xóa ở máy tôi): Endpoint `DELETE /messages/:id/for-me` implemented.
+- **Admin Recall** (Xóa cho cả nhóm): Group `OWNER` and `ADMIN` can recall member messages in-group.
 
 ## [2026-03-04] — V11 Migration & Performance Tune
 

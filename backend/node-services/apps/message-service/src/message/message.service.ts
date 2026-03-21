@@ -238,7 +238,7 @@ export class MessageService {
 
   /** Pin a message in a conversation. Requires admin/owner or allowMemberPin. */
   async pinMessage(userId: string, conversationId: string, messageId: string) {
-    await this.conversationService.assertMember(conversationId, userId);
+    await this.conversationService.assertCanPinMessage(conversationId, userId);
     const message = await this.findMessageOrFail(messageId);
 
     if (message.conversationId !== conversationId) {
@@ -263,7 +263,7 @@ export class MessageService {
 
   /** Unpin a message from a conversation. */
   async unpinMessage(userId: string, conversationId: string, messageId: string) {
-    await this.conversationService.assertMember(conversationId, userId);
+    await this.conversationService.assertCanPinMessage(conversationId, userId);
 
     const pin = await this.pinRepo.findOne({ where: { conversationId, messageId } });
     if (!pin) throw new NotFoundException('Pin not found');
@@ -516,7 +516,8 @@ export class MessageService {
    * Appends the userId to the hiddenByUsers array in the database.
    */
   async deleteForMe(userId: string, messageId: string): Promise<void> {
-    await this.findMessageOrFail(messageId); // ensure it exists
+    const message = await this.findMessageOrFail(messageId);
+    await this.conversationService.assertMember(message.conversationId, userId);
     
     // Use raw query for efficiently appending to the array without fetching it
     await this.dataSource.query(
