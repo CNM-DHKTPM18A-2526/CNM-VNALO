@@ -58,6 +58,34 @@ export class ConversationController {
 
   @Get(':id/members')
   getMembers(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return this.conversationService.getMembers(id);
+    return this.conversationService.getMembers(id, user.userId);
+  }
+
+  @Post(':id/join')
+  requestJoin(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.conversationService.requestJoin(id, user.userId);
+  }
+
+  @Get(':id/join-requests')
+  getJoinRequests(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.conversationService.getJoinRequests(id, user.userId);
+  }
+
+  @Post(':id/join-requests/:userId/approve')
+  approveJoinRequest(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('userId') targetUserId: string,
+  ) {
+    return this.conversationService.approveJoinRequest(id, user.userId, targetUserId);
+  }
+
+  @Delete(':id/join-requests/:userId')
+  rejectJoinRequest(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('userId') targetUserId: string,
+  ) {
+    return this.conversationService.rejectJoinRequest(id, user.userId, targetUserId);
   }
 }

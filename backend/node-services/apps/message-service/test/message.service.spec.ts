@@ -84,7 +84,10 @@ describe('MessageService', () => {
         { provide: getRepositoryToken(ConversationMember), useFactory: mockRepo },
         {
           provide: ConversationService,
-          useValue: { assertMember: jest.fn().mockResolvedValue({ userId, role: MemberRole.MEMBER, lastReadSeq: 5 }) },
+          useValue: {
+            assertMember: jest.fn().mockResolvedValue({ userId, role: MemberRole.MEMBER, lastReadSeq: 5 }),
+            assertCanPinMessage: jest.fn().mockResolvedValue(undefined),
+          },
         },
         { provide: DataSource, useValue: mockDataSource },
         { provide: IOREDIS_TOKEN, useValue: redisMock },

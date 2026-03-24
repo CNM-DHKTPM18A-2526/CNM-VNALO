@@ -20,7 +20,7 @@ Both services share a single **PostgreSQL** database and communicate via shared 
 | Service | Port | Technology | Responsibility |
 |---------|------|------------|---------------|
 | **core-service** | 8081 | Spring Boot 3.4, Java 21 | Auth, User profiles, Friends, Blocks, QR, Contact Sync |
-| **message-service** | 8082 | NestJS 11, TypeScript | Conversations, Messages, Inbox, WebSocket gateway |
+| **message-service** | 3000 (default) | NestJS 11, TypeScript | Conversations, Messages, Inbox, WebSocket gateway |
 
 ### Future Services (Planned)
 
@@ -30,6 +30,7 @@ Both services share a single **PostgreSQL** database and communicate via shared 
 | realtime-gateway | 8085 | Node.js | WebSocket scaling, presence |
 | content-service | 8092 | Spring Boot | Stories, Timeline |
 | notification-service | 8087 | Spring Boot | FCM push notifications |
+| ai-service | 8094 | Python/FastAPI | Support Chatbot, Q&A within permitted scope |
 
 ---
 
@@ -47,7 +48,7 @@ Both services share a single **PostgreSQL** database and communicate via shared 
 ┌───┴──────────┐  ┌───────────────┴──┐
 │ core-service │  │ message-service  │
 │ (Spring Boot)│  │ (NestJS)         │
-│ Port 8081    │  │ Port 8082        │
+│ Port 8081    │  │ Port 3000        │
 │              │  │                  │
 │ • Auth/JWT   │  │ • Conversations  │
 │ • Users      │  │ • Messages       │
@@ -78,8 +79,8 @@ Both services share a single **PostgreSQL** database and communicate via shared 
 - Client → message-service: Conversation CRUD, message history, search
 
 ### WebSocket (Real-time)
-- Client ↔ message-service: `send_message`, `typing_start/stop`, `presence`
-- Socket.IO with JWT authentication via handshake
+- Client ↔ message-service: `conversation.join`, `message.send`, `message.typing`, `message.read`, `presence.changed`
+- Socket.IO namespace `/chat` with JWT authentication via handshake
 
 ### Shared State
 - **JWT Secret**: Same `HS512` key across both services — tokens issued by core-service are validated by message-service
@@ -92,9 +93,9 @@ Both services share a single **PostgreSQL** database and communicate via shared 
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
 | Primary | PostgreSQL 16 | All persistent data (users, messages, conversations) |
-| Cache | Redis 7 | Session store, presence, rate limiting |
+| Cache | Redis 7 | Sequence generator (`INCR`), pub/sub support, cache |
 
-Migrations: Flyway (V1–V10), managed in `core-service/src/main/resources/db/migration/`
+Migrations: Flyway (V1–V13), managed in `core-service/src/main/resources/db/migration/`
 
 ---
 
@@ -103,7 +104,7 @@ Migrations: Flyway (V1–V10), managed in `core-service/src/main/resources/db/mi
 ### Development
 - Docker Compose: PostgreSQL + Redis
 - core-service: `mvn spring-boot:run` (port 8081)
-- message-service: `npm run start:dev` (port 8082)
+- message-service: `npm run start:dev` (default port 3000)
 
 ### Production (Planned)
 - AWS EKS (Kubernetes)

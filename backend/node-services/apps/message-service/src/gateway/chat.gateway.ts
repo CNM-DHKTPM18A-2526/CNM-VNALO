@@ -3,11 +3,18 @@ import {
   OnGatewayConnection, OnGatewayDisconnect, MessageBody,
   ConnectedSocket,
 } from '@nestjs/websockets';
-import { Logger } from '@nestjs/common';
+import { Logger, UseGuards } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { MessageService } from '../message/message.service';
 import { SendMessageDto } from '../dto/send-message.dto';
+import { WsJwtGuard } from '../auth/ws-jwt.guard';
+import { ConversationService } from '../conversation/conversation.service';
+
+const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? 'http://localhost:3000,http://localhost:5173')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 /**
  * WebSocket gateway for real-time chat.
@@ -21,10 +28,14 @@ import { SendMessageDto } from '../dto/send-message.dto';
  * Room naming: `conversation:{conversationId}`
  */
 @WebSocketGateway({
-  cors: { origin: '*' },
+  cors: {
+    origin: allowedOrigins,
+    credentials: true,
+  },
   namespace: '/chat',
   transports: ['websocket', 'polling'],
 })
+@UseGuards(WsJwtGuard)
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
@@ -37,6 +48,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly jwtService: JwtService,
     private readonly messageService: MessageService,
+    private readonly conversationService: ConversationService,
   ) { }
 
   // ─── Connection Lifecycle ─────────────────────────────────
@@ -90,9 +102,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { conversationId: string },
   ) {
+    const userId = client.data.user.userId;
+    await this.conversationService.assertMember(data.conversationId, userId);
+
     const room = `conversation:${data.conversationId}`;
     await client.join(room);
-    this.logger.debug(`${client.data.user.userId} joined room ${room}`);
+    this.logger.debug(`${userId} joined room ${room}`);
     return { event: 'conversation.joined', data: { conversationId: data.conversationId } };
   }
 
@@ -143,10 +158,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const recalled = await this.messageService.recallMessage(userId, data.messageId);
 
       // Broadcast recall event to all clients in the room
-      const room = `conversation:${data.conversationId}`;
+      const room = `conversation:${recalled.conversationId}`;
       this.server.to(room).emit('message.recalled', {
         messageId: recalled.id,
-        conversationId: data.conversationId,
+        conversationId: recalled.conversationId,
         recalledBy: userId,
       });
 
@@ -163,12 +178,19 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { conversationId: string; isTyping: boolean },
   ) {
-    const room = `conversation:${data.conversationId}`;
-    client.to(room).emit('message.typing', {
-      userId: client.data.user.userId,
-      conversationId: data.conversationId,
-      isTyping: data.isTyping,
-    });
+    const userId = client.data.user.userId;
+    this.conversationService.assertMember(data.conversationId, userId)
+      .then(() => {
+        const room = `conversation:${data.conversationId}`;
+        client.to(room).emit('message.typing', {
+          userId,
+          conversationId: data.conversationId,
+          isTyping: data.isTyping,
+        });
+      })
+      .catch((err) => {
+        this.logger.warn(`Typing ignored for non-member user=${userId}: ${err.message}`);
+      });
   }
 
   /** Read receipt: mark messages as read and notify sender. */

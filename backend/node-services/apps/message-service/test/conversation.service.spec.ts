@@ -2,16 +2,18 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { ConversationService } from '../src/conversation/conversation.service';
-import { Conversation, ConversationType, ConversationStatus } from '../src/entities/conversation.entity';
+import { Conversation, ConversationType, JoinMode } from '../src/entities/conversation.entity';
 import { ConversationMember, MemberRole } from '../src/entities/conversation-member.entity';
 import { ConversationDirectMap } from '../src/entities/conversation-direct-map.entity';
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ConversationJoinRequest } from '../src/entities/conversation-join-request.entity';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 
 describe('ConversationService', () => {
   let service: ConversationService;
   let conversationRepo: jest.Mocked<Repository<Conversation>>;
   let memberRepo: jest.Mocked<Repository<ConversationMember>>;
   let directMapRepo: jest.Mocked<Repository<ConversationDirectMap>>;
+  let joinRequestRepo: jest.Mocked<Repository<ConversationJoinRequest>>;
   let dataSource: jest.Mocked<DataSource>;
 
   const mockUserId = '11111111-1111-1111-1111-111111111111';
@@ -19,11 +21,21 @@ describe('ConversationService', () => {
   const mockConvId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 
   beforeEach(async () => {
+    const mockQueryBuilder = {
+      insert: jest.fn().mockReturnThis(),
+      values: jest.fn().mockReturnThis(),
+      orIgnore: jest.fn().mockReturnThis(),
+      execute: jest.fn().mockResolvedValue({}),
+    };
+
     const mockRepo = () => ({
       findOne: jest.fn(),
       find: jest.fn(),
       save: jest.fn(),
       create: jest.fn(),
+      count: jest.fn(),
+      delete: jest.fn().mockResolvedValue({ affected: 1 }),
+      createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
     });
 
     const module: TestingModule = await Test.createTestingModule({
@@ -32,6 +44,7 @@ describe('ConversationService', () => {
         { provide: getRepositoryToken(Conversation), useFactory: mockRepo },
         { provide: getRepositoryToken(ConversationMember), useFactory: mockRepo },
         { provide: getRepositoryToken(ConversationDirectMap), useFactory: mockRepo },
+        { provide: getRepositoryToken(ConversationJoinRequest), useFactory: mockRepo },
         {
           provide: DataSource,
           useValue: {
@@ -42,6 +55,7 @@ describe('ConversationService', () => {
                   if (Array.isArray(data)) return data;
                   return { id: mockConvId, ...data };
                 }),
+                delete: jest.fn().mockResolvedValue({ affected: 1 }),
               }),
             ),
           },
@@ -53,7 +67,10 @@ describe('ConversationService', () => {
     conversationRepo = module.get(getRepositoryToken(Conversation));
     memberRepo = module.get(getRepositoryToken(ConversationMember));
     directMapRepo = module.get(getRepositoryToken(ConversationDirectMap));
+    joinRequestRepo = module.get(getRepositoryToken(ConversationJoinRequest));
     dataSource = module.get(DataSource);
+
+    memberRepo.count.mockResolvedValue(2);
   });
 
   describe('createDirect', () => {
@@ -117,6 +134,54 @@ describe('ConversationService', () => {
       await expect(service.updateGroup(mockConvId, mockUserId, { title: 'test' })).rejects.toThrow(
         ForbiddenException,
       );
+    });
+  });
+
+  describe('addMembers', () => {
+    it('should create pending approvals for APPROVAL groups when requester is MEMBER', async () => {
+      conversationRepo.findOne.mockResolvedValue({
+        id: mockConvId,
+        type: ConversationType.GROUP,
+        joinMode: JoinMode.APPROVAL,
+        allowMemberInvite: true,
+        memberLimit: 100,
+      } as any);
+
+      memberRepo.findOne
+        .mockResolvedValueOnce({ userId: mockUserId, role: MemberRole.MEMBER, leftAt: null } as any)
+        .mockResolvedValueOnce(null as any)
+        .mockResolvedValueOnce({ userId: mockUserId, role: MemberRole.MEMBER, leftAt: null } as any);
+
+      memberRepo.find.mockResolvedValue([] as any);
+
+      const result = await service.addMembers(mockConvId, mockUserId, [mockTargetId]);
+
+      expect(result.status).toBe('PENDING_APPROVAL');
+      expect(result.pendingApprovals).toContain(mockTargetId);
+      expect(joinRequestRepo.createQueryBuilder).toHaveBeenCalled();
+    });
+  });
+
+  describe('requestJoin', () => {
+    it('should create a pending request for APPROVAL mode', async () => {
+      conversationRepo.findOne.mockResolvedValue({
+        id: mockConvId,
+        type: ConversationType.GROUP,
+        joinMode: JoinMode.APPROVAL,
+        memberLimit: 100,
+      } as any);
+      memberRepo.findOne.mockResolvedValue(null as any);
+
+      const result = await service.requestJoin(mockConvId, mockTargetId);
+      expect(result.status).toBe('PENDING_APPROVAL');
+      expect(joinRequestRepo.createQueryBuilder).toHaveBeenCalled();
+    });
+  });
+
+  describe('getMembers', () => {
+    it('should require requester to be a member', async () => {
+      memberRepo.findOne.mockResolvedValue(null as any);
+      await expect(service.getMembers(mockConvId, mockUserId)).rejects.toThrow(ForbiddenException);
     });
   });
 

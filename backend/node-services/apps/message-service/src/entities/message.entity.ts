@@ -63,6 +63,9 @@ export class Message {
   @Column({ name: 'media_size_bytes', type: 'bigint', nullable: true })
   mediaSizeBytes: number | null;
 
+  @Column('uuid', { name: 'hidden_by_users', array: true, default: () => "'{}'" })
+  hiddenByUsers: string[];
+
   // Reply fields
   @Column({ name: 'reply_to_message_id', type: 'uuid', nullable: true })
   replyToMessageId: string | null;

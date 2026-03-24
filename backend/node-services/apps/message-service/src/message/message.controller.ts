@@ -58,6 +58,11 @@ export class MessageController {
     return this.messageService.recallMessage(user.userId, id);
   }
 
+  @Delete('messages/:id/for-me')
+  deleteForMe(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.messageService.deleteForMe(user.userId, id);
+  }
+
   // ─── Reactions ──────────────────────────────────
   @Post('messages/:id/reactions')
   addReaction(
