@@ -1,6 +1,6 @@
 # Implementation Status
 
-> Last updated: 2026-03-15
+> Last updated: 2026-03-20
 
 ---
 
@@ -14,12 +14,12 @@
 | Blocks | ✅ Complete | 4 | ✅ BlockServiceTest |
 | QR Module | ✅ Complete | 3 | — |
 | Contact Sync | ✅ Complete | 4 | — |
-| Conversations | ✅ Complete | 6 | ✅ conversation.service.spec |
+| Conversations | ✅ Complete | 11 | ✅ conversation.service.spec |
 | Messages (CRUD + Delete for Me) | ✅ Complete | 6 | ✅ message.service.spec |
 | Reactions | ✅ Complete | 3 | — |
 | Pins | ✅ Complete | 3 | — |
 | Read Receipts | ✅ Complete | 1 | — |
-| Inbox | ✅ Complete | 1 | — |
+| Inbox | ✅ Complete | 2 | — |
 | WebSocket Gateway | ✅ Complete | 7 events | — |
 
 **Total: 60/60 features implemented**
@@ -31,7 +31,7 @@
 | Module | Status | Notes |
 |--------|--------|-------|
 | realtime-gateway | ⏸️ Not started | Depends on message-service |
-| media-service | ⏸️ Not started | Upload, Cloudinary |
+| media-service | 🔄 In Progress | Upload to S3 (WIP) |
 
 ## Dev 3 — Content & Notifications
 
@@ -66,6 +66,7 @@
 | V10 | ✅ Applied | Schema hardening, idempotent guards, uniqueness constraints, FK integrity, performance indexes |
 | V11 | ✅ Applied | Group member_limit default 1000→100, backfill existing groups |
 | V12 | ✅ Applied | Thêm cột hidden_by_users cho tính năng Delete For Me |
+| V13 | ✅ Applied | `conversation_join_request`, default `join_mode=OPEN` |
 
 ---
 

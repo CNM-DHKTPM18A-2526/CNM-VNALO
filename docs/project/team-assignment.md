@@ -23,7 +23,7 @@
 - Social Module: Friends, Block, Contact Sync
 - QR Module: Generate/Scan QR
 
-### message-service (Port 8082 — NestJS)
+### message-service (Port 3000 default — NestJS)
 - Conversation: Create 1:1/Group, Member Management
 - Message: Send/Receive, History, Search, Edit/Delete
 - Metadata: Reactions, Read Receipts, Pins

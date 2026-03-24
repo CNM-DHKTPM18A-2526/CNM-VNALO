@@ -1,6 +1,8 @@
 <div align="center">
 
-# 💬 VNALO
+<img src="frontend/mobile/assets/icons/app_icon.png" alt="VNALO Logo" width="120" />
+
+# VNALO
 
 ### Enterprise-Grade Real-Time Messaging Platform
 
