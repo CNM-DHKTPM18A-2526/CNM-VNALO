@@ -155,7 +155,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               _navigateToHome(auth);
             },
             child: Text(
-              t.skip,
+              t.laterText,
               style: const TextStyle(color: Color(0xFF6B7280), fontSize: 16),
             ),
           ),
@@ -652,6 +652,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       Navigator.pop(sheetContext);
                     },
                   ),
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                    title: Text(
+                      t.genderNotShare,
+                      style: const TextStyle(
+                          fontSize: 18, color: Color(0xFF1F2937)),
+                    ),
+                    trailing: _gender == 'other'
+                        ? const Icon(Icons.check,
+                            color: AppColors.primary, size: 24)
+                        : null,
+                    onTap: () {
+                      setState(() => _gender = 'other');
+                      Navigator.pop(sheetContext);
+                    },
+                  ),
                 ],
               ),
             ),
@@ -663,68 +679,114 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _pickBirthday() async {
     final now = DateTime.now();
-    final maxDate = DateTime(now.year - 14, now.month, now.day);
     final initial = _birthday ?? DateTime(now.year - 18, now.month, now.day);
+    final t = AuthTexts.of(context, listen: false);
 
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         DateTime tempDate = initial;
-        return Container(
-          height: 320,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            children: [
-              // Header with Done button
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(sheetContext),
+        bool showWarning = false;
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return Container(
+              height: 380,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  // Header with Done button
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(sheetContext),
+                          child: Text(
+                            t.skip,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: Color(0xFF6B7280),
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: showWarning
+                              ? null
+                              : () {
+                                  setState(() => _birthday = tempDate);
+                                  Navigator.pop(sheetContext);
+                                },
+                          child: Text(
+                            t.continueText,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: showWarning
+                                  ? const Color(0xFFD1D5DB)
+                                  : AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Age restriction note
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      t.ageRestrictionNote,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF9CA3AF),
+                      ),
+                    ),
+                  ),
+                  // Warning if under 14
+                  if (showWarning)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
                       child: Text(
-                        AuthTexts.of(context, listen: false).skip,
+                        t.ageRestrictionWarning,
+                        textAlign: TextAlign.center,
                         style: const TextStyle(
-                          fontSize: 16,
-                          color: Color(0xFF6B7280),
+                          fontSize: 13,
+                          color: Color(0xFFEF4444),
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
-                    TextButton(
-                      onPressed: () {
-                        setState(() => _birthday = tempDate);
-                        Navigator.pop(sheetContext);
+                  const SizedBox(height: 4),
+                  // CupertinoDatePicker for smooth scrolling
+                  Expanded(
+                    child: CupertinoDatePicker(
+                      mode: CupertinoDatePickerMode.date,
+                      initialDateTime: initial,
+                      minimumDate: DateTime(1920),
+                      maximumDate: now,
+                      onDateTimeChanged: (date) {
+                        tempDate = date;
+                        final age = now.year - date.year;
+                        final isUnder14 = age < 14 ||
+                            (age == 14 &&
+                                (date.month > now.month ||
+                                    (date.month == now.month &&
+                                        date.day > now.day)));
+                        if (isUnder14 != showWarning) {
+                          setSheetState(() => showWarning = isUnder14);
+                        }
                       },
-                      child: Text(
-                        AuthTexts.of(context, listen: false).continueText,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primary,
-                        ),
-                      ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const Divider(),
-              // CupertinoDatePicker for smooth scrolling
-              Expanded(
-                child: CupertinoDatePicker(
-                  mode: CupertinoDatePickerMode.date,
-                  initialDateTime: initial,
-                  minimumDate: DateTime(1920),
-                  maximumDate: maxDate,
-                  onDateTimeChanged: (date) => tempDate = date,
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
