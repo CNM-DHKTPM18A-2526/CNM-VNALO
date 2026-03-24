@@ -44,33 +44,32 @@ class ConversationMember {
   bool get isOwner => role == MemberRole.OWNER;
   bool get isAdmin => role == MemberRole.ADMIN || role == MemberRole.OWNER;
 
-  factory ConversationMember.fromJson(Map<String, dynamic> json) =>
-      ConversationMember(
-        conversationId: json['conversationId'] ?? '',
-        userId: json['userId'] ?? '',
-        role: enumFromString(MemberRole.values, json['role'] ?? 'MEMBER'),
-        nickname: json['nickname'],
-        joinedAt:
-            json['joinedAt'] != null
-                ? DateTime.parse(json['joinedAt'])
-                : DateTime.now(),
-        joinedBy: json['joinedBy'],
-        leftAt: json['leftAt'] != null ? DateTime.parse(json['leftAt']) : null,
-        removedBy: json['removedBy'],
-        muteUntil: json['muteUntil'] != null
-            ? DateTime.parse(json['muteUntil'])
-            : null,
-        isPinned: json['isPinned'] ?? false,
-        pinOrder: json['pinOrder'],
-        isHidden: json['isHidden'] ?? false,
-        lastReadSeq: json['lastReadSeq'] ?? 0,
-        lastReadAt: json['lastReadAt'] != null
-            ? DateTime.parse(json['lastReadAt'])
-            : null,
-        notificationSetting: enumFromString(
-          NotificationSetting.values,
-          json['notificationSetting'] ?? 'ALL',
-        ),
-        user: json['user'] != null ? User.fromJson(json['user']) : null,
-      );
+  factory ConversationMember.fromJson(
+    Map<String, dynamic> json,
+  ) => ConversationMember(
+    conversationId: json['conversationId'] ?? '',
+    userId: json['userId'] ?? '',
+    role: enumFromString(MemberRole.values, json['role'] ?? 'MEMBER'),
+    nickname: json['nickname'],
+    joinedAt:
+        json['joinedAt'] != null
+            ? DateTime.parse(json['joinedAt'])
+            : DateTime.now(),
+    joinedBy: json['joinedBy'],
+    leftAt: json['leftAt'] != null ? DateTime.parse(json['leftAt']) : null,
+    removedBy: json['removedBy'],
+    muteUntil:
+        json['muteUntil'] != null ? DateTime.parse(json['muteUntil']) : null,
+    isPinned: json['isPinned'] ?? false,
+    pinOrder: json['pinOrder'],
+    isHidden: json['isHidden'] ?? false,
+    lastReadSeq: json['lastReadSeq'] ?? 0,
+    lastReadAt:
+        json['lastReadAt'] != null ? DateTime.parse(json['lastReadAt']) : null,
+    notificationSetting: enumFromString(
+      NotificationSetting.values,
+      json['notificationSetting'] ?? 'ALL',
+    ),
+    user: json['user'] != null ? User.fromJson(json['user']) : null,
+  );
 }

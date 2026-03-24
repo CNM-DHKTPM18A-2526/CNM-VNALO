@@ -4,8 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ThemeProvider extends ChangeNotifier {
   static const _key = 'theme_node';
 
-  // Default to system theme
-  ThemeMode _themeMode = ThemeMode.system;
+  // Default to light to keep first-run auth/welcome visuals consistent.
+  ThemeMode _themeMode = ThemeMode.light;
 
   ThemeMode get themeMode => _themeMode;
 
@@ -16,7 +16,7 @@ class ThemeProvider extends ChangeNotifier {
     if (saved != null) {
       _themeMode = ThemeMode.values.firstWhere(
         (m) => m.name == saved,
-        orElse: () => ThemeMode.system,
+        orElse: () => ThemeMode.light,
       );
     }
     notifyListeners();

@@ -23,14 +23,16 @@ class AvatarWidget extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return Stack(
-      children: [ // Avatar image or placeholder
+      children: [
+        // Avatar image or placeholder
         CircleAvatar(
           radius: size / 2,
-          backgroundColor: AppColors.primary.withOpacity(0.2),
+          backgroundColor: AppColors.primary.withValues(alpha: 0.2),
           backgroundImage:
               imageUrl != null ? CachedNetworkImageProvider(imageUrl!) : null,
           child:
-              imageUrl == null // Show first letter of name if no image, otherwise show nothing (image will cover it)
+              imageUrl ==
+                      null // Show first letter of name if no image, otherwise show nothing (image will cover it)
                   ? Text(
                     name.isNotEmpty ? name[0].toUpperCase() : '?',
                     style: TextStyle(

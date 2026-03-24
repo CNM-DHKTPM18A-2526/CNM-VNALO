@@ -59,7 +59,7 @@ class ChatService {
     return list.map((m) => Message.fromJson(m)).toList();
   }
 
-  // Send a message to a conversation 
+  // Send a message to a conversation
   Future<Message> sendMessage({
     required String conversationId,
     required String content,

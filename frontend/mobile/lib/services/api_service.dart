@@ -62,7 +62,7 @@ class ApiService {
     final encodedBody = body == null ? null : jsonEncode(body);
     http.Response response;
 
-    // Execute the HTTP request with appropriate method 
+    // Execute the HTTP request with appropriate method
     //and handle exceptions for network issues, timeouts, and unexpected errors
     try {
       switch (method) {
@@ -88,7 +88,8 @@ class ApiService {
             message: 'Unsupported HTTP method: $method',
           );
       }
-    } on SocketException { // Handle no internet connection
+    } on SocketException {
+      // Handle no internet connection
       throw ApiException(statusCode: 0, message: 'No Internet connection');
     } on http.ClientException catch (e) {
       throw ApiException(statusCode: 0, message: 'Client error: ${e.message}');

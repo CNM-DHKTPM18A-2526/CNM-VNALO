@@ -9,9 +9,28 @@ class AuthService {
 
   String get _base => AppConfig.instance.coreServiceUrl;
 
+  String _normalizePhone(String phone) {
+    final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.startsWith('0') && digits.length >= 10) {
+      return '+84${digits.substring(1)}';
+    }
+    if (digits.startsWith('84')) {
+      return '+$digits';
+    }
+    if (digits.startsWith('9') && digits.length == 9) {
+      return '+84$digits';
+    }
+    return phone.trim();
+  }
+
   // Send OTP to the given phone number
   Future<void> sendOtp(String phone) async {
-    await _apiService.post(_base, '/auth/register/send-otp', body: {'phone': phone});
+    final normalized = _normalizePhone(phone);
+    await _apiService.post(
+      _base,
+      '/auth/register/send-otp',
+      body: {'phone': normalized},
+    );
   }
 
   // Register a new user with phone, OTP, password and display name
@@ -21,14 +40,16 @@ class AuthService {
     required String password,
     required String displayName,
   }) async {
+    final normalized = _normalizePhone(phone);
     return await _apiService.post(
       _base,
       '/auth/register',
       body: {
-        'phone': phone,
+        'phone': normalized,
         'otp': otp,
         'password': password,
         'displayName': displayName,
+        'display_name': displayName,
       },
     );
   }
@@ -38,10 +59,15 @@ class AuthService {
     required String phone,
     required String password,
   }) async {
+    final normalized = _normalizePhone(phone);
     return await _apiService.post(
       _base,
       '/auth/login',
-      body: {'identifier': phone, 'password': password},
+      body: {
+        'identifier': normalized,
+        'phone': normalized,
+        'password': password,
+      },
     );
   }
 

@@ -8,7 +8,17 @@ enum MemberRole { OWNER, ADMIN, MEMBER }
 
 enum NotificationSetting { ALL, MENTIONS, NONE }
 
-enum MessageType { TEXT, IMAGE, VIDEO, FILE, AUDIO, STICKER, SYSTEM, REPLY, FORWARD }
+enum MessageType {
+  TEXT,
+  IMAGE,
+  VIDEO,
+  FILE,
+  AUDIO,
+  STICKER,
+  SYSTEM,
+  REPLY,
+  FORWARD,
+}
 
 enum MessageStatus { SENT, DELIVERED, RECALLED }
 

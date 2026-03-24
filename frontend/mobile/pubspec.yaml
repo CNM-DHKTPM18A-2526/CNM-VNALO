@@ -122,7 +122,7 @@ flutter:
   # see https://flutter.dev/to/font-from-package
 
 flutter_launcher_icons:
-  android: true
+  android: "app_icon"
   ios: true
   remove_alpha_ios: true
   image_path: assets/icons/app_icon.png

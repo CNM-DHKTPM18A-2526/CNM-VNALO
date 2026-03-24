@@ -17,13 +17,14 @@ class MessageReaction {
     required this.createdAt,
   });
 
-  factory MessageReaction.fromJson(Map<String, dynamic> json) => MessageReaction(
-    id: json['id'],
-    conversationId: json['conversationId'],
-    messageId: json['messageId'],
-    serverSeq: json['serverSeq'],
-    userId: json['userId'],
-    emoji: json['emoji'],
-    createdAt: DateTime.parse(json['createdAt']),
-  );
+  factory MessageReaction.fromJson(Map<String, dynamic> json) =>
+      MessageReaction(
+        id: json['id'],
+        conversationId: json['conversationId'],
+        messageId: json['messageId'],
+        serverSeq: json['serverSeq'],
+        userId: json['userId'],
+        emoji: json['emoji'],
+        createdAt: DateTime.parse(json['createdAt']),
+      );
 }

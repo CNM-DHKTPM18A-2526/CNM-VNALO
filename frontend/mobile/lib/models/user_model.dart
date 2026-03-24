@@ -35,7 +35,7 @@ class User {
     this.isOnline = false,
   });
 
-   factory User.fromJson(Map<String, dynamic> json) => User(
+  factory User.fromJson(Map<String, dynamic> json) => User(
     id: json['id'],
     phone: json['phone'],
     displayName: json['displayName'] ?? json['display_name'] ?? '',
@@ -63,4 +63,4 @@ class User {
     'bio': bio,
     'statusMessage': statusMessage,
   };
-}  
+}

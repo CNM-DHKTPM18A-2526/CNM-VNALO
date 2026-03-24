@@ -119,10 +119,7 @@ class Conversation {
       ConversationStatus.values,
       json['status'] ?? 'ACTIVE',
     ),
-    joinMode: enumFromString(
-      JoinMode.values,
-      json['joinMode'] ?? 'OPEN',
-    ),
+    joinMode: enumFromString(JoinMode.values, json['joinMode'] ?? 'OPEN'),
     memberLimit: json['memberLimit'] ?? 100,
     inviteLink: json['inviteLink'],
     inviteLinkExpiresAt:

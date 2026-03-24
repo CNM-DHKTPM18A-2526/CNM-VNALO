@@ -11,7 +11,7 @@ class ApiResponse<T> {
     this.data,
   });
 
-  // Factory constructor to create an ApiResponse from JSON, 
+  // Factory constructor to create an ApiResponse from JSON,
   // with an optional fromData function to parse the data field.
   factory ApiResponse.fromJson(
     Map<String, dynamic> json,
