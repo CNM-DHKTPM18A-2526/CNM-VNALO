@@ -18,12 +18,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
 
-  static const List<String> _carouselImages = [
-    'assets/images/welcome/welcome_1.png',
-    'assets/images/welcome/welcome_2.png',
-    'assets/images/welcome/welcome_3.png',
-  ];
-
   @override
   void dispose() {
     _pageController.dispose();
@@ -35,7 +29,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (bottomSheetContext) {
-        final selected = bottomSheetContext.watch<LanguageProvider>().language;
+        final selected = Provider.of<LanguageProvider>(bottomSheetContext, listen: true).language;
 
         return Container(
           decoration: const BoxDecoration(
@@ -99,6 +93,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   @override
   Widget build(BuildContext context) {
     final t = AuthTexts.of(context);
+    final carouselImages = AuthTexts.carouselImages;
     final language = context.watch<LanguageProvider>().label;
     final topInset = MediaQuery.of(context).padding.top;
     final bottomInset = MediaQuery.of(context).padding.bottom;
@@ -178,7 +173,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   Expanded(
                     child: PageView.builder(
                       controller: _pageController,
-                      itemCount: _carouselImages.length,
+                      itemCount: carouselImages.length,
                       onPageChanged:
                           (value) => setState(() => _currentPage = value),
                       itemBuilder: (_, index) {
@@ -193,7 +188,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                     vertical: 8,
                                   ),
                                   child: Image.asset(
-                                    _carouselImages[index],
+                                    carouselImages[index],
                                     fit: BoxFit.contain,
                                   ),
                                 ),
@@ -238,7 +233,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: List.generate(
-                        _carouselImages.length,
+                        carouselImages.length,
                         (index) => AnimatedContainer(
                           duration: const Duration(milliseconds: 220),
                           margin: const EdgeInsets.symmetric(horizontal: 5),
@@ -273,6 +268,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                             style: ElevatedButton.styleFrom(
                               minimumSize: const Size.fromHeight(56),
                               backgroundColor: AppColors.primary,
+                              elevation: 0,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(999),
                               ),
@@ -304,6 +300,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                               minimumSize: const Size.fromHeight(56),
                               backgroundColor: const Color(0xFFE5E7EB),
                               foregroundColor: const Color(0xFF111827),
+                              elevation: 0,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(999),
                               ),
