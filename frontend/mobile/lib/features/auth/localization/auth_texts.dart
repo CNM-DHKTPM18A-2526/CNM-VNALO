@@ -87,6 +87,16 @@ class AuthTexts {
   String get genderHint => _isVi ? 'Giới tính' : 'Gender';
   String get genderMale => _isVi ? 'Nam' : 'Male';
   String get genderFemale => _isVi ? 'Nữ' : 'Female';
+  String get genderNotShare => _isVi ? 'Không chia sẻ' : 'Prefer not to say';
+  String get ageRestrictionNote =>
+      _isVi
+          ? 'Người dùng phải đủ 14 tuổi để sử dụng VNALO'
+          : 'Users must be at least 14 years old to use VNALO';
+  String get ageRestrictionWarning =>
+      _isVi
+          ? 'Bạn chưa đủ 14 tuổi để sử dụng VNALO. Vui lòng kiểm tra lại ngày sinh.'
+          : 'You must be at least 14 years old to use VNALO. Please check your birthday.';
+  String get laterText => _isVi ? 'Để sau' : 'Later';
 
   // ─── Register wizard: Avatar step ───
 
@@ -117,6 +127,14 @@ class AuthTexts {
       : 'Allow VNALO to access contacts to find VNALO users from your device.';
 
   // ─── Welcome carousel ───
+  // Data-driven: easily add/remove/reorder slides by editing these lists.
+  // Image paths correspond to assets/images/welcome/ folder.
+
+  static const List<String> carouselImages = [
+    'assets/images/welcome/welcome_1.png',
+    'assets/images/welcome/welcome_2.png',
+    'assets/images/welcome/welcome_3.png',
+  ];
 
   List<String> get welcomeTitles {
     if (_isVi) {
