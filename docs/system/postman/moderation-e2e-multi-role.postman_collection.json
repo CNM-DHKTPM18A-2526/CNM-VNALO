@@ -1,0 +1,490 @@
+{
+  "info": {
+    "_postman_id": "multi-role-e2e-collection-2026",
+    "name": "VNALO Moderation E2E - Multi-Role",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "PHASE 1 - Bootstrap Admin",
+      "item": [
+        {
+          "name": "Health - Moderation",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{moderationBaseUrl}}/actuator/health",
+              "host": ["{{moderationBaseUrl}}"],
+              "path": ["actuator", "health"]
+            }
+          }
+        },
+        {
+          "name": "Auth - Admin Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Admin register accepted', function () { pm.expect([200,201,409]).to.include(pm.response.code); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{testAdminPhone}}\",\n  \"password\": \"{{testAdminPassword}}\",\n  \"displayName\": \"{{testAdminDisplayName}}\"\n}"
+            },
+            "url": {
+              "raw": "{{coreBaseUrl}}/auth/register",
+              "host": ["{{coreBaseUrl}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Auth - Admin Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Admin login success', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "const token = json?.data?.accessToken;",
+                  "pm.test('Access token exists', function () { pm.expect(token).to.be.a('string').and.to.have.length.greaterThan(0); });",
+                  "pm.environment.set('adminAccessToken', token || '');",
+                  "if (token) {",
+                  "  const payload = JSON.parse(atob(token.split('.')[1]));",
+                  "  pm.environment.set('adminUserId', payload.sub || '');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"{{testAdminPhone}}\",\n  \"password\": \"{{testAdminPassword}}\",\n  \"deviceId\": \"postman-device-admin\",\n  \"deviceName\": \"Postman Admin\"\n}"
+            },
+            "url": {
+              "raw": "{{coreBaseUrl}}/auth/login",
+              "host": ["{{coreBaseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Bootstrap - Seed ADMIN Role (Manual)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Manual step: Run this SQL on postgres after getting {{adminUserId}} from login:",
+                  "// docker exec -it vnalo-postgres psql -U postgres -d vnalo_core -c \"",
+                  "// INSERT INTO moderation_admin_user(user_id, role, is_active, created_at, updated_at)",
+                  "// VALUES ('<adminUserId>', 'ADMIN', true, now(), now())",
+                  "// ON CONFLICT (user_id)",
+                  "// DO UPDATE SET role='ADMIN', is_active=true, updated_at=now();\"",
+                  "//"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{moderationBaseUrl}}/actuator/health",
+              "host": ["{{moderationBaseUrl}}"],
+              "path": ["actuator", "health"]
+            }
+          }
+        },
+        {
+          "name": "Admin - Upsert Current User As ADMIN",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Admin upsert accepted', function () { pm.expect([200,201,409]).to.include(pm.response.code); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{adminUserId}}\",\n  \"role\": \"ADMIN\"\n}"
+            },
+            "url": {
+              "raw": "{{moderationBaseUrl}}/api/v1/admin/users",
+              "host": ["{{moderationBaseUrl}}"],
+              "path": ["api", "v1", "admin", "users"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "PHASE 2 - User Flow",
+      "item": [
+        {
+          "name": "Auth - User Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('User register accepted', function () { pm.expect([200,201,409]).to.include(pm.response.code); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{testUserPhone}}\",\n  \"password\": \"{{testUserPassword}}\",\n  \"displayName\": \"{{testUserDisplayName}}\"\n}"
+            },
+            "url": {
+              "raw": "{{coreBaseUrl}}/auth/register",
+              "host": ["{{coreBaseUrl}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Auth - User Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('User login success', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "const token = json?.data?.accessToken;",
+                  "pm.test('Access token exists', function () { pm.expect(token).to.be.a('string').and.to.have.length.greaterThan(0); });",
+                  "pm.environment.set('userAccessToken', token || '');",
+                  "if (token) {",
+                  "  const payload = JSON.parse(atob(token.split('.')[1]));",
+                  "  pm.environment.set('userId', payload.sub || '');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"{{testUserPhone}}\",\n  \"password\": \"{{testUserPassword}}\",\n  \"deviceId\": \"postman-device-user\",\n  \"deviceName\": \"Postman User\"\n}"
+            },
+            "url": {
+              "raw": "{{coreBaseUrl}}/auth/login",
+              "host": ["{{coreBaseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Report - Create",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Create report success', function () { pm.expect([200,201]).to.include(pm.response.code); });",
+                  "const json = pm.response.json();",
+                  "pm.test('Report data returned', function () { pm.expect(json.data).to.have.property('reportId'); });",
+                  "pm.environment.set('reportId', json?.data?.reportId || '');",
+                  "pm.environment.set('caseId', json?.data?.caseId || '');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{userAccessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetType\": \"USER\",\n  \"targetId\": \"{{adminUserId}}\",\n  \"reasonCode\": \"SPAM\",\n  \"description\": \"User reports admin user (E2E test scenario)\"\n}"
+            },
+            "url": {
+              "raw": "{{moderationBaseUrl}}/reports",
+              "host": ["{{moderationBaseUrl}}"],
+              "path": ["reports"]
+            }
+          }
+        },
+        {
+          "name": "Report - My Reports",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{userAccessToken}}" }
+            ],
+            "url": {
+              "raw": "{{moderationBaseUrl}}/reports/me?page=0&size=20",
+              "host": ["{{moderationBaseUrl}}"],
+              "path": ["reports", "me"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Report - Create Appeal",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Appeal created', function () { pm.expect([200,201]).to.include(pm.response.code); });",
+                  "const json = pm.response.json();",
+                  "pm.environment.set('appealId', json?.data?.id || '');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{userAccessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Request review of moderation decision\"\n}"
+            },
+            "url": {
+              "raw": "{{moderationBaseUrl}}/api/v1/moderation/cases/{{caseId}}/appeal",
+              "host": ["{{moderationBaseUrl}}"],
+              "path": [
+                "api",
+                "v1",
+                "moderation",
+                "cases",
+                "{{caseId}}",
+                "appeal"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "PHASE 3 - Admin Flow",
+      "item": [
+        {
+          "name": "Moderation - Get Reports",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }
+            ],
+            "url": {
+              "raw": "{{moderationBaseUrl}}/api/v1/moderation/reports?page=0&size=20",
+              "host": ["{{moderationBaseUrl}}"],
+              "path": ["api", "v1", "moderation", "reports"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Moderation - Get Report Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }
+            ],
+            "url": {
+              "raw": "{{moderationBaseUrl}}/api/v1/moderation/reports/{{reportId}}",
+              "host": ["{{moderationBaseUrl}}"],
+              "path": ["api", "v1", "moderation", "reports", "{{reportId}}"]
+            }
+          }
+        },
+        {
+          "name": "Moderation - Assign Case",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Assign case success', function () { pm.expect([200,201]).to.include(pm.response.code); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"moderatorId\": \"{{adminUserId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{moderationBaseUrl}}/api/v1/moderation/reports/{{reportId}}/assign",
+              "host": ["{{moderationBaseUrl}}"],
+              "path": [
+                "api",
+                "v1",
+                "moderation",
+                "reports",
+                "{{reportId}}",
+                "assign"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Moderation - Resolve Case",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Resolve case success', function () { pm.expect([200,201]).to.include(pm.response.code); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"WARN\",\n  \"note\": \"Admin resolved case from Postman flow\"\n}"
+            },
+            "url": {
+              "raw": "{{moderationBaseUrl}}/api/v1/moderation/cases/{{caseId}}/resolve",
+              "host": ["{{moderationBaseUrl}}"],
+              "path": [
+                "api",
+                "v1",
+                "moderation",
+                "cases",
+                "{{caseId}}",
+                "resolve"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Moderation - Create Action",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"caseId\": \"{{caseId}}\",\n  \"actionType\": \"WARN_USER\",\n  \"targetUserId\": \"{{userId}}\",\n  \"reason\": \"Action created from Postman E2E flow\"\n}"
+            },
+            "url": {
+              "raw": "{{moderationBaseUrl}}/api/v1/moderation/actions",
+              "host": ["{{moderationBaseUrl}}"],
+              "path": ["api", "v1", "moderation", "actions"]
+            }
+          }
+        },
+        {
+          "name": "Moderation - Get Appeals",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }
+            ],
+            "url": {
+              "raw": "{{moderationBaseUrl}}/api/v1/moderation/appeals?page=0&size=20",
+              "host": ["{{moderationBaseUrl}}"],
+              "path": ["api", "v1", "moderation", "appeals"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Moderation - Resolve Appeal",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Resolve appeal success', function () { pm.expect([200,201]).to.include(pm.response.code); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"APPROVED\",\n  \"response\": \"Appeal approved by admin\"\n}"
+            },
+            "url": {
+              "raw": "{{moderationBaseUrl}}/api/v1/moderation/appeals/{{appealId}}/resolve",
+              "host": ["{{moderationBaseUrl}}"],
+              "path": [
+                "api",
+                "v1",
+                "moderation",
+                "appeals",
+                "{{appealId}}",
+                "resolve"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
