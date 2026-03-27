@@ -1,12 +1,17 @@
+import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:vnalo_mobile/config/app_config.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/utils/avatar_utils.dart';
 import 'package:vnalo_mobile/core/utils/validators.dart';
 import 'package:vnalo_mobile/features/auth/localization/auth_texts.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/auth/screens/login_screen.dart';
+import 'package:vnalo_mobile/features/auth/widgets/otp_input.dart';
 import 'package:vnalo_mobile/navigation/main_shell.dart';
 import 'package:vnalo_mobile/features/auth/widgets/phone_input.dart';
 
@@ -32,9 +37,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String _otpCode = '';
   String _countryCode = '+84';
 
+  bool get _requiresOtp => AppConfig.instance.isProd;
+
   // Personal info (optional, client-side only for now)
   DateTime? _birthday;
   String? _gender;
+  File? _avatarFile;
 
   String _buildFullPhone() {
     var digits = _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
@@ -72,12 +80,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!_agreeTermsA || !_agreeTermsB) return;
     if (Validators.phone(_phoneController.text) != null) return;
 
+    if (!_requiresOtp) {
+      // Development/staging shortcut: backend OTP can be disabled.
+      _otpCode = '000000';
+      _nextStep();
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
-      // DEV mode: bypass OTP verification step.
-      // PROD: uncomment the following and add OTP screen step.
-      // await context.read<AuthProvider>().sendOtp(_buildFullPhone());
-      _otpCode = '000000';
+      await context.read<AuthProvider>().sendOtp(_buildFullPhone());
       if (!mounted) return;
       _nextStep();
     } catch (e) {
@@ -91,6 +103,47 @@ class _RegisterScreenState extends State<RegisterScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _onOtpChanged(String value) {
+    setState(() => _otpCode = value);
+  }
+
+  Future<void> _resendOtp() async {
+    setState(() => _isLoading = true);
+    try {
+      await context.read<AuthProvider>().sendOtp(_buildFullPhone());
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AuthTexts.of(context, listen: false).otpResent),
+          backgroundColor: AppColors.primary,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AuthTexts.of(context, listen: false).otpFailed(e)),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _verifyOtpAndContinue() {
+    if (!RegExp(r'^\d{6}$').hasMatch(_otpCode)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AuthTexts.of(context, listen: false).otpInvalid),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+    _nextStep();
   }
 
   Future<void> _completeRegistration() async {
@@ -166,15 +219,75 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            onPressed: () {
-              // TODO: Implement actual contacts permission request 
+            onPressed: () async {
               Navigator.pop(ctx);
+              await Permission.contacts.request();
               _navigateToHome(auth);
             },
             child: Text(
               t.continueText,
               style: const TextStyle(color: Colors.white, fontSize: 16),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    Navigator.pop(context); // Close bottom sheet
+
+    // Check permissions
+    if (source == ImageSource.camera) {
+      final status = await Permission.camera.request();
+      if (status.isPermanentlyDenied) {
+        _showPermissionDialog('Quyền máy ảnh', 'Vui lòng cấp quyền máy ảnh trong cài đặt để chụp ảnh.');
+        return;
+      } else if (!status.isGranted) {
+        return;
+      }
+    } else {
+      final status = await Permission.photos.request();
+      if (!status.isGranted) {
+        final storageStatus = await Permission.storage.request();
+        if (storageStatus.isPermanentlyDenied) {
+          _showPermissionDialog('Quyền thư viện ảnh', 'Vui lòng cấp quyền truy cập ảnh trong cài đặt để chọn ảnh.');
+          return;
+        } else if (!storageStatus.isGranted) {
+          return;
+        }
+      }
+    }
+
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(source: source, maxWidth: 800, maxHeight: 800, imageQuality: 80);
+      if (pickedFile != null) {
+        setState(() => _avatarFile = File(pickedFile.path));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi chọn ảnh: $e')));
+      }
+    }
+  }
+
+  void _showPermissionDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+        content: Text(message, style: const TextStyle(fontSize: 15, color: Color(0xFF4B5563))),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy', style: TextStyle(color: Color(0xFF6B7280)))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            onPressed: () {
+              Navigator.pop(ctx);
+              openAppSettings();
+            },
+            child: const Text('Mở Cài đặt', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -230,11 +343,93 @@ class _RegisterScreenState extends State<RegisterScreen> {
         physics: const NeverScrollableScrollPhysics(),
         children: [
           _buildPhoneStep(),
+          if (_requiresOtp) _buildOtpStep(),
           _buildNameStep(),
           _buildPersonalInfoStep(),
           _buildPasswordStep(),
           _buildAvatarStep(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildOtpStep() {
+    final t = AuthTexts.of(context);
+
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const SizedBox(height: 24),
+            Text(
+              t.enterOtpTitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF141414),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              t.otpSentTo(_buildFullPhone()),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w400,
+                color: Color(0xFF4B5563),
+              ),
+            ),
+            const SizedBox(height: 28),
+            OtpInput(
+              onChanged: _onOtpChanged,
+              onCompleted: _onOtpChanged,
+            ),
+            const SizedBox(height: 14),
+            TextButton(
+              onPressed: _isLoading ? null : _resendOtp,
+              child: Text(
+                t.resendOtp,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(56),
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              onPressed: _isLoading ? null : _verifyOtpAndContinue,
+              child: _isLoading
+                  ? const SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Text(
+                      t.confirmOtp,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -918,9 +1113,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final initials = AvatarUtils.getInitials(displayName);
     final avatarColor = AvatarUtils.getColor(displayName);
 
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
         children: [
           const SizedBox(height: 16),
           // Centered header
@@ -943,6 +1140,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
               color: Color(0xFF4B5563),
             ),
           ),
+          const SizedBox(height: 8),
+          Text(
+            t.avatarDevNotice,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w400,
+              color: Color(0xFF6B7280),
+            ),
+          ),
           const SizedBox(height: 40),
           // Auto-generated initials avatar
           GestureDetector(
@@ -952,16 +1159,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
               height: 140,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: LinearGradient(
+                gradient: _avatarFile == null ? LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
                     avatarColor.withValues(alpha: 0.7),
                     avatarColor,
                   ],
-                ),
+                ) : null,
+                image: _avatarFile != null 
+                    ? DecorationImage(
+                        image: FileImage(_avatarFile!),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
               ),
-              child: Center(
+              child: _avatarFile == null ? Center(
                 child: Text(
                   initials,
                   style: const TextStyle(
@@ -970,11 +1183,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-              ),
+              ) : null,
             ),
           ),
           const SizedBox(height: 50),
-          // "Cập nhật" blue button
+          // Primary Button
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               minimumSize: const Size.fromHeight(56),
@@ -984,7 +1197,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
-            onPressed: _isLoading ? null : _showAvatarPicker,
+            onPressed: _isLoading ? null : (_avatarFile == null ? _showAvatarPicker : _completeRegistration),
             child: _isLoading
                 ? const SizedBox(
                     height: 20,
@@ -995,7 +1208,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                   )
                 : Text(
-                    t.update,
+                    _avatarFile == null ? t.update : t.continueText,
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
@@ -1004,7 +1217,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
           ),
           const SizedBox(height: 12),
-          // "Bỏ qua" skip grey button
+          // Secondary Button
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               minimumSize: const Size.fromHeight(56),
@@ -1015,9 +1228,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
-            onPressed: _isLoading ? null : _confirmSkipAvatar,
+            onPressed: _isLoading ? null : (_avatarFile == null ? _completeRegistration : _showAvatarPicker),
             child: Text(
-              t.skip,
+              _avatarFile == null ? t.skip : 'Chọn ảnh khác',
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
@@ -1027,48 +1240,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
           const SizedBox(height: 20),
         ],
       ),
-    );
-  }
-
-  void _confirmSkipAvatar() {
-    final t = AuthTexts.of(context);
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        title: Text(
-          t.skipAvatarTitle,
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
-        content: Text(
-          t.skipAvatarMessage,
-          style: const TextStyle(fontSize: 15, color: Color(0xFF4B5563)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(
-              t.cancel,
-              style: const TextStyle(color: Color(0xFF6B7280), fontSize: 16),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              _completeRegistration();
-            },
-            child: Text(
-              t.accept,
-              style: const TextStyle(color: Colors.white, fontSize: 16),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -1106,22 +1277,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         color: Color(0xFF374151)),
                     title: Text(t.takePhoto,
                         style: const TextStyle(fontSize: 17)),
-                    onTap: () {
-                      Navigator.pop(sheetContext);
-                      // TODO: Implement camera capture
-                      _completeRegistration();
-                    },
+                    onTap: () => _pickImage(ImageSource.camera),
                   ),
                   ListTile(
                     leading: const Icon(Icons.photo_library_outlined,
                         color: Color(0xFF374151)),
                     title: Text(t.chooseFromGallery,
                         style: const TextStyle(fontSize: 17)),
-                    onTap: () {
-                      Navigator.pop(sheetContext);
-                      // TODO: Implement gallery picker
-                      _completeRegistration();
-                    },
+                    onTap: () => _pickImage(ImageSource.gallery),
                   ),
                 ],
               ),
