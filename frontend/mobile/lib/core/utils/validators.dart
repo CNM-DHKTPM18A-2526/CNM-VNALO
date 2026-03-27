@@ -22,6 +22,12 @@ class Validators {
   static String? password(String? value) {
     final password = value ?? '';
     if (password.length < 8) return 'Mật khẩu tối thiểu 8 ký tự';
+    final hasUpper = RegExp(r'[A-Z]').hasMatch(password);
+    final hasLower = RegExp(r'[a-z]').hasMatch(password);
+    final hasDigit = RegExp(r'\d').hasMatch(password);
+    if (!hasUpper || !hasLower || !hasDigit) {
+      return 'Mật khẩu cần có chữ hoa, chữ thường và số';
+    }
     return null;
   }
 
