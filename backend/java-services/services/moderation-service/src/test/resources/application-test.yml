@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/vnalo_core
+    username: postgres
+    password: postgres
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+
+  main:
+    allow-bean-definition-overriding: true
+
+logging:
+  level:
+    org.flywaydb: INFO
+    org.springframework.test: INFO
