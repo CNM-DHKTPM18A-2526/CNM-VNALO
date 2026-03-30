@@ -56,8 +56,10 @@ logging:
 
 # Firebase Configuration
 firebase:
+  enabled: ${FIREBASE_ENABLED:false}
+  fail-fast: ${FIREBASE_FAIL_FAST:false}
   credentials:
-    path: ${FIREBASE_CREDENTIALS_PATH:iuh-cnm-vnalo-firebase-adminsdk-fbsvc-5008b7c5eb.json}
+    path: ${FIREBASE_CREDENTIALS_PATH:}
 
 management:
   endpoints:
@@ -163,3 +165,7 @@ logging:
   level:
     iuh.cnm.vnalo: INFO
     org.springframework.security: WARN
+
+firebase:
+  enabled: true
+  fail-fast: true

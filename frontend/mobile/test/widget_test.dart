@@ -12,6 +12,10 @@ import 'package:vnalo_mobile/main.dart';
 void main() {
   testWidgets('App boots with VNALO branding', (WidgetTester tester) async {
     await tester.pumpWidget(const VnaloApp());
+
+    // Splash screen enforces a minimum 1.5s display time.
+    await tester.pump(const Duration(milliseconds: 1600));
+
     expect(find.text('VNALO'), findsOneWidget);
   });
 }

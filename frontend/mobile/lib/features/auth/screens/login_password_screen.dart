@@ -15,6 +15,7 @@ class LoginPasswordScreen extends StatefulWidget {
 }
 
 class _LoginPasswordScreenState extends State<LoginPasswordScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
@@ -25,6 +26,8 @@ class _LoginPasswordScreenState extends State<LoginPasswordScreen> {
   }
 
   Future<void> _handleLogin() async {
+    if (!_formKey.currentState!.validate()) return;
+
     final auth = context.read<AuthProvider>();
     final success = await auth.login(
       widget.phoneNumber,
@@ -67,60 +70,69 @@ class _LoginPasswordScreenState extends State<LoginPasswordScreen> {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                t.accountLabel(widget.phoneNumber),
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 24),
-              TextField(
-                controller: _passwordController,
-                obscureText: _obscurePassword,
-                decoration: InputDecoration(
-                  hintText: t.passwordHint,
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscurePassword
-                          ? Icons.visibility_off
-                          : Icons.visibility,
-                    ),
-                    onPressed: () {
-                      setState(() => _obscurePassword = !_obscurePassword);
-                    },
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  t.accountLabel(widget.phoneNumber),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-              ),
-              const Spacer(),
-              Consumer<AuthProvider>(
-                builder:
-                    (_, auth, __) => ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(56),
-                        backgroundColor: AppColors.primary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(999),
-                        ),
+                const SizedBox(height: 24),
+                TextFormField(
+                  controller: _passwordController,
+                  obscureText: _obscurePassword,
+                  validator: (value) {
+                    if ((value ?? '').trim().isEmpty) {
+                      return 'Vui lòng nhập mật khẩu';
+                    }
+                    return null;
+                  },
+                  decoration: InputDecoration(
+                    hintText: t.passwordHint,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_off
+                            : Icons.visibility,
                       ),
-                      onPressed: auth.isLoading ? null : _handleLogin,
-                      child:
-                          auth.isLoading
-                              ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                              : Text(t.login),
+                      onPressed: () {
+                        setState(() => _obscurePassword = !_obscurePassword);
+                      },
                     ),
-              ),
-            ],
+                  ),
+                ),
+                const Spacer(),
+                Consumer<AuthProvider>(
+                  builder:
+                      (_, auth, __) => ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(56),
+                          backgroundColor: AppColors.primary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                        onPressed: auth.isLoading ? null : _handleLogin,
+                        child:
+                            auth.isLoading
+                                ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                                : Text(t.login),
+                      ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

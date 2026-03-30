@@ -34,7 +34,12 @@ class AuthTexts {
       _isVi ? 'Xác nhận mật khẩu' : 'Confirm password';
   String get otpSent =>
       _isVi ? 'Nhập mã OTP đã gửi đến' : 'Enter the OTP sent to';
+  String otpSentTo(String phone) =>
+      _isVi ? 'Nhập mã OTP đã gửi đến $phone' : 'Enter the OTP sent to $phone';
   String get confirmOtp => _isVi ? 'Xác nhận' : 'Confirm';
+  String get resendOtp => _isVi ? 'Gửi lại mã OTP' : 'Resend OTP';
+  String get otpResent => _isVi ? 'Đã gửi lại OTP' : 'OTP resent';
+  String get otpInvalid => _isVi ? 'Mã OTP phải gồm 6 chữ số' : 'OTP must be 6 digits';
 
   String get alreadyHasAccount =>
       _isVi ? 'Bạn đã có tài khoản? ' : 'Already have an account? ';
@@ -106,6 +111,9 @@ class AuthTexts {
       _isVi
           ? 'Đặt ảnh đại diện để mọi người dễ nhận ra bạn'
           : 'Set a profile photo so people can recognize you';
+  String get avatarDevNotice => _isVi
+      ? 'Giai đoạn hiện tại chỉ xem trước ảnh, tính năng đồng bộ ảnh sẽ bật ở bản cập nhật tiếp theo.'
+      : 'This phase supports local preview only; avatar sync will be enabled in a later update.';
   String get update => _isVi ? 'Cập nhật' : 'Update';
   String get skip => _isVi ? 'Bỏ qua' : 'Skip';
   String get takePhoto => _isVi ? 'Chụp ảnh mới' : 'Take a photo';
