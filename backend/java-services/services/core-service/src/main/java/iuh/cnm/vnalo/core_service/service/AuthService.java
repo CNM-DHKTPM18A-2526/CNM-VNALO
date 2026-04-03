@@ -85,6 +85,12 @@ public class AuthService {
 
         // Create profile with same ID as account (1:1 relationship)
         UserProfile profile = UserProfile.createWithAccountId(account.getId(), request.getDisplayName());
+        if (request.getGender() != null) {
+            profile.setGender(request.getGender());
+        }
+        if (request.getDob() != null) {
+            profile.setDob(request.getDob());
+        }
         profile = userProfileRepository.save(profile);
 
         // Create default privacy settings

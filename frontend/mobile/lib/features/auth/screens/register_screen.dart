@@ -37,7 +37,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String _otpCode = '';
   String _countryCode = '+84';
 
-  bool get _requiresOtp => AppConfig.instance.isProd;
+  bool get _requiresOtp => context.watch<AuthProvider>().requiresOtp;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<AuthProvider>().checkOtpStatus();
+      }
+    });
+  }
 
   // Personal info (optional, client-side only for now)
   DateTime? _birthday;
@@ -156,6 +166,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         otp: _otpCode,
         password: _passwordController.text,
         displayName: _nameController.text.trim(),
+        gender: _gender,
+        dob: _birthday?.toIso8601String(),
       );
 
       if (!mounted) return;

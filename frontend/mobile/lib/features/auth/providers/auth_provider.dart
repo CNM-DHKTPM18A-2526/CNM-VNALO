@@ -79,6 +79,20 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  bool _requiresOtp = true;
+  bool get requiresOtp => _requiresOtp;
+
+  Future<void> checkOtpStatus() async {
+    try {
+      final statusMap = await _authService.getOtpStatus();
+      _requiresOtp = statusMap['enabled'] == true;
+      notifyListeners();
+    } catch (_) {
+      _requiresOtp = true; // Default fallback to safe side
+      notifyListeners();
+    }
+  }
+
   Future<void> sendOtp(String phone) async {
     _isLoading = true;
     _error = null;
@@ -100,6 +114,8 @@ class AuthProvider extends ChangeNotifier {
     required String otp,
     required String password,
     required String displayName,
+    String? gender,
+    String? dob,
   }) async {
     _isLoading = true;
     _error = null;
@@ -111,6 +127,8 @@ class AuthProvider extends ChangeNotifier {
         otp: otp,
         password: password,
         displayName: displayName,
+        gender: gender,
+        dob: dob,
       );
 
       final data = (response['data'] ?? response) as Map<String, dynamic>;

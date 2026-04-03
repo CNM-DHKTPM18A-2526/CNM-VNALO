@@ -33,24 +33,39 @@ class AuthService {
     );
   }
 
-  // Register a new user with phone, OTP, password and display name
+  // Check OTP configuration status from backend
+  Future<Map<String, dynamic>> getOtpStatus() async {
+    final response = await _apiService.get(_base, '/auth/otp/status');
+    return response['data'];
+  }
+
+  // Register a new user with phone, OTP, password, display name, gender, and dob
   Future<Map<String, dynamic>> register({
     required String phone,
     required String otp,
     required String password,
     required String displayName,
+    String? gender,
+    String? dob, // ISO 8601 string
   }) async {
     final normalized = _normalizePhone(phone);
+    final body = <String, dynamic>{
+      'phone': normalized,
+      'otp': otp,
+      'password': password,
+      'displayName': displayName,
+      'display_name': displayName,
+    };
+    if (gender != null) {
+      body['gender'] = gender.toUpperCase();
+    }
+    if (dob != null) {
+      body['dob'] = dob;
+    }
     return await _apiService.post(
       _base,
       '/auth/register',
-      body: {
-        'phone': normalized,
-        'otp': otp,
-        'password': password,
-        'displayName': displayName,
-        'display_name': displayName,
-      },
+      body: body,
     );
   }
 
