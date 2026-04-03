@@ -5,8 +5,14 @@ import 'package:vnalo_mobile/core/theme/app_colors.dart';
 class OtpInput extends StatelessWidget {
   final int length;
   final ValueChanged<String> onCompleted;
+  final ValueChanged<String>? onChanged;
 
-  const OtpInput({super.key, this.length = 6, required this.onCompleted});
+  const OtpInput({
+    super.key,
+    this.length = 6,
+    required this.onCompleted,
+    this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -30,6 +36,7 @@ class OtpInput extends StatelessWidget {
         ),
       ),
       onChanged: (value) {
+        onChanged?.call(value);
         if (value.length == length) {
           onCompleted(value);
         }

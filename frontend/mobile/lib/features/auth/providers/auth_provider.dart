@@ -117,19 +117,21 @@ class AuthProvider extends ChangeNotifier {
       final hasTokens =
           data.containsKey('accessToken') && data.containsKey('refreshToken');
 
-      if (hasTokens) {
-        final tokens = _extractTokens(data);
-        await _storageService.saveTokens(
-          accessToken: tokens.accessToken,
-          refreshToken: tokens.refreshToken,
-        );
-        _socketService.connect(tokens.accessToken);
+      if (!hasTokens) {
+        throw StateError('Token data is missing from registration response');
       }
+
+      final tokens = _extractTokens(data);
+      await _storageService.saveTokens(
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      );
+      _socketService.connect(tokens.accessToken);
 
       if (data['user'] != null) {
         await _storageService.saveUserId(data['user']['id']);
         _user = User.fromJson(data['user']);
-      } else if (hasTokens) {
+      } else {
         _user = await _authService.getMe();
       }
 
