@@ -19,7 +19,7 @@ import { RealtimeGateway } from '../gateway/realtime.gateway';
 @Injectable()
 export class RabbitMQConsumer {
   private readonly logger = new Logger(RabbitMQConsumer.name);
-  private connection: amqplib.ChannelModel | null = null;
+  private connection: Awaited<ReturnType<typeof amqplib.connect>> | null = null;
   private channel: amqplib.Channel | null = null;
   private isConnected = false;
   private isConnecting = false;
