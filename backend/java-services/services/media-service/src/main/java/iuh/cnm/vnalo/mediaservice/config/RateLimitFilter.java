@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Simple in-memory rate limiter per IP address.
- * Allows max 30 requests per minute per IP.
+ * Allows max 300 requests per minute per IP.
  * For production, use Redis-based rate limiting (e.g. Bucket4j + Redis).
  */
 @Component
@@ -34,7 +34,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
         RateLimitBucket bucket = buckets.computeIfAbsent(clientIp, k -> new RateLimitBucket());
 
         if (!bucket.tryConsume()) {
-            response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+            response.setStatus(HttpServletResponse.SC_TOO_MANY_REQUESTS);
+            response.setHeader("Retry-After", "60");
             response.setContentType("application/json");
             response.getWriter().write(
                     "{\"success\":false,\"status\":429,\"message\":\"Too many requests. Please try again later.\"}"

@@ -2,6 +2,7 @@ package iuh.cnm.vnalo.mediaservice.controller;
 
 import iuh.cnm.vnalo.mediaservice.domain.dto.*;
 import iuh.cnm.vnalo.mediaservice.domain.model.*;
+import iuh.cnm.vnalo.mediaservice.exception.AccessDeniedException;
 import iuh.cnm.vnalo.mediaservice.service.MediaAccessService;
 import iuh.cnm.vnalo.mediaservice.service.MediaService;
 import jakarta.validation.Valid;
@@ -100,6 +101,8 @@ public class MediaController {
             Authentication authentication,
             @PathVariable UUID id
     ) {
+        UUID userId = getUserId(authentication);
+        ensureCanAccess(id, userId);
         MediaMetadata media = mediaService.getMedia(id);
         return ResponseEntity.ok(ApiResponse.ok(MediaResponse.from(media)));
     }
@@ -114,7 +117,8 @@ public class MediaController {
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "20") int size
     ) {
-        Page<MediaMetadata> mediaPage = mediaService.listMedia(ownerUserId, category,
+        UUID effectiveOwnerUserId = getUserId(authentication);
+        Page<MediaMetadata> mediaPage = mediaService.listMedia(effectiveOwnerUserId, category,
                 PageRequest.of(page, size, Sort.by("createdAt").descending()));
 
         MediaPageResponse response = MediaPageResponse.builder()
@@ -188,6 +192,8 @@ public class MediaController {
             Authentication authentication,
             @PathVariable UUID id
     ) {
+        UUID userId = getUserId(authentication);
+        ensureCanAccess(id, userId);
         String downloadUrl = mediaService.generateDownloadUrl(id);
         return ResponseEntity.ok(ApiResponse.ok(Map.of("downloadUrl", downloadUrl)));
     }
@@ -200,6 +206,7 @@ public class MediaController {
             @PathVariable UUID id
     ) {
         UUID userId = getUserId(authentication);
+        ensureCanAccess(id, userId);
         MediaMetadata media = mediaService.getMedia(id);
 
         org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody stream = out -> {
@@ -230,6 +237,8 @@ public class MediaController {
             Authentication authentication,
             @PathVariable UUID id
     ) {
+        UUID userId = getUserId(authentication);
+        ensureCanAccess(id, userId);
         MediaMetadata media = mediaService.getMedia(id);
         String thumbnailUrl = media.getThumbnailUrl();
         if (thumbnailUrl == null) {
@@ -245,6 +254,8 @@ public class MediaController {
             Authentication authentication,
             @PathVariable UUID id
     ) {
+        UUID userId = getUserId(authentication);
+        ensureCanAccess(id, userId);
         MediaMetadata media = mediaService.getMedia(id);
         return ResponseEntity.ok(ApiResponse.ok(Map.of("status", media.getStatus().name())));
     }
@@ -257,6 +268,8 @@ public class MediaController {
             @PathVariable UUID id,
             @RequestBody @Valid AccessScopeRequest request
     ) {
+        UUID userId = getUserId(authentication);
+        ensureOwner(id, userId);
         mediaAccessService.grantAccess(id, request.getScopeType(), request.getScopeId());
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(null));
     }
@@ -267,6 +280,8 @@ public class MediaController {
             @PathVariable UUID id,
             @RequestBody @Valid AccessScopeRequest request
     ) {
+        UUID userId = getUserId(authentication);
+        ensureOwner(id, userId);
         mediaAccessService.revokeAccess(id, request.getScopeType(), request.getScopeId());
         return ResponseEntity.ok(ApiResponse.ok(null));
     }
@@ -276,6 +291,8 @@ public class MediaController {
             Authentication authentication,
             @PathVariable UUID id
     ) {
+        UUID userId = getUserId(authentication);
+        ensureOwner(id, userId);
         List<MediaAccessScope> scopes = mediaAccessService.getAccessScopes(id);
         return ResponseEntity.ok(ApiResponse.ok(scopes));
     }
@@ -284,5 +301,18 @@ public class MediaController {
 
     private UUID getUserId(Authentication authentication) {
         return UUID.fromString(authentication.getPrincipal().toString());
+    }
+
+    private void ensureCanAccess(UUID mediaId, UUID userId) {
+        if (!mediaAccessService.canAccess(mediaId, userId)) {
+            throw new AccessDeniedException("Forbidden");
+        }
+    }
+
+    private void ensureOwner(UUID mediaId, UUID userId) {
+        MediaMetadata media = mediaService.getMedia(mediaId);
+        if (!media.getOwnerUserId().equals(userId)) {
+            throw new AccessDeniedException("Only owner can manage access scopes");
+        }
     }
 }

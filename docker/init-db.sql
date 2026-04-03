@@ -15,7 +15,8 @@ ALTER DATABASE vnalo_core SET search_path TO public;
 -- Media Service Database
 -- media-service uses a separate database (vnalo_media) for file metadata
 -- =============================================================================
-CREATE DATABASE vnalo_media;
+SELECT 'CREATE DATABASE vnalo_media'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'vnalo_media')\gexec
 \c vnalo_media
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
