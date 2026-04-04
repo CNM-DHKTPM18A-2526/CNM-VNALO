@@ -187,8 +187,7 @@ public class OtpService {
     private void sendOtpViaSms(String phone, String otp) {
         // In production, integrate with SMS provider (Firebase Phone Auth recommended for client-side)
         log.info("OTP delivery requested for {}", maskPhone(phone));
-        log.info("(SMS provider not configured - OTP logged for development only)");
-        log.debug("DEV ONLY - OTP for {}: {}", maskPhone(phone), otp);
+        log.warn("OTP delivery provider is not configured. Configure SMS/FCM delivery before production usage.");
         
         // TODO: For password reset flow, fetch user's FCM tokens and send via FCM:
         // List<String> fcmTokens = deviceRepository.findFcmTokensByPhone(phone);

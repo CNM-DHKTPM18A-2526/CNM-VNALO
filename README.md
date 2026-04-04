@@ -1,6 +1,8 @@
 <div align="center">
 
-# 💬 VNALO
+<img src="frontend/mobile/assets/icons/app_icon.png" alt="VNALO Logo" width="120" />
+
+# VNALO
 
 ### Enterprise-Grade Real-Time Messaging Platform
 
@@ -162,7 +164,7 @@
 #### Backend — core-service (Java)
 - **Framework**: Spring Boot 3.4.2 (Java 21)
 - **Security**: Spring Security 6 + Firebase Admin SDK 9.7.0
-- **Database**: Spring Data JPA + Flyway Migrations (V1–V9)
+- **Database**: Spring Data JPA + Flyway Migrations (V1–V10)
 - **Auth**: JWT (HS512) with refresh tokens + OTP verification
 
 #### Backend — message-service (TypeScript)
@@ -217,7 +219,7 @@
 ┌───┴──────────┐  ┌───────────────┴──┐
 │ core-service │  │ message-service  │
 │ (Spring Boot)│  │ (NestJS 11)      │
-│ Port 8081    │  │ Port 8082        │
+│ Port 8081    │  │ Port 3000        │
 │              │  │                  │
 │ • Auth/JWT   │  │ • Conversations  │
 │ • Users      │  │ • Messages       │
@@ -246,7 +248,7 @@
 | Service | Responsibility | Port | Technology | Status |
 |---------|---------------|------|------------|--------|
 | 🔐 **core-service** | Auth, Users, Social Features, QR, Contacts | 8081 | Spring Boot 3.4 (Java 21) | ✅ Complete |
-| 💬 **message-service** | Conversations, Messages, WebSocket, Inbox | 8082 | NestJS 11 (TypeScript) | ✅ Complete |
+| 💬 **message-service** | Conversations, Messages, WebSocket, Inbox | 3000 | NestJS 11 (TypeScript) | ✅ Complete |
 | 📎 **media-service** | File Upload, Cloudinary, Thumbnails | 8083 | Spring Boot *(planned)* | ⏳ Planned |
 | ⚡ **realtime-gateway** | WebSocket Scaling, Presence | 8085 | Node.js *(planned)* | ⏳ Planned |
 | � **content-service** | Story, Timeline, Posts, Comments | 8086 | Spring Boot *(planned)* | ⏳ Planned |
@@ -309,7 +311,7 @@ cd CNM-ZALO
 
 # 3. Start Docker containers (PostgreSQL + Redis)
 cd docker
-docker-compose up -d postgres redis
+docker compose up -d postgres redis
 
 # 4. Build and run core-service (Terminal 1)
 cd ../backend/java-services/services/core-service
@@ -329,10 +331,10 @@ npm run start:dev
 
 # 6. Verify services
 # core-service:    http://localhost:8081/api/v1/swagger-ui.html
-# message-service: http://localhost:8082/api/v1/health
+# message-service: http://localhost:3000/api/v1/health
 ```
 
-> **Note:** Dev profile có sẵn JWT secret mặc định, OTP disabled. Chỉ cần Firebase file là chạy được!
+> **Note:** Dev profile has JWT default value and OTP disabled. Flyway is enabled and is the source of truth for schema. TypeORM `synchronize` is disabled.
 
 ### 🐳 Docker Services
 
@@ -388,7 +390,7 @@ CNM-ZALO/
 │   │           │   ├── java/        #     75 Java source files
 │   │           │   └── resources/
 │   │           │       ├── application.yml
-│   │           │       └── db/migration/  # V1–V9 Flyway migrations
+│   │           │       └── db/migration/  # V1–V10 Flyway migrations
 │   │           └── pom.xml
 │   │
 │   └── node-services/               # NestJS services
@@ -458,6 +460,9 @@ npm run build
 
 # Run production
 npm run start:prod
+
+# Run e2e from repository root (stable path)
+npm --prefix backend/node-services run test:e2e
 ```
 
 ### Flutter Mobile App
@@ -489,6 +494,7 @@ V6  — User profile enhancements
 V7  — Indexes, constraints
 V8  — conversation, conversation_member, message, conversation_inbox
 V9  — message_reaction, pinned_message, message_receipt (schema alignment)
+V10 — schema hardening and alignment (idempotent guards, constraints, indexes)
 ```
 
 ### Environment Variables
@@ -527,7 +533,7 @@ REDIS_PORT=6379
 |----------|-------------|
 | [📂 Documentation Index](docs/README.md) | All documentation with descriptions |
 | [🏗️ Architecture](docs/system/architecture.md) | System architecture, service map |
-| [🗄️ Database Schema](docs/system/database-schema.md) | Complete PostgreSQL schema (V1–V9) |
+| [🗄️ Database Schema](docs/system/database-schema.md) | Complete PostgreSQL schema (V1–V10) |
 | [📡 API Reference](docs/system/api-reference.md) | REST endpoints + WebSocket events |
 | [📊 Status](docs/project/status.md) | Implementation status per service |
 | [📝 Changelog](docs/project/changelog.md) | Version history |

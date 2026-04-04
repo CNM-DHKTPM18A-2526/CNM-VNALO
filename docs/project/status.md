@@ -1,6 +1,6 @@
 # Implementation Status
 
-> Last updated: 2026-02-15
+> Last updated: 2026-03-20
 
 ---
 
@@ -14,12 +14,12 @@
 | Blocks | ✅ Complete | 4 | ✅ BlockServiceTest |
 | QR Module | ✅ Complete | 3 | — |
 | Contact Sync | ✅ Complete | 4 | — |
-| Conversations | ✅ Complete | 6 | ✅ conversation.service.spec |
-| Messages (CRUD + Search) | ✅ Complete | 5 | ✅ message.service.spec |
+| Conversations | ✅ Complete | 11 | ✅ conversation.service.spec |
+| Messages (CRUD + Delete for Me) | ✅ Complete | 6 | ✅ message.service.spec |
 | Reactions | ✅ Complete | 3 | — |
 | Pins | ✅ Complete | 3 | — |
 | Read Receipts | ✅ Complete | 1 | — |
-| Inbox | ✅ Complete | 1 | — |
+| Inbox | ✅ Complete | 2 | — |
 | WebSocket Gateway | ✅ Complete | 7 events | — |
 
 **Total: 60/60 features implemented**
@@ -31,7 +31,7 @@
 | Module | Status | Notes |
 |--------|--------|-------|
 | realtime-gateway | ⏸️ Not started | Depends on message-service |
-| media-service | ⏸️ Not started | Upload, Cloudinary |
+| media-service | 🔄 In Progress | Upload to S3 (WIP) |
 
 ## Dev 3 — Content & Notifications
 
@@ -63,6 +63,23 @@
 | V7 | ✅ Applied | Indexes, constraints |
 | V8 | ✅ Applied | conversation, conversation_member, message, conversation_inbox |
 | V9 | ✅ Applied | message_reaction, pinned_message, message_receipt |
+| V10 | ✅ Applied | Schema hardening, idempotent guards, uniqueness constraints, FK integrity, performance indexes |
+| V11 | ✅ Applied | Group member_limit default 1000→100, backfill existing groups |
+| V12 | ✅ Applied | Thêm cột hidden_by_users cho tính năng Delete For Me |
+| V13 | ✅ Applied | `conversation_join_request`, default `join_mode=OPEN` |
+
+---
+
+## Frontend — Mobile (Flutter)
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Project setup (pubspec.yaml) | ✅ Complete | SDK ^3.7.2, 16 packages |
+| Environment config (AppConfig) | ✅ Complete | 3 envs via `--dart-define` |
+| Theme system (3 modes) | ✅ Complete | Light/Dark/System + persistence |
+| Data models (10 files) | ✅ Complete | Aligned 100% with backend entities |
+| Feature screens | ⏸️ Not started | Guide docs ready, code to implement |
+| API integration | ⏸️ Not started | Services designed in guide |
 
 ---
 
@@ -70,5 +87,5 @@
 
 | Service | Suites | Tests | Status |
 |---------|--------|-------|--------|
-| core-service | 5 | 44 | ✅ Pass |
-| message-service | 2 | 18 | ✅ Pass (verified 2026-02-15) |
+| core-service | 5 | 43 | ✅ Pass |
+| message-service | 2 | 23 | ✅ Pass (verified 2026-03-07) |

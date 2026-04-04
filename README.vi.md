@@ -51,7 +51,7 @@
 
 | 🎨 UI/UX Hiện Đại | ⚡ Hiệu Năng Cao | 🔒 Bảo Mật | 📈 Khả Năng Mở Rộng |
 |:---:|:---:|:---:|:---:|
-| React Native 0.76+ | Netty WebSocket | Mã Hóa End-to-end | Kiến Trúc Microservices |
+| Flutter 3.x | Socket.IO WebSocket | JWT + Firebase Auth | Kiến Trúc Microservices |
 | NativeWind/Tailwind | Event-Driven (Kafka) | Firebase Auth | Sẵn Sàng Kubernetes |
 | Hiệu Ứng Mượt Mà | Redis Caching | JWT Tokens | Tự Động Mở Rộng |
 
@@ -76,22 +76,22 @@
 
 ![Java](https://img.shields.io/badge/Java_21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot_3-6DB33F?style=for-the-badge&logo=spring&logoColor=white)
-![Netty](https://img.shields.io/badge/Netty-4.1-009688?style=for-the-badge)
-![Kafka](https://img.shields.io/badge/Apache_Kafka-231F20?style=for-the-badge&logo=apachekafka&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-20-339933?style=for-the-badge&logo=node.js&logoColor=white)
+![NestJS](https://img.shields.io/badge/NestJS-11-E0234E?style=for-the-badge&logo=nestjs&logoColor=white)
 
 ### Tầng Dữ Liệu
 
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL_16-316192?style=for-the-badge&logo=postgresql&logoColor=white)
-![Cassandra](https://img.shields.io/badge/Cassandra-1287B1?style=for-the-badge&logo=apache-cassandra&logoColor=white)
+![Flyway](https://img.shields.io/badge/Flyway-Migrations-CC0200?style=for-the-badge)
 ![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white)
-![AWS S3](https://img.shields.io/badge/AWS_S3-569A31?style=for-the-badge&logo=amazons3&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 
 ### Frontend & Mobile
 
-![React Native](https://img.shields.io/badge/React_Native-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
-![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
-![Zustand](https://img.shields.io/badge/Zustand-000000?style=for-the-badge)
-![TailwindCSS](https://img.shields.io/badge/TailwindCSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
+![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?style=for-the-badge&logo=flutter&logoColor=white)
+![Dart](https://img.shields.io/badge/Dart-3.x-0175C2?style=for-the-badge&logo=dart&logoColor=white)
+![Material](https://img.shields.io/badge/Material-Design-3F51B5?style=for-the-badge)
+![Provider](https://img.shields.io/badge/Provider-State-6A1B9A?style=for-the-badge)
 
 ### DevOps & Hạ Tầng
 
@@ -113,23 +113,20 @@
 <summary><b>📦 Ngăn Xếp Công Nghệ Đầy Đủ</b></summary>
 
 #### Backend Services
-- **Framework**: Spring Boot 3.x (Java 21)
-- **WebSocket**: Netty 4.1
+- **Framework**: Spring Boot 3.x (core-service) + NestJS 11 (message-service)
+- **WebSocket**: Socket.IO (message-service)
 - **Bảo mật**: Spring Security + Firebase Admin SDK
-- **Event Streaming**: Apache Kafka (MSK)
-- **API Gateway**: Spring Cloud Gateway
+- **Auth liên service**: JWT HS512 dùng chung secret giữa core/message
 
 #### Cơ Sở Dữ Liệu
-- **RDBMS**: PostgreSQL 16 (Users, Profiles, Social Graph)
-- **NoSQL**: Apache Cassandra/ScyllaDB (Lịch sử tin nhắn)
-- **Cache**: Redis 7 (Session, Presence, Rate Limiting)
-- **Tìm kiếm**: Elasticsearch (Tương lai)
+- **RDBMS**: PostgreSQL 16 (auth, user, social, conversation, message)
+- **Migration**: Flyway V1-V10 (quản lý bởi core-service)
+- **Cache**: Redis 7
 
 #### Frontend
-- **Mobile**: React Native 0.76+
-- **State**: Zustand + React Query
-- **Styling**: NativeWind (TailwindCSS cho RN)
-- **Điều hướng**: React Navigation 6
+- **Mobile**: Flutter 3.x
+- **Ngôn ngữ**: Dart 3.x
+- **UI**: Material Design
 
 #### Hạ Tầng
 - **Container hóa**: Docker + Docker Compose
@@ -185,7 +182,7 @@ graph TB
                 AI[🤖 AI Service]
             end
             
-            Realtime[⚡ Realtime Gateway<br/>Netty WebSocket]
+            Realtime[⚡ Realtime Gateway<br/>Socket.IO WebSocket]
         end
         
         subgraph "Tầng Dữ Liệu"
@@ -222,7 +219,7 @@ graph TB
 | Service | Trách Nhiệm | Port | Công Nghệ | Cơ Sở Dữ Liệu |
 |---------|-------------|------|-----------|----------------|
 | 🔐 **core-service** | Auth, Users, Tính Năng Xã Hội | 8081 | Spring Boot | PostgreSQL (auth, users, social) |
-| 💬 **messaging-service** | Hội Thoại, Tin Nhắn, Chat | 8082 | Spring Boot | PostgreSQL (messaging) |
+| 💬 **message-service** | Hội Thoại, Tin Nhắn, Chat, Socket.IO | 3000 | NestJS 11 | PostgreSQL (messaging) |
 | 📎 **media-service** | Tải File, Cloudinary, Stickers | 8083 | Spring Boot | PostgreSQL (media) |
 | 📰 **content-service** | Stories, Bài Đăng Timeline | 8084 | Spring Boot | PostgreSQL (content) |
 | ⚡ **realtime-gateway** | WebSocket, Gửi Thời Gian Thực | 8085 | Node.js/NestJS | Redis |
@@ -237,7 +234,7 @@ graph TB
 ```
 ┌────────┐    WSS     ┌─────────────┐   Kafka    ┌──────────┐
 │ Client │ ──────────▶│   Gateway   │ ─────────▶ │  Message │
-│        │◀────ACK────│   (Netty)   │            │  Service │
+│        │◀────ACK────│  (Socket.IO)│            │  Service │
 └────────┘            └─────────────┘            └──────────┘
                              │                         │
                              ▼                         ▼
@@ -272,7 +269,7 @@ graph TB
 🍎  Xcode (cho iOS - chỉ macOS)
 ```
 
-### ⚡ Thiết Lập Backend (core-service)
+### ⚡ Thiết Lập Backend (core-service + message-service)
 
 ```bash
 # 1. Clone repository
@@ -285,7 +282,7 @@ cd CNM-ZALO
 
 # 3. Khởi động Docker containers
 cd docker
-docker-compose up -d postgres redis
+docker compose up -d postgres redis
 
 # 4. Build và chạy core-service
 cd ../backend/java-services/services/core-service
@@ -298,11 +295,20 @@ cd ../backend/java-services/services/core-service
 ./mvnw clean install -DskipTests
 ./mvnw spring-boot:run
 
-# 5. Truy cập Swagger UI
+# 5. Chạy message-service (terminal mới)
+cd ../../../../backend/node-services
+npm install
+npm run start:dev
+
+# 6. Kiểm tra health
+# core-service:    http://localhost:8081/api/v1/actuator/health
+# message-service: http://localhost:3000/api/v1/health
+
+# 7. Swagger UI
 # http://localhost:8081/api/v1/swagger-ui.html
 ```
 
-> **Lưu ý:** Profile dev có sẵn JWT secret mặc định, OTP đã tắt. Chỉ cần file Firebase là chạy được!
+> **Lưu ý:** Profile `dev` dùng Flyway để quản lý schema (V1-V10), Hibernate ở chế độ `validate`, TypeORM `synchronize` đã tắt.
 
 ### 🐳 Dịch Vụ Docker
 
@@ -399,27 +405,21 @@ docker build -t vnalo/core-service .
 ```bash
 cd frontend/mobile
 
-# Khởi động Metro bundler
-npm start
+# Cài dependencies
+flutter pub get
 
-# Chạy trên thiết bị cụ thể
-npm run android -- --deviceId=<device_id>
+# Chạy app
+flutter run
 
-# Chế độ debug
-npm run android -- --variant=debug
-
-# Build release
-npm run android -- --variant=release
+# Build Android release
+flutter build apk --release
 ```
 
 ### Migrations Cơ Sở Dữ Liệu
 
 ```bash
-# PostgreSQL
-flyway migrate
-
-# Cassandra
-cqlsh -f schema/cassandra/init.cql
+# Flyway chạy tự động khi core-service khởi động
+# Migration hiện tại: V1 -> V10
 ```
 
 ---
@@ -492,7 +492,7 @@ OLLAMA_BASE_URL=http://localhost:11434
 | Service | Trạng Thái | Tính Năng |
 |---------|------------|------------|
 | **core-service** | ✅ Sẵn sàng | Auth (đăng ký, đăng nhập, đăng xuất), Hồ sơ người dùng, Quản lý bạn bè, Danh sách chặn |
-| **messaging-service** | 🚧 Tiếp theo | Hội thoại, Tin nhắn |
+| **message-service** | ✅ Sẵn sàng | Hội thoại, tin nhắn, phản ứng, ghim, inbox, WebSocket |
 | **media-service** | 📅 Đã lên kế hoạch | Upload file, Cloudinary |
 | **realtime-gateway** | 📅 Đã lên kế hoạch | WebSocket, Gửi tin real-time |
 
@@ -539,7 +539,7 @@ git push origin feature/tinh-nang-tuyet-voi
 | **Backend Lead** | Auth, User, Social Services | TBD |
 | **Backend Dev** | Message, Media, Notification | TBD |
 | **Fullstack** | Realtime Gateway, Hạ tầng | TBD |
-| **Frontend Lead** | React Native, UI/UX | TBD |
+| **Frontend Lead** | Flutter, UI/UX | TBD |
 
 ---
 

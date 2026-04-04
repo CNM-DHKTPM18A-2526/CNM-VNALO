@@ -6,12 +6,12 @@
 
 ## System Documentation
 
-Technical reference that describes how the system works. Rarely changes.
+Technical reference that describes how the system works.
 
 | Document | Description |
 |----------|-------------|
 | [Architecture](system/architecture.md) | System architecture, service map, communication patterns |
-| [Database Schema](system/database-schema.md) | Complete PostgreSQL schema with SQL DDL |
+| [Database Schema](system/database-schema.md) | Complete PostgreSQL schema design (target spec, 71 tables) |
 | [API Reference](system/api-reference.md) | All REST endpoints and WebSocket events |
 
 ## Project Documentation
@@ -24,20 +24,11 @@ Reflects current project state and progress. Updated frequently.
 | [Changelog](project/changelog.md) | Version history and notable changes |
 | [Status](project/status.md) | Current implementation status per service |
 
-## Local-Only Documentation
 
-> These files exist locally but are **not committed** to the repository.
-
-| Directory | Content |
-|-----------|---------|
-| `guides/` | Implementation guides, learning materials, Postman testing |
-| `mobile/` | Mobile UI design specifications |
-| `diagrams/` | Flow diagrams and sequence charts |
 
 ## Root Files
 
 | File | Description |
 |------|-------------|
 | [README.md](../README.md) | Project overview (English) |
-| [README.vi.md](../README.vi.md) | Project overview (Vietnamese) |
 | [CONTRIBUTING.md](contributing.md) | Code standards and conventions |

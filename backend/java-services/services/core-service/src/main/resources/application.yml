@@ -24,7 +24,7 @@ spring:
 
   flyway:
     enabled: true
-    baseline-on-migrate: true
+    baseline-on-migrate: false
     locations: classpath:db/migration
 
   data:
@@ -56,8 +56,10 @@ logging:
 
 # Firebase Configuration
 firebase:
+  enabled: ${FIREBASE_ENABLED:false}
+  fail-fast: ${FIREBASE_FAIL_FAST:false}
   credentials:
-    path: ${FIREBASE_CREDENTIALS_PATH:iuh-cnm-vnalo-firebase-adminsdk-fbsvc-5008b7c5eb.json}
+    path: ${FIREBASE_CREDENTIALS_PATH:}
 
 management:
   endpoints:
@@ -100,10 +102,10 @@ spring:
       on-profile: dev
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: true
   flyway:
-    enabled: false
+    enabled: true
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
@@ -163,3 +165,7 @@ logging:
   level:
     iuh.cnm.vnalo: INFO
     org.springframework.security: WARN
+
+firebase:
+  enabled: true
+  fail-fast: true

@@ -18,6 +18,16 @@
       "compilerOptions": {
         "tsConfigPath": "apps/message-service/tsconfig.app.json"
       }
+    },
+    "realtime-gateway": {
+      "type": "application",
+      "root": "apps/realtime-gateway",
+      "entryFile": "main",
+      "sourceRoot": "apps/realtime-gateway/src",
+      "compilerOptions": {
+        "webpack": false,
+        "tsConfigPath": "apps/realtime-gateway/tsconfig.app.json"
+      }
     }
   }
 }

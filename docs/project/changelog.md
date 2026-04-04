@@ -8,7 +8,45 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 
 ## [Unreleased]
 
-_No unreleased changes._
+### Added
+- **V13 migration**: Added `conversation_join_request` table and indexes for group join approval flow.
+- **Group join approval APIs**: `POST /conversations/{id}/join`, `GET /conversations/{id}/join-requests`, `POST /conversations/{id}/join-requests/{uid}/approve`, `DELETE /conversations/{id}/join-requests/{uid}`.
+
+### Fixed
+- **WebSocket room authorization**: `conversation.join` now verifies membership before room join.
+- **Conversation members endpoint**: `GET /conversations/{id}/members` now enforces requester membership.
+- **Pin/Unpin policy**: Members can pin/unpin only when `allowMemberPin=true`; otherwise admin/owner only.
+- **Recall integrity**: WS `message.recalled` now emits to the real message conversation, not client-provided `conversationId`.
+- **Delete for me authorization**: `DELETE /messages/{id}/for-me` now validates conversation membership.
+- **CORS hardening**: Node and Java services now use configurable explicit origin allow-lists instead of wildcard origins.
+
+### Changed
+- **Group default join mode**: changed to `OPEN` (Zalo-like default), while `APPROVAL` remains configurable.
+
+---
+
+## [2026-03-15] — V10 Migration, Mobile Fixes, Docs Cleanup
+
+### Added
+- **V10 migration**: Schema hardening — idempotent guards for V9 column renames, uniqueness constraints (`uq_msg_conv_seq`, `uq_msg_sender_client_id`), FK integrity for inbox/member → user_profile, performance indexes
+- **V11 migration**: Group `member_limit` default changed 1000→100; backfill existing groups. Standard groups capped at 100 members (future: paid community upgrade for higher limits)
+- **Mobile implementation guides**: Parts 1–4 now fully self-contained (~3,730 lines total). Restored 5 placeholder sections with complete code (services, providers, screens, navigation, testing)
+
+### Fixed
+- **Mobile `main.dart`**: Added `ChangeNotifierProvider<ThemeProvider>` wrapper; removed leftover counter template code
+- **Mobile `theme_provider.dart`**: Fixed swapped dark/light labels
+- **Mobile `app_typography.dart`**: Removed references to non-existent `AppColors.textPrimary/textSecondary`
+- **`docs/feedback/VNALO_VS_ZALO_COMPARISON.md`**: Fixed 7 inaccuracies — inviteLink/avatarUrl/joinMode were ❌ but entity fields exist (→⚠️ Partial); dark mode ❌→✅ (Flutter 3-mode theme); presence ❌→⚠️; updated feature counts (47%→53% overall)
+
+### Removed
+- **Mobile `app_color_light.dart`**: Deleted empty 0-byte duplicate file
+- **Docs cleanup**: Removed `VNALO_Complete_Database_Schema.md` (duplicate), `VNALO_Project_Docs.md` (superseded), empty `architecture/` directory
+
+### Changed
+- **`docs/system/architecture.md`**: Updated migration ref V1–V9 → V1–V11
+- **`docs/project/status.md`**: Added V10-V11 migrations, mobile frontend section, updated test counts
+- **`docs/README.md`**: Updated structure table to match actual committed files
+- **`conversation.entity.ts`**: `memberLimit` default 1000→100
 
 ---
 
@@ -79,7 +117,12 @@ _No unreleased changes._
 
 ---
 
-## [2026-02-12] — Node Services Restructure
+### Historical Notes (already shipped in earlier milestones)
+- **V12 Migration**: Added `hidden_by_users` array (UUID[]) to `message` table.
+- **Delete For Me Feature** (Xóa ở máy tôi): Endpoint `DELETE /messages/:id/for-me` implemented.
+- **Admin Recall** (Xóa cho cả nhóm): Group `OWNER` and `ADMIN` can recall member messages in-group.
+
+## [2026-03-04] — V11 Migration & Performance Tune
 
 ### Changed
 - Restructured `node-services` from multi-app workspace to flat NestJS monorepo

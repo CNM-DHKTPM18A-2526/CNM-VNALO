@@ -74,7 +74,9 @@ Base path: `/api/v1`
 
 ---
 
-## message-service (Port 8082)
+## message-service (Port 3000)
+
+Note: In some environments, `PORT` can be overridden (for example mapping to 8082).
 
 Base path: `/api/v1`
 
@@ -88,6 +90,11 @@ Base path: `/api/v1`
 | PATCH | `/conversations/{id}` | Update group settings | Yes |
 | POST | `/conversations/{id}/members` | Add members to group | Yes |
 | DELETE | `/conversations/{id}/members/{uid}` | Remove/leave group | Yes |
+| GET | `/conversations/{id}/members` | Get group members (member-only) | Yes |
+| POST | `/conversations/{id}/join` | Join by QR/invite id (OPEN) or create approval request (APPROVAL) | Yes |
+| GET | `/conversations/{id}/join-requests` | List pending join requests (admin/owner only) | Yes |
+| POST | `/conversations/{id}/join-requests/{uid}/approve` | Approve pending user into group | Yes |
+| DELETE | `/conversations/{id}/join-requests/{uid}` | Reject pending join request | Yes |
 
 ### Messages
 
@@ -98,6 +105,7 @@ Base path: `/api/v1`
 | GET | `/conversations/{id}/messages/search` | Search messages (keyword + type) | Yes |
 | PATCH | `/messages/{id}` | Edit message | Yes |
 | DELETE | `/messages/{id}` | Recall message | Yes |
+| DELETE | `/messages/{id}/for-me` | Hide message only for current user (requires membership) | Yes |
 
 ### Reactions
 
@@ -131,7 +139,7 @@ Base path: `/api/v1`
 
 ## WebSocket Events (Socket.IO)
 
-Connection: `ws://localhost:8082/chat` with JWT in handshake `auth.token`.
+Connection: `ws://localhost:3000/chat` with JWT in handshake `auth.token`.
 
 Namespace: `/chat` — Transports: `websocket`, `polling`
 
@@ -139,10 +147,10 @@ Namespace: `/chat` — Transports: `websocket`, `polling`
 
 | Event | Payload | Response Event | Description |
 |-------|---------|---------------|-------------|
-| `conversation.join` | `{ conversationId }` | `conversation.joined` | Join a conversation room |
+| `conversation.join` | `{ conversationId }` | `conversation.joined` / `message.error` | Join a conversation room (membership required) |
 | `conversation.leave` | `{ conversationId }` | — | Leave a conversation room |
 | `message.send` | `{ conversationId, content, messageType, clientMessageId }` | `message.sent` / `message.error` | Send message (persisted + broadcast) |
-| `message.typing` | `{ conversationId, isTyping }` | — | Typing indicator (broadcast to room) |
+| `message.typing` | `{ conversationId, isTyping }` | — | Typing indicator (ignored if sender is not a member) |
 | `message.read` | `{ conversationId, lastReadSeq }` | — | Mark messages as read |
 
 ### Server → Client Events
@@ -159,7 +167,7 @@ Namespace: `/chat` — Transports: `websocket`, `polling`
 1. Client connects to `/chat` namespace with `auth: { token: '<JWT>' }`
 2. Server verifies JWT, tracks socket per userId (multi-device support)
 3. Server broadcasts `presence.changed` with `status: 'online'`
-4. Client emits `conversation.join` for each active conversation
+4. Client emits `conversation.join` for each active conversation (server verifies membership)
 5. Client sends/receives messages via room-scoped events
 6. On disconnect, server broadcasts `presence.changed` with `status: 'offline'`
 
