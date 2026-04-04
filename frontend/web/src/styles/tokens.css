@@ -1,0 +1,128 @@
+:root {
+  --bg: #eef3fb;
+  --surface: #ffffff;
+  --surface-2: #f8fbff;
+  --text: #1f2a44;
+  --muted: #6c7891;
+  --border: #dbe4f2;
+  --primary: #1d66e5;
+  --primary-strong: #0f4fc0;
+  --primary-soft: #e8f0ff;
+  --primary-grad: linear-gradient(135deg, #2f7cf6 0%, #1658d1 100%);
+  --success: #13a57a;
+  --sidebar: #0f1930;
+  --sidebar-muted: #8f9dbb;
+  --shadow: 0 16px 40px rgba(15, 35, 74, 0.12);
+  --shadow-soft: 0 8px 28px rgba(21, 44, 94, 0.08);
+  --shadow-hover: 0 18px 34px rgba(18, 53, 121, 0.14);
+  --radius-2: 8px;
+  --radius-3: 12px;
+  --radius-4: 16px;
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --motion-fast: 0.2s ease;
+}
+
+body {
+  background: radial-gradient(circle at top left, #d8ecff 0, #eef3fb 36%, #eef3fb 100%);
+  color: var(--text);
+  font-family: 'Segoe UI', 'Noto Sans', sans-serif;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+button,
+.sidebar-link,
+.chat-item,
+.notification-item,
+.settings-grid > * {
+  transition: all var(--motion-fast);
+}
+
+.page-enter {
+  animation: pageIn 220ms ease;
+}
+
+.stagger-item {
+  animation: itemIn 280ms ease both;
+}
+
+.route-fade-enter {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.route-fade-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+
+.route-fade-exit {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.route-fade-exit-active {
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.6;
+  }
+
+  50% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(0.7);
+    opacity: 0.6;
+  }
+}
+
+@keyframes pageIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes itemIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
