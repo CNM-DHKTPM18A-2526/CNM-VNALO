@@ -16,33 +16,41 @@ import java.util.List;
 @Slf4j
 @Configuration
 public class FirebaseConfig {
+    private boolean firebaseInitialized = false;
+
+    public boolean isInitialized() {
+        return firebaseInitialized;
+    }
 
     @Value("${firebase.credentials.path}")
     private String credentialsPath;
 
-    @PostConstruct
+   @PostConstruct
     public void init() {
         try {
-            // Nếu đã init rồi thì thôi
             List<FirebaseApp> apps = FirebaseApp.getApps();
-            if (apps != null && !apps.isEmpty()) {
+        if (apps != null && !apps.isEmpty()) {
+                firebaseInitialized = true;
                 log.info("Firebase already initialized: {}", apps.get(0).getName());
                 return;
-            }
-
-            Resource resource = new ClassPathResource(credentialsPath);
-            try (InputStream is = resource.getInputStream()) {
-                FirebaseOptions options = FirebaseOptions.builder()
-                        .setCredentials(GoogleCredentials.fromStream(is))
-                        .build();
-                FirebaseApp.initializeApp(options);
-                log.info("Firebase initialized successfully (DEFAULT).");
-            }
-        } catch (Exception e) {
-            // Dev có thể cho phép chạy mà không push (tuỳ bạn)
-            log.error("Firebase init failed: {}", e.getMessage(), e);
-            // Nếu muốn FAIL HARD thì throw:
-            // throw new IllegalStateException("Firebase init failed", e);
         }
+
+        Resource resource = new ClassPathResource(credentialsPath);
+
+        try (InputStream is = resource.getInputStream()) {
+            FirebaseOptions options = FirebaseOptions.builder()
+                    .setCredentials(GoogleCredentials.fromStream(is))
+                    .build();
+
+            FirebaseApp.initializeApp(options);
+            firebaseInitialized = true;
+
+            log.info("Firebase initialized successfully (DEFAULT).");
+        }
+
+    } catch (Exception e) {
+        firebaseInitialized = false;
+        log.error("Firebase init failed: {}", e.getMessage(), e);
     }
+}
 }

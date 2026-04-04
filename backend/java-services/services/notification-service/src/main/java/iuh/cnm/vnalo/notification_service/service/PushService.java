@@ -2,6 +2,7 @@ package iuh.cnm.vnalo.notification_service.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.firebase.messaging.*;
+import iuh.cnm.vnalo.notification_service.config.FirebaseConfig;
 import iuh.cnm.vnalo.notification_service.repository.NotificationDeviceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +17,7 @@ import java.util.*;
 public class PushService {
 
     private final NotificationDeviceRepository deviceRepo;
+    private final FirebaseConfig firebaseConfig;
 
     /**
      * Gửi push cho toàn bộ thiết bị active của user.
@@ -24,6 +26,11 @@ public class PushService {
      */
     @Transactional
     public void sendToUser(UUID userId, String title, String body, JsonNode data) {
+        if (!firebaseConfig.isInitialized()) {
+            log.warn("Firebase not initialized -> skip push for userId={}", userId);
+            return;
+        }
+
         List<String> tokens = deviceRepo.findActiveTokens(userId);
 
         if (tokens == null || tokens.isEmpty()) {
@@ -48,7 +55,6 @@ public class PushService {
                 }
 
             } catch (FirebaseMessagingException e) {
-                // Lỗi kiểu network/service unavailable: để Kafka retry
                 log.error("FCM send failed userId={} errorCode={} message={}",
                         userId, e.getErrorCode(), e.getMessage(), e);
                 throw new RuntimeException("FCM send failed", e);
@@ -64,13 +70,11 @@ public class PushService {
                         .setBody(body)
                         .build());
 
-        // optional: data payload (phải là string)
         if (data != null && data.isObject()) {
             Iterator<Map.Entry<String, JsonNode>> it = data.fields();
             while (it.hasNext()) {
                 var e = it.next();
                 if (e.getValue() != null && !e.getValue().isNull()) {
-                    // FCM data chỉ nhận string => dùng asText() là an toàn
                     b.putData(e.getKey(), e.getValue().asText());
                 }
             }
@@ -79,9 +83,6 @@ public class PushService {
         return b.build();
     }
 
-    /**
-     * Disable token nếu Firebase báo token invalid/unregistered.
-     */
     private void cleanupInvalidTokens(List<String> tokens, BatchResponse resp) {
         List<SendResponse> responses = resp.getResponses();
 
@@ -108,14 +109,9 @@ public class PushService {
         }
     }
 
-    /**
-     * Heuristic check cho token invalid/unregistered.
-     * firebase-admin có thể trả MessagingErrorCode, nhưng đôi khi message chứa chuỗi.
-     */
     private boolean isInvalidToken(FirebaseMessagingException ex) {
         if (ex == null) return false;
 
-        // Khi token không còn hợp lệ, firebase thường trả UNREGISTERED
         if (ex.getMessagingErrorCode() == MessagingErrorCode.UNREGISTERED) return true;
 
         String msg = ex.getMessage();
