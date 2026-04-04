@@ -1,0 +1,123 @@
+package iuh.cnm.vnalo.content_service.service;
+
+import iuh.cnm.vnalo.content_service.exception.ApiException;
+import iuh.cnm.vnalo.content_service.exception.ErrorCode;
+import iuh.cnm.vnalo.content_service.model.dto.CommentPageResponse;
+import iuh.cnm.vnalo.content_service.model.dto.CommentResponse;
+import iuh.cnm.vnalo.content_service.model.dto.CreateCommentRequest;
+import iuh.cnm.vnalo.content_service.model.dto.UpdateCommentRequest;
+import iuh.cnm.vnalo.content_service.model.entity.Comment;
+import iuh.cnm.vnalo.content_service.model.entity.Post;
+import iuh.cnm.vnalo.content_service.repository.CommentRepository;
+import iuh.cnm.vnalo.content_service.repository.PostRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+public class CommentService {
+
+    private final CommentRepository commentRepository;
+    private final PostRepository postRepository;
+
+    @Transactional
+    public CommentResponse createComment(UUID postId, UUID authorId, CreateCommentRequest request) {
+        Post post = postRepository.findByPostIdAndStatus(postId, "ACTIVE")
+                .orElseThrow(() -> new ApiException(ErrorCode.POST_NOT_FOUND));
+
+        Comment comment = Comment.builder()
+                .postId(postId)
+                .authorId(authorId)
+                .parentCommentId(request.getParentCommentId())
+                .contentText(request.getContentText())
+                .status("ACTIVE")
+                .build();
+
+        Comment saved = commentRepository.saveAndFlush(comment);
+
+        post.setCommentCount(post.getCommentCount() + 1);
+        postRepository.save(post);
+
+        return toResponse(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public CommentPageResponse getCommentsByPost(UUID postId, int page, int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), 50);
+
+        PageRequest pageable = PageRequest.of(
+                safePage,
+                safeSize,
+                Sort.by(Sort.Direction.DESC, "createdAt")
+        );
+
+        Page<Comment> result = commentRepository.findByPostIdAndStatusOrderByCreatedAtDesc(
+                postId,
+                "ACTIVE",
+                pageable
+        );
+
+        return CommentPageResponse.builder()
+                .items(result.getContent().stream().map(this::toResponse).toList())
+                .page(result.getNumber())
+                .size(result.getSize())
+                .totalElements(result.getTotalElements())
+                .totalPages(result.getTotalPages())
+                .last(result.isLast())
+                .build();
+    }
+
+    @Transactional
+    public CommentResponse updateComment(UUID commentId, UUID userId, UpdateCommentRequest request) {
+        Comment comment = commentRepository.findByCommentIdAndStatus(commentId, "ACTIVE")
+                .orElseThrow(() -> new ApiException(ErrorCode.COMMENT_NOT_FOUND));
+
+        if (!comment.getAuthorId().equals(userId)) {
+            throw new ApiException(ErrorCode.FORBIDDEN);
+        }
+
+        comment.setContentText(request.getContentText());
+
+        Comment saved = commentRepository.saveAndFlush(comment);
+        return toResponse(saved);
+    }
+
+    @Transactional
+    public void deleteComment(UUID commentId, UUID userId) {
+        Comment comment = commentRepository.findByCommentIdAndStatus(commentId, "ACTIVE")
+                .orElseThrow(() -> new ApiException(ErrorCode.COMMENT_NOT_FOUND));
+
+        if (!comment.getAuthorId().equals(userId)) {
+            throw new ApiException(ErrorCode.FORBIDDEN);
+        }
+
+        comment.setStatus("DELETED");
+        commentRepository.save(comment);
+
+        postRepository.findById(comment.getPostId()).ifPresent(post -> {
+            post.setCommentCount(Math.max(0, post.getCommentCount() - 1));
+            postRepository.save(post);
+        });
+    }
+
+    private CommentResponse toResponse(Comment comment) {
+        return CommentResponse.builder()
+                .commentId(comment.getCommentId())
+                .postId(comment.getPostId())
+                .authorId(comment.getAuthorId())
+                .parentCommentId(comment.getParentCommentId())
+                .contentText(comment.getContentText())
+                .likeCount(comment.getLikeCount())
+                .status(comment.getStatus())
+                .createdAt(comment.getCreatedAt())
+                .updatedAt(comment.getUpdatedAt())
+                .build();
+    }
+}
