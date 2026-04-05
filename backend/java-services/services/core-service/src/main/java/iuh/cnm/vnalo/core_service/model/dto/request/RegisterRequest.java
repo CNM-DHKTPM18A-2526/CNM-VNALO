@@ -8,6 +8,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import iuh.cnm.vnalo.core_service.model.enums.Gender;
+import java.time.LocalDate;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -35,4 +38,8 @@ public class RegisterRequest {
     @Size(min = 6, max = 6, message = "OTP must be 6 digits")
     @Pattern(regexp = "^\\d{6}$", message = "OTP must be 6 digits")
     private String otp;
+
+    private Gender gender;
+
+    private LocalDate dob;
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'dart:io';
 import 'package:vnalo_mobile/models/user_model.dart';
 import 'package:vnalo_mobile/services/auth_service.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
@@ -63,6 +64,7 @@ class AuthProvider extends ChangeNotifier {
         _user = User.fromJson(data['user']);
       } else {
         _user = await _authService.getMe();
+        await _storageService.saveUserId(_user!.id);
       }
 
       _socketService.connect(tokens.accessToken);
@@ -95,11 +97,24 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> fetchOtpRequiredStatus() async {
+    try {
+      final status = await _authService.getOtpStatus();
+      return status['enabled'] == true;
+    } catch (_) {
+      // Fallback is handled by caller.
+      rethrow;
+    }
+  }
+
   Future<bool> register({
     required String phone,
     required String otp,
     required String password,
     required String displayName,
+    File? avatarFile,
+    String? gender,
+    String? dob,
   }) async {
     _isLoading = true;
     _error = null;
@@ -111,6 +126,8 @@ class AuthProvider extends ChangeNotifier {
         otp: otp,
         password: password,
         displayName: displayName,
+        gender: gender,
+        dob: dob,
       );
 
       final data = (response['data'] ?? response) as Map<String, dynamic>;
@@ -133,6 +150,18 @@ class AuthProvider extends ChangeNotifier {
         _user = User.fromJson(data['user']);
       } else {
         _user = await _authService.getMe();
+        await _storageService.saveUserId(_user!.id);
+      }
+
+      if (avatarFile != null) {
+        try {
+          final avatarUrl = await _authService.uploadAvatar(avatarFile);
+          await _authService.updateProfileAvatar(avatarUrl);
+          _user = await _authService.getMe();
+          await _storageService.saveUserId(_user!.id);
+        } catch (e) {
+          _error = 'Dang ky thanh cong nhung cap nhat anh dai dien that bai: $e';
+        }
       }
 
       _isLoading = false;

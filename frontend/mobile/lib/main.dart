@@ -30,6 +30,10 @@ void main() {
     'MESSAGE_SERVICE_URL',
     defaultValue: '',
   );
+  const mediaServiceOverride = String.fromEnvironment(
+    'MEDIA_SERVICE_URL',
+    defaultValue: '',
+  );
   const socketOverride = String.fromEnvironment('SOCKET_URL', defaultValue: '');
 
   final env = Environment.values.firstWhere(
@@ -41,6 +45,8 @@ void main() {
     coreServiceUrl: coreServiceOverride.isEmpty ? null : coreServiceOverride,
     messageServiceUrl:
         messageServiceOverride.isEmpty ? null : messageServiceOverride,
+    mediaServiceUrl:
+      mediaServiceOverride.isEmpty ? null : mediaServiceOverride,
     socketUrl: socketOverride.isEmpty ? null : socketOverride,
   );
   runApp(const VnaloApp());
