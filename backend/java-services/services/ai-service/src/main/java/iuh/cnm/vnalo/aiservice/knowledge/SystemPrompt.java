@@ -58,7 +58,7 @@ public final class SystemPrompt {
             - Đồng bộ danh bạ
             
             ### Media & Sticker
-            - Upload ảnh, video, file (tối đa 100MB)
+            - Upload ảnh, video, file qua multipart với giới hạn hiện tại 5MB/6MB
             - Tự động tạo thumbnail
             - Upload file lớn qua Presigned URL
             - Hệ thống Sticker Pack: duyệt, tải, tìm kiếm
