@@ -217,3 +217,9 @@ out/
 .project
 *.bak
 *.backup
+
+# ===========================
+# Local Backups & Scratch
+# ===========================
+.local-backups/
+**/.local-backups/
