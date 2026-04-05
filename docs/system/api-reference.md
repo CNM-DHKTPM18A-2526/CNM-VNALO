@@ -2,6 +2,11 @@
 
 > All REST endpoints and WebSocket events for VNALO services.
 
+## Performance Reviews
+
+- Strict review: `docs/system/performance/ENDPOINT_PERFORMANCE_STRICT_REVIEW_2026-04-05.md`
+- Auth/message P95-P99 metrics: `docs/system/performance/AUTH_MESSAGE_P95_P99_METRICS_2026-04-05.md`
+
 ---
 
 ## core-service (Port 8081)
