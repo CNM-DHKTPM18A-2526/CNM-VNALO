@@ -46,6 +46,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setUser(profile)
   }
 
+  const updateUser = (patch: Partial<AuthUser>) => {
+    setUser((prev) => {
+      if (!prev) {
+        return prev
+      }
+
+      return {
+        ...prev,
+        ...patch,
+      }
+    })
+  }
+
   const logout = () => {
     localStorage.removeItem(ACCESS_TOKEN_KEY)
     setAccessToken(null)
@@ -59,6 +72,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       isBootstrapping,
       isAuthenticated: Boolean(accessToken),
       login,
+      updateUser,
       logout,
     }),
     [accessToken, isBootstrapping, user],

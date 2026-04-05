@@ -9,10 +9,11 @@ import { UserAvatar } from './UserAvatar'
 type TopbarProps = {
   title: string
   userName: string
+  userAvatarUrl?: string | null
   onLogout: () => void
 }
 
-export function Topbar({ title, userName, onLogout }: TopbarProps) {
+export function Topbar({ title, userName, userAvatarUrl, onLogout }: TopbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const menuItemRefs = useRef<Array<HTMLButtonElement | null>>([])
@@ -143,7 +144,7 @@ export function Topbar({ title, userName, onLogout }: TopbarProps) {
             onKeyDown={handleTriggerKeyDown}
             type='button'
           >
-            <UserAvatar name={userName} size='md' />
+            <UserAvatar imageUrl={userAvatarUrl} name={userName} size='md' />
             <span className='avatar-menu-name'>{userName}</span>
             <span aria-hidden className='avatar-menu-caret'>
               <Icon name='chevronDown' />

@@ -175,6 +175,8 @@
   display: inline-grid;
   place-items: center;
   font-weight: 700;
+  overflow: hidden;
+  position: relative;
 }
 
 .avatar-sm {

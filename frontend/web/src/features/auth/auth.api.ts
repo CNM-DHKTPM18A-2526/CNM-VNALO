@@ -1,7 +1,14 @@
 import { normalizeVietnamPhone } from './phone.util'
-import type { AuthUser, LoginPayload, RegisterPayload, SendRegisterOtpPayload } from './auth.types'
+import type { AuthUser, Gender, LoginPayload, RegisterPayload, SendRegisterOtpPayload } from './auth.types'
 
 const API_BASE_URL = import.meta.env.VITE_CORE_API_URL ?? 'http://localhost:8081/api/v1'
+
+export type UpdateProfilePayload = {
+  displayName?: string
+  avatarUrl?: string
+  dob?: string
+  gender?: Gender
+}
 
 type ApiResponse<T> = {
   data?: T
@@ -99,6 +106,10 @@ function extractToken(payload: unknown): string | null {
   return null
 }
 
+function isGender(value: unknown): value is Gender {
+  return value === 'MALE' || value === 'FEMALE' || value === 'OTHER'
+}
+
 function extractUser(payload: unknown): AuthUser | null {
   if (!payload || typeof payload !== 'object') {
     return null
@@ -127,6 +138,9 @@ function extractUser(payload: unknown): AuthUser | null {
     id: id || email,
     name: displayName || 'VNALO User',
     email,
+    avatarUrl: typeof raw.avatarUrl === 'string' ? raw.avatarUrl : null,
+    dob: typeof raw.dob === 'string' ? raw.dob : null,
+    gender: isGender(raw.gender) ? raw.gender : null,
   }
 }
 
@@ -181,6 +195,31 @@ export async function getMe(token: string): Promise<AuthUser> {
   return user
 }
 
+export async function updateProfile(token: string, payload: UpdateProfilePayload): Promise<AuthUser> {
+  const response = await fetch(`${API_BASE_URL}/users/me`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+
+  const json = (await response.json().catch(() => null)) as unknown
+
+  if (!response.ok) {
+    throw new Error(extractMessage(json) ?? 'Không thể cập nhật hồ sơ người dùng.')
+  }
+
+  const user = extractUser(json)
+
+  if (!user) {
+    throw new Error('Phản hồi cập nhật hồ sơ không hợp lệ.')
+  }
+
+  return user
+}
+
 export async function sendRegisterOtp(payload: SendRegisterOtpPayload): Promise<void> {
   const normalizedPhone = normalizeVietnamPhone(payload.phone)
 
@@ -201,7 +240,7 @@ export async function sendRegisterOtp(payload: SendRegisterOtpPayload): Promise<
   }
 }
 
-export async function register(payload: RegisterPayload): Promise<void> {
+export async function register(payload: RegisterPayload): Promise<string> {
   const response = await fetch(`${API_BASE_URL}/auth/register`, {
     method: 'POST',
     headers: {
@@ -218,4 +257,12 @@ export async function register(payload: RegisterPayload): Promise<void> {
   if (!response.ok) {
     throw new Error(extractMessage(json) ?? 'Đăng ký thất bại. Vui lòng thử lại.')
   }
+
+  const token = extractToken(json)
+
+  if (!token) {
+    throw new Error('Không lấy được access token từ phản hồi đăng ký.')
+  }
+
+  return token
 }

@@ -8,6 +8,7 @@ export type AuthContextValue = {
   isBootstrapping: boolean
   isAuthenticated: boolean
   login: (payload: LoginPayload) => Promise<void>
+  updateUser: (patch: Partial<AuthUser>) => void
   logout: () => void
 }
 

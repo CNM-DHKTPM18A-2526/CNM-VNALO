@@ -32,6 +32,7 @@ export function MainLayout() {
       <section className='workspace'>
         <Topbar
           title={title}
+          userAvatarUrl={user?.avatarUrl}
           userName={user?.name ?? user?.email ?? 'VNALO User'}
           onLogout={logout}
         />

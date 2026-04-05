@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
-import { sendRegisterOtp, register as registerAccount } from '../features/auth/auth.api'
+import { sendRegisterOtp, register as registerAccount, updateProfile } from '../features/auth/auth.api'
+import type { Gender } from '../features/auth/auth.types'
 import { OtpCodeInput } from '../features/auth/components/OtpCodeInput'
 import { isNormalizedVietnamPhone, normalizeVietnamPhone } from '../features/auth/phone.util'
 import { validatePassword } from '../features/auth/password.util'
@@ -12,6 +13,8 @@ type RegisterStep = 'form' | 'otp'
 type RegisterFormState = {
   displayName: string
   phone: string
+  dob: string
+  gender: Gender | ''
   password: string
   confirmPassword: string
   agreeTerms: boolean
@@ -22,6 +25,9 @@ type RegisterErrors = Partial<Record<keyof RegisterFormState | 'otpCode', string
 function validateRegisterForm(values: RegisterFormState): RegisterErrors {
   const errors: RegisterErrors = {}
   const normalizedPhone = normalizeVietnamPhone(values.phone)
+  const todayIso = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000)
+    .toISOString()
+    .slice(0, 10)
 
   // Validate displayName
   if (!values.displayName.trim()) {
@@ -35,6 +41,16 @@ function validateRegisterForm(values: RegisterFormState): RegisterErrors {
     errors.phone = 'Vui lòng nhập số điện thoại'
   } else if (!isNormalizedVietnamPhone(normalizedPhone)) {
     errors.phone = 'Số điện thoại không hợp lệ. Dùng dạng 091..., 849... hoặc +849...'
+  }
+
+  if (!values.dob) {
+    errors.dob = 'Vui lòng chọn ngày sinh'
+  } else if (values.dob > todayIso) {
+    errors.dob = 'Ngày sinh không được ở tương lai'
+  }
+
+  if (!values.gender) {
+    errors.gender = 'Vui lòng chọn giới tính'
   }
 
   // Validate password with policy
@@ -77,6 +93,8 @@ export function RegisterPage() {
   const [form, setForm] = useState<RegisterFormState>({
     displayName: '',
     phone: '',
+    dob: '',
+    gender: '',
     password: '',
     confirmPassword: '',
     agreeTerms: false,
@@ -209,6 +227,32 @@ export function RegisterPage() {
 
               <div className='auth-form-two-columns'>
                 <label>
+                  {t('profile.dateOfBirth')}
+                  <input
+                    type='date'
+                    value={form.dob}
+                    max={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000)
+                      .toISOString()
+                      .slice(0, 10)}
+                    onChange={(event) => setField('dob', event.target.value)}
+                  />
+                  {errors.dob ? <span className='auth-field-error'>{errors.dob}</span> : null}
+                </label>
+
+                <label>
+                  {t('profile.gender')}
+                  <select value={form.gender} onChange={(event) => setField('gender', event.target.value as Gender | '')}>
+                    <option value=''>--</option>
+                    <option value='MALE'>{t('profile.genderLabels.male')}</option>
+                    <option value='FEMALE'>{t('profile.genderLabels.female')}</option>
+                    <option value='OTHER'>{t('profile.genderLabels.other')}</option>
+                  </select>
+                  {errors.gender ? <span className='auth-field-error'>{errors.gender}</span> : null}
+                </label>
+              </div>
+
+              <div className='auth-form-two-columns'>
+                <label>
                   {t('auth.passwordLabel')}
                   <input
                     type='password'
@@ -274,12 +318,18 @@ export function RegisterPage() {
                 setIsSubmitting(true)
 
                 try {
-                  await registerAccount({
+                  const accessToken = await registerAccount({
                     displayName: form.displayName.trim(),
                     phone: normalizedPhone,
                     password: form.password,
                     otpCode,
                   })
+
+                  await updateProfile(accessToken, {
+                    dob: form.dob,
+                    gender: form.gender || undefined,
+                  })
+
                   setSuccessMessage(t('auth.registerSuccessRedirect'))
 
                   setTimeout(() => {
