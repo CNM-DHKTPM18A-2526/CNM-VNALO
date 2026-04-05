@@ -5,10 +5,12 @@ import { ChatWindow } from '../features/chat/components/ChatWindow'
 import { useAuth } from '../features/auth/useAuth'
 import { Skeleton } from '../shared/components/ui/Skeleton'
 import { Card } from '../shared/components/ui/Card'
+import { useLanguage } from '../shared/i18n/LanguageContext'
 import { conversations, messages } from '../shared/mock/data'
 
 export function ChatPage() {
   const { isBootstrapping } = useAuth()
+  const { t } = useLanguage()
   const [selectedConversationId, setSelectedConversationId] = useState(conversations[0]?.id ?? '')
 
   const selectedConversation = useMemo(
@@ -67,19 +69,19 @@ export function ChatPage() {
       />
       <ChatWindow conversation={selectedConversation} seedMessages={messages} />
       <aside className='chat-side-panel'>
-        <h3>Thông tin hội thoại</h3>
+        <h3>{t('pages.chat.sideInfoTitle')}</h3>
         <p>
           {selectedConversation
-            ? `Đang trò chuyện với ${selectedConversation.name}.`
-            : 'Hãy chọn một hội thoại để xem tin nhắn.'}
+            ? `${t('pages.chat.sideInfoWith')} ${selectedConversation.name}.`
+            : t('pages.chat.sideInfoFallback')}
         </p>
         <Card className='chat-side-card'>
-          <p>File đã chia sẻ</p>
-          <strong>4 tệp</strong>
+          <p>{t('pages.chat.sharedFiles')}</p>
+          <strong>{t('pages.chat.sharedFilesCount')}</strong>
         </Card>
         <Card className='chat-side-card'>
-          <p>Media</p>
-          <strong>12 mục</strong>
+          <p>{t('pages.chat.media')}</p>
+          <strong>{t('pages.chat.mediaCount')}</strong>
         </Card>
       </aside>
     </div>

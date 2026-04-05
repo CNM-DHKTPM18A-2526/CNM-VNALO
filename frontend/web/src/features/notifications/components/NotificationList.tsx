@@ -1,6 +1,7 @@
 import { EmptyState } from '../../../shared/components/EmptyState'
 import { Icon } from '../../../shared/components/Icon'
 import { Card } from '../../../shared/components/ui/Card'
+import { useLanguage } from '../../../shared/i18n/LanguageContext'
 import type { AppNotification } from '../../../shared/mock/data'
 
 type NotificationListProps = {
@@ -8,11 +9,13 @@ type NotificationListProps = {
 }
 
 export function NotificationList({ items }: NotificationListProps) {
+  const { t } = useLanguage()
+
   if (items.length === 0) {
     return (
       <EmptyState
-        title='Không có thông báo'
-        description='Mục thông báo của bạn đang trống.'
+        title={t('notifications.emptyTitle')}
+        description={t('notifications.emptyDesc')}
       />
     )
   }

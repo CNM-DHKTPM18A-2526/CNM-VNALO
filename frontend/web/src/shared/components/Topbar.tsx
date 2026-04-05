@@ -2,6 +2,7 @@ import type { KeyboardEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+import { useLanguage } from '../i18n/LanguageContext'
 import { Icon } from './Icon'
 import { UserAvatar } from './UserAvatar'
 
@@ -15,24 +16,25 @@ export function Topbar({ title, userName, onLogout }: TopbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const menuItemRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const { t } = useLanguage()
   const navigate = useNavigate()
 
   const menuItems = [
     {
       key: 'profile',
-      label: 'Hồ sơ',
+      label: t('topbar.menuProfile'),
       icon: 'user' as const,
       onSelect: () => navigate('/profile'),
     },
     {
       key: 'settings',
-      label: 'Cài đặt',
+      label: t('topbar.menuSettings'),
       icon: 'settings' as const,
       onSelect: () => navigate('/settings'),
     },
     {
       key: 'logout',
-      label: 'Đăng xuất',
+      label: t('topbar.menuLogout'),
       icon: 'logout' as const,
       danger: true,
       onSelect: onLogout,
@@ -129,7 +131,7 @@ export function Topbar({ title, userName, onLogout }: TopbarProps) {
     <header className='topbar'>
       <div className='topbar-heading'>
         <h1>{title}</h1>
-        <p>Nhanh, gọn, rõ ràng cho luồng chat đội nhóm hằng ngày</p>
+        <p>{t('topbar.subtitle')}</p>
       </div>
       <div className='topbar-actions'>
         <div className='avatar-menu' ref={menuRef}>

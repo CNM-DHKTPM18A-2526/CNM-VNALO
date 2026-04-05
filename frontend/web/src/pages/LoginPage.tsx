@@ -1,12 +1,15 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../features/auth/useAuth'
+import { useLanguage } from '../shared/i18n/LanguageContext'
 
 export function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { login } = useAuth()
+  const { t } = useLanguage()
 
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
@@ -22,33 +25,31 @@ export function LoginPage() {
     <div className='auth-page'>
       <div className='auth-card'>
         <section className='auth-visual'>
-          <p className='auth-brand'>VNALO</p>
-          <h1>Đăng nhập VNALO</h1>
-          <p className='auth-copy'>
-            Kết nối nhanh bằng email hoặc số điện thoại, đồng bộ tối ưu cho luồng chat và thông báo.
-          </p>
+          <p className='auth-brand'>{t('common.appName')}</p>
+          <h1>{t('auth.loginHeroTitle')}</h1>
+          <p className='auth-copy'>{t('auth.loginHeroCopy')}</p>
 
           <div className='auth-points'>
             <div>
               <span className='auth-point-kicker'>01</span>
-              <p>Phiên đăng nhập an toàn với JWT và hồ sơ người dùng.</p>
+              <p>{t('auth.loginPoint1')}</p>
             </div>
             <div>
               <span className='auth-point-kicker'>02</span>
-              <p>Giao diện desktop rõ ràng, điều hướng và menu tài khoản tiện dụng.</p>
+              <p>{t('auth.loginPoint2')}</p>
             </div>
             <div>
               <span className='auth-point-kicker'>03</span>
-              <p>Phù hợp cho đội nhóm làm việc hằng ngày và thông báo thời gian thực.</p>
+              <p>{t('auth.loginPoint3')}</p>
             </div>
           </div>
         </section>
 
         <section className='auth-content'>
           <div className='auth-copy-block'>
-            <p className='auth-eyebrow'>Đăng nhập với mật khẩu</p>
-            <h2>Xin chào</h2>
-            <p>Nhập thông tin tài khoản VNALO.</p>
+            <p className='auth-eyebrow'>{t('auth.loginEyebrow')}</p>
+            <h2>{t('auth.loginWelcome')}</h2>
+            <p>{t('auth.loginSubtitle')}</p>
           </div>
 
           <form
@@ -63,29 +64,29 @@ export function LoginPage() {
                 await login({ identifier, password })
                 navigate(fromPath, { replace: true })
               } catch {
-                setErrorMessage('Số điện thoại hoặc mật khẩu không chính xác')
+                setErrorMessage(t('auth.loginError'))
               } finally {
                 setIsSubmitting(false)
               }
             }}
           >
             <label>
-              Số điện thoại
+              {t('auth.identifierLabel')}
               <input
                 required
                 type='text'
-                placeholder='0917949410 hoặc +84917949410'
+                placeholder={t('auth.identifierPlaceholder')}
                 value={identifier}
                 onChange={(event) => setIdentifier(event.target.value)}
                 autoComplete='username'
               />
             </label>
             <label>
-              Mật khẩu
+              {t('auth.passwordLabel')}
               <input
                 required
                 type='password'
-                placeholder='Mật khẩu'
+                placeholder={t('auth.passwordPlaceholder')}
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 autoComplete='current-password'
@@ -93,8 +94,12 @@ export function LoginPage() {
             </label>
             {errorMessage ? <p className='auth-form-error'>{errorMessage}</p> : null}
             <button type='submit' disabled={isSubmitting}>
-              {isSubmitting ? 'Đang xử lý...' : 'Đăng nhập'}
+              {isSubmitting ? t('auth.processing') : t('auth.loginButton')}
             </button>
+
+            <p className='auth-switch-copy'>
+              {t('auth.dontHaveAccount')} <Link to='/register'>{t('auth.createAccountLink')}</Link>
+            </p>
           </form>
         </section>
       </div>

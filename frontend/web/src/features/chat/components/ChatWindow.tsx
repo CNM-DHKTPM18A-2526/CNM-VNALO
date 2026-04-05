@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 
 import { EmptyState } from '../../../shared/components/EmptyState'
 import { LoadingState } from '../../../shared/components/LoadingState'
+import { useLanguage } from '../../../shared/i18n/LanguageContext'
 import type { ChatConversation, ChatMessage } from '../../../shared/mock/data'
 import { MessageBubble } from './MessageBubble'
 import { MessageInput } from './MessageInput'
@@ -12,6 +13,7 @@ type ChatWindowProps = {
 }
 
 export function ChatWindow({ conversation, seedMessages }: ChatWindowProps) {
+  const { t } = useLanguage()
   const [messages, setMessages] = useState<ChatMessage[]>(seedMessages)
 
   const conversationMessages = useMemo(() => {
@@ -46,8 +48,8 @@ export function ChatWindow({ conversation, seedMessages }: ChatWindowProps) {
     return (
       <section className='chat-window'>
         <EmptyState
-          title='Chưa chọn hội thoại'
-          description='Hãy chọn một hội thoại.'
+          title={t('chat.windowEmptyTitle')}
+          description={t('chat.windowEmptyDesc')}
         />
       </section>
     )
@@ -57,16 +59,16 @@ export function ChatWindow({ conversation, seedMessages }: ChatWindowProps) {
     <section className='chat-window'>
       <header className='chat-window-header'>
         <h2>{conversation.name}</h2>
-        <p>{conversation.online ? 'Đang hoạt động' : 'Ngoại tuyến'}</p>
+        <p>{conversation.online ? t('chat.online') : t('chat.offline')}</p>
       </header>
       <div className='chat-window-messages'>
         {conversationMessages.length === 0 ? (
-          <LoadingState label='Đang tải hội thoại...' />
+          <LoadingState label={t('chat.loadingConversation')} />
         ) : (
           conversationMessages.map((message) => <MessageBubble key={message.id} message={message} />)
         )}
       </div>
-      <MessageInput onSend={handleSend} />
+      <MessageInput onSend={handleSend} placeholder={t('chat.messageInputPlaceholder')} />
     </section>
   )
 }

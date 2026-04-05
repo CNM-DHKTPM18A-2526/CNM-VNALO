@@ -6,9 +6,10 @@ import { TextField } from '../../../shared/components/ui/TextField'
 
 type MessageInputProps = {
   onSend: (message: string) => void
+  placeholder?: string
 }
 
-export function MessageInput({ onSend }: MessageInputProps) {
+export function MessageInput({ onSend, placeholder = 'Nhập tin nhắn...' }: MessageInputProps) {
   const [message, setMessage] = useState('')
 
   const submitMessage = () => {
@@ -26,7 +27,7 @@ export function MessageInput({ onSend }: MessageInputProps) {
     <footer className='message-input'>
       <TextField
         className='message-input-field'
-        placeholder='Nhập tin nhắn...'
+        placeholder={placeholder}
         value={message}
         onChange={(event) => setMessage(event.target.value)}
         onKeyDown={(event) => {

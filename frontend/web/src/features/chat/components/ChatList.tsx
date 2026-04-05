@@ -4,6 +4,7 @@ import { SearchInput } from '../../../shared/components/SearchInput'
 import { Icon } from '../../../shared/components/Icon'
 import { Button } from '../../../shared/components/ui/Button'
 import { Modal } from '../../../shared/components/ui/Modal'
+import { useLanguage } from '../../../shared/i18n/LanguageContext'
 import type { ChatConversation } from '../../../shared/mock/data'
 import { ChatItem } from './ChatItem'
 
@@ -18,6 +19,7 @@ export function ChatList({
   selectedConversationId,
   onSelectConversation,
 }: ChatListProps) {
+  const { t } = useLanguage()
   const [keyword, setKeyword] = useState('')
   const [isAddFriendOpen, setIsAddFriendOpen] = useState(false)
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false)
@@ -40,27 +42,27 @@ export function ChatList({
   return (
     <section className='chat-list-panel'>
       <div className='panel-header'>
-        <h2>Hội thoại</h2>
+        <h2>{t('chat.conversationTitle')}</h2>
         <div className='chat-toolbar-row'>
-          <SearchInput placeholder='Tìm hội thoại' value={keyword} onChange={setKeyword} />
-          <div className='chat-toolbar-actions' aria-label='Tác vụ nhanh'>
+          <SearchInput placeholder={t('chat.searchPlaceholder')} value={keyword} onChange={setKeyword} />
+          <div className='chat-toolbar-actions' aria-label={t('chat.quickActions')}>
             <button
               className='chat-toolbar-btn'
               onClick={() => setIsAddFriendOpen(true)}
-              title='Thêm bạn'
+              title={t('chat.addFriend')}
               type='button'
             >
               <Icon name='userPlus' />
-              <span className='chat-toolbar-tooltip'>Thêm bạn</span>
+              <span className='chat-toolbar-tooltip'>{t('chat.addFriend')}</span>
             </button>
             <button
               className='chat-toolbar-btn'
               onClick={() => setIsCreateGroupOpen(true)}
-              title='Tạo nhóm'
+              title={t('chat.createGroup')}
               type='button'
             >
               <Icon name='group' />
-              <span className='chat-toolbar-tooltip'>Tạo nhóm</span>
+              <span className='chat-toolbar-tooltip'>{t('chat.createGroup')}</span>
             </button>
           </div>
         </div>
@@ -78,11 +80,11 @@ export function ChatList({
       </div>
 
       <Modal
-        description='Mời một người dùng bằng số điện thoại hoặc email.'
+        description={t('chat.modalAddFriendDesc')}
         footer={
           <>
             <Button variant='ghost' onClick={() => setIsAddFriendOpen(false)}>
-              Hủy
+              {t('chat.modalCancel')}
             </Button>
             <Button
               onClick={() => {
@@ -91,18 +93,18 @@ export function ChatList({
               }}
               variant='primary'
             >
-              Xác nhận
+              {t('chat.modalConfirm')}
             </Button>
           </>
         }
         isOpen={isAddFriendOpen}
         onClose={() => setIsAddFriendOpen(false)}
-        title='Thêm bạn'
+        title={t('chat.modalAddFriendTitle')}
       >
         <label className='modal-field'>
-          <span>Số điện thoại hoặc email</span>
+          <span>{t('chat.modalPhoneOrEmail')}</span>
           <input
-            placeholder='0917949410 hoặc ban@vnalo.app'
+            placeholder={t('chat.modalPhoneOrEmailPlaceholder')}
             value={friendIdentifier}
             onChange={(event) => setFriendIdentifier(event.target.value)}
           />
@@ -110,11 +112,11 @@ export function ChatList({
       </Modal>
 
       <Modal
-        description='Tạo nhóm chat mới và chọn các thành viên sẽ tham gia.'
+        description={t('chat.modalCreateGroupDesc')}
         footer={
           <>
             <Button variant='ghost' onClick={() => setIsCreateGroupOpen(false)}>
-              Hủy
+              {t('chat.modalCancel')}
             </Button>
             <Button
               onClick={() => {
@@ -124,31 +126,31 @@ export function ChatList({
               }}
               variant='primary'
             >
-              Tạo nhóm
+              {t('chat.createGroup')}
             </Button>
           </>
         }
         isOpen={isCreateGroupOpen}
         onClose={() => setIsCreateGroupOpen(false)}
-        title='Tạo nhóm'
+        title={t('chat.modalCreateGroupTitle')}
       >
         <label className='modal-field'>
-          <span>Tên nhóm</span>
+          <span>{t('chat.modalGroupName')}</span>
           <input
-            placeholder='Nhập tên nhóm...'
+            placeholder={t('chat.modalGroupNamePlaceholder')}
             value={groupName}
             onChange={(event) => setGroupName(event.target.value)}
           />
         </label>
         <label className='modal-field'>
-          <span>Thành viên</span>
+          <span>{t('chat.modalMembers')}</span>
           <textarea
-            placeholder='Chọn thành viên theo tên, email hoặc số điện thoại...'
+            placeholder={t('chat.modalMembersPlaceholder')}
             value={groupMembers}
             onChange={(event) => setGroupMembers(event.target.value)}
             rows={4}
           />
-          <small className='modal-helper-text'>Tạm thời là giao diện mô phỏng, sẽ nối dữ liệu thật sau.</small>
+          <small className='modal-helper-text'>{t('chat.modalMembersHelper')}</small>
         </label>
       </Modal>
     </section>
