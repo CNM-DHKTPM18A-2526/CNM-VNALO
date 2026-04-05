@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -34,11 +35,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
   int _currentStep = 0;
   bool _agreeTermsA = false;
   bool _agreeTermsB = false;
-  bool _isLoading = false;
-  bool _isOtpStatusLoading = true;
-  bool _requiresOtp = false;
+  bool _isSendingOtp = false;
+  bool _isResendingOtp = false;
+  bool _isSubmittingRegistration = false;
+  bool _isSkipSubmitting = false;
+  bool _requiresOtp = AppConfig.instance.isProd;
   String _otpCode = '';
   String _countryCode = '+84';
+
+  bool get _isAnyRequestInFlight =>
+      _isSendingOtp || _isResendingOtp || _isSubmittingRegistration;
 
   // Personal info (optional, client-side only for now)
   DateTime? _birthday;
@@ -55,14 +61,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final fallbackRequiresOtp = AppConfig.instance.isProd;
 
     try {
-      final required = await context.read<AuthProvider>().fetchOtpRequiredStatus();
+      final required = await context
+          .read<AuthProvider>()
+          .fetchOtpRequiredStatus()
+          .timeout(
+            const Duration(seconds: 2),
+            onTimeout: () => fallbackRequiresOtp,
+          );
       if (!mounted) return;
       setState(() => _requiresOtp = required);
     } catch (_) {
       if (!mounted) return;
       setState(() => _requiresOtp = fallbackRequiresOtp);
-    } finally {
-      if (mounted) setState(() => _isOtpStatusLoading = false);
     }
   }
 
@@ -117,7 +127,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _sendOtp() async {
-    if (_isOtpStatusLoading) return;
+    if (_isAnyRequestInFlight) return;
     if (!_agreeTermsA || !_agreeTermsB) return;
     if (Validators.phone(_phoneController.text) != null) return;
 
@@ -129,7 +139,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() => _isSendingOtp = true);
     try {
       await context.read<AuthProvider>().sendOtp(_buildFullPhone());
       if (!mounted) return;
@@ -143,7 +153,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       );
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _isSendingOtp = false);
     }
   }
 
@@ -152,7 +162,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _resendOtp() async {
-    setState(() => _isLoading = true);
+    if (_isAnyRequestInFlight) return;
+
+    setState(() => _isResendingOtp = true);
     try {
       await context.read<AuthProvider>().sendOtp(_buildFullPhone());
       if (!mounted) return;
@@ -171,7 +183,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       );
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _isResendingOtp = false);
     }
   }
 
@@ -188,12 +200,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _nextStep();
   }
 
-  Future<void> _completeRegistration() async {
-    setState(() => _isLoading = true);
+  Future<void> _completeRegistration({bool isSkipAction = false}) async {
+    if (_isSubmittingRegistration) return;
+
+    setState(() {
+      _isSubmittingRegistration = true;
+      _isSkipSubmitting = isSkipAction;
+    });
     final auth = context.read<AuthProvider>();
+    Timer? slowSkipHintTimer;
 
     try {
-      final success = await auth.register(
+      if (isSkipAction) {
+        slowSkipHintTimer = Timer(const Duration(seconds: 4), () {
+          if (!mounted || !_isSubmittingRegistration) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Dang hoan tat dang ky, vui long doi them mot chut...'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        });
+      }
+
+      final success = await auth
+          .register(
         phone: _buildFullPhone(),
         otp: _otpCode,
         password: _passwordController.text,
@@ -201,7 +232,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         avatarFile: _avatarFile,
         gender: _genderForApi(),
         dob: _dobForApi(),
-      );
+      )
+          .timeout(const Duration(seconds: 20));
 
       if (!mounted) return;
 
@@ -225,6 +257,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
           backgroundColor: AppColors.error,
         ),
       );
+    } on TimeoutException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isSkipAction
+                ? 'Dang ky dang cham do ket noi. Vui long thu lai sau it giay.'
+                : 'Yeu cau dang ky bi timeout, vui long thu lai.',
+          ),
+          backgroundColor: AppColors.error,
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       // M5: translate known API error codes into user-friendly Vietnamese strings.
@@ -235,7 +279,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       );
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      slowSkipHintTimer?.cancel();
+      if (mounted) {
+        setState(() {
+          _isSubmittingRegistration = false;
+          _isSkipSubmitting = false;
+        });
+      }
     }
   }
 
@@ -469,7 +519,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             const SizedBox(height: 14),
             TextButton(
-              onPressed: _isLoading ? null : _resendOtp,
+              onPressed: _isAnyRequestInFlight ? null : _resendOtp,
               child: Text(
                 t.resendOtp,
                 style: const TextStyle(
@@ -488,8 +538,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
-              onPressed: _isLoading ? null : _verifyOtpAndContinue,
-              child: _isLoading
+                onPressed: _isAnyRequestInFlight ? null : _verifyOtpAndContinue,
+                child: _isResendingOtp
                   ? const SizedBox(
                       height: 16,
                       width: 16,
@@ -517,7 +567,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Widget _buildPhoneStep() {
     final t = AuthTexts.of(context);
-    final canProceed = _agreeTermsA && _agreeTermsB && !_isOtpStatusLoading;
+    final isPhoneValid = Validators.phone(_phoneController.text) == null;
+    final canProceed = _agreeTermsA && _agreeTermsB && isPhoneValid;
 
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -567,14 +618,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
-            onPressed: canProceed && !_isLoading ? _sendOtp : null,
-            child: _isOtpStatusLoading
-                ? const SizedBox(
-                    height: 16,
-                    width: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : _isLoading
+            onPressed: canProceed && !_isAnyRequestInFlight ? _sendOtp : null,
+            child: _isSendingOtp
                 ? const SizedBox(
                     height: 16,
                     width: 16,
@@ -1282,8 +1327,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
-            onPressed: _isLoading ? null : (_avatarFile == null ? _showAvatarPicker : _completeRegistration),
-            child: _isLoading
+            onPressed: _isSubmittingRegistration
+              ? null
+              : (_avatarFile == null
+                ? _showAvatarPicker
+                : () => _completeRegistration()),
+            child: _isSubmittingRegistration && !_isSkipSubmitting
                 ? const SizedBox(
                     height: 20,
                     width: 20,
@@ -1313,8 +1362,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
-            onPressed: _isLoading ? null : (_avatarFile == null ? _completeRegistration : _showAvatarPicker),
-            child: Text(
+            onPressed: _isSubmittingRegistration
+                ? null
+                : (_avatarFile == null
+                    ? () => _completeRegistration(isSkipAction: true)
+                    : _showAvatarPicker),
+            child: _isSubmittingRegistration && _isSkipSubmitting
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Color(0xFF111827),
+                    ),
+                  )
+                : Text(
               // L1: was a hardcoded Vietnamese literal; now uses AuthTexts for i18n consistency.
               _avatarFile == null ? t.skip : t.changePhoto,
               style: const TextStyle(
