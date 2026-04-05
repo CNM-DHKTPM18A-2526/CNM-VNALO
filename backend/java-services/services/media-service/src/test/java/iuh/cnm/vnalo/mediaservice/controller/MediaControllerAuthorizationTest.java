@@ -54,12 +54,12 @@ class MediaControllerAuthorizationTest {
         UUID requestedOwner = UUID.randomUUID();
 
         when(authentication.getPrincipal()).thenReturn(authUserId.toString());
-        when(mediaService.listMedia(eq(authUserId), eq(MediaCategory.IMAGE), any())).thenReturn(org.springframework.data.domain.Page.empty());
+        when(mediaService.listMedia(eq(authUserId), eq(MediaCategory.CHAT_IMAGE), any())).thenReturn(org.springframework.data.domain.Page.empty());
 
-        mediaController.listMedia(authentication, requestedOwner, MediaCategory.IMAGE, 0, 20);
+        mediaController.listMedia(authentication, requestedOwner, MediaCategory.CHAT_IMAGE, 0, 20);
 
-        verify(mediaService).listMedia(eq(authUserId), eq(MediaCategory.IMAGE), any());
-        verify(mediaService, never()).listMedia(eq(requestedOwner), eq(MediaCategory.IMAGE), any());
+        verify(mediaService).listMedia(eq(authUserId), eq(MediaCategory.CHAT_IMAGE), any());
+        verify(mediaService, never()).listMedia(eq(requestedOwner), eq(MediaCategory.CHAT_IMAGE), any());
     }
 
     @Test
@@ -72,7 +72,7 @@ class MediaControllerAuthorizationTest {
         when(mediaService.getMedia(mediaId)).thenReturn(MediaMetadata.builder()
                 .id(mediaId)
                 .ownerUserId(ownerId)
-                .category(MediaCategory.IMAGE)
+                .category(MediaCategory.CHAT_IMAGE)
                 .bucket("bucket")
                 .objectKey("obj")
                 .mimeType("image/png")
