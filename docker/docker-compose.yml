@@ -293,6 +293,8 @@ services:
       context: ../backend/java-services/services/analytics-service
       dockerfile: Dockerfile
     container_name: vnalo-analytics-service
+    profiles:
+      - planned
     ports:
       - "8084:8084"
     environment:
