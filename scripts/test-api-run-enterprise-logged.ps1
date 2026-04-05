@@ -16,8 +16,8 @@ $PH2 = "+8491$sf"
 $PH3 = "+8492$sf"
 
 $runId = "enterprise-full-api-" + (Get-Date -Format "yyyyMMdd-HHmmss")
-$outJson = "docs/feedback/ENTERPRISE_FULL_API_IO_2026-04-05.json"
-$outMd = "docs/feedback/ENTERPRISE_FULL_API_IO_REPORT_2026-04-05.md"
+$outJson = "docs/feedback/${runId}.json"
+$outMd = "docs/feedback/${runId}_REPORT.md"
 
 function Trim-Text {
   param($Text, [int]$Max = 1200)
@@ -147,7 +147,7 @@ function T($tag, $m, $u, $b, $t, $e) {
 }
 
 function JWT($t) {
-  $pp = $t.Split('.')[1]
+  $pp = $t.Split('.')[1].Replace('-', '+').Replace('_', '/')
   while ($pp.Length % 4 -ne 0) { $pp += '=' }
   [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($pp)) | ConvertFrom-Json
 }

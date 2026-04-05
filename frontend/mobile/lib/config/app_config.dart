@@ -7,11 +7,19 @@ class AppConfig {
   /// Returns the current configuration.
   /// Throws [StateError] if [initialize] has not been called yet.
   static EnvConfig get instance {
+    const errorMessage =
+        'AppConfig.initialize() must be called before accessing AppConfig.instance. '
+        'Ensure main() calls AppConfig.initialize() before runApp().';
+
     assert(
       _config != null,
-      'AppConfig.initialize() must be called before accessing AppConfig.instance. '
-      'Ensure main() calls AppConfig.initialize() before runApp().',
+      errorMessage,
     );
+
+    if (_config == null) {
+      throw StateError(errorMessage);
+    }
+
     return _config!;
   }
 

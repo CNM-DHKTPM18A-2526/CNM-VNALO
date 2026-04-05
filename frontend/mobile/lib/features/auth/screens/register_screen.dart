@@ -447,7 +447,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         leading: BackButton(
           onPressed: () {
             if (_currentStep > 0) {
-              _goToStep(_currentStep - 1);
+              // M1: When OTP is disabled, forward nav jumps 0→2. Mirror that on
+              // back nav so users never land on the skipped OTP page (index 1).
+              final prevStep = (!_requiresOtp && _currentStep == 2) ? 0 : _currentStep - 1;
+              _goToStep(prevStep);
             } else {
               Navigator.pop(context);
             }

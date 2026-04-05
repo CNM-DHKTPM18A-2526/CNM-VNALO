@@ -17,7 +17,6 @@ import java.io.ByteArrayInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -50,7 +49,9 @@ public class S3Service {
     public String uploadFile(MultipartFile file, String objectKey) {
         try {
             if (isLocalStorageMode()) {
-                writeStreamToLocal(file.getInputStream(), objectKey);
+                try (InputStream inputStream = file.getInputStream()) {
+                    writeStreamToLocal(inputStream, objectKey);
+                }
                 return getFileUrl(objectKey);
             }
 

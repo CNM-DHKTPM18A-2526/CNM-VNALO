@@ -1,11 +1,12 @@
 param(
   [string]$CoreBase = "http://localhost:8081/api/v1",
   [string]$MediaBase = "http://localhost:8083/api/v1",
+  [string]$MediaServerBase = "http://localhost:8083",
   [string]$MessageBase = "http://localhost:3000/api/v1",
   [int]$PerfIterations = 8,
   [string]$Password = "Abc12345",
-  [string]$OutputJson = "docs/feedback/ENTERPRISE_ENDPOINT_IO_2026-04-05.json",
-  [string]$OutputMd = "docs/feedback/ENTERPRISE_ENDPOINT_IO_REPORT_2026-04-05.md"
+  [string]$OutputJson = "",
+  [string]$OutputMd = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -63,14 +64,24 @@ function Invoke-TimedJson {
       $params["ContentType"] = $ContentType
     }
 
-    $res = Invoke-RestMethod @params
+    $res = Invoke-WebRequest @params
     $sw.Stop()
+
+    $parsedResponse = $null
+    if (-not [string]::IsNullOrWhiteSpace($res.Content)) {
+      try {
+        $parsedResponse = $res.Content | ConvertFrom-Json -Depth 20
+      }
+      catch {
+        $parsedResponse = $res.Content
+      }
+    }
 
     return @{
       ok = $true
-      statusCode = 200
+      statusCode = [int]$res.StatusCode
       durationMs = [Math]::Round($sw.Elapsed.TotalMilliseconds, 2)
-      response = (ConvertTo-Hashtable $res)
+      response = (ConvertTo-Hashtable $parsedResponse)
     }
   }
   catch {
@@ -103,6 +114,9 @@ function Get-Percentile {
 $ts = Get-Date -Format "yyyy-MM-ddTHH:mm:ssK"
 $runId = "enterprise-audit-" + (Get-Date -Format "yyyyMMdd-HHmmss")
 
+if (-not $OutputJson) { $OutputJson = "docs/feedback/${runId}.json" }
+if (-not $OutputMd)   { $OutputMd   = "docs/feedback/${runId}_REPORT.md" }
+
 $phone = "+8483" + (([DateTimeOffset]::UtcNow.ToUnixTimeSeconds() % 1000000).ToString().PadLeft(6, "0"))
 $displayName = "Enterprise Audit User"
 
@@ -128,7 +142,7 @@ $results.functional += [ordered]@{
   outcome = $healthCore
 }
 
-$healthMedia = Invoke-TimedJson -Method GET -Url "$MediaBase/../actuator/health"
+$healthMedia = Invoke-TimedJson -Method GET -Url "$MediaServerBase/actuator/health"
 $results.functional += [ordered]@{
   service = "media-service"
   endpoint = "GET /actuator/health"
@@ -226,7 +240,7 @@ if (-not $register.ok) {
       @{ service = "core-service"; endpoint = "GET /users/me"; method = "GET"; url = "$CoreBase/users/me"; headers = @{ Authorization = "Bearer $loginToken" }; body = $null },
       @{ service = "message-service"; endpoint = "GET /health"; method = "GET"; url = "$MessageBase/health"; headers = @{}; body = $null },
       @{ service = "message-service"; endpoint = "GET /inbox"; method = "GET"; url = "$MessageBase/inbox"; headers = @{ Authorization = "Bearer $loginToken" }; body = $null },
-      @{ service = "media-service"; endpoint = "GET /actuator/health"; method = "GET"; url = "$MediaBase/../actuator/health"; headers = @{}; body = $null }
+      @{ service = "media-service"; endpoint = "GET /actuator/health"; method = "GET"; url = "$MediaServerBase/actuator/health"; headers = @{}; body = $null }
     )
 
     foreach ($spec in $perfSpecs) {

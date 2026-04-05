@@ -134,7 +134,7 @@ class ApiService {
       throw ApiException(statusCode: 0, message: 'Unexpected error: $e');
     }
     if (response.statusCode == 401 && allowRefresh && endpoint != '/auth/refresh') {
-      final refreshed = await _tryRefreshToken(baseUrl);
+      final refreshed = await _tryRefreshToken();
       if (refreshed) {
         return _request(
           method,
@@ -150,7 +150,7 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  Future<bool> _tryRefreshToken(String _unusedBaseUrl) async {
+  Future<bool> _tryRefreshToken() async {
     // H3: Always refresh against the core auth service regardless of which
     // downstream service triggered the 401 (e.g. media-service must not
     // receive the refresh POST).
