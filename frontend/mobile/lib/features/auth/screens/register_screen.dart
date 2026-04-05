@@ -14,6 +14,7 @@ import 'package:vnalo_mobile/features/auth/screens/login_screen.dart';
 import 'package:vnalo_mobile/features/auth/widgets/otp_input.dart';
 import 'package:vnalo_mobile/navigation/main_shell.dart';
 import 'package:vnalo_mobile/features/auth/widgets/phone_input.dart';
+import 'package:vnalo_mobile/services/api_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -204,10 +205,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!mounted) return;
 
       if (success) {
-        if (auth.error != null && auth.error!.isNotEmpty) {
+        // H1: use warning (non-fatal) rather than error for the orange snackbar.
+        if (auth.warning != null && auth.warning!.isNotEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(auth.error!),
+              content: Text(auth.warning!),
               backgroundColor: Colors.orange,
             ),
           );
@@ -218,21 +220,40 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(auth.error ?? 'Đăng ký thất bại'),
+          content: Text(auth.error ?? '\u0110\u0103ng k\u00fd th\u1ea5t b\u1ea1i'),
           backgroundColor: AppColors.error,
         ),
       );
     } catch (e) {
       if (!mounted) return;
+      // M5: translate known API error codes into user-friendly Vietnamese strings.
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Lỗi: $e'),
+          content: Text(_mapApiError(e)),
           backgroundColor: AppColors.error,
         ),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  /// M5: Maps known API error codes to user-friendly messages.
+  /// Falls back to a generic message so raw exception strings never reach the UI.
+  String _mapApiError(Object e) {
+    if (e is ApiException) {
+      switch (e.code) {
+        case 'PHONE_TAKEN':
+          return 'S\u1ed1 \u0111i\u1ec7n tho\u1ea1i n\u00e0y \u0111\u00e3 \u0111\u01b0\u1ee3c \u0111\u0103ng k\u00fd';
+        case 'OTP_INVALID':
+        case 'OTP_EXPIRED':
+          return 'M\u00e3 OTP kh\u00f4ng h\u1ee3p l\u1ec7 ho\u1eb7c \u0111\u00e3 h\u1ebft h\u1ea1n';
+        default:
+          if (e.statusCode == 0) return 'Kh\u00f4ng c\u00f3 k\u1ebft n\u1ed1i m\u1ea1ng';
+          return '\u0110\u0103ng k\u00fd th\u1ea5t b\u1ea1i (${e.statusCode})';
+      }
+    }
+    return '\u0110\u00e3 x\u1ea3y ra l\u1ed7i, vui l\u00f2ng th\u1eed l\u1ea1i';
   }
 
   void _showContactsPrompt() {
@@ -256,7 +277,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
-              _navigateToHome(auth);
+              // H2: guard against widget being unmounted while dialog was open.
+              if (mounted) _navigateToHome(auth);
             },
             child: Text(
               t.laterText,
@@ -273,7 +295,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
             onPressed: () async {
               Navigator.pop(ctx);
               await Permission.contacts.request();
-              _navigateToHome(auth);
+              // H2: guard against widget being unmounted while the permission
+              // dialog was shown.
+              if (mounted) _navigateToHome(auth);
             },
             child: Text(
               t.continueText,
@@ -1287,7 +1311,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             onPressed: _isLoading ? null : (_avatarFile == null ? _completeRegistration : _showAvatarPicker),
             child: Text(
-              _avatarFile == null ? t.skip : 'Chọn ảnh khác',
+              // L1: was a hardcoded Vietnamese literal; now uses AuthTexts for i18n consistency.
+              _avatarFile == null ? t.skip : t.changePhoto,
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
