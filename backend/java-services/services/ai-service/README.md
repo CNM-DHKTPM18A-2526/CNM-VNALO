@@ -36,6 +36,7 @@ AI_RATE_LIMIT=5                                # Tối đa lượt hỏi / 1 ph�
 AI_RATE_LIMIT_GLOBAL=10                        # Tối đa lượt hỏi / 1 phút (Tổng Service - Vượt mức -> Fallback)
 APP_CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
 ```
+> Không cấu hình giá trị `*` cho `APP_CORS_ALLOWED_ORIGINS` vì CORS đang bật credentials.
 
 ### 2. Khởi động AI Service
 

@@ -40,6 +40,9 @@ public class SecurityConfig {
                             .map(String::trim)
                             .filter(origin -> !origin.isBlank())
                             .collect(Collectors.toList());
+                    if (allowedOrigins.stream().anyMatch("*"::equals)) {
+                        throw new IllegalStateException("app.cors.allowed-origins must not contain '*' when credentials are enabled");
+                    }
                     var config = new CorsConfiguration();
                     config.setAllowedOrigins(allowedOrigins);
                     config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
