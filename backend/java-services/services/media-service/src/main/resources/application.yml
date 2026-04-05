@@ -49,8 +49,8 @@ spring:
 
   servlet:
     multipart:
-      max-file-size: 100MB
-      max-request-size: 100MB
+      max-file-size: 5MB
+      max-request-size: 6MB
 
 # AWS S3
 application:
@@ -63,10 +63,10 @@ application:
     # Lấy key tại: AWS Console → IAM → Users → Security credentials → Create access key (cùng lúc với Access Key ID)
     secret-key: ${AWS_SECRET_ACCESS_KEY:}
     # Tên S3 bucket — lấy tại: AWS Console → S3 → tên bucket của bạn
-    bucket: ${AWS_BUCKET_NAME:vnalo-media}
+    bucket: ${AWS_BUCKET_NAME:vnalo-media-service}
     region: ${AWS_REGION:ap-southeast-1}
     # nếu tên bucket s3 khác thì thay vnalo-media bằng tên bucket của bạn
-    public-endpoint: ${AWS_S3_PUBLIC_ENDPOINT:https://vnalo-media.s3.amazonaws.com}
+    public-endpoint: ${AWS_S3_PUBLIC_ENDPOINT:https://vnalo-media-service.s3.amazonaws.com}
 
 # JWT
 jwt:
