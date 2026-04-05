@@ -3,13 +3,13 @@ FROM maven:3.9.9-eclipse-temurin-21-alpine AS builder
 
 WORKDIR /app
 
-# Copy POM first for better dependency cache reuse
+# Copy POM first to cache dependencies
 COPY pom.xml .
 RUN mvn dependency:go-offline -B
 
 # Copy source code and build
 COPY src ./src
-RUN mvn clean package -Dmaven.test.skip=true -B
+RUN mvn clean package -DskipTests -B
 
 # ====== RUNTIME STAGE ======
 FROM eclipse-temurin:21-jre-alpine

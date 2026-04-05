@@ -5,7 +5,6 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -35,7 +34,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
         RateLimitBucket bucket = buckets.computeIfAbsent(clientIp, k -> new RateLimitBucket());
 
         if (!bucket.tryConsume()) {
-            response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+            response.setStatus(429);
+
             response.setHeader("Retry-After", "60");
             response.setContentType("application/json");
             response.getWriter().write(
