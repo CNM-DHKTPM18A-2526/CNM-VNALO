@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -14,6 +15,7 @@ import 'package:vnalo_mobile/features/auth/screens/login_screen.dart';
 import 'package:vnalo_mobile/features/auth/widgets/otp_input.dart';
 import 'package:vnalo_mobile/navigation/main_shell.dart';
 import 'package:vnalo_mobile/features/auth/widgets/phone_input.dart';
+import 'package:vnalo_mobile/services/api_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -33,11 +35,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
   int _currentStep = 0;
   bool _agreeTermsA = false;
   bool _agreeTermsB = false;
-  bool _isLoading = false;
-  bool _isOtpStatusLoading = true;
-  bool _requiresOtp = false;
+  bool _isSendingOtp = false;
+  bool _isResendingOtp = false;
+  bool _isSubmittingRegistration = false;
+  bool _isSkipSubmitting = false;
+  bool _requiresOtp = AppConfig.instance.isProd;
   String _otpCode = '';
   String _countryCode = '+84';
+
+  bool get _isAnyRequestInFlight =>
+      _isSendingOtp || _isResendingOtp || _isSubmittingRegistration;
 
   // Personal info (optional, client-side only for now)
   DateTime? _birthday;
@@ -54,14 +61,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final fallbackRequiresOtp = AppConfig.instance.isProd;
 
     try {
-      final required = await context.read<AuthProvider>().fetchOtpRequiredStatus();
+      final required = await context
+          .read<AuthProvider>()
+          .fetchOtpRequiredStatus()
+          .timeout(
+            const Duration(seconds: 2),
+            onTimeout: () => fallbackRequiresOtp,
+          );
       if (!mounted) return;
       setState(() => _requiresOtp = required);
     } catch (_) {
       if (!mounted) return;
       setState(() => _requiresOtp = fallbackRequiresOtp);
-    } finally {
-      if (mounted) setState(() => _isOtpStatusLoading = false);
     }
   }
 
@@ -116,18 +127,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _sendOtp() async {
-    if (_isOtpStatusLoading) return;
+    if (_isAnyRequestInFlight) return;
     if (!_agreeTermsA || !_agreeTermsB) return;
     if (Validators.phone(_phoneController.text) != null) return;
 
     if (!_requiresOtp) {
-      // Development/staging shortcut: backend OTP can be disabled.
+      // M1: OTP step is always at index 1 in the PageView but we skip it when
+      // OTP is disabled by jumping directly to step 2 (Name).
       _otpCode = '000000';
-      _nextStep();
+      _goToStep(2);
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() => _isSendingOtp = true);
     try {
       await context.read<AuthProvider>().sendOtp(_buildFullPhone());
       if (!mounted) return;
@@ -141,7 +153,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       );
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _isSendingOtp = false);
     }
   }
 
@@ -150,7 +162,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _resendOtp() async {
-    setState(() => _isLoading = true);
+    if (_isAnyRequestInFlight) return;
+
+    setState(() => _isResendingOtp = true);
     try {
       await context.read<AuthProvider>().sendOtp(_buildFullPhone());
       if (!mounted) return;
@@ -169,7 +183,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       );
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _isResendingOtp = false);
     }
   }
 
@@ -186,12 +200,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _nextStep();
   }
 
-  Future<void> _completeRegistration() async {
-    setState(() => _isLoading = true);
+  Future<void> _completeRegistration({bool isSkipAction = false}) async {
+    if (_isSubmittingRegistration) return;
+
+    setState(() {
+      _isSubmittingRegistration = true;
+      _isSkipSubmitting = isSkipAction;
+    });
     final auth = context.read<AuthProvider>();
+    Timer? slowSkipHintTimer;
 
     try {
-      final success = await auth.register(
+      if (isSkipAction) {
+        slowSkipHintTimer = Timer(const Duration(seconds: 4), () {
+          if (!mounted || !_isSubmittingRegistration) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Dang hoan tat dang ky, vui long doi them mot chut...'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        });
+      }
+
+      final success = await auth
+          .register(
         phone: _buildFullPhone(),
         otp: _otpCode,
         password: _passwordController.text,
@@ -199,15 +232,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
         avatarFile: _avatarFile,
         gender: _genderForApi(),
         dob: _dobForApi(),
-      );
+      )
+          .timeout(const Duration(seconds: 20));
 
       if (!mounted) return;
 
       if (success) {
-        if (auth.error != null && auth.error!.isNotEmpty) {
+        // H1: use warning (non-fatal) rather than error for the orange snackbar.
+        if (auth.warning != null && auth.warning!.isNotEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(auth.error!),
+              content: Text(auth.warning!),
               backgroundColor: Colors.orange,
             ),
           );
@@ -218,21 +253,58 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(auth.error ?? 'Đăng ký thất bại'),
+          content: Text(auth.error ?? '\u0110\u0103ng k\u00fd th\u1ea5t b\u1ea1i'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } on TimeoutException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isSkipAction
+                ? 'Dang ky dang cham do ket noi. Vui long thu lai sau it giay.'
+                : 'Yeu cau dang ky bi timeout, vui long thu lai.',
+          ),
           backgroundColor: AppColors.error,
         ),
       );
     } catch (e) {
       if (!mounted) return;
+      // M5: translate known API error codes into user-friendly Vietnamese strings.
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Lỗi: $e'),
+          content: Text(_mapApiError(e)),
           backgroundColor: AppColors.error,
         ),
       );
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      slowSkipHintTimer?.cancel();
+      if (mounted) {
+        setState(() {
+          _isSubmittingRegistration = false;
+          _isSkipSubmitting = false;
+        });
+      }
     }
+  }
+
+  /// M5: Maps known API error codes to user-friendly messages.
+  /// Falls back to a generic message so raw exception strings never reach the UI.
+  String _mapApiError(Object e) {
+    if (e is ApiException) {
+      switch (e.code) {
+        case 'PHONE_TAKEN':
+          return 'S\u1ed1 \u0111i\u1ec7n tho\u1ea1i n\u00e0y \u0111\u00e3 \u0111\u01b0\u1ee3c \u0111\u0103ng k\u00fd';
+        case 'OTP_INVALID':
+        case 'OTP_EXPIRED':
+          return 'M\u00e3 OTP kh\u00f4ng h\u1ee3p l\u1ec7 ho\u1eb7c \u0111\u00e3 h\u1ebft h\u1ea1n';
+        default:
+          if (e.statusCode == 0) return 'Kh\u00f4ng c\u00f3 k\u1ebft n\u1ed1i m\u1ea1ng';
+          return '\u0110\u0103ng k\u00fd th\u1ea5t b\u1ea1i (${e.statusCode})';
+      }
+    }
+    return '\u0110\u00e3 x\u1ea3y ra l\u1ed7i, vui l\u00f2ng th\u1eed l\u1ea1i';
   }
 
   void _showContactsPrompt() {
@@ -256,7 +328,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
-              _navigateToHome(auth);
+              // H2: guard against widget being unmounted while dialog was open.
+              if (mounted) _navigateToHome(auth);
             },
             child: Text(
               t.laterText,
@@ -273,7 +346,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
             onPressed: () async {
               Navigator.pop(ctx);
               await Permission.contacts.request();
-              _navigateToHome(auth);
+              // H2: guard against widget being unmounted while the permission
+              // dialog was shown.
+              if (mounted) _navigateToHome(auth);
             },
             child: Text(
               t.continueText,
@@ -372,7 +447,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         leading: BackButton(
           onPressed: () {
             if (_currentStep > 0) {
-              _goToStep(_currentStep - 1);
+              // M1: When OTP is disabled, forward nav jumps 0→2. Mirror that on
+              // back nav so users never land on the skipped OTP page (index 1).
+              final prevStep = (!_requiresOtp && _currentStep == 2) ? 0 : _currentStep - 1;
+              _goToStep(prevStep);
             } else {
               Navigator.pop(context);
             }
@@ -392,13 +470,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
       body: PageView(
         controller: _pageController,
         physics: const NeverScrollableScrollPhysics(),
+        // M1: Children list is STABLE — always 6 pages regardless of _requiresOtp.
+        // Navigation skips step 1 (OTP) by jumping to step 2 when OTP is disabled.
+        // This prevents _currentStep from desync-ing if _requiresOtp changes.
         children: [
-          _buildPhoneStep(),
-          if (_requiresOtp) _buildOtpStep(),
-          _buildNameStep(),
-          _buildPersonalInfoStep(),
-          _buildPasswordStep(),
-          _buildAvatarStep(),
+          _buildPhoneStep(),     // index 0
+          _buildOtpStep(),       // index 1 — always present
+          _buildNameStep(),      // index 2
+          _buildPersonalInfoStep(), // index 3
+          _buildPasswordStep(),  // index 4
+          _buildAvatarStep(),    // index 5
         ],
       ),
     );
@@ -441,7 +522,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             const SizedBox(height: 14),
             TextButton(
-              onPressed: _isLoading ? null : _resendOtp,
+              onPressed: _isAnyRequestInFlight ? null : _resendOtp,
               child: Text(
                 t.resendOtp,
                 style: const TextStyle(
@@ -460,8 +541,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
-              onPressed: _isLoading ? null : _verifyOtpAndContinue,
-              child: _isLoading
+                onPressed: _isAnyRequestInFlight ? null : _verifyOtpAndContinue,
+                child: _isResendingOtp
                   ? const SizedBox(
                       height: 16,
                       width: 16,
@@ -489,7 +570,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Widget _buildPhoneStep() {
     final t = AuthTexts.of(context);
-    final canProceed = _agreeTermsA && _agreeTermsB && !_isOtpStatusLoading;
+    final isPhoneValid = Validators.phone(_phoneController.text) == null;
+    final canProceed = _agreeTermsA && _agreeTermsB && isPhoneValid;
 
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -539,14 +621,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
-            onPressed: canProceed && !_isLoading ? _sendOtp : null,
-            child: _isOtpStatusLoading
-                ? const SizedBox(
-                    height: 16,
-                    width: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : _isLoading
+            onPressed: canProceed && !_isAnyRequestInFlight ? _sendOtp : null,
+            child: _isSendingOtp
                 ? const SizedBox(
                     height: 16,
                     width: 16,
@@ -1254,8 +1330,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
-            onPressed: _isLoading ? null : (_avatarFile == null ? _showAvatarPicker : _completeRegistration),
-            child: _isLoading
+            onPressed: _isSubmittingRegistration
+              ? null
+              : (_avatarFile == null
+                ? _showAvatarPicker
+                : () => _completeRegistration()),
+            child: _isSubmittingRegistration && !_isSkipSubmitting
                 ? const SizedBox(
                     height: 20,
                     width: 20,
@@ -1285,9 +1365,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
-            onPressed: _isLoading ? null : (_avatarFile == null ? _completeRegistration : _showAvatarPicker),
-            child: Text(
-              _avatarFile == null ? t.skip : 'Chọn ảnh khác',
+            onPressed: _isSubmittingRegistration
+                ? null
+                : (_avatarFile == null
+                    ? () => _completeRegistration(isSkipAction: true)
+                    : _showAvatarPicker),
+            child: _isSubmittingRegistration && _isSkipSubmitting
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Color(0xFF111827),
+                    ),
+                  )
+                : Text(
+              // L1: was a hardcoded Vietnamese literal; now uses AuthTexts for i18n consistency.
+              _avatarFile == null ? t.skip : t.changePhoto,
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,

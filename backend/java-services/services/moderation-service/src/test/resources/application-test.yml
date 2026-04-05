@@ -13,9 +13,15 @@ spring:
 
   flyway:
     enabled: true
+    table: flyway_schema_history_moderation
+    baseline-on-migrate: true
+    baseline-version: 0
 
   main:
     allow-bean-definition-overriding: true
+
+jwt:
+  secret: dGVzdG1vZGVyYXRpb25zZWNyZXRrZXl0ZXN0MTIzNDU2Nzg5MDEyMzQ1Ng==
 
 logging:
   level:

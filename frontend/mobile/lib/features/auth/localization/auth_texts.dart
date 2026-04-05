@@ -119,6 +119,8 @@ class AuthTexts {
   String get takePhoto => _isVi ? 'Chụp ảnh mới' : 'Take a photo';
   String get chooseFromGallery =>
       _isVi ? 'Chọn ảnh trên máy' : 'Choose from gallery';
+  String get changePhoto =>
+      _isVi ? 'Chọn ảnh khác' : 'Change photo';
   String get skipAvatarTitle =>
       _isVi ? 'Bỏ qua ảnh đại diện?' : 'Skip profile photo?';
   String get skipAvatarMessage => _isVi

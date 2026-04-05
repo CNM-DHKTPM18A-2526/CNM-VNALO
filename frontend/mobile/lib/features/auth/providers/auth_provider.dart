@@ -14,12 +14,17 @@ class AuthProvider extends ChangeNotifier {
   bool _isLoading = false;
   bool _isInitialized = false;
   String? _error;
+  /// Non-fatal result message — set when registration succeeds but a
+  /// secondary action (e.g. avatar upload) fails. Does not affect [isLoggedIn].
+  String? _warning;
 
   User? get user => _user;
   bool get isLoading => _isLoading;
   bool get isInitialized => _isInitialized;
   bool get isLoggedIn => _user != null;
   String? get error => _error;
+  /// Non-fatal warning surfaced after a successful registration.
+  String? get warning => _warning;
 
   AuthProvider(this._authService, this._storageService, this._socketService);
 
@@ -118,6 +123,7 @@ class AuthProvider extends ChangeNotifier {
   }) async {
     _isLoading = true;
     _error = null;
+    _warning = null;
     notifyListeners();
 
     try {
@@ -157,10 +163,12 @@ class AuthProvider extends ChangeNotifier {
         try {
           final avatarUrl = await _authService.uploadAvatar(avatarFile);
           await _authService.updateProfileAvatar(avatarUrl);
+          // Refresh profile to pick up the persisted avatar URL.
           _user = await _authService.getMe();
-          await _storageService.saveUserId(_user!.id);
-        } catch (e) {
-          _error = 'Dang ky thanh cong nhung cap nhat anh dai dien that bai: $e';
+          // No need to re-save userId — it cannot change after registration.
+        } catch (_) {
+          // Avatar upload is non-fatal: registration already succeeded.
+          _warning = '\u0110\u0103ng k\u00fd th\u00e0nh c\u00f4ng nh\u01b0ng c\u1eadp nh\u1eadt \u1ea3nh \u0111\u1ea1i di\u1ec7n th\u1ea5t b\u1ea1i';
         }
       }
 

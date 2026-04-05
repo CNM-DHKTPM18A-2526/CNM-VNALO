@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:vnalo_mobile/config/app_config.dart';
 import 'package:vnalo_mobile/services/storage_service.dart';
 
 class ApiService {
@@ -133,7 +134,7 @@ class ApiService {
       throw ApiException(statusCode: 0, message: 'Unexpected error: $e');
     }
     if (response.statusCode == 401 && allowRefresh && endpoint != '/auth/refresh') {
-      final refreshed = await _tryRefreshToken(baseUrl);
+      final refreshed = await _tryRefreshToken();
       if (refreshed) {
         return _request(
           method,
@@ -149,13 +150,17 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  Future<bool> _tryRefreshToken(String baseUrl) async {
+  Future<bool> _tryRefreshToken() async {
+    // H3: Always refresh against the core auth service regardless of which
+    // downstream service triggered the 401 (e.g. media-service must not
+    // receive the refresh POST).
+    final coreBase = AppConfig.instance.coreServiceUrl;
     final refreshToken = await _storageService.getRefreshToken();
     if (refreshToken == null || refreshToken.isEmpty) {
       return false;
     }
 
-    final url = Uri.parse(_normalizeUrl(baseUrl, '/auth/refresh'));
+    final url = Uri.parse(_normalizeUrl(coreBase, '/auth/refresh'));
     final payload = jsonEncode({'refreshToken': refreshToken});
 
     try {

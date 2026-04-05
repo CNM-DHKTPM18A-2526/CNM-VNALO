@@ -13,7 +13,14 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
+import java.io.ByteArrayInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 
 @Service
@@ -30,8 +37,24 @@ public class S3Service {
     @Value("${application.s3.public-endpoint}")
     private String publicEndpoint;
 
+    @Value("${application.s3.access-key:}")
+    private String accessKey;
+
+    @Value("${application.s3.secret-key:}")
+    private String secretKey;
+
+    @Value("${application.s3.local-dir:./.media-local}")
+    private String localDir;
+
     public String uploadFile(MultipartFile file, String objectKey) {
         try {
+            if (isLocalStorageMode()) {
+                try (InputStream inputStream = file.getInputStream()) {
+                    writeStreamToLocal(inputStream, objectKey);
+                }
+                return getFileUrl(objectKey);
+            }
+
             PutObjectRequest putRequest = PutObjectRequest.builder()
                     .bucket(bucketName)
                     .key(objectKey)
@@ -47,6 +70,11 @@ public class S3Service {
     }
 
     public String uploadBytes(byte[] content, String objectKey, String contentType) {
+        if (isLocalStorageMode()) {
+            writeBytesToLocal(content, objectKey);
+            return getFileUrl(objectKey);
+        }
+
         PutObjectRequest putRequest = PutObjectRequest.builder()
                 .bucket(bucketName)
                 .key(objectKey)
@@ -58,6 +86,10 @@ public class S3Service {
     }
 
     public byte[] downloadFile(String objectKey) {
+        if (isLocalStorageMode()) {
+            return readBytesFromLocal(objectKey);
+        }
+
         return s3Client.getObjectAsBytes(GetObjectRequest.builder()
                 .bucket(bucketName)
                 .key(objectKey)
@@ -65,6 +97,16 @@ public class S3Service {
     }
 
     public void downloadFileToPath(String objectKey, java.nio.file.Path destination) {
+        if (isLocalStorageMode()) {
+            try {
+                Files.createDirectories(destination.getParent());
+                Files.copy(resolveLocalPath(objectKey), destination, StandardCopyOption.REPLACE_EXISTING);
+                return;
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to copy local media file", e);
+            }
+        }
+
         s3Client.getObject(GetObjectRequest.builder()
                 .bucket(bucketName)
                 .key(objectKey)
@@ -73,6 +115,15 @@ public class S3Service {
     }
 
     public void streamToResponse(String objectKey, java.io.OutputStream out) {
+        if (isLocalStorageMode()) {
+            try (InputStream inputStream = Files.newInputStream(resolveLocalPath(objectKey))) {
+                inputStream.transferTo(out);
+                return;
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to stream local media file", e);
+            }
+        }
+
         s3Client.getObject(GetObjectRequest.builder()
                 .bucket(bucketName)
                 .key(objectKey)
@@ -81,6 +132,10 @@ public class S3Service {
     }
 
     public String generatePresignedUrl(String objectKey, String contentType) {
+        if (isLocalStorageMode()) {
+            return getFileUrl(objectKey);
+        }
+
         PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
                 .signatureDuration(Duration.ofMinutes(60))
                 .putObjectRequest(PutObjectRequest.builder()
@@ -94,6 +149,15 @@ public class S3Service {
     }
 
     public void deleteFile(String objectKey) {
+        if (isLocalStorageMode()) {
+            try {
+                Files.deleteIfExists(resolveLocalPath(objectKey));
+                return;
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to delete local media file", e);
+            }
+        }
+
         s3Client.deleteObject(software.amazon.awssdk.services.s3.model.DeleteObjectRequest.builder()
                 .bucket(bucketName)
                 .key(objectKey)
@@ -102,6 +166,10 @@ public class S3Service {
     }
 
     public String generatePresignedDownloadUrl(String objectKey) {
+        if (isLocalStorageMode()) {
+            return getFileUrl(objectKey);
+        }
+
         software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest presignRequest =
                 software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest.builder()
                         .signatureDuration(Duration.ofMinutes(60))
@@ -122,5 +190,39 @@ public class S3Service {
 
     public String getBucketName() {
         return bucketName;
+    }
+
+    private boolean isLocalStorageMode() {
+        return accessKey == null || accessKey.isBlank() || secretKey == null || secretKey.isBlank();
+    }
+
+    private Path resolveLocalPath(String objectKey) {
+        return Paths.get(localDir).resolve(objectKey).normalize();
+    }
+
+    private void writeStreamToLocal(InputStream inputStream, String objectKey) {
+        Path path = resolveLocalPath(objectKey);
+        try {
+            Files.createDirectories(path.getParent());
+            Files.copy(inputStream, path, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to write local media file", e);
+        }
+    }
+
+    private void writeBytesToLocal(byte[] content, String objectKey) {
+        writeStreamToLocal(new ByteArrayInputStream(content), objectKey);
+    }
+
+    private byte[] readBytesFromLocal(String objectKey) {
+        Path path = resolveLocalPath(objectKey);
+        try {
+            if (!Files.exists(path)) {
+                throw new FileNotFoundException("Local media file not found: " + objectKey);
+            }
+            return Files.readAllBytes(path);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to read local media file", e);
+        }
     }
 }

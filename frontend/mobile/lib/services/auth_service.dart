@@ -12,6 +12,10 @@ class AuthService {
   String get _mediaBase => AppConfig.instance.mediaServiceUrl;
 
   String _normalizePhone(String phone) {
+    // Already fully-qualified — skip re-normalisation to avoid double-prefixing
+    // (e.g. when _buildFullPhone in the screen already prepended the country code).
+    if (phone.startsWith('+')) return phone.trim();
+
     final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
     if (digits.startsWith('0') && digits.length >= 10) {
       return '+84${digits.substring(1)}';
@@ -35,10 +39,14 @@ class AuthService {
     );
   }
 
-  // Check OTP configuration status from backend
+  // Check OTP configuration status from backend.
+  // Supports both wrapped ({ "data": { "enabled": true } }) and flat ({ "enabled": true }) responses.
   Future<Map<String, dynamic>> getOtpStatus() async {
     final response = await _apiService.get(_base, '/auth/otp/status');
-    return response['data'];
+    final data = response['data'];
+    if (data is Map<String, dynamic>) return data;
+    // Flat response — treat the whole body as the data payload.
+    return response;
   }
 
   // Register a new user with phone, OTP, password, display name, gender, and dob
@@ -82,7 +90,6 @@ class AuthService {
       '/auth/login',
       body: {
         'identifier': normalized,
-        'phone': normalized,
         'password': password,
       },
     );

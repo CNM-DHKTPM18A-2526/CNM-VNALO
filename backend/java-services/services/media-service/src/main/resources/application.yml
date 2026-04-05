@@ -67,6 +67,8 @@ application:
     region: ${AWS_REGION:ap-southeast-1}
     # nếu tên bucket s3 khác thì thay vnalo-media bằng tên bucket của bạn
     public-endpoint: ${AWS_S3_PUBLIC_ENDPOINT:https://vnalo-media-service.s3.amazonaws.com}
+    # Dev fallback: when AWS keys are blank, media is stored in local filesystem path below
+    local-dir: ${MEDIA_LOCAL_DIR:./.media-local}
 
 # JWT
 jwt:
