@@ -35,7 +35,7 @@ ai:
 
 # JWT
 jwt:
-  secret: ${JWT_SECRET:ZGV2ZWxvcG1lbnQtb25seS1zZWNyZXQta2V5LWRvLW5vdC11c2UtaW4tcHJvZHVjdGlvbi10aGlzLWlzLWF0LWxlYXN0LTUxMi1iaXRzLWxvbmc=}
+  secret: ${JWT_SECRET:?JWT_SECRET is required}
 
 # Actuator
 management:
