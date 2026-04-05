@@ -110,6 +110,9 @@ public class ChatService {
     }
 
     public List<ChatMessage> getHistory(String userId, String conversationId) {
+        if (conversationId == null || conversationId.isBlank()) {
+            return new ArrayList<>();
+        }
         return loadHistory(userId, conversationId);
     }
 
