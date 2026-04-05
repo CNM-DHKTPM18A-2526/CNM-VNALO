@@ -12,6 +12,7 @@ class AppConfig {
     Environment env, {
     String? coreServiceUrl,
     String? messageServiceUrl,
+    String? mediaServiceUrl,
     String? socketUrl,
   }) {
     switch (env) {
@@ -20,6 +21,7 @@ class AppConfig {
           environment: Environment.dev,
           coreServiceUrl: coreServiceUrl ?? 'http://10.0.2.2:8081/api/v1',
           messageServiceUrl: messageServiceUrl ?? 'http://10.0.2.2:3000/api/v1',
+          mediaServiceUrl: mediaServiceUrl ?? 'http://10.0.2.2:8083/api/v1',
           socketUrl: socketUrl ?? 'http://10.0.2.2:3000',
           enableLogging: true,
         );
@@ -32,6 +34,8 @@ class AppConfig {
               coreServiceUrl ?? 'https://staging-api.vnalo.com/api/v1',
           messageServiceUrl:
               messageServiceUrl ?? 'https://staging-msg.vnalo.com/api/v1',
+          mediaServiceUrl:
+            mediaServiceUrl ?? 'https://staging-media.vnalo.com/api/v1',
           socketUrl: socketUrl ?? 'https://staging-msg.vnalo.com',
           enableLogging: true,
           enableCrashlytics: true,
@@ -44,6 +48,7 @@ class AppConfig {
           coreServiceUrl: coreServiceUrl ?? 'https://api.vnalo.com/api/v1',
           messageServiceUrl:
               messageServiceUrl ?? 'https://msg.vnalo.com/api/v1',
+          mediaServiceUrl: mediaServiceUrl ?? 'https://media.vnalo.com/api/v1',
           socketUrl: socketUrl ?? 'https://msg.vnalo.com',
           enableCrashlytics: true,
         );

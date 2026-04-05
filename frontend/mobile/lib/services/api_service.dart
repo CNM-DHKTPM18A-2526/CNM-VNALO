@@ -42,6 +42,39 @@ class ApiService {
     return _request('PATCH', baseUrl, endpoint, body: body);
   }
 
+  Future<Map<String, dynamic>> postMultipart(
+    String baseUrl,
+    String endpoint, {
+    required File file,
+    String fileField = 'file',
+    Map<String, String>? fields,
+  }) async {
+    final url = Uri.parse(_normalizeUrl(baseUrl, endpoint));
+    final token = await _storageService.getAccessToken();
+
+    final request = http.MultipartRequest('POST', url)
+      ..fields.addAll(fields ?? <String, String>{})
+      ..files.add(await http.MultipartFile.fromPath(fileField, file.path));
+
+    if (token != null && token.isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
+
+    http.StreamedResponse streamed;
+    try {
+      streamed = await request.send().timeout(_timeout);
+    } on TimeoutException {
+      throw ApiException(statusCode: 0, message: 'Request timed out');
+    } on SocketException {
+      throw ApiException(statusCode: 0, message: 'No Internet connection');
+    } catch (e) {
+      throw ApiException(statusCode: 0, message: 'Unexpected error: $e');
+    }
+
+    final response = await http.Response.fromStream(streamed);
+    return _handleResponse(response);
+  }
+
   Future<Map<String, dynamic>> delete(String baseUrl, String endpoint) {
     return _request('DELETE', baseUrl, endpoint);
   }

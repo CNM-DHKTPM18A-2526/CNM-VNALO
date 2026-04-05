@@ -34,25 +34,54 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _agreeTermsA = false;
   bool _agreeTermsB = false;
   bool _isLoading = false;
+  bool _isOtpStatusLoading = true;
+  bool _requiresOtp = false;
   String _otpCode = '';
   String _countryCode = '+84';
-
-  bool get _requiresOtp => context.watch<AuthProvider>().requiresOtp;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        context.read<AuthProvider>().checkOtpStatus();
-      }
-    });
-  }
 
   // Personal info (optional, client-side only for now)
   DateTime? _birthday;
   String? _gender;
   File? _avatarFile;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOtpStatus();
+  }
+
+  Future<void> _loadOtpStatus() async {
+    final fallbackRequiresOtp = AppConfig.instance.isProd;
+
+    try {
+      final required = await context.read<AuthProvider>().fetchOtpRequiredStatus();
+      if (!mounted) return;
+      setState(() => _requiresOtp = required);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _requiresOtp = fallbackRequiresOtp);
+    } finally {
+      if (mounted) setState(() => _isOtpStatusLoading = false);
+    }
+  }
+
+  String? _genderForApi() {
+    switch (_gender) {
+      case 'male':
+        return 'MALE';
+      case 'female':
+        return 'FEMALE';
+      case 'other':
+        return 'UNKNOWN';
+      default:
+        return null;
+    }
+  }
+
+  String? _dobForApi() {
+    if (_birthday == null) return null;
+    return _birthday!.toIso8601String().split('T').first;
+  }
 
   String _buildFullPhone() {
     var digits = _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
@@ -87,6 +116,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _sendOtp() async {
+    if (_isOtpStatusLoading) return;
     if (!_agreeTermsA || !_agreeTermsB) return;
     if (Validators.phone(_phoneController.text) != null) return;
 
@@ -166,13 +196,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
         otp: _otpCode,
         password: _passwordController.text,
         displayName: _nameController.text.trim(),
-        gender: _gender,
-        dob: _birthday?.toIso8601String(),
+        avatarFile: _avatarFile,
+        gender: _genderForApi(),
+        dob: _dobForApi(),
       );
 
       if (!mounted) return;
 
       if (success) {
+        if (auth.error != null && auth.error!.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(auth.error!),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
         _showContactsPrompt();
         return;
       }
@@ -450,7 +489,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Widget _buildPhoneStep() {
     final t = AuthTexts.of(context);
-    final canProceed = _agreeTermsA && _agreeTermsB;
+    final canProceed = _agreeTermsA && _agreeTermsB && !_isOtpStatusLoading;
 
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -501,7 +540,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             ),
             onPressed: canProceed && !_isLoading ? _sendOtp : null,
-            child: _isLoading
+            child: _isOtpStatusLoading
+                ? const SizedBox(
+                    height: 16,
+                    width: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : _isLoading
                 ? const SizedBox(
                     height: 16,
                     width: 16,
