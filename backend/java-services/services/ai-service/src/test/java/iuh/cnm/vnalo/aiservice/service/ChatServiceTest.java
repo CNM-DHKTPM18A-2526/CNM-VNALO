@@ -47,7 +47,6 @@ class ChatServiceTest {
     void setUp() {
         chatService = new ChatService(geminiProvider, ollamaProvider, redisTemplate);
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(redisTemplate.expire(anyString(), anyLong(), eq(TimeUnit.SECONDS))).thenReturn(true);
 
         ReflectionTestUtils.setField(chatService, "rateLimitPerUser", 5);
         ReflectionTestUtils.setField(chatService, "rateLimitGlobal", 10);
@@ -59,8 +58,9 @@ class ChatServiceTest {
     void ask_shouldFallbackToOllamaWithoutGlobalCounterWhenGeminiUnavailable() {
         when(geminiProvider.isAvailable()).thenReturn(false);
         when(ollamaProvider.generate(anyString(), org.mockito.ArgumentMatchers.anyList())).thenReturn("fallback");
-        when(valueOperations.increment(argThat(key -> key.startsWith("rl:ai:user:")))).thenReturn(1L);
+        when(valueOperations.increment(argThat(key -> key != null && key.startsWith("rl:ai:user:")))).thenReturn(1L);
         when(valueOperations.get(anyString())).thenReturn(null);
+        when(redisTemplate.expire(anyString(), anyLong(), eq(TimeUnit.SECONDS))).thenReturn(true);
 
         ChatResponse response = chatService.ask("u1", "hello", "c1");
 
@@ -70,7 +70,7 @@ class ChatServiceTest {
 
     @Test
     void ask_shouldThrowWhenPerUserRateLimitExceeded() {
-        when(valueOperations.increment(argThat(key -> key.startsWith("rl:ai:user:")))).thenReturn(6L);
+        when(valueOperations.increment(argThat(key -> key != null && key.startsWith("rl:ai:user:")))).thenReturn(6L);
 
         assertThrows(RateLimitExceededException.class, () -> chatService.ask("u1", "hello", "c1"));
     }
@@ -88,9 +88,10 @@ class ChatServiceTest {
 
         when(geminiProvider.isAvailable()).thenReturn(true);
         when(geminiProvider.generate(anyString(), org.mockito.ArgumentMatchers.anyList())).thenReturn("m4");
-        when(valueOperations.increment(argThat(key -> key.startsWith("rl:ai:user:")))).thenReturn(1L);
-        when(valueOperations.increment(argThat(key -> key.startsWith("rl:ai:global:")))).thenReturn(1L);
+        when(valueOperations.increment(argThat(key -> key != null && key.startsWith("rl:ai:user:")))).thenReturn(1L);
+        when(valueOperations.increment(argThat(key -> key != null && key.startsWith("rl:ai:global:")))).thenReturn(1L);
         when(valueOperations.get("ai:history:u1:c1")).thenReturn(mapper.writeValueAsString(existing));
+        when(redisTemplate.expire(anyString(), anyLong(), eq(TimeUnit.SECONDS))).thenReturn(true);
 
         chatService.ask("u1", "new", "c1");
 

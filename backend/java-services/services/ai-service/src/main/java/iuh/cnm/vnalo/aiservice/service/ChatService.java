@@ -14,6 +14,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.RedisCallback;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -175,7 +176,7 @@ public class ChatService {
     }
 
     private Set<String> scanKeys(String pattern) {
-        Set<String> keys = redisTemplate.execute(connection -> {
+        Set<String> keys = redisTemplate.execute((RedisCallback<Set<String>>) connection -> {
             Set<String> result = new LinkedHashSet<>();
             ScanOptions options = ScanOptions.scanOptions().match(pattern).count(100).build();
 
