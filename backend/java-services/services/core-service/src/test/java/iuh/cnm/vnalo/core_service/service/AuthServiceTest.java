@@ -25,10 +25,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Instant;
@@ -58,9 +54,6 @@ class AuthServiceTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
-
-    @Mock
-    private AuthenticationManager authenticationManager;
 
     @Mock
     private JwtTokenProvider jwtTokenProvider;
@@ -191,13 +184,9 @@ class AuthServiceTest {
                     .identifier("+84912345678")
                     .password("password123")
                     .build();
-            UserPrincipal userPrincipal = UserPrincipal.create(testAccount);
-            Authentication authentication = mock(Authentication.class);
-            
+
             when(authAccountRepository.findByPhone("+84912345678")).thenReturn(Optional.of(testAccount));
-            when(authentication.getPrincipal()).thenReturn(userPrincipal);
-            when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
-                .thenReturn(authentication);
+            when(passwordEncoder.matches("password123", "hashedPassword")).thenReturn(true);
             when(userProfileRepository.findById(testAccountId)).thenReturn(Optional.of(testProfile));
             when(authAccountRepository.save(any(AuthAccount.class))).thenReturn(testAccount);
             when(jwtTokenProvider.generateAccessToken(any(UserPrincipal.class))).thenReturn("accessToken");
@@ -223,10 +212,9 @@ class AuthServiceTest {
                     .identifier("+84912345678")
                     .password("wrongPassword")
                     .build();
-            
+
             when(authAccountRepository.findByPhone("+84912345678")).thenReturn(Optional.of(testAccount));
-            when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
-                .thenThrow(new BadCredentialsException("Bad credentials"));
+            when(passwordEncoder.matches("wrongPassword", "hashedPassword")).thenReturn(false);
             when(authAccountRepository.save(any(AuthAccount.class))).thenReturn(testAccount);
 
             // When & Then

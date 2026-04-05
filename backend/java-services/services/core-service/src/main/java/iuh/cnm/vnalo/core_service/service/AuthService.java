@@ -23,10 +23,6 @@ import iuh.cnm.vnalo.core_service.security.UserPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,7 +43,6 @@ public class AuthService {
     private final UserProfileRepository userProfileRepository;
     private final UserPrivacySettingRepository userPrivacySettingRepository;
     private final PasswordEncoder passwordEncoder;
-    private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
     private final OtpConfig otpConfig;
     private final OtpService otpService;
@@ -120,28 +115,7 @@ public class AuthService {
             throw new ApiException(ErrorCode.AUTH_ACCOUNT_DISABLED);
         }
 
-        try {
-            Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.getIdentifier(), request.getPassword())
-            );
-
-            UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
-
-            account.onLoginSuccess(request.getDeviceId());
-            authAccountRepository.save(account);
-
-            UserProfile profile = userProfileRepository.findById(account.getId())
-                    .orElseThrow(() -> new ApiException(ErrorCode.USER_PROFILE_NOT_FOUND));
-
-            if (request.getDeviceId() != null) {
-                refreshTokenRepository.revokeByAccountIdAndDeviceId(account.getId(), request.getDeviceId(), Instant.now());
-            }
-
-            String accessToken = jwtTokenProvider.generateAccessToken(userPrincipal);
-            String refreshToken = generateAndSaveRefreshToken(account.getId(), httpRequest, request.getDeviceId());
-
-            return buildAuthResponse(accessToken, refreshToken, account, profile);
-        } catch (BadCredentialsException e) {
+        if (!passwordEncoder.matches(request.getPassword(), account.getPasswordHash())) {
             // Track failed login attempt
             account.onLoginFailed();
             // Auto-lock after 5 consecutive failures
@@ -152,6 +126,23 @@ public class AuthService {
             authAccountRepository.save(account);
             throw new ApiException(ErrorCode.AUTH_INVALID_CREDENTIALS);
         }
+
+        UserPrincipal userPrincipal = UserPrincipal.create(account);
+
+        account.onLoginSuccess(request.getDeviceId());
+        authAccountRepository.save(account);
+
+        UserProfile profile = userProfileRepository.findById(account.getId())
+                .orElseThrow(() -> new ApiException(ErrorCode.USER_PROFILE_NOT_FOUND));
+
+        if (request.getDeviceId() != null) {
+            refreshTokenRepository.revokeByAccountIdAndDeviceId(account.getId(), request.getDeviceId(), Instant.now());
+        }
+
+        String accessToken = jwtTokenProvider.generateAccessToken(userPrincipal);
+        String refreshToken = generateAndSaveRefreshToken(account.getId(), httpRequest, request.getDeviceId());
+
+        return buildAuthResponse(accessToken, refreshToken, account, profile);
     }
 
     @Transactional
