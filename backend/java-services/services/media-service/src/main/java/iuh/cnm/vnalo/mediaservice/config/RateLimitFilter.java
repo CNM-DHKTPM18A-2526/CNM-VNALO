@@ -34,7 +34,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
         RateLimitBucket bucket = buckets.computeIfAbsent(clientIp, k -> new RateLimitBucket());
 
         if (!bucket.tryConsume()) {
-            response.setStatus(HttpServletResponse.SC_TOO_MANY_REQUESTS);
+            response.setStatus(429);
+
             response.setHeader("Retry-After", "60");
             response.setContentType("application/json");
             response.getWriter().write(
