@@ -106,7 +106,12 @@ class AuthServiceTest {
         @DisplayName("Should register successfully when OTP is disabled")
         void shouldRegisterSuccessfully_WhenOtpDisabled() {
             // Given
-            RegisterRequest request = new RegisterRequest("+84912345678", "password123", "Test User", null);
+            RegisterRequest request = RegisterRequest.builder()
+                    .phone("+84912345678")
+                    .password("password123")
+                    .displayName("Test User")
+                    .otp(null)
+                    .build();
             
             when(otpConfig.shouldSkipOtp()).thenReturn(true);
             when(authAccountRepository.existsByPhone(anyString())).thenReturn(false);
@@ -135,7 +140,12 @@ class AuthServiceTest {
         @DisplayName("Should throw exception when phone already exists")
         void shouldThrowException_WhenPhoneExists() {
             // Given
-            RegisterRequest request = new RegisterRequest("+84912345678", "password123", "Test User", null);
+            RegisterRequest request = RegisterRequest.builder()
+                    .phone("+84912345678")
+                    .password("password123")
+                    .displayName("Test User")
+                    .otp(null)
+                    .build();
             
             when(authAccountRepository.existsByPhone(anyString())).thenReturn(true);
 
@@ -151,7 +161,12 @@ class AuthServiceTest {
         @DisplayName("Should throw exception when OTP is required but not provided")
         void shouldThrowException_WhenOtpRequiredButNotProvided() {
             // Given
-            RegisterRequest request = new RegisterRequest("+84912345678", "password123", "Test User", null);
+            RegisterRequest request = RegisterRequest.builder()
+                    .phone("+84912345678")
+                    .password("password123")
+                    .displayName("Test User")
+                    .otp(null)
+                    .build();
             
             when(authAccountRepository.existsByPhone(anyString())).thenReturn(false);
             when(otpConfig.shouldSkipOtp()).thenReturn(false);
