@@ -34,6 +34,7 @@ OLLAMA_URL=http://ollama:11434                 # URL tới container của Ollam
 OLLAMA_MODEL=llama3.1:8b
 AI_RATE_LIMIT=5                                # Tối đa lượt hỏi / 1 phút (Cho từng user)
 AI_RATE_LIMIT_GLOBAL=10                        # Tối đa lượt hỏi / 1 phút (Tổng Service - Vượt mức -> Fallback)
+APP_CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
 ```
 
 ### 2. Khởi động AI Service
@@ -45,7 +46,7 @@ Chỉ chạy AI Service (và Redis cần thiết):
 docker compose up -d redis ai-service
 ```
 
-> **Lưu ý Fallback Ollama:** Mặc định Ollama không tự khởi động để tiết kiệm RAM. Nếu bạn muốn chạy kèm Ollama để test Fallback:
+> **Lưu ý Fallback Ollama:** `docker-compose.yml` đã có service `ollama` trong profile `ai-local`. Nếu bạn muốn chạy kèm Ollama để test Fallback:
 > ```bash
 > docker compose --profile ai-local up -d ollama
 > ```

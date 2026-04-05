@@ -53,3 +53,7 @@ logging:
   level:
     root: WARN
     iuh.cnm.vnalo: ${LOG_LEVEL:INFO}
+
+app:
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}

@@ -12,11 +12,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.data.redis.core.ScanOptions;
+import org.springframework.data.redis.core.Cursor;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -72,10 +75,9 @@ public class ChatService {
         String provider;
 
         try {
-            // Check global rate limit before calling Gemini
-            checkGlobalRateLimit();
-            
             if (geminiProvider.isAvailable()) {
+                // Check global rate limit before calling Gemini
+                checkGlobalRateLimit();
                 answer = geminiProvider.generate(SystemPrompt.VNALO_SYSTEM_PROMPT, trimmedHistory);
                 provider = "gemini";
                 log.info("Response via Gemini for user {}", userId);
@@ -118,8 +120,8 @@ public class ChatService {
 
     public List<String> getUserConversations(String userId) {
         String pattern = "ai:history:" + userId + ":*";
-        Set<String> keys = redisTemplate.keys(pattern);
-        if (keys == null) return new ArrayList<>();
+        Set<String> keys = scanKeys(pattern);
+        if (keys.isEmpty()) return new ArrayList<>();
 
         return keys.stream()
                 .map(key -> key.substring(key.lastIndexOf(':') + 1))
@@ -131,8 +133,8 @@ public class ChatService {
             redisTemplate.delete(historyKey(userId, conversationId));
         } else {
             String pattern = "ai:history:" + userId + ":*";
-            Set<String> keys = redisTemplate.keys(pattern);
-            if (keys != null && !keys.isEmpty()) {
+            Set<String> keys = scanKeys(pattern);
+            if (!keys.isEmpty()) {
                 redisTemplate.delete(keys);
             }
         }
@@ -150,7 +152,7 @@ public class ChatService {
         }
 
         if (count != null && count > rateLimitPerUser) {
-            throw new RateLimitExceededException("Bạn đã lưu gửi quá " + rateLimitPerUser + " câu hỏi trong 1 phút. Vui lòng chờ.");
+            throw new RateLimitExceededException("Bạn đã gửi quá " + rateLimitPerUser + " câu hỏi trong 1 phút. Vui lòng chờ.");
         }
     }
 
@@ -170,6 +172,28 @@ public class ChatService {
 
     private String historyKey(String userId, String conversationId) {
         return "ai:history:" + userId + ":" + conversationId;
+    }
+
+    private Set<String> scanKeys(String pattern) {
+        Set<String> keys = redisTemplate.execute(connection -> {
+            Set<String> result = new LinkedHashSet<>();
+            ScanOptions options = ScanOptions.scanOptions().match(pattern).count(100).build();
+
+            try (Cursor<byte[]> cursor = connection.scan(options)) {
+                while (cursor.hasNext()) {
+                    byte[] keyBytes = cursor.next();
+                    String key = redisTemplate.getStringSerializer().deserialize(keyBytes);
+                    if (key != null) {
+                        result.add(key);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to scan Redis keys by pattern {}: {}", pattern, e.getMessage());
+            }
+
+            return result;
+        });
+        return keys != null ? keys : new LinkedHashSet<>();
     }
 
     private List<ChatMessage> loadHistory(String userId, String conversationId) {
