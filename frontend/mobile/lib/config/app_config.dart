@@ -2,9 +2,21 @@ import 'package:vnalo_mobile/config/env.dart';
 
 // AppConfig is a singleton class that holds the configuration for the app. It is initialized with the environment configuration and can be accessed throughout the app.
 class AppConfig {
-  static late EnvConfig _config;
+  static EnvConfig? _config;
 
-  static EnvConfig get instance => _config;
+  /// Returns the current configuration.
+  /// Throws [StateError] if [initialize] has not been called yet.
+  static EnvConfig get instance {
+    assert(
+      _config != null,
+      'AppConfig.initialize() must be called before accessing AppConfig.instance. '
+      'Ensure main() calls AppConfig.initialize() before runApp().',
+    );
+    return _config!;
+  }
+
+  /// Whether [initialize] has been called at least once.
+  static bool get isInitialized => _config != null;
 
   /// Initializes the AppConfig with the given environment.
   /// This method should be called at the start of the app before accessing the configuration.
