@@ -6,6 +6,7 @@ const API_BASE_URL = import.meta.env.VITE_CORE_API_URL ?? 'http://localhost:8081
 export type UpdateProfilePayload = {
   displayName?: string
   avatarUrl?: string
+  coverUrl?: string
   dob?: string
   gender?: Gender
 }
@@ -138,7 +139,9 @@ function extractUser(payload: unknown): AuthUser | null {
     id: id || email,
     name: displayName || 'VNALO User',
     email,
+    phone: typeof raw.phone === 'string' ? raw.phone : null,
     avatarUrl: typeof raw.avatarUrl === 'string' ? raw.avatarUrl : null,
+    coverUrl: typeof raw.coverUrl === 'string' ? raw.coverUrl : null,
     dob: typeof raw.dob === 'string' ? raw.dob : null,
     gender: isGender(raw.gender) ? raw.gender : null,
   }
