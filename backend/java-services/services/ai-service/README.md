@@ -28,7 +28,7 @@ Mở file `docker/.env` và thêm/sửa các key sau:
 JWT_SECRET=ZGV2ZWxvcG1lbnQtb25seS1zZWNyZXQta2V5LWRvLW5vdC11c2UtaW4tcHJvZHVjdGlvbi10aGlzLWlzLWF0LWxlYXN0LTUxMi1iaXRzLWxvbmc=
 
 # AI Service Config
-GEMINI_API_KEY=AIzaSyxxxxxxxxxxxxxxxxx         # Lấy Miễn phí tại: https://aistudio.google.com/apikey
+GEMINI_API_KEY=<your_gemini_api_key>          # Lấy Miễn phí tại: https://aistudio.google.com/apikey
 GEMINI_MODEL=gemini-2.5-flash
 OLLAMA_URL=http://ollama:11434                 # URL tới container của Ollama 
 OLLAMA_MODEL=llama3.1:8b
