@@ -62,7 +62,7 @@ public class MediaAccessService {
      * 1. User is the owner of the media
      * 2. Media has a PUBLIC scope
      * 3. User has a USER scope for this media
-     * 4. User is in a CONVERSATION scope for this media (scopeId = conversationId, need to be checked by caller)
+     * 4. Conversation membership check is handled by caller (see canAccessInConversation)
      */
     public boolean canAccess(UUID mediaId, UUID userId) {
         MediaMetadata media = mediaMetadataRepository.findById(mediaId)
@@ -86,17 +86,24 @@ public class MediaAccessService {
                     }
                     break;
                 case CONVERSATION:
-                    // For CONVERSATION scope, the scopeId is the conversationId.
-                    // The userId is also stored as scopeId for user-level conversation access.
-                    // In practice, the calling service passes the conversationId and we check membership.
-                    if (scope.getScopeId().equals(userId)) {
-                        return true;
-                    }
+                    // Conversation access requires conversationId + membership verification by caller.
                     break;
             }
         }
 
         return false;
+    }
+
+    /**
+     * Check access for user when caller has already validated user belongs to conversationId.
+     */
+    public boolean canAccessInConversation(UUID mediaId, UUID userId, UUID conversationId) {
+        if (canAccess(mediaId, userId)) {
+            return true;
+        }
+        return accessScopeRepository.findByMediaId(mediaId).stream()
+                .anyMatch(scope -> scope.getScopeType() == ScopeType.CONVERSATION
+                        && conversationId.equals(scope.getScopeId()));
     }
 
     /**

@@ -53,6 +53,7 @@ class ApiService {
     String endpoint, {
     Map<String, String>? queryParams,
     Map<String, dynamic>? body,
+    bool allowRefresh = true,
   }) async {
     // Normalize URL and prepare headers and body for the request
     final url = Uri.parse(
@@ -98,7 +99,62 @@ class ApiService {
     } catch (e) {
       throw ApiException(statusCode: 0, message: 'Unexpected error: $e');
     }
+    if (response.statusCode == 401 && allowRefresh && endpoint != '/auth/refresh') {
+      final refreshed = await _tryRefreshToken(baseUrl);
+      if (refreshed) {
+        return _request(
+          method,
+          baseUrl,
+          endpoint,
+          queryParams: queryParams,
+          body: body,
+          allowRefresh: false,
+        );
+      }
+    }
+
     return _handleResponse(response);
+  }
+
+  Future<bool> _tryRefreshToken(String baseUrl) async {
+    final refreshToken = await _storageService.getRefreshToken();
+    if (refreshToken == null || refreshToken.isEmpty) {
+      return false;
+    }
+
+    final url = Uri.parse(_normalizeUrl(baseUrl, '/auth/refresh'));
+    final payload = jsonEncode({'refreshToken': refreshToken});
+
+    try {
+      final response = await http
+          .post(
+            url,
+            headers: const {'Content-Type': 'application/json'},
+            body: payload,
+          )
+          .timeout(_timeout);
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return false;
+      }
+
+      final parsed = _parseResponseBody(response.body);
+      final data = (parsed['data'] ?? parsed) as Map<String, dynamic>;
+      final access = data['accessToken'] ?? data['access_token'];
+      final refresh = data['refreshToken'] ?? data['refresh_token'];
+
+      if (access is! String || refresh is! String) {
+        return false;
+      }
+
+      await _storageService.saveTokens(
+        accessToken: access,
+        refreshToken: refresh,
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   // Normalize URL by ensuring there is exactly one slash between baseUrl and endpoint

@@ -4,6 +4,7 @@ import Redis from 'ioredis';
 
 const PRESENCE_KEY = (userId: string) => `presence:${userId}`;
 const ONLINE_SET = 'presence:online';
+const TYPING_SET_KEY = (conversationId: string) => `typing:${conversationId}:users`;
 const TTL_SECONDS = 60; // heartbeat, auto-expire if no ping
 
 @Injectable()
@@ -18,7 +19,7 @@ export class PresenceService {
       socketId,
       lastSeen: new Date().toISOString(),
     });
-    await this.redis.expire(key, TTL_SECONDS * 5); // 5 phút TTL
+    await this.redis.expire(key, TTL_SECONDS);
     await this.redis.sadd(ONLINE_SET, userId);
   }
 
@@ -39,7 +40,7 @@ export class PresenceService {
     const key = PRESENCE_KEY(userId);
     const exists = await this.redis.exists(key);
     if (exists) {
-      await this.redis.expire(key, TTL_SECONDS * 5);
+      await this.redis.expire(key, TTL_SECONDS);
       await this.redis.hset(key, 'lastSeen', new Date().toISOString());
     }
   }
@@ -72,18 +73,17 @@ export class PresenceService {
 
   /** Cập nhật typing indicator (expire nhanh 5 giây) */
   async setTyping(userId: string, conversationId: string, isTyping: boolean): Promise<void> {
-    const key = `typing:${conversationId}:${userId}`;
+    const typingSetKey = TYPING_SET_KEY(conversationId);
     if (isTyping) {
-      await this.redis.set(key, '1', 'EX', 5);
+      await this.redis.sadd(typingSetKey, userId);
+      await this.redis.expire(typingSetKey, 5);
     } else {
-      await this.redis.del(key);
+      await this.redis.srem(typingSetKey, userId);
     }
   }
 
   /** Lấy danh sách ai đang gõ trong conversation */
   async getTypingUsers(conversationId: string): Promise<string[]> {
-    // Scan pattern typing:{conversationId}:*
-    const keys = await this.redis.keys(`typing:${conversationId}:*`);
-    return keys.map((k) => k.split(':')[2]);
+    return this.redis.smembers(TYPING_SET_KEY(conversationId));
   }
 }

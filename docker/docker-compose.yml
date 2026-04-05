@@ -1,7 +1,6 @@
 # =============================================================================
 # VNALO — Docker Compose (Development)
-# Usage: docker-compose up --build
-# Profiles: default (infra + services), kafka (adds Kafka + Zookeeper)
+# Usage: docker compose up --build
 # =============================================================================
 
 services:
@@ -63,6 +62,36 @@ services:
       timeout: 10s
       retries: 5
 
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: vnalo-zookeeper
+    hostname: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - vnalo-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: vnalo-kafka
+    hostname: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - vnalo-network
+
   # ---------------------------------------------------------------------------
   # Application Services
   # ---------------------------------------------------------------------------
@@ -101,157 +130,276 @@ services:
       resources:
         limits:
           memory: 1G
-          cpus: '1.0'
+          cpus: "1.0"
+
   message-service:
-     build:
-       context: ../backend/node-services
-       dockerfile: Dockerfile
-     container_name: vnalo-message-service
-     ports:
-       - "3000:3000"
-     environment:
-       PORT: 3000
-       DB_HOST: postgres
-       DB_PORT: 5432
-       DB_NAME: ${DB_NAME:-vnalo_core}
-       DB_USER: ${DB_USER:-postgres}
-       DB_PASS: ${DB_PASS:-postgres}
-       REDIS_HOST: redis
-       REDIS_PORT: 6379
-       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
-       JWT_ISSUER: ${JWT_ISSUER:-vnalo}
-       NODE_ENV: ${NODE_ENV:-development}
-     depends_on:
-       postgres:
-         condition: service_healthy
-       redis:
-         condition: service_healthy
-     networks:
-       - vnalo-network
-     healthcheck:
-       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/v1/health"]
-       interval: 30s
-       timeout: 5s
-       retries: 3
-       start_period: 20s
-     deploy:
-       resources:
-         limits:
-           memory: 512M
-           cpus: '0.5'
+    build:
+      context: ../backend/node-services
+      dockerfile: Dockerfile
+    container_name: vnalo-message-service
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-vnalo_core}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASS: ${DB_PASS:-postgres}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_ISSUER: ${JWT_ISSUER:-vnalo}
+      NODE_ENV: ${NODE_ENV:-development}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - vnalo-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
 
   media-service:
-     build:
-       context: ../backend/java-services/services/media-service
-       dockerfile: Dockerfile
-     container_name: vnalo-media-service
-     ports:
-       - "8083:8083"
-     environment:
-       DB_HOST: postgres
-       DB_PORT: 5432
-       DB_NAME: vnalo_media
-       DB_USER: ${DB_USER:-postgres}
-       DB_PASS: ${DB_PASS:-postgres}
-       REDIS_HOST: redis
-       REDIS_PORT: 6379
-       RABBITMQ_HOST: rabbitmq
-       RABBITMQ_PORT: 5672
-       RABBITMQ_USER: ${RABBITMQ_USER:-guest}
-       RABBITMQ_PASS: ${RABBITMQ_PASS:-guest}
-       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
-       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-       AWS_BUCKET_NAME: ${AWS_BUCKET_NAME:-vnalo-media}
-       AWS_REGION: ${AWS_REGION:-ap-southeast-1}
-       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
-       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
-     depends_on:
-       postgres:
-         condition: service_healthy
-       redis:
-         condition: service_healthy
-       rabbitmq:
-         condition: service_healthy
-     networks:
-       - vnalo-network
-     healthcheck:
-       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8083/actuator/health"]
-       interval: 30s
-       timeout: 10s
-       retries: 3
-       start_period: 40s
-     deploy:
-       resources:
-         limits:
-           memory: 1G
-           cpus: '1.0'
+    build:
+      context: ../backend/java-services/services/media-service
+      dockerfile: Dockerfile
+    container_name: vnalo-media-service
+    ports:
+      - "8083:8083"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: vnalo_media
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASS: ${DB_PASS:-postgres}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_PASS: ${RABBITMQ_PASS:-guest}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_BUCKET_NAME: ${AWS_BUCKET_NAME:-vnalo-media}
+      AWS_REGION: ${AWS_REGION:-ap-southeast-1}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - vnalo-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8083/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
 
   realtime-gateway:
-     build:
-       context: ../backend/node-services
-       dockerfile: apps/realtime-gateway/Dockerfile
-     container_name: vnalo-realtime-gateway
-     ports:
-       - "8085:8085"
-     environment:
-       PORT: 8085
-       REDIS_HOST: redis
-       REDIS_PORT: 6379
-       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
-       JWT_ISSUER: ${JWT_ISSUER:-vnalo}
-       RABBITMQ_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672
-       NODE_ENV: ${NODE_ENV:-development}
-     depends_on:
-       redis:
-         condition: service_healthy
-       rabbitmq:
-         condition: service_healthy
-     networks:
-       - vnalo-network
-     healthcheck:
-       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8085/health"]
-       interval: 30s
-       timeout: 5s
-       retries: 3
-       start_period: 20s
-     deploy:
-       resources:
-         limits:
-           memory: 256M
-           cpus: '0.5'
-
-  # ---------------------------------------------------------------------------
-  # Optional: Kafka (activate with --profile kafka)
-  # NOTE: Kafka is currently unused in application code. Kept for future use.
-  # ---------------------------------------------------------------------------
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.5.0
-    container_name: vnalo-zookeeper
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    networks:
-      - vnalo-network
-    profiles:
-      - kafka
-
-  kafka:
-    image: confluentinc/cp-kafka:7.5.0
-    container_name: vnalo-kafka
-    depends_on:
-      - zookeeper
+    build:
+      context: ../backend/node-services
+      dockerfile: apps/realtime-gateway/Dockerfile
+    container_name: vnalo-realtime-gateway
     ports:
-      - "9092:9092"
+      - "8085:8085"
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      PORT: 8085
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_ISSUER: ${JWT_ISSUER:-vnalo}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672
+      NODE_ENV: ${NODE_ENV:-development}
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     networks:
       - vnalo-network
-    profiles:
-      - kafka
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8085/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  moderation-service:
+    build:
+      context: ../backend/java-services/services/moderation-service
+      dockerfile: Dockerfile
+    container_name: vnalo-moderation-service
+    ports:
+      - "8082:8082"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-vnalo_core}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASS: ${DB_PASS:-postgres}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_ISSUER: ${JWT_ISSUER:-vnalo}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - vnalo-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/api/v1/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+
+  analytics-service:
+    build:
+      context: ../backend/java-services/services/analytics-service
+      dockerfile: Dockerfile
+    container_name: vnalo-analytics-service
+    ports:
+      - "8084:8084"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-vnalo_core}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASS: ${DB_PASS:-postgres}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_ISSUER: ${JWT_ISSUER:-vnalo}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - vnalo-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8084/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+
+  content-service:
+    build:
+      context: ../backend/java-services/services/content-service
+      dockerfile: Dockerfile
+    container_name: vnalo-content-service
+    ports:
+      - "8086:8086"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-vnalo_core}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASS: ${DB_PASS:-postgres}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - vnalo-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8086/api/v1/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+
+  notification-service:
+    build:
+      context: ../backend/java-services/services/notification-service
+      dockerfile: Dockerfile
+    container_name: vnalo-notification-service
+    ports:
+      - "8087:8087"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-vnalo_core}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASS: ${DB_PASS:-postgres}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_SERVERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_ISSUER: ${JWT_ISSUER:-vnalo}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:-iuh-cnm-vnalo-firebase-adminsdk-fbsvc-5008b7c5eb.json}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - vnalo-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8087/api/v1/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
 
 volumes:
   postgres_data:

@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: moderation-service
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+  kafka:
+    bootstrap-servers: ${KAFKA_SERVERS:localhost:9092}
+    consumer:
+      group-id: moderation-service
+
+server:
+  port: ${SERVER_PORT:8082}
+  servlet:
+    context-path: /api/v1
+
+# JWT Configuration - REQUIRED for all profiles
+jwt:
+  secret: ${JWT_SECRET}
+  issuer: ${JWT_ISSUER:vnalo}
+  access-token-expiration: ${JWT_ACCESS_EXPIRATION:86400000} # 24 hours
+  refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:604800000} # 7 days

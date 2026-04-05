@@ -12,9 +12,63 @@ class ChatService {
 
   Future<List<Conversation>> getInbox() async {
     final response = await _apiService.get(_base, '/inbox');
-    final list = response['data'] as List;
-    // Map each item in the list to a Conversation object and return the list of conversations
-    return list.map((c) => Conversation.fromJson(c)).toList();
+    final raw = response['data'];
+    if (raw is! List) return const [];
+
+    final conversations = <Conversation>[];
+    for (final item in raw) {
+      if (item is! Map<String, dynamic>) continue;
+
+      final inboxEntry = Map<String, dynamic>.from(item);
+      final nestedConversation =
+          inboxEntry['conversation'] is Map<String, dynamic>
+          ? Map<String, dynamic>.from(
+              inboxEntry['conversation'] as Map<String, dynamic>,
+            )
+          : <String, dynamic>{};
+
+      final conversationId =
+          nestedConversation['id'] ??
+          inboxEntry['conversationId'] ??
+          inboxEntry['conversation_id'];
+
+      if (conversationId == null) continue;
+
+      final json = <String, dynamic>{
+        ...nestedConversation,
+        'id': conversationId,
+        'unreadCount':
+            inboxEntry['unreadCount'] ?? inboxEntry['unread_count'] ?? 0,
+        'isPinned': inboxEntry['isPinned'] ?? inboxEntry['is_pinned'] ?? false,
+        'isMuted': inboxEntry['isMuted'] ?? inboxEntry['is_muted'] ?? false,
+        'isHidden': inboxEntry['isHidden'] ?? inboxEntry['is_hidden'] ?? false,
+      };
+
+      final preview =
+          inboxEntry['lastMessagePreview'] ?? inboxEntry['last_message_preview'];
+      final messageAt = inboxEntry['lastMessageAt'] ?? inboxEntry['last_message_at'];
+
+      if (preview != null || messageAt != null) {
+        json['lastMessage'] = {
+          'id': 'inbox-$conversationId',
+          'conversationId': conversationId,
+          'senderId':
+              inboxEntry['lastMessageSenderId'] ??
+              inboxEntry['last_message_sender_id'] ??
+              '',
+          'messageType':
+              inboxEntry['lastMessageType'] ??
+              inboxEntry['last_message_type'] ??
+              'TEXT',
+          'content': preview,
+          'createdAt': messageAt,
+        };
+      }
+
+      conversations.add(Conversation.fromJson(json));
+    }
+
+    return conversations;
   }
 
   // Get or create a direct conversation with another user
