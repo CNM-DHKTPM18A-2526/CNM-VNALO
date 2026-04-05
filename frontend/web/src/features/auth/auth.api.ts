@@ -1,10 +1,56 @@
-import type { AuthUser, LoginPayload } from './auth.types'
+import { normalizeVietnamPhone } from './phone.util'
+import type { AuthUser, LoginPayload, RegisterPayload, SendRegisterOtpPayload } from './auth.types'
 
 const API_BASE_URL = import.meta.env.VITE_CORE_API_URL ?? 'http://localhost:8081/api/v1'
 
 type ApiResponse<T> = {
   data?: T
   message?: string
+  error?: string
+}
+
+function extractMessage(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') {
+    return null
+  }
+
+  const obj = payload as Record<string, unknown>
+
+  if (typeof obj.message === 'string' && obj.message.trim()) {
+    return obj.message
+  }
+
+  if (typeof obj.error === 'string' && obj.error.trim()) {
+    return obj.error
+  }
+
+  if (obj.data && typeof obj.data === 'object') {
+    const nested = obj.data as Record<string, unknown>
+
+    if (typeof nested.message === 'string' && nested.message.trim()) {
+      return nested.message
+    }
+  }
+
+  if (Array.isArray(obj.errors) && obj.errors.length > 0) {
+    const firstError = obj.errors[0]
+
+    if (typeof firstError === 'string' && firstError.trim()) {
+      return firstError
+    }
+
+    if (firstError && typeof firstError === 'object') {
+      const errorObj = firstError as Record<string, unknown>
+      if (typeof errorObj.message === 'string' && errorObj.message.trim()) {
+        return errorObj.message
+      }
+      if (typeof errorObj.defaultMessage === 'string' && errorObj.defaultMessage.trim()) {
+        return errorObj.defaultMessage
+      }
+    }
+  }
+
+  return null
 }
 
 function normalizeIdentifier(identifier: string) {
@@ -101,7 +147,7 @@ export async function login(payload: LoginPayload): Promise<string> {
   const json = (await response.json().catch(() => null)) as unknown
 
   if (!response.ok) {
-    throw new Error('Đăng nhập thất bại. Vui lòng kiểm tra tài khoản.')
+    throw new Error(extractMessage(json) ?? 'Đăng nhập thất bại. Vui lòng kiểm tra tài khoản.')
   }
 
   const token = extractToken(json)
@@ -123,7 +169,7 @@ export async function getMe(token: string): Promise<AuthUser> {
   const json = (await response.json().catch(() => null)) as unknown
 
   if (!response.ok) {
-    throw new Error('Không lấy được thông tin người dùng.')
+    throw new Error(extractMessage(json) ?? 'Không lấy được thông tin người dùng.')
   }
 
   const user = extractUser(json)
@@ -133,4 +179,43 @@ export async function getMe(token: string): Promise<AuthUser> {
   }
 
   return user
+}
+
+export async function sendRegisterOtp(payload: SendRegisterOtpPayload): Promise<void> {
+  const normalizedPhone = normalizeVietnamPhone(payload.phone)
+
+  const response = await fetch(`${API_BASE_URL}/auth/register/send-otp`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      phone: normalizedPhone,
+    }),
+  })
+
+  const json = (await response.json().catch(() => null)) as unknown
+
+  if (!response.ok) {
+    throw new Error(extractMessage(json) ?? 'Không thể gửi OTP. Vui lòng thử lại.')
+  }
+}
+
+export async function register(payload: RegisterPayload): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/auth/register`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      ...payload,
+      phone: normalizeVietnamPhone(payload.phone),
+    }),
+  })
+
+  const json = (await response.json().catch(() => null)) as unknown
+
+  if (!response.ok) {
+    throw new Error(extractMessage(json) ?? 'Đăng ký thất bại. Vui lòng thử lại.')
+  }
 }
