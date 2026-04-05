@@ -22,6 +22,29 @@ export type AppNotification = {
   isRead: boolean
 }
 
+export type ContactStatus = 'online' | 'busy' | 'offline'
+
+export type ContactItem = {
+  id: string
+  displayName: string
+  subtitle: string
+  status: ContactStatus
+}
+
+export type FriendRequestItem = {
+  id: string
+  displayName: string
+  subtitle: string
+  mutualCount: number
+}
+
+export type ContactGroupItem = {
+  id: string
+  name: string
+  memberCount: number
+  description: string
+}
+
 export const CURRENT_USER = {
   id: 'u-me',
   name: 'Trần Minh',
@@ -111,5 +134,62 @@ export const notifications: AppNotification[] = [
     content: 'Hệ thống sẽ bảo trì lúc 01:00 AM.',
     createdAt: '1 giờ trước',
     isRead: true,
+  },
+]
+
+export const contacts: ContactItem[] = [
+  {
+    id: 'ct-1',
+    displayName: 'Nguyễn An',
+    subtitle: 'Frontend • VNALO Team',
+    status: 'online',
+  },
+  {
+    id: 'ct-2',
+    displayName: 'Lê Hương',
+    subtitle: 'Product Designer',
+    status: 'busy',
+  },
+  {
+    id: 'ct-3',
+    displayName: 'Trần Nam',
+    subtitle: 'Backend Engineer',
+    status: 'offline',
+  },
+  {
+    id: 'ct-4',
+    displayName: 'Phạm Long',
+    subtitle: 'QA Engineer',
+    status: 'online',
+  },
+]
+
+export const friendRequests: FriendRequestItem[] = [
+  {
+    id: 'fr-1',
+    displayName: 'Vũ Minh',
+    subtitle: 'Mobile Developer',
+    mutualCount: 5,
+  },
+  {
+    id: 'fr-2',
+    displayName: 'Đào Trang',
+    subtitle: 'Marketing Team',
+    mutualCount: 2,
+  },
+]
+
+export const contactGroups: ContactGroupItem[] = [
+  {
+    id: 'cg-1',
+    name: 'VNALO Frontend',
+    memberCount: 8,
+    description: 'Trao đổi công việc UI và trải nghiệm người dùng.',
+  },
+  {
+    id: 'cg-2',
+    name: 'Core Product',
+    memberCount: 14,
+    description: 'Nhóm liên phòng ban cho kế hoạch sản phẩm.',
   },
 ]

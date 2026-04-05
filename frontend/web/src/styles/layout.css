@@ -2,7 +2,7 @@
   display: grid;
   grid-template-columns: 250px 1fr;
   min-height: 100vh;
-  background: linear-gradient(150deg, #f3f7ff 0%, #edf2fb 44%, #ecf1f7 100%);
+  background: var(--shell-bg);
 }
 
 .workspace {
@@ -15,7 +15,7 @@
 }
 
 .sidebar {
-  color: #f0f5ff;
+  color: var(--sidebar-text);
   padding: 20px 16px;
   display: flex;
   flex-direction: column;
@@ -72,12 +72,12 @@
 }
 
 .sidebar-link:hover {
-  color: #fff;
+  color: var(--sidebar-text);
   transform: translateX(2px);
 }
 
 .sidebar-link-active {
-  color: #fff;
+  color: var(--sidebar-text);
   background: linear-gradient(135deg, rgba(47, 124, 246, 0.28), rgba(47, 124, 246, 0.12));
   box-shadow: inset 0 0 0 1px rgba(125, 174, 255, 0.34);
 }
@@ -89,12 +89,12 @@
   display: inline-grid;
   place-items: center;
   background: rgba(255, 255, 255, 0.09);
-  color: #c9dbff;
+  color: var(--sidebar-icon);
 }
 
 .sidebar-link-active .sidebar-link-icon {
   background: rgba(255, 255, 255, 0.18);
-  color: #fff;
+  color: var(--sidebar-text);
 }
 
 .sidebar-footer {
@@ -103,19 +103,19 @@
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.05);
-  color: #d8e7ff;
+  color: var(--sidebar-footer-text);
 }
 
 .sidebar-footer-label {
-  color: #8aa4d8;
+  color: var(--sidebar-footer-label);
   font-size: 12px;
   margin-bottom: 4px;
 }
 
 .topbar {
-  background: rgba(255, 255, 255, 0.92);
-  border-bottom: 1px solid #dbe5f5;
-  box-shadow: 0 8px 24px rgba(23, 49, 94, 0.06);
+  background: var(--topbar-bg);
+  border-bottom: 1px solid var(--topbar-border);
+  box-shadow: var(--topbar-shadow);
   padding: 14px 24px;
   display: flex;
   justify-content: space-between;
@@ -158,7 +158,7 @@
 }
 
 .search-input-icon {
-  color: #8aa1c8;
+  color: var(--menu-text-muted);
 }
 
 .search-input input {
@@ -202,7 +202,7 @@
 
 .avatar-menu-btn {
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--surface);
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
@@ -212,14 +212,14 @@
 }
 
 .avatar-menu-btn:hover {
-  border-color: #bdd1f2;
-  background: #f6f9ff;
+  border-color: var(--border);
+  background: var(--surface-muted);
 }
 
 .avatar-menu-btn:focus-visible,
 .topbar-menu-item:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(64, 130, 244, 0.22);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .avatar-menu-name {
@@ -229,11 +229,11 @@
   white-space: nowrap;
   font-size: 13px;
   font-weight: 600;
-  color: #3d4a61;
+  color: var(--title-subtle);
 }
 
 .avatar-menu-caret {
-  color: #7489ad;
+  color: var(--menu-text-muted);
   display: inline-grid;
   place-items: center;
 }
@@ -245,8 +245,8 @@
   min-width: 180px;
   padding: 6px;
   border-radius: 12px;
-  border: 1px solid #dce8fb;
-  background: #fff;
+  border: 1px solid var(--border);
+  background: var(--surface);
   box-shadow: 0 16px 28px rgba(18, 49, 102, 0.12);
   display: grid;
   gap: 2px;
@@ -263,19 +263,19 @@
   border-radius: 10px;
   padding: 9px 10px;
   cursor: pointer;
-  color: #30415f;
+  color: var(--menu-text);
 }
 
 .topbar-menu-item:hover {
-  background: #f3f7ff;
+  background: var(--surface-muted);
 }
 
 .topbar-menu-item-danger {
-  color: #c62828;
+  color: var(--danger);
 }
 
 .topbar-menu-item-danger:hover {
-  background: #fff2f2;
+  background: var(--danger-soft);
 }
 
 .logout-btn {

@@ -40,8 +40,8 @@
   align-items: center;
   gap: 4px;
   padding: 2px;
-  border: 1px solid rgba(219, 228, 242, 0.85);
-  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
   border-radius: 999px;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
   margin-top: -85px;
@@ -54,7 +54,7 @@
   border-radius: 999px;
   border: 1px solid transparent;
   background: transparent;
-  color: #51627f;
+  color: var(--menu-text);
   display: inline-grid;
   place-items: center;
   cursor: pointer;
@@ -62,9 +62,9 @@
 }
 
 .chat-toolbar-btn:hover {
-  background: #f4f8ff;
-  color: #1d66e5;
-  box-shadow: inset 0 0 0 1px #d7e6ff;
+  background: var(--surface-muted);
+  color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--border);
 }
 
 .chat-toolbar-btn:active {
@@ -73,7 +73,7 @@
 
 .chat-toolbar-btn:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(64, 130, 244, 0.22);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .chat-toolbar-btn svg {
@@ -130,14 +130,14 @@
 }
 
 .chat-item:hover {
-  background: #f6f9ff;
-  border-color: #dce7f8;
+  background: var(--surface-muted);
+  border-color: var(--border);
   transform: translateY(-1px);
 }
 
 .chat-item-active {
-  background: #edf4ff;
-  border-color: #bfd7ff;
+  background: var(--panel-highlight);
+  border-color: var(--primary);
 }
 
 .chat-item-content {
@@ -159,9 +159,9 @@
   gap: 10px;
   align-items: center;
   padding: 10px;
-  border: 1px solid #e3ebf9;
+  border: 1px solid var(--border);
   border-radius: 12px;
-  background: #fbfdff;
+  background: var(--surface);
 }
 
 .chat-item-avatar-skeleton {
@@ -220,7 +220,7 @@
 }
 
 .chat-window-header {
-  border-bottom: 1px solid #e5edf9;
+  border-bottom: 1px solid var(--border);
   padding: 14px 16px;
 }
 
@@ -236,7 +236,7 @@
   flex-direction: column;
   gap: 10px;
   overflow: auto;
-  background: linear-gradient(180deg, #f6faff, #ffffff);
+  background: var(--chat-window-bg);
 }
 
 .message-row {
@@ -251,8 +251,8 @@
 .message-bubble {
   max-width: 72%;
   border-radius: 18px;
-  border: 1px solid #e3ebfa;
-  background: #fff;
+  border: 1px solid var(--border);
+  background: var(--surface);
   padding: 10px 12px;
   display: grid;
   gap: 6px;
@@ -260,8 +260,8 @@
 }
 
 .message-bubble-me {
-  background: linear-gradient(160deg, #e9f2ff 0, #dceaff 100%);
-  border-color: #b9d4ff;
+  background: color-mix(in srgb, var(--primary-soft) 70%, var(--surface));
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
 }
 
 .message-bubble time {
@@ -272,7 +272,7 @@
 
 .message-input {
   padding: 10px;
-  border-top: 1px solid #e5edf9;
+  border-top: 1px solid var(--border);
 }
 
 .message-input .ui-textfield-input {

@@ -1,22 +1,25 @@
 import { NavLink } from 'react-router-dom'
 
+import { useLanguage } from '../i18n/LanguageContext'
 import { Icon } from './Icon'
 
 const menuItems = [
-  { to: '/chat', label: 'Chat', icon: 'chat' as const },
-  { to: '/notifications', label: 'Thông báo', icon: 'bell' as const },
-  { to: '/profile', label: 'Hồ sơ', icon: 'user' as const },
-  { to: '/settings', label: 'Cài đặt', icon: 'settings' as const },
+  { to: '/chat', labelKey: 'sidebar.chat', icon: 'chat' as const },
+  { to: '/contacts', labelKey: 'sidebar.contacts', icon: 'user' as const },
+  { to: '/profile', labelKey: 'sidebar.profile', icon: 'user' as const },
+  { to: '/settings', labelKey: 'sidebar.settings', icon: 'settings' as const },
 ]
 
 export function Sidebar() {
+  const { t } = useLanguage()
+
   return (
     <aside className='sidebar'>
       <div className='brand'>
         <span className='brand-logo'>V</span>
         <div>
-          <p className='brand-title'>VNALO</p>
-          <p className='brand-sub'>Web chat</p>
+          <p className='brand-title'>{t('common.appName')}</p>
+          <p className='brand-sub'>{t('sidebar.brandSub')}</p>
         </div>
       </div>
       <nav className='sidebar-nav'>
@@ -31,13 +34,13 @@ export function Sidebar() {
             <span aria-hidden className='sidebar-link-icon'>
               <Icon name={item.icon} />
             </span>
-            <span>{item.label}</span>
+            <span>{t(item.labelKey)}</span>
           </NavLink>
         ))}
       </nav>
       <div className='sidebar-footer'>
-        <p className='sidebar-footer-label'>Không gian làm việc</p>
-        <p>Đội VNALO</p>
+        <p className='sidebar-footer-label'>{t('sidebar.workspace')}</p>
+        <p>{t('sidebar.team')}</p>
       </div>
     </aside>
   )

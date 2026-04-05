@@ -4,25 +4,27 @@ import { Outlet, useLocation } from 'react-router-dom'
 import { Sidebar } from '../shared/components/Sidebar'
 import { Topbar } from '../shared/components/Topbar'
 import { useAuth } from '../features/auth/useAuth'
-
-const titleMap: Record<string, string> = {
-  '/chat': 'Tin nhắn',
-  '/notifications': 'Thông báo',
-  '/profile': 'Hồ sơ',
-  '/settings': 'Cài đặt',
-}
+import { useLanguage } from '../shared/i18n/LanguageContext'
 
 export function MainLayout() {
   const location = useLocation()
   const { user, logout } = useAuth()
+  const { t } = useLanguage()
 
   const title = useMemo(() => {
-    if (location.pathname === '/') {
-      return 'Tin nhắn'
+    const titleMap: Record<string, string> = {
+      '/chat': t('pages.chat.title'),
+      '/contacts': t('pages.contacts.title'),
+      '/profile': t('pages.profile.title'),
+      '/settings': t('pages.settings.title'),
     }
 
-    return titleMap[location.pathname] ?? 'VNALO'
-  }, [location.pathname])
+    if (location.pathname === '/') {
+      return t('pages.chat.title')
+    }
+
+    return titleMap[location.pathname] ?? t('common.appName')
+  }, [location.pathname, t])
 
   return (
     <div className='app-shell'>
