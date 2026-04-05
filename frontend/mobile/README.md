@@ -1,16 +1,393 @@
-# vnalo_mobile
+# VNALO Mobile - Team Setup and Run Guide
 
-A new Flutter project.
+Updated: 2026-04-05
+Target readers: all team members (backend, mobile, QA)
 
-## Getting Started
+This guide is a practical runbook to set up, run, debug, and troubleshoot the Flutter mobile app in this repository.
 
-This project is a starting point for a Flutter application.
+## 1. What This App Connects To
 
-A few resources to get you started if this is your first Flutter project:
+The mobile app talks to these backend services:
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+- `core-service`: auth/user/social APIs (default `:8081`)
+- `message-service`: chat/inbox APIs + socket (default `:3000`)
+- `media-service`: avatar/media upload APIs (default `:8083`)
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Configuration is read from `--dart-define` values in `lib/main.dart`.
+
+Supported runtime defines:
+
+- `ENV` (`dev|staging|production`)
+- `CORE_SERVICE_URL`
+- `MESSAGE_SERVICE_URL`
+- `MEDIA_SERVICE_URL`
+- `SOCKET_URL`
+
+## 2. Quick Start (If You Already Have Toolchains)
+
+From `frontend/mobile`:
+
+```bash
+flutter pub get
+flutter devices
+
+# Android emulator (uses 10.0.2.2 for host machine)
+flutter run \
+	--dart-define=ENV=dev \
+	--dart-define=CORE_SERVICE_URL=http://10.0.2.2:8081/api/v1 \
+	--dart-define=MESSAGE_SERVICE_URL=http://10.0.2.2:3000/api/v1 \
+	--dart-define=MEDIA_SERVICE_URL=http://10.0.2.2:8083/api/v1 \
+	--dart-define=SOCKET_URL=http://10.0.2.2:3000
+```
+
+If using a physical phone, do not use `10.0.2.2`; see section 7 for network mapping.
+
+## 3. Prerequisites by OS
+
+## 3.1 Windows
+
+Required:
+
+- Flutter SDK (stable)
+- Android Studio + Android SDK + emulator image
+- JDK 17+ (for Android toolchain)
+- Git
+
+Recommended:
+
+- VS Code with Flutter and Dart extensions
+
+Check:
+
+```powershell
+flutter doctor -v
+```
+
+## 3.2 macOS
+
+Required for Android only:
+
+- Flutter SDK
+- Android Studio + SDK
+
+Required for iOS:
+
+- Xcode + Xcode Command Line Tools
+- CocoaPods
+
+Checks:
+
+```bash
+flutter doctor -v
+xcode-select -p
+pod --version
+```
+
+## 3.3 Linux
+
+Required:
+
+- Flutter SDK
+- Android Studio + SDK
+
+Checks:
+
+```bash
+flutter doctor -v
+```
+
+Note: iOS build/run is not supported on Linux.
+
+## 4. Backend Runtime Prerequisite
+
+Mobile app requires backend services to be reachable from your device/emulator.
+
+At repository root, bring up required services:
+
+```powershell
+docker compose -f docker/docker-compose.yml --env-file config/environments/.env up -d postgres redis rabbitmq core-service media-service message-service
+docker compose -f docker/docker-compose.yml --env-file config/environments/.env ps
+```
+
+Expected ports:
+
+- `8081` core
+- `3000` message
+- `8083` media
+
+## 5. Project Bootstrap
+
+From `frontend/mobile`:
+
+```bash
+flutter clean
+flutter pub get
+flutter pub deps --style=compact
+```
+
+Optional checks:
+
+```bash
+flutter analyze
+flutter test
+```
+
+## 6. Running the App
+
+## 6.1 Android Emulator (recommended first run)
+
+```bash
+flutter emulators
+flutter emulators --launch <emulator_id>
+flutter devices
+```
+
+Run:
+
+```bash
+flutter run \
+	--dart-define=ENV=dev \
+	--dart-define=CORE_SERVICE_URL=http://10.0.2.2:8081/api/v1 \
+	--dart-define=MESSAGE_SERVICE_URL=http://10.0.2.2:3000/api/v1 \
+	--dart-define=MEDIA_SERVICE_URL=http://10.0.2.2:8083/api/v1 \
+	--dart-define=SOCKET_URL=http://10.0.2.2:3000
+```
+
+Why `10.0.2.2`: Android emulator special host alias for localhost of your dev machine.
+
+## 6.2 Android Physical Device (USB)
+
+1. Enable Developer Options and USB Debugging on phone.
+2. Connect USB.
+3. Verify device:
+
+```bash
+adb devices
+flutter devices
+```
+
+4. Use your PC LAN IP (example `192.168.1.50`):
+
+```bash
+flutter run \
+	--dart-define=ENV=dev \
+	--dart-define=CORE_SERVICE_URL=http://192.168.1.50:8081/api/v1 \
+	--dart-define=MESSAGE_SERVICE_URL=http://192.168.1.50:3000/api/v1 \
+	--dart-define=MEDIA_SERVICE_URL=http://192.168.1.50:8083/api/v1 \
+	--dart-define=SOCKET_URL=http://192.168.1.50:3000
+```
+
+## 6.3 iOS Simulator (macOS)
+
+```bash
+open -a Simulator
+flutter devices
+
+flutter run \
+	--dart-define=ENV=dev \
+	--dart-define=CORE_SERVICE_URL=http://127.0.0.1:8081/api/v1 \
+	--dart-define=MESSAGE_SERVICE_URL=http://127.0.0.1:3000/api/v1 \
+	--dart-define=MEDIA_SERVICE_URL=http://127.0.0.1:8083/api/v1 \
+	--dart-define=SOCKET_URL=http://127.0.0.1:3000
+```
+
+## 6.4 iOS Physical Device (macOS)
+
+Use Mac LAN IP in all URLs (similar Android physical device approach), then run on selected iPhone in Xcode/Flutter.
+
+## 7. Network Mapping Matrix (Very Important)
+
+Use correct host mapping based on where app runs:
+
+| Target | Host to backend on your dev machine |
+|---|---|
+| Android emulator | `10.0.2.2` |
+| iOS simulator | `127.0.0.1` or `localhost` |
+| Physical Android/iOS | your dev machine LAN IP (ex: `192.168.x.x`) |
+
+If app runs on physical device and cannot connect:
+
+- Ensure phone and dev machine are on same Wi-Fi.
+- Ensure firewall allows inbound ports `8081`, `3000`, `8083`.
+- Ensure Docker services are mapped to `0.0.0.0` (already in compose default).
+
+## 8. Wireless Debugging (Android)
+
+This section covers cases where USB is unstable or team members need network-only debug.
+
+## 8.1 Android 11+ (Wireless Debugging Pairing)
+
+On phone:
+
+1. Developer options -> Wireless debugging -> enable.
+2. Choose pair device with pairing code.
+
+On machine:
+
+```bash
+adb pair <phone_ip>:<pair_port>
+# enter pairing code shown on phone
+
+adb connect <phone_ip>:<debug_port>
+adb devices
+```
+
+Then run Flutter normally with LAN IP backend URLs.
+
+## 8.2 Legacy `adb tcpip` (when pairing flow unavailable)
+
+1. Connect phone via USB once.
+2. Run:
+
+```bash
+adb devices
+adb tcpip 5555
+adb connect <phone_ip>:5555
+adb devices
+```
+
+3. Unplug USB, continue debug over network.
+
+Security note: disable wireless debugging when done.
+
+## 9. Team "Shared Wireless Debug" Workflow
+
+When one device is shared across team members over same network:
+
+1. Device owner enables wireless debugging and shares `ip:port` privately.
+2. Each developer runs `adb connect <ip:port>`.
+3. Only one active deploy/debug session should run at a time to avoid install conflicts.
+4. Use a team lock protocol (simple chat message):
+	 - `LOCK DEVICE <name> <duration>`
+	 - `RELEASE DEVICE <name>`
+
+Suggested naming for logs:
+
+- Build variant tag: `<member>-<feature>-<timestamp>`
+
+## 10. Useful Commands During Development
+
+From `frontend/mobile`:
+
+```bash
+flutter devices
+flutter run -d <device_id>
+flutter logs
+flutter attach
+flutter hotreload
+flutter test
+flutter analyze
+```
+
+Android ADB helpers:
+
+```bash
+adb devices
+adb kill-server
+adb start-server
+adb reverse --remove-all
+adb reverse tcp:8081 tcp:8081
+adb reverse tcp:3000 tcp:3000
+adb reverse tcp:8083 tcp:8083
+```
+
+Note: `adb reverse` is optional and mostly useful in USB-debug scenarios.
+
+## 11. Troubleshooting Playbook
+
+## 11.1 App cannot call backend (timeout/refused)
+
+Checklist:
+
+1. Confirm service health via Docker.
+2. Confirm correct URL host mapping from section 7.
+3. Confirm firewall rules allow ports.
+4. Confirm phone and dev machine share same network.
+
+## 11.2 Login works but inbox/media fails
+
+Possible causes:
+
+- Message/media URL mismatch in `--dart-define`.
+- Token refresh path issue from older build.
+
+Action:
+
+- Clean and rerun:
+
+```bash
+flutter clean
+flutter pub get
+flutter run ...
+```
+
+## 11.3 Device not found
+
+```bash
+adb devices
+flutter devices
+```
+
+If empty:
+
+- Reconnect USB or re-run wireless `adb connect`.
+- Restart adb server.
+
+## 11.4 Gradle or Android build cache issues
+
+```bash
+flutter clean
+cd android
+./gradlew clean    # Windows: gradlew.bat clean
+cd ..
+flutter pub get
+flutter run
+```
+
+## 11.5 iOS signing errors (macOS)
+
+- Open `ios/Runner.xcworkspace` in Xcode.
+- Configure Team + Signing certificate.
+- Retry `flutter run`.
+
+## 12. Verification Checklist for New Team Members
+
+A member is considered fully onboarded when all checks pass:
+
+1. `flutter doctor -v` no blocking issues.
+2. Device/emulator is visible in `flutter devices`.
+3. App launches with dev URLs.
+4. Register/login succeeds.
+5. Inbox endpoint loads.
+6. Avatar upload flow succeeds.
+
+## 13. Recommended Team Convention
+
+- Always run with explicit `--dart-define` in dev.
+- Do not hardcode machine-specific IP inside source code.
+- Keep `ENV=dev` for local testing.
+- Before PR:
+	- run `flutter analyze`
+	- run `flutter test`
+	- test one real login flow on device/emulator.
+
+## 14. Related Files
+
+- `lib/main.dart` (reads dart-defines)
+- `lib/config/app_config.dart` (environment defaults)
+- `lib/config/env.dart` (env model)
+- `lib/services/auth_service.dart`
+- `lib/services/api_service.dart`
+
+## 15. Escalation Path
+
+If blocked > 30 minutes:
+
+1. Post logs and exact command in team channel.
+2. Include:
+	 - device type and OS
+	 - exact `flutter run` command
+	 - endpoint URLs used
+	 - first failing stack trace.
+
+This significantly reduces debug turnaround time for the team.
