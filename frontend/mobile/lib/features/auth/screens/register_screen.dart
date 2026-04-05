@@ -122,9 +122,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (Validators.phone(_phoneController.text) != null) return;
 
     if (!_requiresOtp) {
-      // Development/staging shortcut: backend OTP can be disabled.
+      // M1: OTP step is always at index 1 in the PageView but we skip it when
+      // OTP is disabled by jumping directly to step 2 (Name).
       _otpCode = '000000';
-      _nextStep();
+      _goToStep(2);
       return;
     }
 
@@ -416,13 +417,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
       body: PageView(
         controller: _pageController,
         physics: const NeverScrollableScrollPhysics(),
+        // M1: Children list is STABLE — always 6 pages regardless of _requiresOtp.
+        // Navigation skips step 1 (OTP) by jumping to step 2 when OTP is disabled.
+        // This prevents _currentStep from desync-ing if _requiresOtp changes.
         children: [
-          _buildPhoneStep(),
-          if (_requiresOtp) _buildOtpStep(),
-          _buildNameStep(),
-          _buildPersonalInfoStep(),
-          _buildPasswordStep(),
-          _buildAvatarStep(),
+          _buildPhoneStep(),     // index 0
+          _buildOtpStep(),       // index 1 — always present
+          _buildNameStep(),      // index 2
+          _buildPersonalInfoStep(), // index 3
+          _buildPasswordStep(),  // index 4
+          _buildAvatarStep(),    // index 5
         ],
       ),
     );
