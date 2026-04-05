@@ -1,0 +1,55 @@
+server:
+  port: ${SERVER_PORT:8094}
+
+spring:
+  application:
+    name: ai-service
+
+  threads:
+    virtual:
+      enabled: true
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+
+# AI Configuration
+ai:
+  gemini:
+    api-key: ${GEMINI_API_KEY:}
+    model: ${GEMINI_MODEL:gemini-2.5-flash}
+  ollama:
+    base-url: ${OLLAMA_URL:http://localhost:11434}
+    model: ${OLLAMA_MODEL:llama3.1:8b}
+  chat:
+    rate-limit-per-user: ${AI_RATE_LIMIT:5}
+    rate-limit-global: ${AI_RATE_LIMIT_GLOBAL:10}
+    max-history: ${AI_MAX_HISTORY:20}
+    history-ttl: ${AI_HISTORY_TTL:86400}
+
+# JWT
+jwt:
+  secret: ${JWT_SECRET:ZGV2ZWxvcG1lbnQtb25seS1zZWNyZXQta2V5LWRvLW5vdC11c2UtaW4tcHJvZHVjdGlvbi10aGlzLWlzLWF0LWxlYXN0LTUxMi1iaXRzLWxvbmc=}
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+
+logging:
+  level:
+    root: WARN
+    iuh.cnm.vnalo: ${LOG_LEVEL:INFO}

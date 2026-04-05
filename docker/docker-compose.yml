@@ -192,7 +192,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      AWS_BUCKET_NAME: ${AWS_BUCKET_NAME:-vnalo-media}
+      AWS_BUCKET_NAME: ${AWS_BUCKET_NAME:-vnalo-media-service}
       AWS_REGION: ${AWS_REGION:-ap-southeast-1}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
@@ -249,7 +249,7 @@ services:
       resources:
         limits:
           memory: 256M
-          cpus: '0.5'
+          cpus: "0.5"
 
   moderation-service:
     build:
@@ -297,35 +297,43 @@ services:
       - planned
     ports:
       - "8084:8084"
+
+  ai-service:
+    build:
+      context: ../backend/java-services/services/ai-service
+      dockerfile: Dockerfile
+    container_name: vnalo-ai-service
+    ports:
+      - "8094:8094"
     environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-vnalo_core}
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASS: ${DB_PASS:-postgres}
+      SERVER_PORT: 8094
       REDIS_HOST: redis
       REDIS_PORT: 6379
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
-      JWT_ISSUER: ${JWT_ISSUER:-vnalo}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}
+      AI_RATE_LIMIT: ${AI_RATE_LIMIT:-5}
+      AI_RATE_LIMIT_GLOBAL: ${AI_RATE_LIMIT_GLOBAL:-10}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     networks:
       - vnalo-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8084/actuator/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8094/actuator/health"]
       interval: 30s
-      timeout: 5s
+      timeout: 10s
       retries: 3
       start_period: 40s
     deploy:
       resources:
         limits:
-          memory: 1G
-          cpus: "1.0"
+          memory: 512M
+          cpus: "0.5"
 
   content-service:
     build:
