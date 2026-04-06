@@ -1,4 +1,4 @@
-import type { ChangeEvent } from 'react'
+import type { ChangeEvent, KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
 
 import { useAuth } from '../features/auth/useAuth'
@@ -8,6 +8,7 @@ import { validateAvatarFile } from '../features/profile/avatar.util'
 import { Skeleton } from '../shared/components/ui/Skeleton'
 import { UserAvatar } from '../shared/components/UserAvatar'
 import { Card } from '../shared/components/ui/Card'
+import { Modal } from '../shared/components/ui/Modal'
 import { useLanguage } from '../shared/i18n/LanguageContext'
 import { CURRENT_USER } from '../shared/mock/data'
 import { updateProfile } from '../features/auth/auth.api'
@@ -17,6 +18,7 @@ const GENDER_VALUES = ['MALE', 'FEMALE', 'OTHER'] as const
 type GenderValue = (typeof GENDER_VALUES)[number]
 
 type GenderDraft = GenderValue | ''
+type PreviewImageKind = 'avatar' | 'cover'
 
 function isGenderValue(value: string): value is GenderValue {
   return (GENDER_VALUES as readonly string[]).includes(value)
@@ -70,6 +72,7 @@ export function ProfilePage() {
   const [draftBio, setDraftBio] = useState('')
   const [draftDob, setDraftDob] = useState('')
   const [draftGender, setDraftGender] = useState<GenderDraft>('')
+  const [activePreview, setActivePreview] = useState<{ kind: PreviewImageKind; url: string } | null>(null)
 
   const resolvedName = user?.name ?? CURRENT_USER.name
   const resolvedDob = user?.dob ?? null
@@ -77,6 +80,10 @@ export function ProfilePage() {
   const resolvedBio = user?.bio ?? null
   const resolvedPhone = user?.phone ?? null
   const resolvedEmail = user?.email ?? null
+  const currentAvatarImage = previewUrl ?? avatarUrl
+  const currentCoverImage = coverPreviewUrl ?? coverUrl
+  const canPreviewAvatar = Boolean(currentAvatarImage)
+  const canPreviewCover = Boolean(currentCoverImage)
 
   useEffect(() => {
     setAvatarUrl(user?.avatarUrl ?? null)
@@ -104,6 +111,31 @@ export function ProfilePage() {
 
   const openCoverPicker = () => {
     coverInputRef.current?.click()
+  }
+
+  const openImagePreview = (kind: PreviewImageKind, imageUrl: string | null) => {
+    if (!imageUrl) {
+      return
+    }
+
+    setActivePreview({ kind, url: imageUrl })
+  }
+
+  const closeImagePreview = () => {
+    setActivePreview(null)
+  }
+
+  const onPreviewKeyDown = (
+    event: ReactKeyboardEvent<HTMLElement>,
+    kind: PreviewImageKind,
+    imageUrl: string | null,
+  ) => {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return
+    }
+
+    event.preventDefault()
+    openImagePreview(kind, imageUrl)
   }
 
   const startEditingProfile = () => {
@@ -339,10 +371,15 @@ export function ProfilePage() {
       </div>
       <Card className='profile-card profile-card-zalo'>
         <div
-          className={`profile-cover${coverPreviewUrl || coverUrl ? ' profile-cover-has-image' : ''}`}
-          style={coverPreviewUrl || coverUrl ? { backgroundImage: `url(${coverPreviewUrl ?? coverUrl})` } : undefined}
+          aria-label={canPreviewCover ? t('profile.cover.viewAriaLabel') : undefined}
+          className={`profile-cover${currentCoverImage ? ' profile-cover-has-image' : ''}${canPreviewCover ? ' profile-media-previewable' : ''}`}
+          onClick={() => openImagePreview('cover', currentCoverImage)}
+          onKeyDown={(event) => onPreviewKeyDown(event, 'cover', currentCoverImage)}
+          role={canPreviewCover ? 'button' : undefined}
+          style={currentCoverImage ? { backgroundImage: `url(${currentCoverImage})` } : undefined}
+          tabIndex={canPreviewCover ? 0 : undefined}
         >
-          <div className='profile-cover-actions'>
+          <div className='profile-cover-actions' onClick={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()}>
             <button className='btn btn-ghost profile-cover-change-btn' type='button' onClick={openCoverPicker} disabled={isSavingCover}>
               {t('profile.cover.changeButton')}
             </button>
@@ -361,15 +398,29 @@ export function ProfilePage() {
 
         <div className='profile-header'>
           <div className='profile-avatar-wrap'>
-            <button
-              className='profile-avatar-trigger'
-              onClick={openFilePicker}
-              type='button'
-              disabled={isSavingAvatar}
+            <div
+              aria-label={canPreviewAvatar ? t('profile.avatar.viewAriaLabel') : undefined}
+              className={`profile-avatar-trigger${canPreviewAvatar ? ' profile-media-previewable' : ''}`}
+              onClick={() => openImagePreview('avatar', currentAvatarImage)}
+              onKeyDown={(event) => onPreviewKeyDown(event, 'avatar', currentAvatarImage)}
+              role={canPreviewAvatar ? 'button' : undefined}
+              tabIndex={canPreviewAvatar ? 0 : undefined}
             >
-              <UserAvatar imageUrl={previewUrl ?? avatarUrl} name={resolvedName} size='lg' />
-              <span className='profile-avatar-overlay'>{t('profile.avatar.changeButton')}</span>
-            </button>
+              <UserAvatar imageUrl={currentAvatarImage} name={resolvedName} size='lg' />
+              <button
+                aria-label={t('profile.avatar.changeButton')}
+                className='profile-avatar-overlay-btn'
+                onClick={(event) => {
+                  event.stopPropagation()
+                  openFilePicker()
+                }}
+                onMouseDown={(event) => event.stopPropagation()}
+                type='button'
+                disabled={isSavingAvatar}
+              >
+                <span className='profile-avatar-overlay'>{t('profile.avatar.changeButton')}</span>
+              </button>
+            </div>
           </div>
 
           <div className='profile-copy'>
@@ -401,6 +452,24 @@ export function ProfilePage() {
           className='profile-cover-input'
           onChange={onCoverFileChange}
         />
+
+        <Modal
+          closeAriaLabel={t('profile.preview.closeAriaLabel')}
+          isOpen={Boolean(activePreview)}
+          onClose={closeImagePreview}
+          title={activePreview?.kind === 'cover' ? t('profile.preview.coverTitle') : t('profile.preview.avatarTitle')}
+          variant='image'
+        >
+          {activePreview ? (
+            <div className='profile-image-preview-wrap'>
+              <img
+                alt={activePreview.kind === 'cover' ? t('profile.preview.coverAlt') : t('profile.preview.avatarAlt')}
+                className='profile-image-preview'
+                src={activePreview.url}
+              />
+            </div>
+          ) : null}
+        </Modal>
 
         <div className='profile-body'>
           {coverErrorMessage ? (
