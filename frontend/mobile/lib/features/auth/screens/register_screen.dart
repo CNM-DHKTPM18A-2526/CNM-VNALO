@@ -47,7 +47,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool get _isAnyRequestInFlight =>
       _isSendingOtp || _isResendingOtp || _isSubmittingRegistration;
 
-  int get _totalSteps => _requiresOtp ? 6 : 5;
+  int get _totalSteps => _requiresOtp ? 7 : 6;
 
   String? _phoneValidationError() {
     return Validators.phone(
@@ -97,7 +97,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           );
       if (!mounted) return;
       setState(() {
-        _requiresOtp = false;
+        _requiresOtp = required;
         if (previousRequiresOtp && !required && _currentStep > 0) {
           _currentStep = (_currentStep - 1).clamp(0, _totalSteps - 1);
         }
@@ -108,7 +108,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _requiresOtp = false;
+        _requiresOtp = fallbackRequiresOtp;
         if (previousRequiresOtp && !fallbackRequiresOtp && _currentStep > 0) {
           _currentStep = (_currentStep - 1).clamp(0, _totalSteps - 1);
         }
@@ -190,20 +190,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _nextStep();
   }
 
-  Future<void> _sendOtp() async {
+  void _continueFromPhoneStep() {
     if (_isAnyRequestInFlight) return;
     if (!_agreeTermsA || !_agreeTermsB) return;
     if (_phoneValidationError() != null) return;
 
+    _goToStep(1);
+  }
+
+  Future<void> _continueFromEmailStep() async {
+    if (_isAnyRequestInFlight) return;
+    final email = _emailController.text.trim();
+    final emailError = Validators.email(email);
+    if (emailError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(emailError), backgroundColor: AppColors.error),
+      );
+      return;
+    }
+
     if (!_requiresOtp) {
       _otpCode = '000000';
-      _goToStep(1);
+      _goToStep(2);
       return;
     }
 
     setState(() => _isSendingOtp = true);
     try {
-      await context.read<AuthProvider>().sendOtp(_buildFullPhone());
+      await context.read<AuthProvider>().sendRegisterOtp(
+        phone: _buildFullPhone(),
+        email: email,
+      );
       if (!mounted) return;
       _nextStep();
     } catch (e) {
@@ -228,7 +245,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     setState(() => _isResendingOtp = true);
     try {
-      await context.read<AuthProvider>().sendOtp(_buildFullPhone());
+      await context.read<AuthProvider>().sendRegisterOtp(
+        phone: _buildFullPhone(),
+        email: _emailController.text.trim(),
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -289,6 +309,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           .register(
         phone: _buildFullPhone(),
         email: _emailController.text.trim(),
+        otp: _otpCode,
         password: _passwordController.text,
         displayName: _nameController.text.trim(),
         avatarFile: _avatarFile,
@@ -363,9 +384,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (e is ApiException) {
       switch (e.code) {
         case 'PHONE_TAKEN':
+        case 'AUTH_008':
           return 'S\u1ed1 \u0111i\u1ec7n tho\u1ea1i n\u00e0y \u0111\u00e3 \u0111\u01b0\u1ee3c \u0111\u0103ng k\u00fd';
+        case 'AUTH_018':
+          return 'Email n\u00e0y \u0111\u00e3 \u0111\u01b0\u1ee3c \u0111\u0103ng k\u00fd';
         case 'OTP_INVALID':
         case 'OTP_EXPIRED':
+        case 'AUTH_010':
+        case 'AUTH_009':
           return 'M\u00e3 OTP kh\u00f4ng h\u1ee3p l\u1ec7 ho\u1eb7c \u0111\u00e3 h\u1ebft h\u1ea1n';
         default:
           if (e.statusCode == 0) return 'Kh\u00f4ng c\u00f3 k\u1ebft n\u1ed1i m\u1ea1ng';
@@ -595,12 +621,110 @@ class _RegisterScreenState extends State<RegisterScreen> {
         physics: const NeverScrollableScrollPhysics(),
         children: [
           _buildPhoneStep(),
+          _buildEmailStep(),
           if (_requiresOtp) _buildOtpStep(),
           _buildNameStep(),
           _buildPersonalInfoStep(),
           _buildPasswordStep(),
           _buildAvatarStep(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildEmailStep() {
+    final t = AuthTexts.of(context);
+    final emailError = Validators.email(_emailController.text.trim());
+    final canProceed = emailError == null;
+
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const SizedBox(height: 24),
+            Text(
+              t.enterEmailTitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF141414),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Email sẽ được dùng để xác thực OTP đăng ký.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w400,
+                color: Color(0xFF4B5563),
+              ),
+            ),
+            const SizedBox(height: 28),
+            TextField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              onChanged: (_) => setState(() {}),
+              style: const TextStyle(fontSize: 17),
+              decoration: InputDecoration(
+                hintText: t.emailHint,
+                errorText: _emailController.text.isEmpty ? null : emailError,
+                filled: true,
+                fillColor: const Color(0xFFF9FAFB),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                    color: AppColors.primary,
+                    width: 1.5,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(56),
+                backgroundColor:
+                    canProceed ? AppColors.primary : const Color(0xFFE5E7EB),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              onPressed:
+                  canProceed && !_isAnyRequestInFlight ? _continueFromEmailStep : null,
+              child: _isSendingOtp
+                  ? const SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(
+                      t.continueText,
+                      style: TextStyle(
+                        color: canProceed
+                            ? Colors.white
+                            : const Color(0xFF9CA3AF),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -627,7 +751,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             const SizedBox(height: 10),
             Text(
-              t.otpSentTo(_buildFullPhone()),
+              t.otpSentToEmail(_emailController.text.trim()),
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 16,
@@ -741,7 +865,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
-            onPressed: canProceed && !_isAnyRequestInFlight ? _sendOtp : null,
+            onPressed: canProceed && !_isAnyRequestInFlight ? _continueFromPhoneStep : null,
             child: _isSendingOtp
                 ? const SizedBox(
                     height: 16,
@@ -917,8 +1041,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Widget _buildPersonalInfoStep() {
     final t = AuthTexts.of(context);
-    final emailError = Validators.email(_emailController.text);
-    final canContinue = emailError == null;
 
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -937,36 +1059,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
           const SizedBox(height: 28),
-          TextField(
-            controller: _emailController,
-            keyboardType: TextInputType.emailAddress,
-            onChanged: (_) => setState(() {}),
-            style: const TextStyle(fontSize: 16),
-            decoration: InputDecoration(
-              hintText: 'Email',
-              errorText: _emailController.text.isEmpty ? null : emailError,
-              filled: true,
-              fillColor: const Color(0xFFF9FAFB),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                  color: AppColors.primary,
-                  width: 1.5,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
           // Birthday — tap to open date picker bottom sheet
           GestureDetector(
             onTap: _pickBirthday,
@@ -1042,18 +1134,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               minimumSize: const Size.fromHeight(56),
-              backgroundColor: canContinue ? AppColors.primary : const Color(0xFFE5E7EB),
+              backgroundColor: AppColors.primary,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
-            onPressed: canContinue ? _nextStep : null,
+            onPressed: _nextStep,
             child: Text(
               t.continueText,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: canContinue ? Colors.white : const Color(0xFF9CA3AF),
+                color: Colors.white,
               ),
             ),
           ),

@@ -29,13 +29,19 @@ class AuthService {
     return phone.trim();
   }
 
-  // Send OTP to the given phone number
-  Future<void> sendOtp(String phone) async {
+  // Send registration OTP to the given email (phone used for duplicate check).
+  Future<void> sendRegisterOtp({
+    required String phone,
+    required String email,
+  }) async {
     final normalized = _normalizePhone(phone);
     await _apiService.post(
       _base,
       '/auth/register/send-otp',
-      body: {'phone': normalized},
+      body: {
+        'phone': normalized,
+        'email': email.trim().toLowerCase(),
+      },
     );
   }
 
@@ -53,6 +59,7 @@ class AuthService {
   Future<Map<String, dynamic>> register({
     required String phone,
     required String email,
+    required String otp,
     required String password,
     required String displayName,
     String? gender,
@@ -62,6 +69,7 @@ class AuthService {
     final body = <String, dynamic>{
       'phone': normalized,
       'email': email.trim().toLowerCase(),
+      'otp': otp.trim(),
       'password': password,
       'displayName': displayName,
       'display_name': displayName,

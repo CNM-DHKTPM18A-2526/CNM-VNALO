@@ -13,7 +13,6 @@ import iuh.cnm.vnalo.core_service.model.dto.request.SendOtpRequest;
 import iuh.cnm.vnalo.core_service.model.dto.response.ApiResponse;
 import iuh.cnm.vnalo.core_service.model.dto.response.AuthResponse;
 import iuh.cnm.vnalo.core_service.model.dto.response.OtpResponse;
-import iuh.cnm.vnalo.core_service.repository.auth.AuthAccountRepository;
 import iuh.cnm.vnalo.core_service.security.UserPrincipal;
 import iuh.cnm.vnalo.core_service.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,25 +36,30 @@ public class AuthController {
 
     private final AuthService authService;
     private final OtpConfig otpConfig;
-    private final AuthAccountRepository authAccountRepository;
 
     /**
      * Send OTP for registration.
-     * Kept for backward compatibility; registration no longer requires phone OTP.
      */
     @PostMapping("/register/send-otp")
     @Operation(summary = "Send OTP for registration",
-               description = "Registration phone OTP is disabled; returns skipped response")
+               description = "Send registration OTP to email")
     public ResponseEntity<ApiResponse<OtpResponse>> sendRegistrationOtp(
             @Valid @RequestBody SendOtpRequest request) {
 
-        if (authAccountRepository.existsByPhone(request.getPhone())) {
+        final String normalizedEmail = request.getEmail().trim().toLowerCase();
+        if (authService.isPhoneRegistered(request.getPhone())) {
             throw new ApiException(ErrorCode.AUTH_PHONE_ALREADY_EXISTS);
         }
+        if (authService.isEmailRegistered(normalizedEmail)) {
+            throw new ApiException(ErrorCode.AUTH_EMAIL_ALREADY_EXISTS);
+        }
 
+        var result = authService.sendRegistrationOtp(normalizedEmail);
         return ResponseEntity.ok(ApiResponse.success(
-            "Phone OTP for registration is disabled",
-            OtpResponse.skipped("Registration no longer requires phone OTP")
+            "Registration OTP sent",
+            result.isSkipped()
+                ? OtpResponse.skipped(result.getMessage())
+                : OtpResponse.success(result.getExpiresInSeconds(), otpConfig.getRateLimit().getCooldownSeconds())
         ));
     }
 
@@ -142,7 +146,8 @@ public class AuthController {
                 otpConfig.getExpirationMinutes(),
                 otpConfig.getRateLimit().getCooldownSeconds(),
                 otpConfig.isEnabled(),
-                false
+                false,
+                otpConfig.isEnabled()
             )
         ));
     }
@@ -193,6 +198,7 @@ public class AuthController {
         int expirationMinutes,
         int cooldownSeconds,
         boolean passwordResetOtpEnabled,
-        boolean registerPhoneOtpEnabled
+        boolean registerPhoneOtpEnabled,
+        boolean registerEmailOtpEnabled
     ) {}
 }

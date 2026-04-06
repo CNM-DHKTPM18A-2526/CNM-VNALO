@@ -52,16 +52,34 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final OtpService otpService;
 
+    @Transactional(readOnly = true)
+    public boolean isPhoneRegistered(String phone) {
+        return authAccountRepository.existsByPhone(phone);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isEmailRegistered(String email) {
+        return authAccountRepository.existsByEmailIgnoreCase(normalizeEmail(email));
+    }
+
+    @Transactional
+    public OtpService.OtpSendResult sendRegistrationOtp(String email) {
+        final String normalizedEmail = normalizeEmail(email);
+        return otpService.sendOtp(normalizedEmail, OtpPurpose.REGISTER);
+    }
+
     @Transactional
     public AuthResponse register(RegisterRequest request, HttpServletRequest httpRequest) {
+        final String normalizedEmail = normalizeEmail(request.getEmail());
+
         if (authAccountRepository.existsByPhone(request.getPhone())) {
             throw new ApiException(ErrorCode.AUTH_PHONE_ALREADY_EXISTS);
         }
-
-        final String normalizedEmail = normalizeEmail(request.getEmail());
         if (authAccountRepository.existsByEmailIgnoreCase(normalizedEmail)) {
             throw new ApiException(ErrorCode.AUTH_EMAIL_ALREADY_EXISTS);
         }
+
+        otpService.verifyOtp(normalizedEmail, request.getOtp(), OtpPurpose.REGISTER);
 
         AuthAccount account = AuthAccount.builder()
                 .phone(request.getPhone())

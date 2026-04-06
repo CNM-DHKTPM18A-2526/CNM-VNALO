@@ -99,6 +99,7 @@ class AuthServiceTest {
             RegisterRequest request = RegisterRequest.builder()
                     .phone("+84912345678")
                 .email("test@example.com")
+                    .otp("123456")
                     .password("password123")
                     .displayName("Test User")
                     .build();
@@ -121,6 +122,7 @@ class AuthServiceTest {
             assertNotNull(response);
             assertEquals("accessToken", response.getAccessToken());
             assertNotNull(response.getRefreshToken());
+            verify(otpService).verifyOtp("test@example.com", "123456", iuh.cnm.vnalo.core_service.model.enums.OtpPurpose.REGISTER);
             verify(authAccountRepository).save(any(AuthAccount.class));
             verify(userProfileRepository).save(any(UserProfile.class));
             verify(userPrivacySettingRepository).save(any(UserPrivacySetting.class));
@@ -133,6 +135,7 @@ class AuthServiceTest {
             RegisterRequest request = RegisterRequest.builder()
                     .phone("+84912345678")
                     .email("test@example.com")
+                    .otp("123456")
                     .password("password123")
                     .displayName("Test User")
                     .build();
@@ -144,6 +147,7 @@ class AuthServiceTest {
                 () -> authService.register(request, httpRequest));
             
             assertEquals(ErrorCode.AUTH_PHONE_ALREADY_EXISTS, exception.getErrorCode());
+            verify(otpService, never()).verifyOtp(anyString(), anyString(), any());
             verify(authAccountRepository, never()).save(any());
         }
 
@@ -154,6 +158,7 @@ class AuthServiceTest {
             RegisterRequest request = RegisterRequest.builder()
                     .phone("+84912345678")
                     .email("test@example.com")
+                    .otp("123456")
                     .password("password123")
                     .displayName("Test User")
                     .build();
@@ -166,6 +171,7 @@ class AuthServiceTest {
                 () -> authService.register(request, httpRequest));
             
             assertEquals(ErrorCode.AUTH_EMAIL_ALREADY_EXISTS, exception.getErrorCode());
+            verify(otpService, never()).verifyOtp(anyString(), anyString(), any());
         }
     }
 

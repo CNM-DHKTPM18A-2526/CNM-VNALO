@@ -90,13 +90,16 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> sendOtp(String phone) async {
+  Future<void> sendRegisterOtp({
+    required String phone,
+    required String email,
+  }) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      await _authService.sendOtp(phone);
+      await _authService.sendRegisterOtp(phone: phone, email: email);
     } catch (e) {
       _error = _friendlyAuthError(e);
       throw StateError(_error ?? 'Gửi OTP thất bại');
@@ -109,6 +112,9 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> fetchOtpRequiredStatus() async {
     try {
       final status = await _authService.getOtpStatus();
+      if (status.containsKey('registerEmailOtpEnabled')) {
+        return status['registerEmailOtpEnabled'] == true;
+      }
       if (status.containsKey('registerPhoneOtpEnabled')) {
         return status['registerPhoneOtpEnabled'] == true;
       }
@@ -122,6 +128,7 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> register({
     required String phone,
     required String email,
+    required String otp,
     required String password,
     required String displayName,
     File? avatarFile,
@@ -137,6 +144,7 @@ class AuthProvider extends ChangeNotifier {
       final response = await _authService.register(
         phone: phone,
         email: email,
+        otp: otp,
         password: password,
         displayName: displayName,
         gender: gender,

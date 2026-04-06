@@ -23,6 +23,8 @@ class AuthTexts {
   String get continueText => _isVi ? 'Tiếp tục' : 'Continue';
   String get enterPhoneTitle =>
       _isVi ? 'Nhập số điện thoại' : 'Enter phone number';
+  String get enterEmailTitle =>
+      _isVi ? 'Nhập email' : 'Enter email';
   String get enterOtpTitle => _isVi ? 'Nhập mã OTP' : 'Enter OTP code';
   String get enterPasswordTitle => _isVi ? 'Nhập mật khẩu' : 'Enter password';
   String get completeRegister =>
@@ -36,6 +38,9 @@ class AuthTexts {
       _isVi ? 'Nhập mã OTP đã gửi đến' : 'Enter the OTP sent to';
   String otpSentTo(String phone) =>
       _isVi ? 'Nhập mã OTP đã gửi đến $phone' : 'Enter the OTP sent to $phone';
+  String otpSentToEmail(String email) =>
+      _isVi ? 'Nhập mã OTP đã gửi đến email $email' : 'Enter the OTP sent to email $email';
+  String get emailHint => _isVi ? 'Email' : 'Email';
   String get confirmOtp => _isVi ? 'Xác nhận' : 'Confirm';
   String get resendOtp => _isVi ? 'Gửi lại mã OTP' : 'Resend OTP';
   String get otpResent => _isVi ? 'Đã gửi lại OTP' : 'OTP resent';
