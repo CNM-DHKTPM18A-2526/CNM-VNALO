@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:vnalo_mobile/core/theme/app_colors.dart';
+import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/features/chat/screens/chat_list_screen.dart';
 import 'package:vnalo_mobile/features/contacts/screens/contacts_screen.dart';
 import 'package:vnalo_mobile/features/discover/screens/discover_screen.dart';
@@ -27,36 +30,51 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: IndexedStack(index: _currentIndex, children: _screens),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: const Color(0xFF0068FF),
-        unselectedItemColor: const Color(0xFF9CA3AF),
-        selectedFontSize: 12,
-        unselectedFontSize: 12,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.chat_bubble_outline),
-            label: 'Tin nhắn',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.contacts_outlined),
-            label: 'Danh bạ',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.grid_view_rounded),
-            label: 'Khám phá',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.access_time),
-            label: 'Nhật ký',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            label: 'Cá nhân',
-          ),
-        ],
+      bottomNavigationBar: Consumer<ChatProvider>(
+        builder: (context, chatProvider, child) {
+          int unreadCount = 0;
+          for (var c in chatProvider.conversations) {
+            unreadCount += c.unreadCount;
+          }
+
+          return BottomNavigationBar(
+            currentIndex: _currentIndex,
+            onTap: (index) => setState(() => _currentIndex = index),
+            type: BottomNavigationBarType.fixed,
+            selectedItemColor: const Color(0xFF0068FF),
+            unselectedItemColor: const Color(0xFF9CA3AF),
+            selectedFontSize: 12,
+            unselectedFontSize: 12,
+            items: [
+              BottomNavigationBarItem(
+                icon: unreadCount > 0 
+                  ? Badge(
+                      label: Text(unreadCount > 99 ? '99+' : unreadCount.toString()),
+                      backgroundColor: AppColors.unreadBadge,
+                      child: const Icon(Icons.chat_bubble_outline),
+                    )
+                  : const Icon(Icons.chat_bubble_outline),
+                label: 'Tin nhắn',
+              ),
+              const BottomNavigationBarItem(
+                icon: Icon(Icons.contacts_outlined),
+                label: 'Danh bạ',
+              ),
+              const BottomNavigationBarItem(
+                icon: Icon(Icons.grid_view_rounded),
+                label: 'Khám phá',
+              ),
+              const BottomNavigationBarItem(
+                icon: Icon(Icons.access_time),
+                label: 'Nhật ký',
+              ),
+              const BottomNavigationBarItem(
+                icon: Icon(Icons.person_outline),
+                label: 'Cá nhân',
+              ),
+            ],
+          );
+        },
       ),
     );
   }
