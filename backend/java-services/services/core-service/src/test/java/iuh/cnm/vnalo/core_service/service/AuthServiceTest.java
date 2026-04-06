@@ -1,6 +1,5 @@
 package iuh.cnm.vnalo.core_service.service;
 
-import iuh.cnm.vnalo.core_service.config.OtpConfig;
 import iuh.cnm.vnalo.core_service.exception.ApiException;
 import iuh.cnm.vnalo.core_service.exception.ErrorCode;
 import iuh.cnm.vnalo.core_service.model.dto.request.LoginRequest;
@@ -59,9 +58,6 @@ class AuthServiceTest {
     private JwtTokenProvider jwtTokenProvider;
 
     @Mock
-    private OtpConfig otpConfig;
-
-    @Mock
     private OtpService otpService;
 
     @Mock
@@ -80,6 +76,7 @@ class AuthServiceTest {
         
         testAccount = AuthAccount.builder()
                 .phone("+84912345678")
+            .email("test@example.com")
                 .passwordHash("hashedPassword")
                 .status(AccountStatus.ACTIVE)
                 .build();
@@ -96,18 +93,19 @@ class AuthServiceTest {
     class RegisterTests {
 
         @Test
-        @DisplayName("Should register successfully when OTP is disabled")
-        void shouldRegisterSuccessfully_WhenOtpDisabled() {
+        @DisplayName("Should register successfully with required email")
+        void shouldRegisterSuccessfully_WithEmail() {
             // Given
             RegisterRequest request = RegisterRequest.builder()
                     .phone("+84912345678")
+                .email("test@example.com")
+                    .otp("123456")
                     .password("password123")
                     .displayName("Test User")
-                    .otp(null)
                     .build();
             
-            when(otpConfig.shouldSkipOtp()).thenReturn(true);
             when(authAccountRepository.existsByPhone(anyString())).thenReturn(false);
+            when(authAccountRepository.existsByEmailIgnoreCase(anyString())).thenReturn(false);
             when(passwordEncoder.encode(anyString())).thenReturn("hashedPassword");
             when(authAccountRepository.save(any(AuthAccount.class))).thenReturn(testAccount);
             when(userProfileRepository.save(any(UserProfile.class))).thenReturn(testProfile);
@@ -124,6 +122,7 @@ class AuthServiceTest {
             assertNotNull(response);
             assertEquals("accessToken", response.getAccessToken());
             assertNotNull(response.getRefreshToken());
+            verify(otpService).verifyOtp("test@example.com", "123456", iuh.cnm.vnalo.core_service.model.enums.OtpPurpose.REGISTER);
             verify(authAccountRepository).save(any(AuthAccount.class));
             verify(userProfileRepository).save(any(UserProfile.class));
             verify(userPrivacySettingRepository).save(any(UserPrivacySetting.class));
@@ -135,9 +134,10 @@ class AuthServiceTest {
             // Given
             RegisterRequest request = RegisterRequest.builder()
                     .phone("+84912345678")
+                    .email("test@example.com")
+                    .otp("123456")
                     .password("password123")
                     .displayName("Test User")
-                    .otp(null)
                     .build();
             
             when(authAccountRepository.existsByPhone(anyString())).thenReturn(true);
@@ -147,28 +147,31 @@ class AuthServiceTest {
                 () -> authService.register(request, httpRequest));
             
             assertEquals(ErrorCode.AUTH_PHONE_ALREADY_EXISTS, exception.getErrorCode());
+            verify(otpService, never()).verifyOtp(anyString(), anyString(), any());
             verify(authAccountRepository, never()).save(any());
         }
 
         @Test
-        @DisplayName("Should throw exception when OTP is required but not provided")
-        void shouldThrowException_WhenOtpRequiredButNotProvided() {
+        @DisplayName("Should throw exception when email already exists")
+        void shouldThrowException_WhenEmailExists() {
             // Given
             RegisterRequest request = RegisterRequest.builder()
                     .phone("+84912345678")
+                    .email("test@example.com")
+                    .otp("123456")
                     .password("password123")
                     .displayName("Test User")
-                    .otp(null)
                     .build();
             
             when(authAccountRepository.existsByPhone(anyString())).thenReturn(false);
-            when(otpConfig.shouldSkipOtp()).thenReturn(false);
+            when(authAccountRepository.existsByEmailIgnoreCase(anyString())).thenReturn(true);
 
             // When & Then
             ApiException exception = assertThrows(ApiException.class, 
                 () -> authService.register(request, httpRequest));
             
-            assertEquals(ErrorCode.AUTH_OTP_REQUIRED, exception.getErrorCode());
+            assertEquals(ErrorCode.AUTH_EMAIL_ALREADY_EXISTS, exception.getErrorCode());
+            verify(otpService, never()).verifyOtp(anyString(), anyString(), any());
         }
     }
 

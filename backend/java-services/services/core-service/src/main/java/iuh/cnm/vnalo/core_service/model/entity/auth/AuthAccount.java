@@ -11,6 +11,7 @@ import java.time.Instant;
 @Entity
 @Table(name = "auth_account", indexes = {
     @Index(name = "idx_auth_account_phone", columnList = "phone"),
+    @Index(name = "idx_auth_account_email", columnList = "email"),
     @Index(name = "idx_auth_account_status", columnList = "status")
 })
 @Getter
@@ -22,6 +23,9 @@ public class AuthAccount extends BaseEntity {
 
     @Column(name = "phone", unique = true, nullable = false, length = 20)
     private String phone;
+
+    @Column(name = "email", unique = true, length = 255)
+    private String email;
 
     @Column(name = "firebase_uid", unique = true, length = 128)
     private String firebaseUid;

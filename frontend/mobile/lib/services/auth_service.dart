@@ -29,13 +29,19 @@ class AuthService {
     return phone.trim();
   }
 
-  // Send OTP to the given phone number
-  Future<void> sendOtp(String phone) async {
+  // Send registration OTP to the given email (phone used for duplicate check).
+  Future<void> sendRegisterOtp({
+    required String phone,
+    required String email,
+  }) async {
     final normalized = _normalizePhone(phone);
     await _apiService.post(
       _base,
       '/auth/register/send-otp',
-      body: {'phone': normalized},
+      body: {
+        'phone': normalized,
+        'email': email.trim().toLowerCase(),
+      },
     );
   }
 
@@ -52,6 +58,7 @@ class AuthService {
   // Register a new user with phone, OTP, password, display name, gender, and dob
   Future<Map<String, dynamic>> register({
     required String phone,
+    required String email,
     required String otp,
     required String password,
     required String displayName,
@@ -61,7 +68,8 @@ class AuthService {
     final normalized = _normalizePhone(phone);
     final body = <String, dynamic>{
       'phone': normalized,
-      'otp': otp,
+      'email': email.trim().toLowerCase(),
+      'otp': otp.trim(),
       'password': password,
       'displayName': displayName,
       'display_name': displayName,
@@ -150,6 +158,46 @@ class AuthService {
       _base,
       '/users/me',
       body: {'avatarUrl': avatarUrl},
+    );
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await _apiService.post(
+      _base,
+      '/auth/change-password',
+      body: {
+        'currentPassword': currentPassword,
+        'newPassword': newPassword,
+      },
+    );
+  }
+
+  Future<void> requestPasswordReset({
+    required String email,
+  }) async {
+    await _apiService.post(
+      _base,
+      '/auth/forgot-password',
+      body: {'email': email.trim().toLowerCase()},
+    );
+  }
+
+  Future<void> resetPassword({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) async {
+    await _apiService.post(
+      _base,
+      '/auth/reset-password',
+      body: {
+        'email': email.trim().toLowerCase(),
+        'otp': otp,
+        'newPassword': newPassword,
+      },
     );
   }
 }

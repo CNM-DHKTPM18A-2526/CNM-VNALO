@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
+import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
+import 'package:vnalo_mobile/features/auth/screens/welcome_screen.dart';
+import 'package:vnalo_mobile/features/profile/screens/account_security_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/appearance_settings_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -40,7 +44,18 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         children: [
           _buildSection(context, [
-            _item(Icons.shield_outlined, 'Tài khoản và bảo mật'),
+            _item(
+              Icons.shield_outlined,
+              'Tài khoản và bảo mật',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const AccountSecurityScreen(),
+                  ),
+                );
+              },
+            ),
             _item(Icons.lock_outline, 'Quyền riêng tư'),
           ]),
           const _SectionDivider(),
@@ -121,7 +136,7 @@ class SettingsScreen extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 14),
         ),
         onPressed: () {
-          // TODO: Logout
+          _confirmLogout(context);
         },
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -141,6 +156,81 @@ class SettingsScreen extends StatelessWidget {
       title: Text(title),
       trailing: const Icon(Icons.chevron_right, size: 20, color: Color(0xFF9CA3AF)),
       onTap: onTap,
+    );
+  }
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          titlePadding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
+          contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+          actionsPadding: const EdgeInsets.fromLTRB(12, 2, 12, 12),
+          title: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEECEC),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.logout_rounded, color: Colors.red),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Xác nhận đăng xuất',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Bạn có chắc chắn muốn đăng xuất khỏi thiết bị này?',
+            style: TextStyle(fontSize: 15, color: Color(0xFF4B5563), height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Hủy', style: TextStyle(color: Color(0xFF6B7280))),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text(
+                'Đăng xuất',
+                style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      await context.read<AuthProvider>().logout();
+    } finally {
+      if (context.mounted) {
+        Navigator.pop(context);
+      }
+    }
+
+    if (!context.mounted) return;
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+      (_) => false,
     );
   }
 }

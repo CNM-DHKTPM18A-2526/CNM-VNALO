@@ -1,15 +1,14 @@
 package iuh.cnm.vnalo.core_service.service;
 
-import iuh.cnm.vnalo.core_service.config.OtpConfig;
 import iuh.cnm.vnalo.core_service.exception.ApiException;
 import iuh.cnm.vnalo.core_service.exception.ErrorCode;
 import iuh.cnm.vnalo.core_service.model.dto.request.ChangePasswordRequest;
-import iuh.cnm.vnalo.core_service.model.dto.request.ResetPasswordRequest;
+import iuh.cnm.vnalo.core_service.model.dto.request.ForgotPasswordRequest;
 import iuh.cnm.vnalo.core_service.model.dto.request.LoginRequest;
 import iuh.cnm.vnalo.core_service.model.dto.request.RefreshTokenRequest;
 import iuh.cnm.vnalo.core_service.model.dto.request.RegisterRequest;
+import iuh.cnm.vnalo.core_service.model.dto.request.ResetPasswordRequest;
 import iuh.cnm.vnalo.core_service.model.dto.response.AuthResponse;
-import iuh.cnm.vnalo.core_service.model.dto.response.OtpResponse;
 import iuh.cnm.vnalo.core_service.model.dto.response.UserInfoResponse;
 import iuh.cnm.vnalo.core_service.model.entity.auth.AuthAccount;
 import iuh.cnm.vnalo.core_service.model.entity.auth.AuthRefreshToken;
@@ -36,6 +35,8 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -49,41 +50,46 @@ public class AuthService {
     private final UserPrivacySettingRepository userPrivacySettingRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
-    private final OtpConfig otpConfig;
     private final OtpService otpService;
+
+    @Transactional(readOnly = true)
+    public boolean isPhoneRegistered(String phone) {
+        return authAccountRepository.existsByPhone(phone);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isEmailRegistered(String email) {
+        return authAccountRepository.existsByEmailIgnoreCase(normalizeEmail(email));
+    }
+
+    @Transactional
+    public OtpService.OtpSendResult sendRegistrationOtp(String email) {
+        final String normalizedEmail = normalizeEmail(email);
+        return otpService.sendOtp(normalizedEmail, OtpPurpose.REGISTER);
+    }
 
     @Transactional
     public AuthResponse register(RegisterRequest request, HttpServletRequest httpRequest) {
-        // Check if phone already registered
+        final String normalizedEmail = normalizeEmail(request.getEmail());
+
         if (authAccountRepository.existsByPhone(request.getPhone())) {
             throw new ApiException(ErrorCode.AUTH_PHONE_ALREADY_EXISTS);
         }
-
-        // Verify OTP if enabled
-        if (!otpConfig.shouldSkipOtp()) {
-            // OTP is required when enabled
-            if (request.getOtp() == null || request.getOtp().isBlank()) {
-                throw new ApiException(ErrorCode.AUTH_OTP_REQUIRED);
-            }
-            // Verify OTP
-            otpService.verifyOtp(request.getPhone(), request.getOtp(), OtpPurpose.REGISTER);
-            log.info("OTP verified for phone: ****{}", request.getPhone().substring(request.getPhone().length() - 4));
-        } else {
-            log.info("OTP verification skipped (disabled in config)");
+        if (authAccountRepository.existsByEmailIgnoreCase(normalizedEmail)) {
+            throw new ApiException(ErrorCode.AUTH_EMAIL_ALREADY_EXISTS);
         }
 
-        // Create account - OTP already verified at this point, so status is ACTIVE
-        AccountStatus initialStatus = AccountStatus.ACTIVE;
-        
+        otpService.verifyOtp(normalizedEmail, request.getOtp(), OtpPurpose.REGISTER);
+
         AuthAccount account = AuthAccount.builder()
                 .phone(request.getPhone())
+                .email(normalizedEmail)
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .passwordUpdatedAt(Instant.now())
-                .status(initialStatus)
+                .status(AccountStatus.ACTIVE)
                 .build();
         account = authAccountRepository.save(account);
 
-        // Create profile with same ID as account (1:1 relationship)
         UserProfile profile = UserProfile.createWithAccountId(account.getId(), request.getDisplayName());
         profile.setAvatarUrl(buildDefaultAvatarUrl(request.getDisplayName(), account.getId()));
         if (request.getGender() != null) {
@@ -94,11 +100,9 @@ public class AuthService {
         }
         profile = userProfileRepository.save(profile);
 
-        // Create default privacy settings
         UserPrivacySetting privacySetting = UserPrivacySetting.createDefault(profile.getId());
         userPrivacySettingRepository.save(privacySetting);
 
-        // Generate tokens
         UserPrincipal userPrincipal = UserPrincipal.create(account);
         String accessToken = jwtTokenProvider.generateAccessToken(userPrincipal);
         String refreshToken = generateAndSaveRefreshToken(account.getId(), httpRequest, null);
@@ -107,17 +111,9 @@ public class AuthService {
         return buildAuthResponse(accessToken, refreshToken, account, profile);
     }
 
-    private String buildDefaultAvatarUrl(String displayName, UUID accountId) {
-        String safeName = (displayName == null || displayName.isBlank()) ? "User" : displayName.trim();
-        String encodedName = URLEncoder.encode(safeName, StandardCharsets.UTF_8);
-        String seed = accountId != null ? accountId.toString() : UUID.randomUUID().toString();
-        return "https://api.dicebear.com/9.x/initials/svg?seed=" + seed + "&radius=50&size=256&chars=2&fontFamily=Arial&fontWeight=600&backgroundType=gradientLinear&text=" + encodedName;
-    }
-
     @Transactional
     public AuthResponse login(LoginRequest request, HttpServletRequest httpRequest) {
-        // Pre-check: find account and check lock status
-        AuthAccount account = authAccountRepository.findByPhone(request.getIdentifier())
+        AuthAccount account = resolveAccountByIdentifier(request.getIdentifier())
                 .orElseThrow(() -> new ApiException(ErrorCode.AUTH_INVALID_CREDENTIALS));
 
         if (account.isLocked()) {
@@ -129,18 +125,14 @@ public class AuthService {
         }
 
         if (!passwordEncoder.matches(request.getPassword(), account.getPasswordHash())) {
-            // Track failed login attempt
             account.onLoginFailed();
-            // Auto-lock after 5 consecutive failures
             if (account.getFailedLoginCount() >= 5) {
-                account.lock(Instant.now().plusSeconds(1800)); // Lock for 30 minutes
+                account.lock(Instant.now().plusSeconds(1800));
                 log.warn("Account {} locked after {} failed attempts", account.getId(), account.getFailedLoginCount());
             }
             authAccountRepository.save(account);
             throw new ApiException(ErrorCode.AUTH_INVALID_CREDENTIALS);
         }
-
-        UserPrincipal userPrincipal = UserPrincipal.create(account);
 
         account.onLoginSuccess(request.getDeviceId());
         authAccountRepository.save(account);
@@ -152,6 +144,7 @@ public class AuthService {
             refreshTokenRepository.revokeByAccountIdAndDeviceId(account.getId(), request.getDeviceId(), Instant.now());
         }
 
+        UserPrincipal userPrincipal = UserPrincipal.create(account);
         String accessToken = jwtTokenProvider.generateAccessToken(userPrincipal);
         String refreshToken = generateAndSaveRefreshToken(account.getId(), httpRequest, request.getDeviceId());
 
@@ -202,71 +195,17 @@ public class AuthService {
     }
 
     @Transactional
-    public OtpResponse sendForgotPasswordOtp(String phone) {
-        log.info("Forgot password OTP requested for phone {}", maskPhone(phone));
-
-        return authAccountRepository.findByPhone(phone)
-                .map(account -> {
-                    OtpService.OtpSendResult result = otpService.sendOtp(phone, OtpPurpose.RESET_PASSWORD);
-                    log.info("Forgot password OTP sent for account {}", account.getId());
-                    return OtpResponse.success(result.getExpiresInSeconds(), otpConfig.getRateLimit().getCooldownSeconds());
-                })
-                .orElseGet(() -> {
-                    log.warn("Forgot password OTP requested for non-existing phone {}", maskPhone(phone));
-                    return OtpResponse.success(otpConfig.getExpirationMinutes() * 60, otpConfig.getRateLimit().getCooldownSeconds());
-                });
-    }
-
-    @Transactional
-    public void resetPassword(ResetPasswordRequest request) {
-        String phone = request.getPhone();
-        log.info("Password reset requested for phone {}", maskPhone(phone));
-
-        AuthAccount account = authAccountRepository.findByPhone(phone)
-                .orElseThrow(() -> {
-                    log.warn("Password reset failed for phone {}: invalid OTP or phone", maskPhone(phone));
-                    return new ApiException(ErrorCode.AUTH_OTP_INVALID);
-                });
-
-        otpService.verifyOtp(phone, request.getOtp(), OtpPurpose.RESET_PASSWORD);
-
-        if (passwordEncoder.matches(request.getNewPassword(), account.getPasswordHash())) {
-            log.warn("Password reset rejected for account {}: same password", account.getId());
-            throw new ApiException(ErrorCode.VALIDATION_ERROR, "New password must be different from current password");
-        }
-
-        account.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
-        account.setPasswordUpdatedAt(Instant.now());
-        account.setFailedLoginCount(0);
-
-        if (account.getStatus() == AccountStatus.LOCKED) {
-            account.setStatus(AccountStatus.ACTIVE);
-            account.setLockedUntil(null);
-        }
-
-        authAccountRepository.save(account);
-        refreshTokenRepository.revokeAllByAccountId(account.getId(), Instant.now());
-
-        log.info("Password reset successful for account {}", account.getId());
-    }
-
-    @Transactional
     public void changePassword(UUID accountId, ChangePasswordRequest request) {
-        log.info("Change password requested for account {}", accountId);
-
         AuthAccount account = authAccountRepository.findById(accountId)
-                .orElseThrow(() -> {
-                    log.warn("Change password failed: account {} not found", accountId);
-                    return new ApiException(ErrorCode.USER_NOT_FOUND);
-                });
+                .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
 
         if (!passwordEncoder.matches(request.getCurrentPassword(), account.getPasswordHash())) {
-            log.warn("Change password failed for account {}: invalid current password", accountId);
-            throw new ApiException(ErrorCode.AUTH_INVALID_CREDENTIALS, "Current password is incorrect");
+            throw new ApiException(ErrorCode.AUTH_PASSWORD_MISMATCH);
         }
 
+        validatePasswordPolicy(request.getNewPassword());
+
         if (passwordEncoder.matches(request.getNewPassword(), account.getPasswordHash())) {
-            log.warn("Change password rejected for account {}: same password", accountId);
             throw new ApiException(ErrorCode.VALIDATION_ERROR, "New password must be different from current password");
         }
 
@@ -283,6 +222,46 @@ public class AuthService {
         refreshTokenRepository.revokeAllByAccountId(accountId, Instant.now());
 
         log.info("Password changed successfully for account {}", accountId);
+    }
+
+    @Transactional
+    public void forgotPassword(ForgotPasswordRequest request) {
+        final String email = normalizeEmail(request.email());
+
+        authAccountRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new ApiException(ErrorCode.AUTH_ACCOUNT_NOT_FOUND_BY_EMAIL));
+
+        otpService.sendOtp(email, OtpPurpose.RESET_PASSWORD);
+        log.info("Password reset OTP sent for email: {}", maskEmail(email));
+    }
+
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        final String email = normalizeEmail(request.getEmail());
+
+        AuthAccount account = authAccountRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new ApiException(ErrorCode.AUTH_ACCOUNT_NOT_FOUND_BY_EMAIL));
+
+        otpService.verifyOtp(email, request.getOtp(), OtpPurpose.RESET_PASSWORD);
+        validatePasswordPolicy(request.getNewPassword());
+
+        if (passwordEncoder.matches(request.getNewPassword(), account.getPasswordHash())) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR, "New password must be different from current password");
+        }
+
+        account.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        account.setPasswordUpdatedAt(Instant.now());
+        account.setFailedLoginCount(0);
+
+        if (account.isLocked()) {
+            account.setStatus(AccountStatus.ACTIVE);
+            account.setLockedUntil(null);
+        }
+
+        authAccountRepository.save(account);
+        refreshTokenRepository.revokeAllByAccountId(account.getId(), Instant.now());
+
+        log.info("Password reset successfully for email: {}", maskEmail(email));
     }
 
     private String generateAndSaveRefreshToken(UUID accountId, HttpServletRequest request, String deviceId) {
@@ -319,6 +298,7 @@ public class AuthService {
                 .user(UserInfoResponse.builder()
                         .id(profile.getId())
                         .phone(account.getPhone())
+                        .email(account.getEmail())
                         .displayName(profile.getDisplayName())
                         .avatarUrl(profile.getAvatarUrl())
                         .coverUrl(profile.getCoverUrl())
@@ -331,10 +311,46 @@ public class AuthService {
                 .build();
     }
 
-    private String maskPhone(String phone) {
-        if (phone == null || phone.length() < 4) {
-            return "****";
+    private Optional<AuthAccount> resolveAccountByIdentifier(String identifier) {
+        final String trimmed = identifier == null ? "" : identifier.trim();
+        if (trimmed.contains("@")) {
+            return authAccountRepository.findByEmailIgnoreCase(normalizeEmail(trimmed));
         }
-        return "****" + phone.substring(phone.length() - 4);
+        return authAccountRepository.findByPhone(trimmed);
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String maskEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return "***";
+        }
+        final String trimmed = email.trim();
+        final int at = trimmed.indexOf('@');
+        if (at <= 1) {
+            return "***";
+        }
+        return trimmed.charAt(0) + "***" + trimmed.substring(at);
+    }
+
+    private void validatePasswordPolicy(String password) {
+        if (password == null || password.length() < 8) {
+            throw new ApiException(ErrorCode.AUTH_PASSWORD_POLICY);
+        }
+        boolean hasUpper = password.chars().anyMatch(Character::isUpperCase);
+        boolean hasLower = password.chars().anyMatch(Character::isLowerCase);
+        boolean hasDigit = password.chars().anyMatch(Character::isDigit);
+        if (!hasUpper || !hasLower || !hasDigit) {
+            throw new ApiException(ErrorCode.AUTH_PASSWORD_POLICY);
+        }
+    }
+
+    private String buildDefaultAvatarUrl(String displayName, UUID accountId) {
+        String safeName = (displayName == null || displayName.isBlank()) ? "User" : displayName.trim();
+        String encodedName = URLEncoder.encode(safeName, StandardCharsets.UTF_8);
+        String seed = accountId != null ? accountId.toString() : UUID.randomUUID().toString();
+        return "https://api.dicebear.com/9.x/initials/svg?seed=" + seed + "&radius=50&size=256&chars=2&fontFamily=Arial&fontWeight=600&backgroundType=gradientLinear&text=" + encodedName;
     }
 }

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/auth/localization/auth_texts.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
+import 'package:vnalo_mobile/features/auth/screens/forgot_password_screen.dart';
 import 'package:vnalo_mobile/navigation/main_shell.dart';
 
 class LoginPasswordScreen extends StatefulWidget {
@@ -104,6 +105,20 @@ class _LoginPasswordScreenState extends State<LoginPasswordScreen> {
                         setState(() => _obscurePassword = !_obscurePassword);
                       },
                     ),
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ForgotPasswordScreen(),
+                        ),
+                      );
+                    },
+                    child: const Text('Quen mat khau?'),
                   ),
                 ),
                 const Spacer(),

@@ -1,21 +1,66 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
+import 'package:vnalo_mobile/features/profile/screens/account_security_screen.dart';
+import 'package:vnalo_mobile/features/profile/screens/profile_detail_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/settings_screen.dart';
+import 'dart:io';
 
 /// Profile tab ("Cá nhân") — shows user avatar + name + quick links.
 /// Tapping the ⚙️ gear icon navigates to the full Settings page.
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  final ImagePicker _picker = ImagePicker();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<AuthProvider>().refreshCurrentUser();
+    });
+  }
+
+  Future<void> _updateAvatar() async {
+    final picked = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1080,
+      imageQuality: 85,
+    );
+    if (picked == null || !mounted) return;
+
+    final auth = context.read<AuthProvider>();
+    final ok = await auth.updateAvatar(File(picked.path));
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok
+              ? 'Cập nhật ảnh đại diện thành công'
+              : (auth.error ?? 'Cập nhật ảnh đại diện thất bại'),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final appBarBg =
         isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
-    final searchHint = isDarkMode ? DarkColors.textHint : Colors.white.withOpacity(0.8);
+    final searchHint = isDarkMode
+      ? DarkColors.textHint
+      : Colors.white.withValues(alpha: 0.8);
     final auth = context.watch<AuthProvider>();
     final displayName = auth.user?.displayName ?? 'Người dùng';
 
@@ -61,29 +106,63 @@ class ProfileScreen extends StatelessWidget {
       body: ListView(
         children: [
           // User header
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
-            child: Row(
-              children: [
-                AvatarWidget(
-                  imageUrl: auth.user?.avatarUrl,
-                  name: displayName,
-                  size: 60,
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Text(
-                    displayName,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
+          InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProfileDetailScreen()),
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+              child: Row(
+                children: [
+                  Stack(
+                    children: [
+                      AvatarWidget(
+                        imageUrl: auth.user?.avatarUrl,
+                        name: displayName,
+                        size: 60,
+                      ),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: GestureDetector(
+                          onTap: _updateAvatar,
+                          child: Container(
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 1.5),
+                            ),
+                            child: const Icon(
+                              Icons.camera_alt,
+                              size: 12,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      displayName,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                  const Icon(Icons.chevron_right, color: Color(0xFFD1D5DB)),
+                ],
+              ),
             ),
           ),
-          const Divider(height: 1),
+          // const Divider(height: 1),
           // Quick menu items
           _menuItem(
             context,
@@ -119,6 +198,14 @@ class ProfileScreen extends StatelessWidget {
             icon: Icons.shield_outlined,
             iconColor: AppColors.primary,
             title: 'Tài khoản và bảo mật',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const AccountSecurityScreen(),
+                ),
+              );
+            },
           ),
           _menuItem(
             context,

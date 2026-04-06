@@ -27,6 +27,7 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final _pageController = PageController();
   final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
   final _nameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -39,14 +40,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isResendingOtp = false;
   bool _isSubmittingRegistration = false;
   bool _isSkipSubmitting = false;
-  bool _requiresOtp = AppConfig.instance.isProd;
+  bool _requiresOtp = false;
   String _otpCode = '';
   String _countryCode = '+84';
 
   bool get _isAnyRequestInFlight =>
       _isSendingOtp || _isResendingOtp || _isSubmittingRegistration;
 
-  int get _totalSteps => _requiresOtp ? 6 : 5;
+  int get _totalSteps => _requiresOtp ? 7 : 6;
 
   String? _phoneValidationError() {
     return Validators.phone(
@@ -63,7 +64,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void initState() {
     super.initState();
+    _resetRegistrationDraft();
     _loadOtpStatus();
+  }
+
+  void _resetRegistrationDraft() {
+    _phoneController.clear();
+    _emailController.clear();
+    _nameController.clear();
+    _passwordController.clear();
+    _confirmPasswordController.clear();
+    _otpCode = '';
+    _currentStep = 0;
+    _agreeTermsA = false;
+    _agreeTermsB = false;
+    _birthday = null;
+    _gender = null;
+    _avatarFile = null;
   }
 
   Future<void> _loadOtpStatus() async {
@@ -132,6 +149,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void dispose() {
     _pageController.dispose();
     _phoneController.dispose();
+    _emailController.dispose();
     _nameController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -172,20 +190,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _nextStep();
   }
 
-  Future<void> _sendOtp() async {
+  void _continueFromPhoneStep() {
     if (_isAnyRequestInFlight) return;
     if (!_agreeTermsA || !_agreeTermsB) return;
     if (_phoneValidationError() != null) return;
 
+    _goToStep(1);
+  }
+
+  Future<void> _continueFromEmailStep() async {
+    if (_isAnyRequestInFlight) return;
+    final email = _emailController.text.trim();
+    final emailError = Validators.email(email);
+    if (emailError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(emailError), backgroundColor: AppColors.error),
+      );
+      return;
+    }
+
     if (!_requiresOtp) {
       _otpCode = '000000';
-      _goToStep(1);
+      _goToStep(2);
       return;
     }
 
     setState(() => _isSendingOtp = true);
     try {
-      await context.read<AuthProvider>().sendOtp(_buildFullPhone());
+      await context.read<AuthProvider>().sendRegisterOtp(
+        phone: _buildFullPhone(),
+        email: email,
+      );
       if (!mounted) return;
       _nextStep();
     } catch (e) {
@@ -210,7 +245,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     setState(() => _isResendingOtp = true);
     try {
-      await context.read<AuthProvider>().sendOtp(_buildFullPhone());
+      await context.read<AuthProvider>().sendRegisterOtp(
+        phone: _buildFullPhone(),
+        email: _emailController.text.trim(),
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -270,6 +308,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final success = await auth
           .register(
         phone: _buildFullPhone(),
+        email: _emailController.text.trim(),
         otp: _otpCode,
         password: _passwordController.text,
         displayName: _nameController.text.trim(),
@@ -281,6 +320,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!mounted) return;
 
       if (success) {
+        if (_avatarFile == null) {
+          await auth.refreshCurrentUser();
+          if (!mounted) return;
+        }
         // H1: use warning (non-fatal) rather than error for the orange snackbar.
         if (auth.warning != null && auth.warning!.isNotEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -341,9 +384,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (e is ApiException) {
       switch (e.code) {
         case 'PHONE_TAKEN':
+        case 'AUTH_008':
           return 'S\u1ed1 \u0111i\u1ec7n tho\u1ea1i n\u00e0y \u0111\u00e3 \u0111\u01b0\u1ee3c \u0111\u0103ng k\u00fd';
+        case 'AUTH_018':
+          return 'Email n\u00e0y \u0111\u00e3 \u0111\u01b0\u1ee3c \u0111\u0103ng k\u00fd';
         case 'OTP_INVALID':
         case 'OTP_EXPIRED':
+        case 'AUTH_010':
+        case 'AUTH_009':
           return 'M\u00e3 OTP kh\u00f4ng h\u1ee3p l\u1ec7 ho\u1eb7c \u0111\u00e3 h\u1ebft h\u1ea1n';
         default:
           if (e.statusCode == 0) return 'Kh\u00f4ng c\u00f3 k\u1ebft n\u1ed1i m\u1ea1ng';
@@ -355,7 +403,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   String _extractErrorMessage(Object error) {
     if (error is StateError) {
-      return error.message?.toString() ?? 'Yêu cầu thất bại';
+      return error.message.toString();
     }
     if (error is ApiException) {
       return _mapApiError(error);
@@ -370,49 +418,103 @@ class _RegisterScreenState extends State<RegisterScreen> {
     showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        title: Text(
-          t.syncContactsTitle,
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
-        content: Text(
-          t.syncContactsMessage,
-          style: const TextStyle(fontSize: 15, color: Color(0xFF4B5563)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              // H2: guard against widget being unmounted while dialog was open.
-              if (mounted) _navigateToHome(auth);
-            },
-            child: Text(
-              t.laterText,
-              style: const TextStyle(color: Color(0xFF6B7280), fontSize: 16),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          titlePadding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
+          contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          title: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEAF2FF),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.contacts_outlined, color: AppColors.primary),
               ),
-            ),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await Permission.contacts.request();
-              // H2: guard against widget being unmounted while the permission
-              // dialog was shown.
-              if (mounted) _navigateToHome(auth);
-            },
-            child: Text(
-              t.continueText,
-              style: const TextStyle(color: Colors.white, fontSize: 16),
-            ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  t.syncContactsTitle,
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                t.syncContactsMessage,
+                style: const TextStyle(fontSize: 15, color: Color(0xFF4B5563), height: 1.4),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Bạn luôn có thể thay đổi lựa chọn này trong Cài đặt quyền riêng tư.',
+                style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(44),
+                        side: const BorderSide(color: Color(0xFFD1D5DB)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        foregroundColor: const Color(0xFF4B5563),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        if (mounted) _navigateToHome(auth);
+                      },
+                      child: Text(
+                        t.laterText,
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(44),
+                        backgroundColor: AppColors.primary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        elevation: 0,
+                      ),
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        final status = await Permission.contacts.request();
+                        if (mounted && status.isPermanentlyDenied) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Bạn đã tắt quyền Danh bạ. Có thể bật lại trong Cài đặt hệ thống.'),
+                            ),
+                          );
+                        }
+                        if (mounted) _navigateToHome(auth);
+                      },
+                      child: Text(
+                        t.continueText,
+                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -519,12 +621,110 @@ class _RegisterScreenState extends State<RegisterScreen> {
         physics: const NeverScrollableScrollPhysics(),
         children: [
           _buildPhoneStep(),
+          _buildEmailStep(),
           if (_requiresOtp) _buildOtpStep(),
           _buildNameStep(),
           _buildPersonalInfoStep(),
           _buildPasswordStep(),
           _buildAvatarStep(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildEmailStep() {
+    final t = AuthTexts.of(context);
+    final emailError = Validators.email(_emailController.text.trim());
+    final canProceed = emailError == null;
+
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const SizedBox(height: 24),
+            Text(
+              t.enterEmailTitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF141414),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Email sẽ được dùng để xác thực OTP đăng ký.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w400,
+                color: Color(0xFF4B5563),
+              ),
+            ),
+            const SizedBox(height: 28),
+            TextField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              onChanged: (_) => setState(() {}),
+              style: const TextStyle(fontSize: 17),
+              decoration: InputDecoration(
+                hintText: t.emailHint,
+                errorText: _emailController.text.isEmpty ? null : emailError,
+                filled: true,
+                fillColor: const Color(0xFFF9FAFB),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                    color: AppColors.primary,
+                    width: 1.5,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(56),
+                backgroundColor:
+                    canProceed ? AppColors.primary : const Color(0xFFE5E7EB),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              onPressed:
+                  canProceed && !_isAnyRequestInFlight ? _continueFromEmailStep : null,
+              child: _isSendingOtp
+                  ? const SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(
+                      t.continueText,
+                      style: TextStyle(
+                        color: canProceed
+                            ? Colors.white
+                            : const Color(0xFF9CA3AF),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -551,7 +751,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             const SizedBox(height: 10),
             Text(
-              t.otpSentTo(_buildFullPhone()),
+              t.otpSentToEmail(_emailController.text.trim()),
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 16,
@@ -665,7 +865,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
-            onPressed: canProceed && !_isAnyRequestInFlight ? _sendOtp : null,
+            onPressed: canProceed && !_isAnyRequestInFlight ? _continueFromPhoneStep : null,
             child: _isSendingOtp
                 ? const SizedBox(
                     height: 16,
@@ -721,8 +921,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Widget _buildNameStep() {
     final t = AuthTexts.of(context);
-    final name = _nameController.text.trim();
-    final hasName = name.length >= 2;
+    final hasValidName = Validators.displayName(_nameController.text) == null;
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -805,18 +1004,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(56),
                 backgroundColor:
-                    hasName ? AppColors.primary : const Color(0xFFE5E7EB),
+                    hasValidName ? AppColors.primary : const Color(0xFFE5E7EB),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
-              onPressed: hasName ? _continueFromNameStep : null,
+              onPressed: hasValidName ? _continueFromNameStep : null,
               child: Text(
                 t.continueText,
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  color: hasName ? Colors.white : const Color(0xFF9CA3AF),
+                  color: hasValidName ? Colors.white : const Color(0xFF9CA3AF),
                 ),
               ),
             ),
@@ -1219,6 +1418,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ),
               ),
+                const SizedBox(height: 10),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Mật khẩu phải có ít nhất 8 ký tự, gồm chữ hoa, chữ thường và số.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF6B7280),
+                      height: 1.4,
+                    ),
+                  ),
+                ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _confirmPasswordController,
@@ -1249,6 +1460,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       color: AppColors.primary,
                       width: 1.5,
                     ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Xác nhận mật khẩu phải trùng khớp hoàn toàn với mật khẩu đã nhập.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF6B7280),
+                    height: 1.4,
                   ),
                 ),
               ),

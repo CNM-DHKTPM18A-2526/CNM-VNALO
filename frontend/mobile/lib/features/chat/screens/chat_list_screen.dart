@@ -27,12 +27,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
-    final searchBg = isDarkMode
-        ? const Color(0xFF2B2B2B)
-        : Colors.white.withValues(alpha: 0.25);
     final searchHint = isDarkMode
         ? DarkColors.textHint
         : Colors.white.withValues(alpha: 0.8);
+    final dividerColor = isDarkMode
+      ? const Color(0xFF3A3F46)
+      : const Color(0xFFE9EDF3);
 
     return Scaffold(
       appBar: AppBar(
@@ -85,40 +85,58 @@ class _ChatListScreenState extends State<ChatListScreen> {
               itemCount: chatProvider.conversations.length + 1,
               itemBuilder: (context, index) {
                 if (index == 0) {
-                  return ListTile(
-                    leading: Container(
-                      width: 52,
-                      height: 52,
-                      decoration: const BoxDecoration(
-                        color: Colors.blue,
-                        shape: BoxShape.circle,
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                        leading: Container(
+                          width: 52,
+                          height: 52,
+                          decoration: const BoxDecoration(
+                            color: Colors.blue,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              const Icon(Icons.folder, color: Colors.white, size: 32),
+                              const Icon(Icons.cloud, color: Colors.blue, size: 16),
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: Container(
+                                  decoration: const BoxDecoration(
+                                    color: Colors.orange,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.check, color: Colors.white, size: 12),
+                                ),
+                              )
+                            ],
+                          ),
+                        ),
+                        title: const Text(
+                          'My Documents',
+                          style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const MyDocumentsScreen()),
+                          );
+                        },
                       ),
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          const Icon(Icons.folder, color: Colors.white, size: 32),
-                          const Icon(Icons.cloud, color: Colors.blue, size: 16),
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: Container(
-                              decoration: const BoxDecoration(
-                                color: Colors.orange,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.check, color: Colors.white, size: 12),
-                            ),
-                          )
-                        ],
+                      Divider(
+                        height: 1,
+                        thickness: 0.5,
+                        indent: 80,
+                        color: dividerColor,
                       ),
-                    ),
-                    title: const Text('My Documents', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16)),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const MyDocumentsScreen()),
-                      );
-                    },
+                    ],
                   );
                 }
 

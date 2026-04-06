@@ -12,5 +12,9 @@ public interface AuthAccountRepository extends JpaRepository<AuthAccount, UUID> 
 
     Optional<AuthAccount> findByPhone(String phone);
 
+    Optional<AuthAccount> findByEmailIgnoreCase(String email);
+
     boolean existsByPhone(String phone);
+
+    boolean existsByEmailIgnoreCase(String email);
 }

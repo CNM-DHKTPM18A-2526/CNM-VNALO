@@ -37,6 +37,18 @@ spring:
     consumer:
       group-id: core-service
 
+  mail:
+    host: ${SMTP_HOST:smtp.gmail.com}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USER:}
+    password: ${MAIL_APP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
 server:
   port: 8081
   servlet:
@@ -79,6 +91,7 @@ springdoc:
 # OTP Configuration
 otp:
   enabled: ${OTP_ENABLED:true}
+  email-enabled: ${OTP_EMAIL_ENABLED:true}
   expiration-minutes: ${OTP_EXPIRATION:5}
   max-attempts: ${OTP_MAX_ATTEMPTS:3}
   length: 6
@@ -112,7 +125,8 @@ spring:
 
 # Dev: OTP disabled for faster development (set OTP_ENABLED=true to test)
 otp:
-  enabled: false
+  enabled: true
+  email-enabled: true
   test-mode:
     enabled: true      # Use mock OTP "123456" when testing
     mock-otp: "123456"

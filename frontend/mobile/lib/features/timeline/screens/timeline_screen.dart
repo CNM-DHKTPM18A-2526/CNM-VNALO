@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
+import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
+import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 
 class TimelineScreen extends StatelessWidget {
   const TimelineScreen({super.key});
@@ -9,7 +12,9 @@ class TimelineScreen extends StatelessWidget {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final appBarBg =
         isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
-    final searchHint = isDarkMode ? DarkColors.textHint : Colors.white.withOpacity(0.8);
+    final searchHint = isDarkMode ? DarkColors.textHint : Colors.white.withValues(alpha: 0.8);
+    final auth = context.watch<AuthProvider>();
+    final displayName = auth.user?.displayName ?? 'Người dùng';
 
     return Scaffold(
       appBar: AppBar(
@@ -43,7 +48,11 @@ class TimelineScreen extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
-                const CircleAvatar(radius: 20),
+                AvatarWidget(
+                  imageUrl: auth.user?.avatarUrl,
+                  name: displayName,
+                  size: 40,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Container(
@@ -61,7 +70,7 @@ class TimelineScreen extends StatelessWidget {
               ],
             ),
           ),
-          const Divider(thickness: 8),
+          Divider(thickness: 8, color: Theme.of(context).dividerColor,),
           const Padding(
             padding: EdgeInsets.all(24),
             child: Center(

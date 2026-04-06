@@ -90,13 +90,16 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> sendOtp(String phone) async {
+  Future<void> sendRegisterOtp({
+    required String phone,
+    required String email,
+  }) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      await _authService.sendOtp(phone);
+      await _authService.sendRegisterOtp(phone: phone, email: email);
     } catch (e) {
       _error = _friendlyAuthError(e);
       throw StateError(_error ?? 'Gửi OTP thất bại');
@@ -109,6 +112,12 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> fetchOtpRequiredStatus() async {
     try {
       final status = await _authService.getOtpStatus();
+      if (status.containsKey('registerEmailOtpEnabled')) {
+        return status['registerEmailOtpEnabled'] == true;
+      }
+      if (status.containsKey('registerPhoneOtpEnabled')) {
+        return status['registerPhoneOtpEnabled'] == true;
+      }
       return status['enabled'] == true;
     } catch (_) {
       // Fallback is handled by caller.
@@ -118,6 +127,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<bool> register({
     required String phone,
+    required String email,
     required String otp,
     required String password,
     required String displayName,
@@ -133,6 +143,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       final response = await _authService.register(
         phone: phone,
+        email: email,
         otp: otp,
         password: password,
         displayName: displayName,
@@ -170,7 +181,14 @@ class AuthProvider extends ChangeNotifier {
           final avatarUrl = await _uploadAvatarWithRetry(avatarFile);
           await _authService.updateProfileAvatar(avatarUrl);
           // Refresh profile to pick up the persisted avatar URL.
-          _user = await _authService.getMe();
+          try {
+            _user = await _authService.getMe();
+          } catch (_) {
+            // Upload+patch succeeded — apply optimistic local update.
+            if (_user != null) {
+              _user = _user!.copyWith(avatarUrl: avatarUrl);
+            }
+          }
           // No need to re-save userId — it cannot change after registration.
         } catch (e) {
           // Avatar upload is non-fatal: registration already succeeded.
@@ -178,6 +196,13 @@ class AuthProvider extends ChangeNotifier {
           _warning = _warning != null && _warning!.isNotEmpty
               ? '$_warning — $av'
               : av;
+        }
+      } else {
+        // No avatar file — do a final consistency refresh.
+        try {
+          _user = await _getMeWithRetry(attempts: 2);
+        } catch (_) {
+          // Non-fatal: keep best-effort hydrated profile.
         }
       }
 
@@ -287,6 +312,7 @@ class AuthProvider extends ChangeNotifier {
     return User(
       id: id,
       phone: raw['phone']?.toString(),
+      email: raw['email']?.toString(),
       displayName:
           raw['displayName']?.toString() ??
           raw['display_name']?.toString() ??
@@ -381,6 +407,45 @@ class AuthProvider extends ChangeNotifier {
     await _storageService.clearAll();
     _user = null;
     notifyListeners();
+  }
+
+  Future<void> refreshCurrentUser() async {
+    try {
+      final me = await _authService.getMe();
+      _user = me;
+      notifyListeners();
+    } catch (_) {
+      // Keep current user if refresh fails transiently.
+    }
+  }
+
+  Future<bool> updateAvatar(File avatarFile) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final avatarUrl = await _uploadAvatarWithRetry(avatarFile);
+      await _authService.updateProfileAvatar(avatarUrl);
+
+      try {
+        _user = await _authService.getMe();
+      } catch (_) {
+        // Avatar is already persisted on server; fallback to local optimistic update.
+        if (_user != null) {
+          _user = _user!.copyWith(avatarUrl: avatarUrl);
+        }
+      }
+
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = _avatarUploadWarning(e);
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
   }
 }
 

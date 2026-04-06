@@ -40,7 +40,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
-    final searchHint = isDarkMode ? DarkColors.textHint : Colors.white.withOpacity(0.8);
+    final searchHint = isDarkMode ? DarkColors.textHint : Colors.white.withValues(alpha: 0.8);
 
     return DefaultTabController(
       length: 3,
@@ -83,6 +83,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
             Container(
               color: isDarkMode ? const Color(0xFF1A1A1A) : Colors.white,
               child: TabBar(
+                dividerColor: Colors.transparent,
                 labelColor: isDarkMode ? Colors.white : Colors.black,
                 unselectedLabelColor: const Color(0xFF9CA3AF),
                 indicatorColor: AppColors.primary,
@@ -144,7 +145,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
+                      color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(Icons.group_add, color: AppColors.primary),
@@ -157,7 +158,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
+                      color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(Icons.cake, color: AppColors.primary),
@@ -210,7 +211,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                        )),
                      ],
                    );
-                }).expand((e) => [e]).toList(), // flatten
+                }).expand((e) => [e]), // flatten
               ],
             ),
           ),
@@ -228,7 +229,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
             ? (isDarkMode ? const Color(0xFF333333) : const Color(0xFFE5E7EB))
             : Colors.transparent,
         borderRadius: BorderRadius.circular(20),
-        border: isActive ? null : Border.all(color: Colors.grey.withOpacity(0.5)),
+        border: isActive ? null : Border.all(color: Colors.grey.withValues(alpha: 0.5)),
       ),
       child: Text(
         label,
@@ -261,7 +262,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
+                  color: AppColors.primary.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.group_add, color: AppColors.primary),

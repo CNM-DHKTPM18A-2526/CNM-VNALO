@@ -89,6 +89,7 @@ public class UserService {
         return UserInfoResponse.builder()
                 .id(profile.getId())
                 .phone(account != null ? account.getPhone() : null)
+            .email(account != null ? account.getEmail() : null)
                 .displayName(profile.getDisplayName())
                 .avatarUrl(profile.getAvatarUrl())
                 .coverUrl(profile.getCoverUrl())

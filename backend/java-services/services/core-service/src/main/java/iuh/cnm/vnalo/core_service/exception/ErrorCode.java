@@ -23,6 +23,12 @@ public enum ErrorCode {
     AUTH_OTP_RATE_LIMITED("AUTH_012", "Too many OTP requests, please try again later"),
     AUTH_OTP_COOLDOWN("AUTH_013", "Please wait before requesting another OTP"),
     AUTH_OTP_REQUIRED("AUTH_014", "OTP verification is required"),
+    AUTH_PASSWORD_MISMATCH("AUTH_015", "Current password is incorrect"),
+    AUTH_PASSWORD_POLICY("AUTH_016", "New password does not meet requirements"),
+    AUTH_ACCOUNT_NOT_FOUND_BY_PHONE("AUTH_017", "No account found with this phone number"),
+    AUTH_EMAIL_ALREADY_EXISTS("AUTH_018", "Email already registered"),
+    AUTH_ACCOUNT_NOT_FOUND_BY_EMAIL("AUTH_019", "No account found with this email"),
+    AUTH_OTP_DELIVERY_FAILED("AUTH_020", "Unable to deliver OTP"),
 
     // User
     USER_NOT_FOUND("USER_001", "User not found"),
