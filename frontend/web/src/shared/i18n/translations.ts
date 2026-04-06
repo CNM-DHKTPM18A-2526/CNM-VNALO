@@ -267,6 +267,7 @@ export const translations = {
       },
       avatar: {
         changeButton: 'Change avatar',
+        viewAriaLabel: 'View avatar image',
         selectButton: 'Choose image',
         saveButton: 'Save avatar',
         savingButton: 'Saving...',
@@ -283,6 +284,7 @@ export const translations = {
       },
       cover: {
         changeButton: 'Change cover',
+        viewAriaLabel: 'View cover image',
         saveButton: 'Save cover',
         savingButton: 'Saving...',
         cancelButton: 'Cancel',
@@ -290,6 +292,13 @@ export const translations = {
           saveSuccess: 'Cover image updated successfully.',
           saveError: 'Cannot update cover image now. Please try again.',
         },
+      },
+      preview: {
+        avatarTitle: 'Avatar preview',
+        coverTitle: 'Cover preview',
+        closeAriaLabel: 'Close preview',
+        avatarAlt: 'Avatar preview',
+        coverAlt: 'Cover preview',
       },
     },
   },
@@ -562,6 +571,7 @@ export const translations = {
       },
       avatar: {
         changeButton: 'Đổi ảnh đại diện',
+        viewAriaLabel: 'Xem ảnh đại diện',
         selectButton: 'Chọn ảnh',
         saveButton: 'Lưu ảnh',
         savingButton: 'Đang lưu...',
@@ -578,6 +588,7 @@ export const translations = {
       },
       cover: {
         changeButton: 'Đổi ảnh bìa',
+        viewAriaLabel: 'Xem ảnh bìa',
         saveButton: 'Lưu ảnh bìa',
         savingButton: 'Đang lưu...',
         cancelButton: 'Hủy',
@@ -585,6 +596,13 @@ export const translations = {
           saveSuccess: 'Cập nhật ảnh bìa thành công.',
           saveError: 'Không thể cập nhật ảnh bìa lúc này. Vui lòng thử lại.',
         },
+      },
+      preview: {
+        avatarTitle: 'Xem ảnh đại diện',
+        coverTitle: 'Xem ảnh bìa',
+        closeAriaLabel: 'Đóng xem trước',
+        avatarAlt: 'Ảnh đại diện xem trước',
+        coverAlt: 'Ảnh bìa xem trước',
       },
     },
   },
