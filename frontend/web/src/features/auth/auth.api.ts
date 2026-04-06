@@ -13,11 +13,11 @@ export type UpdateProfilePayload = {
 }
 
 export type ForgotPasswordSendOtpPayload = {
-  phone: string
+  email: string
 }
 
 export type ResetPasswordPayload = {
-  phone: string
+  email: string
   otp: string
   newPassword: string
 }
@@ -242,6 +242,7 @@ export async function updateProfile(token: string, payload: UpdateProfilePayload
 
 export async function sendRegisterOtp(payload: SendRegisterOtpPayload): Promise<void> {
   const normalizedPhone = normalizeVietnamPhone(payload.phone)
+  const normalizedEmail = payload.email.trim().toLowerCase()
 
   const response = await fetch(`${API_BASE_URL}/auth/register/send-otp`, {
     method: 'POST',
@@ -250,6 +251,7 @@ export async function sendRegisterOtp(payload: SendRegisterOtpPayload): Promise<
     },
     body: JSON.stringify({
       phone: normalizedPhone,
+      email: normalizedEmail,
     }),
   })
 
@@ -261,6 +263,8 @@ export async function sendRegisterOtp(payload: SendRegisterOtpPayload): Promise<
 }
 
 export async function register(payload: RegisterPayload): Promise<string> {
+  const normalizedEmail = payload.email.trim().toLowerCase()
+
   const response = await fetch(`${API_BASE_URL}/auth/register`, {
     method: 'POST',
     headers: {
@@ -270,7 +274,10 @@ export async function register(payload: RegisterPayload): Promise<string> {
       displayName: payload.displayName,
       password: payload.password,
       phone: normalizeVietnamPhone(payload.phone),
+      email: normalizedEmail,
       otp: payload.otpCode,
+      dob: payload.dob,
+      gender: payload.gender,
     }),
   })
 
@@ -290,15 +297,15 @@ export async function register(payload: RegisterPayload): Promise<string> {
 }
 
 export async function sendForgotPasswordOtp(payload: ForgotPasswordSendOtpPayload): Promise<void> {
-  const normalizedPhone = normalizeVietnamPhone(payload.phone)
+  const normalizedEmail = payload.email.trim().toLowerCase()
 
-  const response = await fetch(`${API_BASE_URL}/auth/password/forgot/send-otp`, {
+  const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      phone: normalizedPhone,
+      email: normalizedEmail,
     }),
   })
 
@@ -310,13 +317,13 @@ export async function sendForgotPasswordOtp(payload: ForgotPasswordSendOtpPayloa
 }
 
 export async function resetPassword(payload: ResetPasswordPayload): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/auth/password/reset`, {
+  const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      phone: normalizeVietnamPhone(payload.phone),
+      email: payload.email.trim().toLowerCase(),
       otp: payload.otp,
       newPassword: payload.newPassword,
     }),

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
-import { sendRegisterOtp, register as registerAccount, updateProfile } from '../features/auth/auth.api'
+import { sendRegisterOtp, register as registerAccount } from '../features/auth/auth.api'
 import type { Gender } from '../features/auth/auth.types'
 import { OtpCodeInput } from '../features/auth/components/OtpCodeInput'
 import { isNormalizedVietnamPhone, normalizeVietnamPhone } from '../features/auth/phone.util'
@@ -43,6 +43,7 @@ type RegisterStep = 'form' | 'otp'
 type RegisterFormState = {
   displayName: string
   phone: string
+  email: string
   dob: string
   gender: Gender | ''
   password: string
@@ -107,12 +108,15 @@ function getDobValidationError(dob: string, t: (key: string) => string): string 
 function validateRegisterForm(values: RegisterFormState, t: (key: string) => string): RegisterErrors {
   const errors: RegisterErrors = {}
   const normalizedPhone = normalizeVietnamPhone(values.phone)
+  const normalizedEmail = values.email.trim().toLowerCase()
 
   // Validate displayName
   if (!values.displayName.trim()) {
     errors.displayName = 'Tên người dùng'
   } else if (values.displayName.trim().length < 2) {
     errors.displayName = 'Tên người dùng phải tối thiểu 2 ký tự'
+  } else if (/\d/.test(values.displayName.trim())) {
+    errors.displayName = t('auth.registerDisplayNameNoNumber')
   }
 
   // Validate phone
@@ -120,6 +124,12 @@ function validateRegisterForm(values: RegisterFormState, t: (key: string) => str
     errors.phone = 'Số điện thoại'
   } else if (!isNormalizedVietnamPhone(normalizedPhone)) {
     errors.phone = 'Số điện thoại không hợp lệ. Dùng dạng 091..., 849... hoặc +849...'
+  }
+
+  if (!normalizedEmail) {
+    errors.email = t('auth.registerEmailRequired')
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    errors.email = t('auth.registerEmailInvalid')
   }
 
   const dobError = getDobValidationError(values.dob, t)
@@ -166,6 +176,7 @@ export function RegisterPage() {
   const [form, setForm] = useState<RegisterFormState>({
     displayName: '',
     phone: '',
+    email: '',
     dob: '',
     gender: '',
     password: '',
@@ -173,6 +184,7 @@ export function RegisterPage() {
   })
   const [otpCode, setOtpCode] = useState('')
   const [normalizedPhone, setNormalizedPhone] = useState('')
+  const [normalizedEmail, setNormalizedEmail] = useState('')
   const [errors, setErrors] = useState<RegisterErrors>({})
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
@@ -237,7 +249,7 @@ export function RegisterPage() {
               <p>
                 {step === 'form'
                   ? t('auth.registerSubtitle')
-                  : `${t('auth.otpSubtitlePrefix')} ${normalizedPhone}.`}
+                  : `${t('auth.otpSubtitlePrefix')} ${normalizedEmail}.`}
               </p>
             </div>
 
@@ -259,10 +271,12 @@ export function RegisterPage() {
                 setIsSubmitting(true)
 
                 const phoneValue = normalizeVietnamPhone(form.phone)
+                const emailValue = form.email.trim().toLowerCase()
 
                 try {
-                  await sendRegisterOtp({ phone: phoneValue })
+                  await sendRegisterOtp({ phone: phoneValue, email: emailValue })
                   setNormalizedPhone(phoneValue)
+                  setNormalizedEmail(emailValue)
                   setStep('otp')
                 } catch (error) {
                   setErrorMessage(
@@ -286,15 +300,27 @@ export function RegisterPage() {
               </label>
 
               <label>
-                {t('auth.identifierLabel')}
+                {t('profile.phone')}
                 <input
                   type='tel'
-                  placeholder={t('auth.identifierPlaceholder')}
+                  placeholder={t('auth.registerPhonePlaceholder')}
                   value={form.phone}
                   onChange={(event) => setField('phone', event.target.value)}
                   autoComplete='tel'
                 />
                 {errors.phone ? <span className='auth-field-error'>{errors.phone}</span> : null}
+              </label>
+
+              <label>
+                {t('auth.registerEmailLabel')}
+                <input
+                  type='email'
+                  placeholder={t('auth.registerEmailPlaceholder')}
+                  value={form.email}
+                  onChange={(event) => setField('email', event.target.value)}
+                  autoComplete='email'
+                />
+                {errors.email ? <span className='auth-field-error'>{errors.email}</span> : null}
               </label>
 
               <div className='auth-form-two-columns'>
@@ -400,15 +426,13 @@ export function RegisterPage() {
                 setIsSubmitting(true)
 
                 try {
-                  const accessToken = await registerAccount({
+                  await registerAccount({
                     displayName: form.displayName.trim(),
                     phone: normalizedPhone,
+                    email: normalizedEmail,
                     password: form.password,
                     otpCode,
-                  })
-
-                  await updateProfile(accessToken, {
-                    dob: form.dob,
+                    dob: form.dob || undefined,
                     gender: form.gender || undefined,
                   })
 
@@ -419,7 +443,7 @@ export function RegisterPage() {
                       replace: true,
                       state: {
                         registered: true,
-                        phone: normalizedPhone,
+                        email: normalizedEmail,
                       },
                     })
                   }, 1000)
@@ -453,7 +477,7 @@ export function RegisterPage() {
                     setIsResendingOtp(true)
 
                     try {
-                      await sendRegisterOtp({ phone: normalizedPhone })
+                      await sendRegisterOtp({ phone: normalizedPhone, email: normalizedEmail })
                       setSuccessMessage(t('auth.resendOtpSuccess'))
                     } catch (error) {
                       setErrorMessage(

@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom'
 
 import { resetPassword, sendForgotPasswordOtp } from '../features/auth/auth.api'
 import { OtpCodeInput } from '../features/auth/components/OtpCodeInput'
-import { isNormalizedVietnamPhone, normalizeVietnamPhone } from '../features/auth/phone.util'
 import { validatePassword } from '../features/auth/password.util'
 import { AuthPageControls } from '../shared/components/AuthPageControls'
 import { useLanguage } from '../shared/i18n/LanguageContext'
@@ -37,15 +36,15 @@ function PasswordToggleIcon({ visible }: { visible: boolean }) {
   )
 }
 
-type ForgotStep = 'phone' | 'reset'
+type ForgotStep = 'email' | 'reset'
 
 export function ForgotPasswordPage() {
   const navigate = useNavigate()
   const { t } = useLanguage()
 
-  const [step, setStep] = useState<ForgotStep>('phone')
-  const [phoneInput, setPhoneInput] = useState('')
-  const [normalizedPhone, setNormalizedPhone] = useState('')
+  const [step, setStep] = useState<ForgotStep>('email')
+  const [emailInput, setEmailInput] = useState('')
+  const [normalizedEmail, setNormalizedEmail] = useState('')
   const [otpCode, setOtpCode] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmNewPassword, setConfirmNewPassword] = useState('')
@@ -56,8 +55,8 @@ export function ForgotPasswordPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
-  const resetToPhoneStep = () => {
-    setStep('phone')
+  const resetToEmailStep = () => {
+    setStep('email')
     setOtpCode('')
     setNewPassword('')
     setConfirmNewPassword('')
@@ -79,15 +78,15 @@ export function ForgotPasswordPage() {
           <section className='auth-content'>
             <div className='auth-copy-block'>
               <p className='auth-eyebrow'>{t('auth.forgotEyebrow')}</p>
-              <h2>{step === 'phone' ? t('auth.forgotWelcome') : t('auth.resetWelcome')}</h2>
+              <h2>{step === 'email' ? t('auth.forgotWelcome') : t('auth.resetWelcome')}</h2>
               <p>
-                {step === 'phone'
+                {step === 'email'
                   ? t('auth.forgotSubtitle')
-                  : `${t('auth.resetSubtitlePrefix')} ${normalizedPhone}.`}
+                  : `${t('auth.resetSubtitlePrefix')} ${normalizedEmail}.`}
               </p>
             </div>
 
-            {step === 'phone' ? (
+            {step === 'email' ? (
               <form
                 className='auth-form auth-form-register'
                 onSubmit={async (event) => {
@@ -96,18 +95,23 @@ export function ForgotPasswordPage() {
                   setErrorMessage(null)
                   setSuccessMessage(null)
 
-                  const normalized = normalizeVietnamPhone(phoneInput)
+                  const normalized = emailInput.trim().toLowerCase()
 
-                  if (!isNormalizedVietnamPhone(normalized)) {
-                    setErrorMessage(t('auth.forgotInvalidPhone'))
+                  if (!normalized) {
+                    setErrorMessage(t('auth.forgotEmailRequired'))
+                    return
+                  }
+
+                  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+                    setErrorMessage(t('auth.forgotInvalidEmail'))
                     return
                   }
 
                   setIsSubmitting(true)
 
                   try {
-                    await sendForgotPasswordOtp({ phone: normalized })
-                    setNormalizedPhone(normalized)
+                    await sendForgotPasswordOtp({ email: normalized })
+                    setNormalizedEmail(normalized)
                     setStep('reset')
                     setSuccessMessage(t('auth.otpSentSuccess'))
                   } catch (error) {
@@ -118,13 +122,13 @@ export function ForgotPasswordPage() {
                 }}
               >
                 <label>
-                  {t('auth.identifierLabel')}
+                  {t('auth.registerEmailLabel')}
                   <input
-                    type='tel'
-                    placeholder={t('auth.identifierPlaceholder')}
-                    value={phoneInput}
-                    onChange={(event) => setPhoneInput(event.target.value)}
-                    autoComplete='tel'
+                    type='email'
+                    placeholder={t('auth.registerEmailPlaceholder')}
+                    value={emailInput}
+                    onChange={(event) => setEmailInput(event.target.value)}
+                    autoComplete='email'
                   />
                 </label>
 
@@ -173,7 +177,7 @@ export function ForgotPasswordPage() {
 
                   try {
                     await resetPassword({
-                      phone: normalizedPhone,
+                      email: normalizedEmail,
                       otp: otpCode,
                       newPassword,
                     })
@@ -262,7 +266,7 @@ export function ForgotPasswordPage() {
                       setIsResendingOtp(true)
 
                       try {
-                        await sendForgotPasswordOtp({ phone: normalizedPhone })
+                        await sendForgotPasswordOtp({ email: normalizedEmail })
                         setSuccessMessage(t('auth.otpSentSuccess'))
                       } catch (error) {
                         setErrorMessage(error instanceof Error ? error.message : t('auth.resendOtpFail'))
@@ -278,9 +282,9 @@ export function ForgotPasswordPage() {
                     type='button'
                     className='auth-secondary-button'
                     disabled={isSubmitting || isResendingOtp}
-                    onClick={resetToPhoneStep}
+                    onClick={resetToEmailStep}
                   >
-                    {t('auth.changePhoneButton')}
+                    {t('auth.changeEmailButton')}
                   </button>
                 </div>
 
