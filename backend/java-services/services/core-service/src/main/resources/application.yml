@@ -123,14 +123,14 @@ spring:
     exclude:
       - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
 
-# Dev: OTP disabled for faster development (set OTP_ENABLED=true to test)
+# Dev: OTP email delivery defaults (set SMTP_USER + MAIL_APP_PASSWORD in docker/.env)
 otp:
   enabled: true
   email-enabled: true
   test-mode:
-    enabled: true      # Use mock OTP "123456" when testing
+    enabled: ${OTP_TEST_MODE:false}
     mock-otp: "123456"
-    log-otp: true
+    log-otp: ${OTP_LOG_OTP:false}
 
 # Dev: Default JWT secret (only for development!)
 jwt:
