@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
+import 'package:vnalo_mobile/features/profile/screens/account_security_screen.dart';
+import 'package:vnalo_mobile/features/profile/screens/profile_detail_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/settings_screen.dart';
 import 'dart:io';
 
@@ -104,51 +106,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: ListView(
         children: [
           // User header
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
-            child: Row(
-              children: [
-                Stack(
-                  children: [
-                    AvatarWidget(
-                      imageUrl: auth.user?.avatarUrl,
-                      name: displayName,
-                      size: 60,
-                    ),
-                    Positioned(
-                      right: 0,
-                      bottom: 0,
-                      child: GestureDetector(
-                        onTap: _updateAvatar,
-                        child: Container(
-                          width: 22,
-                          height: 22,
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 1.5),
-                          ),
-                          child: const Icon(
-                            Icons.camera_alt,
-                            size: 12,
-                            color: Colors.white,
+          InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProfileDetailScreen()),
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+              child: Row(
+                children: [
+                  Stack(
+                    children: [
+                      AvatarWidget(
+                        imageUrl: auth.user?.avatarUrl,
+                        name: displayName,
+                        size: 60,
+                      ),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: GestureDetector(
+                          onTap: _updateAvatar,
+                          child: Container(
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 1.5),
+                            ),
+                            child: const Icon(
+                              Icons.camera_alt,
+                              size: 12,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Text(
-                    displayName,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
+                    ],
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      displayName,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                  const Icon(Icons.chevron_right, color: Color(0xFFD1D5DB)),
+                ],
+              ),
             ),
           ),
           // const Divider(height: 1),
@@ -187,6 +198,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: Icons.shield_outlined,
             iconColor: AppColors.primary,
             title: 'Tài khoản và bảo mật',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const AccountSecurityScreen(),
+                ),
+              );
+            },
           ),
           _menuItem(
             context,

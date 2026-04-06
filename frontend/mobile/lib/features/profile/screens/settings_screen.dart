@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/auth/screens/welcome_screen.dart';
+import 'package:vnalo_mobile/features/profile/screens/account_security_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/appearance_settings_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -43,7 +44,18 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         children: [
           _buildSection(context, [
-            _item(Icons.shield_outlined, 'Tài khoản và bảo mật'),
+            _item(
+              Icons.shield_outlined,
+              'Tài khoản và bảo mật',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const AccountSecurityScreen(),
+                  ),
+                );
+              },
+            ),
             _item(Icons.lock_outline, 'Quyền riêng tư'),
           ]),
           const _SectionDivider(),
