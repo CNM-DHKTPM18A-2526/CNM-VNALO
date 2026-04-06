@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:vnalo_mobile/config/app_config.dart';
 import 'package:vnalo_mobile/services/auth_events.dart';
 import 'package:vnalo_mobile/services/storage_service.dart';
+import 'package:http_parser/http_parser.dart';
 
 class ApiService {
   final StorageService _storageService;
@@ -82,7 +83,13 @@ class ApiService {
 
     final request = http.MultipartRequest('POST', url)
       ..fields.addAll(fields ?? <String, String>{})
-      ..files.add(await http.MultipartFile.fromPath(fileField, file.path));
+      ..files.add(
+        await http.MultipartFile.fromPath(
+          fileField,
+          file.path,
+          contentType: _detectMediaType(file.path),
+        ),
+      );
 
     if (token != null && token.isNotEmpty) {
       request.headers['Authorization'] = 'Bearer $token';
@@ -293,10 +300,18 @@ class ApiService {
     if (response.statusCode == 401) {
       throw UnauthorizedException(body['message'] ?? 'Unauthorized');
     }
+
+    // Extract error message from multiple possible response formats
+    final message = body['message']
+        ?? body['error']
+        ?? body['detail']
+        ?? body['error_description']
+        ?? 'Lỗi máy chủ (${response.statusCode})';
+
     throw ApiException(
       statusCode: response.statusCode,
-      message: body['message'] ?? 'Unknown error',
-      code: body['code'],
+      message: message.toString(),
+      code: body['code']?.toString(),
     );
   }
 
@@ -316,6 +331,36 @@ class ApiService {
       return <String, dynamic>{'data': decoded};
     } catch (_) {
       return <String, dynamic>{'raw': rawBody};
+    }
+  }
+  /// Detect MIME type from file extension to ensure backend accepts the upload.
+  static MediaType _detectMediaType(String filePath) {
+    final ext = filePath.split('.').last.toLowerCase();
+    switch (ext) {
+      case 'jpg':
+      case 'jpeg':
+        return MediaType('image', 'jpeg');
+      case 'png':
+        return MediaType('image', 'png');
+      case 'gif':
+        return MediaType('image', 'gif');
+      case 'webp':
+        return MediaType('image', 'webp');
+      case 'mp4':
+        return MediaType('video', 'mp4');
+      case 'webm':
+        return MediaType('video', 'webm');
+      case 'mov':
+        return MediaType('video', 'quicktime');
+      case 'mp3':
+        return MediaType('audio', 'mpeg');
+      case 'ogg':
+        return MediaType('audio', 'ogg');
+      case 'pdf':
+        return MediaType('application', 'pdf');
+      default:
+        // Default to image/jpeg for image-picker temp files with no extension
+        return MediaType('image', 'jpeg');
     }
   }
 }

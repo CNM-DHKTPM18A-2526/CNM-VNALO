@@ -123,12 +123,12 @@ spring:
     exclude:
       - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
 
-# Dev: OTP disabled for faster development (set OTP_ENABLED=true to test)
+# Dev: Testing mode overrides
 otp:
-  enabled: true
-  email-enabled: true
+  enabled: ${OTP_ENABLED:true}
+  email-enabled: ${OTP_EMAIL_ENABLED:true}
   test-mode:
-    enabled: true      # Use mock OTP "123456" when testing
+    enabled: ${OTP_TEST_MODE:true}      # Can be disabled to test real email sending
     mock-otp: "123456"
     log-otp: true
 

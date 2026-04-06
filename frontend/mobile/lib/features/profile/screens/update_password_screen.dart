@@ -32,7 +32,7 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
     if (next.length < 8) return false;
     if (!RegExp(r'[A-Z]').hasMatch(next)) return false;
     if (!RegExp(r'[a-z]').hasMatch(next)) return false;
-    if (!RegExp(r'\d').hasMatch(next)) return false;
+    if (!RegExp(r'[0-9]').hasMatch(next)) return false;
     if (next != confirm) return false;
     return true;
   }
@@ -46,7 +46,7 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
         error = 'Mật khẩu phải có ít nhất 1 chữ hoa';
       } else if (!RegExp(r'[a-z]').hasMatch(value)) {
         error = 'Mật khẩu phải có ít nhất 1 chữ thường';
-      } else if (!RegExp(r'\d').hasMatch(value)) {
+      } else if (!RegExp(r'[0-9]').hasMatch(value)) {
         error = 'Mật khẩu phải có ít nhất 1 chữ số';
       }
     }
@@ -108,7 +108,7 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
           message = 'Mật khẩu mới không đáp ứng yêu cầu';
           break;
         default:
-          message = e.message.isNotEmpty
+          message = e.message.isNotEmpty && e.message != 'Unknown error'
               ? e.message
               : 'Cập nhật mật khẩu thất bại (${e.statusCode})';
       }
@@ -118,8 +118,8 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đã xảy ra lỗi, vui lòng thử lại'),
+        SnackBar(
+          content: Text('Lỗi: $e'),
           backgroundColor: AppColors.error,
         ),
       );

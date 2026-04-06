@@ -297,6 +297,28 @@ public class MediaController {
         return ResponseEntity.ok(ApiResponse.ok(scopes));
     }
 
+    // ==================== Public File Access (no auth) ====================
+
+    /**
+     * Publicly accessible endpoint to serve media files by mediaId.
+     * Used by mobile clients (e.g. avatar images in CachedNetworkImageProvider)
+     * where passing Authorization headers is not practical.
+     */
+    @GetMapping("/public/{id}")
+    public ResponseEntity<byte[]> getPublicFile(
+            @PathVariable UUID id
+    ) {
+        MediaMetadata media = mediaService.getMedia(id);
+        byte[] fileBytes = mediaService.downloadMediaBytes(id);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.add(HttpHeaders.CONTENT_TYPE, media.getMimeType() != null ? media.getMimeType() : "application/octet-stream");
+        headers.setContentLength(fileBytes.length);
+        headers.add(HttpHeaders.CACHE_CONTROL, "public, max-age=86400");
+
+        return ResponseEntity.ok().headers(headers).body(fileBytes);
+    }
+
     // ==================== Helper ====================
 
     private UUID getUserId(Authentication authentication) {

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:vnalo_mobile/config/app_config.dart';
 import 'package:vnalo_mobile/models/user_model.dart';
 import 'package:vnalo_mobile/services/api_service.dart';
@@ -126,15 +127,12 @@ class AuthService {
     return User.fromJson(response['data']);
   }
 
-  /// Extracts a public media URL from core-style `{ data: { ... } }` upload responses.
-  static String? parseUploadedMediaUrl(Map<String, dynamic> response) {
+  /// Extracts the mediaId from a media-service upload response.
+  static String? _parseMediaId(Map<String, dynamic> response) {
     final data = response['data'];
     if (data is! Map<String, dynamic>) return null;
-    final url = data['url'] ??
-        data['fileUrl'] ??
-        data['mediaUrl'] ??
-        data['downloadUrl'];
-    if (url is String && url.isNotEmpty) return url;
+    final id = data['mediaId'] ?? data['media_id'];
+    if (id != null) return id.toString();
     return null;
   }
 
@@ -146,11 +144,26 @@ class AuthService {
       fields: const {'category': 'AVATAR'},
     );
 
-    final url = parseUploadedMediaUrl(response);
-    if (url == null) {
-      throw StateError('Invalid media upload response or missing URL');
+    debugPrint('[AVATAR] Upload response data: ${response['data']}');
+
+    // Use the media-service save endpoint URL (existing, deployed, auth-protected).
+    // AvatarWidget passes auth headers so this works without needing public endpoint.
+    final mediaId = _parseMediaId(response);
+    if (mediaId != null) {
+      final avatarUrl = '$_mediaBase/media/$mediaId/save';
+      debugPrint('[AVATAR] Constructed save URL: $avatarUrl');
+      return avatarUrl;
     }
-    return url;
+
+    // Fallback: try raw URL from response
+    final data = response['data'];
+    if (data is Map<String, dynamic>) {
+      final url = data['url'] ?? data['fileUrl'] ?? data['mediaUrl'];
+      debugPrint('[AVATAR] Fallback URL: $url');
+      if (url is String && url.isNotEmpty) return url;
+    }
+
+    throw StateError('Invalid media upload response or missing mediaId/URL');
   }
 
   Future<void> updateProfileAvatar(String avatarUrl) async {
@@ -198,6 +211,40 @@ class AuthService {
         'otp': otp,
         'newPassword': newPassword,
       },
+    );
+  }
+
+  Future<String> uploadCover(File coverFile) async {
+    final response = await _apiService.postMultipart(
+      _mediaBase,
+      '/media/upload',
+      file: coverFile,
+      fields: const {'category': 'COVER'},
+    );
+
+    debugPrint('[COVER] Upload response data: ${response['data']}');
+
+    final mediaId = _parseMediaId(response);
+    if (mediaId != null) {
+      final coverUrl = '$_mediaBase/media/$mediaId/save';
+      debugPrint('[COVER] Constructed save URL: $coverUrl');
+      return coverUrl;
+    }
+
+    final data = response['data'];
+    if (data is Map<String, dynamic>) {
+      final url = data['url'] ?? data['fileUrl'] ?? data['mediaUrl'];
+      if (url is String && url.isNotEmpty) return url;
+    }
+
+    throw StateError('Invalid media upload response or missing mediaId/URL');
+  }
+
+  Future<void> updateProfileCover(String coverUrl) async {
+    await _apiService.patch(
+      _base,
+      '/users/me',
+      body: {'coverUrl': coverUrl},
     );
   }
 }

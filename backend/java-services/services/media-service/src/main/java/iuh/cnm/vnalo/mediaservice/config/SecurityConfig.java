@@ -52,6 +52,8 @@ public class SecurityConfig {
                         // Public: Swagger, health check
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                        // Public: media files (avatars, etc.) served without auth for image widgets
+                        .requestMatchers("/api/v1/media/public/**").permitAll()
                         // Protected: all other actuator endpoints
                         .requestMatchers("/actuator/**").authenticated()
                         // Protected: all API endpoints require valid JWT

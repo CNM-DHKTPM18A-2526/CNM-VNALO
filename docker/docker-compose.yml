@@ -114,6 +114,9 @@ services:
     container_name: vnalo-core-service
     ports:
       - "8081:8081"
+    env_file:
+      - ../config/environments/.env
+      - .env
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
@@ -125,12 +128,6 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:-iuh-cnm-vnalo-firebase-adminsdk-fbsvc-5008b7c5eb.json}
-      OTP_ENABLED: ${OTP_ENABLED:-true}
-      OTP_EMAIL_ENABLED: ${OTP_EMAIL_ENABLED:-true}
-      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER:-}
-      MAIL_APP_PASSWORD: ${MAIL_APP_PASSWORD:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -214,6 +211,8 @@ services:
       AWS_REGION: ${AWS_REGION:-ap-southeast-1}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+    volumes:
+      - media_local_data:/app/.media-local
     depends_on:
       postgres:
         condition: service_healthy
@@ -437,6 +436,8 @@ volumes:
   ollama_data:
     driver: local
   rabbitmq_data:
+    driver: local
+  media_local_data:
     driver: local
 
 networks:

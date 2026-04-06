@@ -19,6 +19,8 @@ class AuthProvider extends ChangeNotifier {
   /// Non-fatal result message — set when registration succeeds but a
   /// secondary action (e.g. avatar upload) fails. Does not affect [isLoggedIn].
   String? _warning;
+  /// Cached access token for synchronous access (e.g. image loading headers).
+  String? _accessToken;
 
   User? get user => _user;
   bool get isLoading => _isLoading;
@@ -27,6 +29,8 @@ class AuthProvider extends ChangeNotifier {
   String? get error => _error;
   /// Non-fatal warning surfaced after a successful registration.
   String? get warning => _warning;
+  /// Current access token (cached in memory for synchronous access).
+  String? get accessToken => _accessToken;
 
   AuthProvider(this._authService, this._storageService, this._socketService) {
     AuthEvents.onSessionInvalidated = logout;
@@ -36,11 +40,13 @@ class AuthProvider extends ChangeNotifier {
   Future<void> initialize() async {
     final token = await _storageService.getAccessToken();
     if (token != null) {
+      _accessToken = token;
       try {
         _user = await _authService.getMe();
         _socketService.connect(token);
       } catch (_) {
         await _storageService.clearAll();
+        _accessToken = null;
       }
     }
     _isInitialized = true;
@@ -67,6 +73,7 @@ class AuthProvider extends ChangeNotifier {
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
       );
+      _accessToken = tokens.accessToken;
 
       if (data['user'] != null) {
         await _storageService.saveUserId(data['user']['id']);
@@ -164,6 +171,7 @@ class AuthProvider extends ChangeNotifier {
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
       );
+      _accessToken = tokens.accessToken;
       _socketService.connect(tokens.accessToken);
 
       final hydrated = await _hydrateUserAfterRegister(
@@ -179,8 +187,11 @@ class AuthProvider extends ChangeNotifier {
       if (avatarFile != null) {
         try {
           final avatarUrl = await _uploadAvatarWithRetry(avatarFile);
+          debugPrint('[AVATAR-REG] avatarUrl to save: $avatarUrl');
           await _authService.updateProfileAvatar(avatarUrl);
           // Refresh profile to pick up the persisted avatar URL.
+          _user = await _authService.getMe();
+          debugPrint('[AVATAR-REG] user.avatarUrl after getMe: ${_user?.avatarUrl}');
           try {
             _user = await _authService.getMe();
           } catch (_) {
@@ -191,6 +202,7 @@ class AuthProvider extends ChangeNotifier {
           }
           // No need to re-save userId — it cannot change after registration.
         } catch (e) {
+          debugPrint('[AVATAR-REG] Error: $e');
           // Avatar upload is non-fatal: registration already succeeded.
           final av = _avatarUploadWarning(e);
           _warning = _warning != null && _warning!.isNotEmpty
@@ -392,6 +404,30 @@ class AuthProvider extends ChangeNotifier {
     return _TokenPair(accessToken: access, refreshToken: refresh);
   }
 
+  /// Update cover photo from profile detail screen.
+  Future<bool> updateCover(File coverFile) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final coverUrl = await _authService.uploadCover(coverFile);
+      debugPrint('[COVER] updateCover URL: $coverUrl');
+      await _authService.updateProfileCover(coverUrl);
+      _user = await _authService.getMe();
+      debugPrint('[COVER] User coverUrl after update: ${_user?.coverUrl}');
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('[COVER] updateCover error: $e');
+      _error = 'Cập nhật ảnh bìa thất bại';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   // Logout the user by clearing tokens, disconnecting socket, and resetting state
   Future<void> logout() async {
     try {
@@ -406,6 +442,7 @@ class AuthProvider extends ChangeNotifier {
     _socketService.disconnect();
     await _storageService.clearAll();
     _user = null;
+    _accessToken = null;
     notifyListeners();
   }
 
