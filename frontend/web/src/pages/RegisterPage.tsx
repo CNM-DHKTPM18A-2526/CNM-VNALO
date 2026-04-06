@@ -51,12 +51,62 @@ type RegisterFormState = {
 
 type RegisterErrors = Partial<Record<keyof RegisterFormState | 'otpCode', string>>
 
-function validateRegisterForm(values: RegisterFormState): RegisterErrors {
+const MIN_REGISTER_AGE = 16
+
+function getLocalTodayIsoDate() {
+  const now = new Date()
+  const offsetMs = now.getTimezoneOffset() * 60000
+  return new Date(now.getTime() - offsetMs).toISOString().slice(0, 10)
+}
+
+function isAtLeastAge(dobIso: string, minAge: number, referenceDate = new Date()) {
+  const [yearRaw, monthRaw, dayRaw] = dobIso.split('-')
+  const year = Number(yearRaw)
+  const month = Number(monthRaw)
+  const day = Number(dayRaw)
+
+  if (!year || !month || !day) {
+    return false
+  }
+
+  const birthDate = new Date(year, month - 1, day)
+  if (Number.isNaN(birthDate.getTime())) {
+    return false
+  }
+
+  let age = referenceDate.getFullYear() - year
+  const currentMonth = referenceDate.getMonth() + 1
+  const currentDay = referenceDate.getDate()
+  const hadBirthdayThisYear = currentMonth > month || (currentMonth === month && currentDay >= day)
+
+  if (!hadBirthdayThisYear) {
+    age -= 1
+  }
+
+  return age >= minAge
+}
+
+function getDobValidationError(dob: string, t: (key: string) => string): string | null {
+  const todayIso = getLocalTodayIsoDate()
+
+  if (!dob) {
+    return t('auth.registerDobRequired')
+  }
+
+  if (dob > todayIso) {
+    return t('auth.registerDobFuture')
+  }
+
+  if (!isAtLeastAge(dob, MIN_REGISTER_AGE)) {
+    return t('auth.registerMinimumAge')
+  }
+
+  return null
+}
+
+function validateRegisterForm(values: RegisterFormState, t: (key: string) => string): RegisterErrors {
   const errors: RegisterErrors = {}
   const normalizedPhone = normalizeVietnamPhone(values.phone)
-  const todayIso = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000)
-    .toISOString()
-    .slice(0, 10)
 
   // Validate displayName
   if (!values.displayName.trim()) {
@@ -72,10 +122,9 @@ function validateRegisterForm(values: RegisterFormState): RegisterErrors {
     errors.phone = 'Số điện thoại không hợp lệ. Dùng dạng 091..., 849... hoặc +849...'
   }
 
-  if (!values.dob) {
-    errors.dob = 'Vui lòng chọn ngày sinh'
-  } else if (values.dob > todayIso) {
-    errors.dob = 'Ngày sinh không được ở tương lai'
+  const dobError = getDobValidationError(values.dob, t)
+  if (dobError) {
+    errors.dob = dobError
   }
 
   if (!values.gender) {
@@ -137,12 +186,23 @@ export function RegisterPage() {
   const setField = <T extends keyof RegisterFormState>(field: T, value: RegisterFormState[T]) => {
     setForm((prev) => ({ ...prev, [field]: value }))
     setErrors((prev) => {
-      if (!prev[field]) {
-        return prev
+      const next = { ...prev }
+
+      if (field === 'dob') {
+        const dobError = getDobValidationError(String(value), t)
+        if (dobError) {
+          next.dob = dobError
+        } else {
+          delete next.dob
+        }
+
+        return next
       }
 
-      const next = { ...prev }
-      delete next[field]
+      if (next[field]) {
+        delete next[field]
+      }
+
       return next
     })
   }
@@ -187,7 +247,7 @@ export function RegisterPage() {
               onSubmit={async (event) => {
                 event.preventDefault()
 
-                const nextErrors = validateRegisterForm(form)
+                const nextErrors = validateRegisterForm(form, t)
                 setErrors(nextErrors)
 
                 if (Object.keys(nextErrors).length > 0) {
@@ -243,9 +303,7 @@ export function RegisterPage() {
                   <input
                     type='date'
                     value={form.dob}
-                    max={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000)
-                      .toISOString()
-                      .slice(0, 10)}
+                    max={getLocalTodayIsoDate()}
                     onChange={(event) => setField('dob', event.target.value)}
                   />
                   {errors.dob ? <span className='auth-field-error'>{errors.dob}</span> : null}
