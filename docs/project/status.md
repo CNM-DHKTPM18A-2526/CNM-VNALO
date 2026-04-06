@@ -1,91 +1,63 @@
 # Implementation Status
 
-> Last updated: 2026-03-20
+> Last updated: 2026-04-06
 
 ---
 
-## Dev 1 — Leader (core-service + message-service)
+## Backend Runtime Status
 
-| Module | Status | Endpoints | Tests |
-|--------|--------|-----------|-------|
-| Auth (Register/Login/JWT/OTP) | ✅ Complete | 7 | ✅ AuthServiceTest |
-| User (Profile/Settings/Privacy) | ✅ Complete | 6 | ✅ UserServiceTest |
-| Friends | ✅ Complete | 10 | ✅ FriendServiceTest |
-| Blocks | ✅ Complete | 4 | ✅ BlockServiceTest |
-| QR Module | ✅ Complete | 3 | — |
-| Contact Sync | ✅ Complete | 4 | — |
-| Conversations | ✅ Complete | 11 | ✅ conversation.service.spec |
-| Messages (CRUD + Delete for Me) | ✅ Complete | 6 | ✅ message.service.spec |
-| Reactions | ✅ Complete | 3 | — |
-| Pins | ✅ Complete | 3 | — |
-| Read Receipts | ✅ Complete | 1 | — |
-| Inbox | ✅ Complete | 2 | — |
-| WebSocket Gateway | ✅ Complete | 7 events | — |
-
-**Total: 60/60 features implemented**
+| Service | Port | Status | Notes |
+|--------|------|--------|-------|
+| core-service | 8081 | ✅ Complete | Auth, user, social, QR, contact sync; Flyway owner |
+| message-service | 3000 | ✅ Complete | Conversations, messages, inbox, Socket.IO gateway |
+| media-service | 8083 | 🔄 In Progress | Upload/sticker APIs available; S3 and local fallback modes |
+| realtime-gateway | 8085 | 🔄 In Progress | Redis-based WS adapter skeleton, health endpoint |
+| moderation-service | 8082 | 🔄 In Progress | Moderation workflows, dedicated docs/runbooks |
+| content-service | 8086 | 🧪 Scaffolded | Service scaffold in repo + compose |
+| notification-service | 8087 | 🧪 Scaffolded | Service scaffold in repo + compose |
+| ai-service | 8094 | 🧪 Experimental | Gemini + Ollama fallback service |
+| analytics-service | 8084 (profile) | ⏳ Planned | Compose profile placeholder, source not yet present |
 
 ---
 
-## Dev 2 — Realtime & Media
+## Data and Migration Status
 
-| Module | Status | Notes |
-|--------|--------|-------|
-| realtime-gateway | ⏸️ Not started | Depends on message-service |
-| media-service | 🔄 In Progress | Upload to S3 (WIP) |
-
-## Dev 3 — Content & Notifications
-
-| Module | Status | Notes |
-|--------|--------|-------|
-| content-service (Story) | ⏸️ Not started | — |
-| content-service (Timeline) | ⏸️ Not started | — |
-| notification-service | ⏸️ Not started | FCM integration ready in core-service |
-
-## Dev 4 — Admin & Support
-
-| Module | Status | Notes |
-|--------|--------|-------|
-| moderation-service | ⏸️ Not started | — |
-| analytics-service | ⏸️ Not started | — |
+| Item | Status | Notes |
+|------|--------|-------|
+| PostgreSQL | ✅ Active | Primary persistent store |
+| Redis | ✅ Active | Cache, presence/sequence support |
+| Flyway | ✅ Active | V1 -> V13 in core-service |
+| Message persistence | ✅ Active | PostgreSQL via TypeORM entities |
+| Cassandra | ❌ Not runtime | Historical/planned references only in legacy docs |
 
 ---
 
-## Database Migrations
+## Frontend Status (Flutter Mobile)
 
-| Version | Status | Tables |
-|---------|--------|--------|
-| V1 | ✅ Applied | auth_account, user_profile, user_setting, user_privacy_setting |
-| V2 | ✅ Applied | Foreign keys |
-| V3 | ✅ Applied | Auth account enhancements |
-| V4 | ✅ Applied | Refresh token device tracking |
-| V5 | ✅ Applied | friend_request, friendship, block_list, contact_sync |
-| V6 | ✅ Applied | User profile enhancements |
-| V7 | ✅ Applied | Indexes, constraints |
-| V8 | ✅ Applied | conversation, conversation_member, message, conversation_inbox |
-| V9 | ✅ Applied | message_reaction, pinned_message, message_receipt |
-| V10 | ✅ Applied | Schema hardening, idempotent guards, uniqueness constraints, FK integrity, performance indexes |
-| V11 | ✅ Applied | Group member_limit default 1000→100, backfill existing groups |
-| V12 | ✅ Applied | Thêm cột hidden_by_users cho tính năng Delete For Me |
-| V13 | ✅ Applied | `conversation_join_request`, default `join_mode=OPEN` |
+| Area | Status | Notes |
+|------|--------|-------|
+| Project setup and env config | ✅ Complete | `--dart-define` driven environments |
+| Authentication flow | ✅ Complete | Register/login/profile hydration with resilient fallback |
+| Avatar upload flow | 🔄 Hardened | Retry + timeout handling + non-fatal completion path |
+| Chat/contact/profile feature modules | 🔄 In Progress | Module folders exist and active development ongoing |
+| Test coverage (mobile unit) | 🔄 In Progress | Key config/auth service tests present |
 
 ---
 
-## Frontend — Mobile (Flutter)
+## Verification Snapshot
 
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Project setup (pubspec.yaml) | ✅ Complete | SDK ^3.7.2, 16 packages |
-| Environment config (AppConfig) | ✅ Complete | 3 envs via `--dart-define` |
-| Theme system (3 modes) | ✅ Complete | Light/Dark/System + persistence |
-| Data models (10 files) | ✅ Complete | Aligned 100% with backend entities |
-| Feature screens | ⏸️ Not started | Guide docs ready, code to implement |
-| API integration | ⏸️ Not started | Services designed in guide |
+| Track | Result |
+|------|--------|
+| core-service tests | ✅ pass in recent runs |
+| node-services tests | ✅ available and executable from workspace |
+| smoke auth-avatar-inbox flow | ✅ pass in recent reconciled runs |
+| docker compose runtime | ✅ infra + services compose definitions aligned with docs |
 
 ---
 
-## Test Results
+## Known Gaps / Next Priorities
 
-| Service | Suites | Tests | Status |
-|---------|--------|-------|--------|
-| core-service | 5 | 43 | ✅ Pass |
-| message-service | 2 | 23 | ✅ Pass (verified 2026-03-07) |
+1. Complete feature implementation for content-service and notification-service.
+2. Finalize analytics-service source module (compose profile currently placeholder).
+3. Continue strengthening end-to-end tests across mobile + media/realtime paths.
+4. Keep docs synchronized after each service milestone.

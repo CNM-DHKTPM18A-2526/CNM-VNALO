@@ -1,34 +1,43 @@
 # VNALO Documentation
 
-> Standardized documentation for VNALO — Enterprise Real-Time Messaging Platform
+> Runtime-reconciled documentation index for VNALO (updated for current repository state).
 
 ---
 
 ## System Documentation
 
-Technical reference that describes how the system works.
+Core technical references that describe architecture, APIs, and storage.
 
 | Document | Description |
 |----------|-------------|
-| [Architecture](system/architecture.md) | System architecture, service map, communication patterns |
-| [Database Schema](system/database-schema.md) | Complete PostgreSQL schema design (target spec, 71 tables) |
-| [API Reference](system/api-reference.md) | All REST endpoints and WebSocket events |
+| [Architecture](system/architecture.md) | Current service map, ports, communication patterns, runtime scope |
+| [Database Schema](system/database-schema.md) | PostgreSQL-first schema documentation with reconcile notes |
+| [API Reference](system/api-reference.md) | REST endpoints and Socket.IO events |
 
 ## Project Documentation
 
-Reflects current project state and progress. Updated frequently.
+Planning and execution documents for implementation tracking.
 
 | Document | Description |
 |----------|-------------|
-| [Team Assignment](project/team-assignment.md) | Task distribution across 4 team members |
-| [Changelog](project/changelog.md) | Version history and notable changes |
-| [Status](project/status.md) | Current implementation status per service |
+| [Status](project/status.md) | Live implementation status by service and frontend tracks |
+| [Changelog](project/changelog.md) | Version history and audit/reconcile updates |
+| [Team Assignment](project/team-assignment.md) | Service ownership and delivery responsibilities |
 
+## Operational Reviews
 
+Recent audit and validation artifacts.
 
-## Root Files
+| Directory | Description |
+|-----------|-------------|
+| [system/performance](system/performance) | Endpoint performance reviews and integration fix summaries |
+| [feedback](feedback) | Consolidated system feedback and external validation reports |
+| [system/moderation](system/moderation) | Moderation domain runbooks, API catalog, quality gates |
+
+## Root References
 
 | File | Description |
 |------|-------------|
 | [README.md](../README.md) | Project overview (English) |
-| [CONTRIBUTING.md](contributing.md) | Code standards and conventions |
+| [README.vi.md](../README.vi.md) | Project overview (Vietnamese) |
+| [contributing.md](contributing.md) | Development conventions and contribution standards |
