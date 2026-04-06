@@ -3,9 +3,12 @@ package iuh.cnm.vnalo.core_service.controller;
 import iuh.cnm.vnalo.core_service.config.OtpConfig;
 import iuh.cnm.vnalo.core_service.exception.ApiException;
 import iuh.cnm.vnalo.core_service.exception.ErrorCode;
+import iuh.cnm.vnalo.core_service.model.dto.request.ChangePasswordRequest;
 import iuh.cnm.vnalo.core_service.model.dto.request.LoginRequest;
+import iuh.cnm.vnalo.core_service.model.dto.request.ForgotPasswordSendOtpRequest;
 import iuh.cnm.vnalo.core_service.model.dto.request.RefreshTokenRequest;
 import iuh.cnm.vnalo.core_service.model.dto.request.RegisterRequest;
+import iuh.cnm.vnalo.core_service.model.dto.request.ResetPasswordRequest;
 import iuh.cnm.vnalo.core_service.model.dto.request.SendOtpRequest;
 import iuh.cnm.vnalo.core_service.model.dto.response.ApiResponse;
 import iuh.cnm.vnalo.core_service.model.dto.response.AuthResponse;
@@ -170,5 +173,45 @@ public class AuthController {
         int expirationMinutes,
         int cooldownSeconds
     ) {}
+
+    /**
+     * Send OTP for forgot password flow.
+     * Always returns generic success message to avoid exposing account existence.
+     */
+    @PostMapping("/password/forgot/send-otp")
+    @Operation(summary = "Send OTP for forgot password",
+               description = "Sends OTP for password reset if phone exists. Returns generic success message regardless.")
+    public ResponseEntity<ApiResponse<OtpResponse>> sendForgotPasswordOtp(
+            @Valid @RequestBody ForgotPasswordSendOtpRequest request) {
+
+        OtpResponse response = authService.sendForgotPasswordOtp(request.getPhone());
+        return ResponseEntity.ok(ApiResponse.success("If the phone number exists, OTP has been sent", response));
+    }
+
+    /**
+     * Reset password by verifying OTP and setting a new password in one step.
+     */
+    @PostMapping("/password/reset")
+    @Operation(summary = "Reset password",
+               description = "Verify OTP and reset password using phone number.")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request) {
+
+        authService.resetPassword(request);
+        return ResponseEntity.ok(ApiResponse.success("Password reset successful"));
+    }
+
+    /**
+     * Change password for authenticated user.
+     */
+    @PostMapping("/password/change")
+    @Operation(summary = "Change password", description = "Change password for authenticated account")
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Valid @RequestBody ChangePasswordRequest request) {
+
+        authService.changePassword(currentUser.getId(), request);
+        return ResponseEntity.ok(ApiResponse.success("Password changed successfully"));
+    }
 }
 

@@ -3,10 +3,13 @@ package iuh.cnm.vnalo.core_service.service;
 import iuh.cnm.vnalo.core_service.config.OtpConfig;
 import iuh.cnm.vnalo.core_service.exception.ApiException;
 import iuh.cnm.vnalo.core_service.exception.ErrorCode;
+import iuh.cnm.vnalo.core_service.model.dto.request.ChangePasswordRequest;
+import iuh.cnm.vnalo.core_service.model.dto.request.ResetPasswordRequest;
 import iuh.cnm.vnalo.core_service.model.dto.request.LoginRequest;
 import iuh.cnm.vnalo.core_service.model.dto.request.RefreshTokenRequest;
 import iuh.cnm.vnalo.core_service.model.dto.request.RegisterRequest;
 import iuh.cnm.vnalo.core_service.model.dto.response.AuthResponse;
+import iuh.cnm.vnalo.core_service.model.dto.response.OtpResponse;
 import iuh.cnm.vnalo.core_service.model.dto.response.UserInfoResponse;
 import iuh.cnm.vnalo.core_service.model.entity.auth.AuthAccount;
 import iuh.cnm.vnalo.core_service.model.entity.auth.AuthRefreshToken;
@@ -198,6 +201,90 @@ public class AuthService {
         refreshTokenRepository.revokeAllByAccountId(accountId, Instant.now());
     }
 
+    @Transactional
+    public OtpResponse sendForgotPasswordOtp(String phone) {
+        log.info("Forgot password OTP requested for phone {}", maskPhone(phone));
+
+        return authAccountRepository.findByPhone(phone)
+                .map(account -> {
+                    OtpService.OtpSendResult result = otpService.sendOtp(phone, OtpPurpose.RESET_PASSWORD);
+                    log.info("Forgot password OTP sent for account {}", account.getId());
+                    return OtpResponse.success(result.getExpiresInSeconds(), otpConfig.getRateLimit().getCooldownSeconds());
+                })
+                .orElseGet(() -> {
+                    log.warn("Forgot password OTP requested for non-existing phone {}", maskPhone(phone));
+                    return OtpResponse.success(otpConfig.getExpirationMinutes() * 60, otpConfig.getRateLimit().getCooldownSeconds());
+                });
+    }
+
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        String phone = request.getPhone();
+        log.info("Password reset requested for phone {}", maskPhone(phone));
+
+        AuthAccount account = authAccountRepository.findByPhone(phone)
+                .orElseThrow(() -> {
+                    log.warn("Password reset failed for phone {}: invalid OTP or phone", maskPhone(phone));
+                    return new ApiException(ErrorCode.AUTH_OTP_INVALID);
+                });
+
+        otpService.verifyOtp(phone, request.getOtp(), OtpPurpose.RESET_PASSWORD);
+
+        if (passwordEncoder.matches(request.getNewPassword(), account.getPasswordHash())) {
+            log.warn("Password reset rejected for account {}: same password", account.getId());
+            throw new ApiException(ErrorCode.VALIDATION_ERROR, "New password must be different from current password");
+        }
+
+        account.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        account.setPasswordUpdatedAt(Instant.now());
+        account.setFailedLoginCount(0);
+
+        if (account.getStatus() == AccountStatus.LOCKED) {
+            account.setStatus(AccountStatus.ACTIVE);
+            account.setLockedUntil(null);
+        }
+
+        authAccountRepository.save(account);
+        refreshTokenRepository.revokeAllByAccountId(account.getId(), Instant.now());
+
+        log.info("Password reset successful for account {}", account.getId());
+    }
+
+    @Transactional
+    public void changePassword(UUID accountId, ChangePasswordRequest request) {
+        log.info("Change password requested for account {}", accountId);
+
+        AuthAccount account = authAccountRepository.findById(accountId)
+                .orElseThrow(() -> {
+                    log.warn("Change password failed: account {} not found", accountId);
+                    return new ApiException(ErrorCode.USER_NOT_FOUND);
+                });
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), account.getPasswordHash())) {
+            log.warn("Change password failed for account {}: invalid current password", accountId);
+            throw new ApiException(ErrorCode.AUTH_INVALID_CREDENTIALS, "Current password is incorrect");
+        }
+
+        if (passwordEncoder.matches(request.getNewPassword(), account.getPasswordHash())) {
+            log.warn("Change password rejected for account {}: same password", accountId);
+            throw new ApiException(ErrorCode.VALIDATION_ERROR, "New password must be different from current password");
+        }
+
+        account.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        account.setPasswordUpdatedAt(Instant.now());
+        account.setFailedLoginCount(0);
+
+        if (account.getStatus() == AccountStatus.LOCKED) {
+            account.setStatus(AccountStatus.ACTIVE);
+            account.setLockedUntil(null);
+        }
+
+        authAccountRepository.save(account);
+        refreshTokenRepository.revokeAllByAccountId(accountId, Instant.now());
+
+        log.info("Password changed successfully for account {}", accountId);
+    }
+
     private String generateAndSaveRefreshToken(UUID accountId, HttpServletRequest request, String deviceId) {
         String rawToken = jwtTokenProvider.generateRefreshToken();
         String tokenHash = hashToken(rawToken);
@@ -242,5 +329,12 @@ public class AuthService {
                         .isVerified(profile.getIsVerified())
                         .build())
                 .build();
+    }
+
+    private String maskPhone(String phone) {
+        if (phone == null || phone.length() < 4) {
+            return "****";
+        }
+        return "****" + phone.substring(phone.length() - 4);
     }
 }
