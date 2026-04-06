@@ -579,10 +579,100 @@
   cursor: pointer;
 }
 
+.settings-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-card-header-stack {
+  align-items: flex-start;
+}
+
+.settings-card-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.settings-card-copy p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.settings-card-security {
+  border-color: color-mix(in srgb, var(--primary) 28%, var(--border));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 93%, #fff), color-mix(in srgb, var(--primary-soft) 22%, var(--surface)));
+  box-shadow: 0 14px 26px rgba(21, 52, 107, 0.08);
+}
+
+.settings-security-head {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-security-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-security-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-security-action {
+  min-height: 42px;
+  padding: 9px 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 10px;
+  box-shadow: 0 12px 22px rgba(29, 102, 229, 0.26);
+  transition: transform var(--motion-fast), box-shadow var(--motion-fast), filter var(--motion-fast);
+}
+
+.settings-security-action:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.03);
+  box-shadow: 0 16px 26px rgba(29, 102, 229, 0.32);
+}
+
+.settings-security-action:active:not(:disabled) {
+  transform: translateY(0);
+  filter: brightness(0.99);
+  box-shadow: 0 10px 18px rgba(29, 102, 229, 0.24);
+}
+
+.settings-security-action:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent), 0 16px 26px rgba(29, 102, 229, 0.28);
+}
+
+.settings-security-action-icon {
+  width: 16px;
+  height: 16px;
+  display: inline-grid;
+  place-items: center;
+}
+
+.settings-security-action-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
 .settings-card:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-hover);
   border-color: var(--primary);
+}
+
+.settings-card-security:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 20px 34px rgba(21, 52, 107, 0.14);
+  border-color: color-mix(in srgb, var(--primary) 42%, var(--border));
 }
 
 .settings-card h3 {
@@ -730,6 +820,56 @@
 .modal-helper-text {
   color: var(--muted);
   font-size: 12px;
+}
+
+.settings-password-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.settings-password-wrap input {
+  width: 100%;
+  padding-right: 44px;
+}
+
+.settings-password-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--menu-text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color var(--motion-fast), background-color var(--motion-fast);
+}
+
+.settings-password-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+
+.settings-password-toggle:hover:not(:disabled) {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+.settings-password-toggle:focus-visible {
+  outline: none;
+  color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.settings-password-toggle:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 @media (max-width: 640px) {
@@ -969,6 +1109,16 @@
 @media (max-width: 980px) {
   .settings-grid {
     grid-template-columns: 1fr;
+  }
+
+  .settings-security-action {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .settings-security-title-row {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .profile-card-zalo {
