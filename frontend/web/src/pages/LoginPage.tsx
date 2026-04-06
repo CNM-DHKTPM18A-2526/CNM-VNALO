@@ -132,9 +132,9 @@ export function LoginPage() {
                 <button type='button' className='auth-text-action'>
                   {t('auth.forgotPassword')}
                 </button>
-                <button type='button' className='auth-text-action'>
+                {/* <button type='button' className='auth-text-action'>
                   {t('auth.qrLogin')}
-                </button>
+                </button> */}
               </div>
 
               <p className='auth-switch-copy'>
