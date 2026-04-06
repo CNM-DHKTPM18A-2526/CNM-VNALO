@@ -167,7 +167,7 @@ class AuthProvider extends ChangeNotifier {
 
       if (avatarFile != null) {
         try {
-          final avatarUrl = await _authService.uploadAvatar(avatarFile);
+          final avatarUrl = await _uploadAvatarWithRetry(avatarFile);
           await _authService.updateProfileAvatar(avatarUrl);
           // Refresh profile to pick up the persisted avatar URL.
           _user = await _authService.getMe();
@@ -308,6 +308,31 @@ class AuthProvider extends ChangeNotifier {
     return 'Đăng ký thành công; hồ sơ sẽ đồng bộ đầy đủ khi mạng ổn định. Bạn có thể mở Hồ sơ.';
   }
 
+  Future<String> _uploadAvatarWithRetry(File avatarFile, {int attempts = 3}) async {
+    Object? lastError;
+    for (var i = 0; i < attempts; i++) {
+      try {
+        return await _authService.uploadAvatar(avatarFile);
+      } catch (e) {
+        lastError = e;
+        final shouldRetry = _isTransientAvatarFailure(e);
+        if (!shouldRetry || i == attempts - 1) {
+          rethrow;
+        }
+        await Future<void>.delayed(Duration(milliseconds: 700 * (i + 1)));
+      }
+    }
+    throw lastError ?? StateError('Avatar upload failed');
+  }
+
+  bool _isTransientAvatarFailure(Object error) {
+    if (error is ApiException) {
+      if (error.statusCode == 0) return true;
+      if (error.statusCode >= 500) return true;
+      if (error.statusCode == 429) return true;
+    }
+    return false;
+  }
   String _avatarUploadWarning(Object error) {
     if (error is ApiException) {
       if (error.statusCode == 0) {

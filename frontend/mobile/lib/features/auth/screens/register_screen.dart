@@ -48,22 +48,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   int get _totalSteps => _requiresOtp ? 6 : 5;
 
-  int _nextVisibleStep(int step) {
-    final candidate = step + 1;
-    if (!_requiresOtp && candidate == 1) {
-      return 1; // Name step when OTP is hidden.
-    }
-    return candidate;
-  }
-
-  int _previousVisibleStep(int step) {
-    final candidate = step - 1;
-    if (!_requiresOtp && step == 1) {
-      return 0; // Name -> Phone in dev mode.
-    }
-    return candidate;
-  }
-
   String? _phoneValidationError() {
     return Validators.phone(
       _phoneController.text,
@@ -84,6 +68,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _loadOtpStatus() async {
     final fallbackRequiresOtp = AppConfig.instance.isProd;
+    final previousRequiresOtp = _requiresOtp;
 
     try {
       final required = await context
@@ -94,10 +79,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
             onTimeout: () => fallbackRequiresOtp,
           );
       if (!mounted) return;
-      setState(() => _requiresOtp = required);
+      setState(() {
+        _requiresOtp = required;
+        if (previousRequiresOtp && !required && _currentStep > 0) {
+          _currentStep = (_currentStep - 1).clamp(0, _totalSteps - 1);
+        }
+      });
+      if (previousRequiresOtp && !required) {
+        _pageController.jumpToPage(_currentStep);
+      }
     } catch (_) {
       if (!mounted) return;
-      setState(() => _requiresOtp = fallbackRequiresOtp);
+      setState(() {
+        _requiresOtp = fallbackRequiresOtp;
+        if (previousRequiresOtp && !fallbackRequiresOtp && _currentStep > 0) {
+          _currentStep = (_currentStep - 1).clamp(0, _totalSteps - 1);
+        }
+      });
+      if (previousRequiresOtp && !fallbackRequiresOtp) {
+        _pageController.jumpToPage(_currentStep);
+      }
     }
   }
 
@@ -149,7 +150,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   void _nextStep() {
     FocusScope.of(context).unfocus();
-    _goToStep(_nextVisibleStep(_currentStep));
+    _goToStep(_currentStep + 1);
+  }
+
+  void _backStep() {
+    if (_currentStep == 0) {
+      Navigator.pop(context);
+      return;
+    }
+    _goToStep(_currentStep - 1);
   }
 
   void _continueFromNameStep() {
@@ -170,7 +179,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     if (!_requiresOtp) {
       _otpCode = '000000';
-      _goToStep(_nextVisibleStep(0));
+      _goToStep(1);
       return;
     }
 
@@ -492,13 +501,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         surfaceTintColor: Colors.white,
         elevation: 0,
         leading: BackButton(
-          onPressed: () {
-            if (_currentStep > 0) {
-              _goToStep(_previousVisibleStep(_currentStep));
-            } else {
-              Navigator.pop(context);
-            }
-          },
+          onPressed: _backStep,
         ),
         title: showAppBarTitle
             ? Text(
