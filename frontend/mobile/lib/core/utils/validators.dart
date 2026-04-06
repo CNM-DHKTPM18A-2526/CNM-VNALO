@@ -23,8 +23,18 @@ class Validators {
   static String? displayName(String? value) {
     final name = (value ?? '').trim();
     if (name.isEmpty) return 'Vui lòng nhập tên hiển thị';
-    if (name.length < 2) return 'Tên hiển thị tối thiểu 2 ký tự';
     if (name.length > 100) return 'Tên hiển thị tối đa 100 ký tự';
+    final normalized = name.replaceAll(RegExp(r'\s+'), ' ');
+    final words = normalized.split(' ').where((w) => w.isNotEmpty).toList();
+    if (words.length < 2) {
+      return 'Tên hiển thị phải gồm ít nhất 2 từ';
+    }
+
+    final validChars = RegExp(r"^[A-Za-zÀ-ỹà-ỹĐđ\s'\-]+$");
+    if (!validChars.hasMatch(normalized)) {
+      return 'Tên hiển thị chỉ được chứa chữ cái';
+    }
+
     if (RegExp(r'\d').hasMatch(name)) {
       return 'Tên hiển thị không được chứa số';
     }

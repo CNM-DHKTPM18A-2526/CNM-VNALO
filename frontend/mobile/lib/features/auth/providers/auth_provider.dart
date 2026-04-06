@@ -181,6 +181,14 @@ class AuthProvider extends ChangeNotifier {
         }
       }
 
+      // Final consistency refresh to load latest profile/avatar representation
+      // (including default avatar semantics when user skipped avatar upload).
+      try {
+        _user = await _getMeWithRetry(attempts: 2);
+      } catch (_) {
+        // Non-fatal: keep best-effort hydrated profile.
+      }
+
       _isLoading = false;
       notifyListeners();
       return true;
@@ -381,6 +389,36 @@ class AuthProvider extends ChangeNotifier {
     await _storageService.clearAll();
     _user = null;
     notifyListeners();
+  }
+
+  Future<void> refreshCurrentUser() async {
+    try {
+      final me = await _authService.getMe();
+      _user = me;
+      notifyListeners();
+    } catch (_) {
+      // Keep current user if refresh fails transiently.
+    }
+  }
+
+  Future<bool> updateAvatar(File avatarFile) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final avatarUrl = await _uploadAvatarWithRetry(avatarFile);
+      await _authService.updateProfileAvatar(avatarUrl);
+      _user = await _authService.getMe();
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = _avatarUploadWarning(e);
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
   }
 }
 

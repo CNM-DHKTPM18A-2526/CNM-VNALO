@@ -32,6 +32,9 @@ class ChatListItem extends StatelessWidget {
     final secondaryTextColor =
         isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary;
     final hintColor = isDarkMode ? DarkColors.textHint : LightColors.textHint;
+    final dividerColor = isDarkMode
+      ? const Color(0xFF3A3F46)
+      : const Color(0xFFE9EDF3);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -66,7 +69,7 @@ class ChatListItem extends StatelessWidget {
               onTap: onTap,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
-                vertical: 6,
+                vertical: 10,
               ),
               leading: AvatarWidget(
                 imageUrl: displayAvatar,
@@ -132,7 +135,7 @@ class ChatListItem extends StatelessWidget {
           thickness: 0.5,
           indent: 80,
           endIndent: 0,
-          color: isDarkMode ? const Color(0xFF2E2E2E) : const Color(0xFFE5E7EB),
+          color: dividerColor,
         ),
       ],
     );

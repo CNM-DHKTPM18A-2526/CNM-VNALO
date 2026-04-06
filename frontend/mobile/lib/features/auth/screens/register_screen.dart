@@ -63,7 +63,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void initState() {
     super.initState();
+    _resetRegistrationDraft();
     _loadOtpStatus();
+  }
+
+  void _resetRegistrationDraft() {
+    _phoneController.clear();
+    _nameController.clear();
+    _passwordController.clear();
+    _confirmPasswordController.clear();
+    _otpCode = '';
+    _currentStep = 0;
+    _agreeTermsA = false;
+    _agreeTermsB = false;
+    _birthday = null;
+    _gender = null;
+    _avatarFile = null;
   }
 
   Future<void> _loadOtpStatus() async {
@@ -281,6 +296,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!mounted) return;
 
       if (success) {
+        if (_avatarFile == null) {
+          await auth.refreshCurrentUser();
+          if (!mounted) return;
+        }
         // H1: use warning (non-fatal) rather than error for the orange snackbar.
         if (auth.warning != null && auth.warning!.isNotEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -355,7 +374,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   String _extractErrorMessage(Object error) {
     if (error is StateError) {
-      return error.message?.toString() ?? 'Yêu cầu thất bại';
+      return error.message.toString();
     }
     if (error is ApiException) {
       return _mapApiError(error);
@@ -370,49 +389,87 @@ class _RegisterScreenState extends State<RegisterScreen> {
     showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        title: Text(
-          t.syncContactsTitle,
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
-        content: Text(
-          t.syncContactsMessage,
-          style: const TextStyle(fontSize: 15, color: Color(0xFF4B5563)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              // H2: guard against widget being unmounted while dialog was open.
-              if (mounted) _navigateToHome(auth);
-            },
-            child: Text(
-              t.laterText,
-              style: const TextStyle(color: Color(0xFF6B7280), fontSize: 16),
-            ),
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          titlePadding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
+          contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+          actionsPadding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+          title: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEAF2FF),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.contacts_outlined, color: AppColors.primary),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  t.syncContactsTitle,
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+                ),
+              ),
+            ],
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                t.syncContactsMessage,
+                style: const TextStyle(fontSize: 15, color: Color(0xFF4B5563), height: 1.4),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Bạn luôn có thể thay đổi lựa chọn này trong Cài đặt quyền riêng tư.',
+                style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                if (mounted) _navigateToHome(auth);
+              },
+              child: Text(
+                t.laterText,
+                style: const TextStyle(color: Color(0xFF6B7280), fontSize: 16),
               ),
             ),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await Permission.contacts.request();
-              // H2: guard against widget being unmounted while the permission
-              // dialog was shown.
-              if (mounted) _navigateToHome(auth);
-            },
-            child: Text(
-              t.continueText,
-              style: const TextStyle(color: Colors.white, fontSize: 16),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                elevation: 0,
+              ),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final status = await Permission.contacts.request();
+                if (mounted && status.isPermanentlyDenied) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Bạn đã tắt quyền Danh bạ. Có thể bật lại trong Cài đặt hệ thống.'),
+                    ),
+                  );
+                }
+                if (mounted) _navigateToHome(auth);
+              },
+              child: Text(
+                t.continueText,
+                style: const TextStyle(color: Colors.white, fontSize: 16),
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        );
+      },
     );
   }
 
@@ -721,8 +778,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Widget _buildNameStep() {
     final t = AuthTexts.of(context);
-    final name = _nameController.text.trim();
-    final hasName = name.length >= 2;
+    final hasValidName = Validators.displayName(_nameController.text) == null;
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -805,18 +861,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(56),
                 backgroundColor:
-                    hasName ? AppColors.primary : const Color(0xFFE5E7EB),
+                    hasValidName ? AppColors.primary : const Color(0xFFE5E7EB),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
-              onPressed: hasName ? _continueFromNameStep : null,
+              onPressed: hasValidName ? _continueFromNameStep : null,
               child: Text(
                 t.continueText,
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  color: hasName ? Colors.white : const Color(0xFF9CA3AF),
+                  color: hasValidName ? Colors.white : const Color(0xFF9CA3AF),
                 ),
               ),
             ),
@@ -1219,6 +1275,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ),
               ),
+                const SizedBox(height: 10),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Mật khẩu phải có ít nhất 8 ký tự, gồm chữ hoa, chữ thường và số.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF6B7280),
+                      height: 1.4,
+                    ),
+                  ),
+                ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _confirmPasswordController,
@@ -1249,6 +1317,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       color: AppColors.primary,
                       width: 1.5,
                     ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Xác nhận mật khẩu phải trùng khớp hoàn toàn với mật khẩu đã nhập.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF6B7280),
+                    height: 1.4,
                   ),
                 ),
               ),
