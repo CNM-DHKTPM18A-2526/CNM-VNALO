@@ -7,6 +7,7 @@ export type AuthUser = {
   phone?: string | null
   avatarUrl?: string | null
   coverUrl?: string | null
+  bio?: string | null
   dob?: string | null
   gender?: Gender | null
 }

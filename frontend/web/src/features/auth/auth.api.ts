@@ -7,6 +7,7 @@ export type UpdateProfilePayload = {
   displayName?: string
   avatarUrl?: string
   coverUrl?: string
+  bio?: string
   dob?: string
   gender?: Gender
 }
@@ -142,6 +143,7 @@ function extractUser(payload: unknown): AuthUser | null {
     phone: typeof raw.phone === 'string' ? raw.phone : null,
     avatarUrl: typeof raw.avatarUrl === 'string' ? raw.avatarUrl : null,
     coverUrl: typeof raw.coverUrl === 'string' ? raw.coverUrl : null,
+    bio: typeof raw.bio === 'string' ? raw.bio : null,
     dob: typeof raw.dob === 'string' ? raw.dob : null,
     gender: isGender(raw.gender) ? raw.gender : null,
   }

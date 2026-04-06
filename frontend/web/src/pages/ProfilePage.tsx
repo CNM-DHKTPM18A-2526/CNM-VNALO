@@ -42,6 +42,8 @@ function getLocalTodayIsoDate() {
   return new Date(now.getTime() - offsetMs).toISOString().slice(0, 10)
 }
 
+const PROFILE_BIO_MAX_LENGTH = 160
+
 export function ProfilePage() {
   const { accessToken, isBootstrapping, user, updateUser } = useAuth()
   const { t } = useLanguage()
@@ -65,12 +67,14 @@ export function ProfilePage() {
   const [profileErrorMessage, setProfileErrorMessage] = useState<string | null>(null)
   const [profileSuccessMessage, setProfileSuccessMessage] = useState<string | null>(null)
   const [draftDisplayName, setDraftDisplayName] = useState('')
+  const [draftBio, setDraftBio] = useState('')
   const [draftDob, setDraftDob] = useState('')
   const [draftGender, setDraftGender] = useState<GenderDraft>('')
 
   const resolvedName = user?.name ?? CURRENT_USER.name
   const resolvedDob = user?.dob ?? null
   const resolvedGender = user?.gender ?? null
+  const resolvedBio = user?.bio ?? null
   const resolvedPhone = user?.phone ?? null
   const resolvedEmail = user?.email ?? null
 
@@ -106,6 +110,7 @@ export function ProfilePage() {
     setProfileErrorMessage(null)
     setProfileSuccessMessage(null)
     setDraftDisplayName(user?.name ?? CURRENT_USER.name)
+    setDraftBio(user?.bio ?? '')
     setDraftDob(user?.dob ?? '')
     setDraftGender(user?.gender ?? '')
     setIsEditingProfile(true)
@@ -116,6 +121,7 @@ export function ProfilePage() {
     setProfileErrorMessage(null)
     setProfileSuccessMessage(null)
     setDraftDisplayName(user?.name ?? CURRENT_USER.name)
+    setDraftBio(user?.bio ?? '')
     setDraftDob(user?.dob ?? '')
     setDraftGender(user?.gender ?? '')
   }
@@ -255,6 +261,7 @@ export function ProfilePage() {
     try {
       const updatedUser = await updateProfile(accessToken, {
         displayName: trimmedDisplayName,
+        bio: draftBio.trim(),
         dob: draftDob || undefined,
         gender: draftGender,
       })
@@ -454,6 +461,22 @@ export function ProfilePage() {
                   </div>
 
                   <div className='profile-edit-field'>
+                    <label htmlFor='profile-bio'>{t('profile.bio')}</label>
+                    <textarea
+                      id='profile-bio'
+                      rows={4}
+                      value={draftBio}
+                      onChange={(event) => setDraftBio(event.target.value)}
+                      placeholder={t('profile.bioPlaceholder')}
+                      maxLength={PROFILE_BIO_MAX_LENGTH}
+                      disabled={isSavingProfile}
+                    />
+                    <div className='profile-bio-counter' aria-live='polite'>
+                      {`${draftBio.length}/${PROFILE_BIO_MAX_LENGTH} ${t('profile.bioMaxLength')}`}
+                    </div>
+                  </div>
+
+                  <div className='profile-edit-field'>
                     <label htmlFor='profile-dob'>{t('profile.dateOfBirth')}</label>
                     <input
                       id='profile-dob'
@@ -498,6 +521,12 @@ export function ProfilePage() {
                 </div>
               ) : (
                 <div className='profile-basic-info-list'>
+                  <div className='profile-basic-info-item profile-basic-info-item-bio'>
+                    <span className='profile-basic-info-label'>{t('profile.bio')}</span>
+                    <span className='profile-basic-info-value profile-bio-value'>
+                      {resolvedBio && resolvedBio.trim() ? resolvedBio : t('profile.bioPlaceholder')}
+                    </span>
+                  </div>
                   <div className='profile-basic-info-item'>
                     <span className='profile-basic-info-label'>{t('profile.phone')}</span>
                     <span className='profile-basic-info-value'>
