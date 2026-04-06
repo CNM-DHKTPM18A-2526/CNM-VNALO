@@ -76,7 +76,7 @@ class AuthTexts {
           ? 'Hãy dùng tên thật để mọi người dễ nhận ra bạn'
           : 'Use your real name so people can recognize you';
   String get nameHelpLength =>
-      _isVi ? 'Dài từ 2 đến 40 ký tự' : '2 to 40 characters';
+      _isVi ? 'Dài từ 2 đến 100 ký tự' : '2 to 100 characters';
   String get nameHelpNoNumbers =>
       _isVi ? 'Không chứa số' : 'Must not contain numbers';
   String get nameHelpRules =>

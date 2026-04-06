@@ -18,7 +18,7 @@ import java.time.LocalDate;
 public class RegisterRequest {
 
     @NotBlank(message = "Phone number is required")
-    @Pattern(regexp = "^\\+[1-9]\\d{9,14}$", message = "Invalid phone number format")
+    @Pattern(regexp = "^\\+84(?:3|5|7|8|9)\\d{8}$", message = "Phone number must be a valid Vietnamese mobile number (e.g., +84901234567)")
     private String phone;
 
     @NotBlank(message = "Password is required")
@@ -29,6 +29,7 @@ public class RegisterRequest {
 
     @NotBlank(message = "Display name is required")
     @Size(min = 2, max = 100, message = "Display name must be between 2 and 100 characters")
+    @Pattern(regexp = "^(?!.*\\d).+$", message = "Display name must not contain numbers")
     private String displayName;
     
     /**

@@ -27,6 +27,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
@@ -80,6 +82,7 @@ public class AuthService {
 
         // Create profile with same ID as account (1:1 relationship)
         UserProfile profile = UserProfile.createWithAccountId(account.getId(), request.getDisplayName());
+        profile.setAvatarUrl(buildDefaultAvatarUrl(request.getDisplayName(), account.getId()));
         if (request.getGender() != null) {
             profile.setGender(request.getGender());
         }
@@ -99,6 +102,13 @@ public class AuthService {
 
         log.info("User registered successfully: {}", account.getId());
         return buildAuthResponse(accessToken, refreshToken, account, profile);
+    }
+
+    private String buildDefaultAvatarUrl(String displayName, UUID accountId) {
+        String safeName = (displayName == null || displayName.isBlank()) ? "User" : displayName.trim();
+        String encodedName = URLEncoder.encode(safeName, StandardCharsets.UTF_8);
+        String seed = accountId != null ? accountId.toString() : UUID.randomUUID().toString();
+        return "https://api.dicebear.com/9.x/initials/svg?seed=" + seed + "&radius=50&size=256&chars=2&fontFamily=Arial&fontWeight=600&backgroundType=gradientLinear&text=" + encodedName;
     }
 
     @Transactional

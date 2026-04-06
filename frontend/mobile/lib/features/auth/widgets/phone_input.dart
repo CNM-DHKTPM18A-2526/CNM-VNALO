@@ -142,7 +142,8 @@ class PhoneInput extends StatelessWidget {
     return TextFormField(
       controller: controller,
       keyboardType: TextInputType.phone,
-      validator: Validators.phone,
+      validator: (value) =>
+          Validators.phone(value, countryCode: selectedCountryCode),
       onChanged: onChanged,
       inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9]'))],
       decoration: InputDecoration(

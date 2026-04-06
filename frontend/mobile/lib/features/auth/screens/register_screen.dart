@@ -46,6 +46,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool get _isAnyRequestInFlight =>
       _isSendingOtp || _isResendingOtp || _isSubmittingRegistration;
 
+  int get _totalSteps => _requiresOtp ? 6 : 5;
+
+  int _nextVisibleStep(int step) {
+    final candidate = step + 1;
+    if (!_requiresOtp && candidate == 1) {
+      return 1; // Name step when OTP is hidden.
+    }
+    return candidate;
+  }
+
+  int _previousVisibleStep(int step) {
+    final candidate = step - 1;
+    if (!_requiresOtp && step == 1) {
+      return 0; // Name -> Phone in dev mode.
+    }
+    return candidate;
+  }
+
+  String? _phoneValidationError() {
+    return Validators.phone(
+      _phoneController.text,
+      countryCode: _countryCode,
+    );
+  }
+
   // Personal info (optional, client-side only for now)
   DateTime? _birthday;
   String? _gender;
@@ -96,7 +121,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   String _buildFullPhone() {
     var digits = _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digits.startsWith('0') && digits.length > 1) {
+    if (_countryCode == '+84' && digits.startsWith('0') && digits.length > 1) {
       digits = digits.substring(1);
     }
     return '$_countryCode$digits';
@@ -113,29 +138,39 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   void _goToStep(int step) {
+    final target = step.clamp(0, _totalSteps - 1);
     _pageController.animateToPage(
-      step,
+      target,
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
     );
-    setState(() => _currentStep = step);
+    setState(() => _currentStep = target);
   }
 
   void _nextStep() {
     FocusScope.of(context).unfocus();
-    _goToStep(_currentStep + 1);
+    _goToStep(_nextVisibleStep(_currentStep));
+  }
+
+  void _continueFromNameStep() {
+    final error = Validators.displayName(_nameController.text);
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error), backgroundColor: AppColors.error),
+      );
+      return;
+    }
+    _nextStep();
   }
 
   Future<void> _sendOtp() async {
     if (_isAnyRequestInFlight) return;
     if (!_agreeTermsA || !_agreeTermsB) return;
-    if (Validators.phone(_phoneController.text) != null) return;
+    if (_phoneValidationError() != null) return;
 
     if (!_requiresOtp) {
-      // M1: OTP step is always at index 1 in the PageView but we skip it when
-      // OTP is disabled by jumping directly to step 2 (Name).
       _otpCode = '000000';
-      _goToStep(2);
+      _goToStep(_nextVisibleStep(0));
       return;
     }
 
@@ -148,7 +183,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Gửi OTP thất bại: $e'),
+          content: Text(_extractErrorMessage(e)),
           backgroundColor: AppColors.error,
         ),
       );
@@ -232,8 +267,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         avatarFile: _avatarFile,
         gender: _genderForApi(),
         dob: _dobForApi(),
-      )
-          .timeout(const Duration(seconds: 20));
+      );
 
       if (!mounted) return;
 
@@ -257,20 +291,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
           backgroundColor: AppColors.error,
         ),
       );
-    } on TimeoutException {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            isSkipAction
-                ? 'Dang ky dang cham do ket noi. Vui long thu lai sau it giay.'
-                : 'Yeu cau dang ky bi timeout, vui long thu lai.',
-          ),
-          backgroundColor: AppColors.error,
-        ),
-      );
     } catch (e) {
       if (!mounted) return;
+      // If the auth layer already established a valid session, treat this as
+      // a recoverable post-registration issue (typically avatar/network).
+      if (auth.isLoggedIn) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              auth.warning ??
+                  'Đăng ký đã hoàn tất, nhưng có lỗi khi cập nhật ảnh đại diện. Bạn có thể cập nhật lại trong Hồ sơ.',
+            ),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        _showContactsPrompt();
+        return;
+      }
       // M5: translate known API error codes into user-friendly Vietnamese strings.
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -305,6 +342,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
     }
     return '\u0110\u00e3 x\u1ea3y ra l\u1ed7i, vui l\u00f2ng th\u1eed l\u1ea1i';
+  }
+
+  String _extractErrorMessage(Object error) {
+    if (error is StateError) {
+      return error.message?.toString() ?? 'Yêu cầu thất bại';
+    }
+    if (error is ApiException) {
+      return _mapApiError(error);
+    }
+    return 'Yêu cầu thất bại, vui lòng thử lại';
   }
 
   void _showContactsPrompt() {
@@ -447,10 +494,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         leading: BackButton(
           onPressed: () {
             if (_currentStep > 0) {
-              // M1: When OTP is disabled, forward nav jumps 0→2. Mirror that on
-              // back nav so users never land on the skipped OTP page (index 1).
-              final prevStep = (!_requiresOtp && _currentStep == 2) ? 0 : _currentStep - 1;
-              _goToStep(prevStep);
+              _goToStep(_previousVisibleStep(_currentStep));
             } else {
               Navigator.pop(context);
             }
@@ -470,16 +514,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       body: PageView(
         controller: _pageController,
         physics: const NeverScrollableScrollPhysics(),
-        // M1: Children list is STABLE — always 6 pages regardless of _requiresOtp.
-        // Navigation skips step 1 (OTP) by jumping to step 2 when OTP is disabled.
-        // This prevents _currentStep from desync-ing if _requiresOtp changes.
         children: [
-          _buildPhoneStep(),     // index 0
-          _buildOtpStep(),       // index 1 — always present
-          _buildNameStep(),      // index 2
-          _buildPersonalInfoStep(), // index 3
-          _buildPasswordStep(),  // index 4
-          _buildAvatarStep(),    // index 5
+          _buildPhoneStep(),
+          if (_requiresOtp) _buildOtpStep(),
+          _buildNameStep(),
+          _buildPersonalInfoStep(),
+          _buildPasswordStep(),
+          _buildAvatarStep(),
         ],
       ),
     );
@@ -570,7 +611,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Widget _buildPhoneStep() {
     final t = AuthTexts.of(context);
-    final isPhoneValid = Validators.phone(_phoneController.text) == null;
+    final isPhoneValid = _phoneValidationError() == null;
     final canProceed = _agreeTermsA && _agreeTermsB && isPhoneValid;
 
     return Padding(
@@ -766,7 +807,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
-              onPressed: hasName ? _nextStep : null,
+              onPressed: hasName ? _continueFromNameStep : null,
               child: Text(
                 t.continueText,
                 style: TextStyle(

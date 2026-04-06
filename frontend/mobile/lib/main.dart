@@ -49,6 +49,13 @@ void main() {
       mediaServiceOverride.isEmpty ? null : mediaServiceOverride,
     socketUrl: socketOverride.isEmpty ? null : socketOverride,
   );
+
+  if (env == Environment.dev) {
+    debugPrint('DEV coreServiceUrl=${AppConfig.instance.coreServiceUrl}');
+    debugPrint('DEV mediaServiceUrl=${AppConfig.instance.mediaServiceUrl}');
+    debugPrint('DEV messageServiceUrl=${AppConfig.instance.messageServiceUrl}');
+    debugPrint('DEV socketUrl=${AppConfig.instance.socketUrl}');
+  }
   runApp(const VnaloApp());
 }
 

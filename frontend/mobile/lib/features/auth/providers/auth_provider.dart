@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'package:vnalo_mobile/models/user_model.dart';
+import 'package:vnalo_mobile/services/api_service.dart';
+import 'package:vnalo_mobile/services/auth_events.dart';
 import 'package:vnalo_mobile/services/auth_service.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 import 'package:vnalo_mobile/services/storage_service.dart';
@@ -26,7 +28,9 @@ class AuthProvider extends ChangeNotifier {
   /// Non-fatal warning surfaced after a successful registration.
   String? get warning => _warning;
 
-  AuthProvider(this._authService, this._storageService, this._socketService);
+  AuthProvider(this._authService, this._storageService, this._socketService) {
+    AuthEvents.onSessionInvalidated = logout;
+  }
 
   // Initialize the provider by checking if there's a valid token and fetching user info
   Future<void> initialize() async {
@@ -80,7 +84,7 @@ class AuthProvider extends ChangeNotifier {
       return true;
     } catch (e) {
       _isLoading = false;
-      _error = e.toString();
+      _error = _friendlyAuthError(e);
       notifyListeners();
       return false;
     }
@@ -94,8 +98,8 @@ class AuthProvider extends ChangeNotifier {
     try {
       await _authService.sendOtp(phone);
     } catch (e) {
-      _error = e.toString();
-      rethrow;
+      _error = _friendlyAuthError(e);
+      throw StateError(_error ?? 'Gửi OTP thất bại');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -151,12 +155,14 @@ class AuthProvider extends ChangeNotifier {
       );
       _socketService.connect(tokens.accessToken);
 
-      if (data['user'] != null) {
-        await _storageService.saveUserId(data['user']['id']);
-        _user = User.fromJson(data['user']);
-      } else {
-        _user = await _authService.getMe();
-        await _storageService.saveUserId(_user!.id);
+      final hydrated = await _hydrateUserAfterRegister(
+        data,
+        displayName: displayName,
+      );
+      _user = hydrated.user;
+      await _storageService.saveUserId(_user!.id);
+      if (hydrated.warning != null) {
+        _warning = hydrated.warning;
       }
 
       if (avatarFile != null) {
@@ -166,9 +172,12 @@ class AuthProvider extends ChangeNotifier {
           // Refresh profile to pick up the persisted avatar URL.
           _user = await _authService.getMe();
           // No need to re-save userId — it cannot change after registration.
-        } catch (_) {
+        } catch (e) {
           // Avatar upload is non-fatal: registration already succeeded.
-          _warning = '\u0110\u0103ng k\u00fd th\u00e0nh c\u00f4ng nh\u01b0ng c\u1eadp nh\u1eadt \u1ea3nh \u0111\u1ea1i di\u1ec7n th\u1ea5t b\u1ea1i';
+          final av = _avatarUploadWarning(e);
+          _warning = _warning != null && _warning!.isNotEmpty
+              ? '$_warning — $av'
+              : av;
         }
       }
 
@@ -176,11 +185,149 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = _friendlyAuthError(e);
       _isLoading = false;
       notifyListeners();
       return false;
     }
+  }
+
+  String _friendlyAuthError(Object error) {
+    if (error is ApiException) {
+      switch (error.code) {
+        case 'AUTH_001':
+          return 'Sai số điện thoại hoặc mật khẩu';
+        case 'AUTH_002':
+          return 'Tài khoản đã bị vô hiệu hóa';
+        case 'AUTH_003':
+          return 'Tài khoản tạm thời bị khóa';
+        case 'AUTH_008':
+          return 'Số điện thoại đã được đăng ký';
+        case 'AUTH_009':
+          return 'Mã OTP đã hết hạn';
+        case 'AUTH_010':
+          return 'Mã OTP không đúng';
+        case 'AUTH_011':
+          return 'Bạn đã nhập sai OTP quá số lần cho phép';
+        case 'AUTH_012':
+        case 'AUTH_013':
+          return 'Bạn thao tác quá nhanh, vui lòng thử lại sau';
+        case 'ERR_400':
+          return 'Dữ liệu không hợp lệ, vui lòng kiểm tra lại';
+      }
+
+      if (error.message.isNotEmpty) {
+        return error.message;
+      }
+    }
+
+    if (error is UnauthorizedException) {
+      return 'Phiên đăng nhập không hợp lệ';
+    }
+
+    return error.toString();
+  }
+
+  /// Builds [User] after `/auth/register` — tolerant to flaky LAN right after signup.
+  Future<({User user, String? warning})> _hydrateUserAfterRegister(
+    Map<String, dynamic> data, {
+    required String displayName,
+  }) async {
+    final raw = data['user'];
+    Map<String, dynamic>? rawMap;
+    if (raw is Map<String, dynamic>) {
+      rawMap = raw;
+    }
+
+    if (rawMap != null) {
+      try {
+        return (user: User.fromJson(rawMap), warning: null);
+      } catch (_) {
+        // Fall through — e.g. unexpected field shapes on some gateways.
+      }
+    }
+
+    try {
+      final me = await _getMeWithRetry();
+      return (user: me, warning: null);
+    } catch (e) {
+      final fallback = _userFromRegisterPayload(rawMap, displayName: displayName);
+      if (fallback != null) {
+        return (
+          user: fallback,
+          warning: _profileHydrationFallbackWarning(e),
+        );
+      }
+      rethrow;
+    }
+  }
+
+  Future<User> _getMeWithRetry({int attempts = 4}) async {
+    Object? last;
+    for (var i = 0; i < attempts; i++) {
+      try {
+        return await _authService.getMe();
+      } catch (e) {
+        last = e;
+        if (i < attempts - 1) {
+          await Future<void>.delayed(Duration(milliseconds: 350 * (i + 1)));
+        }
+      }
+    }
+    throw last!;
+  }
+
+  User? _userFromRegisterPayload(
+    Map<String, dynamic>? raw, {
+    required String displayName,
+  }) {
+    if (raw == null) return null;
+    final id = raw['id']?.toString();
+    if (id == null || id.isEmpty) return null;
+    return User(
+      id: id,
+      phone: raw['phone']?.toString(),
+      displayName:
+          raw['displayName']?.toString() ??
+          raw['display_name']?.toString() ??
+          displayName,
+      avatarUrl: raw['avatarUrl']?.toString() ?? raw['avatar_url']?.toString(),
+    );
+  }
+
+  String _profileHydrationFallbackWarning(Object error) {
+    if (error is ApiException && error.statusCode == 0) {
+      final m = error.message.toLowerCase();
+      if (m.contains('timed out')) {
+        return 'Đăng ký thành công nhưng tải hồ sơ bị chậm. Mở lại ứng dụng hoặc vào Hồ sơ để đồng bộ.';
+      }
+      if (m.contains('no internet')) {
+        return 'Đăng ký thành công nhưng chưa tải được hồ sơ đầy đủ do mạng. Vào Hồ sơ sau khi có mạng.';
+      }
+    }
+    return 'Đăng ký thành công; hồ sơ sẽ đồng bộ đầy đủ khi mạng ổn định. Bạn có thể mở Hồ sơ.';
+  }
+
+  String _avatarUploadWarning(Object error) {
+    if (error is ApiException) {
+      if (error.statusCode == 0) {
+        final raw = error.message.toLowerCase();
+        if (raw.contains('timed out')) {
+          return 'Đăng ký thành công nhưng tải ảnh đại diện bị timeout. Bạn có thể cập nhật lại ảnh trong Hồ sơ.';
+        }
+        if (raw.contains('no internet')) {
+          return 'Đăng ký thành công nhưng chưa có mạng để tải ảnh đại diện. Bạn có thể cập nhật lại ảnh trong Hồ sơ.';
+        }
+        return 'Đăng ký thành công nhưng chưa tải được ảnh đại diện do lỗi mạng. Bạn có thể cập nhật lại ảnh trong Hồ sơ.';
+      }
+      return 'Đăng ký thành công nhưng cập nhật ảnh đại diện thất bại (${error.statusCode}). Bạn có thể cập nhật lại ảnh trong Hồ sơ.';
+    }
+
+    if (error is StateError) {
+      return 'Đăng ký thành công nhưng phản hồi tải ảnh chưa hợp lệ. Bạn có thể cập nhật lại ảnh trong Hồ sơ.';
+    }
+
+    return 'Đăng ký thành công nhưng cập nhật ảnh đại diện thất bại. Bạn có thể cập nhật lại ảnh trong Hồ sơ.';
   }
 
   _TokenPair _extractTokens(Map<String, dynamic> data) {
