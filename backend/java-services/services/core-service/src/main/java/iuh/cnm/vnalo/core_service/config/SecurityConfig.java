@@ -37,8 +37,8 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // /auth/logout-all requires authentication
-                        .requestMatchers("/auth/logout-all").authenticated()
+                    // Selected auth endpoints still require authentication
+                    .requestMatchers("/auth/logout-all", "/auth/password/change").authenticated()
                         .requestMatchers("/auth/**", "/swagger-ui/**", "/swagger-ui.html",
                                 "/v3/api-docs/**", "/h2-console/**").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
