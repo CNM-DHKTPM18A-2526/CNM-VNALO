@@ -17,6 +17,6 @@ import lombok.NoArgsConstructor;
 public class SendOtpRequest {
 
     @NotBlank(message = "Phone number is required")
-    @Pattern(regexp = "^\\+[1-9]\\d{9,14}$", message = "Invalid phone number format. Must include country code (e.g., +84123456789)")
+    @Pattern(regexp = "^\\+84(?:3|5|7|8|9)\\d{8}$", message = "Phone number must be a valid Vietnamese mobile number (e.g., +84901234567)")
     private String phone;
 }

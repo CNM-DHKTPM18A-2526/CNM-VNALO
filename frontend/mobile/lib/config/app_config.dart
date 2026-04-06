@@ -4,6 +4,8 @@ import 'package:vnalo_mobile/config/env.dart';
 class AppConfig {
   static EnvConfig? _config;
 
+  static const _defaultDevCore = 'http://10.0.2.2:8081/api/v1';
+
   /// Returns the current configuration.
   /// Throws [StateError] if [initialize] has not been called yet.
   static EnvConfig get instance {
@@ -37,12 +39,16 @@ class AppConfig {
   }) {
     switch (env) {
       case Environment.dev:
+        final resolvedCore = coreServiceUrl ?? _defaultDevCore;
+        final coreUri = Uri.parse(resolvedCore);
         _config = EnvConfig(
           environment: Environment.dev,
-          coreServiceUrl: coreServiceUrl ?? 'http://10.0.2.2:8081/api/v1',
-          messageServiceUrl: messageServiceUrl ?? 'http://10.0.2.2:3000/api/v1',
-          mediaServiceUrl: mediaServiceUrl ?? 'http://10.0.2.2:8083/api/v1',
-          socketUrl: socketUrl ?? 'http://10.0.2.2:3000',
+          coreServiceUrl: resolvedCore,
+          messageServiceUrl:
+              messageServiceUrl ?? _buildServiceUrl(coreUri, 3000, '/api/v1'),
+          mediaServiceUrl:
+              mediaServiceUrl ?? _buildServiceUrl(coreUri, 8083, '/api/v1'),
+          socketUrl: socketUrl ?? _buildServiceUrl(coreUri, 3000, ''),
           enableLogging: true,
         );
         break;
@@ -74,5 +80,14 @@ class AppConfig {
         );
         break;
     }
+  }
+
+  static String _buildServiceUrl(Uri coreUri, int port, String path) {
+    return Uri(
+      scheme: coreUri.scheme,
+      host: coreUri.host,
+      port: port,
+      path: path,
+    ).toString();
   }
 }

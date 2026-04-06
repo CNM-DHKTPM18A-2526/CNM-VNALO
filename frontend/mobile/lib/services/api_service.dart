@@ -3,11 +3,19 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:vnalo_mobile/config/app_config.dart';
+import 'package:vnalo_mobile/services/auth_events.dart';
 import 'package:vnalo_mobile/services/storage_service.dart';
 
 class ApiService {
   final StorageService _storageService;
   static const _timeout = Duration(seconds: 20);
+
+  /// Uploads (S3 via media-service) often need more than JSON calls on cellular/Wi‑Fi.
+  static const _multipartTimeout = Duration(seconds: 90);
+
+  /// Coalesces concurrent 401 recoveries so refresh-token rotation does not
+  /// revoke the session for parallel callers (classic multi-tab / burst API).
+  Future<bool>? _refreshInFlight;
 
   ApiService(this._storageService);
 
@@ -49,6 +57,25 @@ class ApiService {
     required File file,
     String fileField = 'file',
     Map<String, String>? fields,
+    bool allowRefresh = true,
+  }) async {
+    return _postMultipartOnce(
+      baseUrl,
+      endpoint,
+      file: file,
+      fileField: fileField,
+      fields: fields,
+      allowRefresh: allowRefresh,
+    );
+  }
+
+  Future<Map<String, dynamic>> _postMultipartOnce(
+    String baseUrl,
+    String endpoint, {
+    required File file,
+    String fileField = 'file',
+    Map<String, String>? fields,
+    required bool allowRefresh,
   }) async {
     final url = Uri.parse(_normalizeUrl(baseUrl, endpoint));
     final token = await _storageService.getAccessToken();
@@ -61,9 +88,9 @@ class ApiService {
       request.headers['Authorization'] = 'Bearer $token';
     }
 
-    http.StreamedResponse streamed;
+    http.Response response;
     try {
-      streamed = await request.send().timeout(_timeout);
+      response = await _sendMultipartWithDeadline(request);
     } on TimeoutException {
       throw ApiException(statusCode: 0, message: 'Request timed out');
     } on SocketException {
@@ -72,8 +99,33 @@ class ApiService {
       throw ApiException(statusCode: 0, message: 'Unexpected error: $e');
     }
 
-    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode == 401 &&
+        allowRefresh &&
+        endpoint != '/auth/refresh') {
+      final refreshed = await _tryRefreshToken(baseUrl);
+      if (refreshed) {
+        return _postMultipartOnce(
+          baseUrl,
+          endpoint,
+          file: file,
+          fileField: fileField,
+          fields: fields,
+          allowRefresh: false,
+        );
+      }
+    }
     return _handleResponse(response);
+  }
+
+  /// One wall-clock budget for TLS + upload + response headers/body (S3 proxy).
+  Future<http.Response> _sendMultipartWithDeadline(
+    http.MultipartRequest request,
+  ) async {
+    return () async {
+          final streamed = await request.send();
+          return http.Response.fromStream(streamed);
+        }()
+        .timeout(_multipartTimeout);
   }
 
   Future<Map<String, dynamic>> delete(String baseUrl, String endpoint) {
@@ -134,7 +186,7 @@ class ApiService {
       throw ApiException(statusCode: 0, message: 'Unexpected error: $e');
     }
     if (response.statusCode == 401 && allowRefresh && endpoint != '/auth/refresh') {
-      final refreshed = await _tryRefreshToken();
+      final refreshed = await _tryRefreshToken(baseUrl);
       if (refreshed) {
         return _request(
           method,
@@ -150,10 +202,21 @@ class ApiService {
     return _handleResponse(response);
   }
 
-  Future<bool> _tryRefreshToken() async {
-    // H3: Always refresh against the core auth service regardless of which
-    // downstream service triggered the 401 (e.g. media-service must not
-    // receive the refresh POST).
+  Future<bool> _tryRefreshToken(String ignoredBaseUrl) {
+    if (_refreshInFlight != null) {
+      return _refreshInFlight!;
+    }
+    final future = _performRefresh();
+    _refreshInFlight = future;
+    return future.whenComplete(() {
+      if (identical(_refreshInFlight, future)) {
+        _refreshInFlight = null;
+      }
+    });
+  }
+
+  Future<bool> _performRefresh() async {
+    // Always refresh against core-service (never the host that returned 401).
     final coreBase = AppConfig.instance.coreServiceUrl;
     final refreshToken = await _storageService.getRefreshToken();
     if (refreshToken == null || refreshToken.isEmpty) {
@@ -173,6 +236,7 @@ class ApiService {
           .timeout(_timeout);
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
+        await _maybeClearSessionOnAuthFailure(response);
         return false;
       }
 
@@ -192,6 +256,20 @@ class ApiService {
       return true;
     } catch (_) {
       return false;
+    }
+  }
+
+  /// If the refresh endpoint rejects the token, clear local credentials so
+  /// the app does not keep retrying with a permanently revoked refresh token.
+  Future<void> _maybeClearSessionOnAuthFailure(http.Response response) async {
+    final code = _parseResponseBody(response.body)['code']?.toString();
+    final fatal = response.statusCode == 401 ||
+        response.statusCode == 403 ||
+        code == 'AUTH_006' ||
+        code == 'AUTH_007';
+    if (fatal) {
+      await _storageService.clearAll();
+      await AuthEvents.onSessionInvalidated?.call();
     }
   }
 

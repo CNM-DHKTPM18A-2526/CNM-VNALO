@@ -30,7 +30,7 @@ function Patch-Json {
 }
 
 $ts = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-$phone = "+8483" + (($ts % 1000000).ToString().PadLeft(6, "0"))
+$phone = "+8483" + (($ts % 10000000).ToString().PadLeft(7, "0"))
 
 Write-Output "[1/6] Register: $phone"
 $register = Post-Json -Url "$CoreBase/auth/register" -Body @{

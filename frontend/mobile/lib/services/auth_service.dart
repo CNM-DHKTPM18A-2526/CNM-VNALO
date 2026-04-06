@@ -118,6 +118,18 @@ class AuthService {
     return User.fromJson(response['data']);
   }
 
+  /// Extracts a public media URL from core-style `{ data: { ... } }` upload responses.
+  static String? parseUploadedMediaUrl(Map<String, dynamic> response) {
+    final data = response['data'];
+    if (data is! Map<String, dynamic>) return null;
+    final url = data['url'] ??
+        data['fileUrl'] ??
+        data['mediaUrl'] ??
+        data['downloadUrl'];
+    if (url is String && url.isNotEmpty) return url;
+    return null;
+  }
+
   Future<String> uploadAvatar(File avatarFile) async {
     final response = await _apiService.postMultipart(
       _mediaBase,
@@ -126,14 +138,9 @@ class AuthService {
       fields: const {'category': 'AVATAR'},
     );
 
-    final data = response['data'];
-    if (data is! Map<String, dynamic>) {
-      throw StateError('Invalid media upload response');
-    }
-
-    final url = data['url'];
-    if (url is! String || url.isEmpty) {
-      throw StateError('Missing uploaded avatar URL');
+    final url = parseUploadedMediaUrl(response);
+    if (url == null) {
+      throw StateError('Invalid media upload response or missing URL');
     }
     return url;
   }
