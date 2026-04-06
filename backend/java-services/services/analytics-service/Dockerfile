@@ -1,5 +1,5 @@
 # =============================================================================
-# Moderation Service — Multi-stage Dockerfile
+# Analytics Service — Multi-stage Dockerfile
 # Base: Eclipse Temurin 21 (Alpine)
 # Build: Maven wrapper (./mvnw) — no Maven install required
 # Runtime: JRE only — minimal image size
