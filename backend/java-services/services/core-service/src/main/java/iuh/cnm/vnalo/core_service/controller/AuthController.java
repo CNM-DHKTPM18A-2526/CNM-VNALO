@@ -41,19 +41,18 @@ public class AuthController {
 
     /**
      * Send OTP for registration.
-     * Call this before /register to get OTP sent to phone.
+     * Kept for backward compatibility; registration no longer requires phone OTP.
      */
     @PostMapping("/register/send-otp")
-    @Operation(summary = "Send OTP for registration", 
-               description = "Send OTP to phone number for registration verification. Skip if OTP is disabled.")
+    @Operation(summary = "Send OTP for registration",
+               description = "Registration phone OTP is disabled; returns skipped response")
     public ResponseEntity<ApiResponse<OtpResponse>> sendRegistrationOtp(
             @Valid @RequestBody SendOtpRequest request) {
-        
-        // Check if phone already registered
+
         if (authAccountRepository.existsByPhone(request.getPhone())) {
             throw new ApiException(ErrorCode.AUTH_PHONE_ALREADY_EXISTS);
         }
-        
+
         return ResponseEntity.ok(ApiResponse.success(
             "Phone OTP for registration is disabled",
             OtpResponse.skipped("Registration no longer requires phone OTP")
@@ -62,17 +61,16 @@ public class AuthController {
 
     /**
      * Register a new user account.
-     * Requires OTP verification if enabled.
      */
     @PostMapping("/register")
-    @Operation(summary = "Register new account", 
-               description = "Create a new user account with phone number. Include OTP if verification is enabled.")
+    @Operation(summary = "Register new account",
+               description = "Create a new user account with phone + email")
     public ResponseEntity<ApiResponse<AuthResponse>> register(
             @Valid @RequestBody RegisterRequest request,
             HttpServletRequest httpRequest) {
-        
+
         AuthResponse response = authService.register(request, httpRequest);
-        
+
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Registration successful", response));
@@ -86,23 +84,21 @@ public class AuthController {
     public ResponseEntity<ApiResponse<AuthResponse>> login(
             @Valid @RequestBody LoginRequest request,
             HttpServletRequest httpRequest) {
-        
+
         AuthResponse response = authService.login(request, httpRequest);
-        
         return ResponseEntity.ok(ApiResponse.success("Login successful", response));
     }
 
     /**
-     * Refresh access token
+     * Refresh access token.
      */
     @PostMapping("/refresh")
     @Operation(summary = "Refresh token", description = "Get new access token using refresh token")
     public ResponseEntity<ApiResponse<AuthResponse>> refreshToken(
             @Valid @RequestBody RefreshTokenRequest request,
             HttpServletRequest httpRequest) {
-        
+
         AuthResponse response = authService.refreshToken(request, httpRequest);
-        
         return ResponseEntity.ok(ApiResponse.success("Token refreshed", response));
     }
 
@@ -113,10 +109,10 @@ public class AuthController {
     @Operation(summary = "Logout", description = "Revoke current refresh token")
     public ResponseEntity<ApiResponse<Void>> logout(
             @RequestBody(required = false) RefreshTokenRequest request) {
-        
+
         String refreshToken = request != null ? request.getRefreshToken() : null;
         authService.logout(refreshToken);
-        
+
         return ResponseEntity.ok(ApiResponse.success("Logout successful"));
     }
 
@@ -127,18 +123,16 @@ public class AuthController {
     @Operation(summary = "Logout from all devices", description = "Revoke all refresh tokens")
     public ResponseEntity<ApiResponse<Void>> logoutAll(
             @AuthenticationPrincipal UserPrincipal currentUser) {
-        
+
         authService.logoutAll(currentUser.getId());
-        
         return ResponseEntity.ok(ApiResponse.success("Logged out from all devices"));
     }
-    
+
     /**
      * Check OTP configuration status.
-     * Useful for frontend to know if OTP verification is required.
      */
     @GetMapping("/otp/status")
-    @Operation(summary = "Check OTP status", description = "Check if OTP verification is enabled")
+    @Operation(summary = "Check OTP status", description = "Check OTP behavior by flow")
     public ResponseEntity<ApiResponse<OtpStatusResponse>> getOtpStatus() {
         return ResponseEntity.ok(ApiResponse.success(
             "OTP status retrieved",
@@ -153,52 +147,43 @@ public class AuthController {
         ));
     }
 
-    // ────────────────────── Password Management ──────────────────────
-
     /**
-     * Change password for the authenticated user.
-     * Requires current password verification.
+     * Change password for authenticated user.
      */
-    @PostMapping("/change-password")
+    @PostMapping({"/change-password", "/password/change"})
     @Operation(summary = "Change password", description = "Change password for authenticated user")
     public ResponseEntity<ApiResponse<Void>> changePassword(
             @AuthenticationPrincipal UserPrincipal currentUser,
             @Valid @RequestBody ChangePasswordRequest request) {
 
         authService.changePassword(currentUser.getId(), request);
-
         return ResponseEntity.ok(ApiResponse.success("Password changed successfully"));
     }
 
     /**
-     * Request password reset OTP.
-         * Sends OTP to the registered email address.
-     * In dev/test mode, OTP is logged to console.
+     * Request password reset OTP by email.
      */
-    @PostMapping("/forgot-password")
-        @Operation(summary = "Forgot password", description = "Send password reset OTP to email")
+    @PostMapping({"/forgot-password", "/password/forgot/send-otp"})
+    @Operation(summary = "Forgot password", description = "Send password reset OTP to email")
     public ResponseEntity<ApiResponse<Void>> forgotPassword(
             @Valid @RequestBody ForgotPasswordRequest request) {
 
         authService.forgotPassword(request);
-
         return ResponseEntity.ok(ApiResponse.success("Password reset OTP sent"));
     }
 
     /**
-     * Reset password using OTP verification.
-         * Requires email + valid OTP + new password.
+     * Reset password using email OTP verification.
      */
-    @PostMapping("/reset-password")
-        @Operation(summary = "Reset password", description = "Reset password with email OTP verification")
+    @PostMapping({"/reset-password", "/password/reset"})
+    @Operation(summary = "Reset password", description = "Reset password with email OTP verification")
     public ResponseEntity<ApiResponse<Void>> resetPassword(
             @Valid @RequestBody ResetPasswordRequest request) {
 
         authService.resetPassword(request);
-
         return ResponseEntity.ok(ApiResponse.success("Password reset successfully"));
     }
-    
+
     /**
      * Response for OTP status check.
      */
@@ -211,4 +196,3 @@ public class AuthController {
         boolean registerPhoneOtpEnabled
     ) {}
 }
-

@@ -1,0 +1,39 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: analytics-service
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  jpa:
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false
+
+jwt:
+  secret: ${JWT_SECRET:your-256-bit-secret}
+  access-token-expiration: 86400000
+
+analytics:
+  internal:
+    api-key: ${ANALYTICS_INTERNAL_API_KEY:dev-analytics-internal-key}
+    client-name: ${ANALYTICS_INTERNAL_CLIENT_NAME:analytics-internal-service}
+  cache:
+    enabled: ${ANALYTICS_CACHE_ENABLED:true}
+    overview-ttl: ${ANALYTICS_CACHE_OVERVIEW_TTL:PT5M}
+    dashboard-ttl: ${ANALYTICS_CACHE_DASHBOARD_TTL:PT3M}
+    maximum-size: ${ANALYTICS_CACHE_MAX_SIZE:10000}
+  retention:
+    enabled: ${ANALYTICS_RETENTION_ENABLED:true}
+    cron: ${ANALYTICS_RETENTION_CRON:0 30 0 * * *}
+    events-days: ${ANALYTICS_RETENTION_EVENTS_DAYS:90}
+    daily-metrics-days: ${ANALYTICS_RETENTION_DAILY_METRICS_DAYS:730}
+    backfill-jobs-days: ${ANALYTICS_RETENTION_BACKFILL_JOBS_DAYS:180}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html

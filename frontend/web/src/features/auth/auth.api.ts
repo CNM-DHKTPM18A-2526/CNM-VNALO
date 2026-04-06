@@ -12,6 +12,21 @@ export type UpdateProfilePayload = {
   gender?: Gender
 }
 
+export type ForgotPasswordSendOtpPayload = {
+  phone: string
+}
+
+export type ResetPasswordPayload = {
+  phone: string
+  otp: string
+  newPassword: string
+}
+
+export type ChangePasswordPayload = {
+  currentPassword: string
+  newPassword: string
+}
+
 type ApiResponse<T> = {
   data?: T
   message?: string
@@ -252,8 +267,10 @@ export async function register(payload: RegisterPayload): Promise<string> {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      ...payload,
+      displayName: payload.displayName,
+      password: payload.password,
       phone: normalizeVietnamPhone(payload.phone),
+      otp: payload.otpCode,
     }),
   })
 
@@ -270,4 +287,61 @@ export async function register(payload: RegisterPayload): Promise<string> {
   }
 
   return token
+}
+
+export async function sendForgotPasswordOtp(payload: ForgotPasswordSendOtpPayload): Promise<void> {
+  const normalizedPhone = normalizeVietnamPhone(payload.phone)
+
+  const response = await fetch(`${API_BASE_URL}/auth/password/forgot/send-otp`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      phone: normalizedPhone,
+    }),
+  })
+
+  const json = (await response.json().catch(() => null)) as unknown
+
+  if (!response.ok) {
+    throw new Error(extractMessage(json) ?? 'Không thể gửi OTP khôi phục mật khẩu. Vui lòng thử lại.')
+  }
+}
+
+export async function resetPassword(payload: ResetPasswordPayload): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/auth/password/reset`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      phone: normalizeVietnamPhone(payload.phone),
+      otp: payload.otp,
+      newPassword: payload.newPassword,
+    }),
+  })
+
+  const json = (await response.json().catch(() => null)) as unknown
+
+  if (!response.ok) {
+    throw new Error(extractMessage(json) ?? 'Không thể đặt lại mật khẩu. Vui lòng thử lại.')
+  }
+}
+
+export async function changePassword(token: string, payload: ChangePasswordPayload): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/auth/password/change`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+
+  const json = (await response.json().catch(() => null)) as unknown
+
+  if (!response.ok) {
+    throw new Error(extractMessage(json) ?? 'Không thể đổi mật khẩu. Vui lòng thử lại.')
+  }
 }

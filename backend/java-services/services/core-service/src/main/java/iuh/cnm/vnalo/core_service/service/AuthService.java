@@ -36,6 +36,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -53,7 +54,6 @@ public class AuthService {
 
     @Transactional
     public AuthResponse register(RegisterRequest request, HttpServletRequest httpRequest) {
-        // Check if phone already registered
         if (authAccountRepository.existsByPhone(request.getPhone())) {
             throw new ApiException(ErrorCode.AUTH_PHONE_ALREADY_EXISTS);
         }
@@ -63,19 +63,15 @@ public class AuthService {
             throw new ApiException(ErrorCode.AUTH_EMAIL_ALREADY_EXISTS);
         }
 
-        // Create account - OTP already verified at this point, so status is ACTIVE
-        AccountStatus initialStatus = AccountStatus.ACTIVE;
-        
         AuthAccount account = AuthAccount.builder()
                 .phone(request.getPhone())
-            .email(normalizedEmail)
+                .email(normalizedEmail)
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .passwordUpdatedAt(Instant.now())
-                .status(initialStatus)
+                .status(AccountStatus.ACTIVE)
                 .build();
         account = authAccountRepository.save(account);
 
-        // Create profile with same ID as account (1:1 relationship)
         UserProfile profile = UserProfile.createWithAccountId(account.getId(), request.getDisplayName());
         profile.setAvatarUrl(buildDefaultAvatarUrl(request.getDisplayName(), account.getId()));
         if (request.getGender() != null) {
@@ -86,11 +82,9 @@ public class AuthService {
         }
         profile = userProfileRepository.save(profile);
 
-        // Create default privacy settings
         UserPrivacySetting privacySetting = UserPrivacySetting.createDefault(profile.getId());
         userPrivacySettingRepository.save(privacySetting);
 
-        // Generate tokens
         UserPrincipal userPrincipal = UserPrincipal.create(account);
         String accessToken = jwtTokenProvider.generateAccessToken(userPrincipal);
         String refreshToken = generateAndSaveRefreshToken(account.getId(), httpRequest, null);
@@ -99,18 +93,10 @@ public class AuthService {
         return buildAuthResponse(accessToken, refreshToken, account, profile);
     }
 
-    private String buildDefaultAvatarUrl(String displayName, UUID accountId) {
-        String safeName = (displayName == null || displayName.isBlank()) ? "User" : displayName.trim();
-        String encodedName = URLEncoder.encode(safeName, StandardCharsets.UTF_8);
-        String seed = accountId != null ? accountId.toString() : UUID.randomUUID().toString();
-        return "https://api.dicebear.com/9.x/initials/svg?seed=" + seed + "&radius=50&size=256&chars=2&fontFamily=Arial&fontWeight=600&backgroundType=gradientLinear&text=" + encodedName;
-    }
-
     @Transactional
     public AuthResponse login(LoginRequest request, HttpServletRequest httpRequest) {
-        // Pre-check: find account and check lock status
         AuthAccount account = resolveAccountByIdentifier(request.getIdentifier())
-            .orElseThrow(() -> new ApiException(ErrorCode.AUTH_INVALID_CREDENTIALS));
+                .orElseThrow(() -> new ApiException(ErrorCode.AUTH_INVALID_CREDENTIALS));
 
         if (account.isLocked()) {
             throw new ApiException(ErrorCode.AUTH_ACCOUNT_LOCKED);
@@ -121,18 +107,14 @@ public class AuthService {
         }
 
         if (!passwordEncoder.matches(request.getPassword(), account.getPasswordHash())) {
-            // Track failed login attempt
             account.onLoginFailed();
-            // Auto-lock after 5 consecutive failures
             if (account.getFailedLoginCount() >= 5) {
-                account.lock(Instant.now().plusSeconds(1800)); // Lock for 30 minutes
+                account.lock(Instant.now().plusSeconds(1800));
                 log.warn("Account {} locked after {} failed attempts", account.getId(), account.getFailedLoginCount());
             }
             authAccountRepository.save(account);
             throw new ApiException(ErrorCode.AUTH_INVALID_CREDENTIALS);
         }
-
-        UserPrincipal userPrincipal = UserPrincipal.create(account);
 
         account.onLoginSuccess(request.getDeviceId());
         authAccountRepository.save(account);
@@ -144,6 +126,7 @@ public class AuthService {
             refreshTokenRepository.revokeByAccountIdAndDeviceId(account.getId(), request.getDeviceId(), Instant.now());
         }
 
+        UserPrincipal userPrincipal = UserPrincipal.create(account);
         String accessToken = jwtTokenProvider.generateAccessToken(userPrincipal);
         String refreshToken = generateAndSaveRefreshToken(account.getId(), httpRequest, request.getDeviceId());
 
@@ -193,6 +176,76 @@ public class AuthService {
         refreshTokenRepository.revokeAllByAccountId(accountId, Instant.now());
     }
 
+    @Transactional
+    public void changePassword(UUID accountId, ChangePasswordRequest request) {
+        AuthAccount account = authAccountRepository.findById(accountId)
+                .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), account.getPasswordHash())) {
+            throw new ApiException(ErrorCode.AUTH_PASSWORD_MISMATCH);
+        }
+
+        validatePasswordPolicy(request.getNewPassword());
+
+        if (passwordEncoder.matches(request.getNewPassword(), account.getPasswordHash())) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR, "New password must be different from current password");
+        }
+
+        account.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        account.setPasswordUpdatedAt(Instant.now());
+        account.setFailedLoginCount(0);
+
+        if (account.getStatus() == AccountStatus.LOCKED) {
+            account.setStatus(AccountStatus.ACTIVE);
+            account.setLockedUntil(null);
+        }
+
+        authAccountRepository.save(account);
+        refreshTokenRepository.revokeAllByAccountId(accountId, Instant.now());
+
+        log.info("Password changed successfully for account {}", accountId);
+    }
+
+    @Transactional
+    public void forgotPassword(ForgotPasswordRequest request) {
+        final String email = normalizeEmail(request.email());
+
+        authAccountRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new ApiException(ErrorCode.AUTH_ACCOUNT_NOT_FOUND_BY_EMAIL));
+
+        otpService.sendOtp(email, OtpPurpose.RESET_PASSWORD);
+        log.info("Password reset OTP sent for email: {}", maskEmail(email));
+    }
+
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        final String email = normalizeEmail(request.getEmail());
+
+        AuthAccount account = authAccountRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new ApiException(ErrorCode.AUTH_ACCOUNT_NOT_FOUND_BY_EMAIL));
+
+        otpService.verifyOtp(email, request.getOtp(), OtpPurpose.RESET_PASSWORD);
+        validatePasswordPolicy(request.getNewPassword());
+
+        if (passwordEncoder.matches(request.getNewPassword(), account.getPasswordHash())) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR, "New password must be different from current password");
+        }
+
+        account.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        account.setPasswordUpdatedAt(Instant.now());
+        account.setFailedLoginCount(0);
+
+        if (account.isLocked()) {
+            account.setStatus(AccountStatus.ACTIVE);
+            account.setLockedUntil(null);
+        }
+
+        authAccountRepository.save(account);
+        refreshTokenRepository.revokeAllByAccountId(account.getId(), Instant.now());
+
+        log.info("Password reset successfully for email: {}", maskEmail(email));
+    }
+
     private String generateAndSaveRefreshToken(UUID accountId, HttpServletRequest request, String deviceId) {
         String rawToken = jwtTokenProvider.generateRefreshToken();
         String tokenHash = hashToken(rawToken);
@@ -227,7 +280,7 @@ public class AuthService {
                 .user(UserInfoResponse.builder()
                         .id(profile.getId())
                         .phone(account.getPhone())
-                    .email(account.getEmail())
+                        .email(account.getEmail())
                         .displayName(profile.getDisplayName())
                         .avatarUrl(profile.getAvatarUrl())
                         .coverUrl(profile.getCoverUrl())
@@ -240,69 +293,7 @@ public class AuthService {
                 .build();
     }
 
-    // ────────────────────── Password Management ──────────────────────
-
-    @Transactional
-    public void changePassword(UUID accountId, ChangePasswordRequest request) {
-        AuthAccount account = authAccountRepository.findById(accountId)
-                .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
-
-        if (!passwordEncoder.matches(request.currentPassword(), account.getPasswordHash())) {
-            throw new ApiException(ErrorCode.AUTH_PASSWORD_MISMATCH);
-        }
-
-        validatePasswordPolicy(request.newPassword());
-
-        account.setPasswordHash(passwordEncoder.encode(request.newPassword()));
-        account.setPasswordUpdatedAt(Instant.now());
-        authAccountRepository.save(account);
-
-        log.info("Password changed successfully for account: {}", accountId);
-    }
-
-    @Transactional
-    public void forgotPassword(ForgotPasswordRequest request) {
-        final String email = normalizeEmail(request.email());
-
-        // Verify account exists
-        authAccountRepository.findByEmailIgnoreCase(email)
-            .orElseThrow(() -> new ApiException(ErrorCode.AUTH_ACCOUNT_NOT_FOUND_BY_EMAIL));
-
-        // Send OTP for password reset purpose
-        otpService.sendOtp(email, OtpPurpose.RESET_PASSWORD);
-
-        log.info("Password reset OTP sent for email: {}", maskEmail(email));
-    }
-
-    @Transactional
-    public void resetPassword(ResetPasswordRequest request) {
-        final String email = normalizeEmail(request.email());
-
-        // Verify account exists
-        AuthAccount account = authAccountRepository.findByEmailIgnoreCase(email)
-            .orElseThrow(() -> new ApiException(ErrorCode.AUTH_ACCOUNT_NOT_FOUND_BY_EMAIL));
-
-        // Verify OTP
-        otpService.verifyOtp(email, request.otp(), OtpPurpose.RESET_PASSWORD);
-
-        // Validate new password
-        validatePasswordPolicy(request.newPassword());
-
-        // Update password
-        account.setPasswordHash(passwordEncoder.encode(request.newPassword()));
-        account.setPasswordUpdatedAt(Instant.now());
-        // Unlock account if it was locked due to too many failed login attempts
-        if (account.isLocked()) {
-            account.setStatus(AccountStatus.ACTIVE);
-            account.setLockedUntil(null);
-            account.setFailedLoginCount(0);
-        }
-        authAccountRepository.save(account);
-
-        log.info("Password reset successfully for email: {}", maskEmail(email));
-    }
-
-    private java.util.Optional<AuthAccount> resolveAccountByIdentifier(String identifier) {
+    private Optional<AuthAccount> resolveAccountByIdentifier(String identifier) {
         final String trimmed = identifier == null ? "" : identifier.trim();
         if (trimmed.contains("@")) {
             return authAccountRepository.findByEmailIgnoreCase(normalizeEmail(trimmed));
@@ -327,7 +318,7 @@ public class AuthService {
     }
 
     private void validatePasswordPolicy(String password) {
-        if (password.length() < 8) {
+        if (password == null || password.length() < 8) {
             throw new ApiException(ErrorCode.AUTH_PASSWORD_POLICY);
         }
         boolean hasUpper = password.chars().anyMatch(Character::isUpperCase);
@@ -336,5 +327,12 @@ public class AuthService {
         if (!hasUpper || !hasLower || !hasDigit) {
             throw new ApiException(ErrorCode.AUTH_PASSWORD_POLICY);
         }
+    }
+
+    private String buildDefaultAvatarUrl(String displayName, UUID accountId) {
+        String safeName = (displayName == null || displayName.isBlank()) ? "User" : displayName.trim();
+        String encodedName = URLEncoder.encode(safeName, StandardCharsets.UTF_8);
+        String seed = accountId != null ? accountId.toString() : UUID.randomUUID().toString();
+        return "https://api.dicebear.com/9.x/initials/svg?seed=" + seed + "&radius=50&size=256&chars=2&fontFamily=Arial&fontWeight=600&backgroundType=gradientLinear&text=" + encodedName;
     }
 }

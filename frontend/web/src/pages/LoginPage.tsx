@@ -129,7 +129,7 @@ export function LoginPage() {
               </button>
 
               <div className='auth-inline-actions'>
-                <button type='button' className='auth-text-action'>
+                <button type='button' className='auth-text-action' onClick={() => navigate('/forgot-password')}>
                   {t('auth.forgotPassword')}
                 </button>
                 {/* <button type='button' className='auth-text-action'>
