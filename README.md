@@ -164,7 +164,7 @@
 #### Backend — core-service (Java)
 - **Framework**: Spring Boot 3.4.2 (Java 21)
 - **Security**: Spring Security 6 + Firebase Admin SDK 9.7.0
-- **Database**: Spring Data JPA + Flyway Migrations (V1–V10)
+- **Database**: Spring Data JPA + Flyway Migrations (V1–V13)
 - **Auth**: JWT (HS512) with refresh tokens + OTP verification
 
 #### Backend — message-service (TypeScript)
@@ -183,7 +183,7 @@
 
 #### Infrastructure
 - **Containerization**: Docker + Docker Compose
-- **Services**: PostgreSQL 16 + Redis 7 (+ optional Kafka)
+- **Services**: PostgreSQL 16 + Redis 7 (+ RabbitMQ, Kafka, Ollama optional for extended flows)
 
 </details>
 
@@ -249,12 +249,13 @@
 |---------|---------------|------|------------|--------|
 | 🔐 **core-service** | Auth, Users, Social Features, QR, Contacts | 8081 | Spring Boot 3.4 (Java 21) | ✅ Complete |
 | 💬 **message-service** | Conversations, Messages, WebSocket, Inbox | 3000 | NestJS 11 (TypeScript) | ✅ Complete |
-| 📎 **media-service** | File Upload, Cloudinary, Thumbnails | 8083 | Spring Boot *(planned)* | ⏳ Planned |
-| ⚡ **realtime-gateway** | WebSocket Scaling, Presence | 8085 | Node.js *(planned)* | ⏳ Planned |
-| � **content-service** | Story, Timeline, Posts, Comments | 8086 | Spring Boot *(planned)* | ⏳ Planned |
-| 🔔 **notification-service** | Push Notifications (FCM) | 8087 | Spring Boot *(planned)* | ⏳ Planned |
-| 🛡️ **moderation-service** | Reports, Content Review, User Actions | 8088 | Spring Boot *(planned)* | ⏳ Planned |
-| 📊 **analytics-service** | Activity Logging, Stats, Monitoring | 8089 | Spring Boot *(planned)* | ⏳ Planned |
+| 📎 **media-service** | File Upload, S3/Local Storage, Stickers | 8083 | Spring Boot 3.4 (Java 21) | 🔄 In Progress |
+| ⚡ **realtime-gateway** | WebSocket Scaling, Presence, Redis adapter | 8085 | NestJS (Node.js 20+) | 🔄 In Progress |
+| 📝 **content-service** | Story, Timeline, Posts, Comments | 8086 | Spring Boot (scaffold) | 🧪 Scaffolded |
+| 🔔 **notification-service** | Push Notifications (FCM) | 8087 | Spring Boot (scaffold) | 🧪 Scaffolded |
+| 🛡️ **moderation-service** | Reports, Content Review, User Actions | 8082 | Spring Boot 3.4 (Java 21) | 🔄 In Progress |
+| 🤖 **ai-service** | Gemini + Ollama fallback chatbot API | 8094 | Spring Boot 3.4 (Java 21) | 🧪 Experimental |
+| 📊 **analytics-service** | Activity Logging, Stats, Monitoring | 8084 *(compose profile)* | Spring Boot *(planned)* | ⏳ Planned |
 
 ### 🔄 Message Flow
 
@@ -390,7 +391,7 @@ CNM-ZALO/
 │   │           │   ├── java/        #     75 Java source files
 │   │           │   └── resources/
 │   │           │       ├── application.yml
-│   │           │       └── db/migration/  # V1–V10 Flyway migrations
+│   │           │       └── db/migration/  # V1–V13 Flyway migrations
 │   │           └── pom.xml
 │   │
 │   └── node-services/               # NestJS services
@@ -409,7 +410,8 @@ CNM-ZALO/
 │       └── nest-cli.json
 │
 ├── 📂 docker/
-│   ├── docker-compose.yml           # PostgreSQL + Redis (+ optional Kafka)
+│   ├── docker-compose.yml           # Full stack (infra + services)
+│   ├── docker-compose.infra.yml     # Infra only (PostgreSQL + Redis)
 │   └── init-db.sql                  # Database initialization
 │
 ├── 📂 frontend/
@@ -493,8 +495,11 @@ V5  — friend_request, friendship, block_list, contact_sync
 V6  — User profile enhancements
 V7  — Indexes, constraints
 V8  — conversation, conversation_member, message, conversation_inbox
-V9  — message_reaction, pinned_message, message_receipt (schema alignment)
-V10 — schema hardening and alignment (idempotent guards, constraints, indexes)
+V9  — message_reaction, pinned_message, message_receipt
+V10 — schema hardening and idempotent guards
+V11 — group member_limit default 1000→100 + backfill
+V12 — message.hidden_by_users for Delete For Me
+V13 — conversation_join_request + join_mode OPEN defaults
 ```
 
 ### Environment Variables
@@ -533,7 +538,7 @@ REDIS_PORT=6379
 |----------|-------------|
 | [📂 Documentation Index](docs/README.md) | All documentation with descriptions |
 | [🏗️ Architecture](docs/system/architecture.md) | System architecture, service map |
-| [🗄️ Database Schema](docs/system/database-schema.md) | Complete PostgreSQL schema (V1–V10) |
+| [🗄️ Database Schema](docs/system/database-schema.md) | Complete PostgreSQL schema and runtime reconcile notes (Flyway V1–V13) |
 | [📡 API Reference](docs/system/api-reference.md) | REST endpoints + WebSocket events |
 | [📊 Status](docs/project/status.md) | Implementation status per service |
 | [📝 Changelog](docs/project/changelog.md) | Version history |
@@ -548,12 +553,13 @@ REDIS_PORT=6379
 |---------|--------|----------|-------|
 | **core-service** | ✅ Complete | Auth, Users, Friends, Blocks, QR, Contacts, FCM | 44 pass |
 | **message-service** | ✅ Complete | Conversations, Messages, Reactions, Pins, Inbox, WebSocket | Build OK |
-| **media-service** | ⏳ Planned | File uploads, Cloudinary | — |
-| **realtime-gateway** | ⏳ Planned | WebSocket scaling, Presence | — |
-| **content-service** | ⏳ Planned | Story, Timeline, Posts, Comments | — |
-| **notification-service** | ⏳ Planned | Push notifications (FCM) | — |
-| **moderation-service** | ⏳ Planned | Reports, Content review, User actions | — |
-| **analytics-service** | ⏳ Planned | Activity logging, Stats, Monitoring | — |
+| **media-service** | 🔄 In Progress | Upload APIs, S3/local storage fallback, stickers | Service tests + smoke script |
+| **realtime-gateway** | 🔄 In Progress | Redis-backed Socket.IO scaling skeleton | Build available |
+| **content-service** | 🧪 Scaffolded | Story/Timeline service skeleton | Build stage |
+| **notification-service** | 🧪 Scaffolded | FCM notification skeleton | Build stage |
+| **moderation-service** | 🔄 In Progress | Reports, moderation workflows, runbook docs | Build verified |
+| **ai-service** | 🧪 Experimental | Gemini + Ollama chatbot API | Build stage |
+| **analytics-service** | ⏳ Planned | Placeholder profile in compose; service code pending | — |
 
 ---
 

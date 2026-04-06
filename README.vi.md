@@ -1,30 +1,64 @@
 <div align="center">
 
-# 💬 VNALO
+<img src="frontend/mobile/assets/icons/app_icon.png" alt="VNALO Logo" width="120" />
 
-### Nền Tảng Nhắn Tin Thời Gian Thực Cấp Doanh Nghiệp
+# VNALO
 
-*Xây dựng thế hệ mới của ứng dụng nhắn tin tức thời với kiến trúc microservices*
+### Nền Tảng Nhắn Tin Thời Gian Thực Theo Kiến Trúc Microservices
 
-[![Version](https://img.shields.io/badge/version-1.0.0--SNAPSHOT-blue.svg?style=flat-square)](https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO)
-[![License](https://img.shields.io/badge/license-MIT-green.svg?style=flat-square)](LICENSE)
-[![Java](https://img.shields.io/badge/Java-21-orange.svg?style=flat-square&logo=openjdk)](https://openjdk.org/)
-[![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.2+-green.svg?style=flat-square&logo=spring)](https://spring.io/projects/spring-boot)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](CONTRIBUTING.md)
+*Bản tiếng Việt đã được audit/reconcile toàn diện theo runtime hiện tại (04/2026)*
 
-**[English](README.md)** | **[Tiếng Việt](README.vi.md)**
+<p align="center">
+  <a href="https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO">
+    <img src="https://img.shields.io/badge/version-1.0.0--SNAPSHOT-blue.svg?style=for-the-badge" alt="Version">
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge" alt="License">
+  </a>
+  <a href="https://openjdk.org/">
+    <img src="https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white" alt="Java">
+  </a>
+  <a href="https://spring.io/projects/spring-boot">
+    <img src="https://img.shields.io/badge/Spring_Boot-3.4-6DB33F?style=for-the-badge&logo=spring-boot&logoColor=white" alt="Spring Boot">
+  </a>
+</p>
 
-[📖 Tài Liệu](docs/) • [🚀 Bắt Đầu Nhanh](#-bắt-đầu-nhanh) • [🏗️ Kiến Trúc](#️-kiến-trúc) • [🤝 Đóng Góp](#-đóng-góp)
+<p align="center">
+  <a href="https://nodejs.org/">
+    <img src="https://img.shields.io/badge/Node.js-20+-339933?style=for-the-badge&logo=node.js&logoColor=white" alt="Node.js">
+  </a>
+  <a href="https://nestjs.com/">
+    <img src="https://img.shields.io/badge/NestJS-11-E0234E?style=for-the-badge&logo=nestjs&logoColor=white" alt="NestJS">
+  </a>
+  <a href="https://www.postgresql.org/">
+    <img src="https://img.shields.io/badge/PostgreSQL-16-316192?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL">
+  </a>
+  <a href="https://redis.io/">
+    <img src="https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Redis">
+  </a>
+</p>
 
----
+<p align="center">
+  <a href="https://flutter.dev/">
+    <img src="https://img.shields.io/badge/Flutter-3.x-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter">
+  </a>
+  <a href="https://www.docker.com/">
+    <img src="https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker">
+  </a>
+</p>
 
-### 🎯 Tính Năng Cốt Lõi
+<p align="center">
+  <strong><a href="README.md">English</a></strong> •
+  <strong><a href="README.vi.md">Tiếng Việt</a></strong>
+</p>
 
-```
-🔐 Xác Thực Số Điện Thoại    💬 Chat Thời Gian Thực       👥 Mạng Xã Hội
-📱 Mobile Đa Nền Tảng        🎥 Chia Sẻ Media             🔔 Thông Báo Push  
-⚡ WebSocket Real-time        📊 Phân Tích & Insights      🌐 Microservices
-```
+<p align="center">
+  <a href="docs/">📖 Tài liệu</a> •
+  <a href="#-bắt-đầu-nhanh">🚀 Bắt đầu nhanh</a> •
+  <a href="#-kiến-trúc">🏗️ Kiến trúc</a> •
+  <a href="#-trạng-thái-hệ-thống">📊 Trạng thái</a> •
+  <a href="#-đóng-góp">🤝 Đóng góp</a>
+</p>
 
 </div>
 
@@ -38,559 +72,223 @@
 - [🚀 Bắt Đầu Nhanh](#-bắt-đầu-nhanh)
 - [📁 Cấu Trúc Dự Án](#-cấu-trúc-dự-án)
 - [🔧 Phát Triển](#-phát-triển)
-- [🚢 Triển Khai](#-triển-khai)
 - [📖 Tài Liệu](#-tài-liệu)
+- [📊 Trạng Thái Hệ Thống](#-trạng-thái-hệ-thống)
 - [🤝 Đóng Góp](#-đóng-góp)
-- [📄 Giấy Phép](#-giấy-phép)
 
 ---
 
 ## ✨ Điểm Nổi Bật
 
-<div align="center">
-
-| 🎨 UI/UX Hiện Đại | ⚡ Hiệu Năng Cao | 🔒 Bảo Mật | 📈 Khả Năng Mở Rộng |
-|:---:|:---:|:---:|:---:|
-| Flutter 3.x | Socket.IO WebSocket | JWT + Firebase Auth | Kiến Trúc Microservices |
-| NativeWind/Tailwind | Event-Driven (Kafka) | Firebase Auth | Sẵn Sàng Kubernetes |
-| Hiệu Ứng Mượt Mà | Redis Caching | JWT Tokens | Tự Động Mở Rộng |
-
-</div>
-
-### 🌟 Điểm Khác Biệt
-
-- **🎯 Sẵn Sàng Sản Xuất**: Xây dựng với kiến trúc microservices cấp doanh nghiệp
-- **⚡ Mọi Thứ Theo Thời Gian Thực**: Gửi tin nhắn dưới 1 giây với WebSocket
-- **🤖 Hỗ Trợ AI**: Trợ lý AI lai với Gemini + Ollama fallback
-- **📱 Đa Nền Tảng**: Một mã nguồn cho cả iOS & Android
-- **🔧 Thân Thiện Với Lập Trình Viên**: Tài liệu đầy đủ & công cụ hiện đại
-- **☁️ Cloud-Native**: Thiết kế cho AWS EKS với tự động mở rộng
+- **Kiến trúc polyglot**: Spring Boot (core/media/moderation/ai) + NestJS (message/realtime).
+- **Realtime thực chiến**: Socket.IO + JWT handshake + inbox CQRS cho luồng chat.
+- **Mobile Flutter**: auth flow đầy đủ, avatar upload có retry/fallback cho thiết bị thật.
+- **Schema có kiểm soát**: Flyway là nguồn sự thật, hiện tại đến **V13**.
+- **Môi trường chạy rõ ràng**: có cả full-stack compose và infra-only compose.
 
 ---
 
 ## 🛠️ Công Nghệ
 
-<div align="center">
+### Backend
+- `core-service`: Spring Boot 3.4.2, Java 21, Spring Security, Flyway.
+- `message-service`: NestJS 11, TypeORM, Socket.IO.
+- `media-service`, `moderation-service`, `realtime-gateway`: đang phát triển tích cực, đã có runtime trong compose.
+- `content-service`, `notification-service`: scaffold đã có trong repo.
+- `ai-service`: experimental (Gemini + Ollama fallback).
 
-### Kiến Trúc Backend
+### Data Layer
+- PostgreSQL 16: lưu trữ chính.
+- Redis 7: cache/presence/sequence.
+- RabbitMQ, Kafka, Ollama: mở rộng theo profile/môi trường.
 
-![Java](https://img.shields.io/badge/Java_21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
-![Spring Boot](https://img.shields.io/badge/Spring_Boot_3-6DB33F?style=for-the-badge&logo=spring&logoColor=white)
-![Node.js](https://img.shields.io/badge/Node.js-20-339933?style=for-the-badge&logo=node.js&logoColor=white)
-![NestJS](https://img.shields.io/badge/NestJS-11-E0234E?style=for-the-badge&logo=nestjs&logoColor=white)
-
-### Tầng Dữ Liệu
-
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL_16-316192?style=for-the-badge&logo=postgresql&logoColor=white)
-![Flyway](https://img.shields.io/badge/Flyway-Migrations-CC0200?style=for-the-badge)
-![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
-
-### Frontend & Mobile
-
-![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?style=for-the-badge&logo=flutter&logoColor=white)
-![Dart](https://img.shields.io/badge/Dart-3.x-0175C2?style=for-the-badge&logo=dart&logoColor=white)
-![Material](https://img.shields.io/badge/Material-Design-3F51B5?style=for-the-badge)
-![Provider](https://img.shields.io/badge/Provider-State-6A1B9A?style=for-the-badge)
-
-### DevOps & Hạ Tầng
-
-![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
-![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white)
-![AWS](https://img.shields.io/badge/AWS-232F3E?style=for-the-badge&logo=amazon-aws&logoColor=white)
-![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=github-actions&logoColor=white)
-
-### Giám Sát & AI
-
-![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?style=for-the-badge&logo=prometheus&logoColor=white)
-![Grafana](https://img.shields.io/badge/Grafana-F46800?style=for-the-badge&logo=grafana&logoColor=white)
-![Gemini](https://img.shields.io/badge/Gemini_AI-8E75B2?style=for-the-badge&logo=google&logoColor=white)
-![Ollama](https://img.shields.io/badge/Ollama-000000?style=for-the-badge)
-
-</div>
-
-<details>
-<summary><b>📦 Ngăn Xếp Công Nghệ Đầy Đủ</b></summary>
-
-#### Backend Services
-- **Framework**: Spring Boot 3.x (core-service) + NestJS 11 (message-service)
-- **WebSocket**: Socket.IO (message-service)
-- **Bảo mật**: Spring Security + Firebase Admin SDK
-- **Auth liên service**: JWT HS512 dùng chung secret giữa core/message
-
-#### Cơ Sở Dữ Liệu
-- **RDBMS**: PostgreSQL 16 (auth, user, social, conversation, message)
-- **Migration**: Flyway V1-V10 (quản lý bởi core-service)
-- **Cache**: Redis 7
-
-#### Frontend
-- **Mobile**: Flutter 3.x
-- **Ngôn ngữ**: Dart 3.x
-- **UI**: Material Design
-
-#### Hạ Tầng
-- **Container hóa**: Docker + Docker Compose
-- **Orchestration**: Kubernetes (AWS EKS)
-- **Cân bằng tải**: ALB (REST) + NLB (WebSocket)
-- **Lưu trữ**: AWS S3 + CloudFront CDN
-- **CI/CD**: GitHub Actions + ArgoCD
-
-</details>
+### Mobile
+- Flutter 3.x, Dart 3.x.
+- Cấu hình endpoint bằng `--dart-define`.
 
 ---
 
-## 🏗 ️ Kiến Trúc
+## 🏗️ Kiến Trúc
 
-<div align="center">
+### Runtime chính hiện tại
 
-### 🎨 Sơ Đồ Kiến Trúc Hệ Thống
+```text
+Flutter Mobile
+  -> core-service (8081): Auth/User/Friend/Contact/QR
+  -> message-service (3000): Conversation/Message/Inbox/WebSocket
+  -> media-service (8083): Upload media + sticker APIs
 
-![VNALO System Architecture](./assets/SA-VNALO_lightver.png)
-
-*Kiến trúc microservices toàn diện với Spring Boot, Node.js và hạ tầng cloud-native*
-
-</div>
-
----
-
-<div align="center">
-
-### Thiết Kế Hệ Thống Tổng Quan
-
-```mermaid
-graph TB
-    subgraph Clients[Ứng Dụng]
-        iOS[📱 iOS App]
-        Android[📱 Android App]
-        Web[🌐 Web Tương Lai]
-    end
-    
-    subgraph "AWS Cloud"
-        ALB[⚖️ Application Load Balancer]
-        NLB[⚖️ Network Load Balancer]
-        
-        subgraph "Kubernetes Cluster"
-            Gateway[🚪 API Gateway]
-            
-            subgraph Microservices
-                Auth[🔐 Auth Service]
-                User[👤 User Service]
-                Social[👥 Social Service]
-                Message[💬 Message Service]
-                Media[📎 Media Service]
-                Notification[🔔 Notification Service]
-                AI[🤖 AI Service]
-            end
-            
-            Realtime[⚡ Realtime Gateway<br/>Socket.IO WebSocket]
-        end
-        
-        subgraph "Tầng Dữ Liệu"
-            Postgres[(🐘 PostgreSQL)]
-            Cassandra[(📊 Cassandra)]
-            Redis[(⚡ Redis)]
-            Kafka[📨 Kafka]
-            S3[(☁️ S3 + CloudFront)]
-        end
-    end
-    
-    iOS --> ALB
-    Android --> ALB
-    iOS -.WebSocket.-> NLB
-    Android -.WebSocket.-> NLB
-    
-    ALB --> Gateway
-    NLB --> Realtime
-    Gateway --> Microservices
-    
-    Microservices --> Postgres
-    Message --> Cassandra
-    Microservices --> Redis
-    Microservices --> Kafka
-    Media --> S3
-    Realtime <--> Redis
-    Realtime <--> Kafka
+Shared infrastructure: PostgreSQL 16 + Redis 7
+JWT HS512 được chia sẻ giữa các service chính
 ```
 
-</div>
+### Bản đồ service
 
-### 🎯 Tổng Quan Microservices
-
-| Service | Trách Nhiệm | Port | Công Nghệ | Cơ Sở Dữ Liệu |
-|---------|-------------|------|-----------|----------------|
-| 🔐 **core-service** | Auth, Users, Tính Năng Xã Hội | 8081 | Spring Boot | PostgreSQL (auth, users, social) |
-| 💬 **message-service** | Hội Thoại, Tin Nhắn, Chat, Socket.IO | 3000 | NestJS 11 | PostgreSQL (messaging) |
-| 📎 **media-service** | Tải File, Cloudinary, Stickers | 8083 | Spring Boot | PostgreSQL (media) |
-| 📰 **content-service** | Stories, Bài Đăng Timeline | 8084 | Spring Boot | PostgreSQL (content) |
-| ⚡ **realtime-gateway** | WebSocket, Gửi Thời Gian Thực | 8085 | Node.js/NestJS | Redis |
-| 🔔 **notification-service** | Thông Báo Push (FCM) | 8086 | Spring Boot | PostgreSQL |
-| 🛡️ **moderation-service** | Báo Cáo, Kiểm Duyệt Nội Dung | 8087 | Spring Boot | PostgreSQL |
-| 📊 **analytics-service** | Số Liệu, Logs, Phân Tích | 8088 | Spring Boot | PostgreSQL |
-
-**Trạng Thái**: ✅ Hạ Tầng Sẵn Sàng | 🚧 core-service Đang Phát Triển | ⏳ Các Service Khác Đã Lên Kế Hoạch
-
-### 🔄 Luồng Tin Nhắn
-
-```
-┌────────┐    WSS     ┌─────────────┐   Kafka    ┌──────────┐
-│ Client │ ──────────▶│   Gateway   │ ─────────▶ │  Message │
-│        │◀────ACK────│  (Socket.IO)│            │  Service │
-└────────┘            └─────────────┘            └──────────┘
-                             │                         │
-                             ▼                         ▼
-                       ┌──────────┐            ┌───────────┐
-                       │  Redis   │            │ Cassandra │
-                       │ (Cache)  │            │ (Lịch sử) │
-                       └──────────┘            └───────────┘
-```
-
-**Quyết Định Thiết Kế Chính:**
-- 📊 **serverSeq per conversation**: Sắp xếp đơn điệu không xung đột timestamp
-- 👥 **Biên lai cấp người dùng**: Đã gửi/Đã xem khi bất kỳ thiết bị nào nhận/đọc
-- 🔄 **Event-driven**: Kafka cho xử lý bất đồng bộ (lưu trữ, thông báo, phân tích)
-- ⚡ **ACK nhanh**: Gateway phản hồi ngay sau khi publish Kafka
-- 🔐 **Idempotency**: `clientMessageId` + bảng tra cứu Cassandra
+| Service | Port | Công nghệ | Trạng thái |
+|---|---:|---|---|
+| core-service | 8081 | Spring Boot 3.4 (Java 21) | ✅ Complete |
+| message-service | 3000 | NestJS 11 (Node.js 20+) | ✅ Complete |
+| media-service | 8083 | Spring Boot 3.4 (Java 21) | 🔄 In Progress |
+| realtime-gateway | 8085 | NestJS (Node.js 20+) | 🔄 In Progress |
+| moderation-service | 8082 | Spring Boot 3.4 (Java 21) | 🔄 In Progress |
+| content-service | 8086 | Spring Boot (scaffold) | 🧪 Scaffolded |
+| notification-service | 8087 | Spring Boot (scaffold) | 🧪 Scaffolded |
+| ai-service | 8094 | Spring Boot 3.4 (Java 21) | 🧪 Experimental |
+| analytics-service | 8084 (compose profile) | Spring Boot (planned) | ⏳ Planned |
 
 ---
 
 ## 🚀 Bắt Đầu Nhanh
 
-### Yêu Cầu
+### Yêu cầu
 
 ```bash
-# Bắt buộc
-☑️  Java 21+ (JDK)
-☑️  Docker & Docker Compose
-☑️  Git
-
-# Tùy chọn (cho phát triển mobile)
-📱  Node.js 20+
-📱  Android Studio (cho Android)
-🍎  Xcode (cho iOS - chỉ macOS)
+Java 21+
+Node.js 20+
+Docker + Docker Compose
+Git
+# Tùy chọn cho mobile:
+Flutter 3.x
 ```
 
-### ⚡ Thiết Lập Backend (core-service + message-service)
+### Chạy local nhanh
 
 ```bash
-# 1. Clone repository
+# 1) Clone
 git clone https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO.git
 cd CNM-ZALO
 
-# 2. Lấy file Firebase credentials từ team lead
-# Đặt file vào: backend/java-services/services/core-service/src/main/resources/
-# Tên file: iuh-cnm-vnalo-firebase-adminsdk-fbsvc-5008b7c5eb.json
+# 2) Khởi động hạ tầng (infra-only)
+docker compose -f docker/docker-compose.infra.yml up -d
 
-# 3. Khởi động Docker containers
-cd docker
-docker compose up -d postgres redis
-
-# 4. Build và chạy core-service
-cd ../backend/java-services/services/core-service
-
-# Windows
-.\mvnw.cmd clean install -DskipTests
-.\mvnw.cmd spring-boot:run
-
-# Linux/Mac
-./mvnw clean install -DskipTests
+# 3) Chạy core-service (Terminal 1)
+cd backend/java-services/services/core-service
 ./mvnw spring-boot:run
 
-# 5. Chạy message-service (terminal mới)
+# 4) Chạy message-service (Terminal 2)
 cd ../../../../backend/node-services
 npm install
 npm run start:dev
 
-# 6. Kiểm tra health
-# core-service:    http://localhost:8081/api/v1/actuator/health
-# message-service: http://localhost:3000/api/v1/health
-
-# 7. Swagger UI
-# http://localhost:8081/api/v1/swagger-ui.html
+# 5) (Tùy chọn) Chạy mobile
+cd ../../frontend/mobile
+flutter pub get
+flutter run --dart-define=ENV=dev --dart-define=CORE_SERVICE_URL=http://<LAN_IP>:8081/api/v1
 ```
 
-> **Lưu ý:** Profile `dev` dùng Flyway để quản lý schema (V1-V10), Hibernate ở chế độ `validate`, TypeORM `synchronize` đã tắt.
+### Health checks
 
-### 🐳 Dịch Vụ Docker
-
-```bash
-# Khởi động tất cả dịch vụ
-docker compose up -d
-
-# Xem logs
-docker compose logs -f
-
-# Dừng tất cả dịch vụ
-docker compose down
-
-# Đặt lại mọi thứ
-docker compose down -v && docker compose up -d
-```
-
-**Dịch Vụ Có Sẵn:**
-- PostgreSQL: `localhost:5432` (database: vnalo_core)
-- Redis: `localhost:6379`
+- core-service: http://localhost:8081/api/v1/actuator/health
+- message-service: http://localhost:3000/api/v1/health
+- media-service: http://localhost:8083/actuator/health
+- moderation-service: http://localhost:8082/api/v1/actuator/health
 
 ---
 
 ## 📁 Cấu Trúc Dự Án
 
-```
+```text
 CNM-ZALO/
-├── 📄 README.md                    # Tài liệu tiếng Anh
-├── 📄 README.vi.md                 # Bạn đang ở đây
-├── 📄 CONTRIBUTING.md              # Hướng dẫn đóng góp
-├── 📄 .gitignore
-│
-├── 📂 docs/                        # Tài liệu
-│   ├── VNALO_Project_Docs.md            # Tài liệu dự án chính
-│   ├── VNALO_Complete_Database_Schema.md # Schema database
-│   ├── PROJECT_STRUCTURE_STANDARD.md    # Quy ước code
-│   ├── TEAM_WORKLOAD_DISTRIBUTION.md    # Phân công nhóm
-│   └── PROJECT_SUMMARY.md               # Tổng quan dự án
-│
-├── 📂 backend/
-│   ├── java-services/               # Spring Boot microservices
-│   │   ├── pom.xml                      # Parent POM
-│   │   ├── common/                      # Module dùng chung
-│   │   │   └── common-domain/           # Entity dùng chung
-│   │   └── services/
-│   │       └── core-service/            # ✅ Auth, Users, Social (SẴN SÀNG)
-│   │           ├── src/main/java/
-│   │           ├── src/main/resources/
-│   │           └── pom.xml
-│   └── node-services/               # NestJS services (tương lai)
-│       └── (realtime-gateway dự kiến)
-│
-├── 📂 docker/
-│   ├── docker-compose.yml           # PostgreSQL + Redis
-│   └── init-db.sql                  # Khởi tạo database
-│
-├── 📂 frontend/
-│   └── mobile/                      # 📦 Flutter mobile app
-│       ├── lib/                     # Mã nguồn Dart
-│       ├── android/                 # Nền tảng Android
-│       ├── ios/                     # Nền tảng iOS
-│       ├── web/                     # Nền tảng Web
-│       └── pubspec.yaml             # Dependencies
-│
-├── 📂 assets/                      # Hình ảnh dự án
-│
-└── 📂 config/                      # Cấu hình
+├── README.md
+├── README.vi.md
+├── docs/
+│   ├── README.md
+│   ├── system/
+│   └── project/
+├── backend/
+│   ├── java-services/services/
+│   │   ├── core-service
+│   │   ├── media-service
+│   │   ├── moderation-service
+│   │   ├── content-service
+│   │   ├── notification-service
+│   │   └── ai-service
+│   └── node-services/apps/
+│       ├── message-service
+│       └── realtime-gateway
+├── frontend/mobile/
+└── docker/
+    ├── docker-compose.yml
+    ├── docker-compose.infra.yml
+    └── init-db.sql
 ```
 
 ---
 
 ## 🔧 Phát Triển
 
-### Phát Triển Backend (core-service)
+### core-service
 
 ```bash
 cd backend/java-services/services/core-service
-
-# Build
 ./mvnw clean install -DskipTests
-
-# Chạy (dev profile - mặc định)
-./mvnw spring-boot:run
-
-# Chạy tests
 ./mvnw test
-
-# Build Docker image
-docker build -t vnalo/core-service .
 ```
 
-### Phát Triển Frontend
+### node-services
+
+```bash
+cd backend/node-services
+npm install
+npm run start:dev
+npm run test
+npm run test:e2e
+```
+
+### mobile
 
 ```bash
 cd frontend/mobile
-
-# Cài dependencies
-flutter pub get
-
-# Chạy app
-flutter run
-
-# Build Android release
-flutter build apk --release
+flutter test
+flutter run -d <device_id> --dart-define=ENV=dev --dart-define=CORE_SERVICE_URL=http://<LAN_IP>:8081/api/v1
 ```
 
-### Migrations Cơ Sở Dữ Liệu
+### Flyway migration
 
-```bash
-# Flyway chạy tự động khi core-service khởi động
-# Migration hiện tại: V1 -> V10
-```
-
----
-
-## 🚢 Triển Khai
-
-### Triển Khai AWS EKS
-
-```bash
-# 1. Build và push Docker images
-./scripts/build-and-push.sh
-
-# 2. Apply Kubernetes manifests
-kubectl apply -f k8s/production/
-
-# 3. Xác minh triển khai
-kubectl get pods -n cnm-zalo
-kubectl get svc -n cnm-zalo
-```
-
-### Biến Môi Trường
-
-<details>
-<summary>Xem Cấu Hình</summary>
-
-```bash
-# Auth Service
-FIREBASE_PROJECT_ID=your-project
-JWT_SECRET=your-secret-key
-JWT_TTL_SECONDS=3600
-
-# Database
-DB_URL=jdbc:postgresql://localhost:5432/cnm_zalo
-DB_USER=admin
-DB_PASS=password
-
-# Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
-
-# Kafka
-KAFKA_BOOTSTRAP_SERVERS=localhost:9092
-
-# AWS S3
-S3_BUCKET=cnm-zalo-media
-S3_REGION=ap-southeast-1
-
-# AI Service
-GEMINI_API_KEY=your-gemini-key
-OLLAMA_BASE_URL=http://localhost:11434
-```
-
-</details>
+- V1 -> V13 (quản lý bởi `core-service`).
+- `message-service` đang dùng PostgreSQL + schema Flyway; **không dùng Cassandra trong runtime hiện tại**.
 
 ---
 
 ## 📖 Tài Liệu
 
-| Tài Liệu | Mô Tả |
-|----------|-------|
-| [📘 Tài Liệu Dự Án](docs/VNALO_Project_Docs.md) | Hướng dẫn kiến trúc & triển khai đầy đủ |
-| [🗄️ Schema Database](docs/VNALO_Complete_Database_Schema.md) | Thiết kế schema database hoàn chỉnh |
-| [📁 Cấu Trúc Dự Án](docs/PROJECT_STRUCTURE_STANDARD.md) | Quy ước code & cấu trúc |
-| [👥 Phân Công Nhóm](docs/TEAM_WORKLOAD_DISTRIBUTION.md) | Phân công công việc |
+| Tài liệu | Nội dung |
+|---|---|
+| [docs/README.md](docs/README.md) | Index toàn bộ tài liệu |
+| [docs/system/architecture.md](docs/system/architecture.md) | Kiến trúc và service map |
+| [docs/system/api-reference.md](docs/system/api-reference.md) | REST + WebSocket contracts |
+| [docs/system/database-schema.md](docs/system/database-schema.md) | Schema tổng hợp + note reconcile |
+| [docs/project/status.md](docs/project/status.md) | Trạng thái implementation hiện tại |
+| [docs/project/changelog.md](docs/project/changelog.md) | Lịch sử thay đổi |
+| [docs/project/team-assignment.md](docs/project/team-assignment.md) | Team ownership |
 
 ---
 
-## ✅ Trạng Thái Hiện Tại
+## 📊 Trạng Thái Hệ Thống
 
-| Service | Trạng Thái | Tính Năng |
-|---------|------------|------------|
-| **core-service** | ✅ Sẵn sàng | Auth (đăng ký, đăng nhập, đăng xuất), Hồ sơ người dùng, Quản lý bạn bè, Danh sách chặn |
-| **message-service** | ✅ Sẵn sàng | Hội thoại, tin nhắn, phản ứng, ghim, inbox, WebSocket |
-| **media-service** | 📅 Đã lên kế hoạch | Upload file, Cloudinary |
-| **realtime-gateway** | 📅 Đã lên kế hoạch | WebSocket, Gửi tin real-time |
+| Nhóm | Trạng thái |
+|---|---|
+| Core auth/user/social | ✅ Complete |
+| Messaging + WebSocket | ✅ Complete |
+| Media upload/sticker | 🔄 In Progress |
+| Moderation workflow | 🔄 In Progress |
+| Realtime scaling gateway | 🔄 In Progress |
+| Content/Notification services | 🧪 Scaffolded |
+| AI assistant service | 🧪 Experimental |
+| Analytics service | ⏳ Planned |
 
 ---
 
 ## 🤝 Đóng Góp
 
-Chúng tôi hoan nghênh mọi đóng góp! Vui lòng tuân theo các hướng dẫn sau:
+- Dùng Conventional Commits (`feat`, `fix`, `docs`, `test`, `chore`).
+- Tạo branch riêng, mở Pull Request về `main`.
+- Trước khi merge: pass test + cập nhật tài liệu liên quan.
 
-### 📝 Quy Ước Commit
-
-Chúng tôi sử dụng [Conventional Commits](https://www.conventionalcommits.org/):
-
-```
-feat:     ✨ Tính năng mới
-fix:      🐛 Sửa lỗi
-docs:     📝 Tài liệu
-style:    💎 Style code (định dạng)
-refactor: ♻️  Tái cấu trúc code
-test:     ✅ Tests
-chore:    🔧 Bảo trì
-```
-
-### 🔀 Quy Trình
-
-```bash
-# 1. Fork repository
-# 2. Tạo branch tính năng của bạn
-git checkout -b feature/tinh-nang-tuyet-voi
-
-# 3. Commit các thay đổi
-git commit -m 'feat: thêm tính năng tuyệt vời'
-
-# 4. Push lên branch
-git push origin feature/tinh-nang-tuyet-voi
-
-# 5. Mở Pull Request
-```
-
-### 👥 Cấu Trúc Nhóm
-
-| Vai Trò | Trách Nhiệm | Thành Viên |
-|---------|-------------|------------|
-| **Backend Lead** | Auth, User, Social Services | TBD |
-| **Backend Dev** | Message, Media, Notification | TBD |
-| **Fullstack** | Realtime Gateway, Hạ tầng | TBD |
-| **Frontend Lead** | Flutter, UI/UX | TBD |
-
----
-
-## 📊 Thống Kê Dự Án
-
-<div align="center">
-
-![GitHub stars](https://img.shields.io/github/stars/CNM-DHKTPM18A-2526/CNM-ZALO?style=social)
-![GitHub forks](https://img.shields.io/github/forks/CNM-DHKTPM18A-2526/CNM-ZALO?style=social)
-![GitHub watchers](https://img.shields.io/github/watchers/CNM-DHKTPM18A-2526/CNM-ZALO?style=social)
-
-![GitHub issues](https://img.shields.io/github/issues/CNM-DHKTPM18A-2526/CNM-ZALO)
-![GitHub pull requests](https://img.shields.io/github/issues-pr/CNM-DHKTPM18A-2526/CNM-ZALO)
-![GitHub last commit](https://img.shields.io/github/last-commit/CNM-DHKTPM18A-2526/CNM-ZALO)
-
-</div>
+Tham khảo: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ---
 
 ## 📄 Giấy Phép
 
-Dự án này được cấp phép theo **Giấy phép MIT** - xem file [LICENSE](LICENSE) để biết chi tiết.
-
----
-
-## 🙏 Lời Cảm Ơn
-
-<div align="center">
-
-**Lấy cảm hứng từ**
-- [Zalo](https://zalo.me) - Nền tảng nhắn tin hàng đầu Việt Nam
-- [WhatsApp](https://whatsapp.com) - Mã hóa end-to-end
-- [Telegram](https://telegram.org) - Tốc độ và độ tin cậy
-
-**Xây dựng với**
-- ☕ Nhiều cà phê
-- 💻 Công nghệ hiện đại
-- ❤️ Đam mê phần mềm tuyệt vời
-
----
-
-### 📬 Liên Hệ & Hỗ Trợ
-
-**Repository Dự Án**: [github.com/CNM-DHKTPM18A-2526/CNM-ZALO](https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO)
-
-**Báo Cáo Vấn Đề**: [GitHub Issues](https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO/issues)
-
----
-
-<sub>Được tạo với ❤️ bởi nhóm CNM-DHKTPM18A-2526 | Tháng 1 năm 2026</sub>
-
-**[⬆ Về Đầu Trang](#-cnm-zalo-clone)**
-
-</div>
+Dự án sử dụng [MIT License](LICENSE).

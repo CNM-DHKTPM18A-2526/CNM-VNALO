@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/features/chat/screens/chat_detail_screen.dart';
+import 'package:vnalo_mobile/features/chat/screens/my_documents_screen.dart';
 import 'package:vnalo_mobile/features/chat/widgets/chat_list_item.dart';
 
 class ChatListScreen extends StatefulWidget {
@@ -37,23 +38,26 @@ class _ChatListScreenState extends State<ChatListScreen> {
       appBar: AppBar(
         backgroundColor: appBarBg,
         elevation: 0,
-        title: Container(
-          height: 36,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: searchBg,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.search, size: 20, color: searchHint),
-              const SizedBox(width: 8),
-              Text(
-                'Tìm kiếm',
-                style: TextStyle(color: searchHint, fontSize: 14),
+        flexibleSpace: isDarkMode
+            ? null
+            : Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF0068FF), Color(0xFF00A2ED)],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  ),
+                ),
               ),
-            ],
-          ),
+        title: Row(
+          children: [
+            Icon(Icons.search, size: 24, color: searchHint),
+            const SizedBox(width: 8),
+            Text(
+              'Tìm kiếm',
+              style: TextStyle(color: searchHint, fontSize: 16, fontWeight: FontWeight.w400),
+            ),
+          ],
         ),
         actions: [
           IconButton(
@@ -74,42 +78,51 @@ class _ChatListScreenState extends State<ChatListScreen> {
             );
           }
 
-          if (chatProvider.conversations.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.chat_bubble_outline,
-                      size: 64, color: Color(0xFFD1D5DB)),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Chưa có cuộc trò chuyện',
-                    style:
-                        TextStyle(fontSize: 16, color: Color(0xFF9CA3AF)),
-                  ),
-                  const SizedBox(height: 24),
-                  OutlinedButton.icon(
-                    onPressed: () => chatProvider.loadInbox(),
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Tải lại'),
-                  ),
-                ],
-              ),
-            );
-          }
-
           return RefreshIndicator(
             onRefresh: () => chatProvider.loadInbox(),
             color: AppColors.primary,
-            child: ListView.separated(
-              itemCount: chatProvider.conversations.length,
-              separatorBuilder: (_, __) => const Divider(
-                height: 1,
-                indent: 76,
-                endIndent: 16,
-              ),
+            child: ListView.builder(
+              itemCount: chatProvider.conversations.length + 1,
               itemBuilder: (context, index) {
-                final conversation = chatProvider.conversations[index];
+                if (index == 0) {
+                  return ListTile(
+                    leading: Container(
+                      width: 52,
+                      height: 52,
+                      decoration: const BoxDecoration(
+                        color: Colors.blue,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          const Icon(Icons.folder, color: Colors.white, size: 32),
+                          const Icon(Icons.cloud, color: Colors.blue, size: 16),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              decoration: const BoxDecoration(
+                                color: Colors.orange,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.check, color: Colors.white, size: 12),
+                            ),
+                          )
+                        ],
+                      ),
+                    ),
+                    title: const Text('My Documents', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16)),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const MyDocumentsScreen()),
+                      );
+                    },
+                  );
+                }
+
+                final conversation = chatProvider.conversations[index - 1];
                 return ChatListItem(
                   conversation: conversation,
                   onTap: () {

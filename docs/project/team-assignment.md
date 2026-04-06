@@ -1,6 +1,6 @@
 # Team Assignment
 
-> 4 backend developers, 8-week timeline
+> 4 backend developers, ownership map aligned with current repository services
 
 ---
 
@@ -11,7 +11,7 @@
 | **Dev 1** (Leader) | Tech Lead, Critical Path | core-service, message-service | 🔴 Very High |
 | **Dev 2** | Real-time & Infrastructure | realtime-gateway, media-service | 🔴 High |
 | **Dev 3** | User Features | content-service, notification-service | 🟡 Medium |
-| **Dev 4** | Admin & Support | moderation-service, analytics-service, ai-service | 🟡 Medium |
+| **Dev 4** | Admin & Support | moderation-service, analytics-service, ai-service | 🔴 High |
 
 ---
 
@@ -67,7 +67,7 @@
 - Logging: activity, API requests, errors
 - Stats: DAU, message count, storage
 
-### ai-service (Python / FastAPI or Node.js)
+### ai-service (Spring Boot, Java 21)
 - Chatbots: Answer user queries, provide support, guide usage
 - Knowledge bounds: Limit answers to permitted scope (FAQs, System rules)
 

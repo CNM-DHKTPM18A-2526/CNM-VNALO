@@ -22,15 +22,17 @@ Both services share a single **PostgreSQL** database and communicate via shared 
 | **core-service** | 8081 | Spring Boot 3.4, Java 21 | Auth, User profiles, Friends, Blocks, QR, Contact Sync |
 | **message-service** | 3000 (default) | NestJS 11, TypeScript | Conversations, Messages, Inbox, WebSocket gateway |
 
-### Future Services (Planned)
+### Extended Services (Current Repository Scope)
 
 | Service | Port | Technology | Responsibility |
 |---------|------|------------|---------------|
-| media-service | 8083 | Spring Boot | File upload, Cloudinary, thumbnails |
-| realtime-gateway | 8085 | Node.js | WebSocket scaling, presence |
-| content-service | 8092 | Spring Boot | Stories, Timeline |
-| notification-service | 8087 | Spring Boot | FCM push notifications |
-| ai-service | 8094 | Python/FastAPI | Support Chatbot, Q&A within permitted scope |
+| media-service | 8083 | Spring Boot 3.4, Java 21 | Media upload APIs, sticker APIs, S3/local storage mode |
+| realtime-gateway | 8085 | NestJS, Node.js 20+ | WebSocket scaling skeleton, Redis adapter, room broadcast |
+| moderation-service | 8082 | Spring Boot 3.4, Java 21 | Report intake, moderation workflows, appeal lifecycle |
+| content-service | 8086 | Spring Boot (scaffold) | Story, Timeline modules (scaffold) |
+| notification-service | 8087 | Spring Boot (scaffold) | FCM push orchestration (scaffold) |
+| ai-service | 8094 | Spring Boot 3.4, Java 21 | Gemini + Ollama fallback assistant APIs |
+| analytics-service | 8084 *(compose profile)* | Spring Boot *(planned)* | Planned metrics/event analytics service |
 
 ---
 
@@ -106,8 +108,11 @@ Migrations: Flyway (V1–V13), managed in `core-service/src/main/resources/db/mi
 - core-service: `mvn spring-boot:run` (port 8081)
 - message-service: `npm run start:dev` (default port 3000)
 
-### Production (Planned)
-- AWS EKS (Kubernetes)
-- ALB for REST, NLB for WebSocket
-- RDS for PostgreSQL
-- ElastiCache for Redis
+### Container Runtime Profiles
+- `docker/docker-compose.infra.yml`: Infrastructure only (PostgreSQL + Redis)
+- `docker/docker-compose.yml`: Full development stack (core/message/media/realtime/moderation/content/notification/ai + optional infra profiles)
+
+### Production Direction (Target)
+- Container orchestration platform (target architecture)
+- Managed PostgreSQL + managed Redis
+- Horizontal scaling for message-service/realtime-gateway paths

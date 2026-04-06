@@ -20,6 +20,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - **Delete for me authorization**: `DELETE /messages/{id}/for-me` now validates conversation membership.
 - **CORS hardening**: Node and Java services now use configurable explicit origin allow-lists instead of wildcard origins.
 
+### Documentation
+- **Comprehensive docs reconcile (2026-04-06)**:
+  - Reconciled `README.md` service map, ports, and status table with current Docker/runtime reality.
+  - Rebuilt `README.vi.md` into a modern Vietnamese equivalent aligned with current architecture (removed stale Cassandra/K8s runtime claims).
+  - Updated docs index (`docs/README.md`) to reflect active documentation sets and audit artifacts.
+  - Updated `docs/system/architecture.md` with current extended services and compose profile model.
+  - Refreshed project tracking docs (`docs/project/status.md`, `docs/project/team-assignment.md`) to match current implementation maturity.
+
 ### Changed
 - **Group default join mode**: changed to `OPEN` (Zalo-like default), while `APPROVAL` remains configurable.
 

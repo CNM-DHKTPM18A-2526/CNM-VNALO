@@ -9,32 +9,32 @@ class TimelineScreen extends StatelessWidget {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final appBarBg =
         isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
-    final searchHint =
-        isDarkMode ? DarkColors.textHint : Colors.white.withValues(alpha: 0.8);
-    final searchBg =
-        isDarkMode ? const Color(0xFF2B2B2B) : Colors.white.withValues(alpha: 0.25);
+    final searchHint = isDarkMode ? DarkColors.textHint : Colors.white.withOpacity(0.8);
 
     return Scaffold(
       appBar: AppBar(
         backgroundColor: appBarBg,
         elevation: 0,
-        title: Container(
-          height: 36,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: searchBg,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.search, size: 20, color: searchHint),
-              const SizedBox(width: 8),
-              Text(
-                'Tìm kiếm',
-                style: TextStyle(color: searchHint, fontSize: 14),
+        flexibleSpace: isDarkMode
+            ? null
+            : Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF0068FF), Color(0xFF00A2ED)],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  ),
+                ),
               ),
-            ],
-          ),
+        title: Row(
+          children: [
+            Icon(Icons.search, size: 24, color: searchHint),
+            const SizedBox(width: 8),
+            Text(
+              'Tìm kiếm',
+              style: TextStyle(color: searchHint, fontSize: 16, fontWeight: FontWeight.w400),
+            ),
+          ],
         ),
       ),
       body: ListView(
