@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:vnalo_mobile/config/app_config.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
+import 'package:vnalo_mobile/core/utils/avatar_utils.dart';
 
 class AvatarWidget extends StatelessWidget {
   final String? imageUrl;
@@ -23,30 +24,25 @@ class AvatarWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final resolvedImage = _resolveImageUrl(imageUrl);
+    final initials = AvatarUtils.getInitials(name);
+    final initialsBg = AvatarUtils.getColor(name);
 
     return Stack(
       children: [
-        // Avatar image or placeholder
-        CircleAvatar(
-          radius: size / 2,
-          backgroundColor: AppColors.primary.withValues(alpha: 0.2),
-          backgroundImage:
-              resolvedImage != null
-                  ? CachedNetworkImageProvider(resolvedImage)
-                  : null,
-          child:
-              resolvedImage ==
-                      null // Show first letter of name if no image, otherwise show nothing (image will cover it)
-                  ? Text(
-                    name.isNotEmpty ? name[0].toUpperCase() : '?',
-                    style: TextStyle(
-                      fontSize: size * 0.4,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
-                    ),
-                  )
-                  : null,
-          onBackgroundImageError: (_, __) {},
+        // Avatar image with robust fallback to initials
+        SizedBox(
+          width: size,
+          height: size,
+          child: ClipOval(
+            child: resolvedImage == null
+                ? _initialsAvatar(initials, initialsBg)
+                : CachedNetworkImage(
+                    imageUrl: resolvedImage,
+                    fit: BoxFit.cover,
+                    placeholder: (_, __) => _initialsAvatar(initials, initialsBg),
+                    errorWidget: (_, __, ___) => _initialsAvatar(initials, initialsBg),
+                  ),
+          ),
         ),
 
         if (showOnline) // Show online status indicator
@@ -64,6 +60,22 @@ class AvatarWidget extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+
+  Widget _initialsAvatar(String initials, Color bg) {
+    return Container(
+      color: bg.withValues(alpha: 0.95),
+      alignment: Alignment.center,
+      child: Text(
+        initials,
+        style: TextStyle(
+          fontSize: size * 0.36,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+          letterSpacing: 0.5,
+        ),
+      ),
     );
   }
 

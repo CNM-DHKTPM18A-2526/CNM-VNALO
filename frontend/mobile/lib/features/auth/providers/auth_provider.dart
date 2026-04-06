@@ -409,7 +409,33 @@ class AuthProvider extends ChangeNotifier {
     try {
       final avatarUrl = await _uploadAvatarWithRetry(avatarFile);
       await _authService.updateProfileAvatar(avatarUrl);
-      _user = await _authService.getMe();
+
+      try {
+        _user = await _authService.getMe();
+      } catch (_) {
+        // Avatar is already persisted on server; fallback to local optimistic update.
+        if (_user != null) {
+          _user = User(
+            id: _user!.id,
+            phone: _user!.phone,
+            displayName: _user!.displayName,
+            avatarUrl: avatarUrl,
+            coverUrl: _user!.coverUrl,
+            gender: _user!.gender,
+            dob: _user!.dob,
+            bio: _user!.bio,
+            statusMessage: _user!.statusMessage,
+            statusMessageType: _user!.statusMessageType,
+            qrCodeUrl: _user!.qrCodeUrl,
+            region: _user!.region,
+            isVerified: _user!.isVerified,
+            isOfficialAccount: _user!.isOfficialAccount,
+            followerCount: _user!.followerCount,
+            isOnline: _user!.isOnline,
+          );
+        }
+      }
+
       _isLoading = false;
       notifyListeners();
       return true;

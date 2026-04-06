@@ -394,8 +394,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           backgroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           titlePadding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
-          contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-          actionsPadding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+          contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
           title: Row(
             children: [
               Container(
@@ -429,45 +428,62 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 'Bạn luôn có thể thay đổi lựa chọn này trong Cài đặt quyền riêng tư.',
                 style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
               ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(44),
+                        side: const BorderSide(color: Color(0xFFD1D5DB)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        foregroundColor: const Color(0xFF4B5563),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        if (mounted) _navigateToHome(auth);
+                      },
+                      child: Text(
+                        t.laterText,
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(44),
+                        backgroundColor: AppColors.primary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        elevation: 0,
+                      ),
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        final status = await Permission.contacts.request();
+                        if (mounted && status.isPermanentlyDenied) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Bạn đã tắt quyền Danh bạ. Có thể bật lại trong Cài đặt hệ thống.'),
+                            ),
+                          );
+                        }
+                        if (mounted) _navigateToHome(auth);
+                      },
+                      child: Text(
+                        t.continueText,
+                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                if (mounted) _navigateToHome(auth);
-              },
-              child: Text(
-                t.laterText,
-                style: const TextStyle(color: Color(0xFF6B7280), fontSize: 16),
-              ),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                elevation: 0,
-              ),
-              onPressed: () async {
-                Navigator.pop(ctx);
-                final status = await Permission.contacts.request();
-                if (mounted && status.isPermanentlyDenied) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Bạn đã tắt quyền Danh bạ. Có thể bật lại trong Cài đặt hệ thống.'),
-                    ),
-                  );
-                }
-                if (mounted) _navigateToHome(auth);
-              },
-              child: Text(
-                t.continueText,
-                style: const TextStyle(color: Colors.white, fontSize: 16),
-              ),
-            ),
-          ],
         );
       },
     );
