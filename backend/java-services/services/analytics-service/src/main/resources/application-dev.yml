@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:vnalo_core}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASS:postgres}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    locations: classpath:db/migration
+    table: flyway_schema_history_analytics
+
+analytics:
+  internal:
+    api-key: ${ANALYTICS_INTERNAL_API_KEY:dev-analytics-internal-key}
+    client-name: ${ANALYTICS_INTERNAL_CLIENT_NAME:analytics-internal-service}
