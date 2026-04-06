@@ -30,6 +30,7 @@ public class OtpService {
     private final OtpConfig otpConfig;
     private final PasswordEncoder passwordEncoder;
     private final FcmService fcmService;
+    private final EmailOtpService emailOtpService;
     private final SecureRandom secureRandom = new SecureRandom();
     
     /**
@@ -40,8 +41,8 @@ public class OtpService {
      * @return Result containing expiration info
      */
     @Transactional
-    public OtpSendResult sendOtp(String phone, OtpPurpose purpose) {
-        log.info("Sending OTP to {} for purpose: {}", maskPhone(phone), purpose);
+    public OtpSendResult sendOtp(String target, OtpPurpose purpose) {
+        log.info("Sending OTP to {} for purpose: {}", maskTarget(target), purpose);
         
         // Check if OTP is disabled (dev mode)
         if (otpConfig.shouldSkipOtp()) {
@@ -51,15 +52,15 @@ public class OtpService {
         
         // Rate limiting check
         long recentRequests = otpRepository.countRecentRequests(
-            phone, purpose, Instant.now().minus(1, ChronoUnit.HOURS));
+            target, purpose, Instant.now().minus(1, ChronoUnit.HOURS));
         
         if (recentRequests >= otpConfig.getRateLimit().getRequestsPerHour()) {
-            log.warn("Rate limit exceeded for phone: {}", maskPhone(phone));
+            log.warn("Rate limit exceeded for target: {}", maskTarget(target));
             throw new ApiException(ErrorCode.AUTH_OTP_RATE_LIMITED);
         }
         
         // Check cooldown period
-        otpRepository.findLatestOtp(phone, purpose).ifPresent(lastOtp -> {
+        otpRepository.findLatestOtp(target, purpose).ifPresent(lastOtp -> {
             long secondsSinceLastRequest = ChronoUnit.SECONDS.between(
                 lastOtp.getCreatedAt(), Instant.now());
             if (secondsSinceLastRequest < otpConfig.getRateLimit().getCooldownSeconds()) {
@@ -73,7 +74,7 @@ public class OtpService {
         
         // Save to database
         AuthOtp otp = AuthOtp.builder()
-            .target(phone)
+            .target(target)
             .purpose(purpose)
             .otpHash(otpHash)
             .expiresAt(Instant.now().plus(otpConfig.getExpirationMinutes(), ChronoUnit.MINUTES))
@@ -85,15 +86,19 @@ public class OtpService {
             // Test mode: log OTP instead of sending
             if (otpConfig.getTestMode().isLogOtp()) {
                 log.info("========================================");
-                log.info("TEST MODE - OTP for {}: {}", maskPhone(phone), rawOtp);
+                log.info("TEST MODE - OTP for {}: {}", maskTarget(target), rawOtp);
                 log.info("========================================");
             }
         } else {
-            // Production: send via SMS
-            sendOtpViaSms(phone, rawOtp);
+            // Production: route OTP by target type.
+            if (isEmailTarget(target)) {
+                emailOtpService.sendOtp(target, rawOtp, purpose);
+            } else {
+                sendOtpViaSms(target, rawOtp);
+            }
         }
         
-        log.info("OTP sent successfully to {}", maskPhone(phone));
+        log.info("OTP sent successfully to {}", maskTarget(target));
         return OtpSendResult.success(otpConfig.getExpirationMinutes() * 60);
     }
     
@@ -106,8 +111,8 @@ public class OtpService {
      * @return true if verified successfully
      */
     @Transactional
-    public boolean verifyOtp(String phone, String otpCode, OtpPurpose purpose) {
-        log.info("Verifying OTP for {}", maskPhone(phone));
+    public boolean verifyOtp(String target, String otpCode, OtpPurpose purpose) {
+        log.info("Verifying OTP for {}", maskTarget(target));
         
         // If OTP disabled, skip verification
         if (otpConfig.shouldSkipOtp()) {
@@ -118,20 +123,20 @@ public class OtpService {
         // Test mode: accept mock OTP
         if (otpConfig.isTestMode() && 
             otpCode.equals(otpConfig.getTestMode().getMockOtp())) {
-            log.info("TEST MODE - Mock OTP accepted for {}", maskPhone(phone));
+            log.info("TEST MODE - Mock OTP accepted for {}", maskTarget(target));
             return true;
         }
         
         // Find latest valid OTP
-        AuthOtp otp = otpRepository.findLatestValidOtp(phone, purpose, Instant.now())
+        AuthOtp otp = otpRepository.findLatestValidOtp(target, purpose, Instant.now())
             .orElseThrow(() -> {
-                log.warn("No valid OTP found for {}", maskPhone(phone));
+                log.warn("No valid OTP found for {}", maskTarget(target));
                 return new ApiException(ErrorCode.AUTH_OTP_EXPIRED);
             });
         
         // Check max attempts
         if (otp.isMaxAttemptsExceeded(otpConfig.getMaxAttempts())) {
-            log.warn("Max OTP attempts exceeded for {}", maskPhone(phone));
+            log.warn("Max OTP attempts exceeded for {}", maskTarget(target));
             throw new ApiException(ErrorCode.AUTH_OTP_MAX_ATTEMPTS);
         }
         
@@ -140,7 +145,7 @@ public class OtpService {
             otp.incrementAttempts();
             otpRepository.save(otp);
             log.warn("Invalid OTP attempt for {} (attempt {})", 
-                maskPhone(phone), otp.getAttempts());
+                maskTarget(target), otp.getAttempts());
             throw new ApiException(ErrorCode.AUTH_OTP_INVALID);
         }
         
@@ -148,7 +153,7 @@ public class OtpService {
         otp.markAsVerified();
         otpRepository.save(otp);
         
-        log.info("OTP verified successfully for {}", maskPhone(phone));
+        log.info("OTP verified successfully for {}", maskTarget(target));
         return true;
     }
     
@@ -186,7 +191,7 @@ public class OtpService {
      */
     private void sendOtpViaSms(String phone, String otp) {
         // In production, integrate with SMS provider (Firebase Phone Auth recommended for client-side)
-        log.info("OTP delivery requested for {}", maskPhone(phone));
+        log.info("OTP delivery requested for {}", maskTarget(phone));
         log.warn("OTP delivery provider is not configured. Configure SMS/FCM delivery before production usage.");
         
         // TODO: For password reset flow, fetch user's FCM tokens and send via FCM:
@@ -204,6 +209,28 @@ public class OtpService {
             return "****";
         }
         return "****" + phone.substring(phone.length() - 4);
+    }
+
+    private String maskEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return "***";
+        }
+        int at = email.indexOf('@');
+        if (at <= 1) {
+            return "***";
+        }
+        return email.charAt(0) + "***" + email.substring(at);
+    }
+
+    private String maskTarget(String target) {
+        if (isEmailTarget(target)) {
+            return maskEmail(target);
+        }
+        return maskPhone(target);
+    }
+
+    private boolean isEmailTarget(String target) {
+        return target != null && target.contains("@");
     }
     
     /**

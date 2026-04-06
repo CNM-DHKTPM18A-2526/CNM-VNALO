@@ -109,6 +109,9 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> fetchOtpRequiredStatus() async {
     try {
       final status = await _authService.getOtpStatus();
+      if (status.containsKey('registerPhoneOtpEnabled')) {
+        return status['registerPhoneOtpEnabled'] == true;
+      }
       return status['enabled'] == true;
     } catch (_) {
       // Fallback is handled by caller.
@@ -118,7 +121,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<bool> register({
     required String phone,
-    required String otp,
+    required String email,
     required String password,
     required String displayName,
     File? avatarFile,
@@ -133,7 +136,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       final response = await _authService.register(
         phone: phone,
-        otp: otp,
+        email: email,
         password: password,
         displayName: displayName,
         gender: gender,
@@ -170,7 +173,14 @@ class AuthProvider extends ChangeNotifier {
           final avatarUrl = await _uploadAvatarWithRetry(avatarFile);
           await _authService.updateProfileAvatar(avatarUrl);
           // Refresh profile to pick up the persisted avatar URL.
-          _user = await _authService.getMe();
+          try {
+            _user = await _authService.getMe();
+          } catch (_) {
+            // Upload+patch succeeded — apply optimistic local update.
+            if (_user != null) {
+              _user = _user!.copyWith(avatarUrl: avatarUrl);
+            }
+          }
           // No need to re-save userId — it cannot change after registration.
         } catch (e) {
           // Avatar upload is non-fatal: registration already succeeded.
@@ -179,14 +189,13 @@ class AuthProvider extends ChangeNotifier {
               ? '$_warning — $av'
               : av;
         }
-      }
-
-      // Final consistency refresh to load latest profile/avatar representation
-      // (including default avatar semantics when user skipped avatar upload).
-      try {
-        _user = await _getMeWithRetry(attempts: 2);
-      } catch (_) {
-        // Non-fatal: keep best-effort hydrated profile.
+      } else {
+        // No avatar file — do a final consistency refresh.
+        try {
+          _user = await _getMeWithRetry(attempts: 2);
+        } catch (_) {
+          // Non-fatal: keep best-effort hydrated profile.
+        }
       }
 
       _isLoading = false;
@@ -295,6 +304,7 @@ class AuthProvider extends ChangeNotifier {
     return User(
       id: id,
       phone: raw['phone']?.toString(),
+      email: raw['email']?.toString(),
       displayName:
           raw['displayName']?.toString() ??
           raw['display_name']?.toString() ??
@@ -415,24 +425,7 @@ class AuthProvider extends ChangeNotifier {
       } catch (_) {
         // Avatar is already persisted on server; fallback to local optimistic update.
         if (_user != null) {
-          _user = User(
-            id: _user!.id,
-            phone: _user!.phone,
-            displayName: _user!.displayName,
-            avatarUrl: avatarUrl,
-            coverUrl: _user!.coverUrl,
-            gender: _user!.gender,
-            dob: _user!.dob,
-            bio: _user!.bio,
-            statusMessage: _user!.statusMessage,
-            statusMessageType: _user!.statusMessageType,
-            qrCodeUrl: _user!.qrCodeUrl,
-            region: _user!.region,
-            isVerified: _user!.isVerified,
-            isOfficialAccount: _user!.isOfficialAccount,
-            followerCount: _user!.followerCount,
-            isOnline: _user!.isOnline,
-          );
+          _user = _user!.copyWith(avatarUrl: avatarUrl);
         }
       }
 

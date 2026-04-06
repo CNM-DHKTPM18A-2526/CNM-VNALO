@@ -53,6 +53,15 @@ class Validators {
     return null;
   }
 
+  static String? email(String? value) {
+    final email = (value ?? '').trim();
+    if (email.isEmpty) return 'Vui lòng nhập email';
+    final pattern = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+    if (!pattern.hasMatch(email)) return 'Email không hợp lệ';
+    if (email.length > 255) return 'Email tối đa 255 ký tự';
+    return null;
+  }
+
   static String? confirmPassword(String? value, String password) {
     if ((value ?? '').isEmpty) return 'Vui lòng xác nhận mật khẩu';
     if (value != password) return 'Mật khẩu xác nhận không khớp';

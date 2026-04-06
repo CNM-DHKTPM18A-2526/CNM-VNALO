@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
+import 'package:vnalo_mobile/services/api_service.dart';
+import 'package:vnalo_mobile/services/auth_service.dart';
 
 class UpdatePasswordScreen extends StatefulWidget {
   const UpdatePasswordScreen({super.key});
@@ -14,7 +17,12 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
   final _confirmController = TextEditingController();
 
   bool _showCurrent = false;
+  bool _showNew = false;
+  bool _showConfirm = false;
   bool _isSubmitting = false;
+
+  String? _newPasswordError;
+  String? _confirmPasswordError;
 
   bool get _canSubmit {
     final current = _currentController.text;
@@ -29,6 +37,41 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
     return true;
   }
 
+  void _validateNewPassword(String value) {
+    String? error;
+    if (value.isNotEmpty) {
+      if (value.length < 8) {
+        error = 'Mật khẩu phải có ít nhất 8 ký tự';
+      } else if (!RegExp(r'[A-Z]').hasMatch(value)) {
+        error = 'Mật khẩu phải có ít nhất 1 chữ hoa';
+      } else if (!RegExp(r'[a-z]').hasMatch(value)) {
+        error = 'Mật khẩu phải có ít nhất 1 chữ thường';
+      } else if (!RegExp(r'\d').hasMatch(value)) {
+        error = 'Mật khẩu phải có ít nhất 1 chữ số';
+      }
+    }
+    setState(() {
+      _newPasswordError = error;
+      // Re-validate confirm if already filled
+      if (_confirmController.text.isNotEmpty &&
+          _confirmController.text != value) {
+        _confirmPasswordError = 'Mật khẩu xác nhận không khớp';
+      } else {
+        _confirmPasswordError = null;
+      }
+    });
+  }
+
+  void _validateConfirmPassword(String value) {
+    setState(() {
+      if (value.isNotEmpty && value != _newController.text) {
+        _confirmPasswordError = 'Mật khẩu xác nhận không khớp';
+      } else {
+        _confirmPasswordError = null;
+      }
+    });
+  }
+
   @override
   void dispose() {
     _currentController.dispose();
@@ -40,13 +83,49 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
   Future<void> _submit() async {
     if (!_canSubmit) return;
     setState(() => _isSubmitting = true);
-    await Future<void>.delayed(const Duration(milliseconds: 450));
-    if (!mounted) return;
-    setState(() => _isSubmitting = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đã cập nhật mật khẩu (mô phỏng UI).')),
-    );
-    Navigator.pop(context);
+
+    try {
+      await context.read<AuthService>().changePassword(
+            currentPassword: _currentController.text,
+            newPassword: _newController.text,
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã cập nhật mật khẩu thành công'),
+          backgroundColor: Color(0xFF22C55E),
+        ),
+      );
+      Navigator.pop(context);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      String message;
+      switch (e.code) {
+        case 'AUTH_015':
+          message = 'Mật khẩu hiện tại không đúng';
+          break;
+        case 'AUTH_016':
+          message = 'Mật khẩu mới không đáp ứng yêu cầu';
+          break;
+        default:
+          message = e.message.isNotEmpty
+              ? e.message
+              : 'Cập nhật mật khẩu thất bại (${e.statusCode})';
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: AppColors.error),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã xảy ra lỗi, vui lòng thử lại'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   @override
@@ -75,12 +154,23 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
         children: [
-          const Text(
+          Text(
             'Mật khẩu phải gồm chữ hoa, chữ thường và số; không nên dùng thông tin dễ đoán như năm sinh hoặc tên.',
-            style: TextStyle(fontSize: 16, color: Color(0xFF374151), height: 1.4),
+            style: TextStyle(
+              fontSize: 16,
+              color: isDarkMode ? const Color(0xFFD1D5DB) : const Color(0xFF374151),
+              height: 1.4,
+            ),
           ),
           const SizedBox(height: 22),
-          const Text('Mật khẩu hiện tại', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          Text(
+            'Mật khẩu hiện tại',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: isDarkMode ? Colors.white : const Color(0xFF111827),
+            ),
+          ),
           const SizedBox(height: 8),
           TextField(
             controller: _currentController,
@@ -103,25 +193,60 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
             ),
           ),
           const SizedBox(height: 18),
-          const Text('Mật khẩu mới', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          Text(
+            'Mật khẩu mới',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: isDarkMode ? Colors.white : const Color(0xFF111827),
+            ),
+          ),
           const SizedBox(height: 8),
           TextField(
             controller: _newController,
-            obscureText: true,
-            onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(
+            obscureText: !_showNew,
+            onChanged: (v) {
+              _validateNewPassword(v);
+            },
+            decoration: InputDecoration(
               hintText: 'Nhập mật khẩu mới',
-              border: UnderlineInputBorder(),
+              errorText: _newPasswordError,
+              suffix: GestureDetector(
+                onTap: () => setState(() => _showNew = !_showNew),
+                child: Text(
+                  _showNew ? 'ẨN' : 'HIỆN',
+                  style: const TextStyle(
+                    color: Color(0xFF9CA3AF),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              border: const UnderlineInputBorder(),
             ),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _confirmController,
-            obscureText: true,
-            onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(
+            obscureText: !_showConfirm,
+            onChanged: (v) {
+              _validateConfirmPassword(v);
+            },
+            decoration: InputDecoration(
               hintText: 'Nhập lại mật khẩu mới',
-              border: UnderlineInputBorder(),
+              errorText: _confirmPasswordError,
+              suffix: GestureDetector(
+                onTap: () => setState(() => _showConfirm = !_showConfirm),
+                child: Text(
+                  _showConfirm ? 'ẨN' : 'HIỆN',
+                  style: const TextStyle(
+                    color: Color(0xFF9CA3AF),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              border: const UnderlineInputBorder(),
             ),
           ),
           const SizedBox(height: 32),

@@ -125,6 +125,12 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:-iuh-cnm-vnalo-firebase-adminsdk-fbsvc-5008b7c5eb.json}
+      OTP_ENABLED: ${OTP_ENABLED:-true}
+      OTP_EMAIL_ENABLED: ${OTP_EMAIL_ENABLED:-true}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      MAIL_APP_PASSWORD: ${MAIL_APP_PASSWORD:-}
     depends_on:
       postgres:
         condition: service_healthy

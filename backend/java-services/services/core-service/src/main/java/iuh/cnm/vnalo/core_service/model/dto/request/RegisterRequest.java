@@ -1,6 +1,7 @@
 package iuh.cnm.vnalo.core_service.model.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -21,6 +22,11 @@ public class RegisterRequest {
     @Pattern(regexp = "^\\+84(?:3|5|7|8|9)\\d{8}$", message = "Phone number must be a valid Vietnamese mobile number (e.g., +84901234567)")
     private String phone;
 
+    @NotBlank(message = "Email is required")
+    @Email(message = "Email must be valid")
+    @Size(max = 255, message = "Email must not exceed 255 characters")
+    private String email;
+
     @NotBlank(message = "Password is required")
     @Size(min = 8, max = 100, message = "Password must be between 8 and 100 characters")
     @Pattern(regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).+$",
@@ -32,14 +38,6 @@ public class RegisterRequest {
     @Pattern(regexp = "^(?!.*\\d).+$", message = "Display name must not contain numbers")
     private String displayName;
     
-    /**
-     * OTP code for phone verification.
-     * Required when OTP verification is enabled.
-     */
-    @Size(min = 6, max = 6, message = "OTP must be 6 digits")
-    @Pattern(regexp = "^\\d{6}$", message = "OTP must be 6 digits")
-    private String otp;
-
     private Gender gender;
 
     private LocalDate dob;

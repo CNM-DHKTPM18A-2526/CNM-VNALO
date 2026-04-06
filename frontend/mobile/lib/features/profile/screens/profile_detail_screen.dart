@@ -87,6 +87,12 @@ class ProfileDetailScreen extends StatelessWidget {
           ),
           _infoTile(
             context,
+            icon: Icons.email_outlined,
+            title: 'Email',
+            value: auth.user?.email ?? 'Chưa cập nhật',
+          ),
+          _infoTile(
+            context,
             icon: Icons.cake_outlined,
             title: 'Ngày sinh',
             value: auth.user?.dob != null

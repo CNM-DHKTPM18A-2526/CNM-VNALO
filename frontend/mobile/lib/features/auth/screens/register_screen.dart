@@ -27,6 +27,7 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final _pageController = PageController();
   final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
   final _nameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -39,7 +40,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isResendingOtp = false;
   bool _isSubmittingRegistration = false;
   bool _isSkipSubmitting = false;
-  bool _requiresOtp = AppConfig.instance.isProd;
+  bool _requiresOtp = false;
   String _otpCode = '';
   String _countryCode = '+84';
 
@@ -69,6 +70,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   void _resetRegistrationDraft() {
     _phoneController.clear();
+    _emailController.clear();
     _nameController.clear();
     _passwordController.clear();
     _confirmPasswordController.clear();
@@ -95,7 +97,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           );
       if (!mounted) return;
       setState(() {
-        _requiresOtp = required;
+        _requiresOtp = false;
         if (previousRequiresOtp && !required && _currentStep > 0) {
           _currentStep = (_currentStep - 1).clamp(0, _totalSteps - 1);
         }
@@ -106,7 +108,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _requiresOtp = fallbackRequiresOtp;
+        _requiresOtp = false;
         if (previousRequiresOtp && !fallbackRequiresOtp && _currentStep > 0) {
           _currentStep = (_currentStep - 1).clamp(0, _totalSteps - 1);
         }
@@ -147,6 +149,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void dispose() {
     _pageController.dispose();
     _phoneController.dispose();
+    _emailController.dispose();
     _nameController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -285,7 +288,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final success = await auth
           .register(
         phone: _buildFullPhone(),
-        otp: _otpCode,
+        email: _emailController.text.trim(),
         password: _passwordController.text,
         displayName: _nameController.text.trim(),
         avatarFile: _avatarFile,
@@ -914,6 +917,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Widget _buildPersonalInfoStep() {
     final t = AuthTexts.of(context);
+    final emailError = Validators.email(_emailController.text);
+    final canContinue = emailError == null;
 
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -932,6 +937,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
           const SizedBox(height: 28),
+          TextField(
+            controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
+            onChanged: (_) => setState(() {}),
+            style: const TextStyle(fontSize: 16),
+            decoration: InputDecoration(
+              hintText: 'Email',
+              errorText: _emailController.text.isEmpty ? null : emailError,
+              filled: true,
+              fillColor: const Color(0xFFF9FAFB),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                  color: AppColors.primary,
+                  width: 1.5,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
           // Birthday — tap to open date picker bottom sheet
           GestureDetector(
             onTap: _pickBirthday,
@@ -1007,18 +1042,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               minimumSize: const Size.fromHeight(56),
-              backgroundColor: AppColors.primary,
+              backgroundColor: canContinue ? AppColors.primary : const Color(0xFFE5E7EB),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
-            onPressed: _nextStep,
+            onPressed: canContinue ? _nextStep : null,
             child: Text(
               t.continueText,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: Colors.white,
+                color: canContinue ? Colors.white : const Color(0xFF9CA3AF),
               ),
             ),
           ),

@@ -1,11 +1,13 @@
 package iuh.cnm.vnalo.core_service.service;
 
-import iuh.cnm.vnalo.core_service.config.OtpConfig;
 import iuh.cnm.vnalo.core_service.exception.ApiException;
 import iuh.cnm.vnalo.core_service.exception.ErrorCode;
+import iuh.cnm.vnalo.core_service.model.dto.request.ChangePasswordRequest;
+import iuh.cnm.vnalo.core_service.model.dto.request.ForgotPasswordRequest;
 import iuh.cnm.vnalo.core_service.model.dto.request.LoginRequest;
 import iuh.cnm.vnalo.core_service.model.dto.request.RefreshTokenRequest;
 import iuh.cnm.vnalo.core_service.model.dto.request.RegisterRequest;
+import iuh.cnm.vnalo.core_service.model.dto.request.ResetPasswordRequest;
 import iuh.cnm.vnalo.core_service.model.dto.response.AuthResponse;
 import iuh.cnm.vnalo.core_service.model.dto.response.UserInfoResponse;
 import iuh.cnm.vnalo.core_service.model.entity.auth.AuthAccount;
@@ -33,6 +35,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
@@ -46,7 +49,6 @@ public class AuthService {
     private final UserPrivacySettingRepository userPrivacySettingRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
-    private final OtpConfig otpConfig;
     private final OtpService otpService;
 
     @Transactional
@@ -56,17 +58,9 @@ public class AuthService {
             throw new ApiException(ErrorCode.AUTH_PHONE_ALREADY_EXISTS);
         }
 
-        // Verify OTP if enabled
-        if (!otpConfig.shouldSkipOtp()) {
-            // OTP is required when enabled
-            if (request.getOtp() == null || request.getOtp().isBlank()) {
-                throw new ApiException(ErrorCode.AUTH_OTP_REQUIRED);
-            }
-            // Verify OTP
-            otpService.verifyOtp(request.getPhone(), request.getOtp(), OtpPurpose.REGISTER);
-            log.info("OTP verified for phone: ****{}", request.getPhone().substring(request.getPhone().length() - 4));
-        } else {
-            log.info("OTP verification skipped (disabled in config)");
+        final String normalizedEmail = normalizeEmail(request.getEmail());
+        if (authAccountRepository.existsByEmailIgnoreCase(normalizedEmail)) {
+            throw new ApiException(ErrorCode.AUTH_EMAIL_ALREADY_EXISTS);
         }
 
         // Create account - OTP already verified at this point, so status is ACTIVE
@@ -74,6 +68,7 @@ public class AuthService {
         
         AuthAccount account = AuthAccount.builder()
                 .phone(request.getPhone())
+            .email(normalizedEmail)
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .passwordUpdatedAt(Instant.now())
                 .status(initialStatus)
@@ -114,8 +109,8 @@ public class AuthService {
     @Transactional
     public AuthResponse login(LoginRequest request, HttpServletRequest httpRequest) {
         // Pre-check: find account and check lock status
-        AuthAccount account = authAccountRepository.findByPhone(request.getIdentifier())
-                .orElseThrow(() -> new ApiException(ErrorCode.AUTH_INVALID_CREDENTIALS));
+        AuthAccount account = resolveAccountByIdentifier(request.getIdentifier())
+            .orElseThrow(() -> new ApiException(ErrorCode.AUTH_INVALID_CREDENTIALS));
 
         if (account.isLocked()) {
             throw new ApiException(ErrorCode.AUTH_ACCOUNT_LOCKED);
@@ -232,6 +227,7 @@ public class AuthService {
                 .user(UserInfoResponse.builder()
                         .id(profile.getId())
                         .phone(account.getPhone())
+                    .email(account.getEmail())
                         .displayName(profile.getDisplayName())
                         .avatarUrl(profile.getAvatarUrl())
                         .coverUrl(profile.getCoverUrl())
@@ -242,5 +238,103 @@ public class AuthService {
                         .isVerified(profile.getIsVerified())
                         .build())
                 .build();
+    }
+
+    // ────────────────────── Password Management ──────────────────────
+
+    @Transactional
+    public void changePassword(UUID accountId, ChangePasswordRequest request) {
+        AuthAccount account = authAccountRepository.findById(accountId)
+                .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
+
+        if (!passwordEncoder.matches(request.currentPassword(), account.getPasswordHash())) {
+            throw new ApiException(ErrorCode.AUTH_PASSWORD_MISMATCH);
+        }
+
+        validatePasswordPolicy(request.newPassword());
+
+        account.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        account.setPasswordUpdatedAt(Instant.now());
+        authAccountRepository.save(account);
+
+        log.info("Password changed successfully for account: {}", accountId);
+    }
+
+    @Transactional
+    public void forgotPassword(ForgotPasswordRequest request) {
+        final String email = normalizeEmail(request.email());
+
+        // Verify account exists
+        authAccountRepository.findByEmailIgnoreCase(email)
+            .orElseThrow(() -> new ApiException(ErrorCode.AUTH_ACCOUNT_NOT_FOUND_BY_EMAIL));
+
+        // Send OTP for password reset purpose
+        otpService.sendOtp(email, OtpPurpose.RESET_PASSWORD);
+
+        log.info("Password reset OTP sent for email: {}", maskEmail(email));
+    }
+
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        final String email = normalizeEmail(request.email());
+
+        // Verify account exists
+        AuthAccount account = authAccountRepository.findByEmailIgnoreCase(email)
+            .orElseThrow(() -> new ApiException(ErrorCode.AUTH_ACCOUNT_NOT_FOUND_BY_EMAIL));
+
+        // Verify OTP
+        otpService.verifyOtp(email, request.otp(), OtpPurpose.RESET_PASSWORD);
+
+        // Validate new password
+        validatePasswordPolicy(request.newPassword());
+
+        // Update password
+        account.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        account.setPasswordUpdatedAt(Instant.now());
+        // Unlock account if it was locked due to too many failed login attempts
+        if (account.isLocked()) {
+            account.setStatus(AccountStatus.ACTIVE);
+            account.setLockedUntil(null);
+            account.setFailedLoginCount(0);
+        }
+        authAccountRepository.save(account);
+
+        log.info("Password reset successfully for email: {}", maskEmail(email));
+    }
+
+    private java.util.Optional<AuthAccount> resolveAccountByIdentifier(String identifier) {
+        final String trimmed = identifier == null ? "" : identifier.trim();
+        if (trimmed.contains("@")) {
+            return authAccountRepository.findByEmailIgnoreCase(normalizeEmail(trimmed));
+        }
+        return authAccountRepository.findByPhone(trimmed);
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String maskEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return "***";
+        }
+        final String trimmed = email.trim();
+        final int at = trimmed.indexOf('@');
+        if (at <= 1) {
+            return "***";
+        }
+        return trimmed.charAt(0) + "***" + trimmed.substring(at);
+    }
+
+    private void validatePasswordPolicy(String password) {
+        if (password.length() < 8) {
+            throw new ApiException(ErrorCode.AUTH_PASSWORD_POLICY);
+        }
+        boolean hasUpper = password.chars().anyMatch(Character::isUpperCase);
+        boolean hasLower = password.chars().anyMatch(Character::isLowerCase);
+        boolean hasDigit = password.chars().anyMatch(Character::isDigit);
+        if (!hasUpper || !hasLower || !hasDigit) {
+            throw new ApiException(ErrorCode.AUTH_PASSWORD_POLICY);
+        }
     }
 }

@@ -3,18 +3,19 @@ package iuh.cnm.vnalo.core_service.controller;
 import iuh.cnm.vnalo.core_service.config.OtpConfig;
 import iuh.cnm.vnalo.core_service.exception.ApiException;
 import iuh.cnm.vnalo.core_service.exception.ErrorCode;
+import iuh.cnm.vnalo.core_service.model.dto.request.ChangePasswordRequest;
+import iuh.cnm.vnalo.core_service.model.dto.request.ForgotPasswordRequest;
 import iuh.cnm.vnalo.core_service.model.dto.request.LoginRequest;
 import iuh.cnm.vnalo.core_service.model.dto.request.RefreshTokenRequest;
 import iuh.cnm.vnalo.core_service.model.dto.request.RegisterRequest;
+import iuh.cnm.vnalo.core_service.model.dto.request.ResetPasswordRequest;
 import iuh.cnm.vnalo.core_service.model.dto.request.SendOtpRequest;
 import iuh.cnm.vnalo.core_service.model.dto.response.ApiResponse;
 import iuh.cnm.vnalo.core_service.model.dto.response.AuthResponse;
 import iuh.cnm.vnalo.core_service.model.dto.response.OtpResponse;
-import iuh.cnm.vnalo.core_service.model.enums.OtpPurpose;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthAccountRepository;
 import iuh.cnm.vnalo.core_service.security.UserPrincipal;
 import iuh.cnm.vnalo.core_service.service.AuthService;
-import iuh.cnm.vnalo.core_service.service.OtpService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,7 +36,6 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
-    private final OtpService otpService;
     private final OtpConfig otpConfig;
     private final AuthAccountRepository authAccountRepository;
 
@@ -54,19 +54,9 @@ public class AuthController {
             throw new ApiException(ErrorCode.AUTH_PHONE_ALREADY_EXISTS);
         }
         
-        // Check if OTP is disabled
-        if (otpConfig.shouldSkipOtp()) {
-            return ResponseEntity.ok(ApiResponse.success(
-                "OTP verification is disabled",
-                OtpResponse.skipped("OTP verification is disabled in current environment")
-            ));
-        }
-        
-        OtpService.OtpSendResult result = otpService.sendOtp(request.getPhone(), OtpPurpose.REGISTER);
-        
         return ResponseEntity.ok(ApiResponse.success(
-            result.getMessage(),
-            OtpResponse.success(result.getExpiresInSeconds(), otpConfig.getRateLimit().getCooldownSeconds())
+            "Phone OTP for registration is disabled",
+            OtpResponse.skipped("Registration no longer requires phone OTP")
         ));
     }
 
@@ -153,12 +143,60 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success(
             "OTP status retrieved",
             new OtpStatusResponse(
-                otpConfig.isEnabled(),
+                false,
                 otpConfig.isTestMode(),
                 otpConfig.getExpirationMinutes(),
-                otpConfig.getRateLimit().getCooldownSeconds()
+                otpConfig.getRateLimit().getCooldownSeconds(),
+                otpConfig.isEnabled(),
+                false
             )
         ));
+    }
+
+    // ────────────────────── Password Management ──────────────────────
+
+    /**
+     * Change password for the authenticated user.
+     * Requires current password verification.
+     */
+    @PostMapping("/change-password")
+    @Operation(summary = "Change password", description = "Change password for authenticated user")
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Valid @RequestBody ChangePasswordRequest request) {
+
+        authService.changePassword(currentUser.getId(), request);
+
+        return ResponseEntity.ok(ApiResponse.success("Password changed successfully"));
+    }
+
+    /**
+     * Request password reset OTP.
+         * Sends OTP to the registered email address.
+     * In dev/test mode, OTP is logged to console.
+     */
+    @PostMapping("/forgot-password")
+        @Operation(summary = "Forgot password", description = "Send password reset OTP to email")
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request) {
+
+        authService.forgotPassword(request);
+
+        return ResponseEntity.ok(ApiResponse.success("Password reset OTP sent"));
+    }
+
+    /**
+     * Reset password using OTP verification.
+         * Requires email + valid OTP + new password.
+     */
+    @PostMapping("/reset-password")
+        @Operation(summary = "Reset password", description = "Reset password with email OTP verification")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request) {
+
+        authService.resetPassword(request);
+
+        return ResponseEntity.ok(ApiResponse.success("Password reset successfully"));
     }
     
     /**
@@ -168,7 +206,9 @@ public class AuthController {
         boolean enabled,
         boolean testMode,
         int expirationMinutes,
-        int cooldownSeconds
+        int cooldownSeconds,
+        boolean passwordResetOtpEnabled,
+        boolean registerPhoneOtpEnabled
     ) {}
 }
 
