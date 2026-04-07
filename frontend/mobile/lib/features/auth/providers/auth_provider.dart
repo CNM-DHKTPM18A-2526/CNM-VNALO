@@ -132,6 +132,26 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<Map<String, dynamic>> getQrLoginSessionPreview(String token) async {
+    return _authService.getQrLoginSessionPreview(token);
+  }
+
+  Future<void> approveQrLoginSession({
+    required String token,
+    String? deviceId,
+    String? deviceName,
+    String? platform,
+    String? location,
+  }) async {
+    await _authService.approveQrLoginSession(
+      token: token,
+      deviceId: deviceId,
+      deviceName: deviceName,
+      platform: platform,
+      location: location,
+    );
+  }
+
   Future<bool> register({
     required String phone,
     required String email,

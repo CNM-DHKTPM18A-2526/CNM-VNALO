@@ -36,4 +36,9 @@ public class LoginRequest {
      * Device name for display (optional).
      */
     private String deviceName;
+
+    /**
+     * Platform identifier (optional): WEB, ANDROID, IOS, PC.
+     */
+    private String platform;
 }

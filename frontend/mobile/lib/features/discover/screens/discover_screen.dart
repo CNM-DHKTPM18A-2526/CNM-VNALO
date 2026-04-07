@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vnalo_mobile/features/auth/screens/qr_login_approval_screen.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 
 class DiscoverScreen extends StatelessWidget {
@@ -9,7 +10,7 @@ class DiscoverScreen extends StatelessWidget {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final appBarBg =
         isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
-    final searchHint = isDarkMode ? DarkColors.textHint : Colors.white.withOpacity(0.8);
+    final searchHint = isDarkMode ? DarkColors.textHint : Colors.white.withValues(alpha: 0.8);
 
     return Scaffold(
       appBar: AppBar(
@@ -38,18 +39,18 @@ class DiscoverScreen extends StatelessWidget {
         ),
       ),
       body: ListView(
-        children: const [
-          _DiscoverItem(
+        children: [
+          const _DiscoverItem(
             icon: Icons.storefront,
             title: 'VNALO Shop',
             subtitle: 'Mua sắm trực tuyến',
           ),
-          _DiscoverItem(
+          const _DiscoverItem(
             icon: Icons.games,
             title: 'Trò chơi',
             subtitle: 'Chơi cùng bạn bè',
           ),
-          _DiscoverItem(
+          const _DiscoverItem(
             icon: Icons.newspaper,
             title: 'Tin tức',
             subtitle: 'Cập nhật mới nhất',
@@ -57,7 +58,12 @@ class DiscoverScreen extends StatelessWidget {
           _DiscoverItem(
             icon: Icons.qr_code_scanner,
             title: 'Quét QR',
-            subtitle: 'Thanh toán, kết bạn',
+            subtitle: 'Đăng nhập web, thanh toán, kết bạn',
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const QrLoginApprovalScreen()),
+              );
+            },
           ),
         ],
       ),
@@ -69,11 +75,13 @@ class _DiscoverItem extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
+  final VoidCallback? onTap;
 
   const _DiscoverItem({
     required this.icon,
     required this.title,
     required this.subtitle,
+    this.onTap,
   });
 
   @override
@@ -91,6 +99,7 @@ class _DiscoverItem extends StatelessWidget {
       title: Text(title),
       subtitle: Text(subtitle),
       trailing: const Icon(Icons.chevron_right, color: Color(0xFFD1D5DB)),
+      onTap: onTap,
     );
   }
 }

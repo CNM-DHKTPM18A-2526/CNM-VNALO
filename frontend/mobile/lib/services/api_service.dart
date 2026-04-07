@@ -9,7 +9,7 @@ import 'package:http_parser/http_parser.dart';
 
 class ApiService {
   final StorageService _storageService;
-  static const _timeout = Duration(seconds: 20);
+  static const _timeout = Duration(seconds: 30);
 
   /// Uploads (S3 via media-service) often need more than JSON calls on cellular/Wi‑Fi.
   static const _multipartTimeout = Duration(seconds: 90);

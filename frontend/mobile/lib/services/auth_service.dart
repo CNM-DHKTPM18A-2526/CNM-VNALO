@@ -100,6 +100,36 @@ class AuthService {
       body: {
         'identifier': normalized,
         'password': password,
+        'platform': 'ANDROID',
+        'deviceName': 'VNALO Mobile',
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> getQrLoginSessionPreview(String token) async {
+    final response = await _apiService.get(_base, '/auth/qr/sessions/$token/preview');
+    final data = response['data'];
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+    return response;
+  }
+
+  Future<void> approveQrLoginSession({
+    required String token,
+    String? deviceId,
+    String? deviceName,
+    String? platform,
+    String? location,
+  }) async {
+    await _apiService.post(
+      _base,
+      '/auth/qr/sessions/$token/approve',
+      body: {
+        'deviceId': deviceId,
+        'deviceName': deviceName,
+        'platform': platform ?? 'ANDROID',
+        'location': location,
       },
     );
   }

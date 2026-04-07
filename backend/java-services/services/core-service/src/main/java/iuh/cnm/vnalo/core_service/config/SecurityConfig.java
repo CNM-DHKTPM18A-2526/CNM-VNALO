@@ -38,7 +38,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                     // Selected auth endpoints still require authentication
-                    .requestMatchers("/auth/logout-all", "/auth/change-password", "/auth/password/change").authenticated()
+                    .requestMatchers("/auth/logout-all", "/auth/change-password", "/auth/password/change", "/auth/login-devices", "/auth/qr/sessions/*/approve").authenticated()
                         .requestMatchers("/auth/**", "/swagger-ui/**", "/swagger-ui.html",
                                 "/v3/api-docs/**", "/h2-console/**").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()

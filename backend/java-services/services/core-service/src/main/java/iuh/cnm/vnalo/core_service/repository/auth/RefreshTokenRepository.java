@@ -4,10 +4,12 @@ import iuh.cnm.vnalo.core_service.model.entity.auth.AuthRefreshToken;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -27,4 +29,8 @@ public interface RefreshTokenRepository extends JpaRepository<AuthRefreshToken, 
     @Modifying
     @Query("UPDATE AuthRefreshToken t SET t.revokedAt = :revokedAt WHERE t.accountId = :accountId AND t.deviceId = :deviceId AND t.revokedAt IS NULL")
     void revokeByAccountIdAndDeviceId(@Param("accountId") UUID accountId, @Param("deviceId") String deviceId, @Param("revokedAt") Instant revokedAt);
+
+    List<AuthRefreshToken> findByAccountIdOrderByCreatedAtDesc(UUID accountId, Pageable pageable);
+
+    List<AuthRefreshToken> findByAccountIdAndRevokedAtIsNullAndExpiresAtAfterOrderByCreatedAtAsc(UUID accountId, Instant now);
 }

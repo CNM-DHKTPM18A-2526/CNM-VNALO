@@ -29,6 +29,10 @@ public enum ErrorCode {
     AUTH_EMAIL_ALREADY_EXISTS("AUTH_018", "Email already registered"),
     AUTH_ACCOUNT_NOT_FOUND_BY_EMAIL("AUTH_019", "No account found with this email"),
     AUTH_OTP_DELIVERY_FAILED("AUTH_020", "Unable to deliver OTP"),
+    AUTH_QR_SESSION_NOT_FOUND("AUTH_021", "QR login session not found"),
+    AUTH_QR_SESSION_EXPIRED("AUTH_022", "QR login session has expired"),
+    AUTH_QR_SESSION_ALREADY_USED("AUTH_023", "QR login session has already been used"),
+    AUTH_QR_APPROVAL_COOLDOWN("AUTH_024", "Please wait before approving QR login"),
 
     // User
     USER_NOT_FOUND("USER_001", "User not found"),

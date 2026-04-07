@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:vnalo_mobile/config/app_config.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/utils/avatar_utils.dart';
 import 'package:vnalo_mobile/core/utils/validators.dart';
@@ -40,7 +39,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isResendingOtp = false;
   bool _isSubmittingRegistration = false;
   bool _isSkipSubmitting = false;
-  bool _requiresOtp = false;
+  bool _requiresOtp = true;
+  bool _otpStatusResolved = false;
   String _otpCode = '';
   String _countryCode = '+84';
 
@@ -84,7 +84,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _loadOtpStatus() async {
-    final fallbackRequiresOtp = AppConfig.instance.isProd;
+    const fallbackRequiresOtp = true;
     final previousRequiresOtp = _requiresOtp;
 
     try {
@@ -98,6 +98,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!mounted) return;
       setState(() {
         _requiresOtp = required;
+        _otpStatusResolved = true;
         if (previousRequiresOtp && !required && _currentStep > 0) {
           _currentStep = (_currentStep - 1).clamp(0, _totalSteps - 1);
         }
@@ -109,13 +110,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!mounted) return;
       setState(() {
         _requiresOtp = fallbackRequiresOtp;
-        if (previousRequiresOtp && !fallbackRequiresOtp && _currentStep > 0) {
-          _currentStep = (_currentStep - 1).clamp(0, _totalSteps - 1);
-        }
+        _otpStatusResolved = true;
       });
-      if (previousRequiresOtp && !fallbackRequiresOtp) {
-        _pageController.jumpToPage(_currentStep);
-      }
     }
   }
 
@@ -200,6 +196,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _continueFromEmailStep() async {
     if (_isAnyRequestInFlight) return;
+
+    if (!_otpStatusResolved) {
+      await _loadOtpStatus();
+      if (!mounted) return;
+    }
+
     final email = _emailController.text.trim();
     final emailError = Validators.email(email);
     if (emailError != null) {
@@ -705,8 +707,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ),
               onPressed:
-                  canProceed && !_isAnyRequestInFlight ? _continueFromEmailStep : null,
-              child: _isSendingOtp
+                  canProceed && !_isAnyRequestInFlight && _otpStatusResolved
+                    ? _continueFromEmailStep
+                    : null,
+                child: _isSendingOtp || !_otpStatusResolved
                   ? const SizedBox(
                       height: 16,
                       width: 16,
