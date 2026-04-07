@@ -45,7 +45,28 @@ class FriendService {
       '/users/search',
       queryParams: {'keyword': keyword},
     );
-    final list = response['data'] as List;
+    final data = response['data'];
+    final list = data is Map<String, dynamic>
+        ? (data['content'] as List? ?? <dynamic>[])
+        : (data as List? ?? <dynamic>[]);
     return list.map((e) => User.fromJson(e)).toList();
+  }
+
+  Future<User> searchUserByPhone(String phoneNumber) async {
+    final normalized = _normalizePhone(phoneNumber);
+    final response = await _apiService.get(_base, '/users/phone/$normalized');
+    final data = response['data'];
+    if (data is! Map<String, dynamic>) {
+      throw StateError('Invalid phone search response');
+    }
+    return User.fromJson(data);
+  }
+
+  String _normalizePhone(String phone) {
+    final cleaned = phone.replaceAll(RegExp(r'[^+\d]'), '');
+    if (cleaned.startsWith('0')) {
+      return '+84${cleaned.substring(1)}';
+    }
+    return cleaned;
   }
 }

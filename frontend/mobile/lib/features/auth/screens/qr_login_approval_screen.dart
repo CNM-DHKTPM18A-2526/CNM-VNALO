@@ -7,7 +7,9 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 
 class QrLoginApprovalScreen extends StatefulWidget {
-  const QrLoginApprovalScreen({super.key});
+  final String? initialToken;
+
+  const QrLoginApprovalScreen({super.key, this.initialToken});
 
   @override
   State<QrLoginApprovalScreen> createState() => _QrLoginApprovalScreenState();
@@ -25,27 +27,24 @@ class _QrLoginApprovalScreenState extends State<QrLoginApprovalScreen> {
   Timer? _cooldownTimer;
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.initialToken != null && widget.initialToken!.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadPreviewFromToken(widget.initialToken!);
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _cooldownTimer?.cancel();
     _scannerController.dispose();
     super.dispose();
   }
 
-  Future<void> _onDetect(BarcodeCapture capture) async {
-    if (_token != null || _isLoadingPreview) {
-      return;
-    }
-
-    final rawValue = capture.barcodes.first.rawValue;
-    if (rawValue == null || rawValue.trim().isEmpty) {
-      return;
-    }
-
-    final token = _extractToken(rawValue);
-    if (token == null) {
-      setState(() {
-        _error = 'Mã QR không hợp lệ cho đăng nhập web.';
-      });
+  Future<void> _loadPreviewFromToken(String token) async {
+    if (_isLoadingPreview) {
       return;
     }
 
@@ -92,6 +91,30 @@ class _QrLoginApprovalScreenState extends State<QrLoginApprovalScreen> {
         });
       }
     }
+  }
+
+  Future<void> _onDetect(BarcodeCapture capture) async {
+    if (_token != null || _isLoadingPreview) {
+      return;
+    }
+
+    final rawValue = capture.barcodes.first.rawValue;
+    if (rawValue == null || rawValue.trim().isEmpty) {
+      return;
+    }
+
+    final token = _extractToken(rawValue);
+    if (token == null) {
+      setState(() {
+        _error = 'Mã QR không hợp lệ cho đăng nhập web.';
+      });
+      return;
+    }
+
+    await _scannerController.stop();
+    if (!mounted) return;
+
+    await _loadPreviewFromToken(token);
   }
 
   String? _extractToken(String rawValue) {

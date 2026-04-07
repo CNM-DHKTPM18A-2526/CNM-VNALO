@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
+import 'package:vnalo_mobile/features/contacts/screens/add_friend_screen.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/user_model.dart';
 import 'package:vnalo_mobile/services/friend_service.dart';
@@ -73,7 +74,9 @@ class _ContactsScreenState extends State<ContactsScreen> {
             IconButton(
               icon: Icon(Icons.person_add_outlined, color: searchHint),
               onPressed: () {
-                // TODO: Add friend
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const AddFriendScreen()),
+                );
               },
             ),
           ],

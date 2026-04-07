@@ -56,10 +56,21 @@ public class UserController {
     @GetMapping("/search")
     @Operation(summary = "Search users")
     public ResponseEntity<ApiResponse<Page<UserInfoResponse>>> searchUsers(
+            @AuthenticationPrincipal UserPrincipal currentUser,
             @RequestParam String keyword,
             @PageableDefault(size = 20) Pageable pageable) {
 
-        Page<UserInfoResponse> response = userService.searchUsers(keyword, pageable);
+        Page<UserInfoResponse> response = userService.searchUsers(currentUser.getId(), keyword, pageable);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/phone/{phoneNumber}")
+    @Operation(summary = "Search user by phone", description = "Exact phone lookup respecting user privacy settings")
+    public ResponseEntity<ApiResponse<UserInfoResponse>> searchUserByPhone(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @PathVariable String phoneNumber) {
+
+        UserInfoResponse response = userService.searchUserByPhone(currentUser.getId(), phoneNumber);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

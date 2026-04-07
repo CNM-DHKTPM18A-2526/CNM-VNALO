@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:vnalo_mobile/core/models/quick_action_item.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
+import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/features/chat/screens/chat_detail_screen.dart';
 import 'package:vnalo_mobile/features/chat/screens/my_documents_screen.dart';
 import 'package:vnalo_mobile/features/chat/widgets/chat_list_item.dart';
+import 'package:vnalo_mobile/features/common/widgets/quick_actions_sheet.dart';
+import 'package:vnalo_mobile/features/contacts/screens/add_friend_screen.dart';
+import 'package:vnalo_mobile/features/profile/screens/account_security_screen.dart';
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
@@ -21,6 +26,74 @@ class _ChatListScreenState extends State<ChatListScreen> {
       if (!mounted) return;
       context.read<ChatProvider>().loadInbox();
     });
+  }
+
+  void _openQrScanner() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const QrScannerScreen()),
+    );
+  }
+
+  void _openQuickActions() {
+    showQuickActionsSheet(
+      context,
+      items: [
+        QuickActionItem(
+          icon: Icons.person_add_alt_1_outlined,
+          title: 'Thêm bạn',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const AddFriendScreen()),
+            );
+          },
+        ),
+        QuickActionItem(
+          icon: Icons.group_add_outlined,
+          title: 'Tạo nhóm',
+          onTap: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Luồng tạo nhóm sẽ được nối ở bước message/group tiếp theo.')),
+            );
+          },
+        ),
+        QuickActionItem(
+          icon: Icons.folder_copy_outlined,
+          title: 'My Documents',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const MyDocumentsScreen()),
+            );
+          },
+        ),
+        QuickActionItem(
+          icon: Icons.calendar_month_outlined,
+          title: 'Lịch Zalo',
+          onTap: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Lịch Zalo sẽ được tích hợp ở bước lịch/message tiếp theo.')),
+            );
+          },
+        ),
+        QuickActionItem(
+          icon: Icons.video_call_outlined,
+          title: 'Tạo cuộc gọi nhóm',
+          onTap: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Tạo cuộc gọi nhóm sẽ được triển khai ở module call.')),
+            );
+          },
+        ),
+        QuickActionItem(
+          icon: Icons.devices_outlined,
+          title: 'Thiết bị đăng nhập',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const AccountSecurityScreen()),
+            );
+          },
+        ),
+      ],
+    );
   }
 
   @override
@@ -62,11 +135,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
         actions: [
           IconButton(
             icon: Icon(Icons.qr_code_scanner, color: searchHint),
-            onPressed: () {},
+            onPressed: _openQrScanner,
           ),
           IconButton(
             icon: Icon(Icons.add, color: searchHint),
-            onPressed: () {},
+            onPressed: _openQuickActions,
           ),
         ],
       ),

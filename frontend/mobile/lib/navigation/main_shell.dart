@@ -51,9 +51,9 @@ class _MainShellState extends State<MainShell> {
                   ? Badge(
                       label: Text(unreadCount > 99 ? '99+' : unreadCount.toString()),
                       backgroundColor: AppColors.unreadBadge,
-                      child: const Icon(Icons.chat_bubble_outline),
+                      child: const Icon(Icons.chat_bubble_rounded),
                     )
-                  : const Icon(Icons.chat_bubble_outline),
+                  : const Icon(Icons.chat_bubble_rounded),
                 label: 'Tin nhắn',
               ),
               const BottomNavigationBarItem(

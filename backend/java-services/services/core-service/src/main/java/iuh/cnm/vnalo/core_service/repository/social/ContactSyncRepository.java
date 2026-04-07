@@ -17,6 +17,8 @@ public interface ContactSyncRepository extends JpaRepository<ContactSync, UUID> 
 
     Page<ContactSync> findByUserIdAndMatchedUserIdIsNotNull(UUID userId, Pageable pageable);
 
+    List<ContactSync> findByUserIdAndMatchedUserIdIsNotNull(UUID userId);
+
     Page<ContactSync> findByUserId(UUID userId, Pageable pageable);
 
     List<ContactSync> findByUserIdAndMatchedUserIdIsNull(UUID userId);
