@@ -132,6 +132,16 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("Logged out from all devices"));
     }
 
+    @GetMapping("/login-devices")
+    @Operation(summary = "Login device history", description = "Get recent login devices for current account")
+    public ResponseEntity<ApiResponse<java.util.List<AuthService.LoginDeviceInfo>>> getLoginDevices(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @RequestParam(defaultValue = "20") int limit) {
+
+        final var devices = authService.getLoginDevices(currentUser.getId(), limit);
+        return ResponseEntity.ok(ApiResponse.success("Login devices retrieved", devices));
+    }
+
     /**
      * Check OTP configuration status.
      */

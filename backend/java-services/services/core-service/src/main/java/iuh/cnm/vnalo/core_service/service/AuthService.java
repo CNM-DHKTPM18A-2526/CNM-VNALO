@@ -25,6 +25,7 @@ import iuh.cnm.vnalo.core_service.security.UserPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +36,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
@@ -43,6 +45,10 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Slf4j
 public class AuthService {
+
+    private static final int MAX_ACTIVE_MOBILE_DEVICES = 1;
+    private static final int MAX_ACTIVE_WEB_DEVICES_STANDARD = 1;
+    private static final int MAX_ACTIVE_WEB_DEVICES_WITH_QR = 2;
 
     private final AuthAccountRepository authAccountRepository;
     private final RefreshTokenRepository refreshTokenRepository;
@@ -105,7 +111,14 @@ public class AuthService {
 
         UserPrincipal userPrincipal = UserPrincipal.create(account);
         String accessToken = jwtTokenProvider.generateAccessToken(userPrincipal);
-        String refreshToken = generateAndSaveRefreshToken(account.getId(), httpRequest, null);
+        String refreshToken = generateAndSaveRefreshToken(
+            account.getId(),
+            httpRequest,
+            null,
+            null,
+            null,
+            false
+        );
 
         log.info("User registered successfully: {}", account.getId());
         return buildAuthResponse(accessToken, refreshToken, account, profile);
@@ -146,7 +159,14 @@ public class AuthService {
 
         UserPrincipal userPrincipal = UserPrincipal.create(account);
         String accessToken = jwtTokenProvider.generateAccessToken(userPrincipal);
-        String refreshToken = generateAndSaveRefreshToken(account.getId(), httpRequest, request.getDeviceId());
+        String refreshToken = generateAndSaveRefreshToken(
+            account.getId(),
+            httpRequest,
+            request.getDeviceId(),
+            request.getDeviceName(),
+            request.getPlatform(),
+            false
+        );
 
         return buildAuthResponse(accessToken, refreshToken, account, profile);
     }
@@ -177,8 +197,36 @@ public class AuthService {
         storedToken.revoke();
         refreshTokenRepository.save(storedToken);
 
-        String newRefreshToken = generateAndSaveRefreshToken(account.getId(), httpRequest, storedToken.getDeviceId());
+        String newRefreshToken = generateAndSaveRefreshToken(
+            account.getId(),
+            httpRequest,
+            storedToken.getDeviceId(),
+            storedToken.getDeviceName(),
+            storedToken.getPlatform(),
+            isQrWebDevice(storedToken.getDeviceId())
+        );
         return buildAuthResponse(newAccessToken, newRefreshToken, account, profile);
+    }
+
+    @Transactional(readOnly = true)
+    public List<LoginDeviceInfo> getLoginDevices(UUID accountId, int limit) {
+        final int pageSize = Math.max(1, Math.min(limit, 50));
+        return refreshTokenRepository
+            .findByAccountIdOrderByCreatedAtDesc(accountId, PageRequest.of(0, pageSize))
+            .stream()
+            .map(token -> new LoginDeviceInfo(
+                token.getTokenId(),
+                token.getDeviceId(),
+                token.getDeviceName(),
+                token.getPlatform(),
+                token.getIpAddress(),
+                token.getUserAgent(),
+                token.getCreatedAt(),
+                token.getExpiresAt(),
+                token.getRevokedAt(),
+                token.isValid()
+            ))
+            .toList();
     }
 
     @Transactional
@@ -264,14 +312,28 @@ public class AuthService {
         log.info("Password reset successfully for email: {}", maskEmail(email));
     }
 
-    private String generateAndSaveRefreshToken(UUID accountId, HttpServletRequest request, String deviceId) {
+    private String generateAndSaveRefreshToken(
+        UUID accountId,
+        HttpServletRequest request,
+        String deviceId,
+        String deviceName,
+        String platform,
+        boolean allowExtraWebSlot
+    ) {
         String rawToken = jwtTokenProvider.generateRefreshToken();
         String tokenHash = hashToken(rawToken);
+        final String normalizedPlatform = resolvePlatform(platform, request);
+
+        enforceActiveDeviceSlots(accountId, normalizedPlatform, allowExtraWebSlot);
 
         AuthRefreshToken refreshToken = AuthRefreshToken.builder()
                 .accountId(accountId)
                 .tokenHash(tokenHash)
                 .deviceId(deviceId != null ? deviceId : UUID.randomUUID().toString())
+                .deviceName(deviceName)
+                .platform(normalizedPlatform)
+                .ipAddress(resolveClientIp(request))
+                .userAgent(request != null ? request.getHeader("User-Agent") : null)
                 .expiresAt(Instant.now().plusMillis(jwtTokenProvider.getRefreshTokenExpiration()))
                 .build();
 
@@ -287,6 +349,78 @@ public class AuthService {
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException("Failed to hash token", e);
         }
+    }
+
+    private void enforceActiveDeviceSlots(UUID accountId, String platform, boolean allowExtraWebSlot) {
+        final DeviceGroup targetGroup = classifyPlatform(platform);
+        final int maxWebDevices = allowExtraWebSlot ? MAX_ACTIVE_WEB_DEVICES_WITH_QR : MAX_ACTIVE_WEB_DEVICES_STANDARD;
+        final int maxAllowedForGroup = targetGroup == DeviceGroup.MOBILE ? MAX_ACTIVE_MOBILE_DEVICES : maxWebDevices;
+
+        final Instant now = Instant.now();
+        final List<AuthRefreshToken> activeTokens = refreshTokenRepository
+            .findByAccountIdAndRevokedAtIsNullAndExpiresAtAfterOrderByCreatedAtAsc(accountId, now);
+
+        final List<AuthRefreshToken> sameGroupTokens = activeTokens.stream()
+            .filter(token -> classifyToken(token) == targetGroup)
+            .toList();
+
+        final int revokeCount = sameGroupTokens.size() - maxAllowedForGroup + 1;
+        if (revokeCount <= 0) {
+            return;
+        }
+
+        for (int i = 0; i < revokeCount; i++) {
+            sameGroupTokens.get(i).setRevokedAt(now);
+        }
+        refreshTokenRepository.saveAll(sameGroupTokens.subList(0, revokeCount));
+    }
+
+    private DeviceGroup classifyToken(AuthRefreshToken token) {
+        final String platform = normalizePlatform(token.getPlatform());
+        if (platform != null) {
+            return classifyPlatform(platform);
+        }
+
+        final String userAgent = token.getUserAgent();
+        if (userAgent != null) {
+            final String ua = userAgent.toLowerCase(Locale.ROOT);
+            if (ua.contains("android") || ua.contains("iphone") || ua.contains("ipad") || ua.contains("ios")) {
+                return DeviceGroup.MOBILE;
+            }
+        }
+        return DeviceGroup.WEB;
+    }
+
+    private DeviceGroup classifyPlatform(String platform) {
+        return switch (platform) {
+            case "ANDROID", "IOS" -> DeviceGroup.MOBILE;
+            default -> DeviceGroup.WEB;
+        };
+    }
+
+    private boolean isQrWebDevice(String deviceId) {
+        return deviceId != null && deviceId.startsWith("qr-web-");
+    }
+
+    private String resolvePlatform(String platform, HttpServletRequest request) {
+        final String normalized = normalizePlatform(platform);
+        if (normalized != null) {
+            return normalized;
+        }
+
+        if (request != null) {
+            final String userAgent = request.getHeader("User-Agent");
+            if (userAgent != null) {
+                final String ua = userAgent.toLowerCase(Locale.ROOT);
+                if (ua.contains("android")) {
+                    return "ANDROID";
+                }
+                if (ua.contains("iphone") || ua.contains("ipad") || ua.contains("ios")) {
+                    return "IOS";
+                }
+            }
+        }
+        return "WEB";
     }
 
     private AuthResponse buildAuthResponse(String accessToken, String refreshToken, AuthAccount account, UserProfile profile) {
@@ -335,6 +469,38 @@ public class AuthService {
         return trimmed.charAt(0) + "***" + trimmed.substring(at);
     }
 
+    private String resolveClientIp(HttpServletRequest request) {
+        if (request == null) {
+            return null;
+        }
+        final String xff = request.getHeader("X-Forwarded-For");
+        if (xff != null && !xff.isBlank()) {
+            final int comma = xff.indexOf(',');
+            return (comma > 0 ? xff.substring(0, comma) : xff).trim();
+        }
+        final String realIp = request.getHeader("X-Real-IP");
+        if (realIp != null && !realIp.isBlank()) {
+            return realIp.trim();
+        }
+        return request.getRemoteAddr();
+    }
+
+    private String normalizePlatform(String platform) {
+        if (platform == null || platform.isBlank()) {
+            return null;
+        }
+        final String normalized = platform.trim().toUpperCase(Locale.ROOT);
+        return switch (normalized) {
+            case "ANDROID", "IOS", "WEB", "PC" -> normalized;
+            default -> "WEB";
+        };
+    }
+
+    private enum DeviceGroup {
+        MOBILE,
+        WEB
+    }
+
     private void validatePasswordPolicy(String password) {
         if (password == null || password.length() < 8) {
             throw new ApiException(ErrorCode.AUTH_PASSWORD_POLICY);
@@ -353,4 +519,17 @@ public class AuthService {
         String seed = accountId != null ? accountId.toString() : UUID.randomUUID().toString();
         return "https://api.dicebear.com/9.x/initials/svg?seed=" + seed + "&radius=50&size=256&chars=2&fontFamily=Arial&fontWeight=600&backgroundType=gradientLinear&text=" + encodedName;
     }
+
+    public record LoginDeviceInfo(
+            UUID tokenId,
+            String deviceId,
+            String deviceName,
+            String platform,
+            String ipAddress,
+            String userAgent,
+            Instant createdAt,
+            Instant expiresAt,
+            Instant revokedAt,
+            boolean active
+    ) {}
 }
