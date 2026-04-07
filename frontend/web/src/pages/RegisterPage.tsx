@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
-import { sendRegisterOtp, register as registerAccount, updateProfile } from '../features/auth/auth.api'
+import { sendRegisterOtp, register as registerAccount } from '../features/auth/auth.api'
 import type { Gender } from '../features/auth/auth.types'
 import { OtpCodeInput } from '../features/auth/components/OtpCodeInput'
 import { isNormalizedVietnamPhone, normalizeVietnamPhone } from '../features/auth/phone.util'
@@ -43,6 +43,7 @@ type RegisterStep = 'form' | 'otp'
 type RegisterFormState = {
   displayName: string
   phone: string
+  email: string
   dob: string
   gender: Gender | ''
   password: string
@@ -51,18 +52,71 @@ type RegisterFormState = {
 
 type RegisterErrors = Partial<Record<keyof RegisterFormState | 'otpCode', string>>
 
-function validateRegisterForm(values: RegisterFormState): RegisterErrors {
+const MIN_REGISTER_AGE = 16
+
+function getLocalTodayIsoDate() {
+  const now = new Date()
+  const offsetMs = now.getTimezoneOffset() * 60000
+  return new Date(now.getTime() - offsetMs).toISOString().slice(0, 10)
+}
+
+function isAtLeastAge(dobIso: string, minAge: number, referenceDate = new Date()) {
+  const [yearRaw, monthRaw, dayRaw] = dobIso.split('-')
+  const year = Number(yearRaw)
+  const month = Number(monthRaw)
+  const day = Number(dayRaw)
+
+  if (!year || !month || !day) {
+    return false
+  }
+
+  const birthDate = new Date(year, month - 1, day)
+  if (Number.isNaN(birthDate.getTime())) {
+    return false
+  }
+
+  let age = referenceDate.getFullYear() - year
+  const currentMonth = referenceDate.getMonth() + 1
+  const currentDay = referenceDate.getDate()
+  const hadBirthdayThisYear = currentMonth > month || (currentMonth === month && currentDay >= day)
+
+  if (!hadBirthdayThisYear) {
+    age -= 1
+  }
+
+  return age >= minAge
+}
+
+function getDobValidationError(dob: string, t: (key: string) => string): string | null {
+  const todayIso = getLocalTodayIsoDate()
+
+  if (!dob) {
+    return t('auth.registerDobRequired')
+  }
+
+  if (dob > todayIso) {
+    return t('auth.registerDobFuture')
+  }
+
+  if (!isAtLeastAge(dob, MIN_REGISTER_AGE)) {
+    return t('auth.registerMinimumAge')
+  }
+
+  return null
+}
+
+function validateRegisterForm(values: RegisterFormState, t: (key: string) => string): RegisterErrors {
   const errors: RegisterErrors = {}
   const normalizedPhone = normalizeVietnamPhone(values.phone)
-  const todayIso = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000)
-    .toISOString()
-    .slice(0, 10)
+  const normalizedEmail = values.email.trim().toLowerCase()
 
   // Validate displayName
   if (!values.displayName.trim()) {
     errors.displayName = 'Tên người dùng'
   } else if (values.displayName.trim().length < 2) {
     errors.displayName = 'Tên người dùng phải tối thiểu 2 ký tự'
+  } else if (/\d/.test(values.displayName.trim())) {
+    errors.displayName = t('auth.registerDisplayNameNoNumber')
   }
 
   // Validate phone
@@ -72,10 +126,15 @@ function validateRegisterForm(values: RegisterFormState): RegisterErrors {
     errors.phone = 'Số điện thoại không hợp lệ. Dùng dạng 091..., 849... hoặc +849...'
   }
 
-  if (!values.dob) {
-    errors.dob = 'Vui lòng chọn ngày sinh'
-  } else if (values.dob > todayIso) {
-    errors.dob = 'Ngày sinh không được ở tương lai'
+  if (!normalizedEmail) {
+    errors.email = t('auth.registerEmailRequired')
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    errors.email = t('auth.registerEmailInvalid')
+  }
+
+  const dobError = getDobValidationError(values.dob, t)
+  if (dobError) {
+    errors.dob = dobError
   }
 
   if (!values.gender) {
@@ -117,6 +176,7 @@ export function RegisterPage() {
   const [form, setForm] = useState<RegisterFormState>({
     displayName: '',
     phone: '',
+    email: '',
     dob: '',
     gender: '',
     password: '',
@@ -124,6 +184,7 @@ export function RegisterPage() {
   })
   const [otpCode, setOtpCode] = useState('')
   const [normalizedPhone, setNormalizedPhone] = useState('')
+  const [normalizedEmail, setNormalizedEmail] = useState('')
   const [errors, setErrors] = useState<RegisterErrors>({})
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
@@ -137,12 +198,23 @@ export function RegisterPage() {
   const setField = <T extends keyof RegisterFormState>(field: T, value: RegisterFormState[T]) => {
     setForm((prev) => ({ ...prev, [field]: value }))
     setErrors((prev) => {
-      if (!prev[field]) {
-        return prev
+      const next = { ...prev }
+
+      if (field === 'dob') {
+        const dobError = getDobValidationError(String(value), t)
+        if (dobError) {
+          next.dob = dobError
+        } else {
+          delete next.dob
+        }
+
+        return next
       }
 
-      const next = { ...prev }
-      delete next[field]
+      if (next[field]) {
+        delete next[field]
+      }
+
       return next
     })
   }
@@ -177,7 +249,7 @@ export function RegisterPage() {
               <p>
                 {step === 'form'
                   ? t('auth.registerSubtitle')
-                  : `${t('auth.otpSubtitlePrefix')} ${normalizedPhone}.`}
+                  : `${t('auth.otpSubtitlePrefix')} ${normalizedEmail}.`}
               </p>
             </div>
 
@@ -187,7 +259,7 @@ export function RegisterPage() {
               onSubmit={async (event) => {
                 event.preventDefault()
 
-                const nextErrors = validateRegisterForm(form)
+                const nextErrors = validateRegisterForm(form, t)
                 setErrors(nextErrors)
 
                 if (Object.keys(nextErrors).length > 0) {
@@ -199,10 +271,12 @@ export function RegisterPage() {
                 setIsSubmitting(true)
 
                 const phoneValue = normalizeVietnamPhone(form.phone)
+                const emailValue = form.email.trim().toLowerCase()
 
                 try {
-                  await sendRegisterOtp({ phone: phoneValue })
+                  await sendRegisterOtp({ phone: phoneValue, email: emailValue })
                   setNormalizedPhone(phoneValue)
+                  setNormalizedEmail(emailValue)
                   setStep('otp')
                 } catch (error) {
                   setErrorMessage(
@@ -226,15 +300,27 @@ export function RegisterPage() {
               </label>
 
               <label>
-                {t('auth.identifierLabel')}
+                {t('profile.phone')}
                 <input
                   type='tel'
-                  placeholder={t('auth.identifierPlaceholder')}
+                  placeholder={t('auth.registerPhonePlaceholder')}
                   value={form.phone}
                   onChange={(event) => setField('phone', event.target.value)}
                   autoComplete='tel'
                 />
                 {errors.phone ? <span className='auth-field-error'>{errors.phone}</span> : null}
+              </label>
+
+              <label>
+                {t('auth.registerEmailLabel')}
+                <input
+                  type='email'
+                  placeholder={t('auth.registerEmailPlaceholder')}
+                  value={form.email}
+                  onChange={(event) => setField('email', event.target.value)}
+                  autoComplete='email'
+                />
+                {errors.email ? <span className='auth-field-error'>{errors.email}</span> : null}
               </label>
 
               <div className='auth-form-two-columns'>
@@ -243,9 +329,7 @@ export function RegisterPage() {
                   <input
                     type='date'
                     value={form.dob}
-                    max={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000)
-                      .toISOString()
-                      .slice(0, 10)}
+                    max={getLocalTodayIsoDate()}
                     onChange={(event) => setField('dob', event.target.value)}
                   />
                   {errors.dob ? <span className='auth-field-error'>{errors.dob}</span> : null}
@@ -342,15 +426,13 @@ export function RegisterPage() {
                 setIsSubmitting(true)
 
                 try {
-                  const accessToken = await registerAccount({
+                  await registerAccount({
                     displayName: form.displayName.trim(),
                     phone: normalizedPhone,
+                    email: normalizedEmail,
                     password: form.password,
                     otpCode,
-                  })
-
-                  await updateProfile(accessToken, {
-                    dob: form.dob,
+                    dob: form.dob || undefined,
                     gender: form.gender || undefined,
                   })
 
@@ -361,7 +443,7 @@ export function RegisterPage() {
                       replace: true,
                       state: {
                         registered: true,
-                        phone: normalizedPhone,
+                        email: normalizedEmail,
                       },
                     })
                   }, 1000)
@@ -395,7 +477,7 @@ export function RegisterPage() {
                     setIsResendingOtp(true)
 
                     try {
-                      await sendRegisterOtp({ phone: normalizedPhone })
+                      await sendRegisterOtp({ phone: normalizedPhone, email: normalizedEmail })
                       setSuccessMessage(t('auth.resendOtpSuccess'))
                     } catch (error) {
                       setErrorMessage(

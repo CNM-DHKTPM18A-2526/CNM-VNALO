@@ -19,11 +19,15 @@ export type LoginPayload = {
 
 export type SendRegisterOtpPayload = {
   phone: string
+  email: string
 }
 
 export type RegisterPayload = {
   displayName: string
   phone: string
+  email: string
   password: string
   otpCode: string
+  dob?: string
+  gender?: Gender
 }
