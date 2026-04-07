@@ -62,6 +62,26 @@ class FriendService {
     return User.fromJson(data);
   }
 
+  Future<Map<String, dynamic>> scanFriendQr({
+    required String userId,
+    required String token,
+    required String nonce,
+    bool addFriend = true,
+  }) async {
+    final endpoint = addFriend ? '/qr/scan/add-friend' : '/qr/scan';
+    final response = await _apiService.post(
+      _base,
+      endpoint,
+      body: {'userId': userId, 'token': token, 'nonce': nonce},
+    );
+
+    final data = response['data'];
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+    return <String, dynamic>{};
+  }
+
   String _normalizePhone(String phone) {
     final cleaned = phone.replaceAll(RegExp(r'[^+\d]'), '');
     if (cleaned.startsWith('0')) {

@@ -5,6 +5,7 @@ import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/features/chat/widgets/chat_input_bar.dart';
 import 'package:vnalo_mobile/features/chat/widgets/message_bubble.dart';
+import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
 
 class ChatDetailScreen extends StatefulWidget {
@@ -22,7 +23,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      context.read<ChatProvider>().openConversation(widget.conversation.id);
+      final currentUserId = context.read<AuthProvider>().user?.id ?? '';
+      final chatProvider = context.read<ChatProvider>();
+      chatProvider.setCurrentUserId(currentUserId);
+      chatProvider.openConversation(widget.conversation.id);
     });
   }
 
@@ -70,6 +74,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     return MessageBubble(
                       message: message,
                       isMine: message.isMine(currentUserId),
+                      onRetry:
+                          message.status == MessageStatus.FAILED
+                              ? () => chat.retryMessage(message)
+                              : null,
                     );
                   },
                 );

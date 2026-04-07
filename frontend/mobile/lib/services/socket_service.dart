@@ -80,18 +80,38 @@ class SocketService {
 
   // Send a message by emitting a 'message.send' event with the conversation ID,
   //message content, and optional message type and client message ID
-  void sendMessage({
+  Future<Map<String, dynamic>?> sendMessage({
     required String conversationId,
     required String content,
     String messageType = 'TEXT',
     String? clientMessageId,
-  }) {
-    _socket?.emit('message.send', {
+  }) async {
+    if (_socket == null) {
+      return null;
+    }
+
+    final completer = Completer<Map<String, dynamic>?>();
+    _socket?.emitWithAck(
+      'message.send',
+      {
       'conversationId': conversationId,
       'content': content,
       'messageType': messageType,
       'clientMessageId': clientMessageId,
-    });
+      },
+      ack: (data) {
+        if (data is Map) {
+          completer.complete(Map<String, dynamic>.from(data));
+          return;
+        }
+        completer.complete(null);
+      },
+    );
+
+    return completer.future.timeout(
+      const Duration(seconds: 12),
+      onTimeout: () => null,
+    );
   }
 
   void sendTyping(String conversationId, bool isTyping) {

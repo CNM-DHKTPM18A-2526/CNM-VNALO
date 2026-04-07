@@ -7,8 +7,14 @@ import 'package:vnalo_mobile/models/message_model.dart';
 class MessageBubble extends StatelessWidget {
   final Message message;
   final bool isMine;
+  final VoidCallback? onRetry;
 
-  const MessageBubble({super.key, required this.message, required this.isMine});
+  const MessageBubble({
+    super.key,
+    required this.message,
+    required this.isMine,
+    this.onRetry,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -57,19 +63,52 @@ class MessageBubble extends StatelessWidget {
                 ),
                 if (isMine) ...[
                   const SizedBox(width: 4),
-                  Icon(
-                    message.status == MessageStatus.DELIVERED
-                        ? Icons.done_all
-                        : Icons.done,
-                    size: 14,
-                    color:
-                        message.status == MessageStatus.DELIVERED
-                            ? Colors.lightBlueAccent
-                            : Colors.white70,
-                  ),
+                  if (message.status == MessageStatus.SENDING) ...[
+                    const Icon(Icons.schedule, size: 14, color: Colors.white70),
+                    const SizedBox(width: 4),
+                    const Text(
+                      'Đang gửi...',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ]
+                  else if (message.status == MessageStatus.FAILED)
+                    GestureDetector(
+                      onTap: onRetry,
+                      child: const Icon(Icons.error_outline, size: 14, color: Colors.orangeAccent),
+                    )
+                  else
+                    Icon(
+                      message.status == MessageStatus.DELIVERED
+                          ? Icons.done_all
+                          : Icons.done,
+                      size: 14,
+                      color:
+                          message.status == MessageStatus.DELIVERED
+                              ? Colors.lightBlueAccent
+                              : Colors.white70,
+                    ),
                 ],
               ],
             ),
+            if (isMine && message.status == MessageStatus.FAILED)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: GestureDetector(
+                  onTap: onRetry,
+                  child: const Text(
+                    'Gửi lại',
+                    style: TextStyle(
+                      color: Colors.orangeAccent,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

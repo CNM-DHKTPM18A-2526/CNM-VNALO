@@ -81,47 +81,47 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg,
-        title: const Text('Thêm bạn'),
+        title: const Text('Thêm bạn', style: TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: ListView(
         children: [
           Container(
-            margin: const EdgeInsets.fromLTRB(18, 16, 18, 12),
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
+            margin: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
             decoration: BoxDecoration(
-              color: const Color(0xFF2B4F82),
-              borderRadius: BorderRadius.circular(22),
+              color: const Color(0xFF205D97),
+              borderRadius: BorderRadius.circular(24),
             ),
             child: Column(
               children: [
                 Text(
                   displayName,
-                  style: const TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.w700),
+                  style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w700, letterSpacing: 0.1),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 Container(
-                  width: 190,
-                  height: 190,
+                  width: 200,
+                  height: 200,
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(18),
                   ),
-                  child: const Icon(Icons.qr_code_2_rounded, size: 140, color: Colors.black87),
+                  child: const Icon(Icons.qr_code_2_rounded, size: 146, color: Colors.black87),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 const Text(
                   'Quét mã để thêm bạn Zalo với tôi',
-                  style: TextStyle(color: Color(0xFFD4E2FF), fontSize: 16),
+                  style: TextStyle(color: Color(0xFFD8E7FF), fontSize: 16, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
                   decoration: BoxDecoration(
                     border: Border.all(color: const Color(0xFF4B5563)),
                     borderRadius: BorderRadius.circular(12),
@@ -154,7 +154,7 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
                 ),
                 const SizedBox(width: 10),
                 CircleAvatar(
-                  radius: 25,
+                  radius: 24,
                   backgroundColor: const Color(0xFF2A2F38),
                   child: IconButton(
                     onPressed: _isSearching ? null : _searchByPhone,
@@ -173,7 +173,7 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
           const SizedBox(height: 8),
           ListTile(
             leading: const Icon(Icons.qr_code_scanner, color: AppColors.primary),
-            title: const Text('Quét mã QR', style: TextStyle(color: Colors.white, fontSize: 20)),
+            title: const Text('Quét mã QR', style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w600)),
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const QrScannerScreen()),
@@ -182,7 +182,7 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
           ),
           ListTile(
             leading: const Icon(Icons.contact_page_outlined, color: AppColors.primary),
-            title: const Text('Bạn bè có thể quen', style: TextStyle(color: Colors.white, fontSize: 20)),
+            title: const Text('Bạn bè có thể quen', style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w600)),
             onTap: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Sẽ triển khai ở bước đề xuất bạn bè tiếp theo.')),
