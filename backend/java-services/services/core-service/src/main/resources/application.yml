@@ -123,12 +123,13 @@ spring:
     exclude:
       - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
 
+# Dev: Testing mode overrides
 # Dev: OTP email delivery defaults (set SMTP_USER + MAIL_APP_PASSWORD in docker/.env)
 otp:
-  enabled: true
-  email-enabled: true
+  enabled: ${OTP_ENABLED:true}
+  email-enabled: ${OTP_EMAIL_ENABLED:true}
   test-mode:
-    enabled: ${OTP_TEST_MODE:false}
+    enabled: ${OTP_TEST_MODE:false}     # Can be disabled to test real email sending
     mock-otp: "123456"
     log-otp: ${OTP_LOG_OTP:false}
 

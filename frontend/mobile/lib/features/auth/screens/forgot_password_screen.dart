@@ -2,9 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/utils/validators.dart';
+import 'package:vnalo_mobile/features/auth/widgets/otp_input.dart';
 import 'package:vnalo_mobile/services/api_service.dart';
 import 'package:vnalo_mobile/services/auth_service.dart';
 
+/// Forgot-password flow with 3 steps:
+///   1. Enter email → check exists & send OTP
+///   2. Enter OTP → verify
+///   3. Enter new password → reset
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
 
@@ -13,31 +18,80 @@ class ForgotPasswordScreen extends StatefulWidget {
 }
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+  final _pageController = PageController();
   final _emailController = TextEditingController();
-  final _otpController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
 
-  bool _isSendingOtp = false;
+  int _currentStep = 0; // 0=email, 1=otp, 2=new password
+  String _otpCode = '';
+  bool _isSending = false;
   bool _isSubmitting = false;
+  bool _showPassword = false;
+  bool _showConfirm = false;
 
   @override
   void dispose() {
+    _pageController.dispose();
     _emailController.dispose();
-    _otpController.dispose();
     _passwordController.dispose();
     _confirmController.dispose();
     super.dispose();
   }
 
+  void _goToStep(int step) {
+    _pageController.animateToPage(
+      step,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+    setState(() => _currentStep = step);
+  }
+
+  // ─── Step 1: Send OTP ───
   Future<void> _sendOtp() async {
-    final emailError = Validators.email(_emailController.text);
+    FocusScope.of(context).unfocus();
+    final email = _emailController.text.trim();
+    final emailError = Validators.email(email);
     if (emailError != null) {
       _showError(emailError);
       return;
     }
 
-    setState(() => _isSendingOtp = true);
+    setState(() => _isSending = true);
+    try {
+      await context.read<AuthService>().requestPasswordReset(email: email);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã gửi mã OTP về email. Vui lòng kiểm tra hộp thư.'),
+          backgroundColor: Color(0xFF22C55E),
+        ),
+      );
+      _goToStep(1);
+    } on ApiException catch (e) {
+      _showError(_mapApiError(e));
+    } catch (_) {
+      _showError('Không thể gửi OTP, vui lòng thử lại');
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
+  }
+
+  // ─── Step 2: Verify OTP ───
+  void _verifyOtp() {
+    FocusScope.of(context).unfocus();
+    if (!RegExp(r'^\d{6}$').hasMatch(_otpCode)) {
+      _showError('Mã OTP phải gồm 6 chữ số');
+      return;
+    }
+    _goToStep(2);
+  }
+
+  // ─── Step 2: Resend OTP ───
+  Future<void> _resendOtp() async {
+    if (_isSending) return;
+    setState(() => _isSending = true);
     try {
       await context.read<AuthService>().requestPasswordReset(
             email: _emailController.text.trim(),
@@ -45,38 +99,43 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Da gui OTP ve email. Vui long kiem tra hop thu.'),
+          content: Text('Đã gửi lại mã OTP'),
           backgroundColor: Color(0xFF22C55E),
         ),
       );
     } on ApiException catch (e) {
       _showError(_mapApiError(e));
     } catch (_) {
-      _showError('Khong the gui OTP, vui long thu lai');
+      _showError('Gửi lại OTP thất bại');
     } finally {
-      if (mounted) setState(() => _isSendingOtp = false);
+      if (mounted) setState(() => _isSending = false);
     }
   }
 
+  // ─── Step 3: Reset Password ───
   Future<void> _resetPassword() async {
-    final emailError = Validators.email(_emailController.text);
-    final passwordError = Validators.password(_passwordController.text);
-    final confirmError =
-        Validators.confirmPassword(_confirmController.text, _passwordController.text);
-    if (emailError != null) {
-      _showError(emailError);
+    FocusScope.of(context).unfocus();
+    final password = _passwordController.text;
+    final confirm = _confirmController.text;
+
+    if (password.length < 8) {
+      _showError('Mật khẩu phải có ít nhất 8 ký tự');
       return;
     }
-    if (_otpController.text.trim().length != 6) {
-      _showError('OTP gom 6 chu so');
+    if (!RegExp(r'[A-Z]').hasMatch(password)) {
+      _showError('Mật khẩu phải có ít nhất 1 chữ hoa');
       return;
     }
-    if (passwordError != null) {
-      _showError(passwordError);
+    if (!RegExp(r'[a-z]').hasMatch(password)) {
+      _showError('Mật khẩu phải có ít nhất 1 chữ thường');
       return;
     }
-    if (confirmError != null) {
-      _showError(confirmError);
+    if (!RegExp(r'[0-9]').hasMatch(password)) {
+      _showError('Mật khẩu phải có ít nhất 1 chữ số');
+      return;
+    }
+    if (password != confirm) {
+      _showError('Mật khẩu xác nhận không khớp');
       return;
     }
 
@@ -84,21 +143,27 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     try {
       await context.read<AuthService>().resetPassword(
             email: _emailController.text.trim(),
-            otp: _otpController.text.trim(),
-            newPassword: _passwordController.text,
+            otp: _otpCode,
+            newPassword: password,
           );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Dat lai mat khau thanh cong'),
+          content: Text('Đặt lại mật khẩu thành công! Hãy đăng nhập bằng mật khẩu mới.'),
           backgroundColor: Color(0xFF22C55E),
         ),
       );
-      Navigator.pop(context);
+      Navigator.pop(context); // Back to login
     } on ApiException catch (e) {
-      _showError(_mapApiError(e));
-    } catch (_) {
-      _showError('Dat lai mat khau that bai');
+      if (e.code == 'AUTH_009' || e.code == 'AUTH_010' || e.code == 'AUTH_011') {
+        // OTP error → go back to OTP step
+        _showError(_mapApiError(e));
+        _goToStep(1);
+      } else {
+        _showError(_mapApiError(e));
+      }
+    } catch (e) {
+      _showError('Đặt lại mật khẩu thất bại: $e');
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -107,19 +172,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   String _mapApiError(ApiException e) {
     switch (e.code) {
       case 'AUTH_019':
-        return 'Email chua duoc dang ky';
+        return 'Email chưa được đăng ký trong hệ thống';
       case 'AUTH_009':
-        return 'OTP da het han';
+        return 'Mã OTP đã hết hạn, vui lòng gửi lại';
       case 'AUTH_010':
-        return 'OTP khong dung';
+        return 'Mã OTP không đúng';
       case 'AUTH_011':
-        return 'OTP vuot qua so lan thu';
+        return 'Vượt quá số lần thử OTP, vui lòng gửi lại';
       case 'AUTH_016':
-        return 'Mat khau moi chua dat yeu cau';
+        return 'Mật khẩu mới chưa đạt yêu cầu';
       case 'AUTH_020':
-        return 'He thong chua cau hinh gui OTP email';
+        return 'Hệ thống chưa cấu hình gửi OTP email';
       default:
-        return e.message.isNotEmpty ? e.message : 'Yeu cau that bai';
+        return e.message.isNotEmpty && e.message != 'Unknown error'
+            ? e.message
+            : 'Yêu cầu thất bại (${e.statusCode})';
     }
   }
 
@@ -130,83 +197,462 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
+  void _onBack() {
+    if (_currentStep == 0) {
+      Navigator.pop(context);
+    } else {
+      _goToStep(_currentStep - 1);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final canReset = !_isSubmitting;
-
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Quen mat khau'),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF0068FF), Color(0xFF00A2ED)],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: _onBack,
+        ),
+        title: const Text(
+          'Quên mật khẩu',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
+      body: PageView(
+        controller: _pageController,
+        physics: const NeverScrollableScrollPhysics(),
         children: [
-          TextField(
-            controller: _emailController,
-            keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(
-              labelText: 'Email',
-              hintText: 'Nhap email tai khoan',
+          _buildEmailStep(),
+          _buildOtpStep(),
+          _buildNewPasswordStep(),
+        ],
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════
+  // STEP 1: Email Input
+  // ═══════════════════════════════════════════
+  Widget _buildEmailStep() {
+    final email = _emailController.text.trim();
+    final isValid = Validators.email(email) == null;
+
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEBF5FF),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.email_outlined,
+                size: 48,
+                color: Color(0xFF0068FF),
+              ),
             ),
+            const SizedBox(height: 24),
+            const Text(
+              'Nhập email đăng ký',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF141414),
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Chúng tôi sẽ gửi mã xác nhận OTP đến email của bạn để đặt lại mật khẩu.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 15,
+                color: Color(0xFF6B7280),
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 28),
+            TextField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              onChanged: (_) => setState(() {}),
+              style: const TextStyle(fontSize: 16),
+              decoration: InputDecoration(
+                hintText: 'example@gmail.com',
+                prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF9CA3AF)),
+                filled: true,
+                fillColor: const Color(0xFFF9FAFB),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF0068FF), width: 1.5),
+                ),
+                errorText: email.isNotEmpty && !isValid
+                    ? Validators.email(email)
+                    : null,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton(
+                onPressed: isValid && !_isSending ? _sendOtp : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isValid ? const Color(0xFF0068FF) : const Color(0xFFE5E7EB),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  elevation: 0,
+                ),
+                child: _isSending
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : Text(
+                        'Gửi mã OTP',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                          color: isValid ? Colors.white : const Color(0xFF9CA3AF),
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════
+  // STEP 2: OTP Verification
+  // ═══════════════════════════════════════════
+  Widget _buildOtpStep() {
+    final email = _emailController.text.trim();
+
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEBF5FF),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.lock_outline,
+                size: 48,
+                color: Color(0xFF0068FF),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Nhập mã xác nhận',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF141414),
+              ),
+            ),
+            const SizedBox(height: 10),
+            RichText(
+              textAlign: TextAlign.center,
+              text: TextSpan(
+                style: const TextStyle(fontSize: 15, color: Color(0xFF6B7280), height: 1.4),
+                children: [
+                  const TextSpan(text: 'Mã OTP đã được gửi đến\n'),
+                  TextSpan(
+                    text: email,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF0068FF),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 28),
+            OtpInput(
+              onChanged: (val) => setState(() => _otpCode = val),
+              onCompleted: (val) => setState(() => _otpCode = val),
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: _isSending ? null : _resendOtp,
+              child: Text(
+                _isSending ? 'Đang gửi...' : 'Gửi lại mã OTP',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF0068FF),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton(
+                onPressed: _otpCode.length == 6 ? _verifyOtp : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _otpCode.length == 6
+                      ? const Color(0xFF0068FF)
+                      : const Color(0xFFE5E7EB),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  elevation: 0,
+                ),
+                child: Text(
+                  'Xác nhận',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    color: _otpCode.length == 6 ? Colors.white : const Color(0xFF9CA3AF),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════
+  // STEP 3: New Password
+  // ═══════════════════════════════════════════
+  Widget _buildNewPasswordStep() {
+    final password = _passwordController.text;
+    final confirm = _confirmController.text;
+    final isPasswordValid = password.length >= 8 &&
+        RegExp(r'[A-Z]').hasMatch(password) &&
+        RegExp(r'[a-z]').hasMatch(password) &&
+        RegExp(r'[0-9]').hasMatch(password);
+    final isMatch = password == confirm && confirm.isNotEmpty;
+    final canSubmit = isPasswordValid && isMatch && !_isSubmitting;
+
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 8),
+            const Center(
+              child: Text(
+                'Đặt mật khẩu mới',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF141414),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Center(
+              child: Text(
+                'Mật khẩu phải gồm chữ hoa, chữ thường và số,\nít nhất 8 ký tự.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF6B7280),
+                  height: 1.5,
+                ),
+              ),
+            ),
+            const SizedBox(height: 28),
+            const Text(
+              'Mật khẩu mới',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF111827),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _passwordController,
+              obscureText: !_showPassword,
+              onChanged: (_) => setState(() {}),
+              style: const TextStyle(fontSize: 16),
+              decoration: InputDecoration(
+                hintText: 'Nhập mật khẩu mới',
+                filled: true,
+                fillColor: const Color(0xFFF9FAFB),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                suffixIcon: GestureDetector(
+                  onTap: () => setState(() => _showPassword = !_showPassword),
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: Text(
+                      _showPassword ? 'ẨN' : 'HIỆN',
+                      style: const TextStyle(
+                        color: Color(0xFF9CA3AF),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+                suffixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+                border: const UnderlineInputBorder(),
+                enabledBorder: const UnderlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFFD1D5DB)),
+                ),
+                focusedBorder: const UnderlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFF0068FF), width: 1.5),
+                ),
+              ),
+            ),
+            if (password.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _buildPasswordCheck('Ít nhất 8 ký tự', password.length >= 8),
+              _buildPasswordCheck('Có chữ hoa', RegExp(r'[A-Z]').hasMatch(password)),
+              _buildPasswordCheck('Có chữ thường', RegExp(r'[a-z]').hasMatch(password)),
+              _buildPasswordCheck('Có chữ số', RegExp(r'[0-9]').hasMatch(password)),
+            ],
+            const SizedBox(height: 20),
+            const Text(
+              'Xác nhận mật khẩu',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF111827),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _confirmController,
+              obscureText: !_showConfirm,
+              onChanged: (_) => setState(() {}),
+              style: const TextStyle(fontSize: 16),
+              decoration: InputDecoration(
+                hintText: 'Nhập lại mật khẩu mới',
+                filled: true,
+                fillColor: const Color(0xFFF9FAFB),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                errorText: confirm.isNotEmpty && !isMatch
+                    ? 'Mật khẩu xác nhận không khớp'
+                    : null,
+                suffixIcon: GestureDetector(
+                  onTap: () => setState(() => _showConfirm = !_showConfirm),
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: Text(
+                      _showConfirm ? 'ẨN' : 'HIỆN',
+                      style: const TextStyle(
+                        color: Color(0xFF9CA3AF),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+                suffixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+                border: const UnderlineInputBorder(),
+                enabledBorder: const UnderlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFFD1D5DB)),
+                ),
+                focusedBorder: const UnderlineInputBorder(
+                  borderSide: BorderSide(color: Color(0xFF0068FF), width: 1.5),
+                ),
+              ),
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton(
+                onPressed: canSubmit ? _resetPassword : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: canSubmit
+                      ? const Color(0xFF0068FF)
+                      : const Color(0xFFBFDBFE),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  elevation: 0,
+                ),
+                child: _isSubmitting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text(
+                        'XÁC NHẬN',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPasswordCheck(String label, bool passed) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        children: [
+          Icon(
+            passed ? Icons.check_circle : Icons.radio_button_unchecked,
+            size: 16,
+            color: passed ? const Color(0xFF22C55E) : const Color(0xFF9CA3AF),
           ),
-          const SizedBox(height: 12),
-          ElevatedButton(
-            onPressed: _isSendingOtp ? null : _sendOtp,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              minimumSize: const Size.fromHeight(48),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              color: passed ? const Color(0xFF22C55E) : const Color(0xFF9CA3AF),
             ),
-            child: _isSendingOtp
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                  )
-                : const Text('Gui OTP'),
-          ),
-          const SizedBox(height: 18),
-          TextField(
-            controller: _otpController,
-            keyboardType: TextInputType.number,
-            maxLength: 6,
-            decoration: const InputDecoration(
-              labelText: 'OTP',
-              hintText: 'Nhap ma OTP 6 so',
-              counterText: '',
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _passwordController,
-            obscureText: true,
-            decoration: const InputDecoration(
-              labelText: 'Mat khau moi',
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _confirmController,
-            obscureText: true,
-            decoration: const InputDecoration(
-              labelText: 'Xac nhan mat khau moi',
-            ),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: canReset ? _resetPassword : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              minimumSize: const Size.fromHeight(52),
-            ),
-            child: _isSubmitting
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                  )
-                : const Text('Dat lai mat khau'),
           ),
         ],
       ),

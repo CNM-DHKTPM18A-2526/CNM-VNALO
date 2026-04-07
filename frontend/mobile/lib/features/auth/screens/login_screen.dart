@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/auth/localization/auth_texts.dart';
 import 'package:vnalo_mobile/features/auth/screens/login_password_screen.dart';
+import 'package:vnalo_mobile/features/auth/screens/forgot_password_screen.dart';
 import 'package:vnalo_mobile/features/auth/screens/register_screen.dart';
 import 'package:vnalo_mobile/features/auth/widgets/phone_input.dart';
 
@@ -111,6 +112,27 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const Spacer(),
+                Center(
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ForgotPasswordScreen(),
+                        ),
+                      );
+                    },
+                    child: const Text(
+                      'Quên mật khẩu?',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
                 Center(
                   child: GestureDetector(
                     onTap: () {

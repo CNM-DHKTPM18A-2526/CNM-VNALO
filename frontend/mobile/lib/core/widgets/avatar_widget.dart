@@ -1,8 +1,11 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/utils/avatar_resolver.dart';
 import 'package:vnalo_mobile/core/utils/avatar_utils.dart';
+import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 
 class AvatarWidget extends StatelessWidget {
   final String? imageUrl;
@@ -24,10 +27,11 @@ class AvatarWidget extends StatelessWidget {
     final resolvedImage = AvatarResolver.resolveUrl(imageUrl);
     final initials = AvatarUtils.getInitials(name);
     final initialsBg = AvatarUtils.getColor(name);
+    final auth = context.watch<AuthProvider>();
+    final token = auth.accessToken;
 
     return Stack(
       children: [
-        // Avatar image with robust fallback to initials
         SizedBox(
           width: size,
           height: size,
@@ -39,15 +43,19 @@ class AvatarWidget extends StatelessWidget {
                     fit: BoxFit.cover,
                     fadeInDuration: Duration.zero,
                     fadeOutDuration: Duration.zero,
+                    httpHeaders: token != null
+                        ? {'Authorization': 'Bearer $token'}
+                        : const {},
                     placeholder: (_, __) =>
                         _initialsAvatar(initials, initialsBg),
-                    errorWidget: (_, __, ___) =>
-                        _initialsAvatar(initials, initialsBg),
+                    errorWidget: (_, url, error) {
+                      debugPrint('[AvatarWidget] Error loading $url: $error');
+                      return _initialsAvatar(initials, initialsBg);
+                    },
                   ),
           ),
         ),
-
-        if (showOnline) // Show online status indicator
+        if (showOnline)
           Positioned(
             right: 0,
             bottom: 0,

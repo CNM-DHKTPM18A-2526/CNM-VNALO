@@ -118,7 +118,7 @@ class _LoginPasswordScreenState extends State<LoginPasswordScreen> {
                         ),
                       );
                     },
-                    child: const Text('Quen mat khau?'),
+                    child: const Text('Quên mật khẩu?'),
                   ),
                 ),
                 const Spacer(),

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -7,10 +8,10 @@ import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/profile/screens/account_security_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/profile_detail_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/settings_screen.dart';
-import 'dart:io';
 
 /// Profile tab ("Cá nhân") — shows user avatar + name + quick links.
-/// Tapping the ⚙️ gear icon navigates to the full Settings page.
+/// Tapping the avatar/name area navigates to the full ProfileDetailScreen.
+/// Tapping the ⚙️ gear icon navigates to the Settings page.
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -56,11 +57,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final appBarBg =
-        isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
+    final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
     final searchHint = isDarkMode
-      ? DarkColors.textHint
-      : Colors.white.withValues(alpha: 0.8);
+        ? DarkColors.textHint
+        : Colors.white.withValues(alpha: 0.8);
     final auth = context.watch<AuthProvider>();
     final displayName = auth.user?.displayName ?? 'Người dùng';
 
@@ -85,7 +85,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(width: 8),
             Text(
               'Tìm kiếm',
-              style: TextStyle(color: searchHint, fontSize: 16, fontWeight: FontWeight.w400),
+              style: TextStyle(
+                  color: searchHint,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w400),
             ),
           ],
         ),
@@ -95,9 +98,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const SettingsScreen(),
-                ),
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
               );
             },
           ),
@@ -105,12 +106,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       body: ListView(
         children: [
-          // User header
+          // User header — tappable to open profile detail
           InkWell(
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const ProfileDetailScreen()),
+                MaterialPageRoute(
+                    builder: (_) => const ProfileDetailScreen()),
               );
             },
             child: Padding(
@@ -135,7 +137,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             decoration: BoxDecoration(
                               color: AppColors.primary,
                               shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 1.5),
+                              border: Border.all(
+                                  color: Colors.white, width: 1.5),
                             ),
                             child: const Icon(
                               Icons.camera_alt,
@@ -157,12 +160,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                   ),
-                  const Icon(Icons.chevron_right, color: Color(0xFFD1D5DB)),
+                  const Icon(Icons.chevron_right,
+                      color: Color(0xFFD1D5DB)),
                 ],
               ),
             ),
           ),
-          // const Divider(height: 1),
           // Quick menu items
           _menuItem(
             context,
@@ -230,21 +233,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
       leading: Icon(icon, color: iconColor, size: 28),
       title: Text(
         title,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-        ),
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
       ),
       subtitle: subtitle != null
           ? Text(
               subtitle,
-              style: const TextStyle(
-                fontSize: 13,
-                color: Color(0xFF9CA3AF),
-              ),
+              style:
+                  const TextStyle(fontSize: 13, color: Color(0xFF9CA3AF)),
             )
           : null,
-      trailing: const Icon(Icons.chevron_right, size: 20, color: Color(0xFFD1D5DB)),
+      trailing: const Icon(Icons.chevron_right,
+          size: 20, color: Color(0xFFD1D5DB)),
       onTap: onTap,
     );
   }

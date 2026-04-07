@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
+import 'package:vnalo_mobile/features/profile/screens/personal_info_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/update_password_screen.dart';
 
 class AccountSecurityScreen extends StatelessWidget {
@@ -52,6 +53,12 @@ class AccountSecurityScreen extends StatelessWidget {
                 style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, height: 1.2),
               ),
               trailing: const Icon(Icons.chevron_right, color: Color(0xFF9CA3AF)),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PersonalInfoScreen()),
+                );
+              },
             ),
           ),
           const SizedBox(height: 10),
