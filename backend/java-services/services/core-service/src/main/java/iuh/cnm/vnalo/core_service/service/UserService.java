@@ -5,19 +5,26 @@ import iuh.cnm.vnalo.core_service.exception.ErrorCode;
 import iuh.cnm.vnalo.core_service.model.dto.request.UpdateProfileRequest;
 import iuh.cnm.vnalo.core_service.model.dto.response.UserInfoResponse;
 import iuh.cnm.vnalo.core_service.model.entity.auth.AuthAccount;
+import iuh.cnm.vnalo.core_service.model.entity.social.ContactSync;
 import iuh.cnm.vnalo.core_service.model.entity.user.UserPrivacySetting;
 import iuh.cnm.vnalo.core_service.model.entity.user.UserProfile;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthAccountRepository;
+import iuh.cnm.vnalo.core_service.repository.social.ContactSyncRepository;
+import iuh.cnm.vnalo.core_service.repository.social.FriendshipRepository;
 import iuh.cnm.vnalo.core_service.repository.user.UserPrivacySettingRepository;
 import iuh.cnm.vnalo.core_service.repository.user.UserProfileRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -28,6 +35,8 @@ public class UserService {
     private final UserProfileRepository userProfileRepository;
     private final UserPrivacySettingRepository userPrivacySettingRepository;
     private final AuthAccountRepository authAccountRepository;
+    private final FriendshipRepository friendshipRepository;
+    private final ContactSyncRepository contactSyncRepository;
 
     @Transactional(readOnly = true)
     public UserInfoResponse getCurrentUserProfile(UUID accountId) {
@@ -65,12 +74,51 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public Page<UserInfoResponse> searchUsers(String keyword, Pageable pageable) {
-        return userProfileRepository.searchByDisplayName(keyword, pageable)
+    public Page<UserInfoResponse> searchUsers(UUID requesterId, String keyword, Pageable pageable) {
+        final String normalizedKeyword = normalizeKeyword(keyword);
+        if (normalizedKeyword.isBlank()) {
+            return Page.empty(pageable);
+        }
+
+        final Set<UUID> allowedIds = new HashSet<>(friendshipRepository.findFriendIds(requesterId));
+        final List<ContactSync> matchedContacts = contactSyncRepository
+            .findByUserIdAndMatchedUserIdIsNotNull(requesterId);
+        matchedContacts.stream()
+                .map(ContactSync::getMatchedUserId)
+                .filter(id -> id != null && !id.equals(requesterId))
+                .forEach(allowedIds::add);
+
+        if (allowedIds.isEmpty()) {
+            return new PageImpl<>(List.of(), pageable, 0);
+        }
+
+        return userProfileRepository.searchByDisplayNameWithinIds(allowedIds, normalizedKeyword, pageable)
                 .map(profile -> {
                     AuthAccount account = authAccountRepository.findById(profile.getId()).orElse(null);
                     return mapToUserInfoResponse(account, profile);
                 });
+    }
+
+    @Transactional(readOnly = true)
+    public UserInfoResponse searchUserByPhone(UUID requesterId, String phoneNumber) {
+        final String normalizedPhone = normalizePhone(phoneNumber);
+        final AuthAccount account = authAccountRepository.findByPhone(normalizedPhone)
+                .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
+
+        if (account.getId().equals(requesterId)) {
+            throw new ApiException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        final boolean allowSearchByPhone = userPrivacySettingRepository.findById(account.getId())
+                .map(setting -> Boolean.TRUE.equals(setting.getAllowSearchByPhone()))
+                .orElse(true);
+        if (!allowSearchByPhone) {
+            throw new ApiException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        final UserProfile profile = userProfileRepository.findById(account.getId())
+                .orElseThrow(() -> new ApiException(ErrorCode.USER_PROFILE_NOT_FOUND));
+        return mapToUserInfoResponse(account, profile);
     }
 
     @Transactional(readOnly = true)
@@ -99,5 +147,20 @@ public class UserService {
                 .statusMessage(profile.getStatusMessage())
                 .isVerified(profile.getIsVerified())
                 .build();
+    }
+
+    private String normalizeKeyword(String keyword) {
+        return keyword == null ? "" : keyword.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizePhone(String phone) {
+        if (phone == null) {
+            return "";
+        }
+        String cleaned = phone.replaceAll("[^+\\d]", "");
+        if (cleaned.startsWith("0")) {
+            cleaned = "+84" + cleaned.substring(1);
+        }
+        return cleaned;
     }
 }

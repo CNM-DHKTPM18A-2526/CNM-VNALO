@@ -6,6 +6,7 @@ import iuh.cnm.vnalo.core_service.model.entity.auth.AuthAccount;
 import iuh.cnm.vnalo.core_service.model.entity.social.ContactSync;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthAccountRepository;
 import iuh.cnm.vnalo.core_service.repository.social.ContactSyncRepository;
+import iuh.cnm.vnalo.core_service.repository.user.UserPrivacySettingRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -29,6 +30,7 @@ public class ContactSyncService {
 
     private final ContactSyncRepository contactSyncRepository;
     private final AuthAccountRepository authAccountRepository;
+    private final UserPrivacySettingRepository userPrivacySettingRepository;
 
     /**
      * Sync a batch of phone contacts.
@@ -107,7 +109,12 @@ public class ContactSyncService {
                 .ifPresent(account -> {
                     // Don't match to self
                     if (!account.getId().equals(contact.getUserId())) {
-                        contact.matchToUser(account.getId());
+                        final boolean allowSearchByPhone = userPrivacySettingRepository.findById(account.getId())
+                                .map(setting -> Boolean.TRUE.equals(setting.getAllowSearchByPhone()))
+                                .orElse(true);
+                        if (allowSearchByPhone) {
+                            contact.matchToUser(account.getId());
+                        }
                     }
                 });
     }

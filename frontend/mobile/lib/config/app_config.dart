@@ -39,16 +39,22 @@ class AppConfig {
   }) {
     switch (env) {
       case Environment.dev:
-        final resolvedCore = coreServiceUrl ?? _defaultDevCore;
+        final resolvedCore = _normalizeApiBaseUrl(coreServiceUrl ?? _defaultDevCore);
         final coreUri = Uri.parse(resolvedCore);
         _config = EnvConfig(
           environment: Environment.dev,
           coreServiceUrl: resolvedCore,
           messageServiceUrl:
-              messageServiceUrl ?? _buildServiceUrl(coreUri, 3000, '/api/v1'),
+              _normalizeApiBaseUrl(
+                messageServiceUrl ?? _buildServiceUrl(coreUri, 3000, '/api/v1'),
+              ),
           mediaServiceUrl:
-              mediaServiceUrl ?? _buildServiceUrl(coreUri, 8083, '/api/v1'),
-          socketUrl: socketUrl ?? _buildServiceUrl(coreUri, 3000, ''),
+              _normalizeApiBaseUrl(
+                mediaServiceUrl ?? _buildServiceUrl(coreUri, 8083, '/api/v1'),
+              ),
+          socketUrl: _normalizeSocketUrl(
+            socketUrl ?? _buildServiceUrl(coreUri, 3000, ''),
+          ),
           enableLogging: true,
         );
         break;
@@ -56,13 +62,20 @@ class AppConfig {
       case Environment.staging:
         _config = EnvConfig(
           environment: Environment.staging,
-          coreServiceUrl:
-              coreServiceUrl ?? 'https://staging-api.vnalo.com/api/v1',
+          coreServiceUrl: _normalizeApiBaseUrl(
+            coreServiceUrl ?? 'https://staging-api.vnalo.com/api/v1',
+          ),
           messageServiceUrl:
-              messageServiceUrl ?? 'https://staging-msg.vnalo.com/api/v1',
+              _normalizeApiBaseUrl(
+                messageServiceUrl ?? 'https://staging-msg.vnalo.com/api/v1',
+              ),
           mediaServiceUrl:
-            mediaServiceUrl ?? 'https://staging-media.vnalo.com/api/v1',
-          socketUrl: socketUrl ?? 'https://staging-msg.vnalo.com',
+            _normalizeApiBaseUrl(
+              mediaServiceUrl ?? 'https://staging-media.vnalo.com/api/v1',
+            ),
+          socketUrl: _normalizeSocketUrl(
+            socketUrl ?? 'https://staging-msg.vnalo.com',
+          ),
           enableLogging: true,
           enableCrashlytics: true,
         );
@@ -71,11 +84,17 @@ class AppConfig {
       case Environment.production:
         _config = EnvConfig(
           environment: Environment.production,
-          coreServiceUrl: coreServiceUrl ?? 'https://api.vnalo.com/api/v1',
+          coreServiceUrl: _normalizeApiBaseUrl(
+            coreServiceUrl ?? 'https://api.vnalo.com/api/v1',
+          ),
           messageServiceUrl:
-              messageServiceUrl ?? 'https://msg.vnalo.com/api/v1',
-          mediaServiceUrl: mediaServiceUrl ?? 'https://media.vnalo.com/api/v1',
-          socketUrl: socketUrl ?? 'https://msg.vnalo.com',
+              _normalizeApiBaseUrl(
+                messageServiceUrl ?? 'https://msg.vnalo.com/api/v1',
+              ),
+          mediaServiceUrl: _normalizeApiBaseUrl(
+            mediaServiceUrl ?? 'https://media.vnalo.com/api/v1',
+          ),
+          socketUrl: _normalizeSocketUrl(socketUrl ?? 'https://msg.vnalo.com'),
           enableCrashlytics: true,
         );
         break;
@@ -89,5 +108,53 @@ class AppConfig {
       port: port,
       path: path,
     ).toString();
+  }
+
+  static String _normalizeApiBaseUrl(String rawUrl) {
+    final trimmed = rawUrl.trim();
+    if (trimmed.isEmpty) {
+      return trimmed;
+    }
+
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null || uri.host.isEmpty) {
+      return trimmed;
+    }
+
+    var normalizedPath = uri.path.trim();
+    if (normalizedPath.isEmpty || normalizedPath == '/') {
+      normalizedPath = '/api/v1';
+    } else {
+      normalizedPath = normalizedPath.replaceAll(RegExp(r'/+$'), '');
+      if (normalizedPath.endsWith('/api/v')) {
+        normalizedPath = '${normalizedPath}1';
+      }
+      if (!normalizedPath.endsWith('/api/v1')) {
+        if (normalizedPath.contains('/api/v')) {
+          normalizedPath = normalizedPath.replaceFirst(RegExp(r'/api/v\d*.*$'), '/api/v1');
+        } else {
+          normalizedPath = '$normalizedPath/api/v1';
+        }
+      }
+    }
+
+    return uri
+        .replace(path: normalizedPath)
+        .toString()
+        .replaceAll(RegExp(r'/+$'), '');
+  }
+
+  static String _normalizeSocketUrl(String rawUrl) {
+    final trimmed = rawUrl.trim();
+    if (trimmed.isEmpty) {
+      return trimmed;
+    }
+
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null || uri.host.isEmpty) {
+      return trimmed;
+    }
+
+    return uri.replace(path: '').toString().replaceAll(RegExp(r'/+$'), '');
   }
 }

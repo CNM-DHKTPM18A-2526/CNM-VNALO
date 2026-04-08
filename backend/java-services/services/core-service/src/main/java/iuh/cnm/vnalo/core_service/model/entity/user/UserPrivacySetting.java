@@ -57,6 +57,10 @@ public class UserPrivacySetting {
     @Builder.Default
     private Boolean allowFriendRequestByPhone = true;
 
+    @Column(name = "allow_search_by_phone")
+    @Builder.Default
+    private Boolean allowSearchByPhone = true;
+
     @Column(name = "allow_friend_request_by_qr_code")
     @Builder.Default
     private Boolean allowFriendRequestByQrCode = true;

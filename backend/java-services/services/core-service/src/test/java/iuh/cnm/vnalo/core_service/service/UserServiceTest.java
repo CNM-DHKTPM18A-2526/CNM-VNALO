@@ -10,6 +10,8 @@ import iuh.cnm.vnalo.core_service.model.entity.user.UserProfile;
 import iuh.cnm.vnalo.core_service.model.enums.AccountStatus;
 import iuh.cnm.vnalo.core_service.model.enums.Gender;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthAccountRepository;
+import iuh.cnm.vnalo.core_service.repository.social.ContactSyncRepository;
+import iuh.cnm.vnalo.core_service.repository.social.FriendshipRepository;
 import iuh.cnm.vnalo.core_service.repository.user.UserPrivacySettingRepository;
 import iuh.cnm.vnalo.core_service.repository.user.UserProfileRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,6 +49,12 @@ class UserServiceTest {
 
     @Mock
     private AuthAccountRepository authAccountRepository;
+
+    @Mock
+    private FriendshipRepository friendshipRepository;
+
+    @Mock
+    private ContactSyncRepository contactSyncRepository;
 
     @InjectMocks
     private UserService userService;
@@ -188,14 +196,17 @@ class UserServiceTest {
         @DisplayName("Should search users by keyword")
         void shouldSearchUsersByKeyword() {
             // Given
+            UUID requesterId = UUID.randomUUID();
             Pageable pageable = PageRequest.of(0, 20);
             Page<UserProfile> profilePage = new PageImpl<>(List.of(testProfile));
             
-            when(userProfileRepository.searchByDisplayName(eq("Test"), eq(pageable))).thenReturn(profilePage);
+            when(friendshipRepository.findFriendIds(requesterId)).thenReturn(List.of(testUserId));
+            when(contactSyncRepository.findByUserIdAndMatchedUserIdIsNotNull(requesterId)).thenReturn(List.of());
+            when(userProfileRepository.searchByDisplayNameWithinIds(any(), eq("test"), eq(pageable))).thenReturn(profilePage);
             when(authAccountRepository.findById(testUserId)).thenReturn(Optional.of(testAccount));
 
             // When
-            Page<UserInfoResponse> result = userService.searchUsers("Test", pageable);
+            Page<UserInfoResponse> result = userService.searchUsers(requesterId, "Test", pageable);
 
             // Then
             assertNotNull(result);

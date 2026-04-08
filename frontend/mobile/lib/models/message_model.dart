@@ -63,6 +63,57 @@ class Message {
   bool get isReply => replyToMessageId != null;
   bool get isForward => forwardFromMessageId != null;
 
+  Message copyWith({
+    String? id,
+    String? conversationId,
+    int? serverSeq,
+    String? senderId,
+    String? senderName,
+    String? senderAvatarUrl,
+    String? clientMessageId,
+    MessageType? messageType,
+    String? content,
+    String? mediaUrl,
+    String? mediaThumbnailUrl,
+    String? mediaMimeType,
+    int? mediaSizeBytes,
+    String? replyToMessageId,
+    String? replyToSenderId,
+    String? replyToContent,
+    String? forwardFromMessageId,
+    String? forwardFromConversationId,
+    MessageStatus? status,
+    bool? isEdited,
+    DateTime? editedAt,
+    DateTime? createdAt,
+  }) {
+    return Message(
+      id: id ?? this.id,
+      conversationId: conversationId ?? this.conversationId,
+      serverSeq: serverSeq ?? this.serverSeq,
+      senderId: senderId ?? this.senderId,
+      senderName: senderName ?? this.senderName,
+      senderAvatarUrl: senderAvatarUrl ?? this.senderAvatarUrl,
+      clientMessageId: clientMessageId ?? this.clientMessageId,
+      messageType: messageType ?? this.messageType,
+      content: content ?? this.content,
+      mediaUrl: mediaUrl ?? this.mediaUrl,
+      mediaThumbnailUrl: mediaThumbnailUrl ?? this.mediaThumbnailUrl,
+      mediaMimeType: mediaMimeType ?? this.mediaMimeType,
+      mediaSizeBytes: mediaSizeBytes ?? this.mediaSizeBytes,
+      replyToMessageId: replyToMessageId ?? this.replyToMessageId,
+      replyToSenderId: replyToSenderId ?? this.replyToSenderId,
+      replyToContent: replyToContent ?? this.replyToContent,
+      forwardFromMessageId: forwardFromMessageId ?? this.forwardFromMessageId,
+      forwardFromConversationId:
+          forwardFromConversationId ?? this.forwardFromConversationId,
+      status: status ?? this.status,
+      isEdited: isEdited ?? this.isEdited,
+      editedAt: editedAt ?? this.editedAt,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
   // Factory constructor to create a Message instance from JSON
   factory Message.fromJson(Map<String, dynamic> json) => Message(
     id: json['id'] ?? json['_id'] ?? '',

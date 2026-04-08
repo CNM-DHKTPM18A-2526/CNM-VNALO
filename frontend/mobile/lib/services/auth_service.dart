@@ -46,6 +46,11 @@ class AuthService {
     );
   }
 
+  // Backward-compatible wrapper kept for existing unit tests and older callers.
+  Future<void> sendOtp(String phone, {String email = 'placeholder@vnalo.local'}) {
+    return sendRegisterOtp(phone: phone, email: email);
+  }
+
   // Check OTP configuration status from backend.
   // Supports both wrapped ({ "data": { "enabled": true } }) and flat ({ "enabled": true }) responses.
   Future<Map<String, dynamic>> getOtpStatus() async {
@@ -163,6 +168,20 @@ class AuthService {
     if (data is! Map<String, dynamic>) return null;
     final id = data['mediaId'] ?? data['media_id'];
     if (id != null) return id.toString();
+    return null;
+  }
+
+  // Backward-compatible helper used by unit tests and older upload callers.
+  static String? parseUploadedMediaUrl(Map<String, dynamic> response) {
+    final data = response['data'];
+    if (data is! Map<String, dynamic>) {
+      return null;
+    }
+
+    final url = data['url'] ?? data['fileUrl'] ?? data['mediaUrl'];
+    if (url is String && url.isNotEmpty) {
+      return url;
+    }
     return null;
   }
 
