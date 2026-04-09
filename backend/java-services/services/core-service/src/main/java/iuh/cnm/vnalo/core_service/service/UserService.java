@@ -165,11 +165,20 @@ public class UserService {
 
     @Transactional
     public SyncPolicyResponse updateSyncPolicy(UUID userId, UpdateSyncPolicyRequest request) {
+        if (request == null || !request.hasAnyChange()) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR,
+                    "At least one policy field must be provided: syncEnabled or webRestrictedMode");
+        }
+
         final UserSetting setting = userSettingRepository.findById(userId)
                 .orElseGet(() -> UserSetting.createDefault(userId));
 
-        setting.setSyncEnabled(Boolean.TRUE.equals(request.syncEnabled()));
-        setting.setWebRestrictedMode(!Boolean.TRUE.equals(request.syncEnabled()));
+        if (request.syncEnabled() != null) {
+            setting.setSyncEnabled(request.syncEnabled());
+        }
+        if (request.webRestrictedMode() != null) {
+            setting.setWebRestrictedMode(request.webRestrictedMode());
+        }
 
         final UserSetting saved = userSettingRepository.save(setting);
         return mapToSyncPolicy(saved);

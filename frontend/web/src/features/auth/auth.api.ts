@@ -32,6 +32,18 @@ export type SyncPolicy = {
   webRestrictedMode: boolean
 }
 
+export type QrLoginSession = {
+  token: string
+  qrPayload: string
+  expiresAt: string
+  expiresInSeconds: number
+}
+
+export type QrLoginPollResult = {
+  status: string
+  accessToken?: string
+}
+
 type ApiResponse<T> = {
   data?: T
   message?: string
@@ -138,6 +150,13 @@ function extractToken(payload: unknown): string | null {
 
     if (typeof nested.token === 'string') {
       return nested.token
+    }
+
+    if (nested.auth && typeof nested.auth === 'object') {
+      const auth = nested.auth as Record<string, unknown>
+      if (typeof auth.accessToken === 'string') {
+        return auth.accessToken
+      }
     }
   }
 
@@ -417,4 +436,72 @@ export async function getSyncPolicy(token: string): Promise<SyncPolicy> {
   }
 
   return policy
+}
+
+function extractQrSession(payload: unknown): QrLoginSession | null {
+  if (!payload || typeof payload !== 'object') {
+    return null
+  }
+
+  const root = payload as Record<string, unknown>
+  const data = root.data && typeof root.data === 'object' ? (root.data as Record<string, unknown>) : root
+
+  if (
+    typeof data.token !== 'string' ||
+    typeof data.qrPayload !== 'string' ||
+    typeof data.expiresAt !== 'string' ||
+    typeof data.expiresInSeconds !== 'number'
+  ) {
+    return null
+  }
+
+  return {
+    token: data.token,
+    qrPayload: data.qrPayload,
+    expiresAt: data.expiresAt,
+    expiresInSeconds: data.expiresInSeconds,
+  }
+}
+
+export async function createQrLoginSession(): Promise<QrLoginSession> {
+  const response = await fetch(`${API_BASE_URL}/auth/qr/sessions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      deviceName: 'VNALO Web',
+      platform: 'WEB',
+    }),
+  })
+
+  const json = (await response.json().catch(() => null)) as unknown
+
+  if (!response.ok) {
+    throw new Error(extractMessage(json) ?? 'Không thể tạo phiên đăng nhập QR.')
+  }
+
+  const session = extractQrSession(json)
+  if (!session) {
+    throw new Error('Phản hồi phiên QR không hợp lệ.')
+  }
+
+  return session
+}
+
+export async function pollQrLoginSession(token: string): Promise<QrLoginPollResult> {
+  const response = await fetch(`${API_BASE_URL}/auth/qr/sessions/${encodeURIComponent(token)}`)
+  const json = (await response.json().catch(() => null)) as unknown
+
+  if (!response.ok) {
+    throw new Error(extractMessage(json) ?? 'Không thể kiểm tra trạng thái QR login.')
+  }
+
+  const root = (json ?? {}) as Record<string, unknown>
+  const data = root.data && typeof root.data === 'object' ? (root.data as Record<string, unknown>) : root
+
+  return {
+    status: typeof data.status === 'string' ? data.status : 'UNKNOWN',
+    accessToken: extractToken(json) ?? undefined,
+  }
 }
