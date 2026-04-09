@@ -67,6 +67,14 @@ public class UserSetting {
     @Builder.Default
     private Boolean autoDownloadFile = false;
 
+    @Column(name = "sync_enabled")
+    @Builder.Default
+    private Boolean syncEnabled = true;
+
+    @Column(name = "web_restricted_mode")
+    @Builder.Default
+    private Boolean webRestrictedMode = false;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

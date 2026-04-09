@@ -33,6 +33,10 @@ public class JwtTokenProvider {
     }
 
     public String generateAccessToken(UserDetails userDetails) {
+        return generateAccessToken(userDetails, Collections.emptyMap());
+    }
+
+    public String generateAccessToken(UserDetails userDetails, Map<String, Object> additionalClaims) {
         UserPrincipal userPrincipal = (UserPrincipal) userDetails;
 
         Map<String, Object> claims = new HashMap<>();
@@ -40,6 +44,9 @@ public class JwtTokenProvider {
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.toList()));
         claims.put("phone", userPrincipal.getPhone());
+        if (additionalClaims != null && !additionalClaims.isEmpty()) {
+            claims.putAll(additionalClaims);
+        }
 
         Instant now = Instant.now();
         Instant expiry = now.plusMillis(jwtConfig.getAccessTokenExpiration());

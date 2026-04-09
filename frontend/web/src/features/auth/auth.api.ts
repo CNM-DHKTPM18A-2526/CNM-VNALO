@@ -27,6 +27,11 @@ export type ChangePasswordPayload = {
   newPassword: string
 }
 
+export type SyncPolicy = {
+  syncEnabled: boolean
+  webRestrictedMode: boolean
+}
+
 type ApiResponse<T> = {
   data?: T
   message?: string
@@ -91,6 +96,22 @@ function normalizeIdentifier(identifier: string) {
   }
 
   return compact
+}
+
+const WEB_DEVICE_STORAGE_KEY = 'vnalo.web.deviceId'
+
+function resolveWebDeviceId(): string {
+  const stored = window.localStorage.getItem(WEB_DEVICE_STORAGE_KEY)
+  if (stored && stored.trim().length > 0) {
+    return stored
+  }
+
+  const generated =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? `web-${crypto.randomUUID()}`
+      : `web-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  window.localStorage.setItem(WEB_DEVICE_STORAGE_KEY, generated)
+  return generated
 }
 
 function extractToken(payload: unknown): string | null {
@@ -165,9 +186,13 @@ function extractUser(payload: unknown): AuthUser | null {
 }
 
 export async function login(payload: LoginPayload): Promise<string> {
+  const deviceId = payload.deviceId ?? resolveWebDeviceId()
   const normalizedPayload = {
     ...payload,
     identifier: normalizeIdentifier(payload.identifier),
+    deviceId,
+    deviceName: payload.deviceName ?? 'VNALO Web',
+    platform: payload.platform ?? 'WEB',
   }
 
   const response = await fetch(`${API_BASE_URL}/auth/login`, {
@@ -351,4 +376,45 @@ export async function changePassword(token: string, payload: ChangePasswordPaylo
   if (!response.ok) {
     throw new Error(extractMessage(json) ?? 'Không thể đổi mật khẩu. Vui lòng thử lại.')
   }
+}
+
+function extractSyncPolicy(payload: unknown): SyncPolicy | null {
+  if (!payload || typeof payload !== 'object') {
+    return null
+  }
+
+  const root = payload as Record<string, unknown>
+  const maybeData = root.data && typeof root.data === 'object' ? (root.data as Record<string, unknown>) : root
+  const syncEnabled = maybeData.syncEnabled
+  const webRestrictedMode = maybeData.webRestrictedMode
+
+  if (typeof syncEnabled !== 'boolean' || typeof webRestrictedMode !== 'boolean') {
+    return null
+  }
+
+  return {
+    syncEnabled,
+    webRestrictedMode,
+  }
+}
+
+export async function getSyncPolicy(token: string): Promise<SyncPolicy> {
+  const response = await fetch(`${API_BASE_URL}/users/me/settings/sync`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  const json = (await response.json().catch(() => null)) as unknown
+
+  if (!response.ok) {
+    throw new Error(extractMessage(json) ?? 'Không lấy được chính sách đồng bộ.')
+  }
+
+  const policy = extractSyncPolicy(json)
+  if (!policy) {
+    throw new Error('Phản hồi sync policy không hợp lệ.')
+  }
+
+  return policy
 }

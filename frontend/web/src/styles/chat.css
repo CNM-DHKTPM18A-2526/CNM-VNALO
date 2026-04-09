@@ -275,6 +275,16 @@
   border-top: 1px solid var(--border);
 }
 
+.chat-restricted-banner {
+  margin: 0 10px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--warning, #f4a825) 45%, var(--border));
+  background: color-mix(in srgb, var(--warning, #f4a825) 12%, var(--surface));
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 12px;
+}
+
 .message-input .ui-textfield-input {
   padding-right: 56px;
 }

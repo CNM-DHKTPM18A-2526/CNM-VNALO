@@ -203,7 +203,7 @@ class UserServiceTest {
             when(friendshipRepository.findFriendIds(requesterId)).thenReturn(List.of(testUserId));
             when(contactSyncRepository.findByUserIdAndMatchedUserIdIsNotNull(requesterId)).thenReturn(List.of());
             when(userProfileRepository.searchByDisplayNameWithinIds(any(), eq("test"), eq(pageable))).thenReturn(profilePage);
-            when(authAccountRepository.findById(testUserId)).thenReturn(Optional.of(testAccount));
+            when(authAccountRepository.findAllByIdIn(any())).thenReturn(List.of(testAccount));
 
             // When
             Page<UserInfoResponse> result = userService.searchUsers(requesterId, "Test", pageable);

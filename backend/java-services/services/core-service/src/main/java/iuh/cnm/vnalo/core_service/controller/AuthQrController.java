@@ -65,7 +65,7 @@ public class AuthQrController {
         }
 
         final QrLoginService.SessionApproveRequest safe = request == null
-                ? new QrLoginService.SessionApproveRequest(null, null, null, null)
+            ? new QrLoginService.SessionApproveRequest(null, null, null, null, null)
                 : request;
 
         final var result = qrLoginService.approveSession(token, currentUser.getId(), httpRequest, safe);

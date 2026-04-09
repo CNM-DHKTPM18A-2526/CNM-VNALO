@@ -1,8 +1,8 @@
-import type { ChatConversation } from '../../../shared/mock/data'
+import type { ConversationSummary } from '../chat.types'
 import { UserAvatar } from '../../../shared/components/UserAvatar'
 
 type ChatItemProps = {
-  conversation: ChatConversation
+  conversation: ConversationSummary
   active: boolean
   index: number
   onSelect: (conversationId: string) => void

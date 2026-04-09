@@ -3,7 +3,7 @@ import {
   BadRequestException, Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan, DataSource, IsNull, type EntityManager, Raw } from 'typeorm';
+import { Repository, DataSource, IsNull, type EntityManager } from 'typeorm';
 import { Message, MessageType, MessageStatus } from '../entities/message.entity';
 import { MessageReaction } from '../entities/message-reaction.entity';
 import { PinnedMessage } from '../entities/pinned-message.entity';
@@ -13,6 +13,12 @@ import { ConversationService } from '../conversation/conversation.service';
 import { SendMessageDto } from '../dto/send-message.dto';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import type Redis from 'ioredis';
+
+type AccessPolicyContext = {
+  clientPlatform?: string;
+  restrictedWebMode?: boolean;
+  loginAtEpochSec?: number;
+};
 
 @Injectable()
 export class MessageService {
@@ -115,21 +121,32 @@ export class MessageService {
   }
 
   /** Get paginated message history for a conversation (cursor-based on server_seq). */
-  async getMessages(conversationId: string, userId: string, before?: number, limit = 50) {
+  async getMessages(
+    conversationId: string,
+    userId: string,
+    before?: number,
+    limit = 50,
+    access?: AccessPolicyContext,
+  ) {
     await this.conversationService.assertMember(conversationId, userId);
 
-    const where: any = { conversationId };
-    if (before !== undefined) {
-      where.serverSeq = LessThan(before);
-    }
-    // Exclude messages hidden by this user
-    where.hiddenByUsers = Raw((alias) => `NOT ('${userId}'::uuid = ANY(${alias}))`);
+    const qb = this.messageRepo
+      .createQueryBuilder('m')
+      .where('m.conversation_id = :cid', { cid: conversationId })
+      .andWhere(`NOT (:userId = ANY(m.hidden_by_users))`, { userId })
+      .orderBy('m.server_seq', 'DESC')
+      .take(Math.min(limit, 100));
 
-    return this.messageRepo.find({
-      where,
-      order: { serverSeq: 'DESC' },
-      take: Math.min(limit, 100),
-    });
+    if (before !== undefined) {
+      qb.andWhere('m.server_seq < :before', { before });
+    }
+
+    if (this.isRestrictedWeb(access)) {
+      const loginAt = this.resolveLoginTime(access?.loginAtEpochSec);
+      qb.andWhere('m.created_at >= :loginAt', { loginAt });
+    }
+
+    return qb.getMany();
   }
 
   /**
@@ -143,14 +160,27 @@ export class MessageService {
     messageType?: MessageType,
     limit = 50,
     offset = 0,
+    access?: AccessPolicyContext,
   ) {
     await this.conversationService.assertMember(conversationId, userId);
+
+    if (this.isRestrictedWeb(access)) {
+      if (!messageType || !this.isDocumentMessageType(messageType)) {
+        throw new ForbiddenException('Restricted web session can only search My Documents.');
+      }
+    }
 
     const qb = this.messageRepo
       .createQueryBuilder('m')
       .where('m.conversation_id = :cid', { cid: conversationId })
       .andWhere('m.status != :recalled', { recalled: MessageStatus.RECALLED })
       .andWhere(`NOT (:userId = ANY(m.hidden_by_users))`, { userId });
+
+    if (this.isRestrictedWeb(access)) {
+      const loginAt = this.resolveLoginTime(access?.loginAtEpochSec);
+      qb.andWhere('m.created_at >= :loginAt', { loginAt })
+        .andWhere('m.sender_id = :uid', { uid: userId });
+    }
 
     if (keyword) {
       qb.andWhere('m.content ILIKE :keyword', { keyword: `%${keyword}%` });
@@ -526,5 +556,24 @@ export class MessageService {
     );
 
     this.logger.log(`Message ${messageId} deleted for me by user ${userId}`);
+  }
+
+  private isRestrictedWeb(access?: AccessPolicyContext): boolean {
+    if (!access) {
+      return false;
+    }
+    const platform = (access.clientPlatform ?? 'WEB').toUpperCase();
+    return Boolean(access.restrictedWebMode) && (platform === 'WEB' || platform === 'PC');
+  }
+
+  private resolveLoginTime(epochSec?: number): Date {
+    if (!epochSec || Number.isNaN(epochSec)) {
+      return new Date(0);
+    }
+    return new Date(epochSec * 1000);
+  }
+
+  private isDocumentMessageType(messageType: MessageType): boolean {
+    return [MessageType.FILE, MessageType.IMAGE, MessageType.VIDEO, MessageType.AUDIO].includes(messageType);
   }
 }

@@ -1,7 +1,9 @@
 package iuh.cnm.vnalo.core_service.controller;
 
 import iuh.cnm.vnalo.core_service.model.dto.request.UpdateProfileRequest;
+import iuh.cnm.vnalo.core_service.model.dto.request.UpdateSyncPolicyRequest;
 import iuh.cnm.vnalo.core_service.model.dto.response.ApiResponse;
+import iuh.cnm.vnalo.core_service.model.dto.response.SyncPolicyResponse;
 import iuh.cnm.vnalo.core_service.model.dto.response.UserInfoResponse;
 import iuh.cnm.vnalo.core_service.model.entity.user.UserPrivacySetting;
 import iuh.cnm.vnalo.core_service.security.UserPrincipal;
@@ -91,5 +93,24 @@ public class UserController {
 
         UserPrivacySetting updated = userService.updatePrivacySettings(currentUser.getId(), settings);
         return ResponseEntity.ok(ApiResponse.success("Privacy settings updated", updated));
+    }
+
+    @GetMapping("/me/settings/sync")
+    @Operation(summary = "Get sync control policy")
+    public ResponseEntity<ApiResponse<SyncPolicyResponse>> getSyncPolicy(
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+
+        final SyncPolicyResponse policy = userService.getSyncPolicy(currentUser.getId());
+        return ResponseEntity.ok(ApiResponse.success("Sync policy retrieved", policy));
+    }
+
+    @PutMapping("/me/settings/sync")
+    @Operation(summary = "Update sync control policy")
+    public ResponseEntity<ApiResponse<SyncPolicyResponse>> updateSyncPolicy(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @Valid @RequestBody UpdateSyncPolicyRequest request) {
+
+        final SyncPolicyResponse policy = userService.updateSyncPolicy(currentUser.getId(), request);
+        return ResponseEntity.ok(ApiResponse.success("Sync policy updated", policy));
     }
 }

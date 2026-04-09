@@ -4,6 +4,12 @@ import { Repository, In } from 'typeorm';
 import { ConversationInbox } from '../entities/conversation-inbox.entity';
 import { Conversation } from '../entities/conversation.entity';
 
+type AccessPolicyContext = {
+  clientPlatform?: string;
+  restrictedWebMode?: boolean;
+  loginAtEpochSec?: number;
+};
+
 @Injectable()
 export class InboxService {
   private readonly logger = new Logger(InboxService.name);
@@ -19,13 +25,23 @@ export class InboxService {
    * Get user's conversation inbox: sorted by pinned first, then by latest message.
    * Uses batch query (IN clause) instead of N+1 pattern for conversation details.
    */
-  async getInbox(userId: string, limit = 50, offset = 0) {
-    const inbox = await this.inboxRepo.find({
-      where: { userId, isHidden: false },
-      order: { isPinned: 'DESC', lastMessageSeq: 'DESC' },
-      take: Math.min(limit, 100),
-      skip: offset,
-    });
+  async getInbox(userId: string, limit = 50, offset = 0, access?: AccessPolicyContext) {
+    const qb = this.inboxRepo
+      .createQueryBuilder('inbox')
+      .where('inbox.user_id = :userId', { userId })
+      .andWhere('inbox.is_hidden = false')
+      .orderBy('inbox.is_pinned', 'DESC')
+      .addOrderBy('inbox.last_message_seq', 'DESC')
+      .take(Math.min(limit, 100))
+      .skip(offset);
+
+    const restrictedWeb = this.isRestrictedWeb(access);
+    if (restrictedWeb) {
+      const loginAt = this.resolveLoginTime(access?.loginAtEpochSec);
+      qb.andWhere('(inbox.is_pinned = true OR inbox.last_message_at >= :loginAt)', { loginAt });
+    }
+
+    const inbox = await qb.getMany();
 
     if (inbox.length === 0) return [];
 
@@ -43,6 +59,7 @@ export class InboxService {
       const conv = convMap.get(entry.conversationId);
       return {
         ...entry,
+        lastMessagePreview: restrictedWeb ? 'Noi dung duoc an tren web do chinh sach dong bo.' : entry.lastMessagePreview,
         conversation: conv
           ? {
             id: conv.id,
@@ -65,5 +82,20 @@ export class InboxService {
       .getRawOne();
 
     return parseInt(total, 10);
+  }
+
+  private isRestrictedWeb(access?: AccessPolicyContext): boolean {
+    if (!access) {
+      return false;
+    }
+    const platform = (access.clientPlatform ?? 'WEB').toUpperCase();
+    return Boolean(access.restrictedWebMode) && (platform === 'WEB' || platform === 'PC');
+  }
+
+  private resolveLoginTime(epochSec?: number): Date {
+    if (!epochSec || Number.isNaN(epochSec)) {
+      return new Date(0);
+    }
+    return new Date(epochSec * 1000);
   }
 }

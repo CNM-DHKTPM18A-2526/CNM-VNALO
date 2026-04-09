@@ -5,11 +5,11 @@ import { Icon } from '../../../shared/components/Icon'
 import { Button } from '../../../shared/components/ui/Button'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { useLanguage } from '../../../shared/i18n/LanguageContext'
-import type { ChatConversation } from '../../../shared/mock/data'
+import type { ConversationSummary } from '../chat.types'
 import { ChatItem } from './ChatItem'
 
 type ChatListProps = {
-  conversations: ChatConversation[]
+  conversations: ConversationSummary[]
   selectedConversationId: string
   onSelectConversation: (conversationId: string) => void
 }

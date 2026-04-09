@@ -63,7 +63,16 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       const payload = this.jwtService.verify(token as string);
       const userId = payload.sub;
-      client.data.user = { userId, phone: payload.phone };
+      client.data.user = {
+        userId,
+        phone: payload.phone,
+        loginAtEpochSec: payload.iat,
+        clientPlatform: payload.clientPlatform ?? 'WEB',
+        trustLevel: payload.trustLevel ?? 'UNKNOWN',
+        sessionType: payload.sessionType ?? 'PASSWORD',
+        restrictedWebMode: Boolean(payload.restrictedWebMode),
+        deviceId: payload.deviceId ?? null,
+      };
 
       // Track socket for this user
       if (!this.userSockets.has(userId)) {

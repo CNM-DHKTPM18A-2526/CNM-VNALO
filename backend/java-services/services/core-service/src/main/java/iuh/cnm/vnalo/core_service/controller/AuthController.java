@@ -15,6 +15,7 @@ import iuh.cnm.vnalo.core_service.model.dto.response.AuthResponse;
 import iuh.cnm.vnalo.core_service.model.dto.response.OtpResponse;
 import iuh.cnm.vnalo.core_service.security.UserPrincipal;
 import iuh.cnm.vnalo.core_service.service.AuthService;
+import iuh.cnm.vnalo.core_service.service.SessionAuditService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,6 +36,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final SessionAuditService sessionAuditService;
     private final OtpConfig otpConfig;
 
     /**
@@ -140,6 +142,16 @@ public class AuthController {
 
         final var devices = authService.getLoginDevices(currentUser.getId(), limit);
         return ResponseEntity.ok(ApiResponse.success("Login devices retrieved", devices));
+    }
+
+    @GetMapping("/session-audit")
+    @Operation(summary = "Session transition audit trail", description = "Get recent session transition events for current account")
+    public ResponseEntity<ApiResponse<java.util.List<iuh.cnm.vnalo.core_service.model.dto.response.SessionAuditResponse>>> getSessionAudit(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @RequestParam(defaultValue = "50") int limit) {
+
+        final var audits = sessionAuditService.getAudits(currentUser.getId(), limit);
+        return ResponseEntity.ok(ApiResponse.success("Session audits retrieved", audits));
     }
 
     /**

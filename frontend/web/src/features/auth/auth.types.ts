@@ -15,6 +15,9 @@ export type AuthUser = {
 export type LoginPayload = {
   identifier: string
   password: string
+  deviceId?: string
+  deviceName?: string
+  platform?: 'WEB' | 'PC'
 }
 
 export type SendRegisterOtpPayload = {

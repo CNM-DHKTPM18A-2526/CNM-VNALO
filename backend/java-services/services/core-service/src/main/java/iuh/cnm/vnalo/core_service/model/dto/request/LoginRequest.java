@@ -41,4 +41,9 @@ public class LoginRequest {
      * Platform identifier (optional): WEB, ANDROID, IOS, PC.
      */
     private String platform;
+
+    /**
+     * Optional confirmation used by clients when replacing an active untrusted web session.
+     */
+    private Boolean confirmReplaceUntrustedWeb;
 }

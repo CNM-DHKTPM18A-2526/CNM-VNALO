@@ -16,6 +16,14 @@ import { SearchMessagesDto } from '../dto/search-messages.dto';
 export class MessageController {
   constructor(private readonly messageService: MessageService) {}
 
+  private buildAccessContext(user: AuthUser) {
+    return {
+      clientPlatform: user.clientPlatform ?? 'WEB',
+      restrictedWebMode: Boolean(user.restrictedWebMode),
+      loginAtEpochSec: user.loginAtEpochSec,
+    };
+  }
+
   /** Send a message via REST (alternative to WebSocket). */
   @Post('messages')
   sendMessage(@CurrentUser() user: AuthUser, @Body() dto: SendMessageDto) {
@@ -29,7 +37,13 @@ export class MessageController {
     @Param('id') id: string,
     @Query() pagination: PaginationDto,
   ) {
-    return this.messageService.getMessages(id, user.userId, pagination.before, pagination.limit);
+    return this.messageService.getMessages(
+      id,
+      user.userId,
+      pagination.before,
+      pagination.limit,
+      this.buildAccessContext(user),
+    );
   }
 
   /** Search messages in a conversation by keyword and/or media type. */
@@ -41,6 +55,7 @@ export class MessageController {
   ) {
     return this.messageService.searchMessages(
       id, user.userId, search.keyword, search.messageType, search.limit, search.offset,
+      this.buildAccessContext(user),
     );
   }
 
