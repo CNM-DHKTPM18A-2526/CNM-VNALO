@@ -9,9 +9,13 @@ import iuh.cnm.vnalo.core_service.repository.auth.AuthOtpRepository;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.security.SecureRandom;
 import java.time.Instant;
@@ -31,6 +35,8 @@ public class OtpService {
     private final PasswordEncoder passwordEncoder;
     private final FcmService fcmService;
     private final EmailOtpService emailOtpService;
+    @Qualifier("otpDeliveryTaskExecutor")
+    private final TaskExecutor otpDeliveryTaskExecutor;
     private final SecureRandom secureRandom = new SecureRandom();
     
     /**
@@ -90,15 +96,10 @@ public class OtpService {
                 log.info("========================================");
             }
         } else {
-            // Production: route OTP by target type.
-            if (isEmailTarget(target)) {
-                emailOtpService.sendOtp(target, rawOtp, purpose);
-            } else {
-                sendOtpViaSms(target, rawOtp);
-            }
+            queueOtpDelivery(target, rawOtp, purpose);
         }
         
-        log.info("OTP sent successfully to {}", maskTarget(target));
+        log.info("OTP queued successfully for {}", maskTarget(target));
         return OtpSendResult.success(otpConfig.getExpirationMinutes() * 60);
     }
     
@@ -231,6 +232,28 @@ public class OtpService {
 
     private boolean isEmailTarget(String target) {
         return target != null && target.contains("@");
+    }
+
+    private void queueOtpDelivery(String target, String rawOtp, OtpPurpose purpose) {
+        final Runnable deliveryTask;
+        if (isEmailTarget(target)) {
+            emailOtpService.ensureDeliveryEnabled();
+            deliveryTask = () -> otpDeliveryTaskExecutor.execute(() -> emailOtpService.sendOtp(target, rawOtp, purpose));
+        } else {
+            deliveryTask = () -> sendOtpViaSms(target, rawOtp);
+        }
+
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            deliveryTask.run();
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                deliveryTask.run();
+            }
+        });
     }
     
     /**

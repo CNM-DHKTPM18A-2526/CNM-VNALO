@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
+import 'package:vnalo_mobile/services/api_service.dart';
 import 'package:vnalo_mobile/services/friend_service.dart';
+import 'package:vnalo_mobile/services/qr_service.dart';
 
 class AddFriendScreen extends StatefulWidget {
   const AddFriendScreen({super.key});
@@ -15,6 +18,41 @@ class AddFriendScreen extends StatefulWidget {
 class _AddFriendScreenState extends State<AddFriendScreen> {
   final TextEditingController _phoneController = TextEditingController();
   bool _isSearching = false;
+  String? _qrPayload;
+  bool _isLoadingQr = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMyQr();
+  }
+
+  Future<void> _loadMyQr() async {
+    if (_isLoadingQr) {
+      return;
+    }
+    setState(() => _isLoadingQr = true);
+    try {
+      final payload = await QrService(
+        context.read<ApiService>(),
+      ).generateFriendQrRawPayload();
+      if (!mounted) {
+        return;
+      }
+      setState(() => _qrPayload = payload);
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không tải được mã QR của bạn.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingQr = false);
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -106,7 +144,26 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(18),
                   ),
-                  child: const Icon(Icons.qr_code_2_rounded, size: 146, color: Colors.black87),
+                  child:
+                      _isLoadingQr
+                          ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+                          : (_qrPayload == null || _qrPayload!.isEmpty)
+                          ? const Icon(Icons.qr_code_2_rounded, size: 146, color: Colors.black87)
+                          : Padding(
+                            padding: const EdgeInsets.all(10),
+                            child: QrImageView(
+                              data: _qrPayload!,
+                              version: QrVersions.auto,
+                              eyeStyle: const QrEyeStyle(
+                                eyeShape: QrEyeShape.square,
+                                color: Colors.black,
+                              ),
+                              dataModuleStyle: const QrDataModuleStyle(
+                                dataModuleShape: QrDataModuleShape.square,
+                                color: Colors.black,
+                              ),
+                            ),
+                          ),
                 ),
                 const SizedBox(height: 14),
                 const Text(
@@ -190,6 +247,16 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
             },
           ),
           const SizedBox(height: 20),
+          if (_qrPayload == null && !_isLoadingQr)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: OutlinedButton.icon(
+                onPressed: _loadMyQr,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Tải lại mã QR'),
+              ),
+            ),
+          const SizedBox(height: 12),
           const Center(
             child: Text(
               'Xem lời mời kết bạn đã gửi tại trang Danh bạ Zalo',

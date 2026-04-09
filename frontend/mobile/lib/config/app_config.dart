@@ -101,6 +101,24 @@ class AppConfig {
     }
   }
 
+  static bool isLikelyLocalOnlyHost(String rawUrl) {
+    final trimmed = rawUrl.trim();
+    if (trimmed.isEmpty) {
+      return false;
+    }
+
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null || uri.host.isEmpty) {
+      return false;
+    }
+
+    final host = uri.host.toLowerCase();
+    return host == '10.0.2.2' ||
+        host == 'localhost' ||
+        host == '127.0.0.1' ||
+        host == '::1';
+  }
+
   static String _buildServiceUrl(Uri coreUri, int port, String path) {
     return Uri(
       scheme: coreUri.scheme,

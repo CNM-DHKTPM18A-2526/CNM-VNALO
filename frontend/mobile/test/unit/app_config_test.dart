@@ -29,5 +29,12 @@ void main() {
       expect(AppConfig.instance.messageServiceUrl, 'http://custom-msg:9001/api/v1');
       expect(AppConfig.instance.socketUrl, 'http://custom-msg:9001');
     });
+
+    test('flags emulator and loopback hosts as local-only', () {
+      expect(AppConfig.isLikelyLocalOnlyHost('http://10.0.2.2:8081/api/v1'), isTrue);
+      expect(AppConfig.isLikelyLocalOnlyHost('http://localhost:8081/api/v1'), isTrue);
+      expect(AppConfig.isLikelyLocalOnlyHost('http://127.0.0.1:8081/api/v1'), isTrue);
+      expect(AppConfig.isLikelyLocalOnlyHost('http://192.168.1.88:8081/api/v1'), isFalse);
+    });
   });
 }

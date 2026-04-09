@@ -21,11 +21,14 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -92,11 +95,26 @@ public class UserService {
             return new PageImpl<>(List.of(), pageable, 0);
         }
 
-        return userProfileRepository.searchByDisplayNameWithinIds(allowedIds, normalizedKeyword, pageable)
-                .map(profile -> {
-                    AuthAccount account = authAccountRepository.findById(profile.getId()).orElse(null);
-                    return mapToUserInfoResponse(account, profile);
-                });
+        Page<UserProfile> profilePage = userProfileRepository
+            .searchByDisplayNameWithinIds(allowedIds, normalizedKeyword, pageable);
+
+        if (profilePage.isEmpty()) {
+            return new PageImpl<>(List.of(), pageable, profilePage.getTotalElements());
+        }
+
+        Set<UUID> profileIds = profilePage.getContent().stream()
+            .map(UserProfile::getId)
+            .collect(Collectors.toSet());
+
+        Map<UUID, AuthAccount> accountMap = new HashMap<>();
+        authAccountRepository.findAllByIdIn(profileIds)
+            .forEach(account -> accountMap.put(account.getId(), account));
+
+        List<UserInfoResponse> content = profilePage.getContent().stream()
+            .map(profile -> mapToUserInfoResponse(accountMap.get(profile.getId()), profile))
+            .toList();
+
+        return new PageImpl<>(content, pageable, profilePage.getTotalElements());
     }
 
     @Transactional(readOnly = true)
