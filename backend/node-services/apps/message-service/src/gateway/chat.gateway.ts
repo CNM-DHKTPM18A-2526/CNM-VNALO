@@ -149,9 +149,22 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       const message = await this.messageService.sendMessage(userId, dto, access);
 
-      // Broadcast to all clients in the conversation room
+      // Broadcast to all clients in the conversation room (for those who have the chat open)
       const room = `conversation:${dto.conversationId}`;
       this.server.to(room).emit('message.received', message);
+
+      // Add: also broadcast to all participants of this conversation globally so their inboxes update!
+      try {
+        const conversation = await this.conversationService.getConversation(dto.conversationId, userId);
+        if (conversation && conversation.members) {
+          for (const member of conversation.members) {
+            // we use the emitToUser helper method to reach their personal connected sockets
+            this.emitToUser(member.userId, 'message.received', message);
+          }
+        }
+      } catch (err) {
+        this.logger.error(`Failed to broadcast to individual members: ${err.message}`);
+      }
 
       return { event: 'message.sent', data: message };
     } catch (err) {

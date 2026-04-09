@@ -3,9 +3,12 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
+import 'package:vnalo_mobile/features/chat/screens/chat_detail_screen.dart';
 import 'package:vnalo_mobile/features/contacts/screens/add_friend_screen.dart';
+import 'package:vnalo_mobile/features/contacts/screens/friend_requests_screen.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/user_model.dart';
+import 'package:vnalo_mobile/services/chat_service.dart';
 import 'package:vnalo_mobile/services/friend_service.dart';
 
 class ContactsScreen extends StatefulWidget {
@@ -18,14 +21,23 @@ class ContactsScreen extends StatefulWidget {
 class _ContactsScreenState extends State<ContactsScreen> {
   List<User> _friends = [];
   bool _isLoading = true;
+  int _pendingCount = 0;
 
   @override
   void initState() {
     super.initState();
     _loadFriends();
+    _loadPendingCount();
   }
 
-  Future<void> _loadFriends() async {
+  Future<void> _loadPendingCount() async {
+    try {
+      final count = await context.read<FriendService>().getPendingRequestCount();
+      if (mounted) setState(() => _pendingCount = count);
+    } catch (_) {}
+  }
+
+   Future<void> _loadFriends() async {
     try {
       _friends = await context.read<FriendService>().getFriends();
     } catch (_) {
@@ -34,6 +46,26 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
     if (mounted) {
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _openChat(User user) async {
+    try {
+      final conversation = await context.read<ChatService>().getOrCreateDirect(user.id);
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ChatDetailScreen(
+            conversation: conversation,
+            friendUser: user,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Không thể mở cuộc trò chuyện: $e')),
+      );
     }
   }
 
@@ -154,7 +186,27 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     child: const Icon(Icons.group_add, color: AppColors.primary),
                   ),
                   title: const Text('Lời mời kết bạn'),
-                  onTap: () {},
+                  trailing: _pendingCount > 0
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '$_pendingCount',
+                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                        )
+                      : null,
+                  onTap: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const FriendRequestsScreen()),
+                    );
+                    // Refresh after returning
+                    _loadPendingCount();
+                    _loadFriends();
+                  },
                 ),
                 ListTile(
                   leading: Container(
@@ -211,6 +263,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                              IconButton(icon: const Icon(Icons.videocam_outlined), onPressed: () {}),
                            ],
                          ),
+                         onTap: () => _openChat(user),
                        )),
                      ],
                    );

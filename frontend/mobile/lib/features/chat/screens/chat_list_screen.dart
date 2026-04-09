@@ -215,6 +215,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
                 final conversation = chatProvider.conversations[index - 1];
                 return ChatListItem(
+                  key: ValueKey(conversation.id),
                   conversation: conversation,
                   onTap: () {
                     Navigator.of(context).push(

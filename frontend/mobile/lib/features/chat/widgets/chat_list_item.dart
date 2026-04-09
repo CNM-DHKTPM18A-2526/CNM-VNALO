@@ -100,10 +100,18 @@ class ChatListItem extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      conversation.lastMessage?.content ?? '',
+                      conversation.lastMessage?.content ??
+                          (conversation.type == ConversationType.DIRECT
+                              ? 'Gửi lời chào $displayName'
+                              : ''),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 13, color: secondaryTextColor),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: conversation.lastMessage == null
+                            ? AppColors.primary
+                            : secondaryTextColor,
+                      ),
                     ),
                   ),
                   if (conversation.isMuted)

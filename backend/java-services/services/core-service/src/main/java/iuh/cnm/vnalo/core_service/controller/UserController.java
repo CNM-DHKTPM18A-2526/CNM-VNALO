@@ -67,12 +67,22 @@ public class UserController {
     }
 
     @GetMapping("/phone/{phoneNumber}")
-    @Operation(summary = "Search user by phone", description = "Exact phone lookup respecting user privacy settings")
+    @Operation(summary = "Search user by phone (path)", description = "Exact phone lookup respecting user privacy settings")
     public ResponseEntity<ApiResponse<UserInfoResponse>> searchUserByPhone(
             @AuthenticationPrincipal UserPrincipal currentUser,
             @PathVariable String phoneNumber) {
 
         UserInfoResponse response = userService.searchUserByPhone(currentUser.getId(), phoneNumber);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/search-by-phone")
+    @Operation(summary = "Search user by phone (query)", description = "Exact phone lookup via query param — avoids URL encoding issues with + in path")
+    public ResponseEntity<ApiResponse<UserInfoResponse>> searchUserByPhoneQuery(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @RequestParam String phone) {
+
+        UserInfoResponse response = userService.searchUserByPhone(currentUser.getId(), phone);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
