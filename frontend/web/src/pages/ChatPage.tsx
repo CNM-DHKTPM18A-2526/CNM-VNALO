@@ -9,6 +9,8 @@ import type { RawMessage } from '../features/chat/chat.api'
 import { createChatSocket, emitSendMessage } from '../features/chat/chat.socket'
 import type { ChatMessage, ConversationSummary } from '../features/chat/chat.types'
 import { useAuth } from '../features/auth/useAuth'
+import { Icon } from '../shared/components/Icon'
+import { UserAvatar } from '../shared/components/UserAvatar'
 import { Skeleton } from '../shared/components/ui/Skeleton'
 import { Card } from '../shared/components/ui/Card'
 import { useLanguage } from '../shared/i18n/LanguageContext'
@@ -424,18 +426,44 @@ export function ChatPage() {
         peerLastReadSeq={selectedConversationId ? peerLastReadByConversation[selectedConversationId] : undefined}
       />
       <aside className='chat-side-panel'>
-        <h3>{t('pages.chat.sideInfoTitle')}</h3>
-        <p>
-          {selectedConversation
-            ? `${t('pages.chat.sideInfoWith')} ${selectedConversation.name}.`
-            : t('pages.chat.sideInfoFallback')}
-        </p>
+        <div className='chat-side-head'>
+          <h3>{t('pages.chat.sideInfoTitle')}</h3>
+        </div>
+
+        {selectedConversation ? (
+          <Card className='chat-side-profile'>
+            <UserAvatar name={selectedConversation.name} size='lg' />
+            <h4>{selectedConversation.name}</h4>
+            <p>{`${t('pages.chat.sideInfoWith')} ${selectedConversation.name}.`}</p>
+            <div className='chat-side-quick-actions'>
+              <button className='chat-side-action-btn' type='button'>
+                <Icon name='phone' />
+              </button>
+              <button className='chat-side-action-btn' type='button'>
+                <Icon name='search' />
+              </button>
+              <button className='chat-side-action-btn' type='button'>
+                <Icon name='info' />
+              </button>
+            </div>
+          </Card>
+        ) : (
+          <p>{t('pages.chat.sideInfoFallback')}</p>
+        )}
+
         <Card className='chat-side-card'>
-          <p>{t('pages.chat.sharedFiles')}</p>
+          <div className='chat-side-section-title'>
+            <Icon name='file' />
+            <p>{t('pages.chat.sharedFiles')}</p>
+          </div>
           <strong>{t('pages.chat.sharedFilesCount')}</strong>
         </Card>
+
         <Card className='chat-side-card'>
-          <p>{t('pages.chat.media')}</p>
+          <div className='chat-side-section-title'>
+            <Icon name='image' />
+            <p>{t('pages.chat.media')}</p>
+          </div>
           <strong>{t('pages.chat.mediaCount')}</strong>
         </Card>
       </aside>

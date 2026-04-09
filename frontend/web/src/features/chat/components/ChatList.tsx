@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import { SearchInput } from '../../../shared/components/SearchInput'
 import { Icon } from '../../../shared/components/Icon'
 import { Button } from '../../../shared/components/ui/Button'
+import { AddFriendModal } from '../../friends/components/AddFriendModal'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { useLanguage } from '../../../shared/i18n/LanguageContext'
 import type { ConversationSummary } from '../chat.types'
@@ -23,9 +24,13 @@ export function ChatList({
   const [keyword, setKeyword] = useState('')
   const [isAddFriendOpen, setIsAddFriendOpen] = useState(false)
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false)
-  const [friendIdentifier, setFriendIdentifier] = useState('')
   const [groupName, setGroupName] = useState('')
   const [groupMembers, setGroupMembers] = useState('')
+
+  const selectedConversation = useMemo(
+    () => conversations.find((conversation) => conversation.id === selectedConversationId),
+    [conversations, selectedConversationId],
+  )
 
   const filteredConversations = useMemo(() => {
     const normalizedKeyword = keyword.trim().toLowerCase()
@@ -79,37 +84,18 @@ export function ChatList({
         ))}
       </div>
 
-      <Modal
-        description={t('chat.modalAddFriendDesc')}
-        footer={
-          <>
-            <Button variant='ghost' onClick={() => setIsAddFriendOpen(false)}>
-              {t('chat.modalCancel')}
-            </Button>
-            <Button
-              onClick={() => {
-                setIsAddFriendOpen(false)
-                setFriendIdentifier('')
-              }}
-              variant='primary'
-            >
-              {t('chat.modalConfirm')}
-            </Button>
-          </>
+      <AddFriendModal
+        initialTarget={
+          selectedConversation
+            ? {
+                displayName: selectedConversation.name,
+                seedQuery: selectedConversation.name,
+              }
+            : null
         }
         isOpen={isAddFriendOpen}
         onClose={() => setIsAddFriendOpen(false)}
-        title={t('chat.modalAddFriendTitle')}
-      >
-        <label className='modal-field'>
-          <span>{t('chat.modalPhoneOrEmail')}</span>
-          <input
-            placeholder={t('chat.modalPhoneOrEmailPlaceholder')}
-            value={friendIdentifier}
-            onChange={(event) => setFriendIdentifier(event.target.value)}
-          />
-        </label>
-      </Modal>
+      />
 
       <Modal
         description={t('chat.modalCreateGroupDesc')}

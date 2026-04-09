@@ -1,53 +1,48 @@
 import { useNavigate } from 'react-router-dom'
 
+import type { Friend } from '../../friends/friends.types'
 import { UserAvatar } from '../../../shared/components/UserAvatar'
 import { Button } from '../../../shared/components/ui/Button'
-import type { ContactItem as Contact } from '../../../shared/mock/data'
 
 type ContactItemProps = {
-  item: Contact
+  item: Friend
   labels: {
     chat: string
-    addFriend: string
-    more: string
-    online: string
-    busy: string
-    offline: string
+    unfriend: string
+    friend: string
+    unknownUser: string
   }
+  onUnfriend: (friendId: string, displayName: string) => void
+  isActionLoading?: boolean
 }
 
-function getStatusLabel(status: Contact['status'], labels: ContactItemProps['labels']) {
-  if (status === 'online') {
-    return labels.online
-  }
-
-  if (status === 'busy') {
-    return labels.busy
-  }
-
-  return labels.offline
-}
-
-export function ContactItem({ item, labels }: ContactItemProps) {
+export function ContactItem({ item, labels, onUnfriend, isActionLoading = false }: ContactItemProps) {
   const navigate = useNavigate()
+  const displayName = item.displayName?.trim() || item.nickname?.trim() || labels.unknownUser
+  const subtitle = item.statusMessage?.trim() || null
 
   return (
     <article className='contacts-item'>
       <div className='contacts-item-main'>
-        <UserAvatar name={item.displayName} size='md' />
+        <UserAvatar imageUrl={item.avatarUrl} name={displayName} size='md' />
         <div className='contacts-item-copy'>
-          <h3>{item.displayName}</h3>
-          <p>{item.subtitle}</p>
+          <h3>{displayName}</h3>
+          {subtitle ? <p>{subtitle}</p> : null}
         </div>
       </div>
       <div className='contacts-item-meta'>
-        <span className={`contacts-status contacts-status-${item.status}`}>{getStatusLabel(item.status, labels)}</span>
+        <span className='contacts-status contacts-status-online'>{labels.friend}</span>
         <div className='contacts-item-actions'>
-          <Button onClick={() => navigate('/chat')} variant='primary'>
+          <Button disabled={isActionLoading} onClick={() => navigate('/chat')} variant='primary'>
             {labels.chat}
           </Button>
-          <Button variant='subtle'>{labels.addFriend}</Button>
-          <Button variant='ghost'>{labels.more}</Button>
+          <Button
+            disabled={isActionLoading}
+            onClick={() => onUnfriend(item.friendId, displayName)}
+            variant='ghost'
+          >
+            {labels.unfriend}
+          </Button>
         </div>
       </div>
     </article>

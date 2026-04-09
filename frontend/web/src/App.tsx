@@ -9,7 +9,6 @@ import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { ChatPage } from './pages/ChatPage'
 import { ContactsPage } from './pages/ContactsPage'
 import { ProfilePage } from './pages/ProfilePage'
-import { SettingsPage } from './pages/SettingsPage'
 import './styles/app.css'
 
 function App() {
@@ -32,7 +31,6 @@ function App() {
         <Route path='chat' element={<ChatPage />} />
         <Route path='contacts' element={<ContactsPage />} />
         <Route path='profile' element={<ProfilePage />} />
-        <Route path='settings' element={<SettingsPage />} />
       </Route>
       <Route path='*' element={<Navigate replace to='/chat' />} />
     </Routes>

@@ -1,7 +1,9 @@
 import { useMemo } from 'react'
 
 import { EmptyState } from '../../../shared/components/EmptyState'
+import { Icon } from '../../../shared/components/Icon'
 import { LoadingState } from '../../../shared/components/LoadingState'
+import { UserAvatar } from '../../../shared/components/UserAvatar'
 import { useLanguage } from '../../../shared/i18n/LanguageContext'
 import type { ChatMessage, ConversationSummary } from '../chat.types'
 import { MessageBubble } from './MessageBubble'
@@ -48,8 +50,27 @@ export function ChatWindow({
   return (
     <section className='chat-window'>
       <header className='chat-window-header'>
-        <h2>{conversation.name}</h2>
-        <p>{conversation.online ? t('chat.online') : t('chat.offline')}</p>
+        <div className='chat-window-header-main'>
+          <UserAvatar name={conversation.name} size='md' />
+          <div className='chat-window-header-copy'>
+            <h2>{conversation.name}</h2>
+            <p>{conversation.online ? t('chat.online') : t('chat.offline')}</p>
+          </div>
+        </div>
+        <div className='chat-window-header-actions'>
+          <button className='chat-header-action-btn' type='button'>
+            <Icon name='phone' />
+          </button>
+          <button className='chat-header-action-btn' type='button'>
+            <Icon name='video' />
+          </button>
+          <button className='chat-header-action-btn' type='button'>
+            <Icon name='search' />
+          </button>
+          <button className='chat-header-action-btn' type='button'>
+            <Icon name='more' />
+          </button>
+        </div>
       </header>
       <div className='chat-window-messages'>
         {isLoadingMessages ? (
