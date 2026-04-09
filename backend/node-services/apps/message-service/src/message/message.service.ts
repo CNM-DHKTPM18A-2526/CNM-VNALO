@@ -51,7 +51,11 @@ export class MessageService {
    * - Handles reply/forward denormalization
    * - Updates inbox for all active members within a transaction (CQRS)
    */
-  async sendMessage(userId: string, dto: SendMessageDto): Promise<Message> {
+  async sendMessage(userId: string, dto: SendMessageDto, access?: AccessPolicyContext): Promise<Message> {
+    if (this.isRestrictedWeb(access)) {
+      throw new ForbiddenException('Restricted web session cannot send messages.');
+    }
+
     // Verify sender is a member
     await this.conversationService.assertMember(dto.conversationId, userId);
 

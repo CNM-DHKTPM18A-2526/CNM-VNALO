@@ -74,7 +74,11 @@ export class InboxService {
   }
 
   /** Get total unread message count across all conversations. */
-  async getTotalUnreadCount(userId: string): Promise<number> {
+  async getTotalUnreadCount(userId: string, access?: AccessPolicyContext): Promise<number> {
+    if (this.isRestrictedWeb(access)) {
+      return 0;
+    }
+
     const { total } = await this.inboxRepo
       .createQueryBuilder('inbox')
       .select('COALESCE(SUM(inbox.unread_count), 0)', 'total')

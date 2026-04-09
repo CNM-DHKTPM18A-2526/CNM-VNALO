@@ -29,6 +29,6 @@ export class InboxController {
   /** Get total unread count badge number. */
   @Get('unread-count')
   getUnreadCount(@CurrentUser() user: AuthUser) {
-    return this.inboxService.getTotalUnreadCount(user.userId);
+    return this.inboxService.getTotalUnreadCount(user.userId, this.buildAccessContext(user));
   }
 }

@@ -140,9 +140,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() dto: SendMessageDto,
   ) {
     const userId = client.data.user.userId;
+    const access = {
+      clientPlatform: client.data.user.clientPlatform ?? 'WEB',
+      restrictedWebMode: Boolean(client.data.user.restrictedWebMode),
+      loginAtEpochSec: client.data.user.loginAtEpochSec,
+    };
 
     try {
-      const message = await this.messageService.sendMessage(userId, dto);
+      const message = await this.messageService.sendMessage(userId, dto, access);
 
       // Broadcast to all clients in the conversation room
       const room = `conversation:${dto.conversationId}`;

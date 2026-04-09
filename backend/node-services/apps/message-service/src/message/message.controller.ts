@@ -27,7 +27,7 @@ export class MessageController {
   /** Send a message via REST (alternative to WebSocket). */
   @Post('messages')
   sendMessage(@CurrentUser() user: AuthUser, @Body() dto: SendMessageDto) {
-    return this.messageService.sendMessage(user.userId, dto);
+    return this.messageService.sendMessage(user.userId, dto, this.buildAccessContext(user));
   }
 
   /** Get paginated message history for a conversation. */
