@@ -4,6 +4,7 @@ import { ProtectedRoute } from './features/auth/ProtectedRoute'
 import { useAuth } from './features/auth/useAuth'
 import { MainLayout } from './layouts/MainLayout'
 import { LoginPage } from './pages/LoginPage'
+import { QrLoginPage } from './pages/QrLoginPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { ChatPage } from './pages/ChatPage'
@@ -17,6 +18,7 @@ function App() {
   return (
     <Routes>
       <Route path='/login' element={isAuthenticated ? <Navigate replace to='/chat' /> : <LoginPage />} />
+      <Route path='/login/qr' element={isAuthenticated ? <Navigate replace to='/chat' /> : <QrLoginPage />} />
       <Route path='/register' element={isAuthenticated ? <Navigate replace to='/chat' /> : <RegisterPage />} />
       <Route path='/forgot-password' element={isAuthenticated ? <Navigate replace to='/chat' /> : <ForgotPasswordPage />} />
       <Route

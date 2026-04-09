@@ -46,6 +46,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setUser(profile)
   }
 
+  const loginWithAccessToken = async (token: string) => {
+    const profile = await getMe(token)
+    localStorage.setItem(ACCESS_TOKEN_KEY, token)
+    setAccessToken(token)
+    setUser(profile)
+  }
+
   const updateUser = (patch: Partial<AuthUser>) => {
     setUser((prev) => {
       if (!prev) {
@@ -72,6 +79,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       isBootstrapping,
       isAuthenticated: Boolean(accessToken),
       login,
+      loginWithAccessToken,
       updateUser,
       logout,
     }),

@@ -46,6 +46,7 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [showQrCta, setShowQrCta] = useState(false)
 
   const fromPath =
     typeof (location.state as { from?: unknown } | null)?.from === 'string'
@@ -76,13 +77,21 @@ export function LoginPage() {
                 event.preventDefault()
 
                 setErrorMessage(null)
+                setShowQrCta(false)
                 setIsSubmitting(true)
 
                 try {
                   await login({ identifier, password })
                   navigate(fromPath, { replace: true })
-                } catch {
-                  setErrorMessage(t('auth.loginError'))
+                } catch (error) {
+                  const message = error instanceof Error ? error.message : ''
+                  const unknownDevice = /unknown web device|approve this login via qr|trusted mobile/i.test(message)
+                  if (unknownDevice) {
+                    setErrorMessage('Thiết bị web này chưa được tin cậy. Hãy dùng đăng nhập bằng QR để mobile xác nhận.')
+                    setShowQrCta(true)
+                  } else {
+                    setErrorMessage(message || t('auth.loginError'))
+                  }
                 } finally {
                   setIsSubmitting(false)
                 }
@@ -123,6 +132,15 @@ export function LoginPage() {
               </label>
 
               {errorMessage ? <p className='auth-form-error'>{errorMessage}</p> : null}
+              {showQrCta ? (
+                <button
+                  type='button'
+                  className='auth-text-action'
+                  onClick={() => navigate('/login/qr')}
+                >
+                  Mở đăng nhập bằng QR
+                </button>
+              ) : null}
 
               <button type='submit' disabled={isSubmitting}>
                 {isSubmitting ? t('auth.processing') : t('auth.loginButton')}
@@ -132,9 +150,9 @@ export function LoginPage() {
                 <button type='button' className='auth-text-action' onClick={() => navigate('/forgot-password')}>
                   {t('auth.forgotPassword')}
                 </button>
-                {/* <button type='button' className='auth-text-action'>
+                <button type='button' className='auth-text-action' onClick={() => navigate('/login/qr')}>
                   {t('auth.qrLogin')}
-                </button> */}
+                </button>
               </div>
 
               <p className='auth-switch-copy'>
