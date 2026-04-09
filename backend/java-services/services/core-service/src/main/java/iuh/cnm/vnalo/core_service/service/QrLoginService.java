@@ -8,11 +8,13 @@ import iuh.cnm.vnalo.core_service.model.entity.auth.AuthAccount;
 import iuh.cnm.vnalo.core_service.model.entity.auth.AuthQrLoginSession;
 import iuh.cnm.vnalo.core_service.model.entity.auth.AuthRefreshToken;
 import iuh.cnm.vnalo.core_service.model.entity.user.UserProfile;
+import iuh.cnm.vnalo.core_service.model.entity.user.UserSetting;
 import iuh.cnm.vnalo.core_service.model.enums.QrLoginSessionStatus;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthAccountRepository;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthQrLoginSessionRepository;
 import iuh.cnm.vnalo.core_service.repository.auth.RefreshTokenRepository;
 import iuh.cnm.vnalo.core_service.repository.user.UserProfileRepository;
+import iuh.cnm.vnalo.core_service.repository.user.UserSettingRepository;
 import iuh.cnm.vnalo.core_service.security.JwtTokenProvider;
 import iuh.cnm.vnalo.core_service.security.UserPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,8 +30,10 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -39,13 +43,15 @@ public class QrLoginService {
 
     private static final Duration SESSION_TTL = Duration.ofSeconds(60);
     private static final Duration APPROVAL_COOLDOWN = Duration.ofSeconds(5);
-    private static final int MAX_ACTIVE_WEB_DEVICES_WITH_QR = 2;
+    private static final int MAX_ACTIVE_UNTRUSTED_WEB_DEVICES = 1;
 
     private final AuthQrLoginSessionRepository qrSessionRepository;
     private final AuthAccountRepository authAccountRepository;
     private final UserProfileRepository userProfileRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final UserSettingRepository userSettingRepository;
     private final JwtTokenProvider jwtTokenProvider;
+    private final SessionAuditService sessionAuditService;
 
     @Transactional
     public SessionCreateResponse createSession(HttpServletRequest request, SessionCreateRequest input) {
@@ -81,6 +87,14 @@ public class QrLoginService {
             final AuthResponse auth = buildAuthResponseForWeb(accountId, session, request);
             session.setStatus(QrLoginSessionStatus.CONSUMED);
             session.setConsumedAt(Instant.now());
+            sessionAuditService.record(
+                accountId,
+                null,
+                "QR_SESSION_CONSUMED",
+                "QR_WEB",
+                "UNTRUSTED",
+                "QR session consumed and auth delivered to web"
+            );
 
             final LoginNotice notice = buildLoginNotice(session);
             return new SessionPollResponse(
@@ -129,6 +143,11 @@ public class QrLoginService {
             throw new ApiException(ErrorCode.AUTH_QR_APPROVAL_COOLDOWN);
         }
 
+        if (hasActiveUntrustedWebSession(approverId) && !Boolean.TRUE.equals(input.confirmReplaceActiveUntrusted())) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR,
+                    "CONFIRM_REPLACE_REQUIRED: Active untrusted web session exists. Confirm replace to continue.");
+        }
+
         session.setStatus(QrLoginSessionStatus.APPROVED);
         session.setApprovedByAccountId(approverId);
         session.setApprovedAt(now);
@@ -137,6 +156,15 @@ public class QrLoginService {
         session.setMobilePlatform(normalizePlatform(input.platform(), "MOBILE"));
         session.setMobileIpAddress(resolveClientIp(request));
         session.setMobileLocation(trimToNull(input.location()));
+
+        sessionAuditService.record(
+            approverId,
+            null,
+            "QR_SESSION_APPROVED",
+            "QR_WEB",
+            "UNTRUSTED",
+            "Trusted mobile approved untrusted web login"
+        );
 
         return new SessionApproveResponse(
                 session.getStatus(),
@@ -183,8 +211,10 @@ public class QrLoginService {
         final UserProfile profile = userProfileRepository.findById(accountId)
                 .orElseThrow(() -> new ApiException(ErrorCode.USER_PROFILE_NOT_FOUND));
 
+        final UserSetting setting = userSettingRepository.findById(accountId)
+            .orElseGet(() -> UserSetting.createDefault(accountId));
+
         final UserPrincipal principal = UserPrincipal.create(account);
-        final String accessToken = jwtTokenProvider.generateAccessToken(principal);
         final String refreshToken = jwtTokenProvider.generateRefreshToken();
 
         enforceQrWebDeviceSlots(accountId);
@@ -200,6 +230,24 @@ public class QrLoginService {
                 .expiresAt(Instant.now().plusMillis(jwtTokenProvider.getRefreshTokenExpiration()))
                 .build();
         refreshTokenRepository.save(stored);
+
+            final Map<String, Object> claims = new HashMap<>();
+            claims.put("clientPlatform", "WEB");
+            claims.put("sessionType", "QR_WEB");
+            claims.put("trustLevel", "UNTRUSTED");
+            claims.put("restrictedWebMode", true);
+            claims.put("deviceId", stored.getDeviceId());
+            claims.put("syncEnabled", Boolean.TRUE.equals(setting.getSyncEnabled()));
+            final String accessToken = jwtTokenProvider.generateAccessToken(principal, claims);
+
+            sessionAuditService.record(
+                accountId,
+                stored,
+                "QR_WEB_SESSION_CREATED",
+                "QR_WEB",
+                "UNTRUSTED",
+                "Untrusted web session created via QR"
+            );
 
         return AuthResponse.builder()
                 .accessToken(accessToken)
@@ -228,10 +276,10 @@ public class QrLoginService {
                 .findByAccountIdAndRevokedAtIsNullAndExpiresAtAfterOrderByCreatedAtAsc(accountId, now);
 
         final List<AuthRefreshToken> activeWebTokens = activeTokens.stream()
-                .filter(token -> isWebToken(token.getPlatform()))
+            .filter(token -> isWebToken(token.getPlatform()) && isQrWebToken(token.getDeviceId()))
                 .toList();
 
-        final int revokeCount = activeWebTokens.size() - MAX_ACTIVE_WEB_DEVICES_WITH_QR + 1;
+        final int revokeCount = activeWebTokens.size() - MAX_ACTIVE_UNTRUSTED_WEB_DEVICES + 1;
         if (revokeCount <= 0) {
             return;
         }
@@ -249,6 +297,19 @@ public class QrLoginService {
         }
         final String upper = normalized.toUpperCase(Locale.ROOT);
         return !"ANDROID".equals(upper) && !"IOS".equals(upper);
+    }
+
+    private boolean isQrWebToken(String deviceId) {
+        final String normalized = trimToNull(deviceId);
+        return normalized != null && normalized.startsWith("qr-web-");
+    }
+
+    private boolean hasActiveUntrustedWebSession(UUID accountId) {
+        final Instant now = Instant.now();
+        return refreshTokenRepository
+                .findByAccountIdAndRevokedAtIsNullAndExpiresAtAfterOrderByCreatedAtAsc(accountId, now)
+                .stream()
+                .anyMatch(token -> isQrWebToken(token.getDeviceId()));
     }
 
     private LoginNotice buildLoginNotice(AuthQrLoginSession session) {
@@ -325,7 +386,7 @@ public class QrLoginService {
 
     public record SessionCreateRequest(String deviceName, String platform, String location) {}
 
-    public record SessionApproveRequest(String deviceId, String deviceName, String platform, String location) {}
+    public record SessionApproveRequest(String deviceId, String deviceName, String platform, String location, Boolean confirmReplaceActiveUntrusted) {}
 
     public record SessionCreateResponse(String token, Instant expiresAt, long expiresInSeconds, String qrPayload) {}
 

@@ -10,6 +10,11 @@ export interface JwtPayload {
   iat: number;
   exp: number;
   iss: string;
+  clientPlatform?: string;
+  trustLevel?: string;
+  sessionType?: string;
+  restrictedWebMode?: boolean;
+  deviceId?: string;
 }
 
 /**
@@ -34,6 +39,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     return {
       userId: payload.sub,
       phone: payload.phone,
+      loginAtEpochSec: payload.iat,
+      clientPlatform: payload.clientPlatform ?? 'WEB',
+      trustLevel: payload.trustLevel ?? 'UNKNOWN',
+      sessionType: payload.sessionType ?? 'PASSWORD',
+      restrictedWebMode: Boolean(payload.restrictedWebMode),
+      deviceId: payload.deviceId ?? null,
     };
   }
 }

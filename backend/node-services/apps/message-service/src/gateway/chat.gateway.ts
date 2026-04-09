@@ -63,7 +63,16 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       const payload = this.jwtService.verify(token as string);
       const userId = payload.sub;
-      client.data.user = { userId, phone: payload.phone };
+      client.data.user = {
+        userId,
+        phone: payload.phone,
+        loginAtEpochSec: payload.iat,
+        clientPlatform: payload.clientPlatform ?? 'WEB',
+        trustLevel: payload.trustLevel ?? 'UNKNOWN',
+        sessionType: payload.sessionType ?? 'PASSWORD',
+        restrictedWebMode: Boolean(payload.restrictedWebMode),
+        deviceId: payload.deviceId ?? null,
+      };
 
       // Track socket for this user
       if (!this.userSockets.has(userId)) {
@@ -131,9 +140,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() dto: SendMessageDto,
   ) {
     const userId = client.data.user.userId;
+    const access = {
+      clientPlatform: client.data.user.clientPlatform ?? 'WEB',
+      restrictedWebMode: Boolean(client.data.user.restrictedWebMode),
+      loginAtEpochSec: client.data.user.loginAtEpochSec,
+    };
 
     try {
-      const message = await this.messageService.sendMessage(userId, dto);
+      const message = await this.messageService.sendMessage(userId, dto, access);
 
       // Broadcast to all clients in the conversation room
       const room = `conversation:${dto.conversationId}`;

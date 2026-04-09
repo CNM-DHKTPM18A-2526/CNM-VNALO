@@ -25,7 +25,16 @@ export class WsJwtGuard implements CanActivate {
 
       const payload = this.jwtService.verify(token as string);
       // Attach user info to socket data for downstream access
-      client.data.user = { userId: payload.sub, phone: payload.phone };
+      client.data.user = {
+        userId: payload.sub,
+        phone: payload.phone,
+        loginAtEpochSec: payload.iat,
+        clientPlatform: payload.clientPlatform ?? 'WEB',
+        trustLevel: payload.trustLevel ?? 'UNKNOWN',
+        sessionType: payload.sessionType ?? 'PASSWORD',
+        restrictedWebMode: Boolean(payload.restrictedWebMode),
+        deviceId: payload.deviceId ?? null,
+      };
       return true;
     } catch (err) {
       this.logger.warn(`WebSocket auth failed: ${err.message}`);

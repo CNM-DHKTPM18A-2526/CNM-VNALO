@@ -51,10 +51,17 @@ void main() {
   );
 
   if (env == Environment.dev) {
-    debugPrint('DEV coreServiceUrl=${AppConfig.instance.coreServiceUrl}');
-    debugPrint('DEV mediaServiceUrl=${AppConfig.instance.mediaServiceUrl}');
-    debugPrint('DEV messageServiceUrl=${AppConfig.instance.messageServiceUrl}');
-    debugPrint('DEV socketUrl=${AppConfig.instance.socketUrl}');
+    debugPrint('DEV endpoints resolved:');
+    debugPrint('  core=${AppConfig.instance.coreServiceUrl}');
+    debugPrint('  media=${AppConfig.instance.mediaServiceUrl}');
+    debugPrint('  message=${AppConfig.instance.messageServiceUrl}');
+    debugPrint('  socket=${AppConfig.instance.socketUrl}');
+    if (AppConfig.isLikelyLocalOnlyHost(AppConfig.instance.coreServiceUrl)) {
+      debugPrint(
+        'DEV WARNING: CORE_SERVICE_URL is using 10.0.2.2/localhost. This only works on emulator or the same host. '
+        'For a physical Android device, pass your computer LAN IP via --dart-define=CORE_SERVICE_URL=http://<LAN-IP>:8081/api/v1',
+      );
+    }
   }
   runApp(const VnaloApp());
 }

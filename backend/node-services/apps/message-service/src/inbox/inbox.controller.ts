@@ -8,6 +8,14 @@ import { InboxService } from './inbox.service';
 export class InboxController {
   constructor(private readonly inboxService: InboxService) {}
 
+  private buildAccessContext(user: AuthUser) {
+    return {
+      clientPlatform: user.clientPlatform ?? 'WEB',
+      restrictedWebMode: Boolean(user.restrictedWebMode),
+      loginAtEpochSec: user.loginAtEpochSec,
+    };
+  }
+
   /** Get user's conversation list sorted by pinned + latest message. */
   @Get()
   getInbox(
@@ -15,12 +23,12 @@ export class InboxController {
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
   ) {
-    return this.inboxService.getInbox(user.userId, limit, offset);
+    return this.inboxService.getInbox(user.userId, limit, offset, this.buildAccessContext(user));
   }
 
   /** Get total unread count badge number. */
   @Get('unread-count')
   getUnreadCount(@CurrentUser() user: AuthUser) {
-    return this.inboxService.getTotalUnreadCount(user.userId);
+    return this.inboxService.getTotalUnreadCount(user.userId, this.buildAccessContext(user));
   }
 }

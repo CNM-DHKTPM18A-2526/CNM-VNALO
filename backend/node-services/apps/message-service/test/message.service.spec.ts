@@ -114,6 +114,15 @@ describe('MessageService', () => {
       expect(redisMock.incr).toHaveBeenCalled();
     });
 
+    it('should reject restricted web sessions from sending messages', async () => {
+      const dto = { conversationId: convId, content: 'Hello!', messageType: MessageType.TEXT };
+      messageRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.sendMessage(userId, dto, { clientPlatform: 'WEB', restrictedWebMode: true, loginAtEpochSec: 100 }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
     it('should return existing message if clientMessageId matches (idempotency)', async () => {
       const clientId = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
       const existingMsg = { id: msgId, clientMessageId: clientId, senderId: userId };

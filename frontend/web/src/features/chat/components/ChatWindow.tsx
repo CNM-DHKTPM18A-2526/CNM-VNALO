@@ -1,20 +1,30 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 
 import { EmptyState } from '../../../shared/components/EmptyState'
 import { LoadingState } from '../../../shared/components/LoadingState'
 import { useLanguage } from '../../../shared/i18n/LanguageContext'
-import type { ChatConversation, ChatMessage } from '../../../shared/mock/data'
+import type { ChatMessage, ConversationSummary } from '../chat.types'
 import { MessageBubble } from './MessageBubble'
 import { MessageInput } from './MessageInput'
 
 type ChatWindowProps = {
-  conversation: ChatConversation | undefined
-  seedMessages: ChatMessage[]
+  conversation: ConversationSummary | undefined
+  messages: ChatMessage[]
+  isLoadingMessages: boolean
+  onSend: (message: string) => void
+  isRestrictedMode?: boolean
+  peerLastReadSeq?: number
 }
 
-export function ChatWindow({ conversation, seedMessages }: ChatWindowProps) {
+export function ChatWindow({
+  conversation,
+  messages,
+  isLoadingMessages,
+  onSend,
+  isRestrictedMode = false,
+  peerLastReadSeq,
+}: ChatWindowProps) {
   const { t } = useLanguage()
-  const [messages, setMessages] = useState<ChatMessage[]>(seedMessages)
 
   const conversationMessages = useMemo(() => {
     if (!conversation) {
@@ -23,26 +33,6 @@ export function ChatWindow({ conversation, seedMessages }: ChatWindowProps) {
 
     return messages.filter((message) => message.conversationId === conversation.id)
   }, [conversation, messages])
-
-  const handleSend = (text: string) => {
-    if (!conversation) {
-      return
-    }
-
-    const now = new Date()
-    const minutes = `${now.getMinutes()}`.padStart(2, '0')
-    const hours = `${now.getHours()}`.padStart(2, '0')
-
-    const newMessage: ChatMessage = {
-      id: `m-${messages.length + 1}`,
-      conversationId: conversation.id,
-      sender: 'me',
-      text,
-      timestamp: `${hours}:${minutes}`,
-    }
-
-    setMessages((prev) => [...prev, newMessage])
-  }
 
   if (!conversation) {
     return (
@@ -62,13 +52,38 @@ export function ChatWindow({ conversation, seedMessages }: ChatWindowProps) {
         <p>{conversation.online ? t('chat.online') : t('chat.offline')}</p>
       </header>
       <div className='chat-window-messages'>
-        {conversationMessages.length === 0 ? (
+        {isLoadingMessages ? (
           <LoadingState label={t('chat.loadingConversation')} />
+        ) : conversationMessages.length === 0 ? (
+          <EmptyState
+            title={t('chat.windowEmptyTitle')}
+            description={t('chat.windowEmptyDesc')}
+          />
         ) : (
-          conversationMessages.map((message) => <MessageBubble key={message.id} message={message} />)
+          conversationMessages.map((message) => (
+            <MessageBubble
+              key={message.id}
+              message={message}
+              isReadByPeer={
+                message.sender === 'me' &&
+                message.serverSeq !== undefined &&
+                peerLastReadSeq !== undefined &&
+                message.serverSeq <= peerLastReadSeq
+              }
+            />
+          ))
         )}
       </div>
-      <MessageInput onSend={handleSend} placeholder={t('chat.messageInputPlaceholder')} />
+      {isRestrictedMode ? (
+        <div className='chat-restricted-banner'>
+          Đồng bộ đa thiết bị đang tắt. Web chỉ hiển thị dữ liệu giới hạn.
+        </div>
+      ) : null}
+      <MessageInput
+        onSend={onSend}
+        placeholder={isRestrictedMode ? 'Tin nhắn bị khóa khi ở chế độ giới hạn' : t('chat.messageInputPlaceholder')}
+        disabled={isRestrictedMode}
+      />
     </section>
   )
 }

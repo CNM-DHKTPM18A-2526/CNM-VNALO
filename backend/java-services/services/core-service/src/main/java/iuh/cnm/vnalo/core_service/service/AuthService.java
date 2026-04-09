@@ -14,12 +14,14 @@ import iuh.cnm.vnalo.core_service.model.entity.auth.AuthAccount;
 import iuh.cnm.vnalo.core_service.model.entity.auth.AuthRefreshToken;
 import iuh.cnm.vnalo.core_service.model.entity.user.UserPrivacySetting;
 import iuh.cnm.vnalo.core_service.model.entity.user.UserProfile;
+import iuh.cnm.vnalo.core_service.model.entity.user.UserSetting;
 import iuh.cnm.vnalo.core_service.model.enums.AccountStatus;
 import iuh.cnm.vnalo.core_service.model.enums.OtpPurpose;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthAccountRepository;
 import iuh.cnm.vnalo.core_service.repository.auth.RefreshTokenRepository;
 import iuh.cnm.vnalo.core_service.repository.user.UserPrivacySettingRepository;
 import iuh.cnm.vnalo.core_service.repository.user.UserProfileRepository;
+import iuh.cnm.vnalo.core_service.repository.user.UserSettingRepository;
 import iuh.cnm.vnalo.core_service.security.JwtTokenProvider;
 import iuh.cnm.vnalo.core_service.security.UserPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
@@ -36,8 +38,10 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -47,16 +51,18 @@ import java.util.UUID;
 public class AuthService {
 
     private static final int MAX_ACTIVE_MOBILE_DEVICES = 1;
-    private static final int MAX_ACTIVE_WEB_DEVICES_STANDARD = 1;
-    private static final int MAX_ACTIVE_WEB_DEVICES_WITH_QR = 2;
+    private static final int MAX_ACTIVE_WEB_DEVICES_STANDARD = 2;
+    private static final int MAX_ACTIVE_WEB_DEVICES_WITH_QR = 3;
 
     private final AuthAccountRepository authAccountRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserProfileRepository userProfileRepository;
     private final UserPrivacySettingRepository userPrivacySettingRepository;
+    private final UserSettingRepository userSettingRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final OtpService otpService;
+    private final SessionAuditService sessionAuditService;
 
     @Transactional(readOnly = true)
     public boolean isPhoneRegistered(String phone) {
@@ -109,9 +115,10 @@ public class AuthService {
         UserPrivacySetting privacySetting = UserPrivacySetting.createDefault(profile.getId());
         userPrivacySettingRepository.save(privacySetting);
 
-        UserPrincipal userPrincipal = UserPrincipal.create(account);
-        String accessToken = jwtTokenProvider.generateAccessToken(userPrincipal);
-        String refreshToken = generateAndSaveRefreshToken(
+        UserSetting userSetting = UserSetting.createDefault(profile.getId());
+        userSettingRepository.save(userSetting);
+
+        IssuedRefreshToken issuedRefreshToken = generateAndSaveRefreshToken(
             account.getId(),
             httpRequest,
             null,
@@ -119,9 +126,11 @@ public class AuthService {
             null,
             false
         );
+        UserPrincipal userPrincipal = UserPrincipal.create(account);
+        String accessToken = buildAccessTokenForSession(userPrincipal, null, "ANDROID", false, true);
 
         log.info("User registered successfully: {}", account.getId());
-        return buildAuthResponse(accessToken, refreshToken, account, profile);
+        return buildAuthResponse(accessToken, issuedRefreshToken.rawToken(), account, profile);
     }
 
     @Transactional
@@ -147,6 +156,11 @@ public class AuthService {
             throw new ApiException(ErrorCode.AUTH_INVALID_CREDENTIALS);
         }
 
+        final String normalizedPlatform = resolvePlatform(request.getPlatform(), httpRequest);
+        if (classifyPlatform(normalizedPlatform) == DeviceGroup.WEB && !isQrWebDevice(request.getDeviceId())) {
+            enforceKnownWebDeviceOrQrApproval(account.getId(), request.getDeviceId());
+        }
+
         account.onLoginSuccess(request.getDeviceId());
         authAccountRepository.save(account);
 
@@ -158,17 +172,37 @@ public class AuthService {
         }
 
         UserPrincipal userPrincipal = UserPrincipal.create(account);
-        String accessToken = jwtTokenProvider.generateAccessToken(userPrincipal);
-        String refreshToken = generateAndSaveRefreshToken(
+        IssuedRefreshToken issuedRefreshToken = generateAndSaveRefreshToken(
             account.getId(),
             httpRequest,
             request.getDeviceId(),
             request.getDeviceName(),
-            request.getPlatform(),
+            normalizedPlatform,
             false
         );
 
-        return buildAuthResponse(accessToken, refreshToken, account, profile);
+        final UserSetting setting = userSettingRepository.findById(account.getId())
+                .orElseGet(() -> UserSetting.createDefault(account.getId()));
+        final boolean restrictedWebMode = isWebRestrictedForSession(setting, normalizedPlatform, request.getDeviceId());
+
+        String accessToken = buildAccessTokenForSession(
+                userPrincipal,
+                request.getDeviceId(),
+                normalizedPlatform,
+                false,
+                restrictedWebMode
+        );
+
+        sessionAuditService.record(
+                account.getId(),
+                issuedRefreshToken.token(),
+                "LOGIN_SUCCESS",
+                resolveSessionType(issuedRefreshToken.token()),
+                resolveTrustLevel(issuedRefreshToken.token()),
+                "Password login succeeded"
+        );
+
+        return buildAuthResponse(accessToken, issuedRefreshToken.rawToken(), account, profile);
     }
 
     @Transactional
@@ -192,12 +226,19 @@ public class AuthService {
                 .orElseThrow(() -> new ApiException(ErrorCode.USER_PROFILE_NOT_FOUND));
 
         UserPrincipal userPrincipal = UserPrincipal.create(account);
-        String newAccessToken = jwtTokenProvider.generateAccessToken(userPrincipal);
 
         storedToken.revoke();
         refreshTokenRepository.save(storedToken);
+        sessionAuditService.record(
+            account.getId(),
+            storedToken,
+            "SESSION_REVOKED_REFRESH_ROTATION",
+            resolveSessionType(storedToken),
+            resolveTrustLevel(storedToken),
+            "Refresh rotation revoked old token"
+        );
 
-        String newRefreshToken = generateAndSaveRefreshToken(
+        IssuedRefreshToken issuedRefreshToken = generateAndSaveRefreshToken(
             account.getId(),
             httpRequest,
             storedToken.getDeviceId(),
@@ -205,7 +246,27 @@ public class AuthService {
             storedToken.getPlatform(),
             isQrWebDevice(storedToken.getDeviceId())
         );
-        return buildAuthResponse(newAccessToken, newRefreshToken, account, profile);
+        final UserSetting setting = userSettingRepository.findById(account.getId())
+            .orElseGet(() -> UserSetting.createDefault(account.getId()));
+        final boolean restrictedWebMode = isWebRestrictedForSession(setting, storedToken.getPlatform(), storedToken.getDeviceId());
+
+        String newAccessToken = buildAccessTokenForSession(
+            userPrincipal,
+            storedToken.getDeviceId(),
+            storedToken.getPlatform(),
+            isQrWebDevice(storedToken.getDeviceId()),
+            restrictedWebMode
+        );
+
+        sessionAuditService.record(
+            account.getId(),
+            issuedRefreshToken.token(),
+            "SESSION_REFRESHED",
+            resolveSessionType(issuedRefreshToken.token()),
+            resolveTrustLevel(issuedRefreshToken.token()),
+            "Refresh token rotated"
+        );
+        return buildAuthResponse(newAccessToken, issuedRefreshToken.rawToken(), account, profile);
     }
 
     @Transactional(readOnly = true)
@@ -224,7 +285,10 @@ public class AuthService {
                 token.getCreatedAt(),
                 token.getExpiresAt(),
                 token.getRevokedAt(),
-                token.isValid()
+                token.isValid(),
+                resolveSessionType(token),
+                resolveTrustLevel(token),
+                resolveSessionState(token)
             ))
             .toList();
     }
@@ -233,12 +297,30 @@ public class AuthService {
     public void logout(String refreshToken) {
         if (refreshToken != null && !refreshToken.isBlank()) {
             String tokenHash = hashToken(refreshToken);
+            refreshTokenRepository.findByTokenHash(tokenHash).ifPresent(token ->
+                sessionAuditService.record(
+                    token.getAccountId(),
+                    token,
+                    "SESSION_REVOKED_LOGOUT",
+                    resolveSessionType(token),
+                    resolveTrustLevel(token),
+                    "User requested logout"
+                )
+            );
             refreshTokenRepository.revokeByTokenHash(tokenHash, Instant.now());
         }
     }
 
     @Transactional
     public void logoutAll(UUID accountId) {
+        sessionAuditService.record(
+                accountId,
+                null,
+                "SESSION_REVOKED_LOGOUT_ALL",
+                "BULK",
+                "N/A",
+                "User requested logout all sessions"
+        );
         refreshTokenRepository.revokeAllByAccountId(accountId, Instant.now());
     }
 
@@ -312,7 +394,7 @@ public class AuthService {
         log.info("Password reset successfully for email: {}", maskEmail(email));
     }
 
-    private String generateAndSaveRefreshToken(
+    private IssuedRefreshToken generateAndSaveRefreshToken(
         UUID accountId,
         HttpServletRequest request,
         String deviceId,
@@ -338,7 +420,7 @@ public class AuthService {
                 .build();
 
         refreshTokenRepository.save(refreshToken);
-        return rawToken;
+            return new IssuedRefreshToken(rawToken, refreshToken);
     }
 
     private String hashToken(String token) {
@@ -371,8 +453,68 @@ public class AuthService {
 
         for (int i = 0; i < revokeCount; i++) {
             sameGroupTokens.get(i).setRevokedAt(now);
+            sessionAuditService.record(
+                    accountId,
+                    sameGroupTokens.get(i),
+                    "SESSION_REVOKED_SLOT_ENFORCED",
+                    resolveSessionType(sameGroupTokens.get(i)),
+                    resolveTrustLevel(sameGroupTokens.get(i)),
+                    "Device slot limit enforcement"
+            );
         }
         refreshTokenRepository.saveAll(sameGroupTokens.subList(0, revokeCount));
+    }
+
+    private void enforceKnownWebDeviceOrQrApproval(UUID accountId, String deviceId) {
+        final String normalizedDeviceId = deviceId == null ? "" : deviceId.trim();
+        if (normalizedDeviceId.isBlank()) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR,
+                    "Unknown web device. Please login by QR approval from trusted mobile.");
+        }
+
+        final boolean knownWebDevice = refreshTokenRepository.existsByAccountIdAndDeviceId(accountId, normalizedDeviceId);
+        if (knownWebDevice) {
+            return;
+        }
+
+        final boolean hasTrustedMobile = refreshTokenRepository.hasActiveTrustedMobileSession(accountId, Instant.now());
+        if (!hasTrustedMobile) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR,
+                    "No trusted mobile session available. Login on mobile first, then approve QR for this web device.");
+        }
+
+        throw new ApiException(ErrorCode.VALIDATION_ERROR,
+                "Unknown web device detected. Please approve this login via QR from trusted mobile.");
+    }
+
+    private String buildAccessTokenForSession(
+            UserPrincipal userPrincipal,
+            String deviceId,
+            String platform,
+            boolean isQrSession,
+            boolean restrictedWebMode
+    ) {
+        final Map<String, Object> claims = new HashMap<>();
+        final String normalizedPlatform = normalizePlatform(platform) != null ? normalizePlatform(platform) : "WEB";
+        claims.put("clientPlatform", normalizedPlatform);
+        claims.put("sessionType", isQrSession ? "QR_WEB" : "PASSWORD");
+        claims.put("trustLevel", isQrSession ? "UNTRUSTED" : ("WEB".equals(normalizedPlatform) ? "TRUSTED_WEB" : "TRUSTED_MOBILE"));
+        claims.put("restrictedWebMode", restrictedWebMode);
+        if (deviceId != null && !deviceId.isBlank()) {
+            claims.put("deviceId", deviceId);
+        }
+        return jwtTokenProvider.generateAccessToken(userPrincipal, claims);
+    }
+
+    private boolean isWebRestrictedForSession(UserSetting setting, String platform, String deviceId) {
+        final String normalizedPlatform = normalizePlatform(platform);
+        if (!"WEB".equals(normalizedPlatform) && !"PC".equals(normalizedPlatform)) {
+            return false;
+        }
+        if (!Boolean.TRUE.equals(setting.getSyncEnabled()) || Boolean.TRUE.equals(setting.getWebRestrictedMode())) {
+            return true;
+        }
+        return isQrWebDevice(deviceId);
     }
 
     private DeviceGroup classifyToken(AuthRefreshToken token) {
@@ -530,6 +672,32 @@ public class AuthService {
             Instant createdAt,
             Instant expiresAt,
             Instant revokedAt,
-            boolean active
+            boolean active,
+            String sessionType,
+            String trustLevel,
+            String sessionState
     ) {}
+
+    private String resolveSessionType(AuthRefreshToken token) {
+        return isQrWebDevice(token.getDeviceId()) ? "QR_WEB" : "PASSWORD";
+    }
+
+    private String resolveTrustLevel(AuthRefreshToken token) {
+        if (isQrWebDevice(token.getDeviceId())) {
+            return "UNTRUSTED";
+        }
+        return classifyToken(token) == DeviceGroup.MOBILE ? "TRUSTED_MOBILE" : "TRUSTED_WEB";
+    }
+
+    private String resolveSessionState(AuthRefreshToken token) {
+        if (token.getRevokedAt() != null) {
+            return "REVOKED";
+        }
+        if (token.getExpiresAt() != null && token.getExpiresAt().isBefore(Instant.now())) {
+            return "EXPIRED";
+        }
+        return "ACTIVE";
+    }
+
+    private record IssuedRefreshToken(String rawToken, AuthRefreshToken token) {}
 }

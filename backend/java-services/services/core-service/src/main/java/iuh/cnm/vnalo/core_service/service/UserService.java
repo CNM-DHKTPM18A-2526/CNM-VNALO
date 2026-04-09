@@ -3,16 +3,20 @@ package iuh.cnm.vnalo.core_service.service;
 import iuh.cnm.vnalo.core_service.exception.ApiException;
 import iuh.cnm.vnalo.core_service.exception.ErrorCode;
 import iuh.cnm.vnalo.core_service.model.dto.request.UpdateProfileRequest;
+import iuh.cnm.vnalo.core_service.model.dto.request.UpdateSyncPolicyRequest;
+import iuh.cnm.vnalo.core_service.model.dto.response.SyncPolicyResponse;
 import iuh.cnm.vnalo.core_service.model.dto.response.UserInfoResponse;
 import iuh.cnm.vnalo.core_service.model.entity.auth.AuthAccount;
 import iuh.cnm.vnalo.core_service.model.entity.social.ContactSync;
 import iuh.cnm.vnalo.core_service.model.entity.user.UserPrivacySetting;
 import iuh.cnm.vnalo.core_service.model.entity.user.UserProfile;
+import iuh.cnm.vnalo.core_service.model.entity.user.UserSetting;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthAccountRepository;
 import iuh.cnm.vnalo.core_service.repository.social.ContactSyncRepository;
 import iuh.cnm.vnalo.core_service.repository.social.FriendshipRepository;
 import iuh.cnm.vnalo.core_service.repository.user.UserPrivacySettingRepository;
 import iuh.cnm.vnalo.core_service.repository.user.UserProfileRepository;
+import iuh.cnm.vnalo.core_service.repository.user.UserSettingRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -21,11 +25,14 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -37,6 +44,7 @@ public class UserService {
     private final AuthAccountRepository authAccountRepository;
     private final FriendshipRepository friendshipRepository;
     private final ContactSyncRepository contactSyncRepository;
+    private final UserSettingRepository userSettingRepository;
 
     @Transactional(readOnly = true)
     public UserInfoResponse getCurrentUserProfile(UUID accountId) {
@@ -92,11 +100,26 @@ public class UserService {
             return new PageImpl<>(List.of(), pageable, 0);
         }
 
-        return userProfileRepository.searchByDisplayNameWithinIds(allowedIds, normalizedKeyword, pageable)
-                .map(profile -> {
-                    AuthAccount account = authAccountRepository.findById(profile.getId()).orElse(null);
-                    return mapToUserInfoResponse(account, profile);
-                });
+        Page<UserProfile> profilePage = userProfileRepository
+            .searchByDisplayNameWithinIds(allowedIds, normalizedKeyword, pageable);
+
+        if (profilePage.isEmpty()) {
+            return new PageImpl<>(List.of(), pageable, profilePage.getTotalElements());
+        }
+
+        Set<UUID> profileIds = profilePage.getContent().stream()
+            .map(UserProfile::getId)
+            .collect(Collectors.toSet());
+
+        Map<UUID, AuthAccount> accountMap = new HashMap<>();
+        authAccountRepository.findAllByIdIn(profileIds)
+            .forEach(account -> accountMap.put(account.getId(), account));
+
+        List<UserInfoResponse> content = profilePage.getContent().stream()
+            .map(profile -> mapToUserInfoResponse(accountMap.get(profile.getId()), profile))
+            .toList();
+
+        return new PageImpl<>(content, pageable, profilePage.getTotalElements());
     }
 
     @Transactional(readOnly = true)
@@ -133,6 +156,25 @@ public class UserService {
         return userPrivacySettingRepository.save(settings);
     }
 
+    @Transactional(readOnly = true)
+    public SyncPolicyResponse getSyncPolicy(UUID userId) {
+        final UserSetting setting = userSettingRepository.findById(userId)
+                .orElseGet(() -> UserSetting.createDefault(userId));
+        return mapToSyncPolicy(setting);
+    }
+
+    @Transactional
+    public SyncPolicyResponse updateSyncPolicy(UUID userId, UpdateSyncPolicyRequest request) {
+        final UserSetting setting = userSettingRepository.findById(userId)
+                .orElseGet(() -> UserSetting.createDefault(userId));
+
+        setting.setSyncEnabled(Boolean.TRUE.equals(request.syncEnabled()));
+        setting.setWebRestrictedMode(!Boolean.TRUE.equals(request.syncEnabled()));
+
+        final UserSetting saved = userSettingRepository.save(setting);
+        return mapToSyncPolicy(saved);
+    }
+
     private UserInfoResponse mapToUserInfoResponse(AuthAccount account, UserProfile profile) {
         return UserInfoResponse.builder()
                 .id(profile.getId())
@@ -162,5 +204,13 @@ public class UserService {
             cleaned = "+84" + cleaned.substring(1);
         }
         return cleaned;
+    }
+
+    private SyncPolicyResponse mapToSyncPolicy(UserSetting setting) {
+        return new SyncPolicyResponse(
+                Boolean.TRUE.equals(setting.getSyncEnabled()),
+                Boolean.TRUE.equals(setting.getWebRestrictedMode()),
+                setting.getUpdatedAt()
+        );
     }
 }

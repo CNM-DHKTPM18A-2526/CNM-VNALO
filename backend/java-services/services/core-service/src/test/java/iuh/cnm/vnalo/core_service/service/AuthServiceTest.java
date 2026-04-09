@@ -13,6 +13,7 @@ import iuh.cnm.vnalo.core_service.repository.auth.AuthAccountRepository;
 import iuh.cnm.vnalo.core_service.repository.auth.RefreshTokenRepository;
 import iuh.cnm.vnalo.core_service.repository.user.UserPrivacySettingRepository;
 import iuh.cnm.vnalo.core_service.repository.user.UserProfileRepository;
+import iuh.cnm.vnalo.core_service.repository.user.UserSettingRepository;
 import iuh.cnm.vnalo.core_service.security.JwtTokenProvider;
 import iuh.cnm.vnalo.core_service.security.UserPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,6 +33,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -52,6 +54,9 @@ class AuthServiceTest {
     private UserPrivacySettingRepository userPrivacySettingRepository;
 
     @Mock
+    private UserSettingRepository userSettingRepository;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     @Mock
@@ -59,6 +64,9 @@ class AuthServiceTest {
 
     @Mock
     private OtpService otpService;
+
+    @Mock
+    private SessionAuditService sessionAuditService;
 
     @Mock
     private HttpServletRequest httpRequest;
@@ -110,7 +118,8 @@ class AuthServiceTest {
             when(authAccountRepository.save(any(AuthAccount.class))).thenReturn(testAccount);
             when(userProfileRepository.save(any(UserProfile.class))).thenReturn(testProfile);
             when(userPrivacySettingRepository.save(any(UserPrivacySetting.class))).thenReturn(UserPrivacySetting.createDefault(testAccountId));
-            when(jwtTokenProvider.generateAccessToken(any(UserPrincipal.class))).thenReturn("accessToken");
+            when(userSettingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(jwtTokenProvider.generateAccessToken(any(UserPrincipal.class), anyMap())).thenReturn("accessToken");
             when(jwtTokenProvider.generateRefreshToken()).thenReturn("refreshToken");
             when(jwtTokenProvider.getRefreshTokenExpiration()).thenReturn(604800000L);
             when(jwtTokenProvider.getAccessTokenExpirationSeconds()).thenReturn(86400L);
@@ -186,13 +195,16 @@ class AuthServiceTest {
             LoginRequest request = LoginRequest.builder()
                     .identifier("+84912345678")
                     .password("password123")
+                    .platform("ANDROID")
+                    .deviceId("android-device-1")
                     .build();
 
             when(authAccountRepository.findByPhone("+84912345678")).thenReturn(Optional.of(testAccount));
             when(passwordEncoder.matches("password123", "hashedPassword")).thenReturn(true);
             when(userProfileRepository.findById(testAccountId)).thenReturn(Optional.of(testProfile));
             when(authAccountRepository.save(any(AuthAccount.class))).thenReturn(testAccount);
-            when(jwtTokenProvider.generateAccessToken(any(UserPrincipal.class))).thenReturn("accessToken");
+            when(userSettingRepository.findById(testAccountId)).thenReturn(Optional.empty());
+            when(jwtTokenProvider.generateAccessToken(any(UserPrincipal.class), anyMap())).thenReturn("accessToken");
             when(jwtTokenProvider.generateRefreshToken()).thenReturn("refreshToken");
             when(jwtTokenProvider.getRefreshTokenExpiration()).thenReturn(604800000L);
             when(jwtTokenProvider.getAccessTokenExpirationSeconds()).thenReturn(86400L);

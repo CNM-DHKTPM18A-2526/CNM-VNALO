@@ -6,10 +6,14 @@ Future<void> showQuickActionsSheet(
   required List<QuickActionItem> items,
 }) async {
   final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+  final sheetBg = isDarkMode ? const Color(0xFF272A30) : Colors.white;
+  final iconColor = isDarkMode ? const Color(0xFFB0B7C3) : const Color(0xFF5D6470);
+  final titleColor = isDarkMode ? Colors.white : const Color(0xFF1F2937);
+  final dividerColor = isDarkMode ? const Color(0xFF353A43) : const Color(0xFFE9EDF3);
 
   await showModalBottomSheet<void>(
     context: context,
-    backgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+    backgroundColor: sheetBg,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
     ),
@@ -20,21 +24,51 @@ Future<void> showQuickActionsSheet(
           padding: const EdgeInsets.fromLTRB(8, 8, 8, 14),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            children: items
-                .map(
-                  (item) => ListTile(
-                    leading: Icon(item.icon, color: const Color(0xFF8C93A3)),
-                    title: Text(
-                      item.title,
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: dividerColor,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              ...List.generate(items.length, (index) {
+                final item = items[index];
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 4,
+                      ),
+                      leading: Icon(item.icon, color: iconColor, size: 28),
+                      title: Text(
+                        item.title,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w500,
+                          color: titleColor,
+                        ),
+                      ),
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        item.onTap();
+                      },
                     ),
-                    onTap: () {
-                      Navigator.of(sheetContext).pop();
-                      item.onTap();
-                    },
-                  ),
-                )
-                .toList(),
+                    if (index < items.length - 1)
+                      Divider(
+                        height: 1,
+                        thickness: 0.7,
+                        indent: 72,
+                        color: dividerColor,
+                      ),
+                  ],
+                );
+              }),
+            ],
           ),
         ),
       );

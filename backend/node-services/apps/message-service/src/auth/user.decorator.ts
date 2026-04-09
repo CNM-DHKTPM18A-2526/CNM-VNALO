@@ -12,4 +12,10 @@ export const CurrentUser = createParamDecorator(
 export interface AuthUser {
   userId: string;
   phone: string;
+  loginAtEpochSec?: number;
+  clientPlatform?: string;
+  trustLevel?: string;
+  sessionType?: string;
+  restrictedWebMode?: boolean;
+  deviceId?: string | null;
 }

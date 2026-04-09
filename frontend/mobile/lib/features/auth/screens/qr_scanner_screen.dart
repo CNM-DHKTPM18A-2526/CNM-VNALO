@@ -281,16 +281,45 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                 children: [
                   Text(
                     'Quét mọi mã QR',
-                    style: TextStyle(color: textColor, fontSize: 30, fontWeight: FontWeight.w700),
+                    style: TextStyle(color: textColor, fontSize: 36, fontWeight: FontWeight.w600),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Đưa mã vào giữa khung để nhận diện nhanh',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.8),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'VietQR',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Icon(
+                        Icons.public,
+                        size: 18,
+                        color: Colors.white.withValues(alpha: 0.85),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'website',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.88),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Text(
+                        'Zalo',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

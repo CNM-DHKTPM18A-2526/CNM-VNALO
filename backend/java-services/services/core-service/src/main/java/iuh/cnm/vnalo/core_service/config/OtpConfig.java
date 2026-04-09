@@ -25,6 +25,11 @@ public class OtpConfig {
      * OTP expiration time in minutes.
      */
     private int expirationMinutes = 5;
+
+    /**
+     * Enable or disable email OTP delivery.
+     */
+    private boolean emailEnabled = true;
     
     /**
      * Maximum wrong attempts before OTP is invalidated.

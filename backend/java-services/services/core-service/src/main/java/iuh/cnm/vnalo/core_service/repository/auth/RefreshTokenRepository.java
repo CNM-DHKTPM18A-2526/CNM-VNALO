@@ -33,4 +33,16 @@ public interface RefreshTokenRepository extends JpaRepository<AuthRefreshToken, 
     List<AuthRefreshToken> findByAccountIdOrderByCreatedAtDesc(UUID accountId, Pageable pageable);
 
     List<AuthRefreshToken> findByAccountIdAndRevokedAtIsNullAndExpiresAtAfterOrderByCreatedAtAsc(UUID accountId, Instant now);
+
+        boolean existsByAccountIdAndDeviceId(UUID accountId, String deviceId);
+
+        @Query("""
+                SELECT CASE WHEN COUNT(t) > 0 THEN true ELSE false END
+                FROM AuthRefreshToken t
+                WHERE t.accountId = :accountId
+                    AND t.revokedAt IS NULL
+                    AND t.expiresAt > :now
+                    AND UPPER(COALESCE(t.platform, 'WEB')) IN ('ANDROID','IOS')
+                """)
+        boolean hasActiveTrustedMobileSession(@Param("accountId") UUID accountId, @Param("now") Instant now);
 }
