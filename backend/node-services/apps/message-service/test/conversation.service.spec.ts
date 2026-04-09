@@ -6,6 +6,7 @@ import { Conversation, ConversationType, JoinMode } from '../src/entities/conver
 import { ConversationMember, MemberRole } from '../src/entities/conversation-member.entity';
 import { ConversationDirectMap } from '../src/entities/conversation-direct-map.entity';
 import { ConversationJoinRequest } from '../src/entities/conversation-join-request.entity';
+import { ConversationInbox } from '../src/entities/conversation-inbox.entity';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 
 describe('ConversationService', () => {
@@ -45,6 +46,7 @@ describe('ConversationService', () => {
         { provide: getRepositoryToken(ConversationMember), useFactory: mockRepo },
         { provide: getRepositoryToken(ConversationDirectMap), useFactory: mockRepo },
         { provide: getRepositoryToken(ConversationJoinRequest), useFactory: mockRepo },
+        { provide: getRepositoryToken(ConversationInbox), useFactory: mockRepo },
         {
           provide: DataSource,
           useValue: {

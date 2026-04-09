@@ -4,6 +4,7 @@ import type { Repository } from 'typeorm';
 import { InboxService } from '../src/inbox/inbox.service';
 import { ConversationInbox } from '../src/entities/conversation-inbox.entity';
 import { Conversation } from '../src/entities/conversation.entity';
+import { ConversationMember } from '../src/entities/conversation-member.entity';
 
 describe('InboxService', () => {
   let service: InboxService;
@@ -21,6 +22,7 @@ describe('InboxService', () => {
         InboxService,
         { provide: getRepositoryToken(ConversationInbox), useFactory: mockRepo },
         { provide: getRepositoryToken(Conversation), useFactory: mockRepo },
+        { provide: getRepositoryToken(ConversationMember), useFactory: mockRepo },
       ],
     }).compile();
 
