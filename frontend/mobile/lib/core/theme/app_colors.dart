@@ -15,6 +15,19 @@ class AppColors {
   static const Color online = Color(0xFF22C55E);
   static const Color unreadBadge = Color(0xFFEF4444);
   static const Color pinIcon = Color(0xFFF59E0B);
+
+  // Shared UI tokens (aligned with main settings screens)
+  static const LinearGradient appBarGradient = LinearGradient(
+    // Search/app bars: softer left blue, stronger right blue.
+    colors: [Color(0xFF2A8DF8), Color(0xFF008CFF)],
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+  );
+  static const Color sectionBackground = Color(0xFFF4F5F7);
+  static const Color sectionDivider = Color(0xFFE5E7EB);
+  static const Color itemDivider = Color(0xFFE9EDF3);
+  static const Color iconSubtle = Color(0xFF5D6470);
+  static const Color itemPressBackground = Color(0xFFEFF2F6);
 }
 
 // Dark and Light color palettes

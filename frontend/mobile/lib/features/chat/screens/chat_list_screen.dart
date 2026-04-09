@@ -10,6 +10,7 @@ import 'package:vnalo_mobile/features/chat/widgets/chat_list_item.dart';
 import 'package:vnalo_mobile/features/common/widgets/quick_actions_sheet.dart';
 import 'package:vnalo_mobile/features/contacts/screens/add_friend_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/account_security_screen.dart';
+import 'package:vnalo_mobile/features/search/screens/unified_search_screen.dart';
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
@@ -87,7 +88,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
           icon: Icons.devices_outlined,
           title: 'Thiết bị đăng nhập',
           onTap: () {
-            Navigator.of(context).push(
+            Navigator.of(context, rootNavigator: true).push(
               MaterialPageRoute(builder: (_) => const AccountSecurityScreen()),
             );
           },
@@ -114,15 +115,16 @@ class _ChatListScreenState extends State<ChatListScreen> {
         flexibleSpace: isDarkMode
             ? null
             : Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF0068FF), Color(0xFF00A2ED)],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  ),
-                ),
+                decoration: const BoxDecoration(gradient: AppColors.appBarGradient),
               ),
-        title: Row(
+        title: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const UnifiedSearchScreen()),
+            );
+          },
+          child: Row(
           children: [
             Icon(Icons.search, size: 24, color: searchHint),
             const SizedBox(width: 8),
@@ -131,6 +133,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
               style: TextStyle(color: searchHint, fontSize: 16, fontWeight: FontWeight.w400),
             ),
           ],
+          ),
         ),
         actions: [
           IconButton(

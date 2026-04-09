@@ -10,6 +10,7 @@ import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/user_model.dart';
 import 'package:vnalo_mobile/services/chat_service.dart';
 import 'package:vnalo_mobile/services/friend_service.dart';
+import 'package:vnalo_mobile/features/search/screens/unified_search_screen.dart';
 
 class ContactsScreen extends StatefulWidget {
   const ContactsScreen({super.key});
@@ -84,15 +85,16 @@ class _ContactsScreenState extends State<ContactsScreen> {
           flexibleSpace: isDarkMode
               ? null
               : Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Color(0xFF0068FF), Color(0xFF00A2ED)],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                    ),
-                  ),
+                  decoration: const BoxDecoration(gradient: AppColors.appBarGradient),
                 ),
-          title: Row(
+          title: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const UnifiedSearchScreen()),
+              );
+            },
+            child: Row(
             children: [
               Icon(Icons.search, size: 24, color: searchHint),
               const SizedBox(width: 8),
@@ -101,6 +103,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                 style: TextStyle(color: searchHint, fontSize: 16, fontWeight: FontWeight.w400),
               ),
             ],
+            ),
           ),
           actions: [
             IconButton(

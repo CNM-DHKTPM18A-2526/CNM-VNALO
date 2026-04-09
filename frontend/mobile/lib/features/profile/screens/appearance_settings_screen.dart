@@ -13,17 +13,27 @@ class AppearanceSettingsScreen extends StatelessWidget {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final cardBorder = isDarkMode
         ? const Color(0xFF3A3A3A)
-        : const Color(0xFFE5E7EB);
+        : AppColors.sectionDivider;
     final sectionLabel = isDarkMode
         ? const Color(0xFF60A5FA)
         : AppColors.primary;
+    final pageBg = isDarkMode ? Colors.black : AppColors.sectionBackground;
+    final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Giao diện và ngôn ngữ')),
+      backgroundColor: pageBg,
+      appBar: AppBar(
+        title: const Text('Giao diện và ngôn ngữ'),
+        backgroundColor: appBarBg,
+        foregroundColor: Colors.white,
+        flexibleSpace: isDarkMode
+            ? null
+            : Container(decoration: const BoxDecoration(gradient: AppColors.appBarGradient)),
+      ),
       body: Consumer<ThemeProvider>(
         builder: (_, themeProvider, __) {
           return ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             children: [
               // ─── Giao diện ───
               Padding(
@@ -67,13 +77,20 @@ class AppearanceSettingsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               // Font options
-              const _SettingsRow(
-                title: 'Đổi phông chữ',
-                trailing: 'Phông chữ VNALO',
+              Container(
+                color: Colors.white,
+                child: const Column(
+                  children: [
+                    _SettingsRow(
+                      title: 'Đổi phông chữ',
+                      trailing: 'Phông chữ Zalo',
+                    ),
+                    Divider(height: 1, color: AppColors.sectionDivider),
+                    _SettingsRow(title: 'Đổi cỡ chữ'),
+                  ],
+                ),
               ),
-              const Divider(height: 1),
-              const _SettingsRow(title: 'Đổi cỡ chữ'),
-              const SizedBox(height: 24),
+              const SizedBox(height: 18),
               // ─── Ngôn ngữ ───
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
@@ -89,10 +106,13 @@ class AppearanceSettingsScreen extends StatelessWidget {
               Consumer<LanguageProvider>(
                 builder: (_, langProvider, __) {
                   final isVi = langProvider.language == AppLanguage.vi;
-                  return _SettingsRow(
-                    title: 'Đổi ngôn ngữ',
-                    trailing: isVi ? '🇻🇳 Tiếng Việt' : '🇺🇸 English',
-                    onTap: () => _showLanguagePicker(context, langProvider),
+                  return Container(
+                    color: Colors.white,
+                    child: _SettingsRow(
+                      title: 'Đổi ngôn ngữ',
+                      trailing: isVi ? '🇻🇳 Tiếng Việt' : '🇺🇸 English',
+                      onTap: () => _showLanguagePicker(context, langProvider),
+                    ),
                   );
                 },
               ),
@@ -215,7 +235,7 @@ class _ThemeCard extends StatelessWidget {
         child: Column(
           children: [
             Container(
-              height: 80,
+              height: 86,
               decoration: BoxDecoration(
                 color: bgColor,
                 borderRadius: BorderRadius.circular(12),
@@ -311,26 +331,33 @@ class _SettingsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Text(title, style: const TextStyle(fontSize: 16)),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (trailing != null) ...[
-            Text(
-              trailing!,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF9CA3AF),
-              ),
-            ),
-            const SizedBox(width: 4),
-          ],
-          const Icon(Icons.chevron_right, size: 20, color: Color(0xFFD1D5DB)),
-        ],
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        highlightColor: AppColors.itemPressBackground,
+        splashColor: AppColors.itemPressBackground.withValues(alpha: 0.7),
+        onTap: onTap,
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+          title: Text(title, style: const TextStyle(fontSize: 16)),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (trailing != null) ...[
+                Text(
+                  trailing!,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF9CA3AF),
+                  ),
+                ),
+                const SizedBox(width: 4),
+              ],
+              const Icon(Icons.chevron_right, size: 20, color: Color(0xFFD1D5DB)),
+            ],
+          ),
+        ),
       ),
-      onTap: onTap,
     );
   }
 }

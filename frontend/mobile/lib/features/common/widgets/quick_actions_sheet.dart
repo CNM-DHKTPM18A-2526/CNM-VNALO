@@ -1,77 +1,99 @@
 import 'package:flutter/material.dart';
 import 'package:vnalo_mobile/core/models/quick_action_item.dart';
+import 'package:vnalo_mobile/core/theme/app_colors.dart';
 
 Future<void> showQuickActionsSheet(
   BuildContext context, {
   required List<QuickActionItem> items,
 }) async {
   final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-  final sheetBg = isDarkMode ? const Color(0xFF272A30) : Colors.white;
-  final iconColor = isDarkMode ? const Color(0xFFB0B7C3) : const Color(0xFF5D6470);
-  final titleColor = isDarkMode ? Colors.white : const Color(0xFF1F2937);
-  final dividerColor = isDarkMode ? const Color(0xFF353A43) : const Color(0xFFE9EDF3);
-
-  await showModalBottomSheet<void>(
+  final selected = await showModalBottomSheet<QuickActionItem>(
     context: context,
-    backgroundColor: sheetBg,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-    ),
+    backgroundColor: Colors.transparent,
     builder: (sheetContext) {
-      return SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 14),
+      final sheetBg = isDarkMode ? DarkColors.surface : Colors.white;
+      final dividerColor = isDarkMode ? DarkColors.divider : AppColors.sectionDivider;
+      final titleColor = isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary;
+      final iconColor = isDarkMode ? DarkColors.textSecondary : AppColors.iconSubtle;
+
+      return Container(
+        decoration: BoxDecoration(
+          color: sheetBg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          top: false,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              const SizedBox(height: 8),
               Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 12),
+                width: 56,
+                height: 6,
                 decoration: BoxDecoration(
                   color: dividerColor,
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
+              const SizedBox(height: 8),
               ...List.generate(items.length, (index) {
                 final item = items[index];
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 4,
-                      ),
-                      leading: Icon(item.icon, color: iconColor, size: 28),
-                      title: Text(
-                        item.title,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w500,
-                          color: titleColor,
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        highlightColor: AppColors.itemPressBackground,
+                        splashColor: AppColors.itemPressBackground.withValues(alpha: 0.7),
+                        onTap: () => Navigator.pop(sheetContext, item),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          child: Row(
+                            children: [
+                              Icon(item.icon, size: 22, color: iconColor),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Text(
+                                  item.title,
+                                  style: TextStyle(
+                                    color: titleColor,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      onTap: () {
-                        Navigator.of(sheetContext).pop();
-                        item.onTap();
-                      },
                     ),
                     if (index < items.length - 1)
-                      Divider(
-                        height: 1,
-                        thickness: 0.7,
-                        indent: 72,
-                        color: dividerColor,
-                      ),
+                      Divider(height: 1, indent: 52, color: dividerColor),
                   ],
                 );
               }),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(sheetContext),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: dividerColor),
+                      foregroundColor: titleColor,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                    ),
+                    child: const Text('Hủy'),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
       );
     },
   );
+  selected?.onTap();
 }

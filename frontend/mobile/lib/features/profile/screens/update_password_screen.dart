@@ -142,13 +142,7 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
         flexibleSpace: isDarkMode
             ? null
             : Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF0068FF), Color(0xFF00A2ED)],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  ),
-                ),
+                decoration: const BoxDecoration(gradient: AppColors.appBarGradient),
               ),
       ),
       body: ListView(

@@ -4,6 +4,7 @@ import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
 import 'package:vnalo_mobile/features/common/widgets/quick_actions_sheet.dart';
 import 'package:vnalo_mobile/features/contacts/screens/add_friend_screen.dart';
+import 'package:vnalo_mobile/features/search/screens/unified_search_screen.dart';
 
 class DiscoverScreen extends StatelessWidget {
   const DiscoverScreen({super.key});
@@ -54,15 +55,20 @@ class DiscoverScreen extends StatelessWidget {
         flexibleSpace: isDarkMode
             ? null
             : Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF0068FF), Color(0xFF00A2ED)],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  ),
+                decoration: const BoxDecoration(gradient: AppColors.appBarGradient),
+              ),
+        title: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const UnifiedSearchScreen(
+                  initialTab: SearchInitialTab.discover,
                 ),
               ),
-        title: Row(
+            );
+          },
+          child: Row(
           children: [
             Icon(Icons.search, size: 24, color: searchHint),
             const SizedBox(width: 8),
@@ -71,6 +77,7 @@ class DiscoverScreen extends StatelessWidget {
               style: TextStyle(color: searchHint, fontSize: 16, fontWeight: FontWeight.w400),
             ),
           ],
+          ),
         ),
         actions: [
           IconButton(

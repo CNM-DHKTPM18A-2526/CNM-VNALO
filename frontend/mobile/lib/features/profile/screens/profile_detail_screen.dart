@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
+import 'package:vnalo_mobile/features/profile/screens/profile_more_settings_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/personal_info_screen.dart';
 
 /// Full profile detail screen — shows cover photo, avatar, name, bio, info tiles,
@@ -202,6 +203,105 @@ class ProfileDetailScreen extends StatelessWidget {
     );
   }
 
+  void _showTimelineVisibilitySheet(BuildContext context) {
+    String selected = 'all';
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            Widget option({
+              required String value,
+              required String label,
+              String? subtitle,
+              bool showChevron = false,
+            }) {
+              return RadioListTile<String>(
+                value: value,
+                groupValue: selected,
+                activeColor: AppColors.primary,
+                onChanged: (v) => setSheetState(() => selected = v ?? selected),
+                title: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(label),
+                          if (subtitle != null)
+                            Text(
+                              subtitle,
+                              style: const TextStyle(fontSize: 13, color: LightColors.textSecondary),
+                            ),
+                        ],
+                      ),
+                    ),
+                    if (showChevron) const Icon(Icons.chevron_right, color: LightColors.textHint),
+                  ],
+                ),
+              );
+            }
+
+            return SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Center(
+                            child: Text(
+                              'Cho phép bạn bè xem nhật ký',
+                              style: TextStyle(fontSize: 24 / 1.2, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(sheetContext),
+                          icon: const Icon(Icons.close),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 1, color: AppColors.sectionDivider),
+                    option(value: 'all', label: 'Toàn bộ bài đăng'),
+                    option(value: '7d', label: 'Trong 7 ngày gần nhất'),
+                    option(value: '1m', label: 'Trong 1 tháng gần nhất'),
+                    option(value: '6m', label: 'Trong 6 tháng gần nhất'),
+                    option(
+                      value: 'custom',
+                      label: 'Tùy chỉnh',
+                      subtitle: 'Bấm chọn khoảng thời gian',
+                      showChevron: true,
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(sheetContext),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary.withValues(alpha: 0.2),
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('LƯU'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
@@ -269,16 +369,37 @@ class ProfileDetailScreen extends StatelessWidget {
                 Positioned(
                   top: MediaQuery.of(context).padding.top + 4,
                   right: 8,
-                  child: IconButton(
-                    icon: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.3),
-                        shape: BoxShape.circle,
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.3),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.remove_red_eye_outlined, color: Colors.white, size: 20),
+                        ),
+                        onPressed: () => _showTimelineVisibilitySheet(context),
                       ),
-                      child: const Icon(Icons.more_horiz, color: Colors.white, size: 20),
-                    ),
-                    onPressed: () {},
+                      IconButton(
+                        icon: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.3),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.more_horiz, color: Colors.white, size: 20),
+                        ),
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => ProfileMoreSettingsScreen(displayName: displayName),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                   ),
                 ),
 
@@ -431,6 +552,19 @@ class ProfileDetailScreen extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 13,
                       color: isDark ? DarkColors.textSecondary : LightColors.textSecondary)),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: 190,
+                    child: ElevatedButton(
+                      onPressed: () => _showComingSoon(context, 'Đăng lên Nhật ký'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                      ),
+                      child: const Text('Đăng lên Nhật ký'),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -473,16 +607,29 @@ class ProfileDetailScreen extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: color.withValues(alpha: 0.3)),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(icon, size: 20, color: color),
               const SizedBox(width: 6),
-              Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: color)),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: LightColors.textPrimary,
+                ),
+              ),
             ],
           ),
         ),
@@ -490,18 +637,6 @@ class ProfileDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _infoTile(BuildContext context, {
-    required IconData icon, required String title, required String value,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return ListTile(
-      leading: Icon(icon, color: const Color(0xFF9CA3AF)),
-      title: Text(title, style: TextStyle(fontSize: 13,
-        color: isDark ? DarkColors.textSecondary : LightColors.textSecondary)),
-      subtitle: Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500,
-        color: isDark ? DarkColors.textPrimary : LightColors.textPrimary)),
-    );
-  }
 }
 
 // ─── Fullscreen Image Viewer ───

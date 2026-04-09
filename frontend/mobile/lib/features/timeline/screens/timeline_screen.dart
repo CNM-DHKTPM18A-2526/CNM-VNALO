@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
+import 'package:vnalo_mobile/features/search/screens/unified_search_screen.dart';
 
 class TimelineScreen extends StatelessWidget {
   const TimelineScreen({super.key});
@@ -23,15 +24,16 @@ class TimelineScreen extends StatelessWidget {
         flexibleSpace: isDarkMode
             ? null
             : Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF0068FF), Color(0xFF00A2ED)],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  ),
-                ),
+                decoration: const BoxDecoration(gradient: AppColors.appBarGradient),
               ),
-        title: Row(
+        title: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const UnifiedSearchScreen()),
+            );
+          },
+          child: Row(
           children: [
             Icon(Icons.search, size: 24, color: searchHint),
             const SizedBox(width: 8),
@@ -40,6 +42,7 @@ class TimelineScreen extends StatelessWidget {
               style: TextStyle(color: searchHint, fontSize: 16, fontWeight: FontWeight.w400),
             ),
           ],
+          ),
         ),
       ),
       body: ListView(
