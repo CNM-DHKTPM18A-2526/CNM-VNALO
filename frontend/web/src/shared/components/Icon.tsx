@@ -4,12 +4,24 @@ type IconName =
   | 'chat'
   | 'bell'
   | 'user'
+  | 'addressBook'
   | 'userPlus'
   | 'group'
   | 'settings'
   | 'send'
   | 'logout'
+  | 'phone'
+  | 'video'
+  | 'info'
+  | 'attach'
+  | 'smile'
+  | 'image'
+  | 'file'
+  | 'more'
   | 'spark'
+  | 'database'
+  | 'help'
+  | 'close'
 
 type IconProps = {
   name: IconName
@@ -71,6 +83,19 @@ export function Icon({ name, className }: IconProps) {
     )
   }
 
+  if (name === 'addressBook') {
+    return (
+      <svg {...commonProps}>
+        <rect x='4' y='4.5' width='16' height='15' rx='2.4' />
+        <path d='M8 4.5v15' />
+        <circle cx='13.6' cy='10.3' r='2' />
+        <path d='M11.4 15a3.4 3.4 0 0 1 4.4 0' />
+        <path d='M17.2 9.2h1.3' />
+        <path d='M17.2 12.1h1.3' />
+      </svg>
+    )
+  }
+
   if (name === 'userPlus') {
     return (
       <svg {...commonProps}>
@@ -117,6 +142,110 @@ export function Icon({ name, className }: IconProps) {
         <path d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4' />
         <polyline points='16 17 21 12 16 7' />
         <line x1='21' y1='12' x2='9' y2='12' />
+      </svg>
+    )
+  }
+
+  if (name === 'phone') {
+    return (
+      <svg {...commonProps}>
+        <path d='M5.3 3.9h3.5l1.3 3.5-2 1.7a14.2 14.2 0 0 0 6.8 6.8l1.7-2 3.5 1.3v3.5a1.6 1.6 0 0 1-1.7 1.6 16.5 16.5 0 0 1-15-15A1.6 1.6 0 0 1 5.3 3.9Z' />
+      </svg>
+    )
+  }
+
+  if (name === 'video') {
+    return (
+      <svg {...commonProps}>
+        <rect x='3' y='6' width='13' height='12' rx='2.5' />
+        <path d='m16 10 5-3v10l-5-3Z' />
+      </svg>
+    )
+  }
+
+  if (name === 'info') {
+    return (
+      <svg {...commonProps}>
+        <circle cx='12' cy='12' r='9' />
+        <path d='M12 10v6' />
+        <path d='M12 7.2h.01' />
+      </svg>
+    )
+  }
+
+  if (name === 'attach') {
+    return (
+      <svg {...commonProps}>
+        <path d='m14.5 6.5-6.6 6.6a3 3 0 0 0 4.2 4.2l7.1-7.1a5 5 0 1 0-7-7l-7.1 7.1' />
+      </svg>
+    )
+  }
+
+  if (name === 'smile') {
+    return (
+      <svg {...commonProps}>
+        <circle cx='12' cy='12' r='9' />
+        <path d='M9 15a4.4 4.4 0 0 0 6 0' />
+        <path d='M9 10h.01' />
+        <path d='M15 10h.01' />
+      </svg>
+    )
+  }
+
+  if (name === 'image') {
+    return (
+      <svg {...commonProps}>
+        <rect x='3' y='5' width='18' height='14' rx='2.5' />
+        <circle cx='9' cy='10' r='1.2' />
+        <path d='m21 15-4.5-4.5L8 19' />
+      </svg>
+    )
+  }
+
+  if (name === 'file') {
+    return (
+      <svg {...commonProps}>
+        <path d='M7 3h7l5 5v13H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z' />
+        <path d='M14 3v5h5' />
+      </svg>
+    )
+  }
+
+  if (name === 'more') {
+    return (
+      <svg {...commonProps}>
+        <circle cx='6' cy='12' r='1.3' />
+        <circle cx='12' cy='12' r='1.3' />
+        <circle cx='18' cy='12' r='1.3' />
+      </svg>
+    )
+  }
+
+  if (name === 'database') {
+    return (
+      <svg {...commonProps}>
+        <ellipse cx='12' cy='5' rx='8' ry='3' />
+        <path d='M4 5v7c0 1.66 3.58 3 8 3s8-1.34 8-3V5' />
+        <path d='M4 12v7c0 1.66 3.58 3 8 3s8-1.34 8-3v-7' />
+      </svg>
+    )
+  }
+
+  if (name === 'help') {
+    return (
+      <svg {...commonProps}>
+        <circle cx='12' cy='12' r='9' />
+        <path d='M12 18.5v.5' />
+        <path d='M9 8.5a3 3 0 1 1 3.15 2.95' />
+      </svg>
+    )
+  }
+
+  if (name === 'close') {
+    return (
+      <svg {...commonProps}>
+        <line x1='18' y1='6' x2='6' y2='18' />
+        <line x1='6' y1='6' x2='18' y2='18' />
       </svg>
     )
   }

@@ -3,40 +3,35 @@ import type { AddFriendTarget } from '../../friends/components/AddFriendModal'
 import { UserAvatar } from '../../../shared/components/UserAvatar'
 import { Button } from '../../../shared/components/ui/Button'
 
-type FriendRequestListProps = {
+type SentRequestListProps = {
   items: FriendRequest[]
   labels: {
-    accept: string
-    decline: string
+    cancelRequest: string
     addFriend: string
     unknownUser: string
   }
-  onAccept: (id: string) => void
-  onDecline: (id: string) => void
+  onCancel: (id: string) => void
   onOpenAddFriend?: (target: AddFriendTarget) => void
   actionLoadingId?: string | null
-  actionType?: 'accept' | 'decline' | null
 }
 
-export function FriendRequestList({
+export function SentRequestList({
   items,
   labels,
-  onAccept,
-  onDecline,
+  onCancel,
   onOpenAddFriend,
   actionLoadingId = null,
-  actionType = null,
-}: FriendRequestListProps) {
+}: SentRequestListProps) {
   return (
     <section className='contacts-list'>
       {items.map((item) => {
-        const displayName = item.fromUserDisplayName?.trim() || labels.unknownUser
+        const displayName = item.toUserDisplayName?.trim() || labels.unknownUser
         const subtitle = item.message?.trim() || null
 
         return (
           <article className='contacts-item contacts-request-item' key={item.id}>
             <div className='contacts-item-main'>
-              <UserAvatar imageUrl={item.fromUserAvatarUrl} name={displayName} size='md' />
+              <UserAvatar imageUrl={item.toUserAvatarUrl} name={displayName} size='md' />
               <div className='contacts-item-copy'>
                 <h3>{displayName}</h3>
                 {subtitle ? <p>{subtitle}</p> : null}
@@ -45,26 +40,19 @@ export function FriendRequestList({
             <div className='contacts-item-actions'>
             <Button
               disabled={actionLoadingId === item.id}
-              onClick={() => onAccept(item.id)}
-              variant='primary'
-            >
-              {labels.accept}
-            </Button>
-            <Button
-              disabled={actionLoadingId === item.id}
-              onClick={() => onDecline(item.id)}
+              onClick={() => onCancel(item.id)}
               variant='ghost'
             >
-              {labels.decline}
+              {labels.cancelRequest}
             </Button>
             {onOpenAddFriend ? (
               <Button
                 disabled={actionLoadingId === item.id}
                 onClick={() =>
                   onOpenAddFriend({
-                    userId: item.fromUserId,
-                    displayName: item.fromUserDisplayName,
-                    avatarUrl: item.fromUserAvatarUrl,
+                    userId: item.toUserId,
+                    displayName: item.toUserDisplayName,
+                    avatarUrl: item.toUserAvatarUrl,
                   })
                 }
                 variant='subtle'
@@ -72,7 +60,6 @@ export function FriendRequestList({
                 {labels.addFriend}
               </Button>
             ) : null}
-            {actionLoadingId === item.id && actionType ? <p className='contacts-inline-loading'>{actionType}...</p> : null}
             </div>
           </article>
         )
