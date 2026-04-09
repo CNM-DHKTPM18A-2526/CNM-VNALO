@@ -659,7 +659,7 @@ public class AuthService {
         String safeName = (displayName == null || displayName.isBlank()) ? "User" : displayName.trim();
         String encodedName = URLEncoder.encode(safeName, StandardCharsets.UTF_8);
         String seed = accountId != null ? accountId.toString() : UUID.randomUUID().toString();
-        return "https://api.dicebear.com/9.x/initials/svg?seed=" + seed + "&radius=50&size=256&chars=2&fontFamily=Arial&fontWeight=600&backgroundType=gradientLinear&text=" + encodedName;
+        return "https://api.dicebear.com/9.x/initials/png?seed=" + seed + "&radius=50&size=256&chars=2&fontFamily=Arial&fontWeight=600&backgroundType=gradientLinear&text=" + encodedName;
     }
 
     public record LoginDeviceInfo(

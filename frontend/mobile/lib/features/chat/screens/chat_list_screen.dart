@@ -124,15 +124,25 @@ class _ChatListScreenState extends State<ChatListScreen> {
               MaterialPageRoute(builder: (_) => const UnifiedSearchScreen()),
             );
           },
-          child: Row(
-          children: [
-            Icon(Icons.search, size: 24, color: searchHint),
-            const SizedBox(width: 8),
-            Text(
-              'Tìm kiếm',
-              style: TextStyle(color: searchHint, fontSize: 16, fontWeight: FontWeight.w400),
+          child: Hero(
+            tag: 'search_bar',
+            child: Material(
+              color: Colors.transparent,
+              child: Row(
+                children: [
+                  Icon(Icons.search, size: 24, color: searchHint),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Tìm kiếm',
+                    style: TextStyle(
+                      color: searchHint,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ],
           ),
         ),
         actions: [
