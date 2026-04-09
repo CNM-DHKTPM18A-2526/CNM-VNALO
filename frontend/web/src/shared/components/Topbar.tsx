@@ -11,9 +11,10 @@ type TopbarProps = {
   userName: string
   userAvatarUrl?: string | null
   onLogout: () => void
+  onOpenSettingsModal?: () => void
 }
 
-export function Topbar({ title, userName, userAvatarUrl, onLogout }: TopbarProps) {
+export function Topbar({ title, userName, userAvatarUrl, onLogout, onOpenSettingsModal }: TopbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const menuItemRefs = useRef<Array<HTMLButtonElement | null>>([])
@@ -31,7 +32,7 @@ export function Topbar({ title, userName, userAvatarUrl, onLogout }: TopbarProps
       key: 'settings',
       label: t('topbar.menuSettings'),
       icon: 'settings' as const,
-      onSelect: () => navigate('/settings'),
+      onSelect: () => onOpenSettingsModal?.(),
     },
     {
       key: 'logout',

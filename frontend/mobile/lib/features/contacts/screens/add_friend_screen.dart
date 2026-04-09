@@ -89,16 +89,36 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
           false;
 
       if (shouldSend) {
-        await friendService.sendFriendRequest(user.id);
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Đã gửi lời mời đến ${user.displayName}.')),
-        );
+        try {
+          await friendService.sendFriendRequest(user.id);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Đã gửi lời mời đến ${user.displayName}.')),
+          );
+        } on ApiException catch (e) {
+          if (!mounted) return;
+          final msg = switch (e.code) {
+            'SOCIAL_003' => 'Bạn đã gửi lời mời kết bạn cho người này rồi.',
+            'SOCIAL_002' => 'Hai bạn đã là bạn bè rồi.',
+            'SOCIAL_001' => 'Không thể tự kết bạn với chính mình.',
+            'SOCIAL_007' => 'Bạn đã chặn người dùng này.',
+            'SOCIAL_008' => 'Người dùng này đã chặn bạn.',
+            _ => 'Không thể gửi lời mời: ${e.message}',
+          };
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        }
       }
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      final msg = switch (e.code) {
+        'USER_001' => 'Không tìm thấy người dùng với số điện thoại này.',
+        _ => 'Không tìm thấy người dùng hoặc bị giới hạn quyền riêng tư.',
+      };
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Không tìm thấy người dùng hoặc bị giới hạn quyền riêng tư. $e')),
+        SnackBar(content: Text('Đã xảy ra lỗi: $e')),
       );
     } finally {
       if (mounted) {

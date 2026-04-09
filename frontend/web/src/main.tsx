@@ -8,6 +8,7 @@ import { NotificationsProvider } from './shared/contexts/NotificationsContext'
 
 import './index.css'
 import './styles/settings.css'
+import './styles/settings-menu.css'
 import App from './App.tsx'
 
 createRoot(document.getElementById('root')!).render(

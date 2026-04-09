@@ -1,0 +1,119 @@
+import { useRef, useEffect, useState, useCallback } from 'react'
+
+import { useAuth } from '../../features/auth/useAuth'
+import { useLanguage } from '../i18n/LanguageContext'
+import { Icon } from './Icon'
+
+type SettingsMenuProps = {
+  onOpenSettings: () => void
+}
+
+export function SettingsMenu({
+  onOpenSettings,
+}: SettingsMenuProps) {
+  const { t } = useLanguage()
+  const { logout } = useAuth()
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+
+  const handleClickOutside = useCallback((event: MouseEvent) => {
+    if (
+      menuRef.current &&
+      !menuRef.current.contains(event.target as Node) &&
+      buttonRef.current &&
+      !buttonRef.current.contains(event.target as Node)
+    ) {
+      setIsMenuOpen(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isMenuOpen) {
+      return
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isMenuOpen, handleClickOutside])
+
+  useEffect(() => {
+    if (!isMenuOpen) {
+      return
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsMenuOpen(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleEscape)
+    return () => {
+      window.removeEventListener('keydown', handleEscape)
+    }
+  }, [isMenuOpen])
+
+  const handleMenuItemClick = (action: () => void) => {
+    setIsMenuOpen(false)
+    action()
+  }
+
+  const handleLogout = () => {
+    setIsMenuOpen(false)
+    logout()
+  }
+
+  const handleButtonClick = () => {
+    setIsMenuOpen((prev) => !prev)
+  }
+
+  return (
+    <div className='settings-menu-wrapper'>
+      <button
+        ref={buttonRef}
+        className='settings-menu-button'
+        onClick={handleButtonClick}
+        title={t('settingsMenu.title')}
+        aria-expanded={isMenuOpen}
+        aria-haspopup='menu'
+      >
+        <span aria-hidden className='settings-menu-button-icon'>
+          <Icon name='settings' />
+        </span>
+      </button>
+
+      {isMenuOpen ? (
+        <div ref={menuRef} className='settings-menu-popover' role='menu'>
+          <div className='settings-menu-items'>
+            <button
+              className='settings-menu-item'
+              role='menuitem'
+              onClick={() => handleMenuItemClick(onOpenSettings)}
+            >
+              <span className='settings-menu-item-icon' aria-hidden='true'>
+                <Icon name='settings' />
+              </span>
+              <span className='settings-menu-item-label'>{t('settingsMenu.settings')}</span>
+            </button>
+
+            <div className='settings-menu-divider' />
+
+            <button
+              className='settings-menu-item settings-menu-item-logout'
+              role='menuitem'
+              onClick={() => handleMenuItemClick(handleLogout)}
+            >
+              <span className='settings-menu-item-icon' aria-hidden='true'>
+                <Icon name='logout' />
+              </span>
+              <span className='settings-menu-item-label'>{t('settingsMenu.logout')}</span>
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  )
+}

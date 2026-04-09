@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, IsNull } from 'typeorm';
 import { ConversationInbox } from '../entities/conversation-inbox.entity';
 import { Conversation } from '../entities/conversation.entity';
+import { ConversationMember } from '../entities/conversation-member.entity';
 
 type AccessPolicyContext = {
   clientPlatform?: string;
@@ -19,6 +20,8 @@ export class InboxService {
     private readonly inboxRepo: Repository<ConversationInbox>,
     @InjectRepository(Conversation)
     private readonly conversationRepo: Repository<Conversation>,
+    @InjectRepository(ConversationMember)
+    private readonly memberRepo: Repository<ConversationMember>,
   ) { }
 
   /**
@@ -51,10 +54,21 @@ export class InboxService {
       where: { id: In(convIds) },
     });
 
-    // Build O(1) lookup map
-    const convMap = new Map(conversations.map((c) => [c.id, c]));
+    // Batch fetch active members for all conversations
+    const members = await this.memberRepo.find({
+      where: { conversationId: In(convIds), leftAt: IsNull() },
+    });
 
-    // Enrich inbox entries with conversation details
+    // Build O(1) lookup maps
+    const convMap = new Map(conversations.map((c) => [c.id, c]));
+    const memberMap = new Map<string, { userId: string; role: string; nickname: string | null }[]>();
+    for (const m of members) {
+      const list = memberMap.get(m.conversationId) ?? [];
+      list.push({ userId: m.userId, role: m.role, nickname: m.nickname });
+      memberMap.set(m.conversationId, list);
+    }
+
+    // Enrich inbox entries with conversation details and members
     return inbox.map((entry) => {
       const conv = convMap.get(entry.conversationId);
       return {
@@ -67,6 +81,7 @@ export class InboxService {
             title: conv.title,
             avatarUrl: conv.avatarUrl,
             status: conv.status,
+            members: memberMap.get(conv.id) ?? [],
           }
           : null,
       };

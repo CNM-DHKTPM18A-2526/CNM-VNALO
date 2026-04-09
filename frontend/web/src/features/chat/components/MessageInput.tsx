@@ -30,23 +30,37 @@ export function MessageInput({ onSend, placeholder = 'Nhập tin nhắn...', dis
 
   return (
     <footer className='message-input'>
-      <TextField
-        className='message-input-field'
-        placeholder={placeholder}
-        value={message}
-        disabled={disabled}
-        onChange={(event) => setMessage(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            submitMessage()
+      <div className='message-input-shell'>
+        <div className='message-input-actions'>
+          <button className='message-action-btn' type='button' disabled={disabled}>
+            <Icon name='attach' />
+          </button>
+          <button className='message-action-btn' type='button' disabled={disabled}>
+            <Icon name='image' />
+          </button>
+          <button className='message-action-btn' type='button' disabled={disabled}>
+            <Icon name='smile' />
+          </button>
+        </div>
+
+        <TextField
+          className='message-input-field'
+          placeholder={placeholder}
+          value={message}
+          disabled={disabled}
+          onChange={(event) => setMessage(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              submitMessage()
+            }
+          }}
+          trailingSlot={
+            <Button className='message-send-btn' onClick={submitMessage} type='button' disabled={disabled}>
+              <Icon name='send' />
+            </Button>
           }
-        }}
-        trailingSlot={
-          <Button className='message-send-btn' onClick={submitMessage} type='button' disabled={disabled}>
-            <Icon name='send' />
-          </Button>
-        }
-      />
+        />
+      </div>
     </footer>
   )
 }

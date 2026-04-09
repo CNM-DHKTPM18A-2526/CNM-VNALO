@@ -4,6 +4,7 @@ import { Conversation } from '../entities/conversation.entity';
 import { ConversationMember } from '../entities/conversation-member.entity';
 import { ConversationDirectMap } from '../entities/conversation-direct-map.entity';
 import { ConversationJoinRequest } from '../entities/conversation-join-request.entity';
+import { ConversationInbox } from '../entities/conversation-inbox.entity';
 import { ConversationService } from './conversation.service';
 import { ConversationController } from './conversation.controller';
 
@@ -14,6 +15,7 @@ import { ConversationController } from './conversation.controller';
       ConversationMember,
       ConversationDirectMap,
       ConversationJoinRequest,
+      ConversationInbox,
     ]),
   ],
   controllers: [ConversationController],

@@ -1,8 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 
 import { Sidebar } from '../shared/components/Sidebar'
 import { Topbar } from '../shared/components/Topbar'
+import { SettingsModal } from '../features/settings/SettingsModal'
 import { useAuth } from '../features/auth/useAuth'
 import { useLanguage } from '../shared/i18n/LanguageContext'
 
@@ -10,13 +11,14 @@ export function MainLayout() {
   const location = useLocation()
   const { user, logout } = useAuth()
   const { t } = useLanguage()
+  const isChatWorkspace = location.pathname === '/chat' || location.pathname === '/'
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
 
   const title = useMemo(() => {
     const titleMap: Record<string, string> = {
       '/chat': t('pages.chat.title'),
       '/contacts': t('pages.contacts.title'),
       '/profile': t('pages.profile.title'),
-      '/settings': t('pages.settings.title'),
     }
 
     if (location.pathname === '/') {
@@ -26,20 +28,38 @@ export function MainLayout() {
     return titleMap[location.pathname] ?? t('common.appName')
   }, [location.pathname, t])
 
+  const handleOpenSettings = () => {
+    setIsSettingsModalOpen(true)
+  }
+
+  const handleCloseSettings = () => {
+    setIsSettingsModalOpen(false)
+  }
+
+  const handleChangePasswordSuccess = () => {
+    setIsSettingsModalOpen(false)
+    logout()
+  }
+
   return (
     <div className='app-shell'>
-      <Sidebar />
+      <Sidebar onOpenSettingsModal={handleOpenSettings} />
       <section className='workspace'>
-        <Topbar
-          title={title}
-          userAvatarUrl={user?.avatarUrl}
-          userName={user?.name ?? user?.email ?? 'VNALO User'}
-          onLogout={logout}
-        />
-        <main className='workspace-main page-enter' key={location.pathname}>
+        {isChatWorkspace ? null : (
+          <Topbar
+            title={title}
+            userAvatarUrl={user?.avatarUrl}
+            userName={user?.name ?? user?.email ?? 'VNALO User'}
+            onLogout={logout}
+            onOpenSettingsModal={handleOpenSettings}
+          />
+        )}
+        <main className={isChatWorkspace ? 'workspace-main workspace-main-chat page-enter' : 'workspace-main page-enter'} key={location.pathname}>
           <Outlet />
         </main>
       </section>
+
+      <SettingsModal isOpen={isSettingsModalOpen} onClose={handleCloseSettings} onChangePasswordSuccess={handleChangePasswordSuccess} />
     </div>
   )
 }

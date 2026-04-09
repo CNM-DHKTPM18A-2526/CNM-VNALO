@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:vnalo_mobile/config/app_config.dart';
+import 'package:vnalo_mobile/models/conversation_member_model.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
 import 'package:vnalo_mobile/services/api_service.dart';
@@ -9,6 +11,7 @@ class ChatService {
   ChatService(this._apiService);
 
   String get _base => AppConfig.instance.messageServiceUrl;
+  String get _coreBase => AppConfig.instance.coreServiceUrl;
 
   Future<List<Conversation>> getInbox() async {
     final response = await _apiService.get(_base, '/inbox');
@@ -16,6 +19,8 @@ class ChatService {
     if (raw is! List) return const [];
 
     final conversations = <Conversation>[];
+    final allMemberIds = <String>{};
+
     for (final item in raw) {
       if (item is! Map<String, dynamic>) continue;
 
@@ -65,7 +70,80 @@ class ChatService {
         };
       }
 
+      // Collect member IDs for batch user fetch
+      final membersList = nestedConversation['members'];
+      if (membersList is List) {
+        for (final m in membersList) {
+          if (m is Map && m['userId'] != null) {
+            allMemberIds.add(m['userId'].toString());
+          }
+        }
+      }
+
       conversations.add(Conversation.fromJson(json));
+    }
+
+    // Batch fetch user profiles for all member IDs
+    if (allMemberIds.isNotEmpty) {
+      final userProfiles = <String, Map<String, dynamic>>{};
+      await Future.wait(allMemberIds.map((uid) async {
+        try {
+          final res = await _apiService.get(_coreBase, '/users/$uid');
+          final data = res['data'];
+          if (data is Map<String, dynamic>) {
+            userProfiles[uid] = data;
+          } else if (res.containsKey('displayName')) {
+            userProfiles[uid] = res;
+          }
+        } catch (_) {
+          // User not found or error, skip
+        }
+      }));
+
+      // Enrich conversation members with user profile data
+      for (int i = 0; i < conversations.length; i++) {
+        final conv = conversations[i];
+        if (conv.members.isEmpty) continue;
+        final enrichedMembers = conv.members.map((member) {
+          final profile = userProfiles[member.userId];
+          if (profile != null && member.user == null) {
+            return ConversationMember.fromJson({
+              'conversationId': member.conversationId,
+              'userId': member.userId,
+              'role': member.role.name,
+              'nickname': member.nickname,
+              'joinedAt': member.joinedAt.toIso8601String(),
+              'user': profile,
+            });
+          }
+          return member;
+        }).toList();
+
+        // Rebuild conversation with enriched members
+        conversations[i] = Conversation(
+          id: conv.id,
+          type: conv.type,
+          title: conv.title,
+          avatarUrl: conv.avatarUrl,
+          description: conv.description,
+          createdBy: conv.createdBy,
+          status: conv.status,
+          joinMode: conv.joinMode,
+          memberLimit: conv.memberLimit,
+          isEncrypted: conv.isEncrypted,
+          allowMemberInvite: conv.allowMemberInvite,
+          allowMemberPin: conv.allowMemberPin,
+          allowMemberEditInfo: conv.allowMemberEditInfo,
+          createdAt: conv.createdAt,
+          updatedAt: conv.updatedAt,
+          members: enrichedMembers,
+          lastMessage: conv.lastMessage,
+          unreadCount: conv.unreadCount,
+          isPinned: conv.isPinned,
+          isMuted: conv.isMuted,
+          isHidden: conv.isHidden,
+        );
+      }
     }
 
     return conversations;
@@ -79,7 +157,21 @@ class ChatService {
       body: {'targetUserId': otherUserId},
     );
 
-    return Conversation.fromJson(response['data']);
+    debugPrint('[CHAT] getOrCreateDirect response: $response');
+    final data = response['data'];
+    if (data is Map<String, dynamic>) {
+      return Conversation.fromJson(data);
+    }
+    // If 'data' is null, the response itself might be the conversation
+    if (response.containsKey('id')) {
+      return Conversation.fromJson(response);
+    }
+    // Try 'conversation' key
+    final conv = response['conversation'];
+    if (conv is Map<String, dynamic>) {
+      return Conversation.fromJson(conv);
+    }
+    throw Exception('Invalid response format from conversations/direct');
   }
 
   // Create a new group conversation with a name and a list of member IDs

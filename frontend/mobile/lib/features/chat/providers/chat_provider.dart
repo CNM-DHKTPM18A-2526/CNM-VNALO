@@ -156,9 +156,11 @@ class ChatProvider extends ChangeNotifier {
     }
 
     final index = _conversations.indexWhere((c) => c.id == conversationId);
-    if (index > 0) {
-      final conversation = _conversations.removeAt(index);
-      _conversations.insert(0, conversation);
+    if (index >= 0) {
+      final conversation = _conversations[index];
+      final updatedConversation = conversation.copyWith(lastMessage: message);
+      _conversations.removeAt(index);
+      _conversations.insert(0, updatedConversation);
     }
 
     notifyListeners();
