@@ -133,6 +133,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return _birthday!.toIso8601String().split('T').first;
   }
 
+  bool _showPasswordInRegister = false;
+  bool _showConfirmPasswordInRegister = false;
+
   String _buildFullPhone() {
     var digits = _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
     if (_countryCode == '+84' && digits.startsWith('0') && digits.length > 1) {
@@ -421,8 +424,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
+        final isDarkMode = Theme.of(ctx).brightness == Brightness.dark;
         return AlertDialog(
-          backgroundColor: Colors.white,
+          backgroundColor: isDarkMode ? DarkColors.surface : Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           titlePadding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
           contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
@@ -432,7 +436,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEAF2FF),
+                  color: isDarkMode ? DarkColors.divider : const Color(0xFFEAF2FF),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(Icons.contacts_outlined, color: AppColors.primary),
@@ -441,7 +445,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               Expanded(
                 child: Text(
                   t.syncContactsTitle,
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18, color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary),
                 ),
               ),
             ],
@@ -452,12 +456,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
             children: [
               Text(
                 t.syncContactsMessage,
-                style: const TextStyle(fontSize: 15, color: Color(0xFF4B5563), height: 1.4),
+                style: TextStyle(fontSize: 15, color: isDarkMode ? DarkColors.textSecondary : const Color(0xFF4B5563), height: 1.4),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Bạn luôn có thể thay đổi lựa chọn này trong Cài đặt quyền riêng tư.',
-                style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+                style: TextStyle(fontSize: 13, color: isDarkMode ? DarkColors.textHint : const Color(0xFF6B7280)),
               ),
               const SizedBox(height: 14),
               Row(
@@ -466,11 +470,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     child: OutlinedButton(
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size.fromHeight(44),
-                        side: const BorderSide(color: Color(0xFFD1D5DB)),
+                        side: BorderSide(color: isDarkMode ? DarkColors.divider : const Color(0xFFD1D5DB)),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        foregroundColor: const Color(0xFF4B5563),
+                        foregroundColor: isDarkMode ? DarkColors.textSecondary : const Color(0xFF4B5563),
                       ),
                       onPressed: () {
                         Navigator.pop(ctx);
@@ -559,14 +563,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   void _showPermissionDialog(String title, String message) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-        content: Text(message, style: const TextStyle(fontSize: 15, color: Color(0xFF4B5563))),
+        backgroundColor: isDarkMode ? DarkColors.surface : Colors.white,
+        title: Text(title, style: TextStyle(fontWeight: FontWeight.w700, color: isDarkMode ? Colors.white : Colors.black)),
+        content: Text(message, style: TextStyle(fontSize: 15, color: isDarkMode ? Colors.white70 : const Color(0xFF4B5563))),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy', style: TextStyle(color: Color(0xFF6B7280)))),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Hủy', style: TextStyle(color: isDarkMode ? Colors.white38 : const Color(0xFF6B7280)))),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
             onPressed: () {
@@ -593,27 +598,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Only show AppBar title for Phone step; other steps use in-body header
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final scaffoldBg = isDarkMode ? DarkColors.scaffold : Colors.white;
+    final appBarBg = isDarkMode ? DarkColors.appBarBg : Colors.white;
     final showAppBarTitle = _currentStep == 0;
     final t = AuthTexts.of(context);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: scaffoldBg,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        backgroundColor: appBarBg,
+        surfaceTintColor: appBarBg,
         elevation: 0,
         leading: BackButton(
           onPressed: _backStep,
+          color: isDarkMode ? Colors.white : Colors.black,
         ),
         title: showAppBarTitle
             ? Text(
                 t.enterPhoneTitle,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF171717),
+                  color: isDarkMode ? Colors.white : const Color(0xFF171717),
                 ),
               )
             : null,
@@ -636,6 +644,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Widget _buildEmailStep() {
     final t = AuthTexts.of(context);
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final emailError = Validators.email(_emailController.text.trim());
     final canProceed = emailError == null;
 
@@ -650,20 +659,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
             Text(
               t.enterEmailTitle,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF141414),
+                color: isDarkMode ? DarkColors.textPrimary : const Color(0xFF141414),
               ),
             ),
             const SizedBox(height: 10),
             Text(
               'Email sẽ được dùng để xác thực OTP đăng ký.',
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w400,
-                color: Color(0xFF4B5563),
+                color: isDarkMode ? Colors.white70 : const Color(0xFF4B5563),
               ),
             ),
             const SizedBox(height: 28),
@@ -671,21 +680,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
               onChanged: (_) => setState(() {}),
-              style: const TextStyle(fontSize: 17),
+              style: TextStyle(fontSize: 17, color: isDarkMode ? Colors.white : Colors.black),
               decoration: InputDecoration(
                 hintText: t.emailHint,
+                hintStyle: TextStyle(color: isDarkMode ? DarkColors.textHint : LightColors.textHint),
                 errorText: _emailController.text.isEmpty ? null : emailError,
                 filled: true,
-                fillColor: const Color(0xFFF9FAFB),
+                fillColor: isDarkMode ? DarkColors.surface : const Color(0xFFF9FAFB),
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                  borderSide: BorderSide(color: isDarkMode ? DarkColors.divider : LightColors.divider),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                  borderSide: BorderSide(color: isDarkMode ? DarkColors.divider : LightColors.divider),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -701,7 +711,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(56),
                 backgroundColor:
-                    canProceed ? AppColors.primary : const Color(0xFFE5E7EB),
+                    canProceed ? AppColors.primary : (isDarkMode ? DarkColors.divider : LightColors.divider),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(999),
                 ),
@@ -721,7 +731,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       style: TextStyle(
                         color: canProceed
                             ? Colors.white
-                            : const Color(0xFF9CA3AF),
+                            : (isDarkMode ? DarkColors.textHint : LightColors.textHint),
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
                       ),
@@ -818,6 +828,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Widget _buildPhoneStep() {
     final t = AuthTexts.of(context);
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final isPhoneValid = _phoneValidationError() == null;
     final canProceed = _agreeTermsA && _agreeTermsB && isPhoneValid;
 
@@ -840,11 +851,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
             onChanged: (value) =>
                 setState(() => _agreeTermsA = value ?? false),
             controlAffinity: ListTileControlAffinity.leading,
+            activeColor: AppColors.primary,
             contentPadding: EdgeInsets.zero,
-            side: const BorderSide(color: Color(0xFFD1D5DB), width: 1.5),
+            side: BorderSide(color: isDarkMode ? DarkColors.divider : const Color(0xFFD1D5DB), width: 1.5),
             title: Text(
               t.agreeTermA,
-              style: const TextStyle(fontSize: 16, color: Color(0xFF252525)),
+              style: TextStyle(fontSize: 16, color: isDarkMode ? DarkColors.textPrimary : const Color(0xFF252525)),
             ),
           ),
           CheckboxListTile(
@@ -852,11 +864,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
             onChanged: (value) =>
                 setState(() => _agreeTermsB = value ?? false),
             controlAffinity: ListTileControlAffinity.leading,
+            activeColor: AppColors.primary,
             contentPadding: EdgeInsets.zero,
-            side: const BorderSide(color: Color(0xFFD1D5DB), width: 1.5),
+            side: BorderSide(color: isDarkMode ? DarkColors.divider : const Color(0xFFD1D5DB), width: 1.5),
             title: Text(
               t.agreeTermB,
-              style: const TextStyle(fontSize: 16, color: Color(0xFF252525)),
+              style: TextStyle(fontSize: 16, color: isDarkMode ? DarkColors.textPrimary : const Color(0xFF252525)),
             ),
           ),
           const SizedBox(height: 16),
@@ -899,8 +912,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
               child: RichText(
                 text: TextSpan(
                   text: t.alreadyHasAccount,
-                  style: const TextStyle(
-                    color: Color(0xFF374151),
+                  style: TextStyle(
+                    color: isDarkMode ? DarkColors.textSecondary : const Color(0xFF374151),
                     fontSize: 17,
                   ),
                   children: [
@@ -925,6 +938,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Widget _buildNameStep() {
     final t = AuthTexts.of(context);
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final hasValidName = Validators.displayName(_nameController.text) == null;
 
     return GestureDetector(
@@ -939,20 +953,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
             Text(
               t.enterNameTitle,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF141414),
+                color: isDarkMode ? DarkColors.textPrimary : const Color(0xFF141414),
               ),
             ),
             const SizedBox(height: 10),
             Text(
               t.enterNameSubtitle,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w400,
-                color: Color(0xFF4B5563),
+                color: isDarkMode ? DarkColors.textSecondary : const Color(0xFF4B5563),
               ),
             ),
             const SizedBox(height: 28),
@@ -960,21 +974,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
               controller: _nameController,
               onChanged: (_) => setState(() {}),
               textCapitalization: TextCapitalization.words,
-              style: const TextStyle(fontSize: 17),
+              style: TextStyle(fontSize: 17, color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary),
               decoration: InputDecoration(
                 hintText: t.displayNameHint,
-                hintStyle: const TextStyle(color: Color(0xFFB0B0B0)),
+                hintStyle: TextStyle(color: isDarkMode ? DarkColors.textHint : const Color(0xFFB0B0B0)),
                 filled: true,
-                fillColor: const Color(0xFFF9FAFB),
+                fillColor: isDarkMode ? DarkColors.surface : const Color(0xFFF9FAFB),
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                  borderSide: BorderSide(color: isDarkMode ? DarkColors.divider : const Color(0xFFD1D5DB)),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                  borderSide: BorderSide(color: isDarkMode ? DarkColors.divider : const Color(0xFFD1D5DB)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -1035,7 +1049,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       style: TextStyle(
         fontSize: 15,
         fontWeight: FontWeight.w500,
-        color: isLink ? AppColors.primary : const Color(0xFF4B5563),
+        color: isLink ? AppColors.primary : (Theme.of(context).brightness == Brightness.dark ? DarkColors.textSecondary : const Color(0xFF4B5563)),
         height: 1.4,
       ),
     );
@@ -1046,6 +1060,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget _buildPersonalInfoStep() {
     final t = AuthTexts.of(context);
 
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -1056,10 +1071,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
           Text(
             t.personalInfoTitle,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 26,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF141414),
+              color: isDarkMode ? Colors.white : const Color(0xFF141414),
             ),
           ),
           const SizedBox(height: 28),
@@ -1071,9 +1086,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
               padding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               decoration: BoxDecoration(
-                color: const Color(0xFFF9FAFB),
+                color: isDarkMode ? DarkColors.surface : const Color(0xFFF9FAFB),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFD1D5DB)),
+                border: Border.all(color: isDarkMode ? DarkColors.divider : const Color(0xFFD1D5DB)),
               ),
               child: Row(
                 children: [
@@ -1086,8 +1101,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         fontSize: 16,
                         fontWeight: FontWeight.w400,
                         color: _birthday != null
-                            ? const Color(0xFF1F2937)
-                            : const Color(0xFFB0B0B0),
+                            ? (isDarkMode ? Colors.white : const Color(0xFF1F2937))
+                            : (isDarkMode ? Colors.white38 : const Color(0xFFB0B0B0)),
                       ),
                     ),
                   ),
@@ -1106,9 +1121,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
               padding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               decoration: BoxDecoration(
-                color: const Color(0xFFF9FAFB),
+                color: isDarkMode ? DarkColors.surface : const Color(0xFFF9FAFB),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFD1D5DB)),
+                border: Border.all(color: isDarkMode ? DarkColors.divider : const Color(0xFFD1D5DB)),
               ),
               child: Row(
                 children: [
@@ -1123,8 +1138,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         fontSize: 16,
                         fontWeight: FontWeight.w400,
                         color: _gender != null
-                            ? const Color(0xFF1F2937)
-                            : const Color(0xFFB0B0B0),
+                            ? (isDarkMode ? Colors.white : const Color(0xFF1F2937))
+                            : (isDarkMode ? Colors.white38 : const Color(0xFFB0B0B0)),
                       ),
                     ),
                   ),
@@ -1160,6 +1175,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   void _showGenderPicker() {
     final t = AuthTexts.of(context, listen: false);
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -1188,10 +1204,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const SizedBox(height: 14),
                   Text(
                     t.genderHint,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF141414),
+                      color: isDarkMode ? DarkColors.textPrimary : const Color(0xFF141414),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -1199,8 +1215,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     contentPadding: const EdgeInsets.symmetric(horizontal: 4),
                     title: Text(
                       t.genderMale,
-                      style: const TextStyle(
-                          fontSize: 18, color: Color(0xFF1F2937)),
+                      style: TextStyle(
+                          fontSize: 18, color: isDarkMode ? DarkColors.textPrimary : const Color(0xFF1F2937)),
                     ),
                     trailing: _gender == 'male'
                         ? const Icon(Icons.check,
@@ -1215,8 +1231,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     contentPadding: const EdgeInsets.symmetric(horizontal: 4),
                     title: Text(
                       t.genderFemale,
-                      style: const TextStyle(
-                          fontSize: 18, color: Color(0xFF1F2937)),
+                      style: TextStyle(
+                          fontSize: 18, color: isDarkMode ? DarkColors.textPrimary : const Color(0xFF1F2937)),
                     ),
                     trailing: _gender == 'female'
                         ? const Icon(Icons.check,
@@ -1231,8 +1247,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     contentPadding: const EdgeInsets.symmetric(horizontal: 4),
                     title: Text(
                       t.genderNotShare,
-                      style: const TextStyle(
-                          fontSize: 18, color: Color(0xFF1F2937)),
+                      style: TextStyle(
+                          fontSize: 18, color: isDarkMode ? DarkColors.textPrimary : const Color(0xFF1F2937)),
                     ),
                     trailing: _gender == 'other'
                         ? const Icon(Icons.check,
@@ -1265,11 +1281,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
         bool showWarning = false;
         return StatefulBuilder(
           builder: (ctx, setSheetState) {
+            final isDarkMode = Theme.of(context).brightness == Brightness.dark;
             return Container(
               height: 380,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              decoration: BoxDecoration(
+                color: isDarkMode ? DarkColors.surface : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: Column(
                 children: [
@@ -1371,6 +1388,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Widget _buildPasswordStep() {
     final t = AuthTexts.of(context);
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -1386,32 +1404,39 @@ class _RegisterScreenState extends State<RegisterScreen> {
               Text(
                 t.enterPasswordTitle,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF141414),
+                  color: isDarkMode ? DarkColors.textPrimary : const Color(0xFF141414),
                 ),
               ),
               const SizedBox(height: 28),
               TextFormField(
                 controller: _passwordController,
-                obscureText: true,
+                obscureText: !_showPasswordInRegister,
                 validator: Validators.password,
-                style: const TextStyle(fontSize: 17),
+                style: TextStyle(fontSize: 17, color: isDarkMode ? DarkColors.textPrimary : Colors.black),
                 decoration: InputDecoration(
                   hintText: t.passwordHint,
-                  hintStyle: const TextStyle(color: Color(0xFFB0B0B0)),
+                  hintStyle: TextStyle(color: isDarkMode ? Colors.white38 : const Color(0xFFB0B0B0)),
                   filled: true,
-                  fillColor: const Color(0xFFF9FAFB),
+                  fillColor: isDarkMode ? DarkColors.surface : const Color(0xFFF9FAFB),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _showPasswordInRegister ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                      color: isDarkMode ? Colors.white54 : Colors.grey,
+                    ),
+                    onPressed: () => setState(() => _showPasswordInRegister = !_showPasswordInRegister),
+                  ),
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                    borderSide: BorderSide(color: isDarkMode ? DarkColors.divider : const Color(0xFFD1D5DB)),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                    borderSide: BorderSide(color: isDarkMode ? DarkColors.divider : const Color(0xFFD1D5DB)),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -1423,13 +1448,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ),
                 const SizedBox(height: 10),
-                const Align(
+                Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
                     'Mật khẩu phải có ít nhất 8 ký tự, gồm chữ hoa, chữ thường và số.',
                     style: TextStyle(
                       fontSize: 13,
-                      color: Color(0xFF6B7280),
+                      color: isDarkMode ? Colors.white54 : const Color(0xFF6B7280),
                       height: 1.4,
                     ),
                   ),
@@ -1437,26 +1462,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _confirmPasswordController,
-                obscureText: true,
+                obscureText: !_showConfirmPasswordInRegister,
                 validator: (value) => Validators.confirmPassword(
                   value,
                   _passwordController.text,
                 ),
-                style: const TextStyle(fontSize: 17),
+                style: TextStyle(fontSize: 17, color: isDarkMode ? DarkColors.textPrimary : Colors.black),
                 decoration: InputDecoration(
                   hintText: t.confirmPasswordHint,
-                  hintStyle: const TextStyle(color: Color(0xFFB0B0B0)),
+                  hintStyle: TextStyle(color: isDarkMode ? Colors.white38 : const Color(0xFFB0B0B0)),
                   filled: true,
-                  fillColor: const Color(0xFFF9FAFB),
+                  fillColor: isDarkMode ? DarkColors.surface : const Color(0xFFF9FAFB),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _showConfirmPasswordInRegister ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                      color: isDarkMode ? Colors.white54 : Colors.grey,
+                    ),
+                    onPressed: () => setState(() => _showConfirmPasswordInRegister = !_showConfirmPasswordInRegister),
+                  ),
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                    borderSide: BorderSide(color: isDarkMode ? DarkColors.divider : const Color(0xFFD1D5DB)),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                    borderSide: BorderSide(color: isDarkMode ? DarkColors.divider : const Color(0xFFD1D5DB)),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -1513,6 +1545,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Widget _buildAvatarStep() {
     final t = AuthTexts.of(context);
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final displayName = _nameController.text.trim();
     final initials = AvatarUtils.getInitials(displayName);
     final avatarColor = AvatarUtils.getColor(displayName);
@@ -1528,20 +1561,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
           Text(
             t.avatarTitle,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 26,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF141414),
+              color: isDarkMode ? Colors.white : const Color(0xFF141414),
             ),
           ),
           const SizedBox(height: 10),
           Text(
             t.avatarSubtitle,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w400,
-              color: Color(0xFF4B5563),
+              color: isDarkMode ? DarkColors.textSecondary : const Color(0xFF4B5563),
             ),
           ),
           const SizedBox(height: 8),

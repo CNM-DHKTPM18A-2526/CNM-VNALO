@@ -22,4 +22,25 @@ class DateFormatter {
 
     return DateFormat('dd/MM').format(local);
   }
+
+  static String formatTimelineDate(DateTime? dateTime) {
+    if (dateTime == null) return '';
+    final local = dateTime.toLocal();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final date = DateTime(local.year, local.month, local.day);
+
+    final timeStr = DateFormat('HH:mm').format(local);
+
+    if (date == today) {
+      return '$timeStr Hôm nay';
+    }
+    
+    final yesterday = today.subtract(const Duration(days: 1));
+    if (date == yesterday) {
+      return '$timeStr Hôm qua';
+    }
+
+    return '$timeStr ${DateFormat('dd/MM/yyyy').format(local)}';
+  }
 }

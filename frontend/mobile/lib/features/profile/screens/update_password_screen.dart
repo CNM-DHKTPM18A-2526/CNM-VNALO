@@ -93,7 +93,7 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Đã cập nhật mật khẩu thành công'),
-          backgroundColor: Color(0xFF22C55E),
+          backgroundColor: AppColors.success,
         ),
       );
       Navigator.pop(context);
@@ -131,14 +131,15 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
+    final scaffoldBg = isDarkMode ? DarkColors.scaffold : LightColors.scaffold;
+    final surfaceColor = isDarkMode ? DarkColors.surface : LightColors.surface;
 
     return Scaffold(
-      backgroundColor: isDarkMode ? Colors.black : const Color(0xFFF3F4F6),
+      backgroundColor: scaffoldBg,
       appBar: AppBar(
         title: const Text('Cập nhật mật khẩu'),
-        backgroundColor: appBarBg,
-        foregroundColor: Colors.white,
+        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
+        elevation: 0,
         flexibleSpace: isDarkMode
             ? null
             : Container(
@@ -146,123 +147,149 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
               ),
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
         children: [
-          Text(
-            'Mật khẩu phải gồm chữ hoa, chữ thường và số; không nên dùng thông tin dễ đoán như năm sinh hoặc tên.',
-            style: TextStyle(
-              fontSize: 16,
-              color: isDarkMode ? const Color(0xFFD1D5DB) : const Color(0xFF374151),
-              height: 1.4,
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDarkMode ? DarkColors.surface : AppColors.primary.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDarkMode ? DarkColors.divider : AppColors.primary.withValues(alpha: 0.1),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline, color: AppColors.primary, size: 24),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Mật khẩu phải có ít nhất 8 ký tự, gồm chữ hoa, chữ thường và số.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 22),
-          Text(
-            'Mật khẩu hiện tại',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: isDarkMode ? Colors.white : const Color(0xFF111827),
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
+          const SizedBox(height: 28),
+          _buildInputField(
+            label: 'Mật khẩu hiện tại',
             controller: _currentController,
-            obscureText: !_showCurrent,
-            onChanged: (_) => setState(() {}),
-            decoration: InputDecoration(
-              hintText: 'Nhập mật khẩu hiện tại',
-              suffix: GestureDetector(
-                onTap: () => setState(() => _showCurrent = !_showCurrent),
-                child: Text(
-                  _showCurrent ? 'ẨN' : 'HIỆN',
-                  style: const TextStyle(
-                    color: Color(0xFF9CA3AF),
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              border: const UnderlineInputBorder(),
-            ),
+            hint: 'Nhập mật khẩu hiện tại',
+            obscure: !_showCurrent,
+            onToggle: () => setState(() => _showCurrent = !_showCurrent),
+            isDarkMode: isDarkMode,
+            surfaceColor: surfaceColor,
           ),
-          const SizedBox(height: 18),
-          Text(
-            'Mật khẩu mới',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: isDarkMode ? Colors.white : const Color(0xFF111827),
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
+          const SizedBox(height: 20),
+          _buildInputField(
+            label: 'Mật khẩu mới',
             controller: _newController,
-            obscureText: !_showNew,
-            onChanged: (v) {
-              _validateNewPassword(v);
-            },
-            decoration: InputDecoration(
-              hintText: 'Nhập mật khẩu mới',
-              errorText: _newPasswordError,
-              suffix: GestureDetector(
-                onTap: () => setState(() => _showNew = !_showNew),
-                child: Text(
-                  _showNew ? 'ẨN' : 'HIỆN',
-                  style: const TextStyle(
-                    color: Color(0xFF9CA3AF),
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              border: const UnderlineInputBorder(),
-            ),
+            hint: 'Nhập mật khẩu mới',
+            obscure: !_showNew,
+            onToggle: () => setState(() => _showNew = !_showNew),
+            errorText: _newPasswordError,
+            onChanged: _validateNewPassword,
+            isDarkMode: isDarkMode,
+            surfaceColor: surfaceColor,
           ),
-          const SizedBox(height: 12),
-          TextField(
+          const SizedBox(height: 20),
+          _buildInputField(
+            label: 'Nhập lại mật khẩu mới',
             controller: _confirmController,
-            obscureText: !_showConfirm,
-            onChanged: (v) {
-              _validateConfirmPassword(v);
-            },
-            decoration: InputDecoration(
-              hintText: 'Nhập lại mật khẩu mới',
-              errorText: _confirmPasswordError,
-              suffix: GestureDetector(
-                onTap: () => setState(() => _showConfirm = !_showConfirm),
-                child: Text(
-                  _showConfirm ? 'ẨN' : 'HIỆN',
-                  style: const TextStyle(
-                    color: Color(0xFF9CA3AF),
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              border: const UnderlineInputBorder(),
-            ),
+            hint: 'Nhập lại mật khẩu mới',
+            obscure: !_showConfirm,
+            onToggle: () => setState(() => _showConfirm = !_showConfirm),
+            errorText: _confirmPasswordError,
+            onChanged: _validateConfirmPassword,
+            isDarkMode: isDarkMode,
+            surfaceColor: surfaceColor,
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 40),
           ElevatedButton(
             onPressed: _isSubmitting || !_canSubmit ? null : _submit,
             style: ElevatedButton.styleFrom(
               minimumSize: const Size.fromHeight(56),
-              backgroundColor: _canSubmit ? AppColors.primary : const Color(0xFFBFDBFE),
+              backgroundColor: _canSubmit ? AppColors.primary : (isDarkMode ? DarkColors.divider : AppColors.primary.withValues(alpha: 0.3)),
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               elevation: 0,
             ),
             child: _isSubmitting
                 ? const SizedBox(
-                    width: 18,
-                    height: 18,
+                    width: 20,
+                    height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                   )
-                : const Text('CẬP NHẬT', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                : const Text('CẬP NHẬT MẬT KHẨU', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildInputField({
+    required String label,
+    required TextEditingController controller,
+    required String hint,
+    required bool obscure,
+    required VoidCallback onToggle,
+    required bool isDarkMode,
+    required Color surfaceColor,
+    String? errorText,
+    ValueChanged<String>? onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context).textTheme.titleMedium?.color,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          obscureText: obscure,
+          onChanged: onChanged,
+          style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color, fontSize: 16),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(color: Theme.of(context).hintColor, fontSize: 15),
+            filled: true,
+            fillColor: surfaceColor,
+            errorText: errorText,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            suffixIcon: IconButton(
+              icon: Icon(
+                obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                color: isDarkMode ? Colors.white54 : Colors.grey,
+                size: 22,
+              ),
+              onPressed: onToggle,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: isDarkMode ? DarkColors.divider : LightColors.divider),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.error),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

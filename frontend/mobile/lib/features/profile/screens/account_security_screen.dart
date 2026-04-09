@@ -16,9 +16,12 @@ class AccountSecurityScreen extends StatelessWidget {
     final auth = context.watch<AuthProvider?>();
     final user = auth?.user;
     final displayName = user?.displayName ?? 'Người dùng';
-    final pageBg = isDarkMode ? Colors.black : AppColors.sectionBackground;
-    final sectionBg = isDarkMode ? const Color(0xFF171717) : Colors.white;
-    final dividerColor = isDarkMode ? const Color(0xFF303030) : AppColors.sectionDivider;
+    final pageBg = isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground;
+    final sectionBg = isDarkMode ? DarkColors.surface : LightColors.surface;
+    final dividerColor = isDarkMode ? DarkColors.divider : AppColors.sectionDivider;
+    final textColor = isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary;
+    final subTextColor = isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary;
+    final iconColor = isDarkMode ? DarkColors.textHint : LightColors.textHint;
 
     return Scaffold(
       backgroundColor: pageBg,
@@ -47,12 +50,12 @@ class AccountSecurityScreen extends StatelessWidget {
                 name: displayName,
                 size: 52,
               ),
-              title: const Text('Thông tin cá nhân', style: TextStyle(fontSize: 15)),
+              title: Text('Thông tin cá nhân', style: TextStyle(fontSize: 15, color: subTextColor)),
               subtitle: Text(
                 displayName,
-                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, height: 1.2),
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, height: 1.2, color: textColor),
               ),
-              trailing: const Icon(Icons.chevron_right, color: Color(0xFF9CA3AF)),
+              trailing: Icon(Icons.chevron_right, color: iconColor),
               onTap: () {
                 Navigator.push(
                   context,
@@ -68,6 +71,7 @@ class AccountSecurityScreen extends StatelessWidget {
             title: 'Số điện thoại',
             subtitle: user?.phone ?? 'Chưa cập nhật',
             backgroundColor: sectionBg,
+            isDarkMode: isDarkMode,
           ),
           _divider(dividerColor),
           _tile(
@@ -76,6 +80,7 @@ class AccountSecurityScreen extends StatelessWidget {
             title: 'Email',
             subtitle: 'Chưa liên kết',
             backgroundColor: sectionBg,
+            isDarkMode: isDarkMode,
           ),
           _divider(dividerColor),
           _tile(
@@ -83,6 +88,7 @@ class AccountSecurityScreen extends StatelessWidget {
             icon: Icons.qr_code_2,
             title: 'Mã QR của tôi',
             backgroundColor: sectionBg,
+            isDarkMode: isDarkMode,
           ),
           const SizedBox(height: 10),
           _sectionTitle('Bảo mật'),
@@ -92,13 +98,14 @@ class AccountSecurityScreen extends StatelessWidget {
             title: 'Kiểm tra bảo mật',
             subtitle: '3 vấn đề bảo mật cần xử lý',
             backgroundColor: sectionBg,
-            subtitleColor: const Color(0xFF8B7A33),
-            trailing: const Row(
+            isDarkMode: isDarkMode,
+            subtitleColor: AppColors.warning,
+            trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.warning_amber_rounded, color: Color(0xFFEAB308), size: 20),
-                SizedBox(width: 8),
-                Icon(Icons.chevron_right, color: Color(0xFF9CA3AF)),
+                const Icon(Icons.warning_amber_rounded, color: AppColors.warning, size: 20),
+                const SizedBox(width: 8),
+                Icon(Icons.chevron_right, color: iconColor),
               ],
             ),
           ),
@@ -109,6 +116,7 @@ class AccountSecurityScreen extends StatelessWidget {
             title: 'Khóa Zalo',
             subtitle: 'Đang tắt',
             backgroundColor: sectionBg,
+            isDarkMode: isDarkMode,
             trailingText: 'Đang tắt',
           ),
           const SizedBox(height: 10),
@@ -119,6 +127,7 @@ class AccountSecurityScreen extends StatelessWidget {
             title: 'Bảo mật 2 lớp',
             subtitle: 'Thêm hình thức xác nhận để bảo vệ tài khoản khi đăng nhập trên thiết bị mới',
             backgroundColor: sectionBg,
+            isDarkMode: isDarkMode,
             trailing: Switch(
               value: false,
               onChanged: (_) {},
@@ -132,6 +141,7 @@ class AccountSecurityScreen extends StatelessWidget {
             title: 'Thiết bị đăng nhập',
             subtitle: 'Quản lý các thiết bị bạn sử dụng để đăng nhập',
             backgroundColor: sectionBg,
+            isDarkMode: isDarkMode,
           ),
           _divider(dividerColor),
           _tile(
@@ -139,6 +149,7 @@ class AccountSecurityScreen extends StatelessWidget {
             icon: Icons.lock_outline,
             title: 'Mật khẩu',
             backgroundColor: sectionBg,
+            isDarkMode: isDarkMode,
             onTap: () {
               Navigator.push(
                 context,
@@ -152,6 +163,7 @@ class AccountSecurityScreen extends StatelessWidget {
             icon: Icons.no_accounts_outlined,
             title: 'Xóa tài khoản',
             backgroundColor: sectionBg,
+            isDarkMode: isDarkMode,
           ),
         ],
       ),
@@ -179,10 +191,13 @@ class AccountSecurityScreen extends StatelessWidget {
     String? subtitle,
     VoidCallback? onTap,
     required Color backgroundColor,
+    required bool isDarkMode,
     Color? subtitleColor,
     String? trailingText,
     Widget? trailing,
   }) {
+    final textColor = isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary;
+    final iconColor = isDarkMode ? DarkColors.textHint : LightColors.textHint;
     return Container(
       color: backgroundColor,
       child: Material(
@@ -192,26 +207,26 @@ class AccountSecurityScreen extends StatelessWidget {
           splashColor: AppColors.itemPressBackground.withValues(alpha: 0.7),
           onTap: onTap,
           child: ListTile(
-            leading: Icon(icon, color: const Color(0xFF9CA3AF)),
-            title: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+            leading: Icon(icon, color: iconColor),
+            title: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: textColor)),
             subtitle: subtitle == null
                 ? null
                 : Text(
                     subtitle,
-                    style: TextStyle(fontSize: 14, color: subtitleColor ?? const Color(0xFF6B7280)),
+                    style: TextStyle(fontSize: 14, color: subtitleColor ?? (isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary)),
                   ),
             trailing: trailing ??
                 (trailingText == null
-                    ? const Icon(Icons.chevron_right, color: Color(0xFF9CA3AF))
+                    ? Icon(Icons.chevron_right, color: iconColor)
                     : Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
                             trailingText,
-                            style: const TextStyle(color: Color(0xFF9CA3AF), fontWeight: FontWeight.w600),
+                            style: TextStyle(color: iconColor, fontWeight: FontWeight.w600),
                           ),
                           const SizedBox(width: 8),
-                          const Icon(Icons.chevron_right, color: Color(0xFF9CA3AF)),
+                          Icon(Icons.chevron_right, color: iconColor),
                         ],
                       )),
           ),

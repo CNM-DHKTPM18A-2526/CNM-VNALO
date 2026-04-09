@@ -39,6 +39,7 @@ class PhoneInput extends StatelessWidget {
   }
 
   void _showCountryCodePicker(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -48,9 +49,9 @@ class PhoneInput extends StatelessWidget {
           constraints: BoxConstraints(
             maxHeight: MediaQuery.of(context).size.height * 0.85,
           ),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          decoration: BoxDecoration(
+            color: isDarkMode ? DarkColors.surface : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: SafeArea(
             top: false,
@@ -66,17 +67,17 @@ class PhoneInput extends StatelessWidget {
                         width: 56,
                         height: 6,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE5E7EB),
+                          color: isDarkMode ? DarkColors.divider : LightColors.divider,
                           borderRadius: BorderRadius.circular(999),
                         ),
                       ),
                       const SizedBox(height: 14),
-                      const Text(
+                      Text(
                         'Chọn mã vùng',
                         style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF141414),
+                          color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
                         ),
                       ),
                     ],
@@ -96,10 +97,10 @@ class PhoneInput extends StatelessWidget {
                           ),
                           title: Text(
                             item.name,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w500,
-                              color: Color(0xFF1F2937),
+                              color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
                             ),
                           ),
                           trailing: Row(
@@ -107,10 +108,10 @@ class PhoneInput extends StatelessWidget {
                             children: [
                               Text(
                                 item.code,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 17,
                                   fontWeight: FontWeight.w500,
-                                  color: Color(0xFF6B7280),
+                                  color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary,
                                 ),
                               ),
                               if (isSelected) ...[
@@ -139,23 +140,26 @@ class PhoneInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return TextFormField(
       controller: controller,
       keyboardType: TextInputType.phone,
+      style: TextStyle(color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary),
       validator: (value) =>
           Validators.phone(value, countryCode: selectedCountryCode),
       onChanged: onChanged,
       inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9]'))],
       decoration: InputDecoration(
         hintText: hintText,
-        fillColor: const Color(0xFFF9FAFB),
+        hintStyle: TextStyle(color: isDarkMode ? DarkColors.textHint : LightColors.textHint),
+        fillColor: isDarkMode ? DarkColors.surface : const Color(0xFFF9FAFB),
         prefixIconConstraints: const BoxConstraints(minWidth: 110),
         prefixIcon: Container(
           margin: const EdgeInsets.only(right: 8),
           padding: const EdgeInsets.only(left: 10, right: 6),
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             border: Border(
-              right: BorderSide(color: Color(0xFFD8DCE2), width: 1),
+              right: BorderSide(color: isDarkMode ? DarkColors.divider : const Color(0xFFD8DCE2), width: 1),
             ),
           ),
           child: InkWell(
@@ -171,10 +175,10 @@ class PhoneInput extends StatelessWidget {
                 const SizedBox(width: 6),
                 Text(
                   selectedCountryCode,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF1F2937),
+                    color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
                   ),
                 ),
                 const Icon(

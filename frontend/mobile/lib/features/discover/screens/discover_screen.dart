@@ -64,12 +64,13 @@ class DiscoverScreen extends StatelessWidget {
               MaterialPageRoute(
                 builder: (_) => const UnifiedSearchScreen(
                   initialTab: SearchInitialTab.discover,
+                  searchTag: 'search_bar_discover',
                 ),
               ),
             );
           },
           child: Hero(
-            tag: 'search_bar',
+            tag: 'search_bar_discover',
             child: Material(
               color: Colors.transparent,
               child: Row(
@@ -146,6 +147,7 @@ class _DiscoverItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return ListTile(
       leading: Container(
         width: 40,
@@ -158,7 +160,7 @@ class _DiscoverItem extends StatelessWidget {
       ),
       title: Text(title),
       subtitle: Text(subtitle),
-      trailing: const Icon(Icons.chevron_right, color: Color(0xFFD1D5DB)),
+      trailing: Icon(Icons.chevron_right, color: isDarkMode ? DarkColors.textHint : const Color(0xFFD1D5DB)),
       onTap: onTap,
     );
   }

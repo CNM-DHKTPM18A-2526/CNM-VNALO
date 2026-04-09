@@ -228,65 +228,87 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
                     ? _buildEmpty()
                     : _buildMessageList(isDarkMode),
           ),
-
-          // Input bar
-          Container(
-            color: inputBgColor,
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom,
-            ),
-            child: SafeArea(
-              top: false,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  IconButton(
-                    icon: Icon(Icons.emoji_emotions_outlined, color: hintColor),
-                    onPressed: () {},
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: _inputController,
-                      onChanged: (v) => setState(() => _hasText = v.trim().isNotEmpty),
-                      minLines: 1,
-                      maxLines: 4,
-                      decoration: InputDecoration(
-                        hintText: 'Tin nhắn',
-                        hintStyle: TextStyle(color: hintColor),
-                        filled: true,
-                        fillColor: isDarkMode ? const Color(0xFF2B2B2B) : const Color(0xFFF0F2F5),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (_hasText)
-                    IconButton(
-                      icon: const Icon(Icons.send, color: AppColors.primary),
-                      onPressed: () => _sendMessage(_inputController.text),
-                    )
-                  else ...[
-                    IconButton(
-                      icon: Icon(Icons.more_horiz, color: hintColor),
-                      onPressed: () {},
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.mic_none_outlined, color: hintColor),
-                      onPressed: () {},
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.image_outlined, color: hintColor),
-                      onPressed: () {},
-                    ),
-                  ],
-                ],
-              ),
+        ],
+      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: isDarkMode ? DarkColors.surface : LightColors.surface,
+          border: Border(
+            top: BorderSide(
+              color: isDarkMode ? DarkColors.divider : const Color(0xFFE5E7EB),
+              width: 0.5,
             ),
           ),
-        ],
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                IconButton(
+                  icon: Icon(Icons.emoji_emotions_outlined, 
+                    color: isDarkMode ? DarkColors.textHint : const Color(0xFF5D6470)),
+                  onPressed: () {},
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _inputController,
+                    onChanged: (v) => setState(() => _hasText = v.trim().isNotEmpty),
+                    minLines: 1,
+                    maxLines: 5,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Tin nhắn',
+                      hintStyle: TextStyle(
+                        color: isDarkMode ? DarkColors.textHint : const Color(0xFFA1A3A7),
+                        fontSize: 16,
+                      ),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 6),
+                      border: InputBorder.none,
+                    ),
+                  ),
+                ),
+                if (_hasText)
+                  IconButton(
+                    icon: const Icon(Icons.send, color: AppColors.primary),
+                    onPressed: () => _sendMessage(_inputController.text),
+                  )
+                else
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.more_horiz, color: isDarkMode ? DarkColors.textHint : const Color(0xFF5D6470)),
+                        onPressed: () {},
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        constraints: const BoxConstraints(),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.mic_none_outlined, color: isDarkMode ? DarkColors.textHint : const Color(0xFF5D6470)),
+                        onPressed: () {},
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        constraints: const BoxConstraints(),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.image_outlined, color: isDarkMode ? DarkColors.textHint : const Color(0xFF5D6470)),
+                        onPressed: () {},
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -345,8 +367,27 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
         ),
       );
 
-      for (final msg in messages) {
-        items.add(_buildBubble(msg, isDarkMode));
+      for (int i = 0; i < messages.length; i++) {
+        final msg = messages[i];
+        
+        // Grouping logic for MyDocuments (all messages are 'Mine')
+        // showTime: if it's the newest message (i == 0) OR gap with message above it (i-1) is > 5 mins
+        bool showTime = true;
+        if (i > 0) {
+          final nextRecent = messages[i - 1]; // nextRecent is "below" in UI (reverse: true)
+          final gap = nextRecent.createdAt.difference(msg.createdAt).inMinutes.abs();
+          if (gap < 5) {
+            showTime = false;
+          }
+        }
+
+        // showStatus: only for the absolute newest message in the newest date group
+        bool showStatus = false;
+        if (i == 0 && date == _formatDateGroup(msgs.first.createdAt)) {
+          showStatus = true;
+        }
+
+        items.add(_buildBubble(msg, isDarkMode, showTime, showStatus));
       }
     });
 
@@ -358,9 +399,8 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
     );
   }
 
-  Widget _buildBubble(_LocalMessage msg, bool isDarkMode) {
-    final bool isLink = msg.type == 'link';
-    final bubbleColor = isDarkMode ? const Color(0xFF2A5298) : const Color(0xFFD4E6FA);
+  Widget _buildBubble(_LocalMessage msg, bool isDarkMode, bool showTime, bool showStatus) {
+    final bubbleColor = isDarkMode ? DarkColors.chatBubbleSent : LightColors.chatBubbleSent;
 
     return Align(
       alignment: Alignment.centerRight,
@@ -371,7 +411,10 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
             constraints: BoxConstraints(
               maxWidth: MediaQuery.of(context).size.width * 0.75,
             ),
-            margin: const EdgeInsets.only(bottom: 4),
+            margin: EdgeInsets.only(
+              top: showTime ? 8 : 2,
+              bottom: 2,
+            ),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               color: bubbleColor,
@@ -382,35 +425,43 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
                 bottomRight: Radius.circular(4),
               ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  msg.content,
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: isLink ? Colors.blue[200] : (isDarkMode ? Colors.white : Colors.black87),
-                    decoration: isLink ? TextDecoration.underline : null,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+            child: Text(
+              msg.content,
+              style: TextStyle(
+                fontSize: 15,
+                color: isDarkMode ? Colors.white : const Color(0xFF1F2937),
+              ),
+            ),
+          ),
+          if (showTime || showStatus)
+            Padding(
+              padding: const EdgeInsets.only(right: 6, bottom: 8, top: 2),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (showTime)
                     Text(
                       _formatTime(msg.createdAt),
                       style: TextStyle(
                         fontSize: 11,
-                        color: isDarkMode ? Colors.white60 : Colors.black45,
+                        color: isDarkMode ? DarkColors.textHint : Colors.grey.shade500,
                       ),
                     ),
+                  if (showStatus) ...[
+                    if (showTime) const SizedBox(width: 6),
+                    const Icon(Icons.done_all, size: 14, color: Colors.blue),
                     const SizedBox(width: 4),
-                    const Icon(Icons.done_all, size: 14, color: Colors.lightBlueAccent),
+                    const Text(
+                      'Đã nhận',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey,
+                      ),
+                    ),
                   ],
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );

@@ -33,28 +33,28 @@ class AppColors {
 // Dark and Light color palettes
 class DarkColors {
   DarkColors._();
-  static const Color scaffold = Color(0xFF1A1A1A);
-  static const Color surface = Color(0xFF242424);
-  static const Color surfaceLight = Color(0xFF2A2A2A);
+  static const Color scaffold = Color(0xFF000000); // Zalo deep black
+  static const Color surface = Color(0xFF1A1A1A);
+  static const Color surfaceLight = Color(0xFF242424);
   static const Color textPrimary = Color(0xFFFFFFFF);
   static const Color textSecondary = Color(0xFFB0B0B0);
   static const Color textHint = Color(0xFF808080);
   static const Color divider = Color(0xFF333333);
-  static const Color chatBubbleSent = Color(0xFF0068FF);
-  static const Color chatBubbleReceived = Color(0xFF3A3A3A);
+  static const Color chatBubbleSent = Color(0xFF374151); // Slate 700
+  static const Color chatBubbleReceived = Color(0xFF1F2937); // Slate 800
   static const Color appBarBg = Color(0xFF1A1A1A);
 }
 
 class LightColors {
   LightColors._();
-  static const Color scaffold = Color(0xFFF5F5F5);
+  static const Color scaffold = Color(0xFFEBEDF0); // Zalo light gray background
   static const Color surface = Color(0xFFFFFFFF);
-  static const Color surfaceLight = Color(0xFFF0F0F0);
+  static const Color surfaceLight = Color(0xFFF6F7F8);
   static const Color textPrimary = Color(0xFF1A1A1A);
   static const Color textSecondary = Color(0xFF666666);
   static const Color textHint = Color(0xFF999999);
   static const Color divider = Color(0xFFE0E0E0);
-  static const Color chatBubbleSent = Color(0xFF0068FF);
-  static const Color chatBubbleReceived = Color(0xFFE8E8E8);
+  static const Color chatBubbleSent = Color(0xFFDDF2FF); // Zalo light blue
+  static const Color chatBubbleReceived = Color(0xFFFFFFFF); // Zalo white
   static const Color appBarBg = Color(0xFF0068FF);
 }

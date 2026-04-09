@@ -82,11 +82,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           behavior: HitTestBehavior.opaque,
           onTap: () {
             Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const UnifiedSearchScreen()),
+              MaterialPageRoute(
+                builder: (_) => const UnifiedSearchScreen(searchTag: 'search_bar_profile'),
+              ),
             );
           },
           child: Hero(
-            tag: 'search_bar',
+            tag: 'search_bar_profile',
             child: Material(
               color: Colors.transparent,
               child: Row(

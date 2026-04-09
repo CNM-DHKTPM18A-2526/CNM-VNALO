@@ -9,6 +9,7 @@ import 'package:vnalo_mobile/features/chat/widgets/message_bubble.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
 import 'package:vnalo_mobile/models/user_model.dart';
+import 'package:vnalo_mobile/core/utils/date_formatter.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final Conversation conversation;
@@ -86,7 +87,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final isDirect = widget.conversation.type == ConversationType.DIRECT ||
         widget.friendUser != null;
 
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
+      backgroundColor: isDarkMode ? DarkColors.scaffold : LightColors.scaffold,
       appBar: AppBar(
         titleSpacing: 0,
         title: Row(
@@ -122,48 +126,78 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           IconButton(icon: const Icon(Icons.menu), onPressed: () {}),
         ],
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: Consumer<ChatProvider>(
-              builder: (_, chat, __) {
-                final items = chat.messages;
+      body: Consumer<ChatProvider>(
+        builder: (_, chat, __) {
+          final items = chat.messages;
 
-                return ListView.builder(
-                  reverse: true,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 8,
-                  ),
-                  itemCount: items.length + (isDirect ? 1 : 0),
-                  itemBuilder: (_, index) {
-                    // Show friend profile card at the bottom (end of reversed list)
-                    if (isDirect && index == items.length) {
-                      return _buildFriendProfileCard(
-                        displayName,
-                        avatarUrl,
-                        coverUrl,
-                      );
-                    }
-
-                    final message = items[index];
-                    return MessageBubble(
-                      message: message,
-                      isMine: message.isMine(currentUserId),
-                      onRetry:
-                          message.status == MessageStatus.FAILED
-                              ? () => chat.retryMessage(message)
-                              : null,
-                    );
-                  },
-                );
-              },
+          return ListView.builder(
+            reverse: true,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 8,
             ),
-          ),
-          ChatInputBar(
-            onSend: (text) => context.read<ChatProvider>().sendMessage(text),
-          ),
-        ],
+            itemCount: items.length + (isDirect ? 1 : 0),
+            itemBuilder: (_, index) {
+              // Show friend profile card at the bottom (end of reversed list)
+              if (isDirect && index == items.length) {
+                return _buildFriendProfileCard(
+                  displayName,
+                  avatarUrl,
+                  coverUrl,
+                );
+              }
+
+              final message = items[index];
+              final isMine = message.isMine(currentUserId);
+              
+              // Grouping Logic:
+              // showTime: if next visual message (index-1, more recent) is from different sender OR gap > 5 mins
+              bool showTime = true;
+              if (index > 0) {
+                final nextRecent = items[index - 1];
+                final sameSender = nextRecent.senderId == message.senderId;
+                final timeGap = nextRecent.createdAt.difference(message.createdAt).inMinutes.abs();
+                if (sameSender && timeGap < 5) {
+                  showTime = false;
+                }
+              }
+
+              // showStatus: ONLY if it's the very latest message from me in the whole conversation
+              bool showStatus = false;
+              if (isMine && index == 0) {
+                showStatus = true;
+              }
+
+              // milestoneText: if older visual message (index+1, older) has gap > 20 mins
+              String? milestoneText;
+              if (index == items.length - 1) {
+                // First message ever in timeline
+                milestoneText = DateFormatter.formatTimelineDate(message.createdAt);
+              } else {
+                final olderMsg = items[index + 1];
+                final gap = message.createdAt.difference(olderMsg.createdAt).inMinutes.abs();
+                if (gap > 20) {
+                   milestoneText = DateFormatter.formatTimelineDate(message.createdAt);
+                }
+              }
+
+              return MessageBubble(
+                message: message,
+                isMine: isMine,
+                showTime: showTime,
+                showStatus: showStatus,
+                milestoneText: milestoneText,
+                onRetry:
+                    message.status == MessageStatus.FAILED
+                        ? () => chat.retryMessage(message)
+                        : null,
+              );
+            },
+          );
+        },
+      ),
+      bottomNavigationBar: ChatInputBar(
+        onSend: (text) => context.read<ChatProvider>().sendMessage(text),
       ),
     );
   }

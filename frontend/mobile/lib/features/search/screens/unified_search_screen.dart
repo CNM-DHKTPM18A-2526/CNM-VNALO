@@ -15,9 +15,14 @@ import 'package:vnalo_mobile/services/friend_service.dart';
 enum SearchInitialTab { mine, discover }
 
 class UnifiedSearchScreen extends StatefulWidget {
-  const UnifiedSearchScreen({super.key, this.initialTab = SearchInitialTab.mine});
+  const UnifiedSearchScreen({
+    super.key,
+    this.initialTab = SearchInitialTab.mine,
+    this.searchTag = 'search_bar',
+  });
 
   final SearchInitialTab initialTab;
+  final String searchTag;
 
   @override
   State<UnifiedSearchScreen> createState() => _UnifiedSearchScreenState();
@@ -282,7 +287,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
               ),
               Expanded(
                 child: Hero(
-                  tag: 'search_bar',
+                  tag: widget.searchTag,
                   child: Material(
                     color: Colors.transparent,
                     child: Container(
@@ -348,8 +353,8 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
             child: TabBar(
               controller: _tabController,
               dividerColor: Colors.transparent,
-              labelColor: isDarkMode ? Colors.white : Colors.black,
-              unselectedLabelColor: const Color(0xFF9CA3AF),
+              labelColor: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
+              unselectedLabelColor: isDarkMode ? DarkColors.textSecondary : const Color(0xFF9CA3AF),
               indicatorColor: AppColors.primary,
               indicatorWeight: 3,
               labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
@@ -476,7 +481,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                 Icon(
                   Icons.chevron_right,
                   size: 18,
-                  color: isDarkMode ? Colors.white70 : LightColors.textSecondary,
+                  color: isDarkMode ? DarkColors.textHint : LightColors.textSecondary,
                 ),
               ],
             ),

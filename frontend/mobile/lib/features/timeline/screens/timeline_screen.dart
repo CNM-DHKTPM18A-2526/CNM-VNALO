@@ -30,11 +30,13 @@ class TimelineScreen extends StatelessWidget {
           behavior: HitTestBehavior.opaque,
           onTap: () {
             Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const UnifiedSearchScreen()),
+              MaterialPageRoute(
+                builder: (_) => const UnifiedSearchScreen(searchTag: 'search_bar_timeline'),
+              ),
             );
           },
           child: Hero(
-            tag: 'search_bar',
+            tag: 'search_bar_timeline',
             child: Material(
               color: Colors.transparent,
               child: Row(
@@ -85,14 +87,14 @@ class TimelineScreen extends StatelessWidget {
           ),
           Divider(
             thickness: 8,
-            color: isDarkMode ? Colors.black : AppColors.sectionBackground,
+            color: isDarkMode ? DarkColors.divider : AppColors.sectionBackground,
           ),
-          const Padding(
-            padding: EdgeInsets.all(24),
+          Padding(
+            padding: const EdgeInsets.all(24),
             child: Center(
               child: Text(
                 'Chưa có bài viết nào',
-                style: TextStyle(color: Color(0xFF9CA3AF)),
+                style: TextStyle(color: isDarkMode ? DarkColors.textHint : const Color(0xFF9CA3AF)),
               ),
             ),
           ),

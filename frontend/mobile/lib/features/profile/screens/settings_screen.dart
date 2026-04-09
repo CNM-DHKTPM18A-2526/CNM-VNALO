@@ -15,12 +15,12 @@ class SettingsScreen extends StatelessWidget {
     final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
 
     return Scaffold(
-      backgroundColor: isDarkMode ? Colors.black : const Color(0xFFF4F5F7),
+      backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
       appBar: AppBar(
         title: const Text('Cài đặt'),
         backgroundColor: appBarBg,
-        foregroundColor: isDarkMode ? null : Colors.white,
-        iconTheme: IconThemeData(color: isDarkMode ? Colors.white : Colors.white),
+        foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
         flexibleSpace: isDarkMode
             ? null
             : Container(
@@ -39,6 +39,7 @@ class SettingsScreen extends StatelessWidget {
         children: [
           _buildSection(context, [
             _item(
+              context,
               Icons.shield_outlined,
               'Tài khoản và bảo mật',
               onTap: () {
@@ -49,21 +50,22 @@ class SettingsScreen extends StatelessWidget {
                 );
               },
             ),
-            _item(Icons.lock_outline, 'Quyền riêng tư'),
+            _item(context, Icons.lock_outline, 'Quyền riêng tư'),
           ]),
           const _SectionDivider(),
           _buildSection(context, [
-            _item(Icons.pie_chart_outline, 'Dữ liệu trên máy'),
-            _item(Icons.cloud_sync_outlined, 'Sao lưu và khôi phục'),
+            _item(context, Icons.pie_chart_outline, 'Dữ liệu trên máy'),
+            _item(context, Icons.cloud_sync_outlined, 'Sao lưu và khôi phục'),
           ]),
           const _SectionDivider(),
           _buildSection(context, [
-            _item(Icons.notifications_outlined, 'Thông báo'),
-            _item(Icons.chat_outlined, 'Tin nhắn'),
-            _item(Icons.call_outlined, 'Cuộc gọi'),
-            _item(Icons.access_time, 'Nhật ký'),
-            _item(Icons.contacts_outlined, 'Danh bạ'),
+            _item(context, Icons.notifications_outlined, 'Thông báo'),
+            _item(context, Icons.chat_outlined, 'Tin nhắn'),
+            _item(context, Icons.call_outlined, 'Cuộc gọi'),
+            _item(context, Icons.access_time, 'Nhật ký'),
+            _item(context, Icons.contacts_outlined, 'Danh bạ'),
             _item(
+              context,
               Icons.color_lens_outlined,
               'Giao diện và ngôn ngữ',
               onTap: () {
@@ -77,9 +79,9 @@ class SettingsScreen extends StatelessWidget {
           ]),
           const _SectionDivider(),
           _buildSection(context, [
-            _item(Icons.info_outline, 'Thông tin về VNALO'),
-            _item(Icons.help_outline, 'Liên hệ hỗ trợ'),
-            _item(Icons.swap_horiz, 'Chuyển tài khoản'),
+            _item(context, Icons.info_outline, 'Thông tin về VNALO'),
+            _item(context, Icons.help_outline, 'Liên hệ hỗ trợ'),
+            _item(context, Icons.swap_horiz, 'Chuyển tài khoản'),
           ]),
           const _SectionDivider(),
           _buildLogoutButton(context),
@@ -91,8 +93,8 @@ class SettingsScreen extends StatelessWidget {
 
   Widget _buildSection(BuildContext context, List<Widget> items) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final itemBgColor = isDarkMode ? const Color(0xFF1A1A1A) : Colors.white;
-    final dividerColor = isDarkMode ? const Color(0xFF333333) : const Color(0xFFE5E7EB);
+    final itemBgColor = isDarkMode ? DarkColors.surface : Colors.white;
+    final dividerColor = isDarkMode ? DarkColors.divider : AppColors.sectionDivider;
 
     final List<Widget> children = [];
     for (int i = 0; i < items.length; i++) {
@@ -112,7 +114,7 @@ class SettingsScreen extends StatelessWidget {
 
   Widget _buildLogoutButton(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final itemBgColor = isDarkMode ? const Color(0xFF2A2A2A) : const Color(0xFFE5E7EB);
+    final itemBgColor = isDarkMode ? DarkColors.divider : AppColors.itemDivider;
     
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -120,7 +122,7 @@ class SettingsScreen extends StatelessWidget {
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
           backgroundColor: itemBgColor,
-          foregroundColor: isDarkMode ? Colors.white : Colors.black87,
+          foregroundColor: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
           elevation: 0,
           shape: RoundedRectangleBorder(
              borderRadius: BorderRadius.circular(24),
@@ -142,7 +144,8 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _item(IconData icon, String title, {VoidCallback? onTap}) {
+  Widget _item(BuildContext context, IconData icon, String title, {VoidCallback? onTap}) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -151,23 +154,30 @@ class SettingsScreen extends StatelessWidget {
         onTap: onTap,
         child: ListTile(
           leading: Icon(icon, color: AppColors.primary),
-          title: Text(title),
-          trailing: const Icon(Icons.chevron_right, size: 20, color: Color(0xFF9CA3AF)),
+          title: Text(
+            title,
+            style: TextStyle(
+              color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
+              fontSize: 16,
+            ),
+          ),
+          trailing: Icon(Icons.chevron_right, size: 20, color: isDarkMode ? DarkColors.textHint : const Color(0xFF9CA3AF)),
         ),
       ),
     );
   }
 
   Future<void> _confirmLogout(BuildContext context) async {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+          decoration: BoxDecoration(
+            color: isDarkMode ? DarkColors.surface : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
           ),
           child: SafeArea(
             top: false,
@@ -180,22 +190,22 @@ class SettingsScreen extends StatelessWidget {
                     width: 56,
                     height: 6,
                     decoration: BoxDecoration(
-                      color: AppColors.sectionDivider,
+                      color: isDarkMode ? Colors.white10 : AppColors.sectionDivider,
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
                   const SizedBox(height: 14),
                   const Icon(Icons.info, color: AppColors.primary, size: 30),
                   const SizedBox(height: 12),
-                  const Text(
+                  Text(
                     'Đăng xuất khỏi tài khoản này?',
-                    style: TextStyle(fontSize: 32 / 2, fontWeight: FontWeight.w700),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'Nếu đổi máy mới, hãy sao lưu để tránh mất tin nhắn và ảnh gần đây',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 15, color: LightColors.textSecondary, height: 1.35),
+                    style: TextStyle(fontSize: 15, color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary, height: 1.35),
                   ),
                   const SizedBox(height: 16),
                   SizedBox(
@@ -220,7 +230,7 @@ class SettingsScreen extends StatelessWidget {
                         foregroundColor: LightColors.textPrimary,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                       ),
-                      child: const Text('Đăng xuất'),
+                      child: Text('Đăng xuất', style: TextStyle(color: isDarkMode ? Colors.white : LightColors.textPrimary)),
                     ),
                   ),
                 ],

@@ -38,9 +38,12 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
+    final pageBg = isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground;
+    final sectionBg = isDarkMode ? DarkColors.surface : LightColors.surface;
+    final dividerColor = isDarkMode ? DarkColors.divider : AppColors.sectionDivider;
 
     return Scaffold(
-      backgroundColor: AppColors.sectionBackground,
+      backgroundColor: pageBg,
       appBar: AppBar(
         title: const Text('Chỉnh sửa thông tin'),
         backgroundColor: appBarBg,
@@ -53,7 +56,7 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
         children: [
           Container(
-            color: Colors.white,
+            color: sectionBg,
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -65,31 +68,35 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
                       Expanded(
                         child: TextField(
                           controller: _nameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Nguyễn Vũ',
+                          decoration: InputDecoration(
+                            labelText: 'Tên hiển thị',
+                            labelStyle: TextStyle(color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary),
                             border: InputBorder.none,
                           ),
+                          style: TextStyle(color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary),
                         ),
                       ),
-                      const Icon(Icons.edit_outlined),
+                      Icon(Icons.edit_outlined, color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary),
                     ],
                   ),
-                  const Divider(height: 20, color: AppColors.sectionDivider),
+                  Divider(height: 20, color: dividerColor),
                   Row(
                     children: [
                       Expanded(
                         child: TextField(
                           controller: _dobController,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             border: InputBorder.none,
-                            hintText: '3/8/2004',
+                            hintText: 'Ngày sinh',
+                            hintStyle: TextStyle(color: isDarkMode ? DarkColors.textHint : LightColors.textHint),
                           ),
+                          style: TextStyle(color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary),
                         ),
                       ),
-                      const Icon(Icons.edit_outlined),
+                      Icon(Icons.edit_outlined, color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary),
                     ],
                   ),
-                  const Divider(height: 20, color: AppColors.sectionDivider),
+                  Divider(height: 20, color: dividerColor),
                   Row(
                     children: [
                       Expanded(
@@ -98,7 +105,7 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
                           groupValue: _gender,
                           activeColor: AppColors.primary,
                           contentPadding: EdgeInsets.zero,
-                          title: const Text('Nam'),
+                          title: Text('Nam', style: TextStyle(color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary)),
                           onChanged: (v) => setState(() => _gender = v ?? 'MALE'),
                         ),
                       ),
@@ -108,7 +115,7 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
                           groupValue: _gender,
                           activeColor: AppColors.primary,
                           contentPadding: EdgeInsets.zero,
-                          title: const Text('Nữ'),
+                          title: Text('Nữ', style: TextStyle(color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary)),
                           onChanged: (v) => setState(() => _gender = v ?? 'FEMALE'),
                         ),
                       ),

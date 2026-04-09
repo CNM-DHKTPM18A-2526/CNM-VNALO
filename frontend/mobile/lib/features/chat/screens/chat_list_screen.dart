@@ -105,7 +105,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         ? DarkColors.textHint
         : Colors.white.withValues(alpha: 0.8);
     final dividerColor = isDarkMode
-      ? const Color(0xFF3A3F46)
+      ? DarkColors.divider
       : const Color(0xFFE9EDF3);
 
     return Scaffold(
@@ -115,17 +115,21 @@ class _ChatListScreenState extends State<ChatListScreen> {
         flexibleSpace: isDarkMode
             ? null
             : Container(
-                decoration: const BoxDecoration(gradient: AppColors.appBarGradient),
+                decoration: const BoxDecoration(
+                  gradient: AppColors.appBarGradient,
+                ),
               ),
         title: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () {
             Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const UnifiedSearchScreen()),
+              MaterialPageRoute(
+                builder: (_) => const UnifiedSearchScreen(searchTag: 'search_bar_chat'),
+              ),
             );
           },
           child: Hero(
-            tag: 'search_bar',
+            tag: 'search_bar_chat',
             child: Material(
               color: Colors.transparent,
               child: Row(
@@ -205,7 +209,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                             ],
                           ),
                         ),
-                        title: const Text(
+                        title: Text(
                           'My Documents',
                           style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
                         ),
