@@ -55,9 +55,62 @@ class Conversation {
     this.isHidden = false,
   });
 
+  Conversation copyWith({
+    String? id,
+    ConversationType? type,
+    String? title,
+    String? avatarUrl,
+    String? description,
+    String? createdBy,
+    ConversationStatus? status,
+    JoinMode? joinMode,
+    int? memberLimit,
+    String? inviteLink,
+    DateTime? inviteLinkExpiresAt,
+    bool? isEncrypted,
+    bool? allowMemberInvite,
+    bool? allowMemberPin,
+    bool? allowMemberEditInfo,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    List<ConversationMember>? members,
+    Message? lastMessage,
+    int? unreadCount,
+    bool? isPinned,
+    bool? isMuted,
+    bool? isHidden,
+  }) {
+    return Conversation(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      title: title ?? this.title,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      description: description ?? this.description,
+      createdBy: createdBy ?? this.createdBy,
+      status: status ?? this.status,
+      joinMode: joinMode ?? this.joinMode,
+      memberLimit: memberLimit ?? this.memberLimit,
+      inviteLink: inviteLink ?? this.inviteLink,
+      inviteLinkExpiresAt: inviteLinkExpiresAt ?? this.inviteLinkExpiresAt,
+      isEncrypted: isEncrypted ?? this.isEncrypted,
+      allowMemberInvite: allowMemberInvite ?? this.allowMemberInvite,
+      allowMemberPin: allowMemberPin ?? this.allowMemberPin,
+      allowMemberEditInfo: allowMemberEditInfo ?? this.allowMemberEditInfo,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      members: members ?? this.members,
+      lastMessage: lastMessage ?? this.lastMessage,
+      unreadCount: unreadCount ?? this.unreadCount,
+      isPinned: isPinned ?? this.isPinned,
+      isMuted: isMuted ?? this.isMuted,
+      isHidden: isHidden ?? this.isHidden,
+    );
+  }
+
   // Method to get display name for the conversation based on its type and members
   String getDisplayName(String currentUserId, {int maxWidth = 0}) {
     if (type == ConversationType.DIRECT) {
+      if (members.isEmpty) return title ?? 'Chat';
       final other = members.firstWhere(
         (m) => m.userId != currentUserId,
         orElse: () => members.first,
@@ -94,6 +147,8 @@ class Conversation {
     // For group conversations, use the conversation avatar
     if (type == ConversationType.GROUP) return avatarUrl;
 
+    if (members.isEmpty) return avatarUrl;
+
     // For direct conversations, use the other user's avatar
     final other = members.firstWhere(
       (m) => m.userId != currentUserId,
@@ -106,6 +161,12 @@ class Conversation {
 
   // Method to get the count of active members (those who haven't left)
   int get activeMemberCount => members.where((m) => m.leftAt == null).length;
+
+  static int _toInt(dynamic v, [int fallback = 0]) {
+    if (v is int) return v;
+    if (v is String) return int.tryParse(v) ?? fallback;
+    return fallback;
+  }
 
   // Factory constructor to create a Conversation instance from JSON data
   factory Conversation.fromJson(Map<String, dynamic> json) => Conversation(
@@ -120,7 +181,7 @@ class Conversation {
       json['status'] ?? 'ACTIVE',
     ),
     joinMode: enumFromString(JoinMode.values, json['joinMode'] ?? 'OPEN'),
-    memberLimit: json['memberLimit'] ?? 100,
+    memberLimit: _toInt(json['memberLimit'], 100),
     inviteLink: json['inviteLink'],
     inviteLinkExpiresAt:
         json['inviteLinkExpiresAt'] != null
@@ -143,7 +204,7 @@ class Conversation {
         json['lastMessage'] != null
             ? Message.fromJson(json['lastMessage'])
             : null,
-    unreadCount: json['unreadCount'] ?? 0,
+    unreadCount: _toInt(json['unreadCount']),
     isPinned: json['isPinned'] ?? false,
     isMuted: json['isMuted'] ?? false,
     isHidden: json['isHidden'] ?? false,

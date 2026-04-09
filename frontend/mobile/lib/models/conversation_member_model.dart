@@ -61,9 +61,9 @@ class ConversationMember {
     muteUntil:
         json['muteUntil'] != null ? DateTime.parse(json['muteUntil']) : null,
     isPinned: json['isPinned'] ?? false,
-    pinOrder: json['pinOrder'],
+    pinOrder: json['pinOrder'] is int ? json['pinOrder'] : (json['pinOrder'] is String ? int.tryParse(json['pinOrder']) : null),
     isHidden: json['isHidden'] ?? false,
-    lastReadSeq: json['lastReadSeq'] ?? 0,
+    lastReadSeq: json['lastReadSeq'] is int ? json['lastReadSeq'] : (json['lastReadSeq'] is String ? int.tryParse(json['lastReadSeq']) ?? 0 : 0),
     lastReadAt:
         json['lastReadAt'] != null ? DateTime.parse(json['lastReadAt']) : null,
     notificationSetting: enumFromString(
