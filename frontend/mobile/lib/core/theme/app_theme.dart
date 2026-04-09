@@ -24,6 +24,7 @@ class AppTheme {
     appBarTheme: AppBarTheme(
       backgroundColor: DarkColors.scaffold,
       elevation: 0,
+      toolbarHeight: 52,
       titleTextStyle: AppTypography.titleLarge,
       iconTheme: const IconThemeData(color: DarkColors.textPrimary),
     ),
@@ -60,6 +61,13 @@ class AppTheme {
 
     // Define the text theme for the dark theme
     dividerColor: DarkColors.divider,
+    splashColor: AppColors.itemPressBackground.withValues(alpha: 0.22),
+    highlightColor: AppColors.itemPressBackground.withValues(alpha: 0.16),
+    hoverColor: AppColors.itemPressBackground.withValues(alpha: 0.1),
+    listTileTheme: const ListTileThemeData(
+      dense: false,
+      enableFeedback: true,
+    ),
   );
 
   // Light Theme
@@ -78,6 +86,7 @@ class AppTheme {
 
     appBarTheme: AppBarTheme(
       elevation: 0,
+      toolbarHeight: 52,
       backgroundColor: LightColors.appBarBg,
       titleTextStyle: AppTypography.titleLarge.copyWith(color: Colors.white),
     ),
@@ -110,5 +119,12 @@ class AppTheme {
     ),
 
     dividerColor: LightColors.divider,
+    splashColor: AppColors.itemPressBackground.withValues(alpha: 0.7),
+    highlightColor: AppColors.itemPressBackground,
+    hoverColor: AppColors.itemPressBackground.withValues(alpha: 0.6),
+    listTileTheme: const ListTileThemeData(
+      dense: false,
+      enableFeedback: true,
+    ),
   );
 }

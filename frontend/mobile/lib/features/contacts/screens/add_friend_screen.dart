@@ -134,35 +134,44 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final auth = context.watch<AuthProvider>();
     final displayName = auth.user?.displayName ?? 'VNALO';
+    final scaffoldBg = isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground;
+    final sectionBg = isDarkMode ? DarkColors.surface : Colors.white;
+    final inputBorder = isDarkMode ? DarkColors.divider : AppColors.sectionDivider;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: scaffoldBg,
       appBar: AppBar(
         backgroundColor: isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg,
+        foregroundColor: Colors.white,
+        flexibleSpace: isDarkMode
+            ? null
+            : Container(
+                decoration: const BoxDecoration(gradient: AppColors.appBarGradient),
+              ),
         title: const Text('Thêm bạn', style: TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: ListView(
         children: [
           Container(
-            margin: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+            margin: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            padding: const EdgeInsets.fromLTRB(22, 18, 22, 18),
             decoration: BoxDecoration(
-              color: const Color(0xFF205D97),
-              borderRadius: BorderRadius.circular(24),
+              color: const Color(0xFF3F5F85),
+              borderRadius: BorderRadius.circular(20),
             ),
             child: Column(
               children: [
                 Text(
                   displayName,
-                  style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w700, letterSpacing: 0.1),
+                  style: const TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.w700),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
                 Container(
-                  width: 200,
-                  height: 200,
+                  width: 188,
+                  height: 188,
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child:
                       _isLoadingQr
@@ -185,54 +194,68 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
                             ),
                           ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 10),
                 const Text(
                   'Quét mã để thêm bạn Zalo với tôi',
-                  style: TextStyle(color: Color(0xFFD8E7FF), fontSize: 16, fontWeight: FontWeight.w500),
+                  style: TextStyle(color: Color(0xFFD7E4F7), fontSize: 14, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                   decoration: BoxDecoration(
-                    border: Border.all(color: const Color(0xFF4B5563)),
-                    borderRadius: BorderRadius.circular(12),
-                    color: const Color(0xFF0F1116),
+                    border: Border.all(color: inputBorder),
+                    borderRadius: BorderRadius.circular(10),
+                    color: sectionBg,
                   ),
-                  child: const Text('+84', style: TextStyle(color: Colors.white, fontSize: 18)),
+                  child: Row(
+                    children: [
+                      Text(
+                        '+84',
+                        style: TextStyle(
+                          color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
+                          fontSize: 30 / 2,
+                        ),
+                      ),
+                      const Icon(Icons.keyboard_arrow_down, color: AppColors.iconSubtle),
+                    ],
+                  ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 Expanded(
                   child: TextField(
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,
-                    style: const TextStyle(color: Colors.white, fontSize: 19),
+                    style: TextStyle(
+                      color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
+                      fontSize: 16,
+                    ),
                     decoration: InputDecoration(
                       hintText: 'Nhập số điện thoại',
-                      hintStyle: const TextStyle(color: Color(0xFF6B7280)),
+                      hintStyle: const TextStyle(color: LightColors.textHint),
                       filled: true,
-                      fillColor: const Color(0xFF0F1116),
+                      fillColor: sectionBg,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF4B5563)),
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: inputBorder),
                       ),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF4B5563)),
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: inputBorder),
                       ),
                     ),
                     onSubmitted: (_) => _searchByPhone(),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 CircleAvatar(
-                  radius: 24,
-                  backgroundColor: const Color(0xFF2A2F38),
+                  radius: 22,
+                  backgroundColor: isDarkMode ? DarkColors.surfaceLight : const Color(0xFFE3E7ED),
                   child: IconButton(
                     onPressed: _isSearching ? null : _searchByPhone,
                     icon: _isSearching
@@ -241,30 +264,40 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
                             height: 18,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Icon(Icons.arrow_forward, color: Colors.white),
+                        : Icon(
+                            Icons.arrow_forward,
+                            color: isDarkMode ? DarkColors.textPrimary : LightColors.textHint,
+                          ),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 8),
-          ListTile(
-            leading: const Icon(Icons.qr_code_scanner, color: AppColors.primary),
-            title: const Text('Quét mã QR', style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w600)),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const QrScannerScreen()),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.contact_page_outlined, color: AppColors.primary),
-            title: const Text('Bạn bè có thể quen', style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w600)),
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Sẽ triển khai ở bước đề xuất bạn bè tiếp theo.')),
-              );
-            },
+          Container(
+            color: sectionBg,
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.qr_code_scanner, color: AppColors.primary),
+                  title: const Text('Quét mã QR', style: TextStyle(fontSize: 18)),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const QrScannerScreen()),
+                    );
+                  },
+                ),
+                const Divider(height: 1, indent: 64, color: AppColors.itemDivider),
+                ListTile(
+                  leading: const Icon(Icons.contact_page_outlined, color: AppColors.primary),
+                  title: const Text('Bạn bè có thể quen', style: TextStyle(fontSize: 18)),
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Sẽ triển khai ở bước đề xuất bạn bè tiếp theo.')),
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 20),
           if (_qrPayload == null && !_isLoadingQr)
@@ -280,7 +313,7 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
           const Center(
             child: Text(
               'Xem lời mời kết bạn đã gửi tại trang Danh bạ Zalo',
-              style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 16),
+              style: TextStyle(color: LightColors.textSecondary, fontSize: 14),
             ),
           ),
         ],

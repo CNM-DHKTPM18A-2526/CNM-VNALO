@@ -24,13 +24,7 @@ class SettingsScreen extends StatelessWidget {
         flexibleSpace: isDarkMode
             ? null
             : Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF0068FF), Color(0xFF00A2ED)],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  ),
-                ),
+                decoration: const BoxDecoration(gradient: AppColors.appBarGradient),
               ),
         actions: [
           IconButton(
@@ -48,8 +42,7 @@ class SettingsScreen extends StatelessWidget {
               Icons.shield_outlined,
               'Tài khoản và bảo mật',
               onTap: () {
-                Navigator.push(
-                  context,
+                Navigator.of(context, rootNavigator: true).push(
                   MaterialPageRoute(
                     builder: (_) => const AccountSecurityScreen(),
                   ),
@@ -74,8 +67,7 @@ class SettingsScreen extends StatelessWidget {
               Icons.color_lens_outlined,
               'Giao diện và ngôn ngữ',
               onTap: () {
-                Navigator.push(
-                  context,
+                Navigator.of(context, rootNavigator: true).push(
                   MaterialPageRoute(
                     builder: (_) => const AppearanceSettingsScreen(),
                   ),
@@ -151,61 +143,90 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Widget _item(IconData icon, String title, {VoidCallback? onTap}) {
-    return ListTile(
-      leading: Icon(icon, color: AppColors.primary),
-      title: Text(title),
-      trailing: const Icon(Icons.chevron_right, size: 20, color: Color(0xFF9CA3AF)),
-      onTap: onTap,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        highlightColor: AppColors.itemPressBackground,
+        splashColor: AppColors.itemPressBackground.withValues(alpha: 0.7),
+        onTap: onTap,
+        child: ListTile(
+          leading: Icon(icon, color: AppColors.primary),
+          title: Text(title),
+          trailing: const Icon(Icons.chevron_right, size: 20, color: Color(0xFF9CA3AF)),
+        ),
+      ),
     );
   }
 
   Future<void> _confirmLogout(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showModalBottomSheet<bool>(
       context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          titlePadding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
-          contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-          actionsPadding: const EdgeInsets.fromLTRB(12, 2, 12, 12),
-          title: Row(
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFEECEC),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.logout_rounded, color: Colors.red),
-              ),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Text(
-                  'Xác nhận đăng xuất',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                ),
-              ),
-            ],
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
           ),
-          content: const Text(
-            'Bạn có chắc chắn muốn đăng xuất khỏi thiết bị này?',
-            style: TextStyle(fontSize: 15, color: Color(0xFF4B5563), height: 1.4),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Hủy', style: TextStyle(color: Color(0xFF6B7280))),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text(
-                'Đăng xuất',
-                style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 56,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: AppColors.sectionDivider,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Icon(Icons.info, color: AppColors.primary, size: 30),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Đăng xuất khỏi tài khoản này?',
+                    style: TextStyle(fontSize: 32 / 2, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Nếu đổi máy mới, hãy sao lưu để tránh mất tin nhắn và ảnh gần đây',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 15, color: LightColors.textSecondary, height: 1.35),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(sheetContext, false),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                      ),
+                      child: const Text('Sao lưu'),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(sheetContext, true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.itemPressBackground,
+                        foregroundColor: LightColors.textPrimary,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                      ),
+                      child: const Text('Đăng xuất'),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         );
       },
     );
