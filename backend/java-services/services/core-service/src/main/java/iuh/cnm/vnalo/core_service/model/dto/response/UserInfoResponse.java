@@ -1,5 +1,6 @@
 package iuh.cnm.vnalo.core_service.model.dto.response;
 
+import iuh.cnm.vnalo.core_service.model.enums.FriendshipStatus;
 import iuh.cnm.vnalo.core_service.model.enums.Gender;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -25,4 +26,5 @@ public class UserInfoResponse {
     private LocalDate dob;
     private String statusMessage;
     private Boolean isVerified;
+    private FriendshipStatus friendshipStatus;
 }
