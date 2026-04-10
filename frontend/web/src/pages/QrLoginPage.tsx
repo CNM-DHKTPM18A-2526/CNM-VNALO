@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { QRCodeCanvas } from 'qrcode.react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { createQrLoginSession, pollQrLoginSession } from '../features/auth/auth.api'
@@ -17,14 +18,6 @@ export function QrLoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  const qrImageSrc = useMemo(() => {
-    if (!qrPayload) {
-      return null
-    }
-
-    const encoded = encodeURIComponent(qrPayload)
-    return `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encoded}`
-  }, [qrPayload])
 
   useEffect(() => {
     let disposed = false
@@ -114,7 +107,16 @@ export function QrLoginPage() {
         <div className='auth-card'>
           <section className='auth-content auth-content-login'>
             {isLoading ? <p>Đang tạo mã QR...</p> : null}
-            {!isLoading && qrImageSrc ? <img src={qrImageSrc} alt='VNALO QR Login' style={{ width: 320, height: 320, borderRadius: 12 }} /> : null}
+            {!isLoading && qrPayload ? (
+              <div style={{ background: 'white', padding: 12, borderRadius: 12, display: 'inline-block' }}>
+                <QRCodeCanvas 
+                  value={qrPayload} 
+                  size={320} 
+                  level="H"
+                  includeMargin={false}
+                />
+              </div>
+            ) : null}
             {expiresAt ? <p style={{ marginTop: 12 }}>Hết hạn lúc: {new Date(expiresAt).toLocaleTimeString()}</p> : null}
             {error ? <p className='auth-form-error'>{error}</p> : null}
             <div className='auth-inline-actions'>
