@@ -255,6 +255,61 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
+  // ─── Calling Events (WebRTC Signaling) ────────────────────
+
+  @SubscribeMessage('call.initiate')
+  handleCallInitiate(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { targetUserId: string; conversationId: string; isVideo: boolean },
+  ) {
+    const callerId = client.data.user.userId;
+    this.logger.log(`Call initiate from ${callerId} to ${data.targetUserId} (video: ${data.isVideo})`);
+    
+    this.emitToUser(data.targetUserId, 'call.incoming', {
+      callerId,
+      conversationId: data.conversationId,
+      isVideo: data.isVideo,
+      callerName: client.data.user.phone, // Temporary, ideal would be real name
+    });
+  }
+
+  @SubscribeMessage('call.answer')
+  handleCallAnswer(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { targetUserId: string; accepted: boolean },
+  ) {
+    const userId = client.data.user.userId;
+    this.logger.log(`Call answer from ${userId} to ${data.targetUserId}: ${data.accepted}`);
+    
+    this.emitToUser(data.targetUserId, 'call.answered', {
+      responderId: userId,
+      accepted: data.accepted,
+    });
+  }
+
+  @SubscribeMessage('call.signal')
+  handleCallSignal(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { targetUserId: string; signal: any },
+  ) {
+    const userId = client.data.user.userId;
+    this.emitToUser(data.targetUserId, 'call.signal', {
+      senderId: userId,
+      signal: data.signal,
+    });
+  }
+
+  @SubscribeMessage('call.end')
+  handleCallEnd(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { targetUserId: string },
+  ) {
+    const userId = client.data.user.userId;
+    this.emitToUser(data.targetUserId, 'call.ended', {
+      senderId: userId,
+    });
+  }
+
   // ─── Utility ──────────────────────────────────────────────
 
   /** Check if a user is currently online (has at least one active socket). */
