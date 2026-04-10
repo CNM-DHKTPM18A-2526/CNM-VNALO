@@ -8,11 +8,11 @@ import iuh.cnm.vnalo.core_service.model.dto.response.SyncPolicyResponse;
 import iuh.cnm.vnalo.core_service.model.dto.response.UserInfoResponse;
 import iuh.cnm.vnalo.core_service.model.entity.auth.AuthAccount;
 import iuh.cnm.vnalo.core_service.model.entity.social.ContactSync;
-import iuh.cnm.vnalo.core_service.model.entity.user.UserPrivacySetting;
-import iuh.cnm.vnalo.core_service.model.entity.user.UserProfile;
 import iuh.cnm.vnalo.core_service.model.entity.social.Friendship;
 import iuh.cnm.vnalo.core_service.model.entity.social.FriendRequest;
 import iuh.cnm.vnalo.core_service.model.entity.social.BlockList;
+import iuh.cnm.vnalo.core_service.model.entity.user.UserPrivacySetting;
+import iuh.cnm.vnalo.core_service.model.entity.user.UserProfile;
 import iuh.cnm.vnalo.core_service.model.entity.user.UserSetting;
 import iuh.cnm.vnalo.core_service.model.enums.FriendshipStatus;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthAccountRepository;
@@ -150,23 +150,40 @@ public class UserService {
         // 2. Check Pending Friend Requests
         List<FriendRequest> requests = friendRequestRepository.findPendingRequestsBetween(requesterId, targetIds);
         requests.forEach(r -> {
-            if (!statusMap.containsKey(r.getUserIdFrom().equals(requesterId) ? r.getUserIdTo() : r.getUserIdFrom())) {
-                if (r.getUserIdFrom().equals(requesterId)) {
-                    statusMap.put(r.getUserIdTo(), FriendshipStatus.PENDING_SENT);
-                } else {
-                    statusMap.put(r.getUserIdFrom(), FriendshipStatus.PENDING_RECEIVED);
-                }
+            UUID targetId = r.getUserIdFrom().equals(requesterId) ? r.getUserIdTo() : r.getUserIdFrom();
+            if (statusMap.containsKey(targetId)) {
+                return;
+            }
+
+            if (r.getUserIdFrom().equals(requesterId)) {
+                statusMap.put(targetId, FriendshipStatus.PENDING_SENT);
+            } else {
+                statusMap.put(targetId, FriendshipStatus.PENDING_RECEIVED);
             }
         });
 
-        // 3. Check Block List
+        // 3. Check Block List (highest precedence)
         List<BlockList> blocks = blockListRepository.findBlocksBetween(requesterId, targetIds);
         blocks.forEach(b -> {
+            UUID targetId;
+            FriendshipStatus nextStatus;
             if (b.getBlockerId().equals(requesterId)) {
-                statusMap.put(b.getBlockedId(), FriendshipStatus.BLOCKED_BY_ME);
+                targetId = b.getBlockedId();
+                nextStatus = FriendshipStatus.BLOCKED_BY_ME;
             } else {
-                statusMap.put(b.getBlockerId(), FriendshipStatus.BLOCKED_BY_THEM);
+                targetId = b.getBlockerId();
+                nextStatus = FriendshipStatus.BLOCKED_BY_THEM;
             }
+
+            FriendshipStatus existing = statusMap.get(targetId);
+            if ((existing == FriendshipStatus.BLOCKED_BY_ME && nextStatus == FriendshipStatus.BLOCKED_BY_THEM)
+                    || (existing == FriendshipStatus.BLOCKED_BY_THEM && nextStatus == FriendshipStatus.BLOCKED_BY_ME)
+                    || existing == FriendshipStatus.BLOCKED_BOTH) {
+                statusMap.put(targetId, FriendshipStatus.BLOCKED_BOTH);
+                return;
+            }
+
+            statusMap.put(targetId, nextStatus);
         });
 
         return statusMap;

@@ -56,7 +56,7 @@ class User {
     isVerified: json['isVerified'] ?? json['is_verified'] ?? false,
     isOfficialAccount: json['isOfficialAccount'] ?? false,
     followerCount: json['followerCount'] ?? 0,
-    friendshipStatus: json['friendshipStatus'],
+    friendshipStatus: json['friendshipStatus'] ?? json['friendship_status'],
   );
 
   User copyWith({

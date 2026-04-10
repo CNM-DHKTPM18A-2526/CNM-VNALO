@@ -85,7 +85,7 @@ class _TimelineScreenState extends State<TimelineScreen> with SingleTickerProvid
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildNhậtKýView(context, isDarkMode, auth, displayName),
+          _buildNhatKyView(context, isDarkMode, auth, displayName),
           const Center(child: Text('Zalo Video Content')),
         ],
       ),
@@ -111,7 +111,7 @@ class _TimelineScreenState extends State<TimelineScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildNhậtKýView(BuildContext context, bool isDarkMode, AuthProvider auth, String displayName) {
+  Widget _buildNhatKyView(BuildContext context, bool isDarkMode, AuthProvider auth, String displayName) {
     final containerColor = isDarkMode ? DarkColors.surface : Colors.white;
 
     return ListView(
