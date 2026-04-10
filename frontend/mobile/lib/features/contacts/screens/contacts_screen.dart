@@ -122,8 +122,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
               color: isDarkMode ? const Color(0xFF1A1A1A) : Colors.white,
               child: TabBar(
                 dividerColor: Colors.transparent,
-                labelColor: isDarkMode ? Colors.white : Colors.black,
-                unselectedLabelColor: const Color(0xFF9CA3AF),
+                labelColor: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
+                unselectedLabelColor: isDarkMode ? DarkColors.textSecondary : const Color(0xFF9CA3AF),
                 indicatorColor: AppColors.primary,
                 indicatorWeight: 3,
                 labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),

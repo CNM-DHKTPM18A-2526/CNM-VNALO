@@ -62,16 +62,20 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final t = AuthTexts.of(context);
 
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final scaffoldBg = isDarkMode ? DarkColors.scaffold : LightColors.scaffold;
+    final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.scaffold;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: scaffoldBg,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        backgroundColor: appBarBg,
+        surfaceTintColor: appBarBg,
         elevation: 0,
         title: Text(
           t.enterPhoneTitle,
-          style: const TextStyle(
-            color: Color(0xFF171717),
+          style: TextStyle(
+            color: isDarkMode ? Colors.white : const Color(0xFF171717),
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -96,7 +100,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     minimumSize: const Size.fromHeight(56),
-                    backgroundColor: _hasPhone ? AppColors.primary : const Color(0xFFE5E7EB),
+                    backgroundColor: _hasPhone ? AppColors.primary : (isDarkMode ? DarkColors.surface : const Color(0xFFE5E7EB)),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(999),
                     ),
@@ -107,7 +111,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
-                      color: _hasPhone ? Colors.white : const Color(0xFF9CA3AF),
+                      color: _hasPhone ? Colors.white : (isDarkMode ? Colors.white38 : const Color(0xFF9CA3AF)),
                     ),
                   ),
                 ),
@@ -146,8 +150,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: RichText(
                       text: TextSpan(
                         text: t.noAccount,
-                        style: const TextStyle(
-                          color: LightColors.textPrimary,
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white70 : LightColors.textPrimary,
                           fontSize: 18,
                         ),
                         children: [

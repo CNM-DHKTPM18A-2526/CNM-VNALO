@@ -25,6 +25,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   }
 
   void _showLanguageSheet(AuthTexts t) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -32,9 +33,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         final selected = Provider.of<LanguageProvider>(bottomSheetContext, listen: true).language;
 
         return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          decoration: BoxDecoration(
+            color: isDarkMode ? DarkColors.surface : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: SafeArea(
             top: false,
@@ -47,17 +48,17 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     width: 56,
                     height: 6,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE5E7EB),
+                      color: isDarkMode ? DarkColors.divider : const Color(0xFFE5E7EB),
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
                   const SizedBox(height: 14),
                   Text(
                     t.languageTitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 30,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF141414),
+                      color: isDarkMode ? Colors.white : const Color(0xFF141414),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -92,19 +93,20 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final t = AuthTexts.of(context);
     final carouselImages = AuthTexts.carouselImages;
     final language = context.watch<LanguageProvider>().label;
     final topInset = MediaQuery.of(context).padding.top;
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
-    const backgroundColor = Colors.white;
+    final backgroundColor = isDarkMode ? DarkColors.scaffold : Colors.white;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
+      value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
+        statusBarIconBrightness: isDarkMode ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDarkMode ? Brightness.dark : Brightness.light,
       ),
       child: Scaffold(
         backgroundColor: backgroundColor,
@@ -124,11 +126,13 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         minimumSize: const Size(0, 40),
-                        side: const BorderSide(color: Color(0xFFD5D7DB)),
+                        side: BorderSide(
+                          color: isDarkMode ? DarkColors.divider : const Color(0xFFD5D7DB),
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(24),
                         ),
-                        foregroundColor: const Color(0xFF2A2A2A),
+                        foregroundColor: isDarkMode ? Colors.white70 : const Color(0xFF2A2A2A),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
                       child: Row(
@@ -199,10 +203,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 textAlign: TextAlign.center,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w700,
-                                  color: Color(0xFF1B1B1B),
+                                  color: isDarkMode ? Colors.white : const Color(0xFF1B1B1B),
                                   height: 1.3,
                                 ),
                               ),
@@ -213,11 +217,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 textAlign: TextAlign.center,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w400,
                                   height: 1.4,
-                                  color: Color(0xFF6B7280),
+                                  color: isDarkMode ? Colors.white70 : const Color(0xFF6B7280),
                                 ),
                               ),
                               const SizedBox(height: 8),
@@ -298,8 +302,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                             },
                             style: ElevatedButton.styleFrom(
                               minimumSize: const Size.fromHeight(56),
-                              backgroundColor: const Color(0xFFE5E7EB),
-                              foregroundColor: const Color(0xFF111827),
+                              backgroundColor: isDarkMode ? DarkColors.surface : const Color(0xFFE5E7EB),
+                              foregroundColor: isDarkMode ? Colors.white : const Color(0xFF111827),
                               elevation: 0,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(999),
@@ -343,12 +347,16 @@ class _LanguageOptionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return ListTile(
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 4),
       title: Text(
         label,
-        style: const TextStyle(fontSize: 18, color: Color(0xFF1F2937)),
+        style: TextStyle(
+          fontSize: 18,
+          color: isDarkMode ? Colors.white : const Color(0xFF1F2937),
+        ),
       ),
       trailing:
           selected

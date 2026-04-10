@@ -156,7 +156,7 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
             margin: const EdgeInsets.fromLTRB(16, 14, 16, 14),
             padding: const EdgeInsets.fromLTRB(22, 18, 22, 18),
             decoration: BoxDecoration(
-              color: const Color(0xFF3F5F85),
+              color: isDarkMode ? DarkColors.surface : const Color(0xFF3F5F85),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Column(

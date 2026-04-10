@@ -82,21 +82,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
           behavior: HitTestBehavior.opaque,
           onTap: () {
             Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const UnifiedSearchScreen()),
+              MaterialPageRoute(
+                builder: (_) => const UnifiedSearchScreen(searchTag: 'search_bar_profile'),
+              ),
             );
           },
-          child: Row(
-          children: [
-            Icon(Icons.search, size: 24, color: searchHint),
-            const SizedBox(width: 8),
-            Text(
-              'Tìm kiếm',
-              style: TextStyle(
-                  color: searchHint,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w400),
+          child: Hero(
+            tag: 'search_bar_profile',
+            child: Material(
+              color: Colors.transparent,
+              child: Row(
+                children: [
+                  Icon(Icons.search, size: 24, color: searchHint),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Tìm kiếm',
+                    style: TextStyle(
+                      color: searchHint,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ],
           ),
         ),
         actions: [

@@ -30,18 +30,30 @@ class TimelineScreen extends StatelessWidget {
           behavior: HitTestBehavior.opaque,
           onTap: () {
             Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const UnifiedSearchScreen()),
+              MaterialPageRoute(
+                builder: (_) => const UnifiedSearchScreen(searchTag: 'search_bar_timeline'),
+              ),
             );
           },
-          child: Row(
-          children: [
-            Icon(Icons.search, size: 24, color: searchHint),
-            const SizedBox(width: 8),
-            Text(
-              'Tìm kiếm',
-              style: TextStyle(color: searchHint, fontSize: 16, fontWeight: FontWeight.w400),
+          child: Hero(
+            tag: 'search_bar_timeline',
+            child: Material(
+              color: Colors.transparent,
+              child: Row(
+                children: [
+                  Icon(Icons.search, size: 24, color: searchHint),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Tìm kiếm',
+                    style: TextStyle(
+                      color: searchHint,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ],
           ),
         ),
       ),
@@ -73,13 +85,16 @@ class TimelineScreen extends StatelessWidget {
               ],
             ),
           ),
-          Divider(thickness: 8, color: Theme.of(context).dividerColor,),
-          const Padding(
-            padding: EdgeInsets.all(24),
+          Divider(
+            thickness: 8,
+            color: isDarkMode ? DarkColors.divider : AppColors.sectionBackground,
+          ),
+          Padding(
+            padding: const EdgeInsets.all(24),
             child: Center(
               child: Text(
                 'Chưa có bài viết nào',
-                style: TextStyle(color: Color(0xFF9CA3AF)),
+                style: TextStyle(color: isDarkMode ? DarkColors.textHint : const Color(0xFF9CA3AF)),
               ),
             ),
           ),

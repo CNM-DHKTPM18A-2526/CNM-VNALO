@@ -37,7 +37,7 @@ class PersonalInfoScreen extends StatelessWidget {
     final displayName = user?.displayName ?? 'Người dùng';
 
     return Scaffold(
-      backgroundColor: AppColors.sectionBackground,
+      backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
       appBar: AppBar(
         backgroundColor: isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg,
         foregroundColor: Colors.white,
@@ -57,7 +57,7 @@ class PersonalInfoScreen extends StatelessWidget {
       body: ListView(
         children: [
           Container(
-            color: Colors.white,
+            color: isDarkMode ? DarkColors.surface : LightColors.surface,
             child: Column(
               children: [
                 const SizedBox(height: 20),
@@ -70,20 +70,23 @@ class PersonalInfoScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 18),
                 _buildInfoRow(
+                  context,
                   icon: Icons.account_circle_outlined,
                   label: 'Tên Zalo',
                   value: displayName,
                 ),
-                const Divider(height: 1, indent: 56, endIndent: 16, color: AppColors.sectionDivider),
+                Divider(height: 1, indent: 56, endIndent: 16, color: isDarkMode ? DarkColors.divider : AppColors.sectionDivider),
 
                 _buildInfoRow(
+                  context,
                   icon: Icons.calendar_today_outlined,
                   label: 'Ngày sinh',
                   value: _formatDob(user?.dob),
                 ),
-                const Divider(height: 1, indent: 56, endIndent: 16, color: AppColors.sectionDivider),
+                Divider(height: 1, indent: 56, endIndent: 16, color: isDarkMode ? DarkColors.divider : AppColors.sectionDivider),
 
                 _buildInfoRow(
+                  context,
                   icon: Icons.person_outline,
                   label: 'Giới tính',
                   value: _formatGender(user?.gender),
@@ -99,17 +102,17 @@ class PersonalInfoScreen extends StatelessWidget {
                           MaterialPageRoute(builder: (_) => const EditPersonalInfoScreen()),
                         );
                       },
-                      icon: const Icon(Icons.edit_outlined, size: 18),
-                      label: const Text(
+                      icon: Icon(Icons.edit_outlined, size: 18, color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary),
+                      label: Text(
                         'Chỉnh sửa',
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
+                          color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
                         ),
                       ),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: LightColors.textPrimary,
-                        backgroundColor: AppColors.itemPressBackground,
+                        backgroundColor: isDarkMode ? DarkColors.divider : AppColors.itemPressBackground,
                         side: BorderSide.none,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(24),
@@ -126,31 +129,32 @@ class PersonalInfoScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoRow({
+  Widget _buildInfoRow(BuildContext context, {
     required IconData icon,
     required String label,
     required String value,
   }) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
-          Icon(icon, size: 24, color: const Color(0xFF9CA3AF)),
+          Icon(icon, size: 24, color: isDarkMode ? DarkColors.textHint : const Color(0xFF9CA3AF)),
           const SizedBox(width: 16),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
-              color: Color(0xFF4B5563),
+              color: isDarkMode ? DarkColors.textPrimary : LightColors.textSecondary,
             ),
           ),
           const Spacer(),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w500,
-              color: Color(0xFF1A1A1A),
+              color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
             ),
           ),
         ],

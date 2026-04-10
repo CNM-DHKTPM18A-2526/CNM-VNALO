@@ -15,9 +15,14 @@ import 'package:vnalo_mobile/services/friend_service.dart';
 enum SearchInitialTab { mine, discover }
 
 class UnifiedSearchScreen extends StatefulWidget {
-  const UnifiedSearchScreen({super.key, this.initialTab = SearchInitialTab.mine});
+  const UnifiedSearchScreen({
+    super.key,
+    this.initialTab = SearchInitialTab.mine,
+    this.searchTag = 'search_bar',
+  });
 
   final SearchInitialTab initialTab;
+  final String searchTag;
 
   @override
   State<UnifiedSearchScreen> createState() => _UnifiedSearchScreenState();
@@ -255,47 +260,70 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
     final query = _queryController.text.trim();
     final results = _buildResults(query);
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
     final appBarIconColor = Colors.white.withValues(alpha: 0.95);
-    final tabBg = isDarkMode ? DarkColors.surface : Colors.white;
+    final surfaceColor = isDarkMode ? DarkColors.surface : Colors.white;
+    final scaffoldBg = isDarkMode ? Colors.black : AppColors.sectionBackground;
 
     return Scaffold(
-      backgroundColor: AppColors.sectionBackground,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Container(
-              decoration: const BoxDecoration(gradient: AppColors.appBarGradient),
-              padding: const EdgeInsets.fromLTRB(8, 3, 8, 5),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: Icon(Icons.arrow_back, size: 22, color: appBarIconColor),
-                  ),
-                  Expanded(
+      backgroundColor: scaffoldBg,
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        elevation: 0,
+        backgroundColor: appBarBg,
+        flexibleSpace: isDarkMode
+            ? null
+            : Container(
+                decoration: const BoxDecoration(gradient: AppColors.appBarGradient),
+              ),
+        titleSpacing: 0,
+        title: Padding(
+          padding: const EdgeInsets.only(right: 4),
+          child: Row(
+            children: [
+              IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: Icon(Icons.arrow_back, color: appBarIconColor),
+              ),
+              Expanded(
+                child: Hero(
+                  tag: widget.searchTag,
+                  child: Material(
+                    color: Colors.transparent,
                     child: Container(
-                      height: 36,
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      height: 38,
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
+                        color: isDarkMode ? const Color(0xFF262626) : Colors.white,
+                        borderRadius: BorderRadius.circular(100),
                       ),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Row(
                         children: [
-                          const Icon(Icons.search, color: AppColors.iconSubtle, size: 20),
+                          Icon(
+                            Icons.search,
+                            color: isDarkMode ? Colors.white54 : AppColors.iconSubtle,
+                            size: 20,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: TextField(
                               controller: _queryController,
                               autofocus: true,
-                              style: const TextStyle(fontSize: 16, color: LightColors.textPrimary),
-                              decoration: const InputDecoration(
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: isDarkMode ? Colors.white : LightColors.textPrimary,
+                              ),
+                              decoration: InputDecoration(
                                 hintText: 'Tìm kiếm',
-                                hintStyle: TextStyle(color: LightColors.textHint),
+                                hintStyle: TextStyle(
+                                  color: isDarkMode ? Colors.white38 : LightColors.textHint,
+                                ),
                                 border: InputBorder.none,
                                 enabledBorder: InputBorder.none,
                                 focusedBorder: InputBorder.none,
-                                isCollapsed: true,
+                                isDense: true,
+                                filled: false,
+                                contentPadding: EdgeInsets.zero,
                               ),
                               onChanged: (_) => setState(() {}),
                             ),
@@ -304,123 +332,157 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                       ),
                     ),
                   ),
-                  IconButton(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const QrScannerScreen()),
-                      );
-                    },
-                    icon: Icon(Icons.qr_code_scanner, size: 22, color: appBarIconColor),
-                  ),
-                ],
+                ),
               ),
-            ),
-            Container(
-              color: tabBg,
-              child: TabBar(
-                controller: _tabController,
-                labelColor: AppColors.primary,
-                unselectedLabelColor: LightColors.textSecondary,
-                indicatorColor: AppColors.primary,
-                dividerColor: AppColors.itemDivider,
-                tabs: const [
-                  Tab(text: 'Của tôi'),
-                  Tab(text: 'Khám phá'),
-                ],
+              IconButton(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const QrScannerScreen()),
+                  );
+                },
+                icon: Icon(Icons.qr_code_scanner, color: appBarIconColor),
               ),
-            ),
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  query.isEmpty ? _buildMineDefault() : _buildResultList(results),
-                  query.isEmpty ? _buildDiscoverDefault() : _buildResultList(results),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
+      ),
+      body: Column(
+        children: [
+          Container(
+            color: surfaceColor,
+            child: TabBar(
+              controller: _tabController,
+              dividerColor: Colors.transparent,
+              labelColor: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
+              unselectedLabelColor: isDarkMode ? DarkColors.textSecondary : const Color(0xFF9CA3AF),
+              indicatorColor: AppColors.primary,
+              indicatorWeight: 3,
+              labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+              tabs: const [
+                Tab(text: 'Của tôi'),
+                Tab(text: 'Khám phá'),
+              ],
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                query.isEmpty ? _buildMineDefault() : _buildResultList(results),
+                query.isEmpty ? _buildDiscoverDefault() : _buildResultList(results),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildMineDefault() {
     final usedMiniApps = _deriveUsedMiniApps();
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final surfaceColor = isDarkMode ? DarkColors.surface : Colors.white;
 
     return ListView(
       children: [
-        _sectionHeader('Mini App đã sử dụng'),
-        if (usedMiniApps.isEmpty)
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 8, 16, 14),
-            child: Text(
-              'Chưa có dữ liệu mini app đã sử dụng',
-              style: TextStyle(color: LightColors.textSecondary),
-            ),
-          )
-        else
-          SizedBox(
-            height: 110,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
-              itemCount: usedMiniApps.length,
-              itemBuilder: (context, index) {
-                final item = usedMiniApps[index];
-                return _MiniAppItem(label: item.$1, icon: item.$2);
-              },
-            ),
-          ),
-        const Divider(height: 1, color: AppColors.itemDivider),
-        _sectionHeader('Liên hệ đã tìm'),
-        if (_loadingFriends)
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Center(child: CircularProgressIndicator()),
-          )
-        else
-          SizedBox(
-            height: 108,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
-              itemCount: _friends.length > 7 ? 7 : _friends.length,
-              itemBuilder: (context, index) {
-                final user = _friends[index];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Column(
-                    children: [
-                      AvatarWidget(imageUrl: user.avatarUrl, name: user.displayName, size: 50),
-                      const SizedBox(height: 6),
-                      SizedBox(
-                        width: 72,
-                        child: Text(
-                          user.displayName,
-                          maxLines: 2,
-                          textAlign: TextAlign.center,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                      ),
-                    ],
+        Container(
+          color: surfaceColor,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _sectionHeader('Mini App đã sử dụng'),
+              if (usedMiniApps.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 8, 16, 14),
+                  child: Text(
+                    'Chưa có dữ liệu mini app đã sử dụng',
+                    style: TextStyle(color: LightColors.textSecondary),
                   ),
-                );
-              },
-            ),
+                )
+              else
+                SizedBox(
+                  height: 110,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
+                    itemCount: usedMiniApps.length,
+                    itemBuilder: (context, index) {
+                      final item = usedMiniApps[index];
+                      return _MiniAppItem(label: item.$1, icon: item.$2);
+                    },
+                  ),
+                ),
+            ],
           ),
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 14),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          color: surfaceColor,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _sectionHeader('Liên hệ đã tìm'),
+              if (_loadingFriends)
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else
+                SizedBox(
+                  height: 108,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
+                    itemCount: _friends.length > 7 ? 7 : _friends.length,
+                    itemBuilder: (context, index) {
+                      final user = _friends[index];
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Column(
+                          children: [
+                            AvatarWidget(imageUrl: user.avatarUrl, name: user.displayName, size: 50),
+                            const SizedBox(height: 6),
+                            SizedBox(
+                              width: 72,
+                              child: Text(
+                                user.displayName,
+                                maxLines: 2,
+                                textAlign: TextAlign.center,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDarkMode ? Colors.white : LightColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 14),
           child: Center(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   'Quản lý lịch sử tìm kiếm',
-                  style: TextStyle(color: LightColors.textSecondary, fontSize: 15),
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white70 : LightColors.textSecondary,
+                    fontSize: 15,
+                  ),
                 ),
-                SizedBox(width: 6),
-                Icon(Icons.chevron_right, size: 18, color: LightColors.textSecondary),
+                const SizedBox(width: 6),
+                Icon(
+                  Icons.chevron_right,
+                  size: 18,
+                  color: isDarkMode ? DarkColors.textHint : LightColors.textSecondary,
+                ),
               ],
             ),
           ),
@@ -441,11 +503,19 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
       separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.itemDivider),
       itemBuilder: (_, index) {
         final item = discoverItems[index];
+        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+        final surfaceColor = isDarkMode ? DarkColors.surface : Colors.white;
         return ListTile(
-          tileColor: Colors.white,
+          tileColor: surfaceColor,
           leading: Icon(item.$3, color: AppColors.primary),
-          title: Text(item.$1),
-          subtitle: Text(item.$2),
+          title: Text(
+            item.$1,
+            style: TextStyle(color: isDarkMode ? Colors.white : LightColors.textPrimary),
+          ),
+          subtitle: Text(
+            item.$2,
+            style: TextStyle(color: isDarkMode ? Colors.white70 : LightColors.textSecondary),
+          ),
           trailing: const Icon(Icons.chevron_right, color: LightColors.textHint),
         );
       },
@@ -463,8 +533,10 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
       separatorBuilder: (_, __) => const Divider(height: 1, indent: 76, color: AppColors.itemDivider),
       itemBuilder: (_, index) {
         final item = items[index];
+        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+        final surfaceColor = isDarkMode ? DarkColors.surface : Colors.white;
         return ListTile(
-          tileColor: Colors.white,
+          tileColor: surfaceColor,
           leading: item.kind == 'chat' || item.kind == 'friend'
               ? AvatarWidget(imageUrl: item.avatarUrl, name: item.title, size: 44)
               : Container(
@@ -479,8 +551,16 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                     color: AppColors.primary,
                   ),
                 ),
-          title: Text(item.title),
-          subtitle: Text(item.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+          title: Text(
+            item.title,
+            style: TextStyle(color: isDarkMode ? Colors.white : LightColors.textPrimary),
+          ),
+          subtitle: Text(
+            item.subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: isDarkMode ? Colors.white70 : LightColors.textSecondary),
+          ),
           trailing: const Icon(Icons.chevron_right, color: LightColors.textHint),
           onTap: () => _handleResultTap(item),
         );
@@ -489,14 +569,26 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
   }
 
   Widget _sectionHeader(String title) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final surfaceColor = isDarkMode ? DarkColors.surface : Colors.white;
     return Container(
-      color: Colors.white,
+      color: surfaceColor,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Row(
         children: [
-          Text(title, style: const TextStyle(fontSize: 31 / 2, fontWeight: FontWeight.w700)),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 15.5,
+              fontWeight: FontWeight.w700,
+              color: isDarkMode ? Colors.white : LightColors.textPrimary,
+            ),
+          ),
           const Spacer(),
-          const Text('Sửa', style: TextStyle(color: LightColors.textSecondary, fontSize: 14)),
+          const Text(
+            'Sửa',
+            style: TextStyle(color: AppColors.primary, fontSize: 14),
+          ),
         ],
       ),
     );

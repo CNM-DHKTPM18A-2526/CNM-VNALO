@@ -31,52 +31,91 @@ class _ChatInputBarState extends State<ChatInputBar> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      color: LightColors.surfaceLight,
+      decoration: BoxDecoration(
+        color: isDarkMode ? const Color(0xFF1A1A1A) : LightColors.surface,
+        border: Border(
+          top: BorderSide(
+            color: isDarkMode ? Colors.white10 : const Color(0xFFE5E7EB),
+            width: 0.5,
+          ),
+        ),
+      ),
       child: SafeArea(
-        child: Row(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.emoji_emotions_outlined),
-              onPressed: () {},
-              color: LightColors.textHint,
-            ),
-            Expanded(
-              child: TextField(
-                controller: _controller,
-                onChanged:
-                    (value) =>
-                        setState(() => _hasText = value.trim().isNotEmpty),
-                minLines: 1,
-                maxLines: 4,
-                decoration: InputDecoration(
-                  hintText: 'Nhap tin nhan...',
-                  filled: true,
-                  fillColor: LightColors.scaffold,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.emoji_emotions_outlined, size: 28),
+                onPressed: () {},
+                color: isDarkMode ? Colors.white70 : const Color(0xFF5D6470),
+                padding: const EdgeInsets.all(8),
+                constraints: const BoxConstraints(),
+              ),
+              Expanded(
+                child: TextField(
+                  controller: _controller,
+                  onChanged: (value) => setState(() => _hasText = value.trim().isNotEmpty),
+                  minLines: 1,
+                  maxLines: 5,
+                  style: TextStyle(
+                    fontSize: 17,
+                    color: isDarkMode ? Colors.white : LightColors.textPrimary,
                   ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    borderSide: BorderSide.none,
+                  decoration: InputDecoration(
+                    hintText: 'Tin nhắn',
+                    hintStyle: TextStyle(
+                      color: isDarkMode ? Colors.white38 : const Color(0xFFA1A3A7),
+                      fontSize: 17,
+                      fontWeight: FontWeight.w400,
+                    ),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 10,
+                    ),
+                    border: InputBorder.none,
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 4),
-            if (_hasText)
-              IconButton(
-                icon: const Icon(Icons.send, color: AppColors.primary),
-                onPressed: _send,
-              )
-            else
-              IconButton(
-                icon: const Icon(Icons.mic, color: LightColors.textHint),
-                onPressed: () {},
-              ),
-          ],
+              if (_hasText)
+                IconButton(
+                  icon: const Icon(Icons.send, color: AppColors.primary, size: 28),
+                  onPressed: _send,
+                  padding: const EdgeInsets.all(8),
+                )
+              else
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.more_horiz, size: 28),
+                      onPressed: () {},
+                      color: isDarkMode ? Colors.white70 : const Color(0xFF5D6470),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      constraints: const BoxConstraints(),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.mic_none, size: 28),
+                      onPressed: () {},
+                      color: isDarkMode ? Colors.white70 : const Color(0xFF5D6470),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      constraints: const BoxConstraints(),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.image_outlined, size: 28),
+                      onPressed: () {},
+                      color: isDarkMode ? Colors.white70 : const Color(0xFF5D6470),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
+            ],
+          ),
         ),
       ),
     );

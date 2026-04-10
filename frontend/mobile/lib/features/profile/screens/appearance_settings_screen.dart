@@ -11,13 +11,9 @@ class AppearanceSettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final cardBorder = isDarkMode
-        ? const Color(0xFF3A3A3A)
-        : AppColors.sectionDivider;
-    final sectionLabel = isDarkMode
-        ? const Color(0xFF60A5FA)
-        : AppColors.primary;
-    final pageBg = isDarkMode ? Colors.black : AppColors.sectionBackground;
+    final cardBorder = isDarkMode ? DarkColors.divider : AppColors.sectionDivider;
+    final sectionLabel = isDarkMode ? AppColors.primaryLight : AppColors.primary;
+    final pageBg = isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground;
     final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
 
     return Scaffold(
@@ -77,18 +73,16 @@ class AppearanceSettingsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               // Font options
-              Container(
-                color: Colors.white,
-                child: const Column(
-                  children: [
-                    _SettingsRow(
-                      title: 'Đổi phông chữ',
-                      trailing: 'Phông chữ Zalo',
-                    ),
-                    Divider(height: 1, color: AppColors.sectionDivider),
-                    _SettingsRow(title: 'Đổi cỡ chữ'),
-                  ],
-                ),
+              Column(
+                children: [
+                   _SettingsRow(
+                    title: 'Đổi phông chữ',
+                    trailing: 'Phông chữ Zalo',
+                    isDarkMode: isDarkMode,
+                  ),
+                  Divider(height: 1, color: isDarkMode ? DarkColors.divider : AppColors.sectionDivider),
+                   _SettingsRow(title: 'Đổi cỡ chữ', isDarkMode: isDarkMode),
+                ],
               ),
               const SizedBox(height: 18),
               // ─── Ngôn ngữ ───
@@ -106,13 +100,11 @@ class AppearanceSettingsScreen extends StatelessWidget {
               Consumer<LanguageProvider>(
                 builder: (_, langProvider, __) {
                   final isVi = langProvider.language == AppLanguage.vi;
-                  return Container(
-                    color: Colors.white,
-                    child: _SettingsRow(
-                      title: 'Đổi ngôn ngữ',
-                      trailing: isVi ? '🇻🇳 Tiếng Việt' : '🇺🇸 English',
-                      onTap: () => _showLanguagePicker(context, langProvider),
-                    ),
+                  return _SettingsRow(
+                    title: 'Đổi ngôn ngữ',
+                    trailing: isVi ? '🇻🇳 Tiếng Việt' : '🇺🇸 English',
+                    onTap: () => _showLanguagePicker(context, langProvider),
+                    isDarkMode: isDarkMode,
                   );
                 },
               ),
@@ -124,14 +116,15 @@ class AppearanceSettingsScreen extends StatelessWidget {
   }
 
   void _showLanguagePicker(BuildContext context, LanguageProvider provider) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (sheetCtx) {
         return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          decoration: BoxDecoration(
+            color: isDarkMode ? DarkColors.surface : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: SafeArea(
             top: false,
@@ -144,24 +137,24 @@ class AppearanceSettingsScreen extends StatelessWidget {
                     width: 56,
                     height: 6,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE5E7EB),
+                      color: isDarkMode ? Colors.white10 : const Color(0xFFE5E7EB),
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
                   const SizedBox(height: 14),
                   Text(
                     AuthTexts.of(context, listen: false).languageTitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF141414),
+                      color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 8),
                   ListTile(
                     leading: const Text('🇻🇳', style: TextStyle(fontSize: 28)),
-                    title: const Text('Tiếng Việt',
-                        style: TextStyle(fontSize: 17)),
+                    title: Text('Tiếng Việt',
+                        style: TextStyle(fontSize: 17, color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary)),
                     trailing: provider.language == AppLanguage.vi
                         ? const Icon(Icons.check,
                             color: AppColors.primary, size: 24)
@@ -172,9 +165,9 @@ class AppearanceSettingsScreen extends StatelessWidget {
                     },
                   ),
                   ListTile(
-                    leading: const Text('🇺🇸', style: TextStyle(fontSize: 28)),
+                    leading: const Text('🇻🇳', style: TextStyle(fontSize: 28)),
                     title:
-                        const Text('English', style: TextStyle(fontSize: 17)),
+                         Text('English', style: TextStyle(fontSize: 17, color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary)),
                     trailing: provider.language == AppLanguage.en
                         ? const Icon(Icons.check,
                             color: AppColors.primary, size: 24)
@@ -310,7 +303,7 @@ class _ThemeCard extends StatelessWidget {
                     fontWeight: FontWeight.w500,
                     color: selected
                         ? AppColors.primary
-                        : null,
+                        : (Theme.of(context).brightness == Brightness.dark ? DarkColors.textSecondary : LightColors.textSecondary),
                   ),
                 ),
               ],
@@ -326,34 +319,36 @@ class _SettingsRow extends StatelessWidget {
   final String title;
   final String? trailing;
   final VoidCallback? onTap;
+  final bool isDarkMode;
 
-  const _SettingsRow({required this.title, this.trailing, this.onTap});
+  const _SettingsRow({required this.title, this.trailing, this.onTap, required this.isDarkMode});
 
   @override
   Widget build(BuildContext context) {
+    final bgColor = isDarkMode ? DarkColors.surface : Colors.white;
     return Material(
-      color: Colors.transparent,
+      color: bgColor,
       child: InkWell(
         highlightColor: AppColors.itemPressBackground,
         splashColor: AppColors.itemPressBackground.withValues(alpha: 0.7),
         onTap: onTap,
         child: ListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-          title: Text(title, style: const TextStyle(fontSize: 16)),
+          title: Text(title, style: TextStyle(fontSize: 16, color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary)),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (trailing != null) ...[
                 Text(
                   trailing!,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
-                    color: Color(0xFF9CA3AF),
+                    color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary,
                   ),
                 ),
                 const SizedBox(width: 4),
               ],
-              const Icon(Icons.chevron_right, size: 20, color: Color(0xFFD1D5DB)),
+              Icon(Icons.chevron_right, size: 20, color: isDarkMode ? DarkColors.textHint : LightColors.textHint),
             ],
           ),
         ),
