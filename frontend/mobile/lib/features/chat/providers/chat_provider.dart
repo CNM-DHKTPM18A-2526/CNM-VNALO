@@ -307,6 +307,9 @@ class ChatProvider extends ChangeNotifier {
       );
       _conversations[index] = updatedConversation;
       _sortConversations();
+    } else {
+      // If the conversation is not in the current inbox, reload the inbox to show the new conversation
+      loadInbox();
     }
 
     // Emit delivered indicator if it's not our message
@@ -516,5 +519,137 @@ class ChatProvider extends ChangeNotifier {
       timer.cancel();
     }
     super.dispose();
+  }
+
+  // ─── Settings & Management ────────────────────────────────
+
+  Future<void> updateConversationSettings({
+    required String conversationId,
+    bool? isPinned,
+    bool? isMuted,
+    bool? isHidden,
+    bool? isFavorite,
+    int? autoDeleteSeconds,
+    bool? notifyCall,
+  }) async {
+    try {
+      await _chatService.updateInboxSettings(
+        conversationId,
+        isPinned: isPinned,
+        isMuted: isMuted,
+        isHidden: isHidden,
+        isFavorite: isFavorite,
+        autoDeleteSeconds: autoDeleteSeconds,
+        notifyCall: notifyCall,
+      );
+
+      final index = _conversations.indexWhere((c) => c.id == conversationId);
+      if (index >= 0) {
+        _conversations[index] = _conversations[index].copyWith(
+          isPinned: isPinned ?? _conversations[index].isPinned,
+          isMuted: isMuted ?? _conversations[index].isMuted,
+          isHidden: isHidden ?? _conversations[index].isHidden,
+          isFavorite: isFavorite ?? _conversations[index].isFavorite,
+          autoDeleteSeconds: autoDeleteSeconds ?? _conversations[index].autoDeleteSeconds,
+          notifyCall: notifyCall ?? _conversations[index].notifyCall,
+        );
+        _sortConversations();
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('updateConversationSettings error: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteChatHistory(String conversationId) async {
+    try {
+      await _chatService.deleteChatHistory(conversationId);
+      _messages[conversationId] = [];
+      
+      final index = _conversations.indexWhere((c) => c.id == conversationId);
+      if (index >= 0) {
+        _conversations[index] = _conversations[index].copyWith(
+          lastMessage: null,
+          unreadCount: 0,
+        );
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint('deleteChatHistory error: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateMemberNickname(String conversationId, String userId, String nickname) async {
+    try {
+      await _chatService.updateMemberNickname(conversationId, userId, nickname);
+      
+      final index = _conversations.indexWhere((c) => c.id == conversationId);
+      if (index >= 0) {
+        final conv = _conversations[index];
+        final memberIndex = conv.members.indexWhere((m) => m.userId == userId);
+        if (memberIndex >= 0) {
+          final updatedMember = conv.members[memberIndex].copyWith(nickname: nickname);
+          final updatedMembers = List<ConversationMember>.from(conv.members);
+          updatedMembers[memberIndex] = updatedMember;
+          _conversations[index] = conv.copyWith(members: updatedMembers);
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint('updateMemberNickname error: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateWallpaper(String conversationId, File file, {bool isGlobal = true}) async {
+    try {
+      final mediaId = await _mediaService.uploadFile(file, MediaCategory.CHAT_IMAGE);
+      final wallpaperUrl = _mediaService.getPublicUrl(mediaId);
+      
+      await _chatService.updateWallpaper(conversationId, wallpaperUrl, isGlobal: isGlobal);
+      
+      final index = _conversations.indexWhere((c) => c.id == conversationId);
+      if (index >= 0) {
+        if (isGlobal) {
+          _conversations[index] = _conversations[index].copyWith(wallpaperUrl: wallpaperUrl);
+        } else {
+          _conversations[index] = _conversations[index].copyWith(personalWallpaperUrl: wallpaperUrl);
+        }
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('updateWallpaper error: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateWallpaperUrl(String conversationId, String wallpaperUrl, {bool isGlobal = true}) async {
+    try {
+      await _chatService.updateWallpaper(conversationId, wallpaperUrl, isGlobal: isGlobal);
+      
+      final index = _conversations.indexWhere((c) => c.id == conversationId);
+      if (index >= 0) {
+        if (isGlobal) {
+          _conversations[index] = _conversations[index].copyWith(wallpaperUrl: wallpaperUrl);
+        } else {
+          _conversations[index] = _conversations[index].copyWith(personalWallpaperUrl: wallpaperUrl);
+        }
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('updateWallpaperUrl error: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<Message>> getSharedMedia(String conversationId, {String? type}) async {
+    try {
+      return await _chatService.searchMedia(conversationId, messageType: type, limit: 10);
+    } catch (e) {
+      debugPrint('getSharedMedia error: $e');
+      return [];
+    }
   }
 }

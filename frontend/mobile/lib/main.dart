@@ -8,7 +8,8 @@ import 'package:vnalo_mobile/core/theme/app_theme.dart';
 import 'package:vnalo_mobile/core/theme/theme_provider.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/auth/screens/splash_screen.dart';
-import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
+import 'package:vnalo_mobile/features/call/providers/call_provider.dart';
+import 'package:vnalo_mobile/features/call/widgets/incoming_call_overlay.dart';
 import 'package:vnalo_mobile/services/api_service.dart';
 import 'package:vnalo_mobile/services/auth_service.dart';
 import 'package:vnalo_mobile/services/chat_service.dart';
@@ -113,6 +114,9 @@ class VnaloApp extends StatelessWidget {
                 context.read<MediaService>(),
               ),
         ),
+        ChangeNotifierProvider<CallProvider>(
+          create: (context) => CallProvider(context.read<SocketService>()),
+        ),
       ],
       child: Consumer2<ThemeProvider, LanguageProvider>(
         builder: (_, themeProvider, languageProvider, __) {
@@ -134,6 +138,14 @@ class VnaloApp extends StatelessWidget {
               Locale('vi', 'VN'),
               Locale('en', 'US'),
             ],
+            builder: (context, child) {
+              return Stack(
+                children: [
+                  if (child != null) child,
+                  const IncomingCallOverlay(),
+                ],
+              );
+            },
             home: const SplashScreen(),
           );
         },
