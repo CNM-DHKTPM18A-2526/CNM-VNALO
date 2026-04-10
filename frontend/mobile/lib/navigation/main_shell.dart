@@ -66,7 +66,7 @@ class _MainShellState extends State<MainShell> {
               ),
               const BottomNavigationBarItem(
                 icon: Icon(Icons.access_time),
-                label: 'Nhật ký',
+                label: 'Tường nhà',
               ),
               const BottomNavigationBarItem(
                 icon: Icon(Icons.person_outline),
