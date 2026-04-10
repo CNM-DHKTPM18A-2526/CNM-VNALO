@@ -5,14 +5,14 @@ import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/search/screens/unified_search_screen.dart';
 
-class TimelineScreen extends StatefulWidget {
-  const TimelineScreen({super.key});
+class HomeWallScreen extends StatefulWidget {
+  const HomeWallScreen({super.key});
 
   @override
-  State<TimelineScreen> createState() => _TimelineScreenState();
+  State<HomeWallScreen> createState() => _HomeWallScreenState();
 }
 
-class _TimelineScreenState extends State<TimelineScreen> with SingleTickerProviderStateMixin {
+class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
   @override
