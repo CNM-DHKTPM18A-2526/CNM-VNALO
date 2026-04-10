@@ -8,6 +8,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/utils/avatar_utils.dart';
 import 'package:vnalo_mobile/core/utils/validators.dart';
+import 'package:vnalo_mobile/core/utils/api_error_mapper.dart';
 import 'package:vnalo_mobile/features/auth/localization/auth_texts.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/auth/screens/login_screen.dart';
@@ -43,6 +44,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _otpStatusResolved = false;
   String _otpCode = '';
   String _countryCode = '+84';
+  int _resendCooldown = 0;
+  Timer? _cooldownTimer;
 
   bool get _isAnyRequestInFlight =>
       _isSendingOtp || _isResendingOtp || _isSubmittingRegistration;
@@ -144,8 +147,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return '$_countryCode$digits';
   }
 
+  void _startCooldownTimer() {
+    _cooldownTimer?.cancel();
+    setState(() => _resendCooldown = 60);
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_resendCooldown > 0) {
+        setState(() => _resendCooldown--);
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
   @override
   void dispose() {
+    _cooldownTimer?.cancel();
     _pageController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
@@ -227,12 +247,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
         email: email,
       );
       if (!mounted) return;
+      _startCooldownTimer();
       _nextStep();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_extractErrorMessage(e)),
+          content: Text(ApiErrorMapper.map(e)),
           backgroundColor: AppColors.error,
         ),
       );
@@ -255,6 +276,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         email: _emailController.text.trim(),
       );
       if (!mounted) return;
+      _startCooldownTimer();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(AuthTexts.of(context, listen: false).otpResent),
@@ -265,7 +287,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(AuthTexts.of(context, listen: false).otpFailed(e)),
+          content: Text(ApiErrorMapper.map(e)),
           backgroundColor: AppColors.error,
         ),
       );
@@ -365,10 +387,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _showContactsPrompt();
         return;
       }
-      // M5: translate known API error codes into user-friendly Vietnamese strings.
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_mapApiError(e)),
+          content: Text(ApiErrorMapper.map(e)),
           backgroundColor: AppColors.error,
         ),
       );
@@ -381,39 +402,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         });
       }
     }
-  }
-
-  /// M5: Maps known API error codes to user-friendly messages.
-  /// Falls back to a generic message so raw exception strings never reach the UI.
-  String _mapApiError(Object e) {
-    if (e is ApiException) {
-      switch (e.code) {
-        case 'PHONE_TAKEN':
-        case 'AUTH_008':
-          return 'S\u1ed1 \u0111i\u1ec7n tho\u1ea1i n\u00e0y \u0111\u00e3 \u0111\u01b0\u1ee3c \u0111\u0103ng k\u00fd';
-        case 'AUTH_018':
-          return 'Email n\u00e0y \u0111\u00e3 \u0111\u01b0\u1ee3c \u0111\u0103ng k\u00fd';
-        case 'OTP_INVALID':
-        case 'OTP_EXPIRED':
-        case 'AUTH_010':
-        case 'AUTH_009':
-          return 'M\u00e3 OTP kh\u00f4ng h\u1ee3p l\u1ec7 ho\u1eb7c \u0111\u00e3 h\u1ebft h\u1ea1n';
-        default:
-          if (e.statusCode == 0) return 'Kh\u00f4ng c\u00f3 k\u1ebft n\u1ed1i m\u1ea1ng';
-          return '\u0110\u0103ng k\u00fd th\u1ea5t b\u1ea1i (${e.statusCode})';
-      }
-    }
-    return '\u0110\u00e3 x\u1ea3y ra l\u1ed7i, vui l\u00f2ng th\u1eed l\u1ea1i';
-  }
-
-  String _extractErrorMessage(Object error) {
-    if (error is StateError) {
-      return error.message.toString();
-    }
-    if (error is ApiException) {
-      return _mapApiError(error);
-    }
-    return 'Yêu cầu thất bại, vui lòng thử lại';
   }
 
   void _showContactsPrompt() {
@@ -780,13 +768,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             const SizedBox(height: 14),
             TextButton(
-              onPressed: _isAnyRequestInFlight ? null : _resendOtp,
+              onPressed: _isAnyRequestInFlight || _resendCooldown > 0 ? null : _resendOtp,
               child: Text(
-                t.resendOtp,
-                style: const TextStyle(
+                _resendCooldown > 0 ? 'Gửi lại mã (${_resendCooldown}s)' : t.resendOtp,
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.primary,
+                  color: _resendCooldown > 0 ? Colors.grey : AppColors.primary,
                 ),
               ),
             ),
