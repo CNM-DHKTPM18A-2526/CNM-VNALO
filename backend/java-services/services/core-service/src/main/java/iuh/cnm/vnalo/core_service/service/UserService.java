@@ -10,9 +10,15 @@ import iuh.cnm.vnalo.core_service.model.entity.auth.AuthAccount;
 import iuh.cnm.vnalo.core_service.model.entity.social.ContactSync;
 import iuh.cnm.vnalo.core_service.model.entity.user.UserPrivacySetting;
 import iuh.cnm.vnalo.core_service.model.entity.user.UserProfile;
+import iuh.cnm.vnalo.core_service.model.entity.social.Friendship;
+import iuh.cnm.vnalo.core_service.model.entity.social.FriendRequest;
+import iuh.cnm.vnalo.core_service.model.entity.social.BlockList;
 import iuh.cnm.vnalo.core_service.model.entity.user.UserSetting;
+import iuh.cnm.vnalo.core_service.model.enums.FriendshipStatus;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthAccountRepository;
+import iuh.cnm.vnalo.core_service.repository.social.BlockListRepository;
 import iuh.cnm.vnalo.core_service.repository.social.ContactSyncRepository;
+import iuh.cnm.vnalo.core_service.repository.social.FriendRequestRepository;
 import iuh.cnm.vnalo.core_service.repository.social.FriendshipRepository;
 import iuh.cnm.vnalo.core_service.repository.user.UserPrivacySettingRepository;
 import iuh.cnm.vnalo.core_service.repository.user.UserProfileRepository;
@@ -43,6 +49,8 @@ public class UserService {
     private final UserPrivacySettingRepository userPrivacySettingRepository;
     private final AuthAccountRepository authAccountRepository;
     private final FriendshipRepository friendshipRepository;
+    private final FriendRequestRepository friendRequestRepository;
+    private final BlockListRepository blockListRepository;
     private final ContactSyncRepository contactSyncRepository;
     private final UserSettingRepository userSettingRepository;
 
@@ -115,11 +123,53 @@ public class UserService {
         authAccountRepository.findAllByIdIn(profileIds)
             .forEach(account -> accountMap.put(account.getId(), account));
 
+        List<UUID> targetIds = profileIds.stream().toList();
+        Map<UUID, FriendshipStatus> statusMap = resolveFriendshipStatuses(requesterId, targetIds);
+
         List<UserInfoResponse> content = profilePage.getContent().stream()
-            .map(profile -> mapToUserInfoResponse(accountMap.get(profile.getId()), profile))
+            .map(profile -> {
+                UserInfoResponse resp = mapToUserInfoResponse(accountMap.get(profile.getId()), profile);
+                resp.setFriendshipStatus(statusMap.getOrDefault(profile.getId(), FriendshipStatus.NONE));
+                return resp;
+            })
             .toList();
 
         return new PageImpl<>(content, pageable, profilePage.getTotalElements());
+    }
+
+    private Map<UUID, FriendshipStatus> resolveFriendshipStatuses(UUID requesterId, List<UUID> targetIds) {
+        Map<UUID, FriendshipStatus> statusMap = new HashMap<>();
+
+        // 1. Check Friendships
+        List<Friendship> friendships = friendshipRepository.findFriendshipsBetween(requesterId, targetIds);
+        friendships.forEach(f -> {
+            UUID targetId = f.getUserIdFrom().equals(requesterId) ? f.getUserIdTo() : f.getUserIdFrom();
+            statusMap.put(targetId, FriendshipStatus.FRIEND);
+        });
+
+        // 2. Check Pending Friend Requests
+        List<FriendRequest> requests = friendRequestRepository.findPendingRequestsBetween(requesterId, targetIds);
+        requests.forEach(r -> {
+            if (!statusMap.containsKey(r.getUserIdFrom().equals(requesterId) ? r.getUserIdTo() : r.getUserIdFrom())) {
+                if (r.getUserIdFrom().equals(requesterId)) {
+                    statusMap.put(r.getUserIdTo(), FriendshipStatus.PENDING_SENT);
+                } else {
+                    statusMap.put(r.getUserIdFrom(), FriendshipStatus.PENDING_RECEIVED);
+                }
+            }
+        });
+
+        // 3. Check Block List
+        List<BlockList> blocks = blockListRepository.findBlocksBetween(requesterId, targetIds);
+        blocks.forEach(b -> {
+            if (b.getBlockerId().equals(requesterId)) {
+                statusMap.put(b.getBlockedId(), FriendshipStatus.BLOCKED_BY_ME);
+            } else {
+                statusMap.put(b.getBlockerId(), FriendshipStatus.BLOCKED_BY_THEM);
+            }
+        });
+
+        return statusMap;
     }
 
     @Transactional(readOnly = true)

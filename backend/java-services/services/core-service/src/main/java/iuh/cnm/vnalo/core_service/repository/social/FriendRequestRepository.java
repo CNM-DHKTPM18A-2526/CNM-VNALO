@@ -37,6 +37,9 @@ public interface FriendRequestRepository extends JpaRepository<FriendRequest, UU
         return findByUserIdToAndStatusOrderByCreatedAtDesc(userId, FriendRequestStatus.PENDING, pageable);
     }
 
+    @Query("SELECT fr FROM FriendRequest fr WHERE (fr.userIdFrom = :userId AND fr.userIdTo IN :targetIds) OR (fr.userIdTo = :userId AND fr.userIdFrom IN :targetIds) AND fr.status = 'PENDING'")
+    List<FriendRequest> findPendingRequestsBetween(@Param("userId") UUID userId, @Param("targetIds") List<UUID> targetIds);
+
     long countByUserIdToAndStatus(UUID userIdTo, FriendRequestStatus status);
 
     default long countPendingRequests(UUID userId) {

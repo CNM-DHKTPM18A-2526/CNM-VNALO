@@ -52,6 +52,9 @@ public interface BlockListRepository extends JpaRepository<BlockList, UUID> {
     @Query("SELECT b.blockerId FROM BlockList b WHERE b.blockedId = :blockedId")
     List<UUID> findBlockerIds(@Param("blockedId") UUID blockedId);
 
+    @Query("SELECT b FROM BlockList b WHERE (b.blockerId = :userId AND b.blockedId IN :targetIds) OR (b.blockedId = :userId AND b.blockerId IN :targetIds)")
+    List<BlockList> findBlocksBetween(@Param("userId") UUID userId, @Param("targetIds") List<UUID> targetIds);
+
     /**
      * Delete block record.
      */
