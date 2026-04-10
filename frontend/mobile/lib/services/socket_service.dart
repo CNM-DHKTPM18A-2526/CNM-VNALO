@@ -15,6 +15,8 @@ class SocketService {
   final _typingController = StreamController<Map<String, dynamic>>.broadcast();
   final _presenceController =
       StreamController<Map<String, dynamic>>.broadcast();
+  final _readController = StreamController<Map<String, dynamic>>.broadcast();
+  final _deliveredController = StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<Message> get onMessage =>
       _messageController.stream; // Stream for incoming messages
@@ -22,6 +24,8 @@ class SocketService {
       _typingController.stream; // Stream for typing indicators
   Stream<Map<String, dynamic>> get onPresence =>
       _presenceController.stream; // Stream for presence updates
+  Stream<Map<String, dynamic>> get onRead => _readController.stream;
+  Stream<Map<String, dynamic>> get onDelivered => _deliveredController.stream;
 
   void connect(String token) {
     _socket = io.io(
@@ -66,6 +70,14 @@ class SocketService {
         Map<String, dynamic>.from(data),
       ); // Add presence update data to the stream (e.g., user online/offline status)
     });
+
+    _socket!.on('message.read', (data) {
+      _readController.add(Map<String, dynamic>.from(data));
+    });
+
+    _socket!.on('message.delivered', (data) {
+      _deliveredController.add(Map<String, dynamic>.from(data));
+    });
   }
 
   // Join a conversation by emitting a 'conversation.join' event with the conversation ID
@@ -85,6 +97,11 @@ class SocketService {
     required String content,
     String messageType = 'TEXT',
     String? clientMessageId,
+    String? mediaUrl,
+    String? mediaThumbnailUrl,
+    String? mediaMimeType,
+    int? mediaSizeBytes,
+    String? replyToMessageId,
   }) async {
     if (_socket == null) {
       return null;
@@ -94,10 +111,15 @@ class SocketService {
     _socket?.emitWithAck(
       'message.send',
       {
-      'conversationId': conversationId,
-      'content': content,
-      'messageType': messageType,
-      'clientMessageId': clientMessageId,
+        'conversationId': conversationId,
+        'content': content,
+        'messageType': messageType,
+        'clientMessageId': clientMessageId,
+        if (mediaUrl != null) 'mediaUrl': mediaUrl,
+        if (mediaThumbnailUrl != null) 'mediaThumbnailUrl': mediaThumbnailUrl,
+        if (mediaMimeType != null) 'mediaMimeType': mediaMimeType,
+        if (mediaSizeBytes != null) 'mediaSizeBytes': mediaSizeBytes,
+        if (replyToMessageId != null) 'replyToMessageId': replyToMessageId,
       },
       ack: (data) {
         if (data is Map) {
@@ -128,6 +150,13 @@ class SocketService {
     });
   }
 
+  void markDelivered(String messageId, String conversationId) {
+    _socket?.emit('message.delivered', {
+      'messageId': messageId,
+      'conversationId': conversationId,
+    });
+  }
+
   void disconnect() {
     _socket?.disconnect(); // Disconnect from the socket server
     _socket?.dispose(); // Dispose the socket instance to free up resources
@@ -139,5 +168,7 @@ class SocketService {
     _messageController.close(); // Close the message stream controller
     _typingController.close(); // Close the typing stream controller
     _presenceController.close(); // Close the presence stream controller
+    _readController.close();
+    _deliveredController.close();
   }
 }

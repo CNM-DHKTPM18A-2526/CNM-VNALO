@@ -153,18 +153,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const room = `conversation:${dto.conversationId}`;
       this.server.to(room).emit('message.received', message);
 
-      // Add: also broadcast to all participants of this conversation globally so their inboxes update!
-      try {
-        const conversation = await this.conversationService.getConversation(dto.conversationId, userId);
-        if (conversation && conversation.members) {
-          for (const member of conversation.members) {
-            // we use the emitToUser helper method to reach their personal connected sockets
-            this.emitToUser(member.userId, 'message.received', message);
-          }
-        }
-      } catch (err) {
-        this.logger.error(`Failed to broadcast to individual members: ${err.message}`);
-      }
+      // Add: We rely strictly on room broadcasts to prevent cross-conversation leakage
+      // Users NOT actively in the chat will receive updates via Firebase FCM or long-polling syncs.
 
       return { event: 'message.sent', data: message };
     } catch (err) {
@@ -241,6 +231,28 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     } catch (err) {
       this.logger.error(`Mark read failed: ${err.message}`);
     }
+  }
+
+  /**
+   * Message delivered indicator: notify the sender that the recipient received the message.
+   * This is real-time only and doesn't persist to DB as per requirements.
+   */
+  @SubscribeMessage('message.delivered')
+  handleMessageDelivered(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { messageId: string; conversationId: string },
+  ) {
+    const userId = client.data.user.userId;
+    const room = `conversation:${data.conversationId}`;
+    
+    // Broadcast to the room so the sender (and other devices of the recipient) see it.
+    // We exclude the sender of the 'delivered' event itself.
+    client.to(room).emit('message.delivered', {
+      userId,
+      messageId: data.messageId,
+      conversationId: data.conversationId,
+      deliveredAt: new Date(),
+    });
   }
 
   // ─── Utility ──────────────────────────────────────────────

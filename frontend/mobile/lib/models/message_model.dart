@@ -117,7 +117,11 @@ class Message {
   // Factory constructor to create a Message instance from JSON
   factory Message.fromJson(Map<String, dynamic> json) => Message(
     id: json['id'] ?? json['_id'] ?? '',
-    conversationId: json['conversationId'] ?? '',
+    conversationId: json['conversationId'] ??
+        json['conversation_id'] ??
+        json['cid'] ??
+        json['conversation']?['id'] ??
+        '',
     serverSeq: json['serverSeq'],
     senderId: json['senderId'] ?? '',
     senderName: json['senderName'],

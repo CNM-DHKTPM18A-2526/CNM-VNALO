@@ -8,6 +8,7 @@ import 'package:vnalo_mobile/features/chat/widgets/chat_input_bar.dart';
 import 'package:vnalo_mobile/features/chat/widgets/message_bubble.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
+import 'package:vnalo_mobile/models/conversation_member_model.dart';
 import 'package:vnalo_mobile/models/user_model.dart';
 import 'package:vnalo_mobile/core/utils/date_formatter.dart';
 
@@ -126,78 +127,96 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           IconButton(icon: const Icon(Icons.menu), onPressed: () {}),
         ],
       ),
-      body: Consumer<ChatProvider>(
-        builder: (_, chat, __) {
-          final items = chat.messages;
+      body: Column(
+        children: [
+          Expanded(
+            child: Consumer<ChatProvider>(
+              key: ValueKey('chat_${widget.conversation.id}'),
+              builder: (_, chat, __) {
+                final items = chat.getMessagesForConversation(widget.conversation.id);
 
-          return ListView.builder(
-            reverse: true,
-            padding: const EdgeInsets.symmetric(
-              horizontal: 8,
-              vertical: 8,
-            ),
-            itemCount: items.length + (isDirect ? 1 : 0),
-            itemBuilder: (_, index) {
-              // Show friend profile card at the bottom (end of reversed list)
-              if (isDirect && index == items.length) {
-                return _buildFriendProfileCard(
-                  displayName,
-                  avatarUrl,
-                  coverUrl,
+                return ListView.builder(
+                  reverse: true,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 8,
+                  ),
+                  itemCount: items.length + (isDirect ? 1 : 0),
+                  itemBuilder: (_, index) {
+                    // Show friend profile card at the bottom (end of reversed list)
+                    if (isDirect && index == items.length) {
+                      return _buildFriendProfileCard(
+                        displayName,
+                        avatarUrl,
+                        coverUrl,
+                      );
+                    }
+
+                    final message = items[index];
+                    final isMine = message.isMine(currentUserId);
+
+                    // Grouping Logic:
+                    bool showTime = true;
+                    if (index > 0) {
+                      final nextRecent = items[index - 1];
+                      final sameSender = nextRecent.senderId == message.senderId;
+                      final timeGap = nextRecent.createdAt.difference(message.createdAt).inMinutes.abs();
+                      if (sameSender && timeGap < 5) {
+                        showTime = false;
+                      }
+                    }
+
+                    bool showStatus = (isMine && index == 0);
+
+                    String? milestoneText;
+                    if (index == items.length - 1) {
+                      milestoneText = DateFormatter.formatTimelineDate(message.createdAt);
+                    } else {
+                      final olderMsg = items[index + 1];
+                      final gap = message.createdAt.difference(olderMsg.createdAt).inMinutes.abs();
+                      if (gap > 20) {
+                        milestoneText = DateFormatter.formatTimelineDate(message.createdAt);
+                      }
+                    }
+                    
+                    // Read status for Group icons
+                    List<ConversationMember>? readByMembers;
+                    if (message.senderId == currentUserId && message.serverSeq != null) {
+                      final conv = chat.conversations.firstWhere(
+                        (c) => c.id == widget.conversation.id,
+                        orElse: () => widget.conversation,
+                      );
+                      readByMembers = conv.members.where((m) {
+                        return m.userId != currentUserId && 
+                               m.lastReadSeq >= message.serverSeq!;
+                      }).toList();
+                    }
+
+                    return MessageBubble(
+                      message: message,
+                      isMine: isMine,
+                      showTime: showTime,
+                      showStatus: showStatus,
+                      milestoneText: milestoneText,
+                      readByMembers: readByMembers,
+                      onRetry:
+                          message.status == MessageStatus.FAILED
+                              ? () => chat.retryMessage(message)
+                              : null,
+                    );
+                  },
                 );
-              }
-
-              final message = items[index];
-              final isMine = message.isMine(currentUserId);
-              
-              // Grouping Logic:
-              // showTime: if next visual message (index-1, more recent) is from different sender OR gap > 5 mins
-              bool showTime = true;
-              if (index > 0) {
-                final nextRecent = items[index - 1];
-                final sameSender = nextRecent.senderId == message.senderId;
-                final timeGap = nextRecent.createdAt.difference(message.createdAt).inMinutes.abs();
-                if (sameSender && timeGap < 5) {
-                  showTime = false;
-                }
-              }
-
-              // showStatus: ONLY if it's the very latest message from me in the whole conversation
-              bool showStatus = false;
-              if (isMine && index == 0) {
-                showStatus = true;
-              }
-
-              // milestoneText: if older visual message (index+1, older) has gap > 20 mins
-              String? milestoneText;
-              if (index == items.length - 1) {
-                // First message ever in timeline
-                milestoneText = DateFormatter.formatTimelineDate(message.createdAt);
-              } else {
-                final olderMsg = items[index + 1];
-                final gap = message.createdAt.difference(olderMsg.createdAt).inMinutes.abs();
-                if (gap > 20) {
-                   milestoneText = DateFormatter.formatTimelineDate(message.createdAt);
-                }
-              }
-
-              return MessageBubble(
-                message: message,
-                isMine: isMine,
-                showTime: showTime,
-                showStatus: showStatus,
-                milestoneText: milestoneText,
-                onRetry:
-                    message.status == MessageStatus.FAILED
-                        ? () => chat.retryMessage(message)
-                        : null,
-              );
-            },
-          );
-        },
-      ),
-      bottomNavigationBar: ChatInputBar(
-        onSend: (text) => context.read<ChatProvider>().sendMessage(text),
+              },
+            ),
+          ),
+          ChatInputBar(
+            conversationId: widget.conversation.id,
+            onSend: (text) => context.read<ChatProvider>().sendMessage(
+              conversationId: widget.conversation.id,
+              content: text,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -289,7 +308,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   Widget _buildActionChip(String emoji, String label) {
     return GestureDetector(
       onTap: () {
-        context.read<ChatProvider>().sendMessage('$emoji $label');
+        context.read<ChatProvider>().sendMessage(
+          conversationId: widget.conversation.id,
+          content: '$emoji $label',
+        );
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),

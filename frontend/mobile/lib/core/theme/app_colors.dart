@@ -54,7 +54,7 @@ class LightColors {
   static const Color textSecondary = Color(0xFF666666);
   static const Color textHint = Color(0xFF999999);
   static const Color divider = Color(0xFFE0E0E0);
-  static const Color chatBubbleSent = Color(0xFFDDF2FF); // Zalo light blue
-  static const Color chatBubbleReceived = Color(0xFFFFFFFF); // Zalo white
+  static const Color chatBubbleSent = Color(0xFFDBEEFD);
+  static const Color chatBubbleReceived = Color(0xFFFFFFFF);
   static const Color appBarBg = Color(0xFF0068FF);
 }

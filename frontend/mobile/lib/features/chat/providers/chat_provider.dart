@@ -5,18 +5,24 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
+import 'package:vnalo_mobile/models/conversation_member_model.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
 import 'package:vnalo_mobile/services/chat_service.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
+import 'package:vnalo_mobile/services/media_service.dart';
+import 'dart:io';
 
 class ChatProvider extends ChangeNotifier {
   final ChatService _chatService;
   final SocketService _socketService;
+  final MediaService _mediaService;
 
   final Map<String, List<Message>> _messages = {};
   final Map<String, Timer> _retryTimers = {};
   final Map<String, int> _retryCounts = {};
   final StreamSubscription<Message> _messageSub;
+  final StreamSubscription<Map<String, dynamic>> _readSub;
+  final StreamSubscription<Map<String, dynamic>> _deliveredSub;
   final Random _random = Random.secure();
 
   List<Conversation> _conversations = [];
@@ -27,14 +33,23 @@ class ChatProvider extends ChangeNotifier {
   List<Conversation> get conversations => _conversations;
   bool get isLoading => _isLoading;
   String? get activeConversationId => _activeConversationId;
+  /// Get messages for the currently active conversation.
+  /// Use [getMessagesForConversation] for explicit scoping.
   List<Message> get messages =>
       _activeConversationId == null
           ? []
           : (_messages[_activeConversationId!] ?? []);
 
-  ChatProvider(this._chatService, this._socketService)
-    : _messageSub = _socketService.onMessage.listen((_) {}) {
+  List<Message> getMessagesForConversation(String conversationId) =>
+      _messages[conversationId] ?? [];
+
+  ChatProvider(this._chatService, this._socketService, this._mediaService)
+    : _messageSub = _socketService.onMessage.listen((_) {}),
+      _readSub = _socketService.onRead.listen((_) {}),
+      _deliveredSub = _socketService.onDelivered.listen((_) {}) {
     _messageSub.onData(_handleIncomingMessage);
+    _readSub.onData(_handleReadEvent);
+    _deliveredSub.onData(_handleDeliveredEvent);
   }
 
   List<Message> getMessages(String conversationId) =>
@@ -46,12 +61,22 @@ class ChatProvider extends ChangeNotifier {
 
     try {
       _conversations = await _chatService.getInbox();
+      _sortConversations();
     } catch (e) {
       debugPrint('loadInbox error: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  void _sortConversations() {
+    _conversations.sort((a, b) {
+      if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
+      final timeA = a.lastMessage?.createdAt ?? a.updatedAt ?? DateTime(0);
+      final timeB = b.lastMessage?.createdAt ?? b.updatedAt ?? DateTime(0);
+      return timeB.compareTo(timeA);
+    });
   }
 
   Future<void> loadMessages(String conversationId, {String? before}) async {
@@ -77,6 +102,21 @@ class ChatProvider extends ChangeNotifier {
   Future<void> openConversation(String conversationId) async {
     _activeConversationId = conversationId;
     _socketService.joinConversation(conversationId);
+
+    // Clear unread count locally
+    final index = _conversations.indexWhere((c) => c.id == conversationId);
+    if (index >= 0) {
+      final conv = _conversations[index];
+      if (conv.unreadCount > 0) {
+        _conversations[index] = conv.copyWith(unreadCount: 0);
+        // Mark as read on server
+        if (conv.lastMessage != null && conv.lastMessage!.serverSeq != null) {
+          _socketService.markRead(conversationId, conv.lastMessage!.serverSeq!);
+        }
+        notifyListeners();
+      }
+    }
+
     await loadMessages(conversationId);
   }
 
@@ -92,14 +132,17 @@ class ChatProvider extends ChangeNotifier {
     _activeConversationId = null;
   }
 
-  void sendMessage(String content, {String messageType = 'TEXT'}) {
-    final id = _activeConversationId;
-    if (id == null || content.trim().isEmpty) return;
+  void sendMessage({
+    required String conversationId,
+    required String content,
+    String messageType = 'TEXT',
+  }) {
+    if (content.trim().isEmpty) return;
 
     final clientMessageId = _generateUuidV4();
     final optimistic = Message(
       id: 'local-$clientMessageId',
-      conversationId: id,
+      conversationId: conversationId,
       senderId: _currentUserId ?? '',
       clientMessageId: clientMessageId,
       content: content.trim(),
@@ -108,9 +151,97 @@ class ChatProvider extends ChangeNotifier {
       createdAt: DateTime.now(),
     );
 
-    _messages[id] = [optimistic, ...(_messages[id] ?? [])];
+    _messages[conversationId] = [optimistic, ...(getMessagesForConversation(conversationId))];
     notifyListeners();
     _sendWithRetry(optimistic);
+  }
+
+  Future<void> sendMediaMessage({
+    required String conversationId,
+    required File file,
+    required MessageType type,
+  }) async {
+    final clientMessageId = _generateUuidV4();
+    final fileName = file.path.split('/').last;
+    final fileSize = file.lengthSync();
+    
+    final optimistic = Message(
+      id: 'local-$clientMessageId',
+      conversationId: conversationId,
+      senderId: _currentUserId ?? '',
+      clientMessageId: clientMessageId,
+      messageType: type,
+      content: fileName,
+      mediaSizeBytes: fileSize,
+      status: MessageStatus.SENDING,
+      createdAt: DateTime.now(),
+      // Temp local path for preview
+      mediaUrl: file.path, 
+    );
+
+    _messages[conversationId] = [optimistic, ...(getMessagesForConversation(conversationId))];
+    notifyListeners();
+
+    try {
+      final category = _mapMessageTypeToCategory(type);
+      final mediaId = await _mediaService.uploadFile(file, category);
+      final publicUrl = _mediaService.getPublicUrl(mediaId);
+      
+      final updated = optimistic.copyWith(
+        mediaUrl: publicUrl,
+        content: fileName,
+        mediaSizeBytes: fileSize,
+      );
+      _replaceMessage(conversationId, optimistic.id, updated);
+      _sendWithRetry(updated);
+    } catch (e) {
+      debugPrint('sendMediaMessage error: $e');
+      _replaceMessage(
+        conversationId,
+        optimistic.id,
+        optimistic.copyWith(status: MessageStatus.FAILED),
+      );
+    }
+  }
+
+  void sendSticker({
+    required String conversationId,
+    required String stickerId,
+    required String stickerUrl,
+  }) {
+    final clientMessageId = _generateUuidV4();
+    final message = Message(
+      id: 'local-$clientMessageId',
+      conversationId: conversationId,
+      senderId: _currentUserId ?? '',
+      clientMessageId: clientMessageId,
+      content: stickerId,
+      mediaUrl: stickerUrl,
+      messageType: MessageType.STICKER,
+      status: MessageStatus.SENDING,
+      createdAt: DateTime.now(),
+    );
+
+    _messages[conversationId] = [message, ...(getMessagesForConversation(conversationId))];
+    notifyListeners();
+    _sendWithRetry(message);
+  }
+
+  MediaCategory _mapMessageTypeToCategory(MessageType type) {
+    switch (type) {
+      case MessageType.IMAGE:
+        return MediaCategory.CHAT_IMAGE;
+      case MessageType.VIDEO:
+        return MediaCategory.CHAT_VIDEO;
+      case MessageType.AUDIO:
+        return MediaCategory.CHAT_VOICE;
+      case MessageType.FILE:
+        return MediaCategory.CHAT_FILE;
+      case MessageType.STICKER:
+        return MediaCategory.STICKER;
+      default:
+        return MediaCategory.CHAT_FILE;
+    }
   }
 
   void retryMessage(Message message) {
@@ -131,8 +262,18 @@ class ChatProvider extends ChangeNotifier {
   void _handleIncomingMessage(Message message) {
     final conversationId = message.conversationId;
 
+    // Resolve mediaId to URL if it's just an ID
+    Message resolvedMessage = message;
+    if (message.mediaUrl != null &&
+        !message.mediaUrl!.startsWith('http') &&
+        !message.mediaUrl!.startsWith('/')) {
+      resolvedMessage = message.copyWith(
+        mediaUrl: _mediaService.getPublicUrl(message.mediaUrl!),
+      );
+    }
+
     final existing = _messages[conversationId] ?? [];
-    final clientMessageId = message.clientMessageId;
+    final clientMessageId = resolvedMessage.clientMessageId;
     if (clientMessageId != null) {
       _clearRetry(clientMessageId);
       final optimisticIndex = existing.indexWhere(
@@ -140,7 +281,7 @@ class ChatProvider extends ChangeNotifier {
       );
       if (optimisticIndex >= 0) {
         final updated = List<Message>.from(existing);
-        updated[optimisticIndex] = message;
+        updated[optimisticIndex] = resolvedMessage;
         _messages[conversationId] = updated;
       } else {
         final alreadyPresent = existing.any((m) => m.id == message.id);
@@ -158,12 +299,85 @@ class ChatProvider extends ChangeNotifier {
     final index = _conversations.indexWhere((c) => c.id == conversationId);
     if (index >= 0) {
       final conversation = _conversations[index];
-      final updatedConversation = conversation.copyWith(lastMessage: message);
-      _conversations.removeAt(index);
-      _conversations.insert(0, updatedConversation);
+      final updatedConversation = conversation.copyWith(
+        lastMessage: message,
+        unreadCount: (conversation.id == _activeConversationId || message.senderId == _currentUserId)
+            ? 0
+            : conversation.unreadCount + 1,
+      );
+      _conversations[index] = updatedConversation;
+      _sortConversations();
+    }
+
+    // Emit delivered indicator if it's not our message
+    if (message.senderId != _currentUserId) {
+      _socketService.markDelivered(message.id, conversationId);
     }
 
     notifyListeners();
+  }
+
+  void _handleReadEvent(Map<String, dynamic> data) {
+    final String conversationId = data['conversationId'];
+    final String userId = data['userId'];
+    final int lastReadSeq = data['lastReadSeq'];
+
+    // Update member's lastReadSeq in the conversation object
+    final convIndex = _conversations.indexWhere((c) => c.id == conversationId);
+    if (convIndex >= 0) {
+      final conv = _conversations[convIndex];
+      final memberIndex = conv.members.indexWhere((m) => m.userId == userId);
+      if (memberIndex >= 0) {
+        final member = conv.members[memberIndex];
+        if (lastReadSeq > member.lastReadSeq) {
+          final updatedMember = member.copyWith(lastReadSeq: lastReadSeq);
+          final updatedMembers = List<ConversationMember>.from(conv.members);
+          updatedMembers[memberIndex] = updatedMember;
+          _conversations[convIndex] = conv.copyWith(members: updatedMembers);
+        }
+      }
+    }
+
+    // Update message statuses to READ if applicable
+    final msgs = _messages[conversationId];
+    if (msgs != null && msgs.isNotEmpty) {
+      bool changed = false;
+      final updatedMsgs = msgs.map((m) {
+        if (m.senderId == _currentUserId && 
+            m.status != MessageStatus.READ && 
+            m.serverSeq != null && 
+            m.serverSeq! <= lastReadSeq) {
+          changed = true;
+          return m.copyWith(status: MessageStatus.READ);
+        }
+        return m;
+      }).toList();
+
+      if (changed) {
+        _messages[conversationId] = updatedMsgs;
+      }
+    }
+
+    notifyListeners();
+  }
+
+  void _handleDeliveredEvent(Map<String, dynamic> data) {
+    final String conversationId = data['conversationId'];
+    final String messageId = data['messageId'];
+
+    final msgs = _messages[conversationId];
+    if (msgs != null) {
+      final index = msgs.indexWhere((m) => m.id == messageId);
+      if (index >= 0) {
+        final msg = msgs[index];
+        if (msg.status == MessageStatus.SENT) {
+          final updated = List<Message>.from(msgs);
+          updated[index] = msg.copyWith(status: MessageStatus.DELIVERED);
+          _messages[conversationId] = updated;
+          notifyListeners();
+        }
+      }
+    }
   }
 
   Future<void> _sendWithRetry(Message message) async {
@@ -177,6 +391,11 @@ class ChatProvider extends ChangeNotifier {
       content: message.content ?? '',
       messageType: message.messageType.name,
       clientMessageId: clientMessageId,
+      mediaUrl: message.mediaUrl,
+      mediaThumbnailUrl: message.mediaThumbnailUrl,
+      mediaMimeType: message.mediaMimeType,
+      mediaSizeBytes: message.mediaSizeBytes,
+      replyToMessageId: message.replyToMessageId,
     );
 
     if (ack != null && ack['event'] == 'message.error') {
@@ -291,6 +510,8 @@ class ChatProvider extends ChangeNotifier {
   @override
   void dispose() {
     _messageSub.cancel();
+    _readSub.cancel();
+    _deliveredSub.cancel();
     for (final timer in _retryTimers.values) {
       timer.cancel();
     }

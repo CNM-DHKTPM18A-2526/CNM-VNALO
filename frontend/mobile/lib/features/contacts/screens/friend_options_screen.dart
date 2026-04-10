@@ -27,6 +27,48 @@ class FriendOptionsScreen extends StatefulWidget {
 
 class _FriendOptionsScreenState extends State<FriendOptionsScreen> {
   bool _blockActivity = false;
+  late String _displayName;
+
+  @override
+  void initState() {
+    super.initState();
+    _displayName = widget.friendName;
+  }
+
+  void _editNickname() {
+    final controller = TextEditingController(text: _displayName);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Đổi gợi nhớ'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'Nhập tên gọi nhớ',
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('HỦY'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (controller.text.trim().isNotEmpty) {
+                setState(() => _displayName = controller.text.trim());
+              }
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Đã cập nhật tên gợi nhớ (Local)')),
+              );
+            },
+            child: const Text('LƯU'),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _onDone() async {
     // Try to open chat with the new friend
@@ -92,14 +134,12 @@ class _FriendOptionsScreenState extends State<FriendOptionsScreen> {
                       Row(
                         children: [
                           Text(
-                            widget.friendName,
+                            _displayName,
                             style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 17),
                           ),
                           const SizedBox(width: 6),
                           GestureDetector(
-                            onTap: () {
-                              // TODO: Implement edit nickname
-                            },
+                            onTap: _editNickname,
                             child: Icon(Icons.edit, size: 18, color: Colors.grey.shade500),
                           ),
                         ],

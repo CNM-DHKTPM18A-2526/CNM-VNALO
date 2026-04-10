@@ -44,6 +44,44 @@ class ConversationMember {
   bool get isOwner => role == MemberRole.OWNER;
   bool get isAdmin => role == MemberRole.ADMIN || role == MemberRole.OWNER;
 
+  ConversationMember copyWith({
+    String? conversationId,
+    String? userId,
+    MemberRole? role,
+    String? nickname,
+    DateTime? joinedAt,
+    String? joinedBy,
+    DateTime? leftAt,
+    String? removedBy,
+    DateTime? muteUntil,
+    bool? isPinned,
+    int? pinOrder,
+    bool? isHidden,
+    int? lastReadSeq,
+    DateTime? lastReadAt,
+    NotificationSetting? notificationSetting,
+    User? user,
+  }) {
+    return ConversationMember(
+      conversationId: conversationId ?? this.conversationId,
+      userId: userId ?? this.userId,
+      role: role ?? this.role,
+      nickname: nickname ?? this.nickname,
+      joinedAt: joinedAt ?? this.joinedAt,
+      joinedBy: joinedBy ?? this.joinedBy,
+      leftAt: leftAt ?? this.leftAt,
+      removedBy: removedBy ?? this.removedBy,
+      muteUntil: muteUntil ?? this.muteUntil,
+      isPinned: isPinned ?? this.isPinned,
+      pinOrder: pinOrder ?? this.pinOrder,
+      isHidden: isHidden ?? this.isHidden,
+      lastReadSeq: lastReadSeq ?? this.lastReadSeq,
+      lastReadAt: lastReadAt ?? this.lastReadAt,
+      notificationSetting: notificationSetting ?? this.notificationSetting,
+      user: user ?? this.user,
+    );
+  }
+
   factory ConversationMember.fromJson(
     Map<String, dynamic> json,
   ) => ConversationMember(
