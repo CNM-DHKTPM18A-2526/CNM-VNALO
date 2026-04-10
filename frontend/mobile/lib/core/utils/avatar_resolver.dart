@@ -20,11 +20,6 @@ class AvatarResolver {
 
     final uri = Uri.tryParse(value);
     if (uri != null && uri.hasScheme) {
-      // Compatibility fix: DiceBear SVG is not supported by standard Flutter image loaders.
-      // Force PNG format for DiceBear initials.
-      if (value.contains('api.dicebear.com') && value.contains('/svg')) {
-        return value.replaceFirst('/svg', '/png');
-      }
       return value;
     }
 

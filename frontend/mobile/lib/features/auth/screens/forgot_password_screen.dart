@@ -5,6 +5,7 @@ import 'package:vnalo_mobile/core/utils/validators.dart';
 import 'package:vnalo_mobile/features/auth/widgets/otp_input.dart';
 import 'package:vnalo_mobile/services/api_service.dart';
 import 'package:vnalo_mobile/services/auth_service.dart';
+import 'package:vnalo_mobile/core/utils/api_error_mapper.dart';
 
 /// Forgot-password flow with 3 steps:
 ///   1. Enter email → check exists & send OTP
@@ -29,9 +30,28 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   bool _isSubmitting = false;
   bool _showPassword = false;
   bool _showConfirm = false;
+  int _resendCooldown = 0;
+  Timer? _cooldownTimer;
+
+  void _startCooldownTimer() {
+    _cooldownTimer?.cancel();
+    setState(() => _resendCooldown = 60);
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_resendCooldown > 0) {
+        setState(() => _resendCooldown--);
+      } else {
+        timer.cancel();
+      }
+    });
+  }
 
   @override
   void dispose() {
+    _cooldownTimer?.cancel();
     _pageController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -68,6 +88,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           backgroundColor: AppColors.success,
         ),
       );
+      _startCooldownTimer();
       _goToStep(1);
     } on ApiException catch (e) {
       _showError(_mapApiError(e));
@@ -103,8 +124,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           backgroundColor: AppColors.success,
         ),
       );
+      _startCooldownTimer();
     } on ApiException catch (e) {
-      _showError(_mapApiError(e));
+      _showError(ApiErrorMapper.map(e));
     } catch (_) {
       _showError('Gửi lại OTP thất bại');
     } finally {
@@ -157,36 +179,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     } on ApiException catch (e) {
       if (e.code == 'AUTH_009' || e.code == 'AUTH_010' || e.code == 'AUTH_011') {
         // OTP error → go back to OTP step
-        _showError(_mapApiError(e));
+        _showError(ApiErrorMapper.map(e));
         _goToStep(1);
       } else {
-        _showError(_mapApiError(e));
+        _showError(ApiErrorMapper.map(e));
       }
     } catch (e) {
       _showError('Đặt lại mật khẩu thất bại: $e');
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
-    }
-  }
-
-  String _mapApiError(ApiException e) {
-    switch (e.code) {
-      case 'AUTH_019':
-        return 'Email chưa được đăng ký trong hệ thống';
-      case 'AUTH_009':
-        return 'Mã OTP đã hết hạn, vui lòng gửi lại';
-      case 'AUTH_010':
-        return 'Mã OTP không đúng';
-      case 'AUTH_011':
-        return 'Vượt quá số lần thử OTP, vui lòng gửi lại';
-      case 'AUTH_016':
-        return 'Mật khẩu mới chưa đạt yêu cầu';
-      case 'AUTH_020':
-        return 'Hệ thống chưa cấu hình gửi OTP email';
-      default:
-        return e.message.isNotEmpty && e.message != 'Unknown error'
-            ? e.message
-            : 'Yêu cầu thất bại (${e.statusCode})';
     }
   }
 
@@ -419,13 +420,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             ),
             const SizedBox(height: 16),
             TextButton(
-              onPressed: _isSending ? null : _resendOtp,
+              onPressed: _isSending || _resendCooldown > 0 ? null : _resendOtp,
               child: Text(
-                _isSending ? 'Đang gửi...' : 'Gửi lại mã OTP',
-                style: const TextStyle(
+                _isSending
+                    ? 'Đang gửi...'
+                    : (_resendCooldown > 0
+                        ? 'Gửi lại mã (${_resendCooldown}s)'
+                        : 'Gửi lại mã OTP'),
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF0068FF),
+                  color: _resendCooldown > 0 ? Colors.grey : const Color(0xFF0068FF),
                 ),
               ),
             ),

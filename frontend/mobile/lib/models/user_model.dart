@@ -16,6 +16,7 @@ class User {
   final bool isOfficialAccount;
   final int followerCount;
   final bool isOnline;
+  final String? friendshipStatus; // NONE, FRIEND, PENDING_SENT, PENDING_RECEIVED, BLOCKED__BY_ME, etc.
 
   User({
     required this.id,
@@ -35,6 +36,7 @@ class User {
     this.isOfficialAccount = false,
     this.followerCount = 0,
     this.isOnline = false,
+    this.friendshipStatus,
   });
 
   factory User.fromJson(Map<String, dynamic> json) => User(
@@ -54,6 +56,7 @@ class User {
     isVerified: json['isVerified'] ?? json['is_verified'] ?? false,
     isOfficialAccount: json['isOfficialAccount'] ?? false,
     followerCount: json['followerCount'] ?? 0,
+    friendshipStatus: json['friendshipStatus'] ?? json['friendship_status'],
   );
 
   User copyWith({
@@ -74,6 +77,7 @@ class User {
     bool? isOfficialAccount,
     int? followerCount,
     bool? isOnline,
+    String? friendshipStatus,
   }) {
     return User(
       id: id ?? this.id,
@@ -93,6 +97,7 @@ class User {
       isOfficialAccount: isOfficialAccount ?? this.isOfficialAccount,
       followerCount: followerCount ?? this.followerCount,
       isOnline: isOnline ?? this.isOnline,
+      friendshipStatus: friendshipStatus ?? this.friendshipStatus,
     );
   }
 
@@ -106,5 +111,6 @@ class User {
     'dob': dob?.toIso8601String(),
     'bio': bio,
     'statusMessage': statusMessage,
+    'friendshipStatus': friendshipStatus,
   };
 }

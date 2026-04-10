@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -36,6 +37,9 @@ public interface FriendRequestRepository extends JpaRepository<FriendRequest, UU
     default Page<FriendRequest> findPendingRequestsToUser(UUID userId, Pageable pageable) {
         return findByUserIdToAndStatusOrderByCreatedAtDesc(userId, FriendRequestStatus.PENDING, pageable);
     }
+
+    @Query("SELECT fr FROM FriendRequest fr WHERE ((fr.userIdFrom = :userId AND fr.userIdTo IN :targetIds) OR (fr.userIdTo = :userId AND fr.userIdFrom IN :targetIds)) AND fr.status = 'PENDING'")
+    List<FriendRequest> findPendingRequestsBetween(@Param("userId") UUID userId, @Param("targetIds") List<UUID> targetIds);
 
     long countByUserIdToAndStatus(UUID userIdTo, FriendRequestStatus status);
 

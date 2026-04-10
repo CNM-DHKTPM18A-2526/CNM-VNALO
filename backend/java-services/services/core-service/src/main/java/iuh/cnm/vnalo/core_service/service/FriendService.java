@@ -168,20 +168,20 @@ public class FriendService {
 
     @Transactional(readOnly = true)
     public Page<FriendRequestResponse> getPendingRequests(UUID userId, Pageable pageable) {
-        return friendRequestRepository.findPendingRequestsToUser(userId, pageable)
-                .map(this::mapToFriendRequestResponse);
+        Page<FriendRequest> requests = friendRequestRepository.findPendingRequestsToUser(userId, pageable);
+        return mapToFriendRequestResponsePage(requests);
     }
 
     @Transactional(readOnly = true)
     public Page<FriendRequestResponse> getSentRequests(UUID userId, Pageable pageable) {
-        return friendRequestRepository.findPendingSentRequests(userId, pageable)
-                .map(this::mapToFriendRequestResponse);
+        Page<FriendRequest> requests = friendRequestRepository.findPendingSentRequests(userId, pageable);
+        return mapToFriendRequestResponsePage(requests);
     }
 
     @Transactional(readOnly = true)
     public Page<FriendResponse> getFriends(UUID userId, Pageable pageable) {
-        return friendshipRepository.findFriendships(userId, pageable)
-                .map(friendship -> mapToFriendResponse(friendship, userId));
+        Page<Friendship> friendships = friendshipRepository.findFriendships(userId, pageable);
+        return mapToFriendResponsePage(friendships, userId);
     }
 
     @Transactional
@@ -207,39 +207,70 @@ public class FriendService {
         return friendRequestRepository.countPendingRequests(userId);
     }
 
-    private FriendRequestResponse mapToFriendRequestResponse(FriendRequest request) {
-        UserProfile fromUser = userProfileRepository.findById(request.getUserIdFrom()).orElse(null);
-        UserProfile toUser = userProfileRepository.findById(request.getUserIdTo()).orElse(null);
+    private Page<FriendRequestResponse> mapToFriendRequestResponsePage(Page<FriendRequest> requests) {
+        if (requests.isEmpty()) {
+            return Page.empty(requests.getPageable());
+        }
 
-        return FriendRequestResponse.builder()
-                .id(request.getRequestId())
-                .fromUserId(request.getUserIdFrom())
-                .fromUserDisplayName(fromUser != null ? fromUser.getDisplayName() : null)
-                .fromUserAvatarUrl(fromUser != null ? fromUser.getAvatarUrl() : null)
-                .toUserId(request.getUserIdTo())
-                .toUserDisplayName(toUser != null ? toUser.getDisplayName() : null)
-                .toUserAvatarUrl(toUser != null ? toUser.getAvatarUrl() : null)
-                .message(request.getMessage())
-                .source(request.getSource())
-                .status(request.getStatus())
-                .createdAt(request.getCreatedAt())
-                .respondedAt(request.getRespondedAt())
-                .build();
+        java.util.Set<UUID> userIds = new java.util.HashSet<>();
+        for (FriendRequest request : requests) {
+            userIds.add(request.getUserIdFrom());
+            userIds.add(request.getUserIdTo());
+        }
+
+        java.util.Map<UUID, UserProfile> userProfileMap = userProfileRepository.findAllById(userIds)
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(UserProfile::getId, p -> p));
+
+        return requests.map(request -> {
+            UserProfile fromUser = userProfileMap.get(request.getUserIdFrom());
+            UserProfile toUser = userProfileMap.get(request.getUserIdTo());
+
+            return FriendRequestResponse.builder()
+                    .id(request.getRequestId())
+                    .fromUserId(request.getUserIdFrom())
+                    .fromUserDisplayName(fromUser != null ? fromUser.getDisplayName() : null)
+                    .fromUserAvatarUrl(fromUser != null ? fromUser.getAvatarUrl() : null)
+                    .toUserId(request.getUserIdTo())
+                    .toUserDisplayName(toUser != null ? toUser.getDisplayName() : null)
+                    .toUserAvatarUrl(toUser != null ? toUser.getAvatarUrl() : null)
+                    .message(request.getMessage())
+                    .source(request.getSource())
+                    .status(request.getStatus())
+                    .createdAt(request.getCreatedAt())
+                    .respondedAt(request.getRespondedAt())
+                    .build();
+        });
     }
 
-    private FriendResponse mapToFriendResponse(Friendship friendship, UUID currentUserId) {
-        UUID friendId = friendship.getFriendId(currentUserId);
-        UserProfile friendProfile = userProfileRepository.findById(friendId).orElse(null);
+    private Page<FriendResponse> mapToFriendResponsePage(Page<Friendship> friendships, UUID currentUserId) {
+        if (friendships.isEmpty()) {
+            return Page.empty(friendships.getPageable());
+        }
 
-        return FriendResponse.builder()
-                .friendshipId(friendship.getFriendshipId())
-                .friendId(friendId)
-                .displayName(friendProfile != null ? friendProfile.getDisplayName() : null)
-                .avatarUrl(friendProfile != null ? friendProfile.getAvatarUrl() : null)
-                .statusMessage(friendProfile != null ? friendProfile.getStatusMessage() : null)
-                .nickname(friendship.getNicknameForFriend(currentUserId))
-                .source(friendship.getSource())
-                .friendsSince(friendship.getCreatedAt())
-                .build();
+        java.util.Set<UUID> friendIds = new java.util.HashSet<>();
+        for (Friendship friendship : friendships) {
+            friendIds.add(friendship.getFriendId(currentUserId));
+        }
+
+        java.util.Map<UUID, UserProfile> userProfileMap = userProfileRepository.findAllById(friendIds)
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(UserProfile::getId, p -> p));
+
+        return friendships.map(friendship -> {
+            UUID friendId = friendship.getFriendId(currentUserId);
+            UserProfile friendProfile = userProfileMap.get(friendId);
+
+            return FriendResponse.builder()
+                    .friendshipId(friendship.getFriendshipId())
+                    .friendId(friendId)
+                    .displayName(friendProfile != null ? friendProfile.getDisplayName() : null)
+                    .avatarUrl(friendProfile != null ? friendProfile.getAvatarUrl() : null)
+                    .statusMessage(friendProfile != null ? friendProfile.getStatusMessage() : null)
+                    .nickname(friendship.getNicknameForFriend(currentUserId))
+                    .source(friendship.getSource())
+                    .friendsSince(friendship.getCreatedAt())
+                    .build();
+        });
     }
 }

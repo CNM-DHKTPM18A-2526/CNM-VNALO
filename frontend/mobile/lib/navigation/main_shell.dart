@@ -6,7 +6,7 @@ import 'package:vnalo_mobile/features/chat/screens/chat_list_screen.dart';
 import 'package:vnalo_mobile/features/contacts/screens/contacts_screen.dart';
 import 'package:vnalo_mobile/features/discover/screens/discover_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/profile_screen.dart';
-import 'package:vnalo_mobile/features/timeline/screens/timeline_screen.dart';
+import 'package:vnalo_mobile/features/timeline/screens/home_wall_screen.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -22,7 +22,7 @@ class _MainShellState extends State<MainShell> {
     ChatListScreen(),
     ContactsScreen(),
     DiscoverScreen(),
-    TimelineScreen(),
+    HomeWallScreen(),
     ProfileScreen(),
   ];
 
@@ -66,7 +66,7 @@ class _MainShellState extends State<MainShell> {
               ),
               const BottomNavigationBarItem(
                 icon: Icon(Icons.access_time),
-                label: 'Nhật ký',
+                label: 'Tường nhà',
               ),
               const BottomNavigationBarItem(
                 icon: Icon(Icons.person_outline),

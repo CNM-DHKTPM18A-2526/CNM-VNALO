@@ -5,15 +5,22 @@ import iuh.cnm.vnalo.core_service.exception.ErrorCode;
 import iuh.cnm.vnalo.core_service.model.dto.request.UpdateProfileRequest;
 import iuh.cnm.vnalo.core_service.model.dto.response.UserInfoResponse;
 import iuh.cnm.vnalo.core_service.model.entity.auth.AuthAccount;
+import iuh.cnm.vnalo.core_service.model.entity.social.BlockList;
+import iuh.cnm.vnalo.core_service.model.entity.social.FriendRequest;
+import iuh.cnm.vnalo.core_service.model.entity.social.Friendship;
 import iuh.cnm.vnalo.core_service.model.entity.user.UserPrivacySetting;
 import iuh.cnm.vnalo.core_service.model.entity.user.UserProfile;
 import iuh.cnm.vnalo.core_service.model.enums.AccountStatus;
+import iuh.cnm.vnalo.core_service.model.enums.FriendshipStatus;
 import iuh.cnm.vnalo.core_service.model.enums.Gender;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthAccountRepository;
+import iuh.cnm.vnalo.core_service.repository.social.BlockListRepository;
 import iuh.cnm.vnalo.core_service.repository.social.ContactSyncRepository;
+import iuh.cnm.vnalo.core_service.repository.social.FriendRequestRepository;
 import iuh.cnm.vnalo.core_service.repository.social.FriendshipRepository;
 import iuh.cnm.vnalo.core_service.repository.user.UserPrivacySettingRepository;
 import iuh.cnm.vnalo.core_service.repository.user.UserProfileRepository;
+import iuh.cnm.vnalo.core_service.repository.user.UserSettingRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -34,6 +41,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -54,7 +62,16 @@ class UserServiceTest {
     private FriendshipRepository friendshipRepository;
 
     @Mock
+    private FriendRequestRepository friendRequestRepository;
+
+    @Mock
+    private BlockListRepository blockListRepository;
+
+    @Mock
     private ContactSyncRepository contactSyncRepository;
+
+    @Mock
+    private UserSettingRepository userSettingRepository;
 
     @InjectMocks
     private UserService userService;
@@ -201,6 +218,11 @@ class UserServiceTest {
             Page<UserProfile> profilePage = new PageImpl<>(List.of(testProfile));
             
             when(friendshipRepository.findFriendIds(requesterId)).thenReturn(List.of(testUserId));
+                when(friendshipRepository.findFriendshipsBetween(eq(requesterId), anyList())).thenReturn(List.of(
+                    Friendship.builder().userIdFrom(requesterId).userIdTo(testUserId).build()
+                ));
+                when(friendRequestRepository.findPendingRequestsBetween(eq(requesterId), anyList())).thenReturn(List.of());
+                when(blockListRepository.findBlocksBetween(eq(requesterId), anyList())).thenReturn(List.of());
             when(contactSyncRepository.findByUserIdAndMatchedUserIdIsNotNull(requesterId)).thenReturn(List.of());
             when(userProfileRepository.searchByDisplayNameWithinIds(any(), eq("test"), eq(pageable))).thenReturn(profilePage);
             when(authAccountRepository.findAllByIdIn(any())).thenReturn(List.of(testAccount));
@@ -212,6 +234,38 @@ class UserServiceTest {
             assertNotNull(result);
             assertEquals(1, result.getTotalElements());
             assertEquals("Test User", result.getContent().get(0).getDisplayName());
+            assertEquals(FriendshipStatus.FRIEND, result.getContent().get(0).getFriendshipStatus());
+        }
+
+        @Test
+        @DisplayName("Should set BLOCKED_BOTH when users block each other")
+        void shouldSetBlockedBothStatus() {
+            // Given
+            UUID requesterId = UUID.randomUUID();
+            Pageable pageable = PageRequest.of(0, 20);
+            Page<UserProfile> profilePage = new PageImpl<>(List.of(testProfile));
+            List<BlockList> blocks = List.of(
+                    BlockList.builder().blockerId(requesterId).blockedId(testUserId).build(),
+                    BlockList.builder().blockerId(testUserId).blockedId(requesterId).build()
+            );
+
+            when(friendshipRepository.findFriendIds(requesterId)).thenReturn(List.of(testUserId));
+            when(friendshipRepository.findFriendshipsBetween(eq(requesterId), anyList())).thenReturn(List.of());
+            when(friendRequestRepository.findPendingRequestsBetween(eq(requesterId), anyList())).thenReturn(List.of(
+                    FriendRequest.builder().userIdFrom(requesterId).userIdTo(testUserId).build()
+            ));
+            when(blockListRepository.findBlocksBetween(eq(requesterId), anyList())).thenReturn(blocks);
+            when(contactSyncRepository.findByUserIdAndMatchedUserIdIsNotNull(requesterId)).thenReturn(List.of());
+            when(userProfileRepository.searchByDisplayNameWithinIds(any(), eq("test"), eq(pageable))).thenReturn(profilePage);
+            when(authAccountRepository.findAllByIdIn(any())).thenReturn(List.of(testAccount));
+
+            // When
+            Page<UserInfoResponse> result = userService.searchUsers(requesterId, "Test", pageable);
+
+            // Then
+            assertNotNull(result);
+            assertEquals(1, result.getTotalElements());
+            assertEquals(FriendshipStatus.BLOCKED_BOTH, result.getContent().get(0).getFriendshipStatus());
         }
     }
 
