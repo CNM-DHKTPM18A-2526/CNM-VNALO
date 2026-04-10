@@ -141,6 +141,12 @@ export class MessageService {
       .orderBy('m.server_seq', 'DESC')
       .take(Math.min(limit, 100));
 
+    // Filter by history cleared threshold
+    const inboxEntry = await this.inboxRepo.findOne({ where: { userId, conversationId } });
+    if (inboxEntry?.historyClearedAt) {
+      qb.andWhere('m.created_at > :clearedAt', { clearedAt: inboxEntry.historyClearedAt });
+    }
+
     if (before !== undefined) {
       qb.andWhere('m.server_seq < :before', { before });
     }
