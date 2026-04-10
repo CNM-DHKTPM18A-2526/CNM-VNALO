@@ -28,6 +28,7 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: Consumer<ChatProvider>(
@@ -41,8 +42,8 @@ class _MainShellState extends State<MainShell> {
             currentIndex: _currentIndex,
             onTap: (index) => setState(() => _currentIndex = index),
             type: BottomNavigationBarType.fixed,
-            selectedItemColor: const Color(0xFF0068FF),
-            unselectedItemColor: const Color(0xFF9CA3AF),
+            selectedItemColor: AppColors.primary,
+            unselectedItemColor: isDarkMode ? DarkColors.textHint : const Color(0xFF9CA3AF),
             selectedFontSize: 12,
             unselectedFontSize: 12,
             items: [
@@ -65,7 +66,7 @@ class _MainShellState extends State<MainShell> {
                 label: 'Khám phá',
               ),
               const BottomNavigationBarItem(
-                icon: Icon(Icons.access_time),
+                icon: Icon(Icons.feed_outlined),
                 label: 'Tường nhà',
               ),
               const BottomNavigationBarItem(

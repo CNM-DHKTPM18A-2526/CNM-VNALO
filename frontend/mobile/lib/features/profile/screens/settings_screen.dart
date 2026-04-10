@@ -13,6 +13,7 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
+    final searchHint = isDarkMode ? DarkColors.textHint : Colors.white.withValues(alpha: 0.8);
 
     return Scaffold(
       backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
@@ -20,7 +21,7 @@ class SettingsScreen extends StatelessWidget {
         title: const Text('Cài đặt'),
         backgroundColor: appBarBg,
         foregroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(color: searchHint),
         flexibleSpace: isDarkMode
             ? null
             : Container(
@@ -28,7 +29,7 @@ class SettingsScreen extends StatelessWidget {
               ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.search),
+            icon: Icon(Icons.search, color: searchHint),
             onPressed: () {
               // TODO: Settings search
             },
@@ -187,11 +188,11 @@ class SettingsScreen extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    width: 56,
-                    height: 6,
+                    width: 40,
+                    height: 4,
                     decoration: BoxDecoration(
-                      color: isDarkMode ? Colors.white10 : AppColors.sectionDivider,
-                      borderRadius: BorderRadius.circular(999),
+                      color: isDarkMode ? Colors.white24 : Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -208,29 +209,38 @@ class SettingsScreen extends StatelessWidget {
                     style: TextStyle(fontSize: 15, color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary, height: 1.35),
                   ),
                   const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(sheetContext, false),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                      ),
-                      child: const Text('Sao lưu'),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
+                    height: 50,
                     child: ElevatedButton(
                       onPressed: () => Navigator.pop(sheetContext, true),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.itemPressBackground,
-                        foregroundColor: LightColors.textPrimary,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                        backgroundColor: Colors.transparent,
+                        foregroundColor: Colors.red,
+                        elevation: 0,
+                        shadowColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(color: isDarkMode ? Colors.red.withValues(alpha: 0.3) : Colors.red.shade100),
+                        ),
                       ),
-                      child: Text('Đăng xuất', style: TextStyle(color: isDarkMode ? Colors.white : LightColors.textPrimary)),
+                      child: const Text('Đăng xuất', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(sheetContext, false),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isDarkMode ? Colors.white10 : Colors.grey.shade100,
+                        foregroundColor: isDarkMode ? Colors.white : Colors.black87,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Hủy', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                     ),
                   ),
                 ],

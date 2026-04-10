@@ -588,8 +588,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final scaffoldBg = isDarkMode ? DarkColors.scaffold : Colors.white;
-    final appBarBg = isDarkMode ? DarkColors.appBarBg : Colors.white;
-    final showAppBarTitle = _currentStep == 0;
+    final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
     final t = AuthTexts.of(context);
 
     return Scaffold(
@@ -599,20 +598,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
         backgroundColor: appBarBg,
         surfaceTintColor: appBarBg,
         elevation: 0,
-        leading: BackButton(
-          onPressed: _backStep,
-          color: isDarkMode ? Colors.white : Colors.black,
-        ),
-        title: showAppBarTitle
-            ? Text(
-                t.enterPhoneTitle,
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: isDarkMode ? Colors.white : const Color(0xFF171717),
-                ),
+        flexibleSpace: isDarkMode
+            ? null
+            : Container(decoration: const BoxDecoration(gradient: AppColors.appBarGradient)),
+        leading: _currentStep > 0
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: _backStep,
               )
             : null,
+        title: Text(
+          _currentStep == 0 ? '' : t.createAccountShort,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
       ),
       body: PageView(
         controller: _pageController,
@@ -1395,7 +1397,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 style: TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.w700,
-                  color: isDarkMode ? DarkColors.textPrimary : const Color(0xFF141414),
+                  color: isDarkMode ? DarkColors.textPrimary : Colors.black,
                 ),
               ),
               const SizedBox(height: 28),

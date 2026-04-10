@@ -49,8 +49,10 @@ class DiscoverScreen extends StatelessWidget {
     final searchHint = isDarkMode ? DarkColors.textHint : Colors.white.withValues(alpha: 0.8);
 
     return Scaffold(
+      backgroundColor: isDarkMode ? Colors.black : const Color(0xFFF4F5F7),
       appBar: AppBar(
         backgroundColor: appBarBg,
+        surfaceTintColor: appBarBg,
         elevation: 0,
         flexibleSpace: isDarkMode
             ? null
@@ -103,31 +105,51 @@ class DiscoverScreen extends StatelessWidget {
       ),
       body: ListView(
         children: [
-          const _DiscoverItem(
-            icon: Icons.storefront,
-            title: 'VNALO Shop',
-            subtitle: 'Mua sắm trực tuyến',
-          ),
-          const _DiscoverItem(
-            icon: Icons.games,
-            title: 'Trò chơi',
-            subtitle: 'Chơi cùng bạn bè',
-          ),
-          const _DiscoverItem(
-            icon: Icons.newspaper,
-            title: 'Tin tức',
-            subtitle: 'Cập nhật mới nhất',
-          ),
-          _DiscoverItem(
-            icon: Icons.qr_code_scanner,
-            title: 'Quét QR',
-            subtitle: 'Đăng nhập web, thanh toán, kết bạn',
-            onTap: () {
-              _openQrScanner(context);
-            },
+          const SizedBox(height: 8),
+          Container(
+            color: isDarkMode ? DarkColors.surface : Colors.white,
+            child: Column(
+              children: [
+                const _DiscoverItem(
+                  icon: Icons.storefront,
+                  title: 'VNALO Shop',
+                  subtitle: 'Mua sắm trực tuyến',
+                ),
+                _buildDivider(isDarkMode),
+                const _DiscoverItem(
+                  icon: Icons.games,
+                  title: 'Trò chơi',
+                  subtitle: 'Chơi cùng bạn bè',
+                ),
+                _buildDivider(isDarkMode),
+                const _DiscoverItem(
+                  icon: Icons.newspaper,
+                  title: 'Tin tức',
+                  subtitle: 'Cập nhật mới nhất',
+                ),
+                _buildDivider(isDarkMode),
+                _DiscoverItem(
+                  icon: Icons.qr_code_scanner,
+                  title: 'Quét QR',
+                  subtitle: 'Đăng nhập web, thanh toán, kết bạn',
+                  onTap: () {
+                    _openQrScanner(context);
+                  },
+                ),
+              ],
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildDivider(bool isDarkMode) {
+    return Divider(
+      height: 1,
+      thickness: 0.5,
+      indent: 72,
+      color: isDarkMode ? DarkColors.divider : AppColors.sectionDivider,
     );
   }
 }
@@ -160,7 +182,7 @@ class _DiscoverItem extends StatelessWidget {
       ),
       title: Text(title),
       subtitle: Text(subtitle),
-      trailing: Icon(Icons.chevron_right, color: isDarkMode ? DarkColors.textHint : const Color(0xFFD1D5DB)),
+      trailing: Icon(Icons.chevron_right, color: isDarkMode ? DarkColors.textHint : Colors.grey.shade300),
       onTap: onTap,
     );
   }

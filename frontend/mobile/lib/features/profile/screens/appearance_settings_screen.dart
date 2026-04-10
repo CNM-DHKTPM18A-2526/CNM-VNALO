@@ -11,6 +11,7 @@ class AppearanceSettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final searchHint = isDarkMode ? DarkColors.textHint : Colors.white.withValues(alpha: 0.8);
     final cardBorder = isDarkMode ? DarkColors.divider : AppColors.sectionDivider;
     final sectionLabel = isDarkMode ? AppColors.primaryLight : AppColors.primary;
     final pageBg = isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground;
@@ -19,9 +20,11 @@ class AppearanceSettingsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: pageBg,
       appBar: AppBar(
-        title: const Text('Giao diện và ngôn ngữ'),
+        title: const Text('Giao diện và ngôn ngữ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: appBarBg,
-        foregroundColor: Colors.white,
+        surfaceTintColor: appBarBg,
+        elevation: 0,
+        iconTheme: IconThemeData(color: searchHint),
         flexibleSpace: isDarkMode
             ? null
             : Container(decoration: const BoxDecoration(gradient: AppColors.appBarGradient)),
@@ -137,7 +140,7 @@ class AppearanceSettingsScreen extends StatelessWidget {
                     width: 56,
                     height: 6,
                     decoration: BoxDecoration(
-                      color: isDarkMode ? Colors.white10 : const Color(0xFFE5E7EB),
+                      color: isDarkMode ? Colors.white10 : Colors.grey.shade300,
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
@@ -207,20 +210,20 @@ class _ThemeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bgColor = isDark == true
-        ? const Color(0xFF2D2D2D)
+        ? (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E1E1E) : const Color(0xFF2D2D2D))
         : isDark == false
             ? const Color(0xFFE8F0FE)
-            : const Color(0xFF4A4A6A);
+            : (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF33334D) : const Color(0xFF4A4A6A));
     final innerBar = isDark == true
         ? AppColors.primary
         : isDark == false
             ? AppColors.primary
             : AppColors.primary;
     final innerBg = isDark == true
-        ? const Color(0xFF404040)
+        ? const Color(0xFF333333)
         : isDark == false
             ? Colors.white
-            : const Color(0xFF5A5A7A);
+            : const Color(0xFF444466);
 
     return Expanded(
       child: GestureDetector(
@@ -293,7 +296,7 @@ class _ThemeCard extends StatelessWidget {
                       ? Icons.radio_button_checked
                       : Icons.radio_button_unchecked,
                   size: 20,
-                  color: selected ? AppColors.primary : const Color(0xFF9CA3AF),
+                  color: selected ? AppColors.primary : Colors.grey.shade400,
                 ),
                 const SizedBox(width: 4),
                 Text(

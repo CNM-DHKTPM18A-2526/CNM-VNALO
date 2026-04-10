@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
@@ -91,7 +92,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       _startCooldownTimer();
       _goToStep(1);
     } on ApiException catch (e) {
-      _showError(_mapApiError(e));
+      _showError(ApiErrorMapper.map(e));
     } catch (_) {
       _showError('Không thể gửi OTP, vui lòng thử lại');
     } finally {

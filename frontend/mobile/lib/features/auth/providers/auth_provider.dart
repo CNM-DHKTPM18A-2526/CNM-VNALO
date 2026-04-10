@@ -504,6 +504,11 @@ class AuthProvider extends ChangeNotifier {
       return false;
     }
   }
+
+  void clearError() {
+    _error = null;
+    notifyListeners();
+  }
 }
 
 class _TokenPair {
