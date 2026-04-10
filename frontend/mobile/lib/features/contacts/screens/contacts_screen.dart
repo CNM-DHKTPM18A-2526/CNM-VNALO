@@ -81,6 +81,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
       child: Scaffold(
         appBar: AppBar(
           backgroundColor: appBarBg,
+          surfaceTintColor: appBarBg,
           elevation: 0,
           flexibleSpace: isDarkMode
               ? null
@@ -119,11 +120,11 @@ class _ContactsScreenState extends State<ContactsScreen> {
         body: Column(
           children: [
             Container(
-              color: isDarkMode ? const Color(0xFF1A1A1A) : Colors.white,
+              color: isDarkMode ? DarkColors.surface : Colors.white,
               child: TabBar(
                 dividerColor: Colors.transparent,
                 labelColor: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
-                unselectedLabelColor: isDarkMode ? DarkColors.textSecondary : const Color(0xFF9CA3AF),
+                unselectedLabelColor: isDarkMode ? DarkColors.textSecondary : Colors.grey.shade400,
                 indicatorColor: AppColors.primary,
                 indicatorWeight: 3,
                 labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),

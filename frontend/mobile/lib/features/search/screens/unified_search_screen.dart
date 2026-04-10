@@ -271,6 +271,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
         automaticallyImplyLeading: false,
         elevation: 0,
         backgroundColor: appBarBg,
+        surfaceTintColor: appBarBg,
         flexibleSpace: isDarkMode
             ? null
             : Container(
@@ -283,7 +284,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
             children: [
               IconButton(
                 onPressed: () => Navigator.of(context).pop(),
-                icon: Icon(Icons.arrow_back, color: appBarIconColor),
+                icon: Icon(Icons.arrow_back, color: isDarkMode ? DarkColors.textPrimary : Colors.white),
               ),
               Expanded(
                 child: Hero(
@@ -293,7 +294,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                     child: Container(
                       height: 38,
                       decoration: BoxDecoration(
-                        color: isDarkMode ? const Color(0xFF262626) : Colors.white,
+                        color: isDarkMode ? Colors.white.withValues(alpha: 0.1) : Colors.white,
                         borderRadius: BorderRadius.circular(100),
                       ),
                       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -301,7 +302,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                         children: [
                           Icon(
                             Icons.search,
-                            color: isDarkMode ? Colors.white54 : AppColors.iconSubtle,
+                            color: isDarkMode ? DarkColors.textHint : const Color(0xFF6B7280),
                             size: 20,
                           ),
                           const SizedBox(width: 8),
@@ -309,14 +310,14 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                             child: TextField(
                               controller: _queryController,
                               autofocus: true,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 16,
-                                color: isDarkMode ? Colors.white : LightColors.textPrimary,
+                                color: Colors.white,
                               ),
-                              decoration: InputDecoration(
+                              decoration: const InputDecoration(
                                 hintText: 'Tìm kiếm',
                                 hintStyle: TextStyle(
-                                  color: isDarkMode ? Colors.white38 : LightColors.textHint,
+                                  color: Colors.white70,
                                 ),
                                 border: InputBorder.none,
                                 enabledBorder: InputBorder.none,
@@ -354,7 +355,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
               controller: _tabController,
               dividerColor: Colors.transparent,
               labelColor: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
-              unselectedLabelColor: isDarkMode ? DarkColors.textSecondary : const Color(0xFF9CA3AF),
+              unselectedLabelColor: isDarkMode ? DarkColors.textSecondary : Colors.grey.shade400,
               indicatorColor: AppColors.primary,
               indicatorWeight: 3,
               labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),

@@ -35,10 +35,10 @@ class _ChatInputBarState extends State<ChatInputBar> {
     
     return Container(
       decoration: BoxDecoration(
-        color: isDarkMode ? const Color(0xFF1A1A1A) : LightColors.surface,
+        color: isDarkMode ? DarkColors.surface : LightColors.surface,
         border: Border(
           top: BorderSide(
-            color: isDarkMode ? Colors.white10 : const Color(0xFFE5E7EB),
+            color: isDarkMode ? DarkColors.divider : AppColors.sectionDivider,
             width: 0.5,
           ),
         ),
@@ -51,7 +51,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
               IconButton(
                 icon: const Icon(Icons.emoji_emotions_outlined, size: 28),
                 onPressed: () {},
-                color: isDarkMode ? Colors.white70 : const Color(0xFF5D6470),
+                color: isDarkMode ? DarkColors.textSecondary : Colors.grey.shade600,
                 padding: const EdgeInsets.all(8),
                 constraints: const BoxConstraints(),
               ),
@@ -68,7 +68,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                   decoration: InputDecoration(
                     hintText: 'Tin nhắn',
                     hintStyle: TextStyle(
-                      color: isDarkMode ? Colors.white38 : const Color(0xFFA1A3A7),
+                      color: isDarkMode ? DarkColors.textHint : Colors.grey.shade400,
                       fontSize: 17,
                       fontWeight: FontWeight.w400,
                     ),
@@ -94,21 +94,21 @@ class _ChatInputBarState extends State<ChatInputBar> {
                     IconButton(
                       icon: const Icon(Icons.more_horiz, size: 28),
                       onPressed: () {},
-                      color: isDarkMode ? Colors.white70 : const Color(0xFF5D6470),
+                      color: isDarkMode ? DarkColors.textSecondary : Colors.grey.shade600,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       constraints: const BoxConstraints(),
                     ),
                     IconButton(
                       icon: const Icon(Icons.mic_none, size: 28),
                       onPressed: () {},
-                      color: isDarkMode ? Colors.white70 : const Color(0xFF5D6470),
+                      color: isDarkMode ? DarkColors.textSecondary : Colors.grey.shade600,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       constraints: const BoxConstraints(),
                     ),
                     IconButton(
                       icon: const Icon(Icons.image_outlined, size: 28),
                       onPressed: () {},
-                      color: isDarkMode ? Colors.white70 : const Color(0xFF5D6470),
+                      color: isDarkMode ? DarkColors.textSecondary : Colors.grey.shade600,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       constraints: const BoxConstraints(),
                     ),

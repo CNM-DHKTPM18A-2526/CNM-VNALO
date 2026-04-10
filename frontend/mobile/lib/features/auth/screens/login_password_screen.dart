@@ -45,27 +45,32 @@ class _LoginPasswordScreenState extends State<LoginPasswordScreen> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(auth.error ?? 'Đăng nhập thất bại'),
-        backgroundColor: AppColors.error,
-      ),
-    );
+    // Error will now be displayed inline in the TextFormField
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final scaffoldBg = isDarkMode ? DarkColors.scaffold : Colors.white;
+    final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
     final t = AuthTexts.of(context);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: scaffoldBg,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        backgroundColor: appBarBg,
+        surfaceTintColor: appBarBg,
         elevation: 0,
+        flexibleSpace: isDarkMode
+            ? null
+            : Container(decoration: const BoxDecoration(gradient: AppColors.appBarGradient)),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: Text(
           t.enterPasswordTitle,
-          style: const TextStyle(color: Color(0xFF171717)),
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
       ),
       body: SafeArea(
@@ -78,34 +83,45 @@ class _LoginPasswordScreenState extends State<LoginPasswordScreen> {
               children: [
                 Text(
                   t.accountLabel(widget.phoneNumber),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
+                    color: isDarkMode ? Colors.white : Colors.black87,
                   ),
                 ),
                 const SizedBox(height: 24),
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: _obscurePassword,
-                  validator: (value) {
-                    if ((value ?? '').trim().isEmpty) {
-                      return 'Vui lòng nhập mật khẩu';
-                    }
-                    return null;
-                  },
-                  decoration: InputDecoration(
-                    hintText: t.passwordHint,
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                      ),
-                      onPressed: () {
-                        setState(() => _obscurePassword = !_obscurePassword);
+                Consumer<AuthProvider>(
+                  builder: (context, auth, _) {
+                    return TextFormField(
+                      controller: _passwordController,
+                      obscureText: _obscurePassword,
+                      onChanged: (_) {
+                        if (auth.error != null) {
+                          auth.clearError();
+                        }
                       },
-                    ),
-                  ),
+                      validator: (value) {
+                        if ((value ?? '').trim().isEmpty) {
+                          return 'Vui lòng nhập mật khẩu';
+                        }
+                        return null;
+                      },
+                      decoration: InputDecoration(
+                        hintText: t.passwordHint,
+                        errorText: auth.error,
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                          ),
+                          onPressed: () {
+                            setState(() => _obscurePassword = !_obscurePassword);
+                          },
+                        ),
+                      ),
+                    );
+                  },
                 ),
                 Align(
                   alignment: Alignment.centerRight,
@@ -121,7 +137,7 @@ class _LoginPasswordScreenState extends State<LoginPasswordScreen> {
                     child: const Text('Quên mật khẩu?'),
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(height: 24),
                 Consumer<AuthProvider>(
                   builder:
                       (_, auth, __) => ElevatedButton(
@@ -143,9 +159,10 @@ class _LoginPasswordScreenState extends State<LoginPasswordScreen> {
                                     color: Colors.white,
                                   ),
                                 )
-                                : Text(t.login),
+                                : Text(t.login, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                       ),
                 ),
+                const Spacer(),
               ],
             ),
           ),

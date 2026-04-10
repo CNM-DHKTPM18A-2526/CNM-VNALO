@@ -72,6 +72,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       backgroundColor: pageBg,
       appBar: AppBar(
         backgroundColor: appBarBg,
+        surfaceTintColor: appBarBg,
         elevation: 0,
         flexibleSpace: isDarkMode
             ? null
@@ -181,7 +182,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     const Icon(Icons.chevron_right,
-                        color: Color(0xFFD1D5DB)),
+                        color: Colors.grey),
                   ],
                 ),
               ),
@@ -324,7 +325,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             size: 20,
             color: Theme.of(context).brightness == Brightness.dark
                 ? DarkColors.textHint
-                : const Color(0xFFD1D5DB),
+                : Colors.grey.shade300,
           ),
         ),
       ),
