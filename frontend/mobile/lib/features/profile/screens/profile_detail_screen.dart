@@ -10,7 +10,7 @@ import 'package:vnalo_mobile/features/profile/screens/profile_more_settings_scre
 import 'package:vnalo_mobile/features/profile/screens/personal_info_screen.dart';
 
 /// Full profile detail screen — shows cover photo, avatar, name, bio, info tiles,
-/// and action buttons. Similar to Zalo's personal profile page.
+/// and action buttons. Similar to Vnalo's personal profile page.
 class ProfileDetailScreen extends StatelessWidget {
   const ProfileDetailScreen({super.key});
 
@@ -42,7 +42,7 @@ class ProfileDetailScreen extends StatelessWidget {
               child: Text('Ảnh đại diện',
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.primary)),
             ),
-            const Divider(height: 1),
+            const SizedBox(height: 8),
             ListTile(
               leading: const Icon(Icons.account_circle_outlined, size: 28, color: Colors.black87),
               title: const Text('Xem ảnh đại diện', style: TextStyle(fontSize: 15)),
@@ -69,10 +69,10 @@ class ProfileDetailScreen extends StatelessWidget {
             ),
             ListTile(
               leading: const Icon(Icons.auto_awesome_outlined, size: 28, color: Colors.black87),
-              title: const Text('Chọn trang trí ảnh đại diện zStyle', style: TextStyle(fontSize: 15)),
+              title: const Text('Chọn trang trí ảnh đại diện vnStyle', style: TextStyle(fontSize: 15)),
               onTap: () {
                 Navigator.pop(ctx);
-                _showComingSoon(context, 'Trang trí zStyle');
+                _showComingSoon(context, 'Trang trí vnStyle');
               },
             ),
             const SizedBox(height: 8),
@@ -110,7 +110,7 @@ class ProfileDetailScreen extends StatelessWidget {
               child: Text('Ảnh bìa',
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.primary)),
             ),
-            const Divider(height: 1),
+            const SizedBox(height: 8),
             ListTile(
               leading: const Icon(Icons.panorama_outlined, size: 28, color: Colors.black87),
               title: const Text('Xem ảnh bìa', style: TextStyle(fontSize: 15)),
@@ -269,7 +269,7 @@ class ProfileDetailScreen extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const Divider(height: 1, color: AppColors.sectionDivider),
+                    const SizedBox(height: 12),
                     option(value: 'all', label: 'Toàn bộ bài đăng'),
                     option(value: '7d', label: 'Trong 7 ngày gần nhất'),
                     option(value: '1m', label: 'Trong 1 tháng gần nhất'),
@@ -479,8 +479,8 @@ class ProfileDetailScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Row(
                       children: [
-                        _actionChip(icon: Icons.auto_awesome, label: 'Cài zStyle',
-                          color: const Color(0xFFFFA726), onTap: () => _showComingSoon(context, 'Cài zStyle')),
+                        _actionChip(icon: Icons.auto_awesome, label: 'Cài vnStyle',
+                          color: const Color(0xFFFFA726), onTap: () => _showComingSoon(context, 'Cài vnStyle')),
                         const SizedBox(width: 10),
                         _actionChip(icon: Icons.photo_library, label: 'Ảnh của tôi',
                           color: AppColors.primary, onTap: () => _showComingSoon(context, 'Ảnh của tôi')),
