@@ -4,7 +4,7 @@ class AppColors {
   // Private constructor to prevent instantiation
   AppColors._();
   // Primary
-  static const Color primary = Color(0xFF0068FF);
+  static const Color primary = Color(0xFF007BFF);
   static const Color primaryLight = Color(0xFF00A2ED);
   static const Color primaryDark = Color(0xFF0050CC);
 
@@ -18,8 +18,8 @@ class AppColors {
 
   // Shared UI tokens (aligned with main settings screens)
   static const LinearGradient appBarGradient = LinearGradient(
-    // Search/app bars: softer left blue, stronger right blue.
-    colors: [Color(0xFF2A8DF8), Color(0xFF008CFF)],
+    // Search/app bars: original blue left, lighter blue right (matching MyDocuments)
+    colors: [primary, primaryLight],
     begin: Alignment.centerLeft,
     end: Alignment.centerRight,
   );
@@ -33,7 +33,7 @@ class AppColors {
 // Dark and Light color palettes
 class DarkColors {
   DarkColors._();
-  static const Color scaffold = Color(0xFF000000); // Zalo deep black
+  static const Color scaffold = Color(0xFF000000); // Vnalo deep black
   static const Color surface = Color(0xFF1A1A1A);
   static const Color surfaceLight = Color(0xFF242424);
   static const Color textPrimary = Color(0xFFFFFFFF);
@@ -47,14 +47,14 @@ class DarkColors {
 
 class LightColors {
   LightColors._();
-  static const Color scaffold = Color(0xFFEBEDF0); // Zalo light gray background
+  static const Color scaffold = Color(0xFFEBEDF0); // Vnalo light gray background
   static const Color surface = Color(0xFFFFFFFF);
   static const Color surfaceLight = Color(0xFFF6F7F8);
   static const Color textPrimary = Color(0xFF1A1A1A);
   static const Color textSecondary = Color(0xFF666666);
   static const Color textHint = Color(0xFF999999);
   static const Color divider = Color(0xFFE0E0E0);
-  static const Color chatBubbleSent = Color(0xFFDDF2FF); // Zalo light blue
-  static const Color chatBubbleReceived = Color(0xFFFFFFFF); // Zalo white
+  static const Color chatBubbleSent = Color(0xFFDDF2FF); // Vnalo light blue
+  static const Color chatBubbleReceived = Color(0xFFFFFFFF); // Vnalo white
   static const Color appBarBg = Color(0xFF0068FF);
 }

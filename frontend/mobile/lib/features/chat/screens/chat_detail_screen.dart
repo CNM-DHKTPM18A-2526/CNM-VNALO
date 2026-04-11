@@ -109,6 +109,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         titleSpacing: 0,
         backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
         elevation: 0,
+        forceMaterialTransparency: true,
         foregroundColor: Colors.white,
         iconTheme: const IconThemeData(color: Colors.white),
         flexibleSpace: isDarkMode
@@ -135,7 +136,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     displayName,
                     style: const TextStyle(
                       fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w600,
                       color: Colors.white,
                     ),
                   ),

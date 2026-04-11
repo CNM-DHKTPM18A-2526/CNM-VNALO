@@ -141,8 +141,10 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
     return Scaffold(
       backgroundColor: scaffoldBg,
       appBar: AppBar(
-        backgroundColor: isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg,
+        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
         foregroundColor: Colors.white,
+        elevation: 0,
+        forceMaterialTransparency: true,
         flexibleSpace: isDarkMode
             ? null
             : Container(

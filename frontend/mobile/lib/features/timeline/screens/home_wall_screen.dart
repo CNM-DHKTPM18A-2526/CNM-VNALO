@@ -41,10 +41,10 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.black : const Color(0xFFF3F4F6),
       appBar: AppBar(
-        backgroundColor: appBarBg,
+        backgroundColor: isDarkMode ? appBarBg : Colors.transparent,
         elevation: 0,
+        forceMaterialTransparency: true,
         titleSpacing: 0,
-        surfaceTintColor: appBarBg,
         flexibleSpace: isDarkMode
             ? null
             : Container(decoration: const BoxDecoration(gradient: AppColors.appBarGradient)),
@@ -96,7 +96,7 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
                   onRefresh: () => postProvider.refreshTimeline(),
                   child: _buildNhatKyView(context, isDarkMode, auth, postProvider, displayName),
                 ),
-                const Center(child: Text('Zalo Video Content')),
+                const Center(child: Text('Vnalo Video Content')),
               ],
             ),
           ),

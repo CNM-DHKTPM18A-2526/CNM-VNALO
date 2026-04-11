@@ -20,7 +20,10 @@ class AppearanceSettingsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: pageBg,
       appBar: AppBar(
-        title: const Text('Giao diện và ngôn ngữ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Giao diện và ngôn ngữ',
+          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
+        ),
         backgroundColor: appBarBg,
         surfaceTintColor: appBarBg,
         elevation: 0,
@@ -337,7 +340,14 @@ class _SettingsRow extends StatelessWidget {
         onTap: onTap,
         child: ListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-          title: Text(title, style: TextStyle(fontSize: 16, color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary)),
+          title: Text(
+            title,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
+            ),
+          ),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [

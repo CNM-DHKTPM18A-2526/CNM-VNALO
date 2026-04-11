@@ -113,6 +113,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
       appBar: AppBar(
         backgroundColor: isDarkMode ? appBarBg : Colors.transparent,
         elevation: 0,
+        forceMaterialTransparency: true,
         flexibleSpace: isDarkMode
             ? null
             : Container(

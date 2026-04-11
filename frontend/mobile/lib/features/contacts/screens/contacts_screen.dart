@@ -80,9 +80,9 @@ class _ContactsScreenState extends State<ContactsScreen> {
       length: 3,
       child: Scaffold(
         appBar: AppBar(
-          backgroundColor: appBarBg,
-          surfaceTintColor: appBarBg,
+          backgroundColor: isDarkMode ? appBarBg : Colors.transparent,
           elevation: 0,
+          forceMaterialTransparency: true,
           flexibleSpace: isDarkMode
               ? null
               : Container(

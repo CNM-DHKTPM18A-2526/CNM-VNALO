@@ -924,7 +924,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // ━━━━━━━━━━━━━━━ Step 1: Name Input (Zalo-style header) ━━━━━━━━━━━━━━━
+  // ━━━━━━━━━━━━━━━ Step 1: Name Input (Vnalo-style header) ━━━━━━━━━━━━━━━
 
   Widget _buildNameStep() {
     final t = AuthTexts.of(context);
@@ -939,7 +939,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             const SizedBox(height: 24),
-            // Centered header (NOT in AppBar) — like Zalo
+            // Centered header (NOT in AppBar) — like Vnalo
             Text(
               t.enterNameTitle,
               textAlign: TextAlign.center,
@@ -990,7 +990,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            // Rules — bolder text, matching Zalo
+            // Rules — bolder text, matching Vnalo
             Align(
               alignment: Alignment.centerLeft,
               child: Column(
@@ -1045,7 +1045,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // ━━━━━━━━━━━━━━━ Step 2: Personal Info (Zalo-style) ━━━━━━━━━━━━━━━
+  // ━━━━━━━━━━━━━━━ Step 2: Personal Info (Vnalo-style) ━━━━━━━━━━━━━━━
 
   Widget _buildPersonalInfoStep() {
     final t = AuthTexts.of(context);
