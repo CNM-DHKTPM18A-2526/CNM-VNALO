@@ -599,7 +599,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
     final set = <String>{};
     for (final h in _searchHistory) {
       final lower = h.toLowerCase();
-      if (lower.contains('Vnalopay')) set.add('Vnalopay');
+      if (lower.contains('vnalopay')) set.add('Vnalopay');
       if (lower.contains('document')) set.add('My Documents');
       if (lower.contains('lịch') || lower.contains('lich')) set.add('Lịch Vnalo');
       if (lower.contains('nạp') || lower.contains('nap')) set.add('Nạp điện thoại');
