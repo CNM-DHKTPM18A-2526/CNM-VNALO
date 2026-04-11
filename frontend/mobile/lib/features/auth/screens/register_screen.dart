@@ -588,7 +588,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final scaffoldBg = isDarkMode ? DarkColors.scaffold : Colors.white;
-    final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
+    final appBarBg = isDarkMode ? DarkColors.appBarBg : Colors.white;
+    final showAppBarTitle = _currentStep == 0;
     final t = AuthTexts.of(context);
 
     return Scaffold(
@@ -598,23 +599,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
         backgroundColor: appBarBg,
         surfaceTintColor: appBarBg,
         elevation: 0,
-        flexibleSpace: isDarkMode
-            ? null
-            : Container(decoration: const BoxDecoration(gradient: AppColors.appBarGradient)),
-        leading: _currentStep > 0
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: _backStep,
+        leading: BackButton(
+          onPressed: _backStep,
+          color: isDarkMode ? Colors.white : Colors.black,
+        ),
+        title: showAppBarTitle
+            ? Text(
+                t.enterPhoneTitle,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: isDarkMode ? Colors.white : const Color(0xFF171717),
+                ),
               )
             : null,
-        title: Text(
-          _currentStep == 0 ? '' : t.createAccountShort,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-        ),
       ),
       body: PageView(
         controller: _pageController,
@@ -924,7 +922,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // ━━━━━━━━━━━━━━━ Step 1: Name Input (Vnalo-style header) ━━━━━━━━━━━━━━━
+  // ━━━━━━━━━━━━━━━ Step 1: Name Input (Zalo-style header) ━━━━━━━━━━━━━━━
 
   Widget _buildNameStep() {
     final t = AuthTexts.of(context);
@@ -939,7 +937,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             const SizedBox(height: 24),
-            // Centered header (NOT in AppBar) — like Vnalo
+            // Centered header (NOT in AppBar) — like Zalo
             Text(
               t.enterNameTitle,
               textAlign: TextAlign.center,
@@ -990,7 +988,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            // Rules — bolder text, matching Vnalo
+            // Rules — bolder text, matching Zalo
             Align(
               alignment: Alignment.centerLeft,
               child: Column(
@@ -1045,7 +1043,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // ━━━━━━━━━━━━━━━ Step 2: Personal Info (Vnalo-style) ━━━━━━━━━━━━━━━
+  // ━━━━━━━━━━━━━━━ Step 2: Personal Info (Zalo-style) ━━━━━━━━━━━━━━━
 
   Widget _buildPersonalInfoStep() {
     final t = AuthTexts.of(context);
@@ -1397,7 +1395,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 style: TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.w700,
-                  color: isDarkMode ? DarkColors.textPrimary : Colors.black,
+                  color: isDarkMode ? DarkColors.textPrimary : const Color(0xFF141414),
                 ),
               ),
               const SizedBox(height: 28),

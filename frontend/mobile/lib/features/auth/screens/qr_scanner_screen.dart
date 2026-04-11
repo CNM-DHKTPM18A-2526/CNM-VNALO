@@ -5,6 +5,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/constants/api_endpoints.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_login_approval_screen.dart';
+import 'package:vnalo_mobile/features/auth/localization/auth_texts.dart';
 import 'package:vnalo_mobile/services/api_service.dart';
 import 'package:vnalo_mobile/services/friend_service.dart';
 
@@ -211,6 +212,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AuthTexts.of(context);
     final textColor = Colors.white.withValues(alpha: 0.92);
 
     return Scaffold(
@@ -312,7 +314,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                       ),
                       const SizedBox(width: 14),
                       Text(
-                        'VNALO',
+                        t.appName,
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.9),
                           fontSize: 16,

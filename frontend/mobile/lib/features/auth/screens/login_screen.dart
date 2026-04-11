@@ -64,7 +64,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final scaffoldBg = isDarkMode ? DarkColors.scaffold : Colors.white;
-    final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
+    final appBarBg = isDarkMode ? DarkColors.appBarBg : Colors.white;
 
     return Scaffold(
       backgroundColor: scaffoldBg,
@@ -72,14 +72,11 @@ class _LoginScreenState extends State<LoginScreen> {
         backgroundColor: appBarBg,
         surfaceTintColor: appBarBg,
         elevation: 0,
-        flexibleSpace: isDarkMode
-            ? null
-            : Container(decoration: const BoxDecoration(gradient: AppColors.appBarGradient)),
         title: Text(
           t.enterPhoneTitle,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
+          style: TextStyle(
+            color: isDarkMode ? Colors.white : const Color(0xFF171717),
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),
@@ -103,19 +100,18 @@ class _LoginScreenState extends State<LoginScreen> {
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     minimumSize: const Size.fromHeight(56),
-                    backgroundColor: _hasPhone ? AppColors.primary : (isDarkMode ? DarkColors.surface : Colors.grey.shade200),
-                    elevation: 0,
+                    backgroundColor: _hasPhone ? AppColors.primary : (isDarkMode ? DarkColors.surface : const Color(0xFFE5E7EB)),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
                   onPressed: _hasPhone ? _handleNext : null,
-                    child: Text(
+                  child: Text(
                     t.continueText,
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: 18,
                       fontWeight: FontWeight.w600,
-                      color: _hasPhone ? Colors.white : (isDarkMode ? Colors.white24 : Colors.grey.shade400),
+                      color: _hasPhone ? Colors.white : (isDarkMode ? Colors.white38 : const Color(0xFF9CA3AF)),
                     ),
                   ),
                 ),
