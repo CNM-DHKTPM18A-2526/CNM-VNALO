@@ -196,7 +196,7 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
                 ),
                 const SizedBox(height: 10),
                 const Text(
-                  'Quét mã để thêm bạn Zalo với tôi',
+                  'Quét mã để thêm bạn Vnalo với tôi',
                   style: TextStyle(color: Color(0xFFD7E4F7), fontSize: 14, fontWeight: FontWeight.w500),
                 ),
               ],
@@ -312,7 +312,7 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
           const SizedBox(height: 12),
           const Center(
             child: Text(
-              'Xem lời mời kết bạn đã gửi tại trang Danh bạ Zalo',
+              'Xem lời mời kết bạn đã gửi tại trang Danh bạ Vnalo',
               style: TextStyle(color: LightColors.textSecondary, fontSize: 14),
             ),
           ),

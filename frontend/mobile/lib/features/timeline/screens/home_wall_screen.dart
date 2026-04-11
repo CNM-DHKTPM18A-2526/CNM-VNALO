@@ -79,7 +79,7 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('Zalo Video'),
+                      Text('Vnalo Video'),
                       SizedBox(width: 4),
                       Badge(label: Text('Mới'), backgroundColor: Colors.orange),
                     ],

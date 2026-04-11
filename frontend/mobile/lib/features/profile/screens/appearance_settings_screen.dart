@@ -80,7 +80,7 @@ class AppearanceSettingsScreen extends StatelessWidget {
                 children: [
                    _SettingsRow(
                     title: 'Đổi phông chữ',
-                    trailing: 'Phông chữ Zalo',
+                    trailing: 'Phông chữ Vnalo',
                     isDarkMode: isDarkMode,
                   ),
                   Divider(height: 1, color: isDarkMode ? DarkColors.divider : AppColors.sectionDivider),

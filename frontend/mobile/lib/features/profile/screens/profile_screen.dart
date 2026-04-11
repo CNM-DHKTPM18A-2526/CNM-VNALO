@@ -195,22 +195,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: [
                 _menuItem(
                   context,
-                  itemKey: 'zCloud',
+                  itemKey: 'vnCloud',
                   normalBg: sectionBg,
                   icon: Icons.cloud_outlined,
                   iconColor: AppColors.primary,
-                  title: 'zCloud',
+                  title: 'vnCloud',
                   subtitle: 'Không gian lưu trữ dữ liệu trên đám mây',
                 ),
                 Divider(height: 1, indent: 70, color: dividerColor),
                 _menuItem(
                   context,
-                  itemKey: 'zStyle',
+                  itemKey: 'vnStyle',
                   normalBg: sectionBg,
                   icon: Icons.auto_fix_high_outlined,
                   iconColor: AppColors.primary,
-                  title: 'zStyle - Nổi bật trên Zalo',
-                  subtitle: 'Hình nền và nhạc cho cuộc gọi Zalo',
+                  title: 'vnStyle - Nổi bật trên Vnalo',
+                  subtitle: 'Hình nền và nhạc cho cuộc gọi Vnalo',
                 ),
                 Divider(height: 1, indent: 70, color: dividerColor),
                 _menuItem(

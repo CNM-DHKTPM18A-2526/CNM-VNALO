@@ -68,10 +68,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
         ),
         QuickActionItem(
           icon: Icons.calendar_month_outlined,
-          title: 'Lịch Zalo',
+          title: 'Lịch Vnalo',
           onTap: () {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Lịch Zalo sẽ được tích hợp ở bước lịch/message tiếp theo.')),
+              const SnackBar(content: Text('Lịch Vnalo sẽ được tích hợp ở bước lịch/message tiếp theo.')),
             );
           },
         ),
@@ -109,8 +109,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
       : const Color(0xFFE9EDF3);
 
     return Scaffold(
+      backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
       appBar: AppBar(
-        backgroundColor: appBarBg,
+        backgroundColor: isDarkMode ? appBarBg : Colors.transparent,
         elevation: 0,
         flexibleSpace: isDarkMode
             ? null
@@ -134,7 +135,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
               color: Colors.transparent,
               child: Row(
                 children: [
-                  Icon(Icons.search, size: 24, color: searchHint),
+                  Icon(Icons.search, size: 24, color: isDarkMode ? searchHint : Colors.white),
                   const SizedBox(width: 8),
                   Text(
                     'Tìm kiếm',
@@ -151,11 +152,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.qr_code_scanner, color: searchHint),
+            icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
             onPressed: _openQrScanner,
           ),
           IconButton(
-            icon: Icon(Icons.add, color: searchHint),
+            icon: const Icon(Icons.add, color: Colors.white),
             onPressed: _openQuickActions,
           ),
         ],
@@ -171,12 +172,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
           return RefreshIndicator(
             onRefresh: () => chatProvider.loadInbox(),
             color: AppColors.primary,
-            child: ListView.builder(
-              itemCount: chatProvider.conversations.length + 1,
-              itemBuilder: (context, index) {
-                if (index == 0) {
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
+            child: ListView(
+              children: [
+                // My Documents Section
+                Container(
+                  color: isDarkMode ? DarkColors.surface : Colors.white,
+                  child: Column(
                     children: [
                       ListTile(
                         contentPadding: const EdgeInsets.symmetric(
@@ -209,7 +210,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                             ],
                           ),
                         ),
-                        title: Text(
+                        title: const Text(
                           'My Documents',
                           style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
                         ),
@@ -220,31 +221,43 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           );
                         },
                       ),
-                      Divider(
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Inbox Section
+                if (chatProvider.conversations.isNotEmpty)
+                  Container(
+                    color: isDarkMode ? DarkColors.surface : Colors.white,
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: chatProvider.conversations.length,
+                      separatorBuilder: (context, index) => Divider(
                         height: 1,
                         thickness: 0.5,
                         indent: 80,
                         color: dividerColor,
                       ),
-                    ],
-                  );
-                }
-
-                final conversation = chatProvider.conversations[index - 1];
-                return ChatListItem(
-                  key: ValueKey(conversation.id),
-                  conversation: conversation,
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => ChatDetailScreen(
+                      itemBuilder: (context, index) {
+                        final conversation = chatProvider.conversations[index];
+                        return ChatListItem(
+                          key: ValueKey(conversation.id),
                           conversation: conversation,
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => ChatDetailScreen(
+                                  conversation: conversation,
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+              ],
             ),
           );
         },

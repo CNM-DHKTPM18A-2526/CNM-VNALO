@@ -105,7 +105,6 @@ class DiscoverScreen extends StatelessWidget {
       ),
       body: ListView(
         children: [
-          const SizedBox(height: 8),
           Container(
             color: isDarkMode ? DarkColors.surface : Colors.white,
             child: Column(
@@ -180,7 +179,7 @@ class _DiscoverItem extends StatelessWidget {
         ),
         child: Icon(icon, color: AppColors.primary),
       ),
-      title: Text(title),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 16)),
       subtitle: Text(subtitle),
       trailing: Icon(Icons.chevron_right, color: isDarkMode ? DarkColors.textHint : Colors.grey.shade300),
       onTap: onTap,
