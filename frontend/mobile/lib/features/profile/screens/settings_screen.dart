@@ -5,6 +5,8 @@ import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/auth/screens/welcome_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/account_security_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/appearance_settings_screen.dart';
+import 'package:vnalo_mobile/features/profile/screens/personal_info_screen.dart';
+import 'package:vnalo_mobile/core/models/menu_item_model.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -18,9 +20,14 @@ class SettingsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
       appBar: AppBar(
-        title: const Text('Cài đặt'),
-        backgroundColor: appBarBg,
+        title: const Text(
+          'Cài đặt',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+        ),
+        backgroundColor: isDarkMode ? appBarBg : Colors.transparent,
         foregroundColor: Colors.white,
+        elevation: 0,
+        forceMaterialTransparency: true,
         iconTheme: IconThemeData(color: searchHint),
         flexibleSpace: isDarkMode
             ? null
@@ -38,58 +45,93 @@ class SettingsScreen extends StatelessWidget {
       ),
       body: ListView(
         children: [
-          _buildSection(context, [
-            _item(
-              context,
-              Icons.shield_outlined,
-              'Tài khoản và bảo mật',
-              onTap: () {
-                Navigator.of(context, rootNavigator: true).push(
-                  MaterialPageRoute(
-                    builder: (_) => const AccountSecurityScreen(),
-                  ),
-                );
-              },
-            ),
-            _item(context, Icons.lock_outline, 'Quyền riêng tư'),
-          ]),
-          const _SectionDivider(),
-          _buildSection(context, [
-            _item(context, Icons.pie_chart_outline, 'Dữ liệu trên máy'),
-            _item(context, Icons.cloud_sync_outlined, 'Sao lưu và khôi phục'),
-          ]),
-          const _SectionDivider(),
-          _buildSection(context, [
-            _item(context, Icons.notifications_outlined, 'Thông báo'),
-            _item(context, Icons.chat_outlined, 'Tin nhắn'),
-            _item(context, Icons.call_outlined, 'Cuộc gọi'),
-            _item(context, Icons.access_time, 'Nhật ký'),
-            _item(context, Icons.contacts_outlined, 'Danh bạ'),
-            _item(
-              context,
-              Icons.color_lens_outlined,
-              'Giao diện và ngôn ngữ',
-              onTap: () {
-                Navigator.of(context, rootNavigator: true).push(
-                  MaterialPageRoute(
-                    builder: (_) => const AppearanceSettingsScreen(),
-                  ),
-                );
-              },
-            ),
-          ]),
-          const _SectionDivider(),
-          _buildSection(context, [
-            _item(context, Icons.info_outline, 'Thông tin về VNALO'),
-            _item(context, Icons.help_outline, 'Liên hệ hỗ trợ'),
-            _item(context, Icons.swap_horiz, 'Chuyển tài khoản'),
-          ]),
-          const _SectionDivider(),
+          ..._buildAllSections(context),
           _buildLogoutButton(context),
           const SizedBox(height: 32),
         ],
       ),
     );
+  }
+
+  List<MenuSection> _getSettingsSections(BuildContext context) {
+    return [
+      MenuSection(
+        items: [
+          MenuItem(
+            key: 'account',
+            icon: Icons.shield_outlined,
+            title: 'Tài khoản và bảo mật',
+            onTap: () {
+              Navigator.of(context, rootNavigator: true).push(
+                MaterialPageRoute(builder: (_) => const AccountSecurityScreen()),
+              );
+            },
+          ),
+          const MenuItem(key: 'privacy', icon: Icons.lock_outline, title: 'Quyền riêng tư'),
+        ],
+      ),
+      const MenuSection(
+        items: [
+          MenuItem(key: 'storage', icon: Icons.pie_chart_outline, title: 'Dữ liệu trên máy'),
+          MenuItem(key: 'backup', icon: Icons.cloud_sync_outlined, title: 'Sao lưu và khôi phục'),
+        ],
+      ),
+      MenuSection(
+        items: [
+          const MenuItem(key: 'notif', icon: Icons.notifications_outlined, title: 'Thông báo'),
+          const MenuItem(key: 'message', icon: Icons.chat_outlined, title: 'Tin nhắn'),
+          const MenuItem(key: 'call', icon: Icons.call_outlined, title: 'Cuộc gọi'),
+          const MenuItem(key: 'timeline', icon: Icons.access_time, title: 'Nhật ký'),
+          const MenuItem(key: 'contacts', icon: Icons.contacts_outlined, title: 'Danh bạ'),
+          MenuItem(
+            key: 'appearance',
+            icon: Icons.color_lens_outlined,
+            title: 'Giao diện và ngôn ngữ',
+            onTap: () {
+              Navigator.of(context, rootNavigator: true).push(
+                MaterialPageRoute(builder: (_) => const AppearanceSettingsScreen()),
+              );
+            },
+          ),
+        ],
+      ),
+      MenuSection(
+        items: [
+          MenuItem(
+            key: 'about',
+            icon: Icons.info_outline,
+            title: 'Thông tin về VNALO',
+            onTap: () {
+              Navigator.of(context, rootNavigator: true).push(
+                MaterialPageRoute(builder: (_) => const PersonalInfoScreen()),
+              );
+            },
+          ),
+          const MenuItem(key: 'help', icon: Icons.help_outline, title: 'Liên hệ hỗ trợ'),
+          const MenuItem(key: 'switch_account', icon: Icons.swap_horiz, title: 'Chuyển tài khoản'),
+        ],
+      ),
+    ];
+  }
+
+  List<Widget> _buildAllSections(BuildContext context) {
+    final sections = _getSettingsSections(context);
+    return sections.expand((section) {
+      return [
+        _buildSection(
+          context,
+          section.items.map((item) {
+            return _item(
+              context,
+              item.icon,
+              item.title,
+              onTap: item.onTap,
+            );
+          }).toList(),
+        ),
+        const _SectionDivider(),
+      ];
+    }).toList();
   }
 
   Widget _buildSection(BuildContext context, List<Widget> items) {
@@ -160,6 +202,7 @@ class SettingsScreen extends StatelessWidget {
             style: TextStyle(
               color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
               fontSize: 16,
+              fontWeight: FontWeight.w500,
             ),
           ),
           trailing: Icon(Icons.chevron_right, size: 20, color: isDarkMode ? DarkColors.textHint : const Color(0xFF9CA3AF)),

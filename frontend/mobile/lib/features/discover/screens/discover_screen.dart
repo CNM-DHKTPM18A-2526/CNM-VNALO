@@ -5,6 +5,7 @@ import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
 import 'package:vnalo_mobile/features/common/widgets/quick_actions_sheet.dart';
 import 'package:vnalo_mobile/features/contacts/screens/add_friend_screen.dart';
 import 'package:vnalo_mobile/features/search/screens/unified_search_screen.dart';
+import 'package:vnalo_mobile/core/models/menu_item_model.dart';
 
 class DiscoverScreen extends StatelessWidget {
   const DiscoverScreen({super.key});
@@ -51,9 +52,9 @@ class DiscoverScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.black : const Color(0xFFF4F5F7),
       appBar: AppBar(
-        backgroundColor: appBarBg,
-        surfaceTintColor: appBarBg,
+        backgroundColor: isDarkMode ? appBarBg : Colors.transparent,
         elevation: 0,
+        forceMaterialTransparency: true,
         flexibleSpace: isDarkMode
             ? null
             : Container(
@@ -105,41 +106,61 @@ class DiscoverScreen extends StatelessWidget {
       ),
       body: ListView(
         children: [
-          const SizedBox(height: 8),
-          Container(
-            color: isDarkMode ? DarkColors.surface : Colors.white,
-            child: Column(
-              children: [
-                const _DiscoverItem(
-                  icon: Icons.storefront,
-                  title: 'VNALO Shop',
-                  subtitle: 'Mua sắm trực tuyến',
-                ),
-                _buildDivider(isDarkMode),
-                const _DiscoverItem(
-                  icon: Icons.games,
-                  title: 'Trò chơi',
-                  subtitle: 'Chơi cùng bạn bè',
-                ),
-                _buildDivider(isDarkMode),
-                const _DiscoverItem(
-                  icon: Icons.newspaper,
-                  title: 'Tin tức',
-                  subtitle: 'Cập nhật mới nhất',
-                ),
-                _buildDivider(isDarkMode),
-                _DiscoverItem(
-                  icon: Icons.qr_code_scanner,
-                  title: 'Quét QR',
-                  subtitle: 'Đăng nhập web, thanh toán, kết bạn',
-                  onTap: () {
-                    _openQrScanner(context);
-                  },
-                ),
-              ],
-            ),
-          ),
+          _buildServicesSection(context, isDarkMode),
         ],
+      ),
+    );
+  }
+
+  List<MenuItem> _getDiscoverServices(BuildContext context) {
+    return [
+      const MenuItem(
+        key: 'vnShop',
+        icon: Icons.storefront,
+        title: 'VNALO Shop',
+        subtitle: 'Mua sắm trực tuyến',
+      ),
+      const MenuItem(
+        key: 'games',
+        icon: Icons.games,
+        title: 'Trò chơi',
+        subtitle: 'Chơi cùng bạn bè',
+      ),
+      const MenuItem(
+        key: 'news',
+        icon: Icons.newspaper,
+        title: 'Tin tức',
+        subtitle: 'Cập nhật mới nhất',
+      ),
+      MenuItem(
+        key: 'qrScanner',
+        icon: Icons.qr_code_scanner,
+        title: 'Quét QR',
+        subtitle: 'Đăng nhập web, thanh toán, kết bạn',
+        onTap: () => _openQrScanner(context),
+      ),
+    ];
+  }
+
+  Widget _buildServicesSection(BuildContext context, bool isDarkMode) {
+    final services = _getDiscoverServices(context);
+    return Container(
+      color: isDarkMode ? DarkColors.surface : Colors.white,
+      child: Column(
+        children: List.generate(services.length, (index) {
+          final item = services[index];
+          return Column(
+            children: [
+              _DiscoverItem(
+                icon: item.icon,
+                title: item.title,
+                subtitle: item.subtitle ?? '',
+                onTap: item.onTap,
+              ),
+              if (index < services.length - 1) _buildDivider(isDarkMode),
+            ],
+          );
+        }),
       ),
     );
   }
@@ -180,7 +201,7 @@ class _DiscoverItem extends StatelessWidget {
         ),
         child: Icon(icon, color: AppColors.primary),
       ),
-      title: Text(title),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 16)),
       subtitle: Text(subtitle),
       trailing: Icon(Icons.chevron_right, color: isDarkMode ? DarkColors.textHint : Colors.grey.shade300),
       onTap: onTap,

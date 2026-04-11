@@ -80,9 +80,9 @@ class _ContactsScreenState extends State<ContactsScreen> {
       length: 3,
       child: Scaffold(
         appBar: AppBar(
-          backgroundColor: appBarBg,
-          surfaceTintColor: appBarBg,
+          backgroundColor: isDarkMode ? appBarBg : Colors.transparent,
           elevation: 0,
+          forceMaterialTransparency: true,
           flexibleSpace: isDarkMode
               ? null
               : Container(
@@ -189,7 +189,10 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     ),
                     child: const Icon(Icons.group_add, color: AppColors.primary),
                   ),
-                  title: const Text('Lời mời kết bạn'),
+                  title: const Text(
+                    'Lời mời kết bạn',
+                    style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
+                  ),
                   trailing: _pendingCount > 0
                       ? Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -222,7 +225,10 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     ),
                     child: const Icon(Icons.cake, color: AppColors.primary),
                   ),
-                  title: const Text('Sinh nhật'),
+                  title: const Text(
+                    'Sinh nhật',
+                    style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
+                  ),
                   onTap: () {},
                 ),
               ],

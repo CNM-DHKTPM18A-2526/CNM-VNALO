@@ -26,7 +26,10 @@ class AccountSecurityScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: pageBg,
       appBar: AppBar(
-        title: const Text('Tài khoản và bảo mật'),
+        title: const Text(
+          'Tài khoản và bảo mật',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+        ),
         backgroundColor: appBarBg,
         foregroundColor: Colors.white,
         flexibleSpace: isDarkMode
@@ -113,7 +116,7 @@ class AccountSecurityScreen extends StatelessWidget {
           _tile(
             context,
             icon: Icons.lock_person_outlined,
-            title: 'Khóa Zalo',
+            title: 'Khóa Vnalo',
             subtitle: 'Đang tắt',
             backgroundColor: sectionBg,
             isDarkMode: isDarkMode,
@@ -208,7 +211,10 @@ class AccountSecurityScreen extends StatelessWidget {
           onTap: onTap,
           child: ListTile(
             leading: Icon(icon, color: iconColor),
-            title: Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: textColor)),
+            title: Text(
+              title,
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: textColor),
+            ),
             subtitle: subtitle == null
                 ? null
                 : Text(

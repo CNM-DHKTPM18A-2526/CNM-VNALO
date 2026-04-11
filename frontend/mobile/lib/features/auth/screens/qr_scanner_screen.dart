@@ -312,7 +312,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                       ),
                       const SizedBox(width: 14),
                       Text(
-                        'Zalo',
+                        'VNALO',
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.9),
                           fontSize: 16,

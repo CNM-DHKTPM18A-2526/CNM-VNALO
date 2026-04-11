@@ -10,6 +10,7 @@ import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
 import 'package:vnalo_mobile/models/user_model.dart';
 import 'package:vnalo_mobile/core/utils/date_formatter.dart';
+import 'dart:async';
 
 class ChatDetailScreen extends StatefulWidget {
   final Conversation conversation;
@@ -28,6 +29,9 @@ class ChatDetailScreen extends StatefulWidget {
 }
 
 class _ChatDetailScreenState extends State<ChatDetailScreen> {
+  Timer? _subtextTimer;
+  bool _showGroupMembers = false;
+
   @override
   void initState() {
     super.initState();
@@ -37,11 +41,21 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       final chatProvider = context.read<ChatProvider>();
       chatProvider.setCurrentUserId(currentUserId);
       chatProvider.openConversation(widget.conversation.id);
+
+      // Tự động chuyển subtext cho chat nhóm sau 3 giây
+      if (widget.conversation.type == ConversationType.GROUP) {
+        _subtextTimer = Timer(const Duration(seconds: 3), () {
+          if (mounted) {
+            setState(() => _showGroupMembers = true);
+          }
+        });
+      }
     });
   }
 
   @override
   void dispose() {
+    _subtextTimer?.cancel();
     context.read<ChatProvider>().closeConversation();
     super.dispose();
   }
@@ -93,37 +107,58 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       backgroundColor: isDarkMode ? DarkColors.scaffold : LightColors.scaffold,
       appBar: AppBar(
         titleSpacing: 0,
+        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
+        elevation: 0,
+        forceMaterialTransparency: true,
+        foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: isDarkMode
+            ? null
+            : Container(
+                decoration: const BoxDecoration(
+                  gradient: AppColors.appBarGradient,
+                ),
+              ),
         title: Row(
           children: [
             AvatarWidget(
               name: displayName,
               imageUrl: avatarUrl,
-              size: 36,
+              size: 40,
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(displayName, style: const TextStyle(fontSize: 16)),
-                  if (isDirect)
-                    Text(
-                      'Vừa truy cập',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade400,
-                        fontWeight: FontWeight.w400,
-                      ),
+                  Text(
+                    displayName,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
                     ),
+                  ),
+                  _buildSubtext(isDirect),
                 ],
               ),
             ),
           ],
         ),
         actions: [
-          IconButton(icon: const Icon(Icons.call_outlined), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.videocam_outlined), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.menu), onPressed: () {}),
+          IconButton(
+            icon: const Icon(Icons.call_outlined, color: Colors.white),
+            onPressed: () {},
+          ),
+          IconButton(
+            icon: const Icon(Icons.videocam_outlined, color: Colors.white),
+            onPressed: () {},
+          ),
+          IconButton(
+            icon: const Icon(Icons.menu, color: Colors.white),
+            onPressed: () {},
+          ),
         ],
       ),
       body: Consumer<ChatProvider>(
@@ -198,6 +233,30 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       ),
       bottomNavigationBar: ChatInputBar(
         onSend: (text) => context.read<ChatProvider>().sendMessage(text),
+      ),
+    );
+  }
+
+  Widget _buildSubtext(bool isDirect) {
+    if (isDirect) {
+      return Text(
+        'Vừa truy cập',
+        style: TextStyle(
+          fontSize: 13,
+          color: Colors.white.withValues(alpha: 0.8),
+          fontWeight: FontWeight.w400,
+        ),
+      );
+    }
+
+    return Text(
+      _showGroupMembers
+          ? '${widget.conversation.activeMemberCount} thành viên'
+          : 'Bấm để xem thông tin',
+      style: TextStyle(
+        fontSize: 13,
+        color: Colors.white.withValues(alpha: 0.8),
+        fontWeight: FontWeight.w400,
       ),
     );
   }

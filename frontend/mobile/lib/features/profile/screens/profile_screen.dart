@@ -9,6 +9,8 @@ import 'package:vnalo_mobile/features/profile/screens/account_security_screen.da
 import 'package:vnalo_mobile/features/profile/screens/profile_detail_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/settings_screen.dart';
 import 'package:vnalo_mobile/features/search/screens/unified_search_screen.dart';
+import 'package:vnalo_mobile/core/models/menu_item_model.dart';
+import 'package:vnalo_mobile/features/chat/screens/my_documents_screen.dart';
 
 /// Profile tab ("Cá nhân") — shows user avatar + name + quick links.
 /// Tapping the avatar/name area navigates to the full ProfileDetailScreen.
@@ -71,9 +73,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       backgroundColor: pageBg,
       appBar: AppBar(
-        backgroundColor: appBarBg,
-        surfaceTintColor: appBarBg,
+        backgroundColor: isDarkMode ? appBarBg : Colors.transparent,
         elevation: 0,
+        forceMaterialTransparency: true,
         flexibleSpace: isDarkMode
             ? null
             : Container(
@@ -189,104 +191,129 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const _SectionDivider(),
-          Container(
-            color: sectionBg,
-            child: Column(
-              children: [
-                _menuItem(
-                  context,
-                  itemKey: 'zCloud',
-                  normalBg: sectionBg,
-                  icon: Icons.cloud_outlined,
-                  iconColor: AppColors.primary,
-                  title: 'zCloud',
-                  subtitle: 'Không gian lưu trữ dữ liệu trên đám mây',
-                ),
-                Divider(height: 1, indent: 70, color: dividerColor),
-                _menuItem(
-                  context,
-                  itemKey: 'zStyle',
-                  normalBg: sectionBg,
-                  icon: Icons.auto_fix_high_outlined,
-                  iconColor: AppColors.primary,
-                  title: 'zStyle - Nổi bật trên Zalo',
-                  subtitle: 'Hình nền và nhạc cho cuộc gọi Zalo',
-                ),
-                Divider(height: 1, indent: 70, color: dividerColor),
-                _menuItem(
-                  context,
-                  itemKey: 'myDocuments',
-                  normalBg: sectionBg,
-                  icon: Icons.folder_outlined,
-                  iconColor: AppColors.primary,
-                  title: 'My Documents',
-                  subtitle: 'Lưu trữ các tin nhắn quan trọng',
-                ),
-              ],
-            ),
-          ),
-          const _SectionDivider(),
-          Container(
-            color: sectionBg,
-            child: Column(
-              children: [
-                _menuItem(
-                  context,
-                  itemKey: 'deviceData',
-                  normalBg: sectionBg,
-                  icon: Icons.pie_chart_outline,
-                  iconColor: AppColors.primary,
-                  title: 'Dữ liệu trên máy',
-                  subtitle: 'Quản lý dữ liệu VNALO của bạn',
-                ),
-                Divider(height: 1, indent: 70, color: dividerColor),
-                _menuItem(
-                  context,
-                  itemKey: 'qrWallet',
-                  normalBg: sectionBg,
-                  icon: Icons.qr_code_rounded,
-                  iconColor: AppColors.primary,
-                  title: 'Ví QR',
-                  subtitle: 'Lưu trữ và xuất trình các mã QR quan trọng',
-                ),
-              ],
-            ),
-          ),
-          const _SectionDivider(),
-          Container(
-            color: sectionBg,
-            child: Column(
-              children: [
-                _menuItem(
-                  context,
-                  itemKey: 'security',
-                  normalBg: sectionBg,
-                  icon: Icons.shield_outlined,
-                  iconColor: AppColors.primary,
-                  title: 'Tài khoản và bảo mật',
-                  onTap: () {
-                    Navigator.of(context, rootNavigator: true).push(
-                      MaterialPageRoute(
-                        builder: (_) => const AccountSecurityScreen(),
-                      ),
-                    );
-                  },
-                ),
-                Divider(height: 1, indent: 70, color: dividerColor),
-                _menuItem(
-                  context,
-                  itemKey: 'privacy',
-                  normalBg: sectionBg,
-                  icon: Icons.lock_outline,
-                  iconColor: AppColors.primary,
-                  title: 'Quyền riêng tư',
-                ),
-              ],
-            ),
-          ),
+          ..._buildSections(context),
         ],
       ),
     );
+  }
+
+  List<MenuSection> _getMenuSections(BuildContext context) {
+    return [
+      MenuSection(
+        items: [
+          MenuItem(
+            key: 'vnCloud',
+            icon: Icons.cloud_outlined,
+            title: 'vnCloud',
+            subtitle: 'Không gian lưu trữ dữ liệu trên đám mây',
+            onTap: () {},
+          ),
+          MenuItem(
+            key: 'vnStyle',
+            icon: Icons.auto_fix_high_outlined,
+            title: 'vnStyle - Nổi bật trên Vnalo',
+            subtitle: 'Hình nền và nhạc cho cuộc gọi Vnalo',
+            onTap: () {},
+          ),
+          MenuItem(
+            key: 'myDocuments',
+            icon: Icons.folder_outlined,
+            title: 'My Documents',
+            subtitle: 'Lưu trữ các tin nhắn quan trọng',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const MyDocumentsScreen()),
+              );
+            },
+          ),
+        ],
+      ),
+      MenuSection(
+        items: [
+          MenuItem(
+            key: 'deviceData',
+            icon: Icons.pie_chart_outline,
+            title: 'Dữ liệu trên máy',
+            subtitle: 'Quản lý dữ liệu VNALO của bạn',
+            onTap: () {},
+          ),
+          MenuItem(
+            key: 'qrWallet',
+            icon: Icons.qr_code_rounded,
+            title: 'Ví QR',
+            subtitle: 'Lưu trữ và xuất trình các mã QR quan trọng',
+            onTap: () {},
+          ),
+          MenuItem(
+            key: 'vnPay',
+            icon: Icons.account_balance_wallet_outlined,
+            title: 'Vnalo Pay (Sắp ra mắt)',
+            subtitle: 'Thanh toán tiện lợi, bảo mật',
+            onTap: () {},
+          ),
+        ],
+      ),
+      MenuSection(
+        items: [
+          MenuItem(
+            key: 'security',
+            icon: Icons.shield_outlined,
+            title: 'Tài khoản và bảo mật',
+            onTap: () {
+              Navigator.of(context, rootNavigator: true).push(
+                MaterialPageRoute(
+                  builder: (_) => const AccountSecurityScreen(),
+                ),
+              );
+            },
+          ),
+          MenuItem(
+            key: 'privacy',
+            icon: Icons.lock_outline,
+            title: 'Quyền riêng tư',
+            onTap: () {},
+          ),
+        ],
+      ),
+    ];
+  }
+
+  List<Widget> _buildSections(BuildContext context) {
+    final sections = _getMenuSections(context);
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final sectionBg = isDarkMode ? DarkColors.surface : Colors.white;
+    final dividerColor = isDarkMode ? DarkColors.divider : AppColors.sectionDivider;
+
+    return sections.expand((section) {
+      return [
+        Container(
+          color: sectionBg,
+          child: Column(
+            children: List.generate(section.items.length, (index) {
+              final item = section.items[index];
+              return Column(
+                children: [
+                  _menuItem(
+                    context,
+                    itemKey: item.key,
+                    normalBg: sectionBg,
+                    icon: item.icon,
+                    iconColor: item.iconColor ?? AppColors.primary,
+                    title: item.title,
+                    subtitle: item.subtitle,
+                    onTap: item.onTap,
+                  ),
+                  if (index < section.items.length - 1)
+                    Divider(height: 1, indent: 70, color: dividerColor),
+                ],
+              );
+            }),
+          ),
+        ),
+        const _SectionDivider(),
+      ];
+    }).toList();
   }
 
   Widget _menuItem(

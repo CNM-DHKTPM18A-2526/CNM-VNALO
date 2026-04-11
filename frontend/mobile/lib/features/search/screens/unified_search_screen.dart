@@ -599,15 +599,15 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
     final set = <String>{};
     for (final h in _searchHistory) {
       final lower = h.toLowerCase();
-      if (lower.contains('zalopay')) set.add('Zalopay');
+      if (lower.contains('vnalopay')) set.add('Vnalopay');
       if (lower.contains('document')) set.add('My Documents');
-      if (lower.contains('lịch') || lower.contains('lich')) set.add('Lịch Zalo');
+      if (lower.contains('lịch') || lower.contains('lich')) set.add('Lịch Vnalo');
       if (lower.contains('nạp') || lower.contains('nap')) set.add('Nạp điện thoại');
     }
 
     return set.map((name) {
-      if (name == 'Zalopay') return (name, Icons.account_balance_wallet_outlined);
-      if (name == 'Lịch Zalo') return (name, Icons.calendar_month_outlined);
+      if (name == 'Vnalopay') return (name, Icons.account_balance_wallet_outlined);
+      if (name == 'Lịch Vnalo') return (name, Icons.calendar_month_outlined);
       if (name == 'Nạp điện thoại') return (name, Icons.sim_card_outlined);
       return (name, Icons.folder_outlined);
     }).toList();

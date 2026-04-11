@@ -1,6 +1,6 @@
 import 'dart:ui';
 
-/// Utility for generating Google/Zalo-style initials avatars.
+/// Utility for generating Google/Vnalo-style initials avatars.
 class AvatarUtils {
   AvatarUtils._();
 
