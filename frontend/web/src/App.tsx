@@ -31,6 +31,7 @@ function App() {
       >
         <Route index element={<Navigate replace to='/chat' />} />
         <Route path='chat' element={<ChatPage />} />
+        <Route path='chat/:conversationId' element={<ChatPage />} />
         <Route path='contacts' element={<ContactsPage />} />
         <Route path='profile' element={<ProfilePage />} />
       </Route>

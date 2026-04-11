@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 
 import { EmptyState } from '../../../shared/components/EmptyState'
 import { Icon } from '../../../shared/components/Icon'
@@ -27,6 +27,7 @@ export function ChatWindow({
   peerLastReadSeq,
 }: ChatWindowProps) {
   const { t } = useLanguage()
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null)
 
   const conversationMessages = useMemo(() => {
     if (!conversation) {
@@ -35,6 +36,19 @@ export function ChatWindow({
 
     return messages.filter((message) => message.conversationId === conversation.id)
   }, [conversation, messages])
+
+  useEffect(() => {
+    if (!conversation || isLoadingMessages) {
+      return
+    }
+
+    const container = messagesContainerRef.current
+    if (!container) {
+      return
+    }
+
+    container.scrollTop = container.scrollHeight
+  }, [conversation, conversationMessages.length, isLoadingMessages])
 
   if (!conversation) {
     return (
@@ -72,7 +86,7 @@ export function ChatWindow({
           </button>
         </div>
       </header>
-      <div className='chat-window-messages'>
+      <div className='chat-window-messages' ref={messagesContainerRef}>
         {isLoadingMessages ? (
           <LoadingState label={t('chat.loadingConversation')} />
         ) : conversationMessages.length === 0 ? (

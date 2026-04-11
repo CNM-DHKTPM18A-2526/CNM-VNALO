@@ -1,7 +1,9 @@
 import { normalizeVietnamPhone } from './phone.util'
 import type { AuthUser, Gender, LoginPayload, RegisterPayload, SendRegisterOtpPayload } from './auth.types'
 
-const API_BASE_URL = import.meta.env.VITE_CORE_API_URL ?? 'http://localhost:8081/api/v1'
+const fallbackProtocol = typeof window !== 'undefined' ? window.location.protocol.replace(':', '') : 'http'
+const fallbackHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
+const API_BASE_URL = import.meta.env.VITE_CORE_API_URL ?? `${fallbackProtocol}://${fallbackHost}:8081/api/v1`
 
 export type UpdateProfilePayload = {
   displayName?: string

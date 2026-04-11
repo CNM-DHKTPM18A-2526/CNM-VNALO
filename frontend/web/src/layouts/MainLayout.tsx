@@ -11,7 +11,7 @@ export function MainLayout() {
   const location = useLocation()
   const { user, logout } = useAuth()
   const { t } = useLanguage()
-  const isChatWorkspace = location.pathname === '/chat' || location.pathname === '/'
+  const isChatWorkspace = location.pathname === '/' || location.pathname.startsWith('/chat')
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
 
   const title = useMemo(() => {
@@ -22,6 +22,10 @@ export function MainLayout() {
     }
 
     if (location.pathname === '/') {
+      return t('pages.chat.title')
+    }
+
+    if (location.pathname.startsWith('/chat')) {
       return t('pages.chat.title')
     }
 

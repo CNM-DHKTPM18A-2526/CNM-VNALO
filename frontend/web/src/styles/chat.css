@@ -2,7 +2,8 @@
   display: grid;
   grid-template-columns: 336px minmax(560px, 1fr) 308px;
   gap: 10px;
-  min-height: calc(100vh - 24px);
+  min-height: 0;
+  height: 100%;
 }
 
 .chat-list-panel,
@@ -20,6 +21,7 @@
   flex-direction: column;
   overflow: hidden;
   min-width: 0;
+  min-height: 0;
 }
 
 .panel-header {
@@ -117,7 +119,9 @@
   padding: 8px;
   display: grid;
   gap: 2px;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
 }
 
 .chat-item {
@@ -212,6 +216,7 @@
   display: grid;
   grid-template-rows: auto 1fr auto;
   overflow: hidden;
+  min-height: 0;
 }
 
 .chat-window-header {
@@ -274,8 +279,34 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  overflow: auto;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
   background: var(--chat-window-bg);
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--muted) 55%, transparent) transparent;
+}
+
+.chat-window-messages::-webkit-scrollbar,
+.chat-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-window-messages::-webkit-scrollbar-track,
+.chat-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-window-messages::-webkit-scrollbar-thumb,
+.chat-list::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--muted) 40%, transparent);
+  border-radius: 999px;
+}
+
+.chat-window-messages::-webkit-scrollbar-thumb:hover,
+.chat-list::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--muted) 62%, transparent);
 }
 
 .message-row {
@@ -371,6 +402,8 @@
   display: grid;
   align-content: start;
   gap: 10px;
+  min-height: 0;
+  overflow: auto;
 }
 
 .chat-side-head {
@@ -490,6 +523,7 @@
   .chat-layout {
     grid-template-columns: 1fr;
     min-height: auto;
+    height: auto;
   }
 
   .chat-toolbar-row {
