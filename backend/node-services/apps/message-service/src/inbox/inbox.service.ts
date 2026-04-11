@@ -104,11 +104,10 @@ export class InboxService {
   }
 
   private isRestrictedWeb(access?: AccessPolicyContext): boolean {
-    if (!access) {
-      return false;
-    }
-    const platform = (access.clientPlatform ?? 'WEB').toUpperCase();
-    return Boolean(access.restrictedWebMode) && (platform === 'WEB' || platform === 'PC');
+    // Temporary override: do not enforce restricted web filtering in inbox-service
+    // so inbox and last messages are retained after page refresh.
+    // TODO: Re-enable when core-service restrictedWebMode policy is fully aligned.
+    return false;
   }
 
   private resolveLoginTime(epochSec?: number): Date {

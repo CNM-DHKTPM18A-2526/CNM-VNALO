@@ -18,11 +18,12 @@ export class WsJwtGuard implements CanActivate {
         client.handshake?.query?.token;
 
       if (!token) {
-        this.logger.warn(`WebSocket connection rejected: no token`);
+        this.logger.warn(`[WsJwtGuard] Connection rejected: no token found in auth or query`);
         client.disconnect();
         return false;
       }
 
+      this.logger.debug(`[WsJwtGuard] Token received, length: ${(token as string).length}`);
       const payload = this.jwtService.verify(token as string);
       // Attach user info to socket data for downstream access
       client.data.user = {
@@ -35,9 +36,10 @@ export class WsJwtGuard implements CanActivate {
         restrictedWebMode: Boolean(payload.restrictedWebMode),
         deviceId: payload.deviceId ?? null,
       };
+      this.logger.log(`[WsJwtGuard] Auth success, user: ${payload.sub}, restrictedWebMode: ${payload.restrictedWebMode}`);
       return true;
     } catch (err) {
-      this.logger.warn(`WebSocket auth failed: ${err.message}`);
+      this.logger.warn(`[WsJwtGuard] Auth failed: ${err.message}`);
       client.disconnect();
       return false;
     }
