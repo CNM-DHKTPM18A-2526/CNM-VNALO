@@ -38,7 +38,6 @@ class PersonalInfoScreen extends StatelessWidget {
     final displayName = user?.displayName ?? 'Người dùng';
 
     final sectionBg = isDarkMode ? DarkColors.surface : LightColors.surface;
-    final dividerColor = isDarkMode ? DarkColors.divider : AppColors.itemDivider;
 
     return Scaffold(
       backgroundColor: isDarkMode ? DarkColors.scaffold : const Color(0xFFF3F4F6),
