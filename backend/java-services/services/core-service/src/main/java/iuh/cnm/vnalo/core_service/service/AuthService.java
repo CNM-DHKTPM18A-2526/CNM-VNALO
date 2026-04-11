@@ -511,7 +511,8 @@ public class AuthService {
         if (!"WEB".equals(normalizedPlatform) && !"PC".equals(normalizedPlatform)) {
             return false;
         }
-        if (!Boolean.TRUE.equals(setting.getSyncEnabled()) || Boolean.TRUE.equals(setting.getWebRestrictedMode())) {
+        // Null syncEnabled should behave as enabled for backward compatibility.
+        if (Boolean.FALSE.equals(setting.getSyncEnabled()) || Boolean.TRUE.equals(setting.getWebRestrictedMode())) {
             return true;
         }
         return isQrWebDevice(deviceId);
@@ -659,7 +660,7 @@ public class AuthService {
         String safeName = (displayName == null || displayName.isBlank()) ? "User" : displayName.trim();
         String encodedName = URLEncoder.encode(safeName, StandardCharsets.UTF_8);
         String seed = accountId != null ? accountId.toString() : UUID.randomUUID().toString();
-        return "https://api.dicebear.com/9.x/initials/png?seed=" + seed + "&radius=50&size=256&chars=2&fontFamily=Arial&fontWeight=600&backgroundType=gradientLinear&text=" + encodedName;
+        return "https://api.dicebear.com/9.x/initials/svg?seed=" + seed + "&radius=50&size=256&chars=2&fontFamily=Arial&fontWeight=600&backgroundType=gradientLinear&text=" + encodedName;
     }
 
     public record LoginDeviceInfo(
@@ -700,4 +701,5 @@ public class AuthService {
     }
 
     private record IssuedRefreshToken(String rawToken, AuthRefreshToken token) {}
+
 }
