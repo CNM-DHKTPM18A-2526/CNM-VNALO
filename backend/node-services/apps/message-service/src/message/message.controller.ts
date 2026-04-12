@@ -37,12 +37,12 @@ export class MessageController {
     @Param('id') id: string,
     @Query() pagination: PaginationDto,
   ) {
-    return this.messageService.getMessages(
       id,
       user.userId,
       pagination.before,
       pagination.limit,
       this.buildAccessContext(user),
+      pagination.forceSync,
     );
   }
 
