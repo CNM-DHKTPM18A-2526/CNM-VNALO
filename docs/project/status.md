@@ -1,6 +1,6 @@
 # Implementation Status
 
-> Last updated: 2026-04-06
+> Last updated: 2026-04-12
 
 ---
 
@@ -39,6 +39,8 @@
 | Project setup and env config | ✅ Complete | `--dart-define` driven environments |
 | Authentication flow | ✅ Complete | Register/login/profile hydration with resilient fallback |
 | Avatar upload flow | 🔄 Hardened | Retry + timeout handling + non-fatal completion path |
+| Search + local sync remediation | ✅ Stabilized | Local-first search fallback, API normalization, post-auth sync ordering fixed |
+| Notification messaging integration | ✅ Restored | `firebase_messaging` dependency re-aligned with `NotificationService` implementation |
 | Chat/contact/profile feature modules | 🔄 In Progress | Module folders exist and active development ongoing |
 | Test coverage (mobile unit) | 🔄 In Progress | Key config/auth service tests present |
 
@@ -50,6 +52,8 @@
 |------|--------|
 | core-service tests | ✅ pass in recent runs |
 | node-services tests | ✅ available and executable from workspace |
+| mobile unit tests (`flutter test`) | ✅ pass (latest run: all tests passed) |
+| mobile static analysis (`flutter analyze`) | ✅ no errors/warnings (remaining info-level lint debt only) |
 | smoke auth-avatar-inbox flow | ✅ pass in recent reconciled runs |
 | docker compose runtime | ✅ infra + services compose definitions aligned with docs |
 

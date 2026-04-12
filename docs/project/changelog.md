@@ -19,6 +19,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - **Recall integrity**: WS `message.recalled` now emits to the real message conversation, not client-provided `conversationId`.
 - **Delete for me authorization**: `DELETE /messages/{id}/for-me` now validates conversation membership.
 - **CORS hardening**: Node and Java services now use configurable explicit origin allow-lists instead of wildcard origins.
+- **Mobile notification compile blockers**: restored missing `firebase_messaging` dependency required by `NotificationService`.
+- **Mobile analyze warning debt (blocking level)**: removed unused imports/fields/elements in chat module and unit test helpers to return analyzer to no error/warning state.
 
 ### Documentation
 - **Comprehensive docs reconcile (2026-04-06)**:
