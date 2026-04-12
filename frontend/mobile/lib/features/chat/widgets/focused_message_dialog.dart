@@ -23,7 +23,6 @@ class FocusedMessageDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
-    final screenWidth = MediaQuery.of(context).size.width;
     final safeAreaBottom = MediaQuery.of(context).padding.bottom;
     
     // Estimated height for the menu (Emoji box + spacing + Action box)

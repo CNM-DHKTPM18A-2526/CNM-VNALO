@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
-import 'package:vnalo_mobile/features/chat/widgets/message_action_menu.dart';
 import 'package:vnalo_mobile/features/chat/widgets/focused_message_dialog.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/utils/date_formatter.dart';
@@ -10,7 +9,6 @@ import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/conversation_member_model.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:audioplayers/audioplayers.dart';
 import 'package:open_file/open_file.dart';
 import 'package:vnalo_mobile/features/chat/widgets/full_screen_image_viewer.dart';
 import 'package:vnalo_mobile/features/chat/widgets/audio_player_widget.dart';
@@ -512,9 +510,6 @@ class MessageBubble extends StatelessWidget {
   }
 
   Widget _buildReplyQuote(BuildContext context, bool isDarkMode) {
-    final chatProvider = context.read<ChatProvider>();
-    final currentUserId = chatProvider.currentUserId;
-    
     return GestureDetector(
       onTap: () {
         if (message.replyToMessageId != null) {

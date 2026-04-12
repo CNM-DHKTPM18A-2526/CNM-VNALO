@@ -68,7 +68,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final index = items.indexWhere((item) {
       if (item is Message) return item.id == messageId;
       if (item is List<Message>) {
-        return (item as List<Message>).any((m) => m.id == messageId);
+        return item.any((m) => m.id == messageId);
       }
       return false;
     });
