@@ -107,11 +107,15 @@ class LocalDatabase extends _$LocalDatabase {
   Future<List<LocalMessageSearchResult>> searchMessages(String query) async {
     final results = await customSelect(
       'SELECT m.*, c.name as conv_name, c.avatar_url as conv_avatar FROM messages m '
-      'JOIN messages_fts f ON m.id = f.external_id '
       'LEFT JOIN conversations c ON m.conversation_id = c.id '
-      'WHERE f.content MATCH ? '
+      'WHERE m.id IN ( '
+      '  SELECT external_id FROM messages_fts WHERE content MATCH ? '
+      ') OR m.content LIKE ? '
       'ORDER BY m.created_at DESC',
-      variables: [Variable.withString('$query*')],
+      variables: [
+        Variable.withString('$query*'),
+        Variable.withString('%$query%'),
+      ],
     ).get();
 
     return results.map((row) {
@@ -130,24 +134,23 @@ class LocalDatabase extends _$LocalDatabase {
   }
 
   Future<List<LocalContact>> searchContacts(String query) async {
-    final results =
-        await customSelect(
-          'SELECT c.* FROM contacts c '
-          'JOIN contacts_fts f ON c.id = f.external_id '
-          'WHERE f.display_name MATCH ? OR c.phone LIKE ?',
-          variables: [
-            Variable.withString('$query*'),
-            Variable.withString('%$query%'),
-          ],
-        ).get();
+    final results = await customSelect(
+      'SELECT * FROM contacts WHERE id IN ('
+      '  SELECT external_id FROM contacts_fts WHERE display_name MATCH ?'
+      ') OR phone LIKE ?',
+      variables: [
+        Variable.withString('$query*'),
+        Variable.withString('%$query%'),
+      ],
+    ).get();
 
     return results
         .map(
           (row) => LocalContact(
             id: row.read<String>('id'),
             displayName: row.read<String>('display_name'),
-            phone: row.read<String>('phone'),
-            avatarUrl: row.read<String>('avatar_url'),
+            phone: row.readNullable<String>('phone'),
+            avatarUrl: row.readNullable<String>('avatar_url'),
           ),
         )
         .toList();
@@ -165,10 +168,10 @@ class LocalDatabase extends _$LocalDatabase {
     final row = results.first;
     return LocalConversation(
       id: row.read<String>('id'),
-      name: row.read<String>('name'),
+      name: row.readNullable<String>('name'),
       type: row.read<String>('type'),
-      avatarUrl: row.read<String>('avatar_url'),
-      lastMessage: row.read<String>('last_message'),
+      avatarUrl: row.readNullable<String>('avatar_url'),
+      lastMessage: row.readNullable<String>('last_message'),
       updatedAt: row.read<DateTime>('updated_at'),
     );
   }
