@@ -27,7 +27,7 @@ class AppearanceSettingsScreen extends StatelessWidget {
         backgroundColor: appBarBg,
         surfaceTintColor: appBarBg,
         elevation: 0,
-        iconTheme: IconThemeData(color: searchHint),
+        iconTheme: const IconThemeData(color: Colors.white),
         flexibleSpace: isDarkMode
             ? null
             : Container(decoration: const BoxDecoration(gradient: AppColors.appBarGradient)),

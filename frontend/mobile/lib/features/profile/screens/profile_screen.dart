@@ -95,7 +95,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               color: Colors.transparent,
               child: Row(
                 children: [
-                  Icon(Icons.search, size: 24, color: searchHint),
+                  Icon(Icons.search, size: 24, color: isDarkMode ? searchHint : Colors.white),
                   const SizedBox(width: 8),
                   Text(
                     'Tìm kiếm',
@@ -112,7 +112,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.settings_outlined, color: searchHint),
+            icon: const Icon(Icons.settings_outlined, color: Colors.white),
             onPressed: () {
               Navigator.push(
                 context,

@@ -49,7 +49,7 @@ class DiscoverScreen extends StatelessWidget {
               color: Colors.transparent,
               child: Row(
                 children: [
-                  Icon(Icons.search, size: 24, color: searchHint),
+                  Icon(Icons.search, size: 24, color: isDarkMode ? searchHint : Colors.white),
                   const SizedBox(width: 8),
                   Text(
                     'Tìm kiếm',
@@ -66,7 +66,7 @@ class DiscoverScreen extends StatelessWidget {
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.qr_code_scanner, color: searchHint),
+            icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
             onPressed: () => _openQrScanner(context),
           ),
         ],

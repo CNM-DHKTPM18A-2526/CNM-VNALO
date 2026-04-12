@@ -28,7 +28,7 @@ class SettingsScreen extends StatelessWidget {
         foregroundColor: Colors.white,
         elevation: 0,
         forceMaterialTransparency: true,
-        iconTheme: IconThemeData(color: searchHint),
+        iconTheme: const IconThemeData(color: Colors.white),
         flexibleSpace: isDarkMode
             ? null
             : Container(
@@ -36,7 +36,7 @@ class SettingsScreen extends StatelessWidget {
               ),
         actions: [
           IconButton(
-            icon: Icon(Icons.search, color: searchHint),
+            icon: const Icon(Icons.search, color: Colors.white),
             onPressed: () {
               showSearch(
                 context: context,

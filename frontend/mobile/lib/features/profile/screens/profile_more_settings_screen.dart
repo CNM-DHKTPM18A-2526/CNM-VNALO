@@ -34,6 +34,7 @@ class ProfileMoreSettingsScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: appBarBg,
         foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
         flexibleSpace: isDarkMode
             ? null
             : Container(

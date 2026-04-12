@@ -54,6 +54,7 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
         elevation: 0,
         forceMaterialTransparency: true,
         foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
         flexibleSpace: isDarkMode
             ? null
             : Container(decoration: const BoxDecoration(gradient: AppColors.appBarGradient)),
