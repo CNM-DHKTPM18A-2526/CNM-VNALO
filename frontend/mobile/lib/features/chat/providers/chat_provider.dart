@@ -119,6 +119,10 @@ class ChatProvider extends ChangeNotifier {
       senderId: m.senderId,
       content: m.content ?? '',
       createdAt: m.createdAt,
+      messageType: m.messageType.name,
+      mediaUrl: m.mediaUrl,
+      mediaMimeType: m.mediaMimeType,
+      mediaSizeBytes: m.mediaSizeBytes,
     );
   }
 
@@ -129,6 +133,10 @@ class ChatProvider extends ChangeNotifier {
       senderId: lm.senderId,
       content: lm.content,
       createdAt: lm.createdAt,
+      messageType: enumFromString(MessageType.values, lm.messageType),
+      mediaUrl: lm.mediaUrl,
+      mediaMimeType: lm.mediaMimeType,
+      mediaSizeBytes: lm.mediaSizeBytes,
       status: MessageStatus.SENT,
     );
   }

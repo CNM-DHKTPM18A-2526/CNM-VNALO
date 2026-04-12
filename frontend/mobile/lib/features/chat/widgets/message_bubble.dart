@@ -12,6 +12,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:open_file/open_file.dart';
 import 'package:vnalo_mobile/features/chat/widgets/full_screen_image_viewer.dart';
 import 'package:vnalo_mobile/features/chat/widgets/audio_player_widget.dart';
+import 'package:vnalo_mobile/services/media_cache_service.dart';
 import 'package:flutter/services.dart';
 
 class MessageBubble extends StatelessWidget {
@@ -233,13 +234,11 @@ class MessageBubble extends StatelessWidget {
       constraints: BoxConstraints(
         maxWidth: MediaQuery.of(context).size.width * 0.75,
       ),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.transparent,
         borderRadius: BorderRadius.only(
-          topLeft: const Radius.circular(16),
-          topRight: const Radius.circular(16),
-          bottomLeft: Radius.circular(isMine ? 16 : 4),
-          bottomRight: Radius.circular(isMine ? 4 : 16),
+          topLeft: Radius.circular(16),
+          topRight: Radius.circular(16),
         ),
       ),
       clipBehavior: Clip.antiAlias,
@@ -267,14 +266,12 @@ class MessageBubble extends StatelessWidget {
             },
             child: isLocal
                 ? Image.file(File(url), fit: BoxFit.cover)
-                : Image.network(
-                    url,
-                    headers: const {
-                      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                    },
+                : CachedNetworkImage(
+                    imageUrl: url,
                     fit: BoxFit.cover,
-                    loadingBuilder: (context, child, loadingProgress) => loadingProgress == null ? child : Container(color: Colors.grey.shade200),
-                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image),
+                    fadeInDuration: const Duration(milliseconds: 150),
+                    placeholder: (_, __) => Container(color: const Color(0xFFEEEEEE)),
+                    errorWidget: (_, __, ___) => const Icon(Icons.broken_image, color: Colors.grey),
                   ),
           );
         },
@@ -285,39 +282,47 @@ class MessageBubble extends StatelessWidget {
   Widget _buildImage(BuildContext context) {
     final url = message.mediaUrl ?? '';
     if (url.isEmpty) return const SizedBox.shrink();
+    final isLocal = url.startsWith('/') || url.contains('Users') || url.contains('storage');
 
     return GestureDetector(
       onTap: () {
-        final isLocal = url.startsWith('/') || url.contains('Users') || url.contains('storage');
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => FullScreenImageViewer(
-              imageUrl: url,
-              isLocal: isLocal,
-            ),
+            builder: (_) => FullScreenImageViewer(imageUrl: url, isLocal: isLocal),
           ),
         );
       },
-      child: url.startsWith('/') || url.contains('Users') || url.contains('storage') // Basic check for local path
-          ? Image.file(File(url), fit: BoxFit.cover)
-          : Image.network(
-              url,
-              headers: const {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-              },
-              fit: BoxFit.cover,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return Container(
+      child: ClipRRect(
+        borderRadius: BorderRadius.only(
+          topLeft: const Radius.circular(12),
+          topRight: const Radius.circular(12),
+          bottomLeft: Radius.circular(isMine ? 12 : 4),
+          bottomRight: Radius.circular(isMine ? 4 : 12),
+        ),
+        child: isLocal
+            ? Image.file(File(url), fit: BoxFit.cover)
+            : CachedNetworkImage(
+                imageUrl: url,
+                fit: BoxFit.cover,
+                fadeInDuration: const Duration(milliseconds: 200),
+                placeholder: (_, __) => Container(
+                  width: 200,
                   height: 200,
-                  color: Colors.grey.shade200,
-                  child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                );
-              },
-              errorBuilder: (context, error, stackTrace) => const Center(
-                child: Icon(Icons.broken_image, size: 40, color: Colors.grey),
+                  color: const Color(0xFFEEEEEE),
+                  child: const Center(
+                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                  ),
+                ),
+                errorWidget: (_, __, ___) => Container(
+                  width: 200,
+                  height: 100,
+                  color: const Color(0xFFEEEEEE),
+                  child: const Center(
+                    child: Icon(Icons.broken_image, size: 40, color: Colors.grey),
+                  ),
+                ),
               ),
-            ),
+      ),
     );
   }
 
@@ -337,44 +342,10 @@ class MessageBubble extends StatelessWidget {
   }
 
   Widget _buildFileCard(BuildContext context, bool isDarkMode) {
-    return InkWell(
-      onTap: () {
-        if (message.mediaUrl != null) {
-          OpenFile.open(message.mediaUrl);
-        }
-      },
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.insert_drive_file, color: Colors.blue, size: 32),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  message.content ?? 'Tài liệu',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  message.mediaSizeBytes != null
-                      ? '${(message.mediaSizeBytes! / (1024 * 1024)).toStringAsFixed(2)} MB'
-                      : 'File',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDarkMode ? DarkColors.textHint : Colors.grey.shade500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+    return _FileCardWidget(
+      message: message,
+      isMine: isMine,
+      isDarkMode: isDarkMode,
     );
   }
 
@@ -469,18 +440,26 @@ class MessageBubble extends StatelessWidget {
           ...displayed.map((m) => Padding(
                 padding: const EdgeInsets.only(left: 2),
                 child: ClipOval(
-                  child: Image.network(
-                    m.user?.avatarUrl ?? 'https://ui-avatars.com/api/?name=${m.user?.displayName ?? 'U'}',
-                    width: 14,
-                    height: 14,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      width: 14,
-                      height: 14,
-                      color: Colors.grey,
-                      child: const Icon(Icons.person, size: 10, color: Colors.white),
-                    ),
-                  ),
+                  child: m.user?.avatarUrl != null
+                      ? CachedNetworkImage(
+                          imageUrl: m.user!.avatarUrl!,
+                          width: 14,
+                          height: 14,
+                          fit: BoxFit.cover,
+                          fadeInDuration: Duration.zero,
+                          errorWidget: (_, __, ___) => Container(
+                            width: 14,
+                            height: 14,
+                            color: Colors.grey,
+                            child: const Icon(Icons.person, size: 10, color: Colors.white),
+                          ),
+                        )
+                      : Container(
+                          width: 14,
+                          height: 14,
+                          color: Colors.grey,
+                          child: const Icon(Icons.person, size: 10, color: Colors.white),
+                        ),
                 ),
               )),
           if (remainingCount > 0)
@@ -549,6 +528,149 @@ class MessageBubble extends StatelessWidget {
                 fontSize: 13,
                 color: isDarkMode ? DarkColors.textSecondary : const Color(0xFF4A4A4A),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// _FileCardWidget — on-demand download + local-path caching
+// ---------------------------------------------------------------------------
+class _FileCardWidget extends StatefulWidget {
+  final Message message;
+  final bool isMine;
+  final bool isDarkMode;
+
+  const _FileCardWidget({
+    required this.message,
+    required this.isMine,
+    required this.isDarkMode,
+  });
+
+  @override
+  State<_FileCardWidget> createState() => _FileCardWidgetState();
+}
+
+class _FileCardWidgetState extends State<_FileCardWidget> {
+  bool _isDownloading = false;
+  String? _error;
+
+  String _formatSize(int? bytes) {
+    if (bytes == null) return 'File';
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} MB';
+  }
+
+  IconData _iconForMime(String? mime) {
+    if (mime == null) return Icons.insert_drive_file;
+    if (mime.contains('pdf')) return Icons.picture_as_pdf;
+    if (mime.contains('word') || mime.contains('doc')) return Icons.description;
+    if (mime.contains('excel') || mime.contains('sheet') || mime.contains('xls')) return Icons.table_chart;
+    if (mime.contains('video')) return Icons.videocam;
+    if (mime.contains('audio')) return Icons.audiotrack;
+    if (mime.contains('zip') || mime.contains('rar')) return Icons.archive;
+    return Icons.insert_drive_file;
+  }
+
+  Future<void> _handleTap() async {
+    if (_isDownloading) return;
+    final mediaUrl = widget.message.mediaUrl;
+    if (mediaUrl == null || mediaUrl.isEmpty) return;
+
+    final cacheService = context.read<MediaCacheService>();
+    setState(() {
+      _isDownloading = true;
+      _error = null;
+    });
+
+    try {
+      // Check local first
+      String? localPath = await cacheService.getLocalPath(widget.message.id);
+      localPath ??= await cacheService.downloadAndCache(
+        messageId: widget.message.id,
+        remoteUrl: mediaUrl,
+        mimeType: widget.message.mediaMimeType,
+      );
+      if (!mounted) return;
+      await cacheService.openFile(localPath);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = 'Tải thất bại. Kiểm tra kết nối mạng.');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Không thể mở file: $e'), backgroundColor: AppColors.error),
+      );
+    } finally {
+      if (mounted) setState(() => _isDownloading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final msg = widget.message;
+    final isDark = widget.isDarkMode;
+    final icon = _iconForMime(msg.mediaMimeType);
+
+    return InkWell(
+      onTap: _handleTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E3A5F) : const Color(0xFFE3F2FD),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: _isDownloading
+                  ? const Padding(
+                      padding: EdgeInsets.all(10),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                    )
+                  : Icon(icon, color: AppColors.primary, size: 22),
+            ),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    msg.content ?? 'Tài liệu',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: isDark ? DarkColors.textPrimary : LightColors.textPrimary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _isDownloading
+                        ? 'Đang tải...'
+                        : _error ?? _formatSize(msg.mediaSizeBytes),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: _error != null
+                          ? AppColors.error
+                          : (isDark ? DarkColors.textHint : Colors.grey.shade500),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              _isDownloading ? Icons.downloading : Icons.open_in_new,
+              size: 18,
+              color: isDark ? DarkColors.textHint : Colors.grey.shade400,
             ),
           ],
         ),

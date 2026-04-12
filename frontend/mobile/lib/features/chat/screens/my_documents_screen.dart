@@ -63,6 +63,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
               senderId: myId,
               content: item['content'] ?? '',
               createdAt: DateTime.tryParse(item['createdAt'] ?? '') ?? DateTime.now(),
+              messageType: 'TEXT',
             ));
           }
           if (toMigrate.isNotEmpty) {
@@ -105,6 +106,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
       senderId: myId,
       content: content.trim(),
       createdAt: DateTime.now(),
+      messageType: 'TEXT',
     );
 
     await db.saveMessage(msg);

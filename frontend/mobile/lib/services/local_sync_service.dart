@@ -69,6 +69,10 @@ class LocalSyncService {
               senderId: m.senderId,
               content: m.content ?? '',
               createdAt: m.createdAt,
+              messageType: Value(m.messageType.name),
+              mediaUrl: Value(m.mediaUrl),
+              mediaMimeType: Value(m.mediaMimeType),
+              mediaSizeBytes: Value(m.mediaSizeBytes),
             )),
             mode: InsertMode.insertOrReplace,
           );

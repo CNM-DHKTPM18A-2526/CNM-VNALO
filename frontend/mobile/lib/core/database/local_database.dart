@@ -12,7 +12,7 @@ class LocalDatabase extends _$LocalDatabase {
   LocalDatabase() : super(conn.openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -65,6 +65,17 @@ class LocalDatabase extends _$LocalDatabase {
         await customStatement('DELETE FROM messages');
         await customStatement('DELETE FROM messages_fts');
         debugPrint('[Migration] Database v3: Purged legacy messages to fix formatting errors.');
+      }
+
+      if (from < 4) {
+        // Add media columns to messages (non-destructive ALTER TABLE)
+        await customStatement("ALTER TABLE messages ADD COLUMN message_type TEXT NOT NULL DEFAULT 'TEXT'");
+        await customStatement('ALTER TABLE messages ADD COLUMN media_url TEXT');
+        await customStatement('ALTER TABLE messages ADD COLUMN thumb_url TEXT');
+        await customStatement('ALTER TABLE messages ADD COLUMN local_path TEXT');
+        await customStatement('ALTER TABLE messages ADD COLUMN media_mime_type TEXT');
+        await customStatement('ALTER TABLE messages ADD COLUMN media_size_bytes INTEGER');
+        debugPrint('[Migration] Database v4: Added media columns to messages table.');
       }
     },
   );
@@ -126,6 +137,12 @@ class LocalDatabase extends _$LocalDatabase {
           conversationId: row.read<String>('conversation_id'),
           createdAt: row.read<DateTime>('created_at'),
           senderId: row.read<String>('sender_id'),
+          messageType: (row.readNullable<String>('message_type')) ?? 'TEXT',
+          mediaUrl: row.readNullable<String>('media_url'),
+          thumbUrl: row.readNullable<String>('thumb_url'),
+          localPath: row.readNullable<String>('local_path'),
+          mediaMimeType: row.readNullable<String>('media_mime_type'),
+          mediaSizeBytes: row.readNullable<int>('media_size_bytes'),
         ),
         conversationName: row.readNullable<String>('conv_name'),
         conversationAvatar: row.readNullable<String>('conv_avatar'),
@@ -184,6 +201,24 @@ class LocalDatabase extends _$LocalDatabase {
     await batch((batch) {
       batch.insertAll(messages, messageList, mode: InsertMode.insertOrReplace);
     });
+  }
+
+  /// Update the local_path for a downloaded file/image.
+  Future<void> updateLocalPath(String messageId, String localPath) async {
+    await customStatement(
+      'UPDATE messages SET local_path = ? WHERE id = ?',
+      [localPath, messageId],
+    );
+  }
+
+  /// Clear local_path entries for messages whose files have been deleted.
+  Future<void> clearStalePaths(List<String> messageIds) async {
+    if (messageIds.isEmpty) return;
+    final placeholders = List.filled(messageIds.length, '?').join(',');
+    await customStatement(
+      'UPDATE messages SET local_path = NULL WHERE id IN ($placeholders)',
+      messageIds,
+    );
   }
 
   Future<List<LocalMessage>> getMessagesByConversation(String conversationId) async {
