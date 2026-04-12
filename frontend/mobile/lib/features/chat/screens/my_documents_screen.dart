@@ -140,8 +140,6 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
     final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
     final bgColor = isDarkMode ? Colors.black : const Color(0xFFEBEDF0);
     final cardColor = isDarkMode ? const Color(0xFF1E1E1E) : Colors.white;
-    final inputBgColor = isDarkMode ? const Color(0xFF1E1E1E) : Colors.white;
-    final hintColor = isDarkMode ? Colors.grey[500]! : Colors.grey[400]!;
 
     return Scaffold(
       backgroundColor: bgColor,

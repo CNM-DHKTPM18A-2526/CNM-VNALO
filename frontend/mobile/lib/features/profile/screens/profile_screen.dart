@@ -66,7 +66,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         : Colors.white.withValues(alpha: 0.8);
     final pageBg = isDarkMode ? Colors.black : AppColors.sectionBackground;
     final sectionBg = isDarkMode ? DarkColors.surface : Colors.white;
-    final dividerColor = isDarkMode ? DarkColors.divider : AppColors.sectionDivider;
     final auth = context.watch<AuthProvider>();
     final displayName = auth.user?.displayName ?? 'Người dùng';
 

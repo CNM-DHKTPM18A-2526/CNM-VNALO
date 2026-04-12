@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vnalo_mobile/models/post_model.dart';
 import 'package:vnalo_mobile/models/story_model.dart';
-import 'package:vnalo_mobile/models/user_model.dart';
 
 class PostProvider with ChangeNotifier {
   List<Post> _posts = [];

@@ -15,7 +15,6 @@ import 'package:vnalo_mobile/features/auth/screens/login_screen.dart';
 import 'package:vnalo_mobile/features/auth/widgets/otp_input.dart';
 import 'package:vnalo_mobile/navigation/main_shell.dart';
 import 'package:vnalo_mobile/features/auth/widgets/phone_input.dart';
-import 'package:vnalo_mobile/services/api_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
