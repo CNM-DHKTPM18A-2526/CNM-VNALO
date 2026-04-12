@@ -28,6 +28,14 @@ public class StickerService {
     private final StickerRepository stickerRepository;
     private final UserStickerPackRepository userStickerPackRepository;
     private final StickerUsageRepository stickerUsageRepository;
+    private final MediaObjectRepository mediaObjectRepository;
+
+    private String getUrl(UUID mediaId) {
+        if (mediaId == null) return "";
+        return mediaObjectRepository.findById(mediaId)
+                .map(MediaObject::getUrl)
+                .orElse("");
+    }
 
     // ==================== PACK ====================
 
@@ -35,7 +43,7 @@ public class StickerService {
     public Page<StickerPackResponse> listPacks(int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("downloadCount").descending());
         Page<StickerPack> packs = stickerPackRepository.findByStatus(StickerPackStatus.PUBLISHED, pageable);
-        return packs.map(StickerPackResponse::from);
+        return packs.map(pack -> StickerPackResponse.from(pack, getUrl(pack.getCoverMediaId())));
     }
 
     public StickerPackDetailResponse getPackDetail(UUID packId) {
@@ -43,10 +51,10 @@ public class StickerService {
 
         List<StickerResponse> stickers = stickerRepository.findByPackIdOrderByDisplayOrder(packId)
                 .stream()
-                .map(StickerResponse::from)
+                .map(s -> StickerResponse.from(s, getUrl(s.getMediaId())))
                 .toList();
 
-        return StickerPackDetailResponse.from(pack, stickers);
+        return StickerPackDetailResponse.from(pack, getUrl(pack.getCoverMediaId()), stickers);
     }
 
     @Transactional
@@ -62,7 +70,7 @@ public class StickerService {
 
         StickerPack saved = stickerPackRepository.save(pack);
         log.info("Created sticker pack: {} by user {}", saved.getStickerPackId(), userId);
-        return StickerPackResponse.from(saved);
+        return StickerPackResponse.from(saved, getUrl(saved.getCoverMediaId()));
     }
 
     @Transactional
@@ -96,7 +104,7 @@ public class StickerService {
         stickerPackRepository.save(pack);
 
         log.info("Added sticker {} to pack {}", saved.getStickerId(), packId);
-        return StickerResponse.from(saved);
+        return StickerResponse.from(saved, getUrl(saved.getMediaId()));
     }
 
     @Transactional
@@ -149,12 +157,22 @@ public class StickerService {
         List<UUID> packIds = userStickerPackRepository.findByUserIdOrderByPinnedOrder(userId)
                 .stream()
                 .map(UserStickerPack::getPackId)
-                .toList();
+                .collect(java.util.stream.Collectors.toList());
+
+        // Tìm pack hệ thống 'vnalo sticker' để tự động thêm vào cho tất cả người dùng
+        stickerPackRepository.findAll().stream()
+                .filter(p -> "vnalo sticker".equalsIgnoreCase(p.getName()))
+                .findFirst()
+                .ifPresent(systemPack -> {
+                    if (!packIds.contains(systemPack.getStickerPackId())) {
+                        packIds.add(0, systemPack.getStickerPackId()); // Thêm vào đầu danh sách
+                    }
+                });
 
         return stickerPackRepository.findAllById(packIds)
                 .stream()
                 .filter(p -> p.getStatus() == StickerPackStatus.PUBLISHED || p.getStatus() == StickerPackStatus.DRAFT)
-                .map(StickerPackResponse::from)
+                .map(p -> StickerPackResponse.from(p, getUrl(p.getCoverMediaId())))
                 .toList();
     }
 
@@ -192,7 +210,7 @@ public class StickerService {
 
         return stickerRepository.findAllById(stickerIds)
                 .stream()
-                .map(StickerResponse::from)
+                .map(s -> StickerResponse.from(s, getUrl(s.getMediaId())))
                 .toList();
     }
 
@@ -201,7 +219,7 @@ public class StickerService {
     public StickerResponse getSticker(UUID stickerId) {
         Sticker sticker = stickerRepository.findById(stickerId)
                 .orElseThrow(() -> new EntityNotFoundException("Sticker not found: " + stickerId));
-        return StickerResponse.from(sticker);
+        return StickerResponse.from(sticker, getUrl(sticker.getMediaId()));
     }
 
     // ==================== SEARCH ====================
@@ -209,7 +227,7 @@ public class StickerService {
     public List<StickerResponse> searchStickers(String keyword) {
         return stickerRepository.findByNameContainingIgnoreCaseAndStatus(keyword, StickerStatus.ACTIVE)
                 .stream()
-                .map(StickerResponse::from)
+                .map(s -> StickerResponse.from(s, getUrl(s.getMediaId())))
                 .toList();
     }
 
@@ -229,7 +247,7 @@ public class StickerService {
 
         StickerPack saved = stickerPackRepository.save(pack);
         log.info("Updated sticker pack: {} by user {}", packId, userId);
-        return StickerPackResponse.from(saved);
+        return StickerPackResponse.from(saved, getUrl(saved.getCoverMediaId()));
     }
 
     // ==================== HELPER ====================

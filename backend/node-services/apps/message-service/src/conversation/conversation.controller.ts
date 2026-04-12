@@ -88,4 +88,23 @@ export class ConversationController {
   ) {
     return this.conversationService.rejectJoinRequest(id, user.userId, targetUserId);
   }
+
+  @Patch(':id/member/:targetUserId')
+  updateMember(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('targetUserId') targetUserId: string,
+    @Body() dto: { nickname?: string; role?: string },
+  ) {
+    return this.conversationService.updateMember(id, user.userId, targetUserId, dto);
+  }
+
+  @Patch(':id/wallpaper')
+  updateWallpaper(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: { wallpaperUrl: string; isGlobal?: boolean },
+  ) {
+    return this.conversationService.updateWallpaper(id, user.userId, dto.wallpaperUrl, dto.isGlobal ?? true);
+  }
 }

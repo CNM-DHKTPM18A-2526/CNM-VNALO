@@ -237,6 +237,10 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
         }
         final conversation = await chatService.getOrCreateDirect(item.user!.id);
         if (!mounted) return;
+        
+        // Refresh inbox so this new conversation appears in the messages tab
+        context.read<ChatProvider>().loadInbox();
+
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => ChatDetailScreen(conversation: conversation, friendUser: item.user),

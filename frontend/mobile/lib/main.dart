@@ -9,11 +9,11 @@ import 'package:vnalo_mobile/core/theme/theme_provider.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/auth/screens/splash_screen.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
-import 'package:vnalo_mobile/features/timeline/providers/post_provider.dart';
 import 'package:vnalo_mobile/services/api_service.dart';
 import 'package:vnalo_mobile/services/auth_service.dart';
 import 'package:vnalo_mobile/services/chat_service.dart';
 import 'package:vnalo_mobile/services/friend_service.dart';
+import 'package:vnalo_mobile/services/media_service.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 import 'package:vnalo_mobile/services/storage_service.dart';
 
@@ -88,6 +88,9 @@ class VnaloApp extends StatelessWidget {
         Provider<FriendService>(
           create: (context) => FriendService(context.read<ApiService>()),
         ),
+        Provider<MediaService>(
+          create: (context) => MediaService(context.read<ApiService>()),
+        ),
         ChangeNotifierProvider<ThemeProvider>(
           create: (_) => ThemeProvider()..initialize(),
         ),
@@ -107,16 +110,14 @@ class VnaloApp extends StatelessWidget {
               (context) => ChatProvider(
                 context.read<ChatService>(),
                 context.read<SocketService>(),
+                context.read<MediaService>(),
               ),
-        ),
-        ChangeNotifierProvider<PostProvider>(
-          create: (_) => PostProvider(),
         ),
       ],
       child: Consumer2<ThemeProvider, LanguageProvider>(
         builder: (_, themeProvider, languageProvider, __) {
           return MaterialApp(
-            title: 'Vnalo',
+            title: 'VNALO',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,

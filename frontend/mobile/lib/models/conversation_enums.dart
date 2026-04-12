@@ -20,7 +20,7 @@ enum MessageType {
   FORWARD,
 }
 
-enum MessageStatus { SENDING, SENT, DELIVERED, FAILED, RECALLED }
+enum MessageStatus { SENDING, SENT, DELIVERED, READ, FAILED, RECALLED }
 
 T enumFromString<T>(List<T> values, String value) {
   return values.firstWhere(

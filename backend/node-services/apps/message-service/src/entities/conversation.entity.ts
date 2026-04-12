@@ -37,6 +37,9 @@ export class Conversation {
   @Column({ name: 'avatar_url', type: 'varchar', length: 500, nullable: true })
   avatarUrl: string | null;
 
+  @Column({ name: 'wallpaper_url', type: 'varchar', nullable: true })
+  wallpaperUrl: string | null;
+
   @Column({ type: 'varchar', length: 500, nullable: true })
   description: string | null;
 
