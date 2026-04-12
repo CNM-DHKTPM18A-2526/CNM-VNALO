@@ -12,7 +12,7 @@ export class InboxController {
   private buildAccessContext(user: AuthUser) {
     return {
       clientPlatform: user.clientPlatform ?? 'WEB',
-      restrictedWebMode: Boolean(user.restrictedWebMode),
+      restrictedWebMode: false,
       loginAtEpochSec: user.loginAtEpochSec,
     };
   }

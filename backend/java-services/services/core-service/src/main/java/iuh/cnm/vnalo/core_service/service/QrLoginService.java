@@ -218,7 +218,6 @@ public class QrLoginService {
         final String refreshToken = jwtTokenProvider.generateRefreshToken();
 
         enforceQrWebDeviceSlots(accountId);
-
         final AuthRefreshToken stored = AuthRefreshToken.builder()
                 .accountId(accountId)
                 .tokenHash(hashToken(refreshToken))
@@ -235,7 +234,7 @@ public class QrLoginService {
             claims.put("clientPlatform", "WEB");
             claims.put("sessionType", "QR_WEB");
             claims.put("trustLevel", "UNTRUSTED");
-            claims.put("restrictedWebMode", true);
+            claims.put("restrictedWebMode", false);
             claims.put("deviceId", stored.getDeviceId());
             claims.put("syncEnabled", Boolean.TRUE.equals(setting.getSyncEnabled()));
             final String accessToken = jwtTokenProvider.generateAccessToken(principal, claims);

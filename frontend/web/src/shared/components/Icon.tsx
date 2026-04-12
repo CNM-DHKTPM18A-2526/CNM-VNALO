@@ -22,6 +22,7 @@ type IconName =
   | 'database'
   | 'help'
   | 'close'
+  | 'layoutSidebar'
 
 type IconProps = {
   name: IconName
@@ -246,6 +247,18 @@ export function Icon({ name, className }: IconProps) {
       <svg {...commonProps}>
         <line x1='18' y1='6' x2='6' y2='18' />
         <line x1='6' y1='6' x2='18' y2='18' />
+      </svg>
+    )
+  }
+
+  if (name === 'layoutSidebar') {
+    return (
+      <svg {...commonProps}>
+        <rect x='3.5' y='4.5' width='17' height='15' rx='2.5' />
+        <line x1='10' y1='4.5' x2='10' y2='19.5' />
+        <line x1='13.5' y1='9' x2='18' y2='9' />
+        <line x1='13.5' y1='12' x2='18' y2='12' />
+        <line x1='13.5' y1='15' x2='16.8' y2='15' />
       </svg>
     )
   }

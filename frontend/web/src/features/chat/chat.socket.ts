@@ -1,5 +1,6 @@
 import { io, type Socket } from 'socket.io-client'
 import type { RawMessage } from './chat.api'
+import type { ChatMessageType } from './chat.types'
 
 const fallbackProtocol = typeof window !== 'undefined' ? window.location.protocol.replace(':', '') : 'http'
 const fallbackHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
@@ -10,7 +11,11 @@ const SOCKET_URL =
 export type SocketMessagePayload = {
   conversationId: string
   content: string
-  messageType?: string
+  messageType?: Uppercase<ChatMessageType>
+  mediaUrl?: string | null
+  mediaThumbnailUrl?: string | null
+  mediaMimeType?: string | null
+  mediaSizeBytes?: number | null
   clientMessageId?: string
 }
 
@@ -19,6 +24,8 @@ export type SendMessageAck = {
   data?: RawMessage
   message?: string
 }
+
+const SEND_ACK_TIMEOUT_MS = 4000
 
 export type MessageReadPayload = {
   conversationId: string
@@ -35,8 +42,17 @@ export type PresenceChangedPayload = {
 // SOCKET SINGLETON (prevents React StrictMode re-renders from creating new instances)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 let globalSocket: Socket | null = null
+let globalSocketToken: string | null = null
 
 export function getOrCreateSocket(token: string): Socket {
+  const incomingToken = token.trim()
+
+  if (globalSocket && globalSocketToken && globalSocketToken !== incomingToken) {
+    console.log('[Socket.singleton] Token changed, recreating socket connection')
+    globalSocket.disconnect()
+    globalSocket = null
+  }
+
   if (globalSocket && globalSocket.connected) {
     console.log('[Socket.singleton] Reusing existing connected socket, ID:', globalSocket.id)
     return globalSocket
@@ -49,6 +65,7 @@ export function getOrCreateSocket(token: string): Socket {
   }
 
   console.log('[Socket.singleton] Creating new socket connection to:', `${SOCKET_URL}/chat`)
+  globalSocketToken = incomingToken
   globalSocket = io(`${SOCKET_URL}/chat`, {
     transports: ['websocket'],
     auth: { token },
@@ -78,6 +95,7 @@ export function disconnectSocket() {
     console.log('[Socket.singleton] Disconnecting socket')
     globalSocket.disconnect()
     globalSocket = null
+    globalSocketToken = null
   }
 }
 
@@ -128,6 +146,15 @@ export class ChatSocketService {
     this.joinedConversations.clear()
   }
 
+  clearJoinedConversations() {
+    if (!this.joinedConversations) {
+      this.joinedConversations = new Set<string>()
+      return
+    }
+
+    this.joinedConversations.clear()
+  }
+
   isConnected(): boolean {
     return Boolean(this.socket?.connected)
   }
@@ -137,6 +164,10 @@ export class ChatSocketService {
   }
 
   async emitSendMessage(payload: SocketMessagePayload): Promise<SendMessageAck | null> {
+    if (!this.joinedConversations) {
+      this.joinedConversations = new Set<string>()
+    }
+
     if (!this.socket?.connected) {
       console.error('[SEND] ❌ Socket not connected', {
         socket: Boolean(this.socket),
@@ -171,11 +202,32 @@ export class ChatSocketService {
 
     return new Promise((resolve) => {
       if (!this.socket) {
-        return resolve(null)
+        return resolve({
+          event: 'message.error',
+          message: 'Socket instance unavailable',
+        })
       }
+
+      let settled = false
+      const timeoutId = window.setTimeout(() => {
+        if (settled) {
+          return
+        }
+        settled = true
+        console.error('[SEND] ❌ ACK timeout from backend')
+        resolve({
+          event: 'message.error',
+          message: 'ACK timeout from backend',
+        })
+      }, SEND_ACK_TIMEOUT_MS)
 
       console.log('[SEND] Emitting message.send to backend...')
       this.socket.emit('message.send', payload, (ack: unknown) => {
+        if (settled) {
+          return
+        }
+        settled = true
+        window.clearTimeout(timeoutId)
         console.log('[SEND] ✅ Received ACK from backend:', ack)
         resolve((ack as SendMessageAck | null) ?? null)
       })
@@ -188,6 +240,10 @@ export class ChatSocketService {
       return false
     }
 
+    if (!this.joinedConversations) {
+      this.joinedConversations = new Set<string>()
+    }
+
     if (!this.socket.connected) {
       console.log('[JOIN] ⏳ Socket not connected yet, waiting for connect event...')
       const connected = await waitForSocketConnect(5000)
@@ -197,15 +253,10 @@ export class ChatSocketService {
       }
     }
 
-    if (this.joinedConversations.has(conversationId)) {
-      console.log('[JOIN] ℹ️ Already joined conversation:', conversationId)
-      return true
-    }
-
     console.log('[JOIN] 🚀 Emitting join for:', conversationId, '| Socket ID:', this.socket.id)
     this.socket.emit('conversation.join', { conversationId })
     this.joinedConversations.add(conversationId)
-    console.log('[JOIN] ✅ Added to joined set, total joined:', this.joinedConversations.size)
+    console.log('[JOIN] ✅ Join emitted for conversation:', conversationId)
 
     return true
   }
@@ -246,7 +297,24 @@ export function createChatSocket(token: string): Socket {
 
 export function emitSendMessage(socket: Socket, payload: SocketMessagePayload): Promise<SendMessageAck | null> {
   return new Promise((resolve) => {
+    let settled = false
+    const timeoutId = window.setTimeout(() => {
+      if (settled) {
+        return
+      }
+      settled = true
+      resolve({
+        event: 'message.error',
+        message: 'ACK timeout from backend',
+      })
+    }, SEND_ACK_TIMEOUT_MS)
+
     socket.emit('message.send', payload, (ack: unknown) => {
+      if (settled) {
+        return
+      }
+      settled = true
+      window.clearTimeout(timeoutId)
       resolve((ack as SendMessageAck | null) ?? null)
     })
   })

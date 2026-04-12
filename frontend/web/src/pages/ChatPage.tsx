@@ -3,22 +3,40 @@ import { useNavigate, useParams } from 'react-router-dom'
 
 import { getSyncPolicy } from '../features/auth/auth.api'
 import { ChatList } from '../features/chat/components/ChatList'
+import { ConversationInfo } from '../features/chat/components/ConversationInfo'
+import { SearchMessagesPanel } from '../features/chat/components/SearchMessagesPanel'
 import { ChatWindow } from '../features/chat/components/ChatWindow'
+import type { MessageContextMenuAction } from '../features/chat/components/MessageContextMenu'
 import {
+  addMessageReaction,
+  fetchMessageReactions,
   fetchInbox,
   fetchMessages,
+  fetchPinnedMessages,
   getOrCreateDirectConversation,
   mapRawMessage,
   markConversationRead,
+  pinMessage,
+  recallMessage,
+  removeMessageReaction,
+  searchConversationMessages,
+  sendMessage as sendMessageViaRest,
+  unpinMessage,
+  uploadChatMedia,
 } from '../features/chat/chat.api'
 import type { RawMessage } from '../features/chat/chat.api'
+import { REACTION_OPTIONS, type MessageReactionState, type ReactionKey } from '../features/chat/components/MessageReaction'
 import { useChatSocket } from '../features/chat/useChatSocket'
-import type { ChatMessage, ConversationSummary, MessageDeliveryState } from '../features/chat/chat.types'
+import type {
+  ChatComposePayload,
+  ChatMessage,
+  ChatMessageType,
+  ConversationSummary,
+  MessageDeliveryState,
+} from '../features/chat/chat.types'
 import { getFriends, getUserById, searchUsers } from '../features/friends/friends.api'
 import type { UserLookupResult } from '../features/friends/friends.types'
 import { useAuth } from '../features/auth/useAuth'
-import { Icon } from '../shared/components/Icon'
-import { UserAvatar } from '../shared/components/UserAvatar'
 import { Skeleton } from '../shared/components/ui/Skeleton'
 import { Card } from '../shared/components/ui/Card'
 import { useLanguage } from '../shared/i18n/LanguageContext'
@@ -36,31 +54,76 @@ function sortMessages(messages: ChatMessage[]): ChatMessage[] {
   })
 }
 
+function mergeMessage(existing: ChatMessage, incoming: ChatMessage): ChatMessage {
+  const mergedDeliveryState = resolveDeliveryState(existing.deliveryState, incoming.deliveryState)
+  const hasExistingMedia = Boolean(existing.mediaUrl || existing.attachments?.length)
+  const hasIncomingMedia = Boolean(incoming.mediaUrl || incoming.attachments?.length)
+  const shouldPreserveExistingType =
+    existing.type !== 'text' &&
+    incoming.type === 'text' &&
+    hasExistingMedia &&
+    !hasIncomingMedia
+
+  return {
+    ...existing,
+    ...incoming,
+    type: shouldPreserveExistingType ? existing.type : incoming.type,
+    clientMessageId: incoming.clientMessageId ?? existing.clientMessageId,
+    mediaUrl: incoming.mediaUrl ?? existing.mediaUrl,
+    mediaThumbnailUrl: incoming.mediaThumbnailUrl ?? existing.mediaThumbnailUrl,
+    mediaMimeType: incoming.mediaMimeType ?? existing.mediaMimeType,
+    mediaSizeBytes: incoming.mediaSizeBytes ?? existing.mediaSizeBytes,
+    attachments: incoming.attachments?.length ? incoming.attachments : existing.attachments,
+    deliveryState: mergedDeliveryState,
+  }
+}
+
+function dedupeMessages(messages: ChatMessage[]): ChatMessage[] {
+  const deduped: ChatMessage[] = []
+
+  for (const message of messages) {
+    const existingIndex = deduped.findIndex(
+      (item) =>
+        (Boolean(message.clientMessageId) && item.clientMessageId === message.clientMessageId) ||
+        item.id === message.id,
+    )
+
+    if (existingIndex === -1) {
+      deduped.push(message)
+      continue
+    }
+
+    deduped[existingIndex] = mergeMessage(deduped[existingIndex], message)
+  }
+
+  return deduped
+}
+
 function upsertMessage(messages: ChatMessage[], incoming: ChatMessage): ChatMessage[] {
   const index = messages.findIndex(
     (message) =>
-      message.id === incoming.id ||
-      (Boolean(incoming.clientMessageId) && message.clientMessageId === incoming.clientMessageId),
+      (Boolean(incoming.clientMessageId) && message.clientMessageId === incoming.clientMessageId) ||
+      message.id === incoming.id,
   )
 
   if (index === -1) {
-    return sortMessages([...messages, incoming])
+    return sortMessages(dedupeMessages([...messages, incoming]))
   }
 
   const next = [...messages]
-  const mergedDeliveryState = resolveDeliveryState(next[index].deliveryState, incoming.deliveryState)
-  next[index] = {
-    ...next[index],
-    ...incoming,
-    deliveryState: mergedDeliveryState,
-  }
-  return sortMessages(next)
+  next[index] = mergeMessage(next[index], incoming)
+  return sortMessages(dedupeMessages(next))
 }
 
 function resolveDeliveryState(
   current: MessageDeliveryState | undefined,
   incoming: MessageDeliveryState | undefined,
 ): MessageDeliveryState | undefined {
+  // Once a message is marked failed, never regress back to sending for that same local id.
+  if (current === 'failed' || incoming === 'failed') {
+    return 'failed'
+  }
+
   const rank: Record<MessageDeliveryState, number> = {
     failed: 0,
     sending: 1,
@@ -79,7 +142,156 @@ function resolveDeliveryState(
   return rank[incoming] >= rank[current] ? incoming : current
 }
 
+function formatMessageTimestamp(): string {
+  return new Date().toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function markLocalMessageFailed(messages: ChatMessage[], clientMessageId: string): ChatMessage[] {
+  return messages.map((message) => {
+    const isTarget = message.clientMessageId === clientMessageId || message.id === clientMessageId
+    if (!isTarget) {
+      return message
+    }
+
+    return {
+      ...message,
+      deliveryState: 'failed' as const,
+    }
+  })
+}
+
+function toSocketMessageType(type: ChatMessageType): Uppercase<ChatMessageType> {
+  return type.toUpperCase() as Uppercase<ChatMessageType>
+}
+
+function getConversationPreview(message: ChatMessage): string {
+  const text = message.text.trim()
+  if (text) {
+    return text
+  }
+
+  switch (message.type) {
+    case 'image':
+      return 'Ảnh'
+    case 'file':
+      return 'Tệp đính kèm'
+    case 'sticker':
+      return 'Sticker'
+    default:
+      return ''
+  }
+}
+
+function getDraftMessageType(payload: ChatComposePayload): ChatMessageType {
+  if (payload.sticker) {
+    return 'sticker'
+  }
+
+  if (payload.file) {
+    return payload.file.type.startsWith('image/') ? 'image' : 'file'
+  }
+
+  return 'text'
+}
+
+function getDraftContent(payload: ChatComposePayload): string {
+  const text = payload.text.trim()
+
+  if (text) {
+    return text
+  }
+
+  if (payload.file) {
+    return payload.file.name
+  }
+
+  if (payload.sticker) {
+    return payload.sticker.name
+  }
+
+  return ''
+}
+
+function getFileNameFromUrl(url?: string | null): string {
+  if (!url) {
+    return ''
+  }
+
+  const normalized = url.trim()
+  if (!normalized) {
+    return ''
+  }
+
+  try {
+    const parsed = new URL(normalized)
+    const fileName = parsed.pathname.split('/').filter(Boolean).pop() ?? ''
+    return decodeURIComponent(fileName).toLowerCase()
+  } catch {
+    const safeUrl = normalized.split('?')[0]
+    const fileName = safeUrl.split('/').filter(Boolean).pop() ?? ''
+    return decodeURIComponent(fileName).toLowerCase()
+  }
+}
+
+const EMOJI_TO_REACTION_KEY = REACTION_OPTIONS.reduce<Record<string, ReactionKey>>((acc, item) => {
+  acc[item.emoji] = item.key
+  return acc
+}, {})
+
 const RESTRICTED_TEXT = 'Noi dung duoc an tren web do chinh sach dong bo.'
+const DELETE_FOR_ME_STORAGE_PREFIX = 'vnalo:chat:deleted-for-me:'
+
+function buildDeleteForMeStorageKey(userId?: string | null): string | null {
+  const normalized = String(userId ?? '').trim()
+  if (!normalized) {
+    return null
+  }
+  return `${DELETE_FOR_ME_STORAGE_PREFIX}${normalized}`
+}
+
+function loadDeletedMessageIds(userId?: string | null): Record<string, true> {
+  const key = buildDeleteForMeStorageKey(userId)
+  if (!key) {
+    return {}
+  }
+
+  try {
+    const raw = window.localStorage.getItem(key)
+    if (!raw) {
+      return {}
+    }
+
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) {
+      return {}
+    }
+
+    return parsed.reduce<Record<string, true>>((acc, id) => {
+      if (typeof id === 'string' && id.trim()) {
+        acc[id] = true
+      }
+      return acc
+    }, {})
+  } catch {
+    return {}
+  }
+}
+
+function persistDeletedMessageIds(userId: string, deletedMap: Record<string, true>): void {
+  const key = buildDeleteForMeStorageKey(userId)
+  if (!key) {
+    return
+  }
+
+  try {
+    window.localStorage.setItem(key, JSON.stringify(Object.keys(deletedMap)))
+  } catch {
+    // Ignore storage errors and keep in-memory fallback behavior.
+  }
+}
 
 type CachedUserProfile = {
   displayName: string
@@ -112,6 +324,56 @@ function applyRestrictedConversationPreview(conversation: ConversationSummary, r
   }
 }
 
+function parseJwtPayload(token: string): Record<string, unknown> | null {
+  const parts = token.split('.')
+  if (parts.length < 2) {
+    return null
+  }
+
+  const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+  const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=')
+
+  try {
+    const decoded = atob(padded)
+    return JSON.parse(decoded) as Record<string, unknown>
+  } catch {
+    return null
+  }
+}
+
+function parseBooleanClaim(value: unknown): boolean {
+  if (typeof value === 'boolean') {
+    return value
+  }
+
+  if (typeof value === 'number') {
+    return value !== 0
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
+    if (normalized === 'true' || normalized === '1' || normalized === 'yes') {
+      return true
+    }
+    if (normalized === 'false' || normalized === '0' || normalized === 'no' || normalized === '') {
+      return false
+    }
+  }
+
+  return false
+}
+
+function isRestrictedWebToken(token: string): boolean {
+  const payload = parseJwtPayload(token)
+  if (!payload) {
+    return false
+  }
+
+  const restrictedWebMode = parseBooleanClaim(payload.restrictedWebMode)
+  const platform = String(payload.clientPlatform ?? 'WEB').trim().toLowerCase()
+  return restrictedWebMode && platform === 'web'
+}
+
 export function ChatPage() {
   const { isBootstrapping, accessToken, user } = useAuth()
   const { t } = useLanguage()
@@ -125,10 +387,22 @@ export function ChatPage() {
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   const [isRestrictedMode, setIsRestrictedMode] = useState(false)
   const [peerLastReadByConversation, setPeerLastReadByConversation] = useState<Record<string, number>>({})
+  const [reactionStatesByMessage, setReactionStatesByMessage] = useState<Record<string, MessageReactionState>>({})
   const [friendResults, setFriendResults] = useState<UserLookupResult[]>([])
   const [userProfileCache, setUserProfileCache] = useState<Record<string, CachedUserProfile>>({})
+  const [isSocketConnected, setIsSocketConnected] = useState(false)
+  const [rightSidebarContent, setRightSidebarContent] = useState<'info' | 'search' | null>('info')
+  const [jumpToMessageId, setJumpToMessageId] = useState<string | null>(null)
+  const [pinnedMessageIds, setPinnedMessageIds] = useState<Record<string, true>>({})
+  const [starredMessageIds, setStarredMessageIds] = useState<Record<string, true>>({})
+  const [recalledMessageIds, setRecalledMessageIds] = useState<Record<string, true>>({})
+  const [deletedMessageIds, setDeletedMessageIds] = useState<Record<string, true>>({})
+  const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([])
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false)
+  const [isTokenRestrictedMode, setIsTokenRestrictedMode] = useState(false)
 
   const selectedConversationIdRef = useRef('')
+  const selectedMessagesRef = useRef<ChatMessage[]>([])
   const conversationsRef = useRef<ConversationSummary[]>([])
   const userProfileCacheRef = useRef<Record<string, CachedUserProfile>>({})
   const pendingProfileLookupRef = useRef<Set<string>>(new Set())
@@ -136,8 +410,8 @@ export function ChatPage() {
   const messageLoadRequestSeqRef = useRef(0)
 
   useEffect(() => {
-    selectedConversationIdRef.current = selectedConversationId
-  }, [selectedConversationId])
+    selectedConversationIdRef.current = routedConversationId || selectedConversationId
+  }, [routedConversationId, selectedConversationId])
 
   useEffect(() => {
     conversationsRef.current = conversations
@@ -148,17 +422,300 @@ export function ChatPage() {
   }, [userProfileCache])
 
   const selectedConversation = useMemo(
-    () => conversations.find((conversation) => conversation.id === selectedConversationId),
-    [conversations, selectedConversationId],
+    () => conversations.find((conversation) => conversation.id === (routedConversationId || selectedConversationId)),
+    [conversations, routedConversationId, selectedConversationId],
   )
 
   const selectedMessages = useMemo(() => {
-    if (!selectedConversationId) {
+    const resolvedConversationId = routedConversationId || selectedConversationId
+    if (!resolvedConversationId) {
       return []
     }
 
-    return messagesByConversation[selectedConversationId] ?? []
-  }, [messagesByConversation, selectedConversationId])
+    return messagesByConversation[resolvedConversationId] ?? []
+  }, [messagesByConversation, routedConversationId, selectedConversationId])
+
+  useEffect(() => {
+    selectedMessagesRef.current = selectedMessages
+  }, [selectedMessages])
+
+  useEffect(() => {
+    setIsMultiSelectMode(false)
+    setSelectedMessageIds([])
+  }, [routedConversationId, selectedConversationId])
+
+  useEffect(() => {
+    setDeletedMessageIds(loadDeletedMessageIds(user?.id))
+  }, [user?.id])
+
+  useEffect(() => {
+    if (!user?.id) {
+      return
+    }
+
+    persistDeletedMessageIds(user.id, deletedMessageIds)
+  }, [deletedMessageIds, user?.id])
+
+  const toReactionState = useCallback(
+    (rows: Array<{ userId: string; emoji: string }>): MessageReactionState => {
+      const reactions: MessageReactionState['reactions'] = {}
+
+      for (const row of rows) {
+        const reactionKey = EMOJI_TO_REACTION_KEY[row.emoji]
+        if (!reactionKey) {
+          continue
+        }
+
+        const current = reactions[reactionKey] ?? { count: 0, myCount: 0 }
+        reactions[reactionKey] = {
+          count: current.count + 1,
+          myCount: current.myCount + (row.userId === user?.id ? 1 : 0),
+        }
+      }
+
+      const myReaction = (Object.keys(reactions) as ReactionKey[]).find(
+        (key) => (reactions[key]?.myCount ?? 0) > 0,
+      )
+
+      return {
+        reactions,
+        lastUsedReaction: myReaction,
+      }
+    },
+    [user?.id],
+  )
+
+  const syncMessageReaction = useCallback(
+    async (messageId: string): Promise<void> => {
+      if (!accessToken || !messageId) {
+        return
+      }
+
+      try {
+        const rows = await fetchMessageReactions(accessToken, messageId)
+        const nextState = toReactionState(rows)
+
+        setReactionStatesByMessage((prev) => {
+          if (Object.keys(nextState.reactions).length === 0) {
+            if (!prev[messageId]) {
+              return prev
+            }
+            const next = { ...prev }
+            delete next[messageId]
+            return next
+          }
+
+          return {
+            ...prev,
+            [messageId]: nextState,
+          }
+        })
+      } catch (error) {
+        console.warn('[ChatPage.syncMessageReaction] Failed to sync reaction', { messageId, error })
+      }
+    },
+    [accessToken, toReactionState],
+  )
+
+  const syncConversationReactions = useCallback(async () => {
+    if (!selectedConversationIdRef.current || !accessToken) {
+      return
+    }
+
+    const messageIds = selectedMessagesRef.current
+      .map((message) => message.id)
+      .slice(-25)
+
+    if (messageIds.length === 0) {
+      return
+    }
+
+    await Promise.all(messageIds.map((messageId) => syncMessageReaction(messageId)))
+  }, [accessToken, syncMessageReaction])
+
+  const syncPinnedMessages = useCallback(
+    async (conversationId: string) => {
+      if (!accessToken || !conversationId) {
+        return
+      }
+
+      try {
+        const pins = await fetchPinnedMessages(accessToken, conversationId)
+        const nextPinnedIds = pins.reduce<Record<string, true>>((acc, pin) => {
+          if (pin.messageId) {
+            acc[pin.messageId] = true
+          }
+          return acc
+        }, {})
+
+        setPinnedMessageIds(nextPinnedIds)
+      } catch (error) {
+        console.warn('[ChatPage.syncPinnedMessages] Failed to fetch pinned messages', { conversationId, error })
+      }
+    },
+    [accessToken],
+  )
+
+  const handleAddReaction = useCallback(
+    async (messageId: string, reactionKey: ReactionKey) => {
+      if (!accessToken) {
+        return
+      }
+
+      const emoji = REACTION_OPTIONS.find((item) => item.key === reactionKey)?.emoji
+      if (!emoji) {
+        return
+      }
+
+      try {
+        await addMessageReaction(accessToken, messageId, emoji)
+        await syncMessageReaction(messageId)
+      } catch (error) {
+        console.error('[ChatPage.handleAddReaction] Failed to add reaction', { messageId, reactionKey, error })
+      }
+    },
+    [accessToken, syncMessageReaction],
+  )
+
+  const handleRemoveReaction = useCallback(
+    async (messageId: string, reactionKey: ReactionKey) => {
+      if (!accessToken) {
+        return
+      }
+
+      const current = reactionStatesByMessage[messageId]?.reactions[reactionKey]
+      if (!current || current.myCount <= 0) {
+        return
+      }
+
+      try {
+        await removeMessageReaction(accessToken, messageId)
+        await syncMessageReaction(messageId)
+      } catch (error) {
+        console.error('[ChatPage.handleRemoveReaction] Failed to remove reaction', { messageId, reactionKey, error })
+      }
+    },
+    [accessToken, reactionStatesByMessage, syncMessageReaction],
+  )
+
+  const handleDeleteForMe = useCallback(
+    async (messageId: string) => {
+      if (!messageId) {
+        return
+      }
+
+      setDeletedMessageIds((prev) => ({
+        ...prev,
+        [messageId]: true,
+      }))
+    },
+    [],
+  )
+
+  const handleRecallMessage = useCallback(
+    async (messageId: string, conversationId: string) => {
+      if (!accessToken) {
+        return
+      }
+
+      try {
+        await recallMessage(accessToken, messageId)
+        setRecalledMessageIds((prev) => ({
+          ...prev,
+          [messageId]: true,
+        }))
+        await Promise.all([
+          syncMessageReaction(messageId),
+          syncPinnedMessages(conversationId),
+        ])
+      } catch (error) {
+        console.error('[ChatPage.handleRecallMessage] Failed to recall message', { messageId, conversationId, error })
+      }
+    },
+    [accessToken, syncMessageReaction, syncPinnedMessages],
+  )
+
+  const handleTogglePinMessage = useCallback(
+    async (messageId: string, conversationId: string) => {
+      if (!accessToken) {
+        return
+      }
+
+      const isPinned = Boolean(pinnedMessageIds[messageId])
+
+      try {
+        if (isPinned) {
+          await unpinMessage(accessToken, conversationId, messageId)
+          setPinnedMessageIds((prev) => {
+            const next = { ...prev }
+            delete next[messageId]
+            return next
+          })
+          return
+        }
+
+        await pinMessage(accessToken, conversationId, messageId)
+        await syncPinnedMessages(conversationId)
+      } catch (error) {
+        console.error('[ChatPage.handleTogglePinMessage] Failed to toggle pin', { messageId, conversationId, error })
+      }
+    },
+    [accessToken, pinnedMessageIds, syncPinnedMessages],
+  )
+
+  const toggleMessageIdInList = useCallback((messageId: string) => {
+    setSelectedMessageIds((prev) => {
+      if (prev.includes(messageId)) {
+        return prev.filter((item) => item !== messageId)
+      }
+
+      return [...prev, messageId]
+    })
+  }, [])
+
+  const handleClearMultiSelectMode = useCallback(() => {
+    setIsMultiSelectMode(false)
+    setSelectedMessageIds([])
+  }, [])
+
+  const handleMessageContextMenuAction = useCallback(
+    (messageId: string, action: MessageContextMenuAction, message: ChatMessage) => {
+      if (!messageId) {
+        return
+      }
+
+      switch (action) {
+        case 'pin':
+          void handleTogglePinMessage(messageId, message.conversationId)
+          return
+        case 'star':
+          setStarredMessageIds((prev) => {
+            const next = { ...prev }
+            if (next[messageId]) {
+              delete next[messageId]
+            } else {
+              next[messageId] = true
+            }
+            return next
+          })
+          return
+        case 'multiSelect':
+          setIsMultiSelectMode(true)
+          toggleMessageIdInList(messageId)
+          return
+        case 'recall':
+          void handleRecallMessage(messageId, message.conversationId)
+          return
+        case 'deleteSelf':
+          void handleDeleteForMe(messageId)
+          setSelectedMessageIds((prev) => prev.filter((item) => item !== messageId))
+          return
+        default:
+          return
+      }
+    },
+    [handleDeleteForMe, handleRecallMessage, handleTogglePinMessage, toggleMessageIdInList],
+  )
 
   const getCachedProfileFromStore = useCallback(
     (userId: string): CachedUserProfile | null => {
@@ -258,7 +815,9 @@ export function ChatPage() {
           getSyncPolicy(token).catch(() => null),
           getFriends(token).catch(() => []),
         ])
-        const restricted = Boolean(policy?.webRestrictedMode) || policy?.syncEnabled === false
+        const restrictedByToken = isRestrictedWebToken(token)
+        const restrictedByPolicy = Boolean(policy?.webRestrictedMode) || policy?.syncEnabled === false
+        const restrictionSignalsPresent = restrictedByToken || restrictedByPolicy
         const friendNameById = new Map(
           friends
             .filter((friend) => Boolean(friend.friendId))
@@ -327,10 +886,17 @@ export function ChatPage() {
               }
             : item
 
-          return applyRestrictedConversationPreview(withName, restricted)
+          return applyRestrictedConversationPreview(withName, false)
         })
 
-        setIsRestrictedMode(restricted)
+        // Keep diagnostics but do not lock web composer from policy flags.
+        if (restrictionSignalsPresent) {
+          console.warn('[ChatPage.inbox] Restriction signal detected but ignored by client override', {
+            restrictedByToken,
+            restrictedByPolicy,
+          })
+        }
+        setIsRestrictedMode(false)
         setConversations((prev) => {
           if (!preferredConversationId) {
             return mappedItems
@@ -382,7 +948,7 @@ export function ChatPage() {
         const current = next[index]
         next[index] = {
           ...current,
-          lastMessage: message.text,
+          lastMessage: getConversationPreview(message),
           lastMessageSeq: message.serverSeq ?? current.lastMessageSeq,
           unreadCount: markAsReadNow ? 0 : current.unreadCount + (message.sender === 'me' ? 0 : 1),
         }
@@ -399,9 +965,24 @@ export function ChatPage() {
       setMessagesByConversation({})
       setSelectedConversationId('')
       setFriendResults([])
+      setIsTokenRestrictedMode(false)
       lastLoadedMessagesKeyRef.current = ''
       return
     }
+
+    const tokenPayload = parseJwtPayload(accessToken)
+    const rawRestrictedClaim = tokenPayload?.restrictedWebMode
+    const tokenRestricted = isRestrictedWebToken(accessToken)
+    setIsTokenRestrictedMode(false)
+    console.log('[ChatPage.auth] Token policy decoded:', {
+      tokenRestricted,
+      rawRestrictedClaim,
+      rawRestrictedClaimType: typeof rawRestrictedClaim,
+      accessTokenTail: accessToken.slice(-12),
+    })
+
+    // Do not hard-lock composer from token claim; backend enforces real permission.
+    setIsRestrictedMode(false)
 
     void loadInbox(accessToken)
   }, [accessToken, loadInbox])
@@ -448,31 +1029,6 @@ export function ChatPage() {
 
   const activeConversationId = routedConversationId || selectedConversationId
 
-  const handleSyncHistory = useCallback(async () => {
-    if (!accessToken || !activeConversationId || !user) {
-      return
-    }
-
-    setIsLoadingMessages(true)
-    try {
-      const rawMessages = await fetchMessages(accessToken, activeConversationId, true)
-      const mapped = sortMessages(
-        rawMessages.map((message) => applyRestrictedMessage(mapRawMessage(message, user.id), isRestrictedMode)),
-      )
-      setMessagesByConversation((prev) => ({
-        ...prev,
-        [activeConversationId]: mapped,
-      }))
-      
-      // Refresh inbox to update previews if needed
-      void loadInbox(accessToken, activeConversationId)
-    } catch (error) {
-      console.error('Failed to sync history', error)
-    } finally {
-      setIsLoadingMessages(false)
-    }
-  }, [accessToken, activeConversationId, isRestrictedMode, loadInbox, user])
-
   useEffect(() => {
     if (!accessToken || !activeConversationId || !user) {
       return
@@ -492,12 +1048,16 @@ export function ChatPage() {
         const rawMessages = await fetchMessages(accessToken, activeConversationId)
         console.log('Dữ liệu tin nhắn nhận được:', rawMessages)
         const mapped = sortMessages(
-          rawMessages.map((message) => applyRestrictedMessage(mapRawMessage(message, user.id), isRestrictedMode)),
+          rawMessages
+            .map((message) => applyRestrictedMessage(mapRawMessage(message, user.id), isRestrictedMode))
+            .filter((message) => !deletedMessageIds[message.id]),
         )
         setMessagesByConversation((prev) => ({
           ...prev,
           [activeConversationId]: mapped,
         }))
+        void syncPinnedMessages(activeConversationId)
+        void syncConversationReactions()
 
         const newestSeq = mapped[mapped.length - 1]?.serverSeq
         if (newestSeq !== undefined) {
@@ -522,15 +1082,17 @@ export function ChatPage() {
         }
       }
     })()
-  }, [accessToken, activeConversationId, isRestrictedMode, user])
+  }, [accessToken, activeConversationId, deletedMessageIds, isRestrictedMode, syncConversationReactions, syncPinnedMessages, user])
 
-  const { emitSendMessage, joinConversation, markAsRead } = useChatSocket({
+  const { emitSendMessage, joinConversation, markAsRead, getSocket } = useChatSocket({
     token: accessToken,
     onConnected: async () => {
-      console.log('[ChatPage.onConnected] Socket connected, joining all conversations...')
-      for (const conversation of conversationsRef.current) {
-        await joinConversation(conversation.id)
-      }
+      setIsSocketConnected(true)
+      void syncConversationReactions()
+      void syncPinnedMessages(selectedConversationIdRef.current)
+    },
+    onDisconnected: () => {
+      setIsSocketConnected(false)
     },
     onMessageReceived: (raw: RawMessage) => {
       if (!user || !accessToken) {
@@ -543,6 +1105,10 @@ export function ChatPage() {
 
       if (!mapped.conversationId) {
         console.warn('[ChatPage.onMessageReceived] Missing conversationId in payload, skipping render', raw)
+        return
+      }
+
+      if (deletedMessageIds[mapped.id]) {
         return
       }
 
@@ -567,7 +1133,7 @@ export function ChatPage() {
               {
                 id: mapped.conversationId,
                 name: profile.displayName,
-                lastMessage: mapped.text,
+                lastMessage: getConversationPreview(mapped),
                 unreadCount: mapped.sender === 'me' ? 0 : 1,
                 online: false,
                 lastMessageSeq: mapped.serverSeq,
@@ -604,6 +1170,9 @@ export function ChatPage() {
         }
       })
 
+      // Socket event arrived: refresh reaction snapshot for that message.
+      void syncMessageReaction(mapped.id)
+
       const isActiveConversation = selectedConversationIdRef.current === mapped.conversationId
       updateConversationAfterMessage(mapped.conversationId, mapped, isActiveConversation)
 
@@ -613,6 +1182,51 @@ export function ChatPage() {
           void markConversationRead(accessToken, mapped.conversationId, mapped.serverSeq).catch(() => undefined)
         }
       }
+    },
+    onMessageRecalled: (payload) => {
+      if (!payload.messageId || !payload.conversationId) {
+        return
+      }
+
+      setRecalledMessageIds((prev) => ({
+        ...prev,
+        [payload.messageId]: true,
+      }))
+
+      setMessagesByConversation((prev) => {
+        const current = prev[payload.conversationId] ?? []
+        if (current.length === 0) {
+          return prev
+        }
+
+        return {
+          ...prev,
+          [payload.conversationId]: current.map((message) =>
+            message.id === payload.messageId
+              ? {
+                  ...message,
+                  text: '',
+                  mediaUrl: null,
+                  mediaThumbnailUrl: null,
+                  mediaMimeType: null,
+                  mediaSizeBytes: null,
+                }
+              : message,
+          ),
+        }
+      })
+
+      setPinnedMessageIds((prev) => {
+        if (!prev[payload.messageId]) {
+          return prev
+        }
+
+        const next = { ...prev }
+        delete next[payload.messageId]
+        return next
+      })
+
+      void syncMessageReaction(payload.messageId)
     },
     onMessageRead: (payload) => {
       if (!user || payload.userId === user.id) {
@@ -663,22 +1277,101 @@ export function ChatPage() {
         return
       }
 
-      setConversations((prev) =>
-        prev.map((conversation) => {
-          const participants = conversation.participantUserIds ?? []
-          const isPeerConversation = participants.includes(payload.userId) && payload.userId !== user.id
-          if (!isPeerConversation) {
-            return conversation
+      console.log('Đã nhận sự kiện presence:', payload)
+      console.log('Đang tìm userId:', payload.userId, 'trong danh sách conversations...')
+      console.log('Danh sách ID hiện có:', conversations.map((conv) => conv.userId))
+
+      setConversations((prev) => {
+        let changed = false
+        const next = prev.map((conv) => {
+          const isMatch = String(conv.userId ?? '').trim() === String(payload.userId ?? '').trim()
+
+          if (!isMatch) {
+            return conv
           }
 
-          return {
-            ...conversation,
-            online: payload.status === 'online',
+          const nextOnline = payload.status === 'online'
+          const nextLastSeen = payload.status === 'offline' ? new Date().toISOString() : null
+          if (conv.online === nextOnline && conv.isOnline === nextOnline && conv.lastSeenTime === nextLastSeen) {
+            return conv
           }
-        }),
-      )
+
+          changed = true
+
+          return {
+            ...conv,
+            online: nextOnline,
+            isOnline: nextOnline,
+            lastSeenTime: nextLastSeen,
+          }
+        })
+
+        return changed ? next : prev
+      })
     },
   })
+
+  useEffect(() => {
+    if (!isSocketConnected || !selectedConversationId || !accessToken) {
+      return
+    }
+
+    void syncConversationReactions()
+
+    const timerId = window.setInterval(() => {
+      void syncConversationReactions()
+    }, 2500)
+
+    return () => {
+      window.clearInterval(timerId)
+    }
+  }, [accessToken, isSocketConnected, selectedConversationId, syncConversationReactions])
+
+  useEffect(() => {
+    console.log('Danh sách ID sau khi sửa mapping:', conversations.map((conv) => conv.userId))
+  }, [conversations])
+
+  const conversationIdsSignature = useMemo(
+    () => conversations.map((conversation) => conversation.id).sort().join(','),
+    [conversations],
+  )
+
+  const joinAllConversations = useCallback(async (list: ConversationSummary[]) => {
+    const conversationIds = list.map((conversation) => conversation.id)
+
+    if (conversationIds.length === 0) {
+      return
+    }
+
+    console.log('--- ĐANG THỰC HIỆN JOIN ROOM CHO', list.length, 'HỘI THOẠI ---')
+    console.log('Đã tự động Join vào các room:', conversationIds)
+
+    for (const conversationId of conversationIds) {
+      const joined = await joinConversation(conversationId)
+      if (!joined) {
+        console.warn('[ChatPage.joinAllConversations] Failed to join conversation:', conversationId)
+      }
+    }
+  }, [joinConversation])
+
+  const previousSocketConnectedRef = useRef(false)
+
+  useEffect(() => {
+    const socket = getSocket()
+    console.log('Trạng thái Socket:', socket?.connected ?? false, 'ID:', socket?.id ?? 'unknown')
+  }, [conversations, getSocket])
+
+  useEffect(() => {
+    const socket = getSocket()
+    const currentConnected = Boolean(socket?.connected)
+
+    if (!previousSocketConnectedRef.current && currentConnected && conversations.length > 0) {
+      console.log('[ChatPage.retryJoin] Socket vừa chuyển false -> true, join lại rooms')
+      void joinAllConversations(conversations)
+    }
+
+    previousSocketConnectedRef.current = currentConnected
+  }, [conversations, getSocket, joinAllConversations])
 
   const handleOpenFriendChat = useCallback(
     async (friend: UserLookupResult) => {
@@ -735,22 +1428,13 @@ export function ChatPage() {
   }, [conversations, navigate, routedConversationId, selectedConversationId])
 
   useEffect(() => {
-    if (conversations.length === 0) {
+    if (conversations.length === 0 || !isSocketConnected) {
       return
     }
 
-    const joinAllConversations = async () => {
-      console.log('[ChatPage.useEffect] Joining conversations after list updated, count:', conversations.length)
-      for (const conversation of conversations) {
-        const joined = await joinConversation(conversation.id)
-        if (!joined) {
-          console.warn('[ChatPage.useEffect] Failed to join conversation:', conversation.id)
-        }
-      }
-    }
-
-    joinAllConversations()
-  }, [conversations, joinConversation])
+    console.log('[ChatPage.joinEffect] conversations changed while socket connected, re-joining rooms')
+    void joinAllConversations(conversations)
+  }, [conversationIdsSignature, conversations, isSocketConnected, joinAllConversations])
 
   useEffect(() => {
     if (!selectedConversationId) {
@@ -765,106 +1449,449 @@ export function ChatPage() {
     markAsRead({ conversationId: selectedConversationId, lastReadSeq: latestSeq })
   }, [markAsRead, messagesByConversation, selectedConversationId])
 
+  useEffect(() => {
+    if (!accessToken || !selectedConversationId) {
+      return
+    }
+
+    void syncPinnedMessages(selectedConversationId)
+  }, [accessToken, selectedConversationId, syncPinnedMessages])
+
+  // Auto-update presence status every 60 seconds to refresh time-based text
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setConversations((prev) => [...prev])
+    }, 60000)
+
+    return () => clearInterval(interval)
+  }, [])
+
   const handleSend = useCallback(
-    async (content: string) => {
-      if (!selectedConversationId || !user || !accessToken) {
+    async (draft: ChatComposePayload) => {
+      const conversationId = selectedConversationIdRef.current || selectedConversationId || routedConversationId
+
+      if (!conversationId || !user || !accessToken) {
         console.warn('[ChatPage.send] Precondition failed:', {
-          conversationId: !!selectedConversationId,
+          conversationId: !!conversationId,
           user: !!user,
           token: !!accessToken,
         })
         return
       }
 
-      if (isRestrictedMode) {
-        console.warn('[ChatPage.send] Restricted mode active')
-        return
+      const restrictedByToken = accessToken ? isRestrictedWebToken(accessToken) : false
+      if (restrictedByToken || isTokenRestrictedMode || isRestrictedMode) {
+        console.warn('[ChatPage.send] Token indicates restricted mode, but send is still allowed by client-side override')
       }
+
+      const content = getDraftContent(draft)
+      const messageType = getDraftMessageType(draft)
 
       const clientMessageId =
         typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
           ? crypto.randomUUID()
           : `${Date.now()}-${Math.random().toString(16).slice(2)}`
 
+      let mediaUrl: string | null = null
+      let mediaThumbnailUrl: string | null = null
+      let mediaMimeType: string | null = null
+      let mediaSizeBytes: number | null = null
+      let localPreviewUrl: string | null = null
+
+      if (draft.file && messageType === 'image') {
+        localPreviewUrl = URL.createObjectURL(draft.file)
+
+        const optimisticPreviewMessage: ChatMessage = {
+          id: clientMessageId,
+          clientMessageId,
+          conversationId,
+          sender: 'me',
+          senderId: user.id,
+          type: 'image',
+          isLocal: true,
+          text: content,
+          mediaUrl: localPreviewUrl,
+          mediaMimeType: draft.file.type || null,
+          mediaSizeBytes: draft.file.size,
+          attachments: [
+            {
+              url: localPreviewUrl,
+              mimeType: draft.file.type || null,
+              sizeBytes: draft.file.size,
+            },
+          ],
+          timestamp: formatMessageTimestamp(),
+          deliveryState: 'sending',
+        }
+
+        console.log('[OPTIMISTIC MESSAGE]', optimisticPreviewMessage)
+
+        setMessagesByConversation((prev) => {
+          const current = prev[conversationId] ?? []
+          return {
+            ...prev,
+            [conversationId]: upsertMessage(current, optimisticPreviewMessage),
+          }
+        })
+
+        updateConversationAfterMessage(conversationId, optimisticPreviewMessage, true)
+      }
+
+      if (draft.file) {
+        try {
+          const uploadResult = await uploadChatMedia(accessToken, draft.file)
+          console.log('[UPLOAD RESULT]', uploadResult)
+          mediaUrl = uploadResult.url
+          mediaThumbnailUrl = uploadResult.thumbnailUrl
+          mediaMimeType = uploadResult.mimeType
+          mediaSizeBytes = uploadResult.sizeBytes
+
+          if (messageType === 'image') {
+            if (!mediaUrl) {
+              console.warn('[ChatPage.send] Upload finished but mediaUrl is missing for image message')
+              return
+            }
+
+            const uploadedImageUrl = mediaUrl
+            let previousBlobUrl: string | null = null
+            setMessagesByConversation((prev) => {
+              const current = prev[conversationId] ?? []
+              return {
+                ...prev,
+                [conversationId]: current.map((message) => {
+                  if (message.clientMessageId !== clientMessageId) {
+                    return message
+                  }
+
+                  if (message.mediaUrl?.startsWith('blob:')) {
+                    previousBlobUrl = message.mediaUrl
+                  }
+
+                  return {
+                    ...message,
+                    isLocal: false,
+                    mediaUrl: uploadedImageUrl,
+                    mediaThumbnailUrl,
+                    mediaMimeType,
+                    mediaSizeBytes,
+                    attachments: [
+                      {
+                        url: uploadedImageUrl,
+                        thumbnailUrl: mediaThumbnailUrl,
+                        mimeType: mediaMimeType,
+                        sizeBytes: mediaSizeBytes,
+                      },
+                    ],
+                  }
+                }),
+              }
+            })
+
+            if (previousBlobUrl && previousBlobUrl !== uploadedImageUrl) {
+              queueMicrotask(() => {
+                URL.revokeObjectURL(previousBlobUrl as string)
+              })
+            }
+          }
+        } catch (error) {
+          console.error('[ChatPage.send] Upload failed', error)
+
+          if (messageType === 'image') {
+            setMessagesByConversation((prev) => {
+              const current = prev[conversationId] ?? []
+              return {
+                ...prev,
+                [conversationId]: markLocalMessageFailed(current, clientMessageId),
+              }
+            })
+          }
+          return
+        }
+      } else if (draft.sticker) {
+        mediaUrl = `sticker://${encodeURIComponent(draft.sticker.id)}`
+        mediaMimeType = 'application/x-chat-sticker'
+      }
+
+      if (messageType === 'image' && !mediaUrl) {
+        console.warn('[ChatPage.send] Skip optimistic image message because mediaUrl is missing')
+        return
+      }
+
       console.log('[ChatPage.send] Start:', {
         clientMessageId,
-        conversationId: selectedConversationId,
+        conversationId,
         contentLength: content.length,
+        messageType,
       })
 
       const optimisticMessage: ChatMessage = {
         id: clientMessageId,
         clientMessageId,
-        conversationId: selectedConversationId,
+        conversationId,
         sender: 'me',
         senderId: user.id,
+        type: messageType,
+        isLocal: false,
         text: content,
-        timestamp: new Date().toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
+        mediaUrl,
+        mediaThumbnailUrl,
+        mediaMimeType,
+        mediaSizeBytes,
+        attachments: mediaUrl
+          ? [
+              {
+                url: mediaUrl,
+                name: draft.file?.name ?? undefined,
+                thumbnailUrl: mediaThumbnailUrl,
+                mimeType: mediaMimeType,
+                sizeBytes: mediaSizeBytes,
+              },
+            ]
+          : undefined,
+        timestamp: formatMessageTimestamp(),
         deliveryState: 'sending',
       }
 
-      setMessagesByConversation((prev) => {
-        const current = prev[selectedConversationId] ?? []
-        return {
-          ...prev,
-          [selectedConversationId]: upsertMessage(current, optimisticMessage),
-        }
-      })
+      console.log('[OPTIMISTIC MESSAGE]', optimisticMessage)
 
-      updateConversationAfterMessage(selectedConversationId, optimisticMessage, true)
+      const payloadContent =
+        content.trim().length > 0
+          ? content
+          : messageType === 'image'
+            ? mediaUrl ?? '[image]'
+            : messageType === 'file'
+              ? draft.file?.name ?? mediaUrl ?? '[file]'
+              : messageType === 'sticker'
+                ? '[sticker]'
+                : content
+
+      const payload = {
+        conversationId,
+        content: payloadContent,
+        clientMessageId,
+        messageType: toSocketMessageType(messageType),
+        mediaUrl,
+        mediaThumbnailUrl,
+        mediaMimeType,
+        mediaSizeBytes,
+      }
+
+      console.log('[SEND PAYLOAD]', payload)
+
+      if (messageType !== 'image') {
+        setMessagesByConversation((prev) => {
+          const current = prev[conversationId] ?? []
+          return {
+            ...prev,
+            [conversationId]: upsertMessage(current, optimisticMessage),
+          }
+        })
+
+        updateConversationAfterMessage(conversationId, optimisticMessage, true)
+      }
 
       console.log('[ChatPage.send] Emitting message...')
-      const ack = await emitSendMessage({
-        conversationId: selectedConversationId,
-        content,
-        clientMessageId,
-      })
+      const ack = await emitSendMessage(payload)
 
       console.log('[ChatPage.send] ACK received:', ack, 'event:', ack?.event)
 
       if (ack?.event === 'message.sent' && ack?.data) {
         console.log('[ChatPage.send] Success, got message.sent')
-        const serverMessage = {
-          ...mapRawMessage(ack.data, user.id),
+        const mappedServerMessage = mapRawMessage(ack.data, user.id)
+        const resolvedMediaUrl = mappedServerMessage.mediaUrl ?? mediaUrl ?? null
+        const serverMessage: ChatMessage = {
+          ...mappedServerMessage,
+          clientMessageId,
+          type: messageType === 'image' ? 'image' : mappedServerMessage.type,
+          isLocal: false,
+          mediaUrl: resolvedMediaUrl,
+          mediaThumbnailUrl: mappedServerMessage.mediaThumbnailUrl ?? mediaThumbnailUrl,
+          mediaMimeType: mappedServerMessage.mediaMimeType ?? mediaMimeType,
+          mediaSizeBytes: mappedServerMessage.mediaSizeBytes ?? mediaSizeBytes,
+          attachments: resolvedMediaUrl
+            ? [
+                {
+                  url: resolvedMediaUrl,
+                  name: draft.file?.name ?? mappedServerMessage.attachments?.[0]?.name ?? undefined,
+                  thumbnailUrl: mappedServerMessage.mediaThumbnailUrl ?? mediaThumbnailUrl,
+                  mimeType: mappedServerMessage.mediaMimeType ?? mediaMimeType,
+                  sizeBytes: mappedServerMessage.mediaSizeBytes ?? mediaSizeBytes,
+                },
+              ]
+            : mappedServerMessage.attachments,
           deliveryState: 'sent' as const,
         }
         setMessagesByConversation((prev) => {
-          const current = prev[selectedConversationId] ?? []
+          const current = prev[conversationId] ?? []
           return {
             ...prev,
-            [selectedConversationId]: upsertMessage(current, serverMessage),
+            [conversationId]: upsertMessage(current, serverMessage),
           }
         })
 
-        updateConversationAfterMessage(selectedConversationId, serverMessage, true)
+        updateConversationAfterMessage(conversationId, serverMessage, true)
         return
       }
 
-      console.log('[ChatPage.send] Failed, no message.sent ACK')
+      console.warn('[ChatPage.send] No valid ACK, trying REST fallback /messages before marking failed')
+      try {
+        const restMessage = await sendMessageViaRest(accessToken, {
+          conversationId,
+          content: payloadContent,
+          clientMessageId,
+          messageType: payload.messageType,
+          mediaUrl,
+          mediaThumbnailUrl,
+          mediaMimeType,
+          mediaSizeBytes,
+        })
+
+        if (restMessage?.id) {
+          console.log('[ChatPage.send] REST fallback send succeeded')
+          const mappedRestMessage: ChatMessage = {
+            ...mapRawMessage(restMessage, user.id),
+            clientMessageId,
+            deliveryState: 'sent',
+          }
+
+          setMessagesByConversation((prev) => {
+            const current = prev[conversationId] ?? []
+            return {
+              ...prev,
+              [conversationId]: upsertMessage(current, mappedRestMessage),
+            }
+          })
+
+          updateConversationAfterMessage(conversationId, mappedRestMessage, true)
+          return
+        }
+      } catch (restFallbackError) {
+        console.warn('[ChatPage.send] REST fallback failed, continue reconcile flow', restFallbackError)
+
+        const message = restFallbackError instanceof Error ? restFallbackError.message : String(restFallbackError)
+        if (message.toLowerCase().includes('restricted web session cannot send messages')) {
+          setMessagesByConversation((prev) => {
+            const current = prev[conversationId] ?? []
+            return {
+              ...prev,
+              [conversationId]: markLocalMessageFailed(current, clientMessageId),
+            }
+          })
+          console.warn('[ChatPage.send] Send blocked by restricted web policy; message marked failed immediately')
+          return
+        }
+      }
+
+      console.warn('[ChatPage.send] No valid ACK, reconciling from API before marking failed')
+      try {
+        const latestRawMessages = await fetchMessages(accessToken, conversationId)
+        const matchedRawMessage = latestRawMessages.find((message) => {
+          const sameClientMessageId =
+            message.clientMessageId === clientMessageId ||
+            (message as RawMessage & { client_message_id?: string | null }).client_message_id === clientMessageId
+
+          if (sameClientMessageId) {
+            return true
+          }
+
+          return (
+            (message.senderId ?? message.from ?? '') === user.id &&
+            String(message.content ?? '').trim() === payloadContent.trim()
+          )
+        })
+
+        if (matchedRawMessage) {
+          console.log('[ChatPage.send] Message found in API after ACK timeout, marking sent')
+          const reconciledMessage: ChatMessage = {
+            ...mapRawMessage(matchedRawMessage, user.id),
+            clientMessageId,
+            deliveryState: 'sent',
+          }
+
+          setMessagesByConversation((prev) => {
+            const current = prev[conversationId] ?? []
+            return {
+              ...prev,
+              [conversationId]: upsertMessage(current, reconciledMessage),
+            }
+          })
+
+          updateConversationAfterMessage(conversationId, reconciledMessage, true)
+          return
+        }
+      } catch (reconcileError) {
+        console.warn('[ChatPage.send] Reconcile after ACK timeout failed', reconcileError)
+      }
+
+      console.log('[ChatPage.send] Failed after reconcile, marking as failed')
       setMessagesByConversation((prev) => {
-        const current = prev[selectedConversationId] ?? []
+        const current = prev[conversationId] ?? []
         return {
           ...prev,
-          [selectedConversationId]: current.map((message) =>
-            message.clientMessageId === clientMessageId
-              ? {
-                  ...message,
-                  deliveryState: 'failed' as const,
-                }
-              : message,
-          ),
+          [conversationId]: markLocalMessageFailed(current, clientMessageId),
         }
       })
     },
-    [accessToken, emitSendMessage, isRestrictedMode, selectedConversationId, updateConversationAfterMessage, user],
+    [accessToken, emitSendMessage, isRestrictedMode, isTokenRestrictedMode, routedConversationId, selectedConversationId, updateConversationAfterMessage, user],
   )
+
+  const handleSearchConversation = useCallback(
+    async (conversationId: string, keyword: string) => {
+      if (!accessToken || !user) {
+        return { messages: [] as ChatMessage[], files: [] as ChatMessage[] }
+      }
+
+      const normalizedKeyword = keyword.trim().toLowerCase()
+
+      const [messageResult, fileResult] = await Promise.all([
+        searchConversationMessages(accessToken, conversationId, {
+          keyword: normalizedKeyword.length > 0 ? normalizedKeyword : undefined,
+          limit: 40,
+          offset: 0,
+        }),
+        searchConversationMessages(accessToken, conversationId, {
+          messageType: 'FILE',
+          limit: 60,
+          offset: 0,
+        }),
+      ])
+
+      const mappedMessages = messageResult.items
+        .map((raw) => mapRawMessage(raw, user.id))
+        .filter((message) => message.type !== 'file')
+
+      const mappedFiles = fileResult.items
+        .map((raw) => mapRawMessage(raw, user.id))
+        .filter((message) => message.type === 'file')
+        .filter((message) => {
+          if (!normalizedKeyword) {
+            return true
+          }
+
+          const messageText = message.text.toLowerCase()
+          const fileName = getFileNameFromUrl(message.mediaUrl ?? message.attachments?.[0]?.url)
+          return messageText.includes(normalizedKeyword) || fileName.includes(normalizedKeyword)
+        })
+
+      return {
+        messages: mappedMessages,
+        files: mappedFiles,
+      }
+    },
+    [accessToken, user],
+  )
+
+  const handleToggleSearchSidebar = useCallback(() => {
+    setRightSidebarContent((prev) => (prev === 'search' ? null : 'search'))
+  }, [])
+
+  const handleToggleInfoSidebar = useCallback(() => {
+    setRightSidebarContent((prev) => (prev === 'info' ? null : 'info'))
+  }, [])
 
   if (isBootstrapping || isLoadingConversations) {
     return (
-      <div className='chat-layout'>
+      <div className={rightSidebarContent ? 'chat-layout' : 'chat-layout chat-layout-sidebar-closed'}>
         <section className='chat-list-panel chat-list-panel-skeleton'>
           <div className='panel-header'>
             <Skeleton className='skeleton-line skeleton-line-title' />
@@ -892,24 +1919,26 @@ export function ChatPage() {
             <Skeleton className='chat-message-skeleton me' />
           </div>
         </section>
-        <aside className='chat-side-panel'>
-          <Skeleton className='skeleton-line skeleton-line-title' />
-          <Skeleton className='skeleton-line' />
-          <Card className='chat-side-card'>
+        {rightSidebarContent ? (
+          <aside className='chat-side-panel'>
+            <Skeleton className='skeleton-line skeleton-line-title' />
             <Skeleton className='skeleton-line' />
-            <Skeleton className='skeleton-line skeleton-line-short' />
-          </Card>
-        </aside>
+            <Card className='chat-side-card'>
+              <Skeleton className='skeleton-line' />
+              <Skeleton className='skeleton-line skeleton-line-short' />
+            </Card>
+          </aside>
+        ) : null}
       </div>
     )
   }
 
   return (
-    <div className='chat-layout'>
+    <div className={rightSidebarContent ? 'chat-layout' : 'chat-layout chat-layout-sidebar-closed'}>
       <ChatList
         conversations={conversations}
         friendResults={friendResults}
-        selectedConversationId={selectedConversationId}
+        selectedConversationId={routedConversationId || selectedConversationId}
         onSearchFriends={handleSearchFriends}
         onOpenFriendChat={handleOpenFriendChat}
         onSelectConversation={handleSelectConversation}
@@ -919,52 +1948,53 @@ export function ChatPage() {
         messages={selectedMessages}
         isLoadingMessages={isLoadingMessages}
         onSend={handleSend}
-        onSyncHistory={handleSyncHistory}
+        onToggleSearchSidebar={handleToggleSearchSidebar}
+        onToggleInfoSidebar={handleToggleInfoSidebar}
+        rightSidebarContent={rightSidebarContent}
+        jumpToMessageId={jumpToMessageId}
+        onJumpToMessageHandled={() => setJumpToMessageId(null)}
         isRestrictedMode={isRestrictedMode}
-        peerLastReadSeq={selectedConversationId ? peerLastReadByConversation[selectedConversationId] : undefined}
+        peerLastReadSeq={(routedConversationId || selectedConversationId)
+          ? peerLastReadByConversation[routedConversationId || selectedConversationId]
+          : undefined}
+        reactionStatesByMessage={reactionStatesByMessage}
+        onAddReaction={handleAddReaction}
+        onRemoveReaction={handleRemoveReaction}
+        pinnedMessageIds={pinnedMessageIds}
+        starredMessageIds={starredMessageIds}
+        recalledMessageIds={recalledMessageIds}
+        deletedMessageIds={deletedMessageIds}
+        selectedMessageIds={selectedMessageIds}
+        isMultiSelectMode={isMultiSelectMode}
+        onToggleMessageSelection={toggleMessageIdInList}
+        onClearMultiSelectMode={handleClearMultiSelectMode}
+        onMessageContextMenuAction={handleMessageContextMenuAction}
       />
-      <aside className='chat-side-panel'>
-        <div className='chat-side-head'>
-          <h3>{t('pages.chat.sideInfoTitle')}</h3>
-        </div>
+      {rightSidebarContent ? (
+        <aside className='chat-side-panel'>
+          {rightSidebarContent === 'search' && selectedConversation ? (
+            <SearchMessagesPanel
+              conversation={selectedConversation}
+              onSearchConversation={handleSearchConversation}
+              onSelectMessage={(messageId) => setJumpToMessageId(messageId)}
+            />
+          ) : null}
 
-        {selectedConversation ? (
-          <Card className='chat-side-profile'>
-            <UserAvatar name={selectedConversation.name} size='lg' />
-            <h4>{selectedConversation.name}</h4>
-            <p>{`${t('pages.chat.sideInfoWith')} ${selectedConversation.name}.`}</p>
-            <div className='chat-side-quick-actions'>
-              <button className='chat-side-action-btn' type='button'>
-                <Icon name='phone' />
-              </button>
-              <button className='chat-side-action-btn' type='button'>
-                <Icon name='search' />
-              </button>
-              <button className='chat-side-action-btn' type='button'>
-                <Icon name='info' />
-              </button>
-            </div>
-          </Card>
-        ) : (
-          <p>{t('pages.chat.sideInfoFallback')}</p>
-        )}
+          {rightSidebarContent === 'search' && !selectedConversation ? (
+            <p>{t('pages.chat.sideInfoFallback')}</p>
+          ) : null}
 
-        <Card className='chat-side-card'>
-          <div className='chat-side-section-title'>
-            <Icon name='file' />
-            <p>{t('pages.chat.sharedFiles')}</p>
-          </div>
-          <strong>{t('pages.chat.sharedFilesCount')}</strong>
-        </Card>
-
-        <Card className='chat-side-card'>
-          <div className='chat-side-section-title'>
-            <Icon name='image' />
-            <p>{t('pages.chat.media')}</p>
-          </div>
-          <strong>{t('pages.chat.mediaCount')}</strong>
-        </Card>
-      </aside>
+          {rightSidebarContent === 'info' ? (
+            <>
+              {selectedConversation ? (
+                <ConversationInfo conversation={selectedConversation} messages={selectedMessages} />
+              ) : (
+                <p>{t('pages.chat.sideInfoFallback')}</p>
+              )}
+            </>
+          ) : null}
+        </aside>
+      ) : null}
     </div>
   )
 }

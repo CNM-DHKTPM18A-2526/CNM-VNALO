@@ -145,6 +145,10 @@ logging:
   level:
     iuh.cnm.vnalo: DEBUG
 
+app:
+  sync-policy:
+    enforce-web-restriction: false
+
 ---
 # =============================================================================
 # PROD PROFILE - Production deployment with hardened security

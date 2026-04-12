@@ -2,6 +2,7 @@ type UserAvatarProps = {
   name: string
   size?: 'sm' | 'md' | 'lg'
   imageUrl?: string | null
+  className?: string
 }
 
 const sizeClass: Record<NonNullable<UserAvatarProps['size']>, string> = {
@@ -18,14 +19,16 @@ function getFallback(name: string) {
     .join('')
 }
 
-export function UserAvatar({ name, size = 'md', imageUrl }: UserAvatarProps) {
+export function UserAvatar({ name, size = 'md', imageUrl, className }: UserAvatarProps) {
+  const mergedClassName = `user-avatar ${sizeClass[size]}${className ? ` ${className}` : ''}`
+
   if (imageUrl) {
     return (
-      <span className={`user-avatar ${sizeClass[size]}`}>
+      <span className={mergedClassName}>
         <img alt={name} className='user-avatar-image' src={imageUrl} />
       </span>
     )
   }
 
-  return <span className={`user-avatar ${sizeClass[size]}`}>{getFallback(name)}</span>
+  return <span className={mergedClassName}>{getFallback(name)}</span>
 }
