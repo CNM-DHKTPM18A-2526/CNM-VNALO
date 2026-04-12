@@ -51,11 +51,11 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
         title: _buildSearchHeader(context, isDarkMode, searchHint),
         actions: [
           IconButton(
-            icon: Icon(Icons.post_add_outlined, size: 28, color: searchHint),
+            icon: const Icon(Icons.post_add_outlined, size: 28, color: Colors.white),
             onPressed: () {},
           ),
           IconButton(
-            icon: Icon(Icons.notifications_none_outlined, size: 28, color: searchHint),
+            icon: const Icon(Icons.notifications_none_outlined, size: 28, color: Colors.white),
             onPressed: () {},
           ),
           const SizedBox(width: 4),
@@ -114,7 +114,7 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
         ),
         child: Row(
           children: [
-            Icon(Icons.search, size: 24, color: searchHint),
+            Icon(Icons.search, size: 24, color: isDarkMode ? searchHint : Colors.white),
             const SizedBox(width: 8),
             Text('Tìm kiếm', style: TextStyle(color: searchHint, fontSize: 16, fontWeight: FontWeight.normal)),
           ],

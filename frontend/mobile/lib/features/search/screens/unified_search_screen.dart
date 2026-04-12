@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
-import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
-import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
+import 'package:vnalo_mobile/features/contacts/screens/send_request_screen.dart';
 import 'package:vnalo_mobile/features/chat/screens/chat_detail_screen.dart';
-import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
 import 'package:vnalo_mobile/models/user_model.dart';
 import 'package:vnalo_mobile/services/chat_service.dart';
 import 'package:vnalo_mobile/services/friend_service.dart';
+import 'package:vnalo_mobile/services/user_service.dart';
+import 'package:vnalo_mobile/core/database/local_database.dart';
+import 'package:intl/intl.dart';
 
 enum SearchInitialTab { mine, discover }
 
@@ -28,35 +28,28 @@ class UnifiedSearchScreen extends StatefulWidget {
   State<UnifiedSearchScreen> createState() => _UnifiedSearchScreenState();
 }
 
-class _SearchResult {
-  const _SearchResult({
-    required this.id,
-    required this.title,
-    required this.subtitle,
-    required this.score,
-    this.conversation,
-    this.user,
-    this.avatarUrl,
-    this.kind = 'chat',
-  });
-
-  final String id;
-  final String title;
-  final String subtitle;
-  final int score;
-  final Conversation? conversation;
-  final User? user;
-  final String? avatarUrl;
-  final String kind;
-}
-
 class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
     with SingleTickerProviderStateMixin {
   final TextEditingController _queryController = TextEditingController();
   late final TabController _tabController;
-  final List<String> _searchHistory = <String>[];
-  List<User> _friends = <User>[];
-  bool _loadingFriends = true;
+  int _searchRequestId = 0;
+
+  // States for search history and current query
+  List<User> _recentFriends = <User>[];
+  bool _loadingRecent = true;
+
+  // New states for hybrid search
+  User? _strangerFoundByPhone;
+  List<LocalContact> _localContactResults = [];
+  List<LocalMessageSearchResult> _localMessageResults = [];
+  bool _isSearching = false;
+  bool _isCancelling = false;
+  String _selectedFilter = 'Tất cả'; // 'Tất cả', 'Link', 'File'
+
+  int get _mineCount =>
+      _localContactResults.length +
+      _localMessageResults.length +
+      (_strangerFoundByPhone != null ? 1 : 0);
 
   @override
   void initState() {
@@ -66,20 +59,20 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
       vsync: this,
       initialIndex: widget.initialTab == SearchInitialTab.mine ? 0 : 1,
     );
-    _loadFriends();
+    _loadRecentFriends();
   }
 
-  Future<void> _loadFriends() async {
+  Future<void> _loadRecentFriends() async {
     try {
       final friends = await context.read<FriendService>().getFriends();
       if (!mounted) return;
       setState(() {
-        _friends = friends;
-        _loadingFriends = false;
+        _recentFriends = friends;
+        _loadingRecent = false;
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _loadingFriends = false);
+      setState(() => _loadingRecent = false);
     }
   }
 
@@ -90,252 +83,277 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
     super.dispose();
   }
 
-  List<_SearchResult> _buildResults(String query) {
+  Future<void> _performHybridSearch(String query) async {
+    final requestId = ++_searchRequestId;
     final q = query.trim();
-    if (q.isEmpty) return const <_SearchResult>[];
-
-    final currentUserId = context.read<AuthProvider?>()?.user?.id ?? '';
-    final conversations = context.read<ChatProvider?>()?.conversations ?? const <Conversation>[];
-    final phoneIntent = RegExp(r'\d{8,}').hasMatch(q.replaceAll(RegExp(r'\D'), ''));
-    final normalizedQueryPhone = _normalizeVnPhone(q);
-
-    int matchText(String source) {
-      final raw = source.toLowerCase();
-      final key = q.toLowerCase();
-      if (raw == key) return 70;
-      if (raw.startsWith(key)) return 50;
-      if (raw.contains(key)) return 30;
-      return 0;
-    }
-
-    final results = <_SearchResult>[];
-
-    for (final c in conversations) {
-      final name = c.getDisplayName(currentUserId);
-      final member = c.members.where((m) => m.userId != currentUserId).isNotEmpty
-          ? c.members.firstWhere((m) => m.userId != currentUserId)
-          : null;
-      final nickname = member?.nickname ?? '';
-      final userName = member?.user?.displayName ?? '';
-      final phone = member?.user?.phone;
-      final phoneScore = (phoneIntent && normalizedQueryPhone != null && _phoneEquivalentMatch(phone, normalizedQueryPhone))
-          ? 120
-          : 0;
-      final base = matchText(name) + matchText(nickname) + matchText(userName) + phoneScore;
-      if (base <= 0) continue;
-      final relationBoost = c.type == ConversationType.DIRECT ? 240 : 140;
-      final historyBoost = _searchHistory.any((h) => h.toLowerCase() == q.toLowerCase()) ? 90 : 0;
-      final sharedGroupBoost = c.type == ConversationType.GROUP ? 110 : 0;
-      results.add(
-        _SearchResult(
-          id: 'c:${c.id}',
-          title: name,
-          subtitle: c.lastMessage?.content ?? 'Đoạn chat',
-          score: base + relationBoost + historyBoost + sharedGroupBoost,
-          conversation: c,
-          avatarUrl: c.getDisplayAvatarUrl(currentUserId),
-          kind: 'chat',
-        ),
-      );
-    }
-
-    for (final f in _friends) {
-      final phoneScore = (phoneIntent && normalizedQueryPhone != null && _phoneEquivalentMatch(f.phone, normalizedQueryPhone))
-          ? 160
-          : 0;
-      final base = matchText(f.displayName) + phoneScore;
-      if (base <= 0) continue;
-      final sharedGroup = conversations.any(
-        (c) => c.type == ConversationType.GROUP && c.members.any((m) => m.userId == f.id),
-      );
-      results.add(
-        _SearchResult(
-          id: 'u:${f.id}',
-          title: f.displayName,
-          subtitle: f.phone ?? 'Liên hệ',
-          score: base + 250 + (sharedGroup ? 120 : 0),
-          user: f,
-          avatarUrl: f.avatarUrl,
-          kind: 'friend',
-        ),
-      );
-    }
-
-    const oa = ['VNALO Shop OA', 'VNALO Support OA'];
-    final mini = _deriveUsedMiniApps().map((e) => e.$1).toList();
-    for (final name in oa) {
-      final base = matchText(name);
-      if (base > 0) {
-        results.add(
-          _SearchResult(
-            id: 'oa:$name',
-            title: name,
-            subtitle: 'Official Account',
-            score: base + 60,
-            kind: 'oa',
-          ),
-        );
-      }
-    }
-    for (final name in mini) {
-      final base = matchText(name);
-      if (base > 0) {
-        results.add(
-          _SearchResult(
-            id: 'mini:$name',
-            title: name,
-            subtitle: 'Mini App',
-            score: base + 50,
-            kind: 'mini',
-          ),
-        );
-      }
-    }
-
-    results.sort((a, b) => b.score.compareTo(a.score));
-    return results;
-  }
-
-  String? _normalizeVnPhone(String input) {
-    final digits = input.replaceAll(RegExp(r'\D'), '');
-    if (digits.length < 8) return null;
-    if (digits.startsWith('84')) return digits;
-    if (digits.startsWith('0')) return '84${digits.substring(1)}';
-    if (digits.length == 9 || digits.length == 10) return '84$digits';
-    return digits;
-  }
-
-  bool _phoneEquivalentMatch(String? value, String normalizedQuery) {
-    if (value == null || value.isEmpty) return false;
-    final normalizedValue = _normalizeVnPhone(value);
-    if (normalizedValue == null) return false;
-    return normalizedValue == normalizedQuery ||
-        normalizedValue.endsWith(normalizedQuery) ||
-        normalizedQuery.endsWith(normalizedValue);
-  }
-
-  Future<void> _handleResultTap(_SearchResult item) async {
-    final q = _queryController.text.trim();
-    if (q.isNotEmpty && !_searchHistory.contains(q)) {
-      setState(() => _searchHistory.insert(0, q));
-    }
-
-    if (item.conversation != null) {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => ChatDetailScreen(conversation: item.conversation!)),
-      );
+    if (q.isEmpty) {
+      setState(() {
+        _isSearching = false;
+        _strangerFoundByPhone = null;
+        _localContactResults = [];
+        _localMessageResults = [];
+      });
       return;
     }
-    if (item.user != null) {
-      try {
-        final chatService = context.read<ChatService?>();
-        if (chatService == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Chưa sẵn sàng mở cuộc trò chuyện ở màn này.')),
+
+    setState(() => _isSearching = true);
+
+    final db = context.read<LocalDatabase>();
+    final userService = context.read<UserService>();
+
+    // 1. Local Search (Contacts & Messages)
+    final contactsTask = db.searchContacts(q);
+    final messagesTask = db.searchMessages(q);
+
+    // 2. Global Phone Search (flexible: 9-15 digits, opt leading '+')
+    final phoneRegex = RegExp(r'^\+?[0-9]{9,15}$');
+    Future<User?> phoneTask = Future.value(null);
+    if (phoneRegex.hasMatch(q)) {
+      phoneTask = userService.getUserByPhone(q).catchError((e) {
+        return null;
+      });
+    }
+
+    final results = await Future.wait([contactsTask, messagesTask, phoneTask]);
+
+    if (!mounted || requestId != _searchRequestId) return;
+
+    setState(() {
+      _localContactResults = results[0] as List<LocalContact>;
+      _localMessageResults = results[1] as List<LocalMessageSearchResult>;
+      _strangerFoundByPhone = results[2] as User?;
+      _isSearching = false;
+    });
+
+    // Fast check for friendship status if stranger found
+    if (_strangerFoundByPhone != null && 
+        _strangerFoundByPhone!.friendshipStatus?.toUpperCase() != 'PENDING_SENT') {
+      _verifyStrangerStatus(_strangerFoundByPhone!.id, requestId);
+    }
+  }
+
+  Future<void> _verifyStrangerStatus(String userId, int requestId) async {
+    final isSent = await context.read<FriendService>().checkSentRequest(userId);
+    if (isSent && mounted && requestId == _searchRequestId) {
+      setState(() {
+        if (_strangerFoundByPhone?.id == userId) {
+          _strangerFoundByPhone = _strangerFoundByPhone?.copyWith(
+            friendshipStatus: 'PENDING_SENT',
           );
-          return;
         }
-        final conversation = await chatService.getOrCreateDirect(item.user!.id);
-        if (!mounted) return;
-        
-        // Refresh inbox so this new conversation appears in the messages tab
-        context.read<ChatProvider>().loadInbox();
+      });
+    }
+  }
 
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => ChatDetailScreen(conversation: conversation, friendUser: item.user),
-          ),
-        );
-      } catch (_) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Không mở được cuộc trò chuyện.')),
+  // UI Helper for Highlighting
+  TextSpan _highlightText(
+    String text,
+    String query, {
+    required TextStyle baseStyle,
+    Color highlightColor = const Color(0xFF0091FF),
+  }) {
+    if (query.isEmpty || !text.toLowerCase().contains(query.toLowerCase())) {
+      return TextSpan(text: text, style: baseStyle);
+    }
+
+    final spans = <TextSpan>[];
+    final lowerText = text.toLowerCase();
+    final lowerQuery = query.toLowerCase();
+    int start = 0;
+    int indexOfMatch;
+
+    while ((indexOfMatch = lowerText.indexOf(lowerQuery, start)) != -1) {
+      if (indexOfMatch > start) {
+        spans.add(
+          TextSpan(text: text.substring(start, indexOfMatch), style: baseStyle),
         );
       }
-      return;
+      spans.add(
+        TextSpan(
+          text: text.substring(indexOfMatch, indexOfMatch + query.length),
+          style: baseStyle.copyWith(
+            color: highlightColor,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      );
+      start = indexOfMatch + query.length;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Đã chọn ${item.title}')),
-    );
+
+    if (start < text.length) {
+      spans.add(TextSpan(text: text.substring(start), style: baseStyle));
+    }
+
+    return TextSpan(children: spans);
+  }
+
+  Future<void> _handleLocalContactTap(LocalContact contact) async {
+    try {
+      final chatService = context.read<ChatService>();
+      final conversation = await chatService.getOrCreateDirect(contact.id);
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ChatDetailScreen(conversation: conversation),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không mở được cuộc trò chuyện.')),
+      );
+    }
+  }
+
+  Future<void> _handleLocalMessageTap(LocalMessage msg) async {
+    try {
+      final db = context.read<LocalDatabase>();
+      final chatService = context.read<ChatService>();
+
+      // 1. Local Lookup First
+      LocalConversation? localConv = await db.getLocalConversationById(
+        msg.conversationId,
+      );
+
+      Conversation? conv;
+      if (localConv != null) {
+        // Map local model to UI model
+        conv = Conversation.fromLocal(localConv);
+      } else {
+        // 2. Fallback to API
+        conv = await chatService.getConversationById(msg.conversationId);
+        if (conv == null) {
+          final inbox = await chatService.getInbox();
+          for (final item in inbox) {
+            if (item.id == msg.conversationId) {
+              conv = item;
+              break;
+            }
+          }
+        }
+        if (conv == null) {
+          throw StateError('Conversation not found: ${msg.conversationId}');
+        }
+      }
+
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ChatDetailScreen(conversation: conv!),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không thể mở cuộc trò chuyện này.')),
+      );
+    }
+  }
+
+  Future<void> _handleStrangerCancel(User user) async {
+    setState(() => _isCancelling = true);
+    try {
+      await context.read<FriendService>().cancelRequestByUserId(user.id);
+      if (!mounted) return;
+      setState(() {
+        _strangerFoundByPhone = _strangerFoundByPhone?.copyWith(
+          friendshipStatus: 'NONE',
+        );
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Đã hủy lời mời đến ${user.displayName}')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Không thể hủy lời mời: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isCancelling = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final query = _queryController.text.trim();
-    final results = _buildResults(query);
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
-    final appBarIconColor = Colors.white.withValues(alpha: 0.95);
-    final surfaceColor = isDarkMode ? DarkColors.surface : Colors.white;
-    final scaffoldBg = isDarkMode ? Colors.black : AppColors.sectionBackground;
+    final scaffoldBg =
+        Theme.of(context).brightness == Brightness.dark
+            ? Colors.black
+            : const Color(0xFFF4F5F7);
 
     return Scaffold(
       backgroundColor: scaffoldBg,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         elevation: 0,
-        backgroundColor: appBarBg,
-        surfaceTintColor: appBarBg,
-        flexibleSpace: isDarkMode
-            ? null
-            : Container(
-                decoration: const BoxDecoration(gradient: AppColors.appBarGradient),
-              ),
+        backgroundColor: Colors.transparent,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [Color(0xFF0091FF), Color(0xFF007AFF)],
+            ),
+          ),
+        ),
         titleSpacing: 0,
         title: Padding(
-          padding: const EdgeInsets.only(right: 4),
+          padding: const EdgeInsets.only(right: 8),
           child: Row(
             children: [
               IconButton(
                 onPressed: () => Navigator.of(context).pop(),
-                icon: Icon(Icons.arrow_back, color: isDarkMode ? DarkColors.textPrimary : Colors.white),
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
               ),
               Expanded(
-                child: Hero(
-                  tag: widget.searchTag,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: Container(
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: isDarkMode ? Colors.white.withValues(alpha: 0.1) : Colors.white,
-                        borderRadius: BorderRadius.circular(100),
+                child: Container(
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.search,
+                        color: Color(0xFF757575),
+                        size: 18,
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.search,
-                            color: isDarkMode ? DarkColors.textHint : const Color(0xFF6B7280),
-                            size: 20,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: _queryController,
+                          autofocus: true,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            color: Colors.black,
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: TextField(
-                              controller: _queryController,
-                              autofocus: true,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                color: Colors.white,
-                              ),
-                              decoration: const InputDecoration(
-                                hintText: 'Tìm kiếm',
-                                hintStyle: TextStyle(
-                                  color: Colors.white70,
-                                ),
-                                border: InputBorder.none,
-                                enabledBorder: InputBorder.none,
-                                focusedBorder: InputBorder.none,
-                                isDense: true,
-                                filled: false,
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                              onChanged: (_) => setState(() {}),
-                            ),
+                          decoration: const InputDecoration(
+                            hintText: 'Tìm kiếm',
+                            hintStyle: TextStyle(color: Color(0xFF9E9E9E)),
+                            filled: true,
+                            fillColor: Colors.transparent,
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: EdgeInsets.zero,
                           ),
-                        ],
+                          onChanged: _performHybridSearch,
+                        ),
                       ),
-                    ),
+                      if (query.isNotEmpty)
+                        GestureDetector(
+                          onTap: () {
+                            _queryController.clear();
+                            _performHybridSearch('');
+                          },
+                          child: const Icon(
+                            Icons.cancel,
+                            color: Color(0xFF757575),
+                            size: 18,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),
@@ -345,310 +363,397 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                     MaterialPageRoute(builder: (_) => const QrScannerScreen()),
                   );
                 },
-                icon: Icon(Icons.qr_code_scanner, color: appBarIconColor),
+                icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
               ),
             ],
           ),
         ),
       ),
-      body: Column(
+      body: query.isEmpty ? _buildDefaultView() : _buildResultList(query),
+    );
+  }
+
+  Widget _buildMineTab() {
+    return ListView(
+      children: [
+        _sectionHeader('Liên hệ vừa tìm'),
+        if (_loadingRecent)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: CircularProgressIndicator(),
+            ),
+          )
+        else if (_recentFriends.isEmpty)
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Text(
+              'Chưa có lịch sử tìm kiếm',
+              style: TextStyle(color: Colors.grey),
+            ),
+          )
+        else
+          SizedBox(
+            height: 100,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              itemCount: _recentFriends.length,
+              itemBuilder: (context, index) {
+                final friend = _recentFriends[index];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Column(
+                    children: [
+                      AvatarWidget(
+                        imageUrl: friend.avatarUrl,
+                        name: friend.displayName,
+                        size: 52,
+                      ),
+                      const SizedBox(height: 4),
+                      SizedBox(
+                        width: 60,
+                        child: Text(
+                          friend.displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildDiscoverTab() {
+    return const Center(child: Text('Khám phá các tính năng mới trên Vnalo'));
+  }
+
+  Widget _buildResultList(String query) {
+    if (_strangerFoundByPhone == null &&
+        _localContactResults.isEmpty &&
+        _localMessageResults.isEmpty) {
+      if (_isSearching) {
+        return const Center(
+          child: Padding(
+            padding: EdgeInsets.all(32),
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        );
+      }
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.search_off, size: 64, color: Colors.grey.shade300),
+              const SizedBox(height: 16),
+              const Text(
+                'Không tìm thấy liên hệ, tin nhắn\ncó chứa nội dung bạn đang tìm kiếm',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Color(0xFF757575), fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      color: Colors.white,
+      child: ListView(
         children: [
-          Container(
-            color: surfaceColor,
-            child: TabBar(
-              controller: _tabController,
-              dividerColor: Colors.transparent,
-              labelColor: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
-              unselectedLabelColor: isDarkMode ? DarkColors.textSecondary : Colors.grey.shade400,
-              indicatorColor: AppColors.primary,
-              indicatorWeight: 3,
-              labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-              tabs: const [
-                Tab(text: 'Của tôi'),
-                Tab(text: 'Khám phá'),
-              ],
-            ),
-          ),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                query.isEmpty ? _buildMineDefault() : _buildResultList(results),
-                query.isEmpty ? _buildDiscoverDefault() : _buildResultList(results),
-              ],
-            ),
-          ),
+          if (_strangerFoundByPhone != null) _buildStrangerSection(),
+          if (_localContactResults.isNotEmpty) _buildContactSection(query),
+          if (_localMessageResults.isNotEmpty) _buildMessageSection(query),
         ],
       ),
     );
   }
 
-  Widget _buildMineDefault() {
-    final usedMiniApps = _deriveUsedMiniApps();
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final surfaceColor = isDarkMode ? DarkColors.surface : Colors.white;
-
-    return ListView(
+  Widget _buildStrangerSection() {
+    final user = _strangerFoundByPhone!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          color: surfaceColor,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _sectionHeader('Mini App đã sử dụng'),
-              if (usedMiniApps.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 8, 16, 14),
-                  child: Text(
-                    'Chưa có dữ liệu mini app đã sử dụng',
-                    style: TextStyle(color: LightColors.textSecondary),
-                  ),
-                )
-              else
-                SizedBox(
-                  height: 110,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
-                    itemCount: usedMiniApps.length,
-                    itemBuilder: (context, index) {
-                      final item = usedMiniApps[index];
-                      return _MiniAppItem(label: item.$1, icon: item.$2);
-                    },
-                  ),
-                ),
-            ],
+        _sectionHeader('Tìm bạn qua số điện thoại (1)', showEdit: false),
+        ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          leading: AvatarWidget(
+            imageUrl: user.avatarUrl,
+            name: user.displayName,
+            size: 52,
           ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          color: surfaceColor,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _sectionHeader('Liên hệ đã tìm'),
-              if (_loadingFriends)
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else
-                SizedBox(
-                  height: 108,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
-                    itemCount: _friends.length > 7 ? 7 : _friends.length,
-                    itemBuilder: (context, index) {
-                      final user = _friends[index];
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: Column(
-                          children: [
-                            AvatarWidget(imageUrl: user.avatarUrl, name: user.displayName, size: 50),
-                            const SizedBox(height: 6),
-                            SizedBox(
-                              width: 72,
-                              child: Text(
-                                user.displayName,
-                                maxLines: 2,
-                                textAlign: TextAlign.center,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: isDarkMode ? Colors.white : LightColors.textPrimary,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
-            ],
+          title: Text(
+            user.displayName,
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          child: Center(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Quản lý lịch sử tìm kiếm',
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.white70 : LightColors.textSecondary,
-                    fontSize: 15,
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: RichText(
+              text: TextSpan(
+                style: const TextStyle(color: Color(0xFF757575), fontSize: 14),
+                children: [
+                  const TextSpan(text: 'Số điện thoại: '),
+                  _highlightText(
+                    user.phone ?? '',
+                    _queryController.text,
+                    baseStyle: const TextStyle(color: Color(0xFF0091FF)),
                   ),
-                ),
-                const SizedBox(width: 6),
-                Icon(
-                  Icons.chevron_right,
-                  size: 18,
-                  color: isDarkMode ? DarkColors.textHint : LightColors.textSecondary,
-                ),
-              ],
+                ],
+              ),
             ),
+          ),
+          trailing: _isCancelling
+              ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0091FF)),
+              )
+              : OutlinedButton(
+                onPressed: () async {
+                  if (user.friendshipStatus == 'PENDING_SENT') {
+                    _handleStrangerCancel(user);
+                  } else {
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => SendRequestScreen(targetUser: user),
+                      ),
+                    );
+                    if (result == true) {
+                      setState(() {
+                        final currentStatus = _strangerFoundByPhone?.friendshipStatus;
+                        _strangerFoundByPhone = _strangerFoundByPhone?.copyWith(
+                          friendshipStatus: currentStatus == 'PENDING_SENT' ? 'NONE' : 'PENDING_SENT',
+                        );
+                      });
+                    }
+                  }
+                },
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: user.friendshipStatus == 'PENDING_SENT'
+                      ? Colors.grey.shade100
+                      : const Color(0xFFE3F2FD),
+                  side: BorderSide.none,
+                  foregroundColor: user.friendshipStatus == 'PENDING_SENT'
+                      ? Colors.grey
+                      : const Color(0xFF0091FF),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+                child: Text(
+                  (_strangerFoundByPhone?.friendshipStatus?.toUpperCase() == 'PENDING_SENT' || 
+                   _strangerFoundByPhone?.friendshipStatus?.toUpperCase() == 'PENDING') 
+                      ? 'Đã gửi' 
+                      : 'Kết bạn',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+        ),
+        const Divider(height: 8, thickness: 8, color: Color(0xFFF4F5F7)),
+      ],
+    );
+  }
+
+  Widget _buildContactSection(String query) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionHeader('Liên hệ (${_localContactResults.length})'),
+        ..._localContactResults.map(
+          (contact) => ListTile(
+            leading: AvatarWidget(
+              imageUrl: contact.avatarUrl,
+              name: contact.displayName,
+              size: 52,
+            ),
+            title: RichText(
+              text: _highlightText(
+                contact.displayName,
+                query,
+                baseStyle: const TextStyle(
+                  color: Colors.black,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ),
+            trailing: const Icon(
+              Icons.phone_outlined,
+              color: Color(0xFF0091FF),
+              size: 24,
+            ),
+            onTap: () => _handleLocalContactTap(contact),
+          ),
+        ),
+        const Divider(height: 8, thickness: 8, color: Color(0xFFF4F5F7)),
+      ],
+    );
+  }
+
+  Widget _buildFilterChips() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: ['Tất cả', 'Link', 'File'].map((filter) {
+          final isSelected = _selectedFilter == filter;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              label: Text(filter),
+              selected: isSelected,
+              onSelected: (val) {
+                if (val) setState(() => _selectedFilter = filter);
+              },
+              selectedColor: const Color(0xFFE3F2FD),
+              backgroundColor: Colors.white,
+              labelStyle: TextStyle(
+                color: isSelected ? const Color(0xFF0091FF) : Colors.grey,
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(
+                  color: isSelected ? const Color(0xFF0091FF) : Colors.grey.shade300,
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildMessageSection(String query) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionHeader('Tin nhắn (${_localMessageResults.length})'),
+        _buildFilterChips(),
+        ..._localMessageResults.map(
+          (result) => ListTile(
+            leading: AvatarWidget(
+              imageUrl: result.conversationAvatar,
+              name: result.conversationName ?? 'Group',
+              size: 52,
+            ),
+            title: Text(
+              result.conversationName ?? 'Cuộc hội thoại',
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+            ),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: RichText(
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                text: _highlightText(
+                  result.message.content,
+                  query,
+                  baseStyle: const TextStyle(color: Color(0xFF757575), fontSize: 14),
+                ),
+              ),
+            ),
+            trailing: Text(
+              DateFormat('dd/MM/yy').format(result.message.createdAt),
+              style: const TextStyle(color: Colors.grey, fontSize: 11),
+            ),
+            onTap: () => _handleLocalMessageTap(result.message),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildDiscoverDefault() {
-    const discoverItems = [
-      ('VNALO Shop', 'Mua sắm trực tuyến', Icons.storefront_outlined),
-      ('Mini App', 'Khám phá ứng dụng', Icons.apps_outlined),
-      ('Official Account', 'Theo dõi OA', Icons.campaign_outlined),
-      ('Tin tức', 'Nội dung thịnh hành', Icons.newspaper_outlined),
-    ];
-    return ListView.separated(
-      itemCount: discoverItems.length,
-      separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.itemDivider),
-      itemBuilder: (_, index) {
-        final item = discoverItems[index];
-        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-        final surfaceColor = isDarkMode ? DarkColors.surface : Colors.white;
-        return ListTile(
-          tileColor: surfaceColor,
-          leading: Icon(item.$3, color: AppColors.primary),
-          title: Text(
-            item.$1,
-            style: TextStyle(color: isDarkMode ? Colors.white : LightColors.textPrimary),
-          ),
-          subtitle: Text(
-            item.$2,
-            style: TextStyle(color: isDarkMode ? Colors.white70 : LightColors.textSecondary),
-          ),
-          trailing: const Icon(Icons.chevron_right, color: LightColors.textHint),
-        );
-      },
-    );
-  }
-
-  Widget _buildResultList(List<_SearchResult> items) {
-    if (items.isEmpty) {
-      return const Center(
-        child: Text('Không tìm thấy kết quả phù hợp', style: TextStyle(color: LightColors.textSecondary)),
-      );
-    }
-    return ListView.separated(
-      itemCount: items.length,
-      separatorBuilder: (_, __) => const Divider(height: 1, indent: 76, color: AppColors.itemDivider),
-      itemBuilder: (_, index) {
-        final item = items[index];
-        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-        final surfaceColor = isDarkMode ? DarkColors.surface : Colors.white;
-        return ListTile(
-          tileColor: surfaceColor,
-          leading: item.kind == 'chat' || item.kind == 'friend'
-              ? AvatarWidget(imageUrl: item.avatarUrl, name: item.title, size: 44)
-              : Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    item.kind == 'oa' ? Icons.campaign_outlined : Icons.widgets_outlined,
-                    color: AppColors.primary,
-                  ),
-                ),
-          title: Text(
-            item.title,
-            style: TextStyle(color: isDarkMode ? Colors.white : LightColors.textPrimary),
-          ),
-          subtitle: Text(
-            item.subtitle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: isDarkMode ? Colors.white70 : LightColors.textSecondary),
-          ),
-          trailing: const Icon(Icons.chevron_right, color: LightColors.textHint),
-          onTap: () => _handleResultTap(item),
-        );
-      },
-    );
-  }
-
-  Widget _sectionHeader(String title) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final surfaceColor = isDarkMode ? DarkColors.surface : Colors.white;
+  Widget _sectionHeader(String title, {bool showEdit = true}) {
     return Container(
-      color: surfaceColor,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Row(
         children: [
           Text(
             title,
-            style: TextStyle(
-              fontSize: 15.5,
-              fontWeight: FontWeight.w700,
-              color: isDarkMode ? Colors.white : LightColors.textPrimary,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF757575),
             ),
           ),
           const Spacer(),
-          const Text(
-            'Sửa',
-            style: TextStyle(color: AppColors.primary, fontSize: 14),
-          ),
+          if (showEdit)
+            const Text(
+              'Sửa',
+              style: TextStyle(color: Color(0xFF0091FF), fontSize: 13),
+            ),
         ],
       ),
     );
   }
 
-  List<(String, IconData)> _deriveUsedMiniApps() {
-    final set = <String>{};
-    for (final h in _searchHistory) {
-      final lower = h.toLowerCase();
-      if (lower.contains('vnalopay')) set.add('Vnalopay');
-      if (lower.contains('document')) set.add('My Documents');
-      if (lower.contains('lịch') || lower.contains('lich')) set.add('Lịch Vnalo');
-      if (lower.contains('nạp') || lower.contains('nap')) set.add('Nạp điện thoại');
-    }
-
-    return set.map((name) {
-      if (name == 'Vnalopay') return (name, Icons.account_balance_wallet_outlined);
-      if (name == 'Lịch Vnalo') return (name, Icons.calendar_month_outlined);
-      if (name == 'Nạp điện thoại') return (name, Icons.sim_card_outlined);
-      return (name, Icons.folder_outlined);
-    }).toList();
-  }
-}
-
-class _MiniAppItem extends StatelessWidget {
-  const _MiniAppItem({required this.label, required this.icon});
-
-  final String label;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 82,
-      child: Column(
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(icon, color: AppColors.primary),
+  Widget _buildDefaultView() {
+    return Column(
+      children: [
+        Container(
+          color:
+              Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF1A1A1A)
+                  : Colors.white,
+          child: TabBar(
+            controller: _tabController,
+            dividerColor: Colors.transparent,
+            labelColor: const Color(0xFF0091FF),
+            unselectedLabelColor: Colors.grey,
+            indicatorColor: const Color(0xFF0091FF),
+            indicatorWeight: 3,
+            tabs: [
+              Tab(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Của tôi'),
+                    if (_mineCount > 0) ...[
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0091FF).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '$_mineCount',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0091FF),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Tab(text: 'Khám phá'),
+            ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            maxLines: 2,
-            textAlign: TextAlign.center,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12),
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [_buildMineTab(), _buildDiscoverTab()],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

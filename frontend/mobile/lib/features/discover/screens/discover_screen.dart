@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:vnalo_mobile/core/models/quick_action_item.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
-import 'package:vnalo_mobile/features/common/widgets/quick_actions_sheet.dart';
-import 'package:vnalo_mobile/features/contacts/screens/add_friend_screen.dart';
 import 'package:vnalo_mobile/features/search/screens/unified_search_screen.dart';
 import 'package:vnalo_mobile/core/models/menu_item_model.dart';
 
@@ -13,32 +10,6 @@ class DiscoverScreen extends StatelessWidget {
   void _openQrScanner(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const QrScannerScreen()),
-    );
-  }
-
-  void _openQuickActions(BuildContext context) {
-    showQuickActionsSheet(
-      context,
-      items: [
-        QuickActionItem(
-          icon: Icons.person_add_alt_1_outlined,
-          title: 'Thêm bạn',
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const AddFriendScreen()),
-            );
-          },
-        ),
-        QuickActionItem(
-          icon: Icons.group_add_outlined,
-          title: 'Tạo nhóm',
-          onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Tạo nhóm sẽ được nối ở module chat nhóm.')),
-            );
-          },
-        ),
-      ],
     );
   }
 
@@ -78,7 +49,7 @@ class DiscoverScreen extends StatelessWidget {
               color: Colors.transparent,
               child: Row(
                 children: [
-                  Icon(Icons.search, size: 24, color: searchHint),
+                  Icon(Icons.search, size: 24, color: isDarkMode ? searchHint : Colors.white),
                   const SizedBox(width: 8),
                   Text(
                     'Tìm kiếm',
@@ -95,12 +66,8 @@ class DiscoverScreen extends StatelessWidget {
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.qr_code_scanner, color: searchHint),
+            icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
             onPressed: () => _openQrScanner(context),
-          ),
-          IconButton(
-            icon: Icon(Icons.add, color: searchHint),
-            onPressed: () => _openQuickActions(context),
           ),
         ],
       ),

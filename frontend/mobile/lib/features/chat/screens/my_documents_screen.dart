@@ -1,37 +1,13 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vnalo_mobile/core/database/local_database.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
+import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 
 // A simple local message model for self-storage
-class _LocalMessage {
-  final String id;
-  final String content;
-  final String type; // 'text', 'image', 'file', 'link'
-  final DateTime createdAt;
-
-  _LocalMessage({
-    required this.id,
-    required this.content,
-    required this.type,
-    required this.createdAt,
-  });
-
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'content': content,
-    'type': type,
-    'createdAt': createdAt.toIso8601String(),
-  };
-
-  factory _LocalMessage.fromJson(Map<String, dynamic> json) => _LocalMessage(
-    id: json['id'],
-    content: json['content'],
-    type: json['type'] ?? 'text',
-    createdAt: DateTime.parse(json['createdAt']),
-  );
-}
+// Migrated from private _LocalMessage to global LocalMessage
 
 class MyDocumentsScreen extends StatefulWidget {
   const MyDocumentsScreen({super.key});
@@ -42,10 +18,11 @@ class MyDocumentsScreen extends StatefulWidget {
 
 class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
   static const _storageKey = 'my_documents_messages';
+  static const _convId = 'MY_DOCUMENTS';
   static const List<String> _tabs = ['Tất cả', 'Văn bản', 'Ảnh', 'File', 'Link'];
 
   int _selectedTabIndex = 0;
-  final List<_LocalMessage> _messages = [];
+  final List<LocalMessage> _messages = [];
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _hasText = false;
@@ -65,57 +42,80 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
   }
 
   Future<void> _loadMessages() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_storageKey);
-    if (raw != null) {
-      final List<dynamic> decoded = jsonDecode(raw);
+    try {
+      final db = context.read<LocalDatabase>();
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
+      
+      // 1. One-time Migration from SharedPreferences to SQLite
+      final raw = prefs.getString(_storageKey);
+      if (raw != null) {
+        try {
+          final List<dynamic> decoded = jsonDecode(raw);
+          final auth = context.read<AuthProvider>();
+          final myId = auth.user?.id ?? 'ME';
+          
+          final List<LocalMessage> toMigrate = [];
+          for (final item in decoded) {
+            toMigrate.add(LocalMessage(
+              id: item['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+              conversationId: _convId,
+              senderId: myId,
+              content: item['content'] ?? '',
+              createdAt: DateTime.tryParse(item['createdAt'] ?? '') ?? DateTime.now(),
+            ));
+          }
+          if (toMigrate.isNotEmpty) {
+            await db.saveMessagesBatch(toMigrate);
+          }
+          await prefs.remove(_storageKey); // Clear legacy storage
+        } catch (e) {
+          debugPrint('Migration failed: $e');
+        }
+      }
+
+      // 2. Fetch from SQLite
+      final msgs = await db.getMessagesByConversation(_convId);
+      if (!mounted) return;
       setState(() {
-        _messages.addAll(decoded.map((e) => _LocalMessage.fromJson(e)));
-        _isLoading = false;
+        _messages.clear();
+        _messages.addAll(msgs);
       });
-    } else {
-      setState(() => _isLoading = false);
+    } catch (e) {
+      debugPrint('Error loading messages: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
-  Future<void> _saveMessages() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _storageKey,
-      jsonEncode(_messages.map((m) => m.toJson()).toList()),
-    );
-  }
-
-  void _sendMessage(String content) {
+  void _sendMessage(String content) async {
     if (content.trim().isEmpty) return;
 
-    final String type = _detectType(content);
-    final msg = _LocalMessage(
+    final db = context.read<LocalDatabase>();
+    final auth = context.read<AuthProvider>();
+    final myId = auth.user?.id ?? 'ME';
+    
+    final msg = LocalMessage(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
+      conversationId: _convId,
+      senderId: myId,
       content: content.trim(),
-      type: type,
       createdAt: DateTime.now(),
     );
 
+    await db.saveMessage(msg);
+    if (!mounted) return;
     setState(() => _messages.insert(0, msg));
     _inputController.clear();
     setState(() => _hasText = false);
-    _saveMessages();
   }
 
-  String _detectType(String content) {
-    final trimmed = content.trim();
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-      return 'link';
-    }
-    return 'text';
-  }
-
-  List<_LocalMessage> get _filteredMessages {
-    if (_selectedTabIndex == 0) return _messages;
-    final typeMap = ['', 'text', 'image', 'file', 'link'];
-    final targetType = typeMap[_selectedTabIndex];
-    return _messages.where((m) => m.type == targetType).toList();
+  List<LocalMessage> get _filteredMessages {
+    return _messages; // SQLite query should handle filtering in the future
   }
 
   String _formatTime(DateTime dt) {
@@ -140,8 +140,6 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
     final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
     final bgColor = isDarkMode ? Colors.black : const Color(0xFFEBEDF0);
     final cardColor = isDarkMode ? const Color(0xFF1E1E1E) : Colors.white;
-    final inputBgColor = isDarkMode ? const Color(0xFF1E1E1E) : Colors.white;
-    final hintColor = isDarkMode ? Colors.grey[500]! : Colors.grey[400]!;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -226,7 +224,10 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
                 ? const Center(child: CircularProgressIndicator())
                 : _filteredMessages.isEmpty
                     ? _buildEmpty()
-                    : _buildMessageList(isDarkMode),
+                    : RefreshIndicator(
+                        onRefresh: _loadMessages,
+                        child: _buildMessageList(isDarkMode),
+                      ),
           ),
         ],
       ),
@@ -338,7 +339,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
     final msgs = _filteredMessages;
 
     // Group by date
-    final Map<String, List<_LocalMessage>> grouped = {};
+    final Map<String, List<LocalMessage>> grouped = {};
     for (final m in msgs) {
       final key = _formatDateGroup(m.createdAt);
       grouped.putIfAbsent(key, () => []);
@@ -399,7 +400,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
     );
   }
 
-  Widget _buildBubble(_LocalMessage msg, bool isDarkMode, bool showTime, bool showStatus) {
+  Widget _buildBubble(LocalMessage msg, bool isDarkMode, bool showTime, bool showStatus) {
     final bubbleColor = isDarkMode ? DarkColors.chatBubbleSent : LightColors.chatBubbleSent;
 
     return Align(

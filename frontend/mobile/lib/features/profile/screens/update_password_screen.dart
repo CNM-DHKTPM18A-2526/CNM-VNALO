@@ -139,6 +139,8 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
       appBar: AppBar(
         title: const Text('Cập nhật mật khẩu'),
         backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
+        foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
         flexibleSpace: isDarkMode
             ? null

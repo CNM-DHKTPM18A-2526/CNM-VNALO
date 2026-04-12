@@ -97,7 +97,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
             },
             child: Row(
             children: [
-              Icon(Icons.search, size: 24, color: searchHint),
+              Icon(Icons.search, size: 24, color: isDarkMode ? searchHint : Colors.white),
               const SizedBox(width: 8),
               Text(
                 'Tìm kiếm',
@@ -108,7 +108,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
           ),
           actions: [
             IconButton(
-              icon: Icon(Icons.person_add_outlined, color: searchHint),
+              icon: const Icon(Icons.person_add_outlined, color: Colors.white),
               onPressed: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const AddFriendScreen()),

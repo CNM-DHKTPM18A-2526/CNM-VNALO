@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/services/media_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vnalo_mobile/services/gif_service.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
@@ -28,7 +27,6 @@ class _StickerPickerState extends State<StickerPicker> {
   List<Map<String, dynamic>> _myPacks = [];
   List<Map<String, dynamic>> _recentStickers = [];
   final Map<String, List<Map<String, dynamic>>> _stickersCache = {};
-  bool _isLoadingPacks = false;
   bool _isLoadingRecent = false;
   List<String> _recentEmojis = [];
 
@@ -49,7 +47,6 @@ class _StickerPickerState extends State<StickerPicker> {
 
   Future<void> _loadMyPacks() async {
     if (!mounted) return;
-    setState(() => _isLoadingPacks = true);
     try {
       final mediaService = context.read<MediaService>();
       final packs = await mediaService.getMyPacks();
@@ -62,8 +59,6 @@ class _StickerPickerState extends State<StickerPicker> {
       }
     } catch (e) {
       debugPrint('Error loading sticker packs: $e');
-    } finally {
-      if (mounted) setState(() => _isLoadingPacks = false);
     }
   }
 

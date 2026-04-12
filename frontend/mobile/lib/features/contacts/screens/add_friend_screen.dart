@@ -4,6 +4,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
+import 'package:vnalo_mobile/features/auth/widgets/phone_input.dart';
+import 'package:vnalo_mobile/features/contacts/screens/send_request_screen.dart';
 import 'package:vnalo_mobile/services/api_service.dart';
 import 'package:vnalo_mobile/services/friend_service.dart';
 import 'package:vnalo_mobile/services/qr_service.dart';
@@ -17,6 +19,8 @@ class AddFriendScreen extends StatefulWidget {
 
 class _AddFriendScreenState extends State<AddFriendScreen> {
   final TextEditingController _phoneController = TextEditingController();
+  String _countryCode = '+84';
+  bool _isValid = false;
   bool _isSearching = false;
   String? _qrPayload;
   bool _isLoadingQr = false;
@@ -24,7 +28,25 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
   @override
   void initState() {
     super.initState();
+    _phoneController.addListener(_onPhoneChanged);
     _loadMyQr();
+  }
+
+  void _onPhoneChanged() {
+    final digits = _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
+    // Simple validation: 9-11 digits
+    final isValid = digits.length >= 9 && digits.length <= 11;
+    if (isValid != _isValid) {
+      setState(() => _isValid = isValid);
+    }
+  }
+
+  String _buildFullPhone() {
+    var digits = _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.startsWith('0') && digits.length > 1) {
+      digits = digits.substring(1);
+    }
+    return '$_countryCode$digits';
   }
 
   Future<void> _loadMyQr() async {
@@ -56,16 +78,16 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
 
   @override
   void dispose() {
+    _phoneController.removeListener(_onPhoneChanged);
     _phoneController.dispose();
     super.dispose();
   }
 
   Future<void> _searchByPhone() async {
-    final phone = _phoneController.text.trim();
+    if (!_isValid || _isSearching) return;
+
+    final phone = _buildFullPhone();
     final friendService = context.read<FriendService>();
-    if (phone.isEmpty || _isSearching) {
-      return;
-    }
 
     setState(() {
       _isSearching = true;
@@ -75,39 +97,10 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
       final user = await friendService.searchUserByPhone(phone);
       if (!mounted) return;
 
-      final shouldSend = await showDialog<bool>(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Kết quả tìm kiếm'),
-              content: Text('Tìm thấy ${user.displayName}. Gửi lời mời kết bạn?'),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Huỷ')),
-                FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Gửi lời mời')),
-              ],
-            ),
-          ) ??
-          false;
-
-      if (shouldSend) {
-        try {
-          await friendService.sendFriendRequest(user.id);
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Đã gửi lời mời đến ${user.displayName}.')),
-          );
-        } on ApiException catch (e) {
-          if (!mounted) return;
-          final msg = switch (e.code) {
-            'SOCIAL_003' => 'Bạn đã gửi lời mời kết bạn cho người này rồi.',
-            'SOCIAL_002' => 'Hai bạn đã là bạn bè rồi.',
-            'SOCIAL_001' => 'Không thể tự kết bạn với chính mình.',
-            'SOCIAL_007' => 'Bạn đã chặn người dùng này.',
-            'SOCIAL_008' => 'Người dùng này đã chặn bạn.',
-            _ => 'Không thể gửi lời mời: ${e.message}',
-          };
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-        }
-      }
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => SendRequestScreen(targetUser: user)),
+      );
     } on ApiException catch (e) {
       if (!mounted) return;
       final msg = switch (e.code) {
@@ -136,20 +129,14 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
     final displayName = auth.user?.displayName ?? 'VNALO';
     final scaffoldBg = isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground;
     final sectionBg = isDarkMode ? DarkColors.surface : Colors.white;
-    final inputBorder = isDarkMode ? DarkColors.divider : AppColors.sectionDivider;
 
     return Scaffold(
       backgroundColor: scaffoldBg,
       appBar: AppBar(
-        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
-        foregroundColor: Colors.white,
+        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.white,
+        surfaceTintColor: isDarkMode ? DarkColors.appBarBg : Colors.white,
+        foregroundColor: isDarkMode ? Colors.white : Colors.black,
         elevation: 0,
-        forceMaterialTransparency: true,
-        flexibleSpace: isDarkMode
-            ? null
-            : Container(
-                decoration: const BoxDecoration(gradient: AppColors.appBarGradient),
-              ),
         title: const Text('Thêm bạn', style: TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: ListView(
@@ -205,71 +192,43 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: inputBorder),
-                    borderRadius: BorderRadius.circular(10),
-                    color: sectionBg,
-                  ),
-                  child: Row(
-                    children: [
-                      Text(
-                        '+84',
-                        style: TextStyle(
-                          color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
-                          fontSize: 30 / 2,
-                        ),
-                      ),
-                      const Icon(Icons.keyboard_arrow_down, color: AppColors.iconSubtle),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
                 Expanded(
-                  child: TextField(
+                  child: PhoneInput(
                     controller: _phoneController,
-                    keyboardType: TextInputType.phone,
-                    style: TextStyle(
-                      color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
-                      fontSize: 16,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'Nhập số điện thoại',
-                      hintStyle: const TextStyle(color: LightColors.textHint),
-                      filled: true,
-                      fillColor: sectionBg,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: inputBorder),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: inputBorder),
-                      ),
-                    ),
-                    onSubmitted: (_) => _searchByPhone(),
+                    selectedCountryCode: _countryCode,
+                    onCountryCodeChanged: (val) => setState(() => _countryCode = val),
+                    hintText: 'Nhập số điện thoại',
                   ),
                 ),
-                const SizedBox(width: 8),
-                CircleAvatar(
-                  radius: 22,
-                  backgroundColor: isDarkMode ? DarkColors.surfaceLight : const Color(0xFFE3E7ED),
-                  child: IconButton(
-                    onPressed: _isSearching ? null : _searchByPhone,
-                    icon: _isSearching
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Icon(
-                            Icons.arrow_forward,
-                            color: isDarkMode ? DarkColors.textPrimary : LightColors.textHint,
-                          ),
+                const SizedBox(width: 12),
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: CircleAvatar(
+                    radius: 26,
+                    backgroundColor: 
+                        _isSearching
+                        ? Colors.transparent
+                        : (_isValid 
+                            ? AppColors.primary 
+                            : (isDarkMode ? DarkColors.surface : const Color(0xFFE3E7ED))),
+                    child: IconButton(
+                      onPressed: (_isValid && !_isSearching) ? _searchByPhone : null,
+                      icon: _isSearching
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                            )
+                          : Icon(
+                              Icons.arrow_forward,
+                              color: _isValid ? Colors.white : (isDarkMode ? Colors.white24 : LightColors.textHint),
+                              size: 26,
+                            ),
+                    ),
                   ),
                 ),
               ],

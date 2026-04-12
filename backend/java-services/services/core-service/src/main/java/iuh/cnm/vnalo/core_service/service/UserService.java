@@ -208,7 +208,21 @@ public class UserService {
 
         final UserProfile profile = userProfileRepository.findById(account.getId())
                 .orElseThrow(() -> new ApiException(ErrorCode.USER_PROFILE_NOT_FOUND));
-        return mapToUserInfoResponse(account, profile);
+
+        UserInfoResponse resp = mapToUserInfoResponse(account, profile);
+        resp.setFriendshipStatus(FriendshipStatus.NONE); // Default contract safety
+
+        try {
+            Map<UUID, FriendshipStatus> statusMap = resolveFriendshipStatuses(requesterId, List.of(profile.getId()));
+            if (statusMap.containsKey(profile.getId())) {
+                resp.setFriendshipStatus(statusMap.get(profile.getId()));
+            }
+        } catch (Exception e) {
+            log.warn("Friendship resolution failed: req={}, target={}, cause={}", 
+                requesterId, profile.getId(), e.getMessage(), e);
+        }
+
+        return resp;
     }
 
     @Transactional(readOnly = true)

@@ -32,6 +32,7 @@ class AccountSecurityScreen extends StatelessWidget {
         ),
         backgroundColor: appBarBg,
         foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
         flexibleSpace: isDarkMode
             ? null
             : Container(decoration: const BoxDecoration(gradient: AppColors.appBarGradient)),

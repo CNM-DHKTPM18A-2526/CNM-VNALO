@@ -7,10 +7,13 @@ import 'package:vnalo_mobile/services/auth_service.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 import 'package:vnalo_mobile/services/storage_service.dart';
 
+import 'package:vnalo_mobile/services/local_sync_service.dart';
+
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService;
   final StorageService _storageService;
   final SocketService _socketService;
+  final LocalSyncService _localSyncService;
 
   User? _user;
   bool _isLoading = false;
@@ -32,7 +35,12 @@ class AuthProvider extends ChangeNotifier {
   /// Current access token (cached in memory for synchronous access).
   String? get accessToken => _accessToken;
 
-  AuthProvider(this._authService, this._storageService, this._socketService) {
+  AuthProvider(
+    this._authService,
+    this._storageService,
+    this._socketService,
+    this._localSyncService,
+  ) {
     AuthEvents.onSessionInvalidated = logout;
   }
 
@@ -44,9 +52,14 @@ class AuthProvider extends ChangeNotifier {
       try {
         _user = await _authService.getMe();
         _socketService.connect(token);
-      } catch (_) {
+        debugPrint('[Auth] Success: Profile hydrated.');
+        // Trigger sync after successful hydration
+        _localSyncService.syncRecently();
+      } catch (e) {
+        debugPrint('[Auth] Error: Fetching profile failed: $e');
         await _storageService.clearAll();
         _accessToken = null;
+        // NO sync triggered on failure
       }
     }
     _isInitialized = true;
@@ -87,6 +100,9 @@ class AuthProvider extends ChangeNotifier {
 
       _isLoading = false;
       notifyListeners();
+
+      debugPrint('[Auth] Success: Logged in.');
+      _localSyncService.syncRecently();
 
       return true;
     } catch (e) {
@@ -240,6 +256,10 @@ class AuthProvider extends ChangeNotifier {
 
       _isLoading = false;
       notifyListeners();
+      
+      debugPrint('[Auth] Success: Registered.');
+      _localSyncService.syncRecently();
+      
       return true;
     } catch (e) {
       _error = _friendlyAuthError(e);

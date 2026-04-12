@@ -16,6 +16,10 @@ import 'package:vnalo_mobile/services/friend_service.dart';
 import 'package:vnalo_mobile/services/media_service.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 import 'package:vnalo_mobile/services/storage_service.dart';
+import 'package:vnalo_mobile/services/user_service.dart';
+import 'package:vnalo_mobile/services/local_sync_service.dart';
+import 'package:vnalo_mobile/core/database/local_database.dart';
+import 'package:vnalo_mobile/features/timeline/providers/post_provider.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -46,8 +50,7 @@ void main() {
     coreServiceUrl: coreServiceOverride.isEmpty ? null : coreServiceOverride,
     messageServiceUrl:
         messageServiceOverride.isEmpty ? null : messageServiceOverride,
-    mediaServiceUrl:
-      mediaServiceOverride.isEmpty ? null : mediaServiceOverride,
+    mediaServiceUrl: mediaServiceOverride.isEmpty ? null : mediaServiceOverride,
     socketUrl: socketOverride.isEmpty ? null : socketOverride,
   );
 
@@ -88,6 +91,21 @@ class VnaloApp extends StatelessWidget {
         Provider<FriendService>(
           create: (context) => FriendService(context.read<ApiService>()),
         ),
+        Provider<UserService>(
+          create: (context) => UserService(context.read<ApiService>()),
+        ),
+        Provider<LocalDatabase>(
+          create: (_) => LocalDatabase(),
+          dispose: (_, db) => db.close(),
+        ),
+        Provider<LocalSyncService>(
+          create:
+              (context) => LocalSyncService(
+                db: context.read<LocalDatabase>(),
+                chatService: context.read<ChatService>(),
+                friendService: context.read<FriendService>(),
+              ), // Moved sync logic to AuthProvider
+        ),
         Provider<MediaService>(
           create: (context) => MediaService(context.read<ApiService>()),
         ),
@@ -103,6 +121,7 @@ class VnaloApp extends StatelessWidget {
                 context.read<AuthService>(),
                 context.read<StorageService>(),
                 context.read<SocketService>(),
+                context.read<LocalSyncService>(),
               ),
         ),
         ChangeNotifierProvider<ChatProvider>(
@@ -111,7 +130,11 @@ class VnaloApp extends StatelessWidget {
                 context.read<ChatService>(),
                 context.read<SocketService>(),
                 context.read<MediaService>(),
+                context.read<LocalDatabase>(),
               ),
+        ),
+        ChangeNotifierProvider<PostProvider>(
+          create: (_) => PostProvider(),
         ),
       ],
       child: Consumer2<ThemeProvider, LanguageProvider>(
@@ -122,18 +145,16 @@ class VnaloApp extends StatelessWidget {
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: themeProvider.themeMode,
-            locale: languageProvider.language == AppLanguage.vi
-                ? const Locale('vi', 'VN')
-                : const Locale('en', 'US'),
+            locale:
+                languageProvider.language == AppLanguage.vi
+                    ? const Locale('vi', 'VN')
+                    : const Locale('en', 'US'),
             localizationsDelegates: const [
               GlobalMaterialLocalizations.delegate,
               GlobalWidgetsLocalizations.delegate,
               GlobalCupertinoLocalizations.delegate,
             ],
-            supportedLocales: const [
-              Locale('vi', 'VN'),
-              Locale('en', 'US'),
-            ],
+            supportedLocales: const [Locale('vi', 'VN'), Locale('en', 'US')],
             home: const SplashScreen(),
           );
         },

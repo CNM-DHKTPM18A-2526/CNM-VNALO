@@ -286,7 +286,7 @@ class ProfileDetailScreen extends StatelessWidget {
                       child: ElevatedButton(
                         onPressed: () => Navigator.pop(sheetContext),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary.withValues(alpha: 0.2),
+                          backgroundColor: AppColors.primary.withOpacity(0.2),
                           foregroundColor: Colors.white,
                         ),
                         child: const Text('LƯU'),
@@ -342,6 +342,7 @@ class ProfileDetailScreen extends StatelessWidget {
                             httpHeaders: token != null
                                 ? {'Authorization': 'Bearer $token'}
                                 : const {},
+                            placeholder: (_, __) => _buildCoverPlaceholder(),
                             errorWidget: (_, __, ___) => _buildCoverPlaceholder(),
                           )
                         : _buildCoverPlaceholder(),
@@ -436,7 +437,7 @@ class ProfileDetailScreen extends StatelessWidget {
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 3),
                           boxShadow: [
-                            BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4)),
+                            BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4)),
                           ],
                         ),
                         child: AvatarWidget(imageUrl: user?.avatarUrl, name: displayName, size: 100),
@@ -536,11 +537,11 @@ class ProfileDetailScreen extends StatelessWidget {
                   Stack(
                     alignment: Alignment.center,
                     children: [
-                      Icon(Icons.person_outline, size: 64, color: AppColors.primary.withValues(alpha: 0.3)),
+                      Icon(Icons.person_outline, size: 64, color: AppColors.primary.withOpacity(0.3)),
                       Positioned(left: -10, top: 5,
-                        child: Icon(Icons.favorite, size: 24, color: Colors.red.withValues(alpha: 0.6))),
+                        child: Icon(Icons.favorite, size: 24, color: Colors.red.withOpacity(0.6))),
                       Positioned(right: -10, top: 0,
-                        child: Icon(Icons.chat_bubble, size: 24, color: AppColors.primary.withValues(alpha: 0.6))),
+                        child: Icon(Icons.chat_bubble, size: 24, color: AppColors.primary.withOpacity(0.6))),
                     ],
                   ),
                   const SizedBox(height: 16),
