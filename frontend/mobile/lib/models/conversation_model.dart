@@ -20,6 +20,8 @@ class Conversation {
   final bool allowMemberEditInfo;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final String? wallpaperUrl;
+  final DateTime? historyClearedAt;
 
   // Fields for client-side use (not from server)
   final List<ConversationMember> members;
@@ -28,6 +30,10 @@ class Conversation {
   final bool isPinned;
   final bool isMuted;
   final bool isHidden;
+  final bool isFavorite;
+  final int autoDeleteSeconds;
+  final bool notifyCall;
+  final String? personalWallpaperUrl;
 
   Conversation({
     required this.id,
@@ -47,12 +53,18 @@ class Conversation {
     this.allowMemberEditInfo = false,
     this.createdAt,
     this.updatedAt,
+    this.wallpaperUrl,
+    this.historyClearedAt,
     this.members = const [],
     this.lastMessage,
     this.unreadCount = 0,
     this.isPinned = false,
     this.isMuted = false,
     this.isHidden = false,
+    this.isFavorite = false,
+    this.autoDeleteSeconds = 0,
+    this.notifyCall = true,
+    this.personalWallpaperUrl,
   });
 
   Conversation copyWith({
@@ -79,6 +91,12 @@ class Conversation {
     bool? isPinned,
     bool? isMuted,
     bool? isHidden,
+    bool? isFavorite,
+    int? autoDeleteSeconds,
+    bool? notifyCall,
+    String? personalWallpaperUrl,
+    String? wallpaperUrl,
+    DateTime? historyClearedAt,
   }) {
     return Conversation(
       id: id ?? this.id,
@@ -104,6 +122,12 @@ class Conversation {
       isPinned: isPinned ?? this.isPinned,
       isMuted: isMuted ?? this.isMuted,
       isHidden: isHidden ?? this.isHidden,
+      isFavorite: isFavorite ?? this.isFavorite,
+      autoDeleteSeconds: autoDeleteSeconds ?? this.autoDeleteSeconds,
+      notifyCall: notifyCall ?? this.notifyCall,
+      personalWallpaperUrl: personalWallpaperUrl ?? this.personalWallpaperUrl,
+      wallpaperUrl: wallpaperUrl ?? this.wallpaperUrl,
+      historyClearedAt: historyClearedAt ?? this.historyClearedAt,
     );
   }
 
@@ -210,6 +234,11 @@ class Conversation {
         json['createdAt'] != null ? DateTime.parse(json['createdAt']) : null,
     updatedAt:
         json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : null,
+    wallpaperUrl: json['wallpaperUrl'],
+    historyClearedAt:
+        json['historyClearedAt'] != null
+            ? DateTime.parse(json['historyClearedAt'])
+            : null,
     members:
         (json['members'] as List?)
             ?.map((m) => ConversationMember.fromJson(m))
@@ -220,8 +249,12 @@ class Conversation {
             ? Message.fromJson(json['lastMessage'])
             : null,
     unreadCount: _toInt(json['unreadCount']),
-    isPinned: json['isPinned'] ?? false,
-    isMuted: json['isMuted'] ?? false,
-    isHidden: json['isHidden'] ?? false,
+    isPinned: json['isPinned'] ?? json['is_pinned'] ?? false,
+    isMuted: json['isMuted'] ?? json['is_muted'] ?? false,
+    isHidden: json['isHidden'] ?? json['is_hidden'] ?? false,
+    isFavorite: json['isFavorite'] ?? json['is_favorite'] ?? false,
+    autoDeleteSeconds: _toInt(json['autoDeleteSeconds'] ?? json['auto_delete_seconds']),
+    notifyCall: json['notifyCall'] ?? json['notify_call'] ?? true,
+    personalWallpaperUrl: json['personalWallpaperUrl'] ?? json['personal_wallpaper_url'],
   );
 }

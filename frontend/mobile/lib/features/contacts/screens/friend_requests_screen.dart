@@ -6,6 +6,7 @@ import 'package:vnalo_mobile/features/contacts/screens/friend_options_screen.dar
 import 'package:vnalo_mobile/services/api_service.dart';
 import 'package:vnalo_mobile/services/chat_service.dart';
 import 'package:vnalo_mobile/services/friend_service.dart';
+import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
 
 class FriendRequestsScreen extends StatefulWidget {
@@ -65,6 +66,10 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
       if (friendUserId.isNotEmpty) {
         try {
           conversation = await context.read<ChatService>().getOrCreateDirect(friendUserId);
+          // Refresh inbox so the new friend appears in the messages tab
+          if (mounted) {
+            context.read<ChatProvider>().loadInbox();
+          }
         } catch (_) {
           // Conversation creation may fail, continue to options screen
         }

@@ -47,6 +47,10 @@ class ChatService {
         'isPinned': inboxEntry['isPinned'] ?? inboxEntry['is_pinned'] ?? false,
         'isMuted': inboxEntry['isMuted'] ?? inboxEntry['is_muted'] ?? false,
         'isHidden': inboxEntry['isHidden'] ?? inboxEntry['is_hidden'] ?? false,
+        'isFavorite': inboxEntry['isFavorite'] ?? inboxEntry['is_favorite'] ?? false,
+        'autoDeleteSeconds': inboxEntry['autoDeleteSeconds'] ?? inboxEntry['auto_delete_seconds'] ?? 0,
+        'notifyCall': inboxEntry['notifyCall'] ?? inboxEntry['notify_call'] ?? true,
+        'personalWallpaperUrl': inboxEntry['personalWallpaperUrl'] ?? inboxEntry['personal_wallpaper_url'],
       };
 
       final preview =
@@ -147,6 +151,10 @@ class ChatService {
           isPinned: conv.isPinned,
           isMuted: conv.isMuted,
           isHidden: conv.isHidden,
+          isFavorite: conv.isFavorite,
+          autoDeleteSeconds: conv.autoDeleteSeconds,
+          notifyCall: conv.notifyCall,
+          personalWallpaperUrl: conv.personalWallpaperUrl,
         );
       }
     }
@@ -251,5 +259,54 @@ class ChatService {
     );
 
     return Message.fromJson(response['data']);
+  }
+
+  Future<Map<String, dynamic>> updateInboxSettings(String conversationId, {
+    bool? isPinned, 
+    bool? isMuted, 
+    bool? isHidden,
+    bool? isFavorite,
+    int? autoDeleteSeconds,
+    bool? notifyCall,
+    String? wallpaperUrl,
+  }) async {
+    final Map<String, dynamic> body = {};
+    if (isPinned != null) body['isPinned'] = isPinned;
+    if (isMuted != null) body['isMuted'] = isMuted;
+    if (isHidden != null) body['isHidden'] = isHidden;
+    if (isFavorite != null) body['isFavorite'] = isFavorite;
+    if (autoDeleteSeconds != null) body['autoDeleteSeconds'] = autoDeleteSeconds;
+    if (notifyCall != null) body['notifyCall'] = notifyCall;
+    if (wallpaperUrl != null) body['wallpaperUrl'] = wallpaperUrl;
+
+    return _apiService.patch(_base, '/inbox/$conversationId', body: body);
+  }
+
+  Future<void> deleteChatHistory(String conversationId) async {
+    await _apiService.delete(_base, '/inbox/$conversationId/history');
+  }
+
+  Future<void> updateMemberNickname(String conversationId, String targetUserId, String nickname) async {
+    await _apiService.patch(_base, '/conversations/$conversationId/member/$targetUserId', body: {
+      'nickname': nickname,
+    });
+  }
+
+  Future<void> updateWallpaper(String conversationId, String wallpaperUrl, {bool isGlobal = true}) async {
+    await _apiService.patch(_base, '/conversations/$conversationId/wallpaper', body: {
+      'wallpaperUrl': wallpaperUrl,
+      'isGlobal': isGlobal,
+    });
+  }
+
+  Future<List<Message>> searchMedia(String conversationId, {String? messageType, int limit = 50}) async {
+    final queryParams = {
+      'limit': limit.toString(),
+      if (messageType != null) 'messageType': messageType,
+    };
+
+    final response = await _apiService.get(_base, '/messages/search/$conversationId', queryParams: queryParams);
+    final List items = response['items'] ?? [];
+    return items.map((m) => Message.fromJson(m)).toList();
   }
 }

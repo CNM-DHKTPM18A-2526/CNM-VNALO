@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { SearchInput } from '../../../shared/components/SearchInput'
 import { Icon } from '../../../shared/components/Icon'
@@ -6,26 +6,48 @@ import { Button } from '../../../shared/components/ui/Button'
 import { AddFriendModal } from '../../friends/components/AddFriendModal'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { useLanguage } from '../../../shared/i18n/LanguageContext'
+import type { UserLookupResult } from '../../friends/friends.types'
 import type { ConversationSummary } from '../chat.types'
 import { ChatItem } from './ChatItem'
 
 type ChatListProps = {
   conversations: ConversationSummary[]
+  friendResults: UserLookupResult[]
   selectedConversationId: string
+  onSearchFriends: (keyword: string) => void
+  onOpenFriendChat: (friend: UserLookupResult) => void | Promise<void>
   onSelectConversation: (conversationId: string) => void
 }
 
 export function ChatList({
   conversations,
+  friendResults,
   selectedConversationId,
+  onSearchFriends,
+  onOpenFriendChat,
   onSelectConversation,
 }: ChatListProps) {
   const { t } = useLanguage()
   const [keyword, setKeyword] = useState('')
+  const [debouncedKeyword, setDebouncedKeyword] = useState('')
   const [isAddFriendOpen, setIsAddFriendOpen] = useState(false)
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false)
   const [groupName, setGroupName] = useState('')
   const [groupMembers, setGroupMembers] = useState('')
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedKeyword(keyword.trim())
+    }, 300)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [keyword])
+
+  useEffect(() => {
+    onSearchFriends(debouncedKeyword)
+  }, [debouncedKeyword, onSearchFriends])
 
   const selectedConversation = useMemo(
     () => conversations.find((conversation) => conversation.id === selectedConversationId),
@@ -33,7 +55,7 @@ export function ChatList({
   )
 
   const filteredConversations = useMemo(() => {
-    const normalizedKeyword = keyword.trim().toLowerCase()
+    const normalizedKeyword = debouncedKeyword.toLowerCase()
 
     if (!normalizedKeyword) {
       return conversations
@@ -42,7 +64,33 @@ export function ChatList({
     return conversations.filter((conversation) =>
       conversation.name.toLowerCase().includes(normalizedKeyword),
     )
-  }, [conversations, keyword])
+  }, [conversations, debouncedKeyword])
+
+  const friendResultItems = useMemo<ConversationSummary[]>(() => {
+    return friendResults.map((friend) => ({
+      id: friend.id,
+      name: friend.displayName?.trim() || friend.phone || friend.email || t('contacts.common.unknownUser'),
+      lastMessage: friend.statusMessage?.trim() || friend.phone || friend.email || '',
+      unreadCount: 0,
+      online: false,
+      lastMessageSeq: 0,
+    }))
+  }, [friendResults, t])
+
+  const hasKeyword = debouncedKeyword.length > 0
+  const hasResults = filteredConversations.length > 0 || friendResultItems.length > 0
+
+  const openFriendSearch = () => {
+    setIsAddFriendOpen(true)
+  }
+
+  const addFriendInitialTarget = useMemo(
+    () => ({
+      displayName: selectedConversation?.name ?? undefined,
+      seedQuery: keyword.trim() || selectedConversation?.name || undefined,
+    }),
+    [keyword, selectedConversation],
+  )
 
   return (
     <section className='chat-list-panel'>
@@ -53,7 +101,7 @@ export function ChatList({
           <div className='chat-toolbar-actions' aria-label={t('chat.quickActions')}>
             <button
               className='chat-toolbar-btn'
-              onClick={() => setIsAddFriendOpen(true)}
+              onClick={openFriendSearch}
               title={t('chat.addFriend')}
               type='button'
             >
@@ -73,6 +121,7 @@ export function ChatList({
         </div>
       </div>
       <div className='chat-list'>
+        {filteredConversations.length > 0 ? <p>{t('chat.searchConversationsSection')}</p> : null}
         {filteredConversations.map((conversation, index) => (
           <ChatItem
             key={conversation.id}
@@ -82,17 +131,28 @@ export function ChatList({
             onSelect={onSelectConversation}
           />
         ))}
+
+        {friendResultItems.length > 0 ? <p>{t('chat.searchFriendsSection')}</p> : null}
+        {friendResultItems.map((friend, index) => (
+          <ChatItem
+            key={`friend-${friend.id}`}
+            conversation={friend}
+            active={false}
+            index={filteredConversations.length + index}
+            onSelect={() => {
+              const selectedFriend = friendResults[index]
+              if (selectedFriend) {
+                void onOpenFriendChat(selectedFriend)
+              }
+            }}
+          />
+        ))}
+
+        {hasKeyword && !hasResults ? <p>{t('chat.searchEmpty')}</p> : null}
       </div>
 
       <AddFriendModal
-        initialTarget={
-          selectedConversation
-            ? {
-                displayName: selectedConversation.name,
-                seedQuery: selectedConversation.name,
-              }
-            : null
-        }
+        initialTarget={addFriendInitialTarget}
         isOpen={isAddFriendOpen}
         onClose={() => setIsAddFriendOpen(false)}
       />

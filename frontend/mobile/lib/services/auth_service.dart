@@ -135,6 +135,7 @@ class AuthService {
         'deviceName': deviceName,
         'platform': platform ?? 'ANDROID',
         'location': location,
+        'confirmReplaceActiveUntrusted': true,
       },
     );
   }

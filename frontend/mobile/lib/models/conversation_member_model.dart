@@ -44,31 +44,79 @@ class ConversationMember {
   bool get isOwner => role == MemberRole.OWNER;
   bool get isAdmin => role == MemberRole.ADMIN || role == MemberRole.OWNER;
 
+  ConversationMember copyWith({
+    String? conversationId,
+    String? userId,
+    MemberRole? role,
+    String? nickname,
+    DateTime? joinedAt,
+    String? joinedBy,
+    DateTime? leftAt,
+    String? removedBy,
+    DateTime? muteUntil,
+    bool? isPinned,
+    int? pinOrder,
+    bool? isHidden,
+    int? lastReadSeq,
+    DateTime? lastReadAt,
+    NotificationSetting? notificationSetting,
+    User? user,
+  }) {
+    return ConversationMember(
+      conversationId: conversationId ?? this.conversationId,
+      userId: userId ?? this.userId,
+      role: role ?? this.role,
+      nickname: nickname ?? this.nickname,
+      joinedAt: joinedAt ?? this.joinedAt,
+      joinedBy: joinedBy ?? this.joinedBy,
+      leftAt: leftAt ?? this.leftAt,
+      removedBy: removedBy ?? this.removedBy,
+      muteUntil: muteUntil ?? this.muteUntil,
+      isPinned: isPinned ?? this.isPinned,
+      pinOrder: pinOrder ?? this.pinOrder,
+      isHidden: isHidden ?? this.isHidden,
+      lastReadSeq: lastReadSeq ?? this.lastReadSeq,
+      lastReadAt: lastReadAt ?? this.lastReadAt,
+      notificationSetting: notificationSetting ?? this.notificationSetting,
+      user: user ?? this.user,
+    );
+  }
+
+  static int _toInt(dynamic v, [int fallback = 0]) {
+    if (v == null) return fallback;
+    if (v is int) return v;
+    if (v is String) return int.tryParse(v) ?? fallback;
+    return fallback;
+  }
+
   factory ConversationMember.fromJson(
     Map<String, dynamic> json,
   ) => ConversationMember(
-    conversationId: json['conversationId'] ?? '',
-    userId: json['userId'] ?? '',
+    conversationId: json['conversationId'] ?? json['conversation_id'] ?? '',
+    userId: json['userId'] ?? json['user_id'] ?? '',
     role: enumFromString(MemberRole.values, json['role'] ?? 'MEMBER'),
     nickname: json['nickname'],
     joinedAt:
-        json['joinedAt'] != null
-            ? DateTime.parse(json['joinedAt'])
+        json['joinedAt'] != null || json['joined_at'] != null
+            ? DateTime.parse(json['joinedAt'] ?? json['joined_at'])
             : DateTime.now(),
-    joinedBy: json['joinedBy'],
-    leftAt: json['leftAt'] != null ? DateTime.parse(json['leftAt']) : null,
-    removedBy: json['removedBy'],
+    joinedBy: json['joinedBy'] ?? json['joined_by'],
+    leftAt: json['leftAt'] != null || json['left_at'] != null 
+        ? DateTime.parse(json['leftAt'] ?? json['left_at']) : null,
+    removedBy: json['removedBy'] ?? json['removed_by'],
     muteUntil:
-        json['muteUntil'] != null ? DateTime.parse(json['muteUntil']) : null,
-    isPinned: json['isPinned'] ?? false,
-    pinOrder: json['pinOrder'] is int ? json['pinOrder'] : (json['pinOrder'] is String ? int.tryParse(json['pinOrder']) : null),
-    isHidden: json['isHidden'] ?? false,
-    lastReadSeq: json['lastReadSeq'] is int ? json['lastReadSeq'] : (json['lastReadSeq'] is String ? int.tryParse(json['lastReadSeq']) ?? 0 : 0),
+        json['muteUntil'] != null || json['mute_until'] != null 
+            ? DateTime.parse(json['muteUntil'] ?? json['mute_until']) : null,
+    isPinned: json['isPinned'] ?? json['is_pinned'] ?? false,
+    pinOrder: _toInt(json['pinOrder'] ?? json['pin_order'], 0),
+    isHidden: json['isHidden'] ?? json['is_hidden'] ?? false,
+    lastReadSeq: _toInt(json['lastReadSeq'] ?? json['last_read_seq'], 0),
     lastReadAt:
-        json['lastReadAt'] != null ? DateTime.parse(json['lastReadAt']) : null,
+        json['lastReadAt'] != null || json['last_read_at'] != null 
+            ? DateTime.parse(json['lastReadAt'] ?? json['last_read_at']) : null,
     notificationSetting: enumFromString(
       NotificationSetting.values,
-      json['notificationSetting'] ?? 'ALL',
+      json['notificationSetting'] ?? json['notification_setting'] ?? 'ALL',
     ),
     user: json['user'] != null ? User.fromJson(json['user']) : null,
   );

@@ -20,6 +20,7 @@ class Message {
   // Reply fields
   final String? replyToMessageId;
   final String? replyToSenderId;
+  final String? replyToSenderName;
   final String? replyToContent;
 
   // Forward fields
@@ -47,6 +48,7 @@ class Message {
     this.mediaSizeBytes,
     this.replyToMessageId,
     this.replyToSenderId,
+    this.replyToSenderName,
     this.replyToContent,
     this.forwardFromMessageId,
     this.forwardFromConversationId,
@@ -79,6 +81,7 @@ class Message {
     int? mediaSizeBytes,
     String? replyToMessageId,
     String? replyToSenderId,
+    String? replyToSenderName,
     String? replyToContent,
     String? forwardFromMessageId,
     String? forwardFromConversationId,
@@ -103,6 +106,7 @@ class Message {
       mediaSizeBytes: mediaSizeBytes ?? this.mediaSizeBytes,
       replyToMessageId: replyToMessageId ?? this.replyToMessageId,
       replyToSenderId: replyToSenderId ?? this.replyToSenderId,
+      replyToSenderName: replyToSenderName ?? this.replyToSenderName,
       replyToContent: replyToContent ?? this.replyToContent,
       forwardFromMessageId: forwardFromMessageId ?? this.forwardFromMessageId,
       forwardFromConversationId:
@@ -114,36 +118,55 @@ class Message {
     );
   }
 
+  static int? _toInt(dynamic v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    if (v is String) return int.tryParse(v);
+    return null;
+  }
+
   // Factory constructor to create a Message instance from JSON
   factory Message.fromJson(Map<String, dynamic> json) => Message(
     id: json['id'] ?? json['_id'] ?? '',
-    conversationId: json['conversationId'] ?? '',
-    serverSeq: json['serverSeq'],
-    senderId: json['senderId'] ?? '',
-    senderName: json['senderName'],
-    senderAvatarUrl: json['senderAvatarUrl'],
-    clientMessageId: json['clientMessageId'],
+    conversationId: json['conversationId'] ??
+        json['conversation_id'] ??
+        json['cid'] ??
+        json['conversation']?['id'] ??
+        '',
+    serverSeq: _toInt(json['serverSeq'] ?? json['server_seq']),
+    senderId: json['senderId'] ?? json['sender_id'] ?? '',
+    senderName: json['senderName'] ?? json['sender_name'],
+    senderAvatarUrl: json['senderAvatarUrl'] ?? json['sender_avatar_url'],
+    clientMessageId: json['clientMessageId'] ?? json['client_message_id'],
     messageType: enumFromString(
       MessageType.values,
-      json['messageType'] ?? 'TEXT',
+      json['messageType'] ?? json['message_type'] ?? 'TEXT',
     ),
     content: json['content'],
-    mediaUrl: json['mediaUrl'],
-    mediaThumbnailUrl: json['mediaThumbnailUrl'],
-    mediaMimeType: json['mediaMimeType'],
-    mediaSizeBytes: json['mediaSizeBytes'],
-    replyToMessageId: json['replyToMessageId'],
-    replyToSenderId: json['replyToSenderId'],
-    replyToContent: json['replyToContent'],
-    forwardFromMessageId: json['forwardFromMessageId'],
-    forwardFromConversationId: json['forwardFromConversationId'],
-    status: enumFromString(MessageStatus.values, json['status'] ?? 'SENT'),
-    isEdited: json['isEdited'] ?? false,
+    mediaUrl: json['mediaUrl'] ?? json['media_url'],
+    mediaThumbnailUrl: json['mediaThumbnailUrl'] ?? json['media_thumbnail_url'],
+    mediaMimeType: json['mediaMimeType'] ?? json['media_mime_type'],
+    mediaSizeBytes: _toInt(json['mediaSizeBytes'] ?? json['media_size_bytes']),
+    replyToMessageId: json['replyToMessageId'] ?? json['reply_to_message_id'],
+    replyToSenderId: json['replyToSenderId'] ?? json['reply_to_sender_id'],
+    replyToSenderName: json['replyToSenderName'] ?? json['reply_to_sender_name'],
+    replyToContent: json['replyToContent'] ?? json['reply_to_content'],
+    forwardFromMessageId:
+        json['forwardFromMessageId'] ?? json['forward_from_message_id'],
+    forwardFromConversationId:
+        json['forwardFromConversationId'] ?? json['forward_from_conversation_id'],
+    status: enumFromString(
+      MessageStatus.values,
+      json['status'] ?? 'SENT',
+    ),
+    isEdited: json['isEdited'] ?? json['is_edited'] ?? false,
     editedAt:
-        json['editedAt'] != null ? DateTime.parse(json['editedAt']) : null,
+        json['editedAt'] != null || json['edited_at'] != null
+            ? DateTime.parse(json['editedAt'] ?? json['edited_at'])
+            : null,
     createdAt:
-        json['createdAt'] != null
-            ? DateTime.parse(json['createdAt'])
+        json['createdAt'] != null || json['created_at'] != null
+            ? DateTime.parse(json['createdAt'] ?? json['created_at'])
             : DateTime.now(),
   );
 }

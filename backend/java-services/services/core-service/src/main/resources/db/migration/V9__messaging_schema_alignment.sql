@@ -9,10 +9,20 @@
 -- =====================================================
 
 -- Rename reply_to_id → reply_to_message_id
-ALTER TABLE message RENAME COLUMN reply_to_id TO reply_to_message_id;
+DO $$ 
+BEGIN 
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='message' AND column_name='reply_to_id') THEN
+    ALTER TABLE message RENAME COLUMN reply_to_id TO reply_to_message_id;
+  END IF;
+END $$;
 
 -- Rename forward_from_id → forward_from_message_id
-ALTER TABLE message RENAME COLUMN forward_from_id TO forward_from_message_id;
+DO $$ 
+BEGIN 
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='message' AND column_name='forward_from_id') THEN
+    ALTER TABLE message RENAME COLUMN forward_from_id TO forward_from_message_id;
+  END IF;
+END $$;
 
 -- Add media columns (denormalized for fast access)
 ALTER TABLE message ADD COLUMN IF NOT EXISTS media_url VARCHAR(500);

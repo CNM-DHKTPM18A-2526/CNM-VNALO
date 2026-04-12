@@ -394,7 +394,7 @@ export class ConversationService {
     return conversation;
   }
 
-  private async ensureUnderMemberLimit(
+  async ensureUnderMemberLimit(
     conversationId: string,
     memberLimit: number,
     addingCount: number,
@@ -407,6 +407,42 @@ export class ConversationService {
       throw new BadRequestException(
         `Cannot exceed member limit of ${memberLimit}. Current: ${currentMemberCount}, adding: ${addingCount}`,
       );
+    }
+  }
+
+  /** Update member nickname or role. */
+  async updateMember(conversationId: string, requesterId: string, targetUserId: string, dto: { nickname?: string; role?: any }) {
+    const member = await this.memberRepo.findOne({
+      where: { conversationId, userId: targetUserId, leftAt: IsNull() },
+    });
+    if (!member) throw new NotFoundException('Member not found');
+
+    const isSelf = requesterId === targetUserId;
+    if (!isSelf) {
+      await this.assertAdminOrOwner(conversationId, requesterId);
+    }
+
+    if (dto.nickname !== undefined) member.nickname = dto.nickname;
+    if (dto.role !== undefined && !isSelf) member.role = dto.role;
+
+    return this.memberRepo.save(member);
+  }
+
+  /** Update conversation wallpaper. */
+  async updateWallpaper(conversationId: string, userId: string, wallpaperUrl: string, isGlobal = true) {
+    if (isGlobal) {
+      const conversation = await this.getConversationOrFail(conversationId);
+      await this.assertAdminOrOwner(conversationId, userId);
+
+      conversation.wallpaperUrl = wallpaperUrl;
+      return this.conversationRepo.save(conversation);
+    } else {
+      const entry = await this.inboxRepo.findOne({ where: { userId, conversationId } });
+      if (!entry) {
+        throw new NotFoundException('Conversation not found in your inbox');
+      }
+      entry.wallpaperUrl = wallpaperUrl;
+      return this.inboxRepo.save(entry);
     }
   }
 }

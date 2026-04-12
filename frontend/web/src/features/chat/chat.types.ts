@@ -5,7 +5,10 @@ export type ConversationSummary = {
   unreadCount: number
   online: boolean
   lastMessageSeq?: number
+  participantUserIds?: string[]
 }
+
+export type MessageDeliveryState = 'sending' | 'sent' | 'read' | 'failed'
 
 export type ChatMessage = {
   id: string
@@ -16,6 +19,7 @@ export type ChatMessage = {
   timestamp: string
   serverSeq?: number
   clientMessageId?: string
+  deliveryState?: MessageDeliveryState
 }
 
 export type MessageReadEvent = {

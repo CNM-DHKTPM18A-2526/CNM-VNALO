@@ -18,19 +18,21 @@ public class StickerPackDetailResponse {
     private String name;
     private String description;
     private UUID coverMediaId;
+    private String coverUrl;
     private Integer downloadCount;
     private Integer stickerCount;
     private StickerPackStatus status;
     private LocalDateTime createdAt;
     private List<StickerResponse> stickers;
 
-    public static StickerPackDetailResponse from(StickerPack pack, List<StickerResponse> stickers) {
+    public static StickerPackDetailResponse from(StickerPack pack, String coverUrl, List<StickerResponse> stickers) {
         return StickerPackDetailResponse.builder()
                 .stickerPackId(pack.getStickerPackId())
                 .ownerUserId(pack.getOwnerUserId())
                 .name(pack.getName())
                 .description(pack.getDescription())
                 .coverMediaId(pack.getCoverMediaId())
+                .coverUrl(coverUrl)
                 .downloadCount(pack.getDownloadCount())
                 .stickerCount(pack.getStickerCount())
                 .status(pack.getStatus())

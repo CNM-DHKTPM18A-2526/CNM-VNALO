@@ -38,7 +38,10 @@ class SettingsScreen extends StatelessWidget {
           IconButton(
             icon: Icon(Icons.search, color: searchHint),
             onPressed: () {
-              // TODO: Settings search
+              showSearch(
+                context: context,
+                delegate: _SettingsSearchDelegate(),
+              );
             },
           ),
         ],
@@ -325,5 +328,76 @@ class _SectionDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const SizedBox(height: 8);
+  }
+}
+
+class _SettingsSearchDelegate extends SearchDelegate<String> {
+  final List<String> _settingsKeys = [
+    'Tài khoản và bảo mật',
+    'Quyền riêng tư',
+    'Dữ liệu trên máy',
+    'Sao lưu và khôi phục',
+    'Thông báo',
+    'Tin nhắn',
+    'Danh bạ',
+    'Giao diện và ngôn ngữ',
+  ];
+
+  @override
+  String get searchFieldLabel => 'Tìm cài đặt...';
+
+  @override
+  List<Widget>? buildActions(BuildContext context) {
+    return [
+      if (query.isNotEmpty)
+        IconButton(
+          icon: const Icon(Icons.clear),
+          onPressed: () {
+            query = '';
+          },
+        ),
+    ];
+  }
+
+  @override
+  Widget? buildLeading(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () {
+        close(context, '');
+      },
+    );
+  }
+
+  @override
+  Widget buildResults(BuildContext context) {
+    return _buildSuggestionsList();
+  }
+
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    return _buildSuggestionsList();
+  }
+
+  Widget _buildSuggestionsList() {
+    final suggestions = _settingsKeys
+        .where((key) => key.toLowerCase().contains(query.toLowerCase()))
+        .toList();
+
+    return ListView.builder(
+      itemCount: suggestions.length,
+      itemBuilder: (context, index) {
+        return ListTile(
+          title: Text(suggestions[index]),
+          leading: const Icon(Icons.settings),
+          onTap: () {
+            close(context, suggestions[index]);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Đang phát triển thiết lập: ${suggestions[index]}')),
+            );
+          },
+        );
+      },
+    );
   }
 }

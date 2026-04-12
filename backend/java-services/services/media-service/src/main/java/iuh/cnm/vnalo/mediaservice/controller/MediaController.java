@@ -46,6 +46,7 @@ public class MediaController {
             "application/pdf"
     );
     private static final long MAX_FILE_SIZE = 100 * 1024 * 1024L; // 100MB
+    private static final UUID SYSTEM_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000000");
 
     @PostMapping(value = "/upload", consumes = "multipart/form-data")
     public ResponseEntity<ApiResponse<MediaResponse>> uploadFile(
@@ -102,8 +103,11 @@ public class MediaController {
             @PathVariable UUID id
     ) {
         UUID userId = getUserId(authentication);
-        ensureCanAccess(id, userId);
+        // Kiểm tra quyền: Chủ sở hữu hoặc Hệ thống (đối với GIF/Emoji)
         MediaMetadata media = mediaService.getMedia(id);
+        if (!media.getOwnerUserId().equals(SYSTEM_USER_ID)) {
+            ensureCanAccess(id, userId);
+        }
         return ResponseEntity.ok(ApiResponse.ok(MediaResponse.from(media)));
     }
 
@@ -118,7 +122,13 @@ public class MediaController {
             @RequestParam(value = "size", defaultValue = "20") int size
     ) {
         UUID effectiveOwnerUserId = getUserId(authentication);
-        Page<MediaMetadata> mediaPage = mediaService.listMedia(effectiveOwnerUserId, category,
+        
+        // Nếu là GIF hoặc EMOJI, ta cho phép xem dữ liệu hệ thống (owner = null hoặc SYSTEM)
+        UUID filterOwnerId = (category == MediaCategory.GIF || category == MediaCategory.EMOJI) 
+                ? null 
+                : (ownerUserId != null ? ownerUserId : effectiveOwnerUserId);
+
+        Page<MediaMetadata> mediaPage = mediaService.listMedia(filterOwnerId, category,
                 PageRequest.of(page, size, Sort.by("createdAt").descending()));
 
         MediaPageResponse response = MediaPageResponse.builder()

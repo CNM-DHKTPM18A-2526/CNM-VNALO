@@ -73,6 +73,10 @@ export class InboxService {
       const conv = convMap.get(entry.conversationId);
       return {
         ...entry,
+        isFavorite: entry.isFavorite,
+        autoDeleteSeconds: entry.autoDeleteSeconds,
+        notifyCall: entry.notifyCall,
+        personalWallpaperUrl: entry.wallpaperUrl,
         lastMessagePreview: restrictedWeb ? 'Noi dung duoc an tren web do chinh sach dong bo.' : entry.lastMessagePreview,
         conversation: conv
           ? {
@@ -103,12 +107,41 @@ export class InboxService {
     return parseInt(total, 10);
   }
 
+  /** Update personal settings for a conversation. */
+  async updateSettings(userId: string, conversationId: string, settings: any) {
+    const entry = await this.inboxRepo.findOne({ where: { userId, conversationId } });
+    if (!entry) return null;
+
+    if (settings.isPinned !== undefined) entry.isPinned = settings.isPinned;
+    if (settings.isMuted !== undefined) entry.isMuted = settings.isMuted;
+    if (settings.isHidden !== undefined) entry.isHidden = settings.isHidden;
+    if (settings.isFavorite !== undefined) entry.isFavorite = settings.isFavorite;
+    if (settings.autoDeleteSeconds !== undefined) entry.autoDeleteSeconds = settings.autoDeleteSeconds;
+    if (settings.notifyCall !== undefined) entry.notifyCall = settings.notifyCall;
+    if (settings.wallpaperUrl !== undefined) entry.wallpaperUrl = settings.wallpaperUrl;
+
+    return this.inboxRepo.save(entry);
+  }
+
+  /** Hide conversation history for the user by setting the clear threshold. */
+  async clearHistory(userId: string, conversationId: string) {
+    const entry = await this.inboxRepo.findOne({ where: { userId, conversationId } });
+    if (!entry) return null;
+
+    entry.historyClearedAt = new Date();
+    // Also clear unread count as history is "gone"
+    entry.unreadCount = 0;
+    entry.lastMessagePreview = null;
+    
+    return this.inboxRepo.save(entry);
+  }
+
   private isRestrictedWeb(access?: AccessPolicyContext): boolean {
-    if (!access) {
+    if (!access?.restrictedWebMode) {
       return false;
     }
-    const platform = (access.clientPlatform ?? 'WEB').toUpperCase();
-    return Boolean(access.restrictedWebMode) && (platform === 'WEB' || platform === 'PC');
+
+    return access.clientPlatform?.trim().toLowerCase() === 'web';
   }
 
   private resolveLoginTime(epochSec?: number): Date {

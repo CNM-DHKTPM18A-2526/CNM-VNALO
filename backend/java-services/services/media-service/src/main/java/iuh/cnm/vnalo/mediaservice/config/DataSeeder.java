@@ -28,7 +28,7 @@ import java.util.UUID;
  * Seeds 10 real files per MediaCategory (8 categories = 80 total).
  */
 @Component
-@Profile("dev")
+@Profile("legacy-seeder") // Deactivate default seeding from external CDNs
 @RequiredArgsConstructor
 @Slf4j
 public class DataSeeder implements ApplicationRunner {
