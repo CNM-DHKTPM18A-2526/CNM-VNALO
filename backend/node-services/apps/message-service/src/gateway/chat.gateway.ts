@@ -366,6 +366,28 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  /**
+   * Message delivered indicator: notify the sender that the recipient received the message.
+   * This is real-time only and doesn't persist to DB as per requirements.
+   */
+  @SubscribeMessage('message.delivered')
+  handleMessageDelivered(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { messageId: string; conversationId: string },
+  ) {
+    const userId = client.data.user.userId;
+    const room = `conversation:${data.conversationId}`;
+    
+    // Broadcast to the room so the sender (and other devices of the recipient) see it.
+    // We exclude the sender of the 'delivered' event itself.
+    client.to(room).emit('message.delivered', {
+      userId,
+      messageId: data.messageId,
+      conversationId: data.conversationId,
+      deliveredAt: new Date(),
+    });
+  }
+
   // ─── Utility ──────────────────────────────────────────────
 
   /** Get the standard room name for a conversation. */

@@ -38,6 +38,21 @@ export class ConversationInbox {
   @Column({ name: 'is_hidden', type: 'boolean', default: false })
   isHidden: boolean;
 
+  @Column({ name: 'history_cleared_at', type: 'timestamptz', nullable: true })
+  historyClearedAt: Date | null;
+
+  @Column({ name: 'wallpaper_url', type: 'varchar', length: 500, nullable: true })
+  wallpaperUrl: string | null;
+
+  @Column({ name: 'is_favorite', type: 'boolean', default: false })
+  isFavorite: boolean;
+
+  @Column({ name: 'auto_delete_seconds', type: 'int', default: 0 })
+  autoDeleteSeconds: number;
+
+  @Column({ name: 'notify_call', type: 'boolean', default: true })
+  notifyCall: boolean;
+
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 }

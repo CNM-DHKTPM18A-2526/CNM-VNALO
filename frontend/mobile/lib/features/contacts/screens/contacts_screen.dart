@@ -379,7 +379,11 @@ class _ContactsScreenState extends State<ContactsScreen> {
                       title: Text(group.title ?? 'Nhóm', style: const TextStyle(fontWeight: FontWeight.w500)),
                       subtitle: Text(group.lastMessage?.content ?? '', maxLines: 1, overflow: TextOverflow.ellipsis),
                       onTap: () {
-                        // TODO: Navigate to group chat
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => ChatDetailScreen(conversation: group),
+                          ),
+                        );
                       },
                     );
                   }),

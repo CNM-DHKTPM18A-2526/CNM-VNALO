@@ -15,16 +15,18 @@ public class StickerResponse {
     private UUID packId;
     private String name;
     private UUID mediaId;
+    private String url;
     private Boolean isAnimated;
     private Integer displayOrder;
     private StickerStatus status;
 
-    public static StickerResponse from(Sticker sticker) {
+    public static StickerResponse from(Sticker sticker, String url) {
         return StickerResponse.builder()
                 .stickerId(sticker.getStickerId())
                 .packId(sticker.getPackId())
                 .name(sticker.getName())
                 .mediaId(sticker.getMediaId())
+                .url(url)
                 .isAnimated(sticker.getIsAnimated())
                 .displayOrder(sticker.getDisplayOrder())
                 .status(sticker.getStatus())

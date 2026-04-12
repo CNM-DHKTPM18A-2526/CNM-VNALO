@@ -215,6 +215,7 @@ services:
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
     volumes:
       - media_local_data:/app/.media-local
+      - ../backend/java-services/services/media-service/img:/app/img
     depends_on:
       postgres:
         condition: service_healthy

@@ -8,14 +8,16 @@ import 'package:vnalo_mobile/features/chat/widgets/chat_input_bar.dart';
 import 'package:vnalo_mobile/features/chat/widgets/message_bubble.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
+import 'package:vnalo_mobile/models/conversation_member_model.dart';
 import 'package:vnalo_mobile/models/user_model.dart';
 import 'package:vnalo_mobile/core/utils/date_formatter.dart';
+import 'package:vnalo_mobile/features/chat/screens/chat_options_screen.dart';
+import 'package:vnalo_mobile/models/message_model.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:async';
 
 class ChatDetailScreen extends StatefulWidget {
   final Conversation conversation;
-  /// Optional: pass friend info directly when opening from contacts
-  /// so we don't depend on conversation.members having user data
   final User? friendUser;
 
   const ChatDetailScreen({
@@ -31,6 +33,7 @@ class ChatDetailScreen extends StatefulWidget {
 class _ChatDetailScreenState extends State<ChatDetailScreen> {
   Timer? _subtextTimer;
   bool _showGroupMembers = false;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -56,11 +59,33 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   @override
   void dispose() {
     _subtextTimer?.cancel();
+    _scrollController.dispose();
     context.read<ChatProvider>().closeConversation();
     super.dispose();
   }
 
-  /// Get display name: prefer friendUser if passed, otherwise fallback to conversation
+  void _jumpToMessage(String messageId, List<dynamic> items) {
+    final index = items.indexWhere((item) {
+      if (item is Message) return item.id == messageId;
+      if (item is List<Message>) {
+        return (item as List<Message>).any((m) => m.id == messageId);
+      }
+      return false;
+    });
+
+    if (index != -1) {
+      _scrollController.animateTo(
+        index * 80.0,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOut,
+      ).then((_) {
+        if (mounted) {
+           context.read<ChatProvider>().highlightMessage(messageId);
+        }
+      });
+    }
+  }
+
   String _getDisplayName(String currentUserId) {
     if (widget.friendUser != null) {
       return widget.friendUser!.displayName;
@@ -68,7 +93,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     return widget.conversation.getDisplayName(currentUserId);
   }
 
-  /// Get avatar URL
   String? _getAvatarUrl(String currentUserId) {
     if (widget.friendUser != null) {
       return widget.friendUser!.avatarUrl;
@@ -76,7 +100,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     return widget.conversation.getDisplayAvatarUrl(currentUserId);
   }
 
-  /// Get cover URL for direct chats
   String? _getCoverUrl(String currentUserId) {
     if (widget.friendUser != null) {
       return widget.friendUser!.coverUrl;
@@ -95,145 +118,213 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final currentUserId = context.read<AuthProvider>().user?.id ?? '';
-    final displayName = _getDisplayName(currentUserId);
-    final avatarUrl = _getAvatarUrl(currentUserId);
-    final coverUrl = _getCoverUrl(currentUserId);
-    final isDirect = widget.conversation.type == ConversationType.DIRECT ||
-        widget.friendUser != null;
-
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: isDarkMode ? DarkColors.scaffold : LightColors.scaffold,
-      appBar: AppBar(
-        titleSpacing: 0,
-        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
-        elevation: 0,
-        forceMaterialTransparency: true,
-        foregroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.white),
-        flexibleSpace: isDarkMode
-            ? null
-            : Container(
-                decoration: const BoxDecoration(
-                  gradient: AppColors.appBarGradient,
-                ),
-              ),
-        title: Row(
-          children: [
-            AvatarWidget(
-              name: displayName,
-              imageUrl: avatarUrl,
-              size: 40,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    displayName,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+    return Consumer<ChatProvider>(
+      builder: (context, chat, child) {
+        final conv = chat.conversations.firstWhere(
+          (c) => c.id == widget.conversation.id,
+          orElse: () => widget.conversation,
+        );
+
+        final displayName = _getDisplayName(currentUserId);
+        final avatarUrl = _getAvatarUrl(currentUserId);
+        final coverUrl = _getCoverUrl(currentUserId);
+        final isDirect = conv.type == ConversationType.DIRECT || widget.friendUser != null;
+        final wallpaperUrl = conv.personalWallpaperUrl ?? conv.wallpaperUrl;
+
+        return Scaffold(
+          backgroundColor: wallpaperUrl != null 
+              ? (isDarkMode ? Colors.black : LightColors.scaffold) 
+              : (isDarkMode ? Colors.black : const Color(0xFFEBEDF0)),
+          appBar: AppBar(
+            titleSpacing: 0,
+            backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
+            elevation: 0,
+            forceMaterialTransparency: true,
+            foregroundColor: Colors.white,
+            iconTheme: const IconThemeData(color: Colors.white),
+            flexibleSpace: isDarkMode
+                ? null
+                : Container(
+                    decoration: const BoxDecoration(
+                      gradient: AppColors.appBarGradient,
                     ),
                   ),
-                  _buildSubtext(isDirect),
-                ],
+            title: Row(
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 1),
+                  ),
+                  child: AvatarWidget(name: displayName, imageUrl: avatarUrl, size: 36),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        displayName,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                      _buildSubtext(isDirect),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.call_outlined, color: Colors.white),
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Tính năng đang được phát triển')),
+                  );
+                },
               ),
+              IconButton(
+                icon: const Icon(Icons.videocam_outlined, color: Colors.white),
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Tính năng đang được phát triển')),
+                  );
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.menu, color: Colors.white),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ChatOptionsScreen(conversation: conv),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+          body: Container(
+            decoration: wallpaperUrl != null
+                ? BoxDecoration(
+                    image: DecorationImage(
+                      image: CachedNetworkImageProvider(wallpaperUrl),
+                      fit: BoxFit.cover,
+                      colorFilter: ColorFilter.mode(
+                        Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
+                        BlendMode.darken,
+                      ),
+                    ),
+                  )
+                : null,
+            child: Column(
+              children: [
+                Expanded(
+                  child: Builder(
+                    builder: (context) {
+                      final rawItems = chat.getMessagesForConversation(conv.id);
+                      final List<dynamic> items = [];
+                      for (int i = 0; i < rawItems.length; i++) {
+                         final msg = rawItems[i];
+                         if (msg.messageType == MessageType.IMAGE) {
+                            if (items.isNotEmpty && items.last is List<Message>) {
+                               final group = items.last as List<Message>;
+                               final newestInGroup = group.first;
+                               if (newestInGroup.senderId == msg.senderId && 
+                                   newestInGroup.createdAt.difference(msg.createdAt).inMinutes.abs() < 2) {
+                                   group.add(msg);
+                                   continue;
+                               }
+                            }
+                            items.add([msg]);
+                         } else {
+                            items.add(msg);
+                         }
+                      }
+                      
+                      for (int i = 0; i < items.length; i++) {
+                         if (items[i] is List<Message> && (items[i] as List<Message>).length == 1) {
+                             items[i] = (items[i] as List<Message>).first;
+                         }
+                      }
+
+                      return ListView.builder(
+                        controller: _scrollController,
+                        reverse: true,
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                        itemCount: items.length + (isDirect ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          if (isDirect && index == items.length) {
+                            return _buildFriendProfileCard(displayName, avatarUrl, coverUrl);
+                          }
+
+                          final item = items[index];
+                          final message = item is List<Message> ? item.first : item as Message;
+                          final groupedMessages = item is List<Message> ? item : null;
+                          final isMine = message.isMine(currentUserId);
+
+                          bool showTime = true;
+                          if (index > 0) {
+                            final nextRecentItem = items[index - 1];
+                            final nextRecentMsg = nextRecentItem is List<Message> ? nextRecentItem.last : nextRecentItem as Message;
+                            final sameSender = nextRecentMsg.senderId == message.senderId;
+                            final timeGap = nextRecentMsg.createdAt.difference(message.createdAt).inMinutes.abs();
+                            if (sameSender && timeGap < 5) showTime = false;
+                          }
+
+                          final rawMyLatestIndex = rawItems.indexWhere((m) => m.senderId == currentUserId);
+                          bool showStatus = (isMine && rawMyLatestIndex != -1 && rawItems[rawMyLatestIndex].id == message.id);
+
+                          String? milestoneText;
+                          if (index == items.length - 1) {
+                            milestoneText = DateFormatter.formatTimelineDate(message.createdAt);
+                          } else {
+                            final olderItem = items[index + 1];
+                            final olderMsg = olderItem is List<Message> ? olderItem.first : olderItem as Message;
+                            final gap = message.createdAt.difference(olderMsg.createdAt).inMinutes.abs();
+                            if (gap > 20) {
+                              milestoneText = DateFormatter.formatTimelineDate(message.createdAt);
+                            }
+                          }
+
+                          List<ConversationMember>? readByMembers;
+                          if (isMine && message.serverSeq != null) {
+                            readByMembers = conv.members.where((m) {
+                              return m.userId != currentUserId && m.lastReadSeq >= message.serverSeq!;
+                            }).toList();
+                          }
+
+                          return MessageBubble(
+                            message: message,
+                            isMine: isMine,
+                            showTime: showTime,
+                            showStatus: showStatus,
+                            milestoneText: milestoneText,
+                            groupedMessages: groupedMessages,
+                            readByMembers: readByMembers,
+                            onReplyTap: (msgId) => _jumpToMessage(msgId, items),
+                            onRetry: message.status == MessageStatus.FAILED ? () => chat.retryMessage(message) : null,
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+                ChatInputBar(
+                  conversationId: conv.id,
+                  onSend: (text) => chat.sendMessage(conversationId: conv.id, content: text),
+                ),
+              ],
             ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.call_outlined, color: Colors.white),
-            onPressed: () {},
           ),
-          IconButton(
-            icon: const Icon(Icons.videocam_outlined, color: Colors.white),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: const Icon(Icons.menu, color: Colors.white),
-            onPressed: () {},
-          ),
-        ],
-      ),
-      body: Consumer<ChatProvider>(
-        builder: (_, chat, __) {
-          final items = chat.messages;
-
-          return ListView.builder(
-            reverse: true,
-            padding: const EdgeInsets.symmetric(
-              horizontal: 8,
-              vertical: 8,
-            ),
-            itemCount: items.length + (isDirect ? 1 : 0),
-            itemBuilder: (_, index) {
-              // Show friend profile card at the bottom (end of reversed list)
-              if (isDirect && index == items.length) {
-                return _buildFriendProfileCard(
-                  displayName,
-                  avatarUrl,
-                  coverUrl,
-                );
-              }
-
-              final message = items[index];
-              final isMine = message.isMine(currentUserId);
-              
-              // Grouping Logic:
-              // showTime: if next visual message (index-1, more recent) is from different sender OR gap > 5 mins
-              bool showTime = true;
-              if (index > 0) {
-                final nextRecent = items[index - 1];
-                final sameSender = nextRecent.senderId == message.senderId;
-                final timeGap = nextRecent.createdAt.difference(message.createdAt).inMinutes.abs();
-                if (sameSender && timeGap < 5) {
-                  showTime = false;
-                }
-              }
-
-              // showStatus: ONLY if it's the very latest message from me in the whole conversation
-              bool showStatus = false;
-              if (isMine && index == 0) {
-                showStatus = true;
-              }
-
-              // milestoneText: if older visual message (index+1, older) has gap > 20 mins
-              String? milestoneText;
-              if (index == items.length - 1) {
-                // First message ever in timeline
-                milestoneText = DateFormatter.formatTimelineDate(message.createdAt);
-              } else {
-                final olderMsg = items[index + 1];
-                final gap = message.createdAt.difference(olderMsg.createdAt).inMinutes.abs();
-                if (gap > 20) {
-                   milestoneText = DateFormatter.formatTimelineDate(message.createdAt);
-                }
-              }
-
-              return MessageBubble(
-                message: message,
-                isMine: isMine,
-                showTime: showTime,
-                showStatus: showStatus,
-                milestoneText: milestoneText,
-                onRetry:
-                    message.status == MessageStatus.FAILED
-                        ? () => chat.retryMessage(message)
-                        : null,
-              );
-            },
-          );
-        },
-      ),
-      bottomNavigationBar: ChatInputBar(
-        onSend: (text) => context.read<ChatProvider>().sendMessage(text),
-      ),
+        );
+      },
     );
   }
 
@@ -242,7 +333,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       return Text(
         'Vừa truy cập',
         style: TextStyle(
-          fontSize: 13,
+          fontSize: 12,
           color: Colors.white.withValues(alpha: 0.8),
           fontWeight: FontWeight.w400,
         ),
@@ -254,7 +345,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           ? '${widget.conversation.activeMemberCount} thành viên'
           : 'Bấm để xem thông tin',
       style: TextStyle(
-        fontSize: 13,
+        fontSize: 12,
         color: Colors.white.withValues(alpha: 0.8),
         fontWeight: FontWeight.w400,
       ),
@@ -348,7 +439,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   Widget _buildActionChip(String emoji, String label) {
     return GestureDetector(
       onTap: () {
-        context.read<ChatProvider>().sendMessage('$emoji $label');
+        context.read<ChatProvider>().sendMessage(
+          conversationId: widget.conversation.id,
+          content: '$emoji $label',
+        );
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),

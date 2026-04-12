@@ -9,10 +9,12 @@ public enum MediaCategory {
     CHAT_VOICE,
     STORY,
     TIMELINE,
-    STICKER;
+    STICKER,
+    EMOJI,
+    GIF;
 
     public boolean isImage() {
-        return this == AVATAR || this == COVER || this == CHAT_IMAGE || this == STORY || this == TIMELINE;
+        return this == AVATAR || this == COVER || this == CHAT_IMAGE || this == STORY || this == TIMELINE || this == STICKER || this == EMOJI || this == GIF;
     }
 
     public boolean isVideo() {
