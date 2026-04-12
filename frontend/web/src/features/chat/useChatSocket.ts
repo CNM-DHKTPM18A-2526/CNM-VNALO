@@ -15,6 +15,7 @@ type UseChatSocketOptions = {
   onConnected?: () => void
   onDisconnected?: () => void
   onMessageReceived?: (message: RawMessage) => void
+  onMessageRecalled?: (payload: { messageId: string; conversationId: string; recalledBy: string }) => void
   onMessageRead?: (payload: { userId: string; conversationId: string; lastReadSeq: number }) => void
   onPresenceChanged?: (payload: PresenceChangedPayload) => void
 }
@@ -37,6 +38,7 @@ export function useChatSocket({
   onConnected,
   onDisconnected,
   onMessageReceived,
+  onMessageRecalled,
   onMessageRead,
   onPresenceChanged,
 }: UseChatSocketOptions) {
@@ -48,6 +50,7 @@ export function useChatSocket({
   const onConnectedRef = useRef<UseChatSocketOptions['onConnected']>(onConnected)
   const onDisconnectedRef = useRef<UseChatSocketOptions['onDisconnected']>(onDisconnected)
   const onMessageReceivedRef = useRef<UseChatSocketOptions['onMessageReceived']>(onMessageReceived)
+  const onMessageRecalledRef = useRef<UseChatSocketOptions['onMessageRecalled']>(onMessageRecalled)
   const onMessageReadRef = useRef<UseChatSocketOptions['onMessageRead']>(onMessageRead)
   const onPresenceChangedRef = useRef<UseChatSocketOptions['onPresenceChanged']>(onPresenceChanged)
 
@@ -55,9 +58,10 @@ export function useChatSocket({
     onConnectedRef.current = onConnected
     onDisconnectedRef.current = onDisconnected
     onMessageReceivedRef.current = onMessageReceived
+    onMessageRecalledRef.current = onMessageRecalled
     onMessageReadRef.current = onMessageRead
     onPresenceChangedRef.current = onPresenceChanged
-  }, [onConnected, onDisconnected, onMessageRead, onMessageReceived, onPresenceChanged])
+  }, [onConnected, onDisconnected, onMessageRead, onMessageReceived, onMessageRecalled, onPresenceChanged])
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // CONNECT ONLY ONCE (even with Strict Mode)
@@ -65,6 +69,8 @@ export function useChatSocket({
   useEffect(() => {
     if (!token) {
       console.log('[useChatSocket.effect] Skipping: no token provided')
+      hasConnectedRef.current = false
+      getOrCreateChatService().disconnect()
       return
     }
 
@@ -78,9 +84,7 @@ export function useChatSocket({
       socket = service.connect(token)
     } else {
       console.log('[useChatSocket.effect] Reusing existing socket connection, re-attaching listeners')
-      if (!socket) {
-        socket = service.connect(token)
-      }
+      socket = service.connect(token)
     }
 
     if (!socket) {
@@ -94,12 +98,13 @@ export function useChatSocket({
     // SET UP LISTENERS (remove before adding to prevent duplicates)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     const handleConnect = () => {
-      console.log('[useChatSocket.listener] ✅ CONNECTED event received')
+      console.log('[useChatSocket.listener] ✅ CONNECTED event received, socket.id:', socket.id)
       onConnectedRef.current?.()
     }
 
     const handleDisconnect = () => {
       console.log('[useChatSocket.listener] ⚪ DISCONNECTED event received')
+      getOrCreateChatService().clearJoinedConversations()
       onDisconnectedRef.current?.()
     }
 
@@ -112,13 +117,18 @@ export function useChatSocket({
       onMessageReceivedRef.current?.(payload)
     }
 
+    const handleMessageRecalled = (payload: { messageId: string; conversationId: string; recalledBy: string }) => {
+      console.log('[useChatSocket.listener] ↩️ message.recalled event', payload)
+      onMessageRecalledRef.current?.(payload)
+    }
+
     const handleMessageRead = (payload: { userId: string; conversationId: string; lastReadSeq: number }) => {
       console.log('[useChatSocket.listener] ✓ message.read event')
       onMessageReadRef.current?.(payload)
     }
 
     const handlePresenceChanged = (payload: PresenceChangedPayload) => {
-      console.log('[useChatSocket.listener] 👤 presence.changed event')
+      console.log('[useChatSocket.listener] 👤 presence.changed event', payload)
       onPresenceChangedRef.current?.(payload)
     }
 
@@ -126,6 +136,7 @@ export function useChatSocket({
     socket.off('connect', handleConnect)
     socket.off('disconnect', handleDisconnect)
     socket.off('message.received', handleMessageReceived)
+    socket.off('message.recalled', handleMessageRecalled)
     socket.off('message.read', handleMessageRead)
     socket.off('presence.changed', handlePresenceChanged)
 
@@ -133,8 +144,22 @@ export function useChatSocket({
     socket.on('connect', handleConnect)
     socket.on('disconnect', handleDisconnect)
     socket.on('message.received', handleMessageReceived)
+    socket.on('message.recalled', handleMessageRecalled)
     socket.on('message.read', handleMessageRead)
     socket.on('presence.changed', handlePresenceChanged)
+
+    socket.onAny((event, ...args) => {
+      if (String(event).includes('presence') || event === 'connect' || event === 'disconnect') {
+        console.log('[useChatSocket.onAny] socket event:', event, 'payload:', args)
+      }
+    })
+
+    if (socket.connected && socket.id) {
+      queueMicrotask(() => {
+        console.log('[useChatSocket.effect] Socket already connected, replaying onConnected, socket.id:', socket.id)
+        onConnectedRef.current?.()
+      })
+    }
 
     return () => {
       // DO NOT DISCONNECT on cleanup in Strict Mode
@@ -144,10 +169,24 @@ export function useChatSocket({
       socket.off('connect', handleConnect)
       socket.off('disconnect', handleDisconnect)
       socket.off('message.received', handleMessageReceived)
+      socket.off('message.recalled', handleMessageRecalled)
       socket.off('message.read', handleMessageRead)
       socket.off('presence.changed', handlePresenceChanged)
+      socket.offAny()
     }
   }, [token])
+
+  useEffect(() => {
+    const handleAuthLogout = () => {
+      hasConnectedRef.current = false
+      getOrCreateChatService().disconnect()
+    }
+
+    window.addEventListener('vnalo:auth-logout', handleAuthLogout)
+    return () => {
+      window.removeEventListener('vnalo:auth-logout', handleAuthLogout)
+    }
+  }, [])
 
   const connect = useCallback(() => {
     if (!token) {
@@ -178,6 +217,10 @@ export function useChatSocket({
     return getOrCreateChatService().isConnected() ?? false
   }, [])
 
+  const getSocket = useCallback(() => {
+    return getOrCreateChatService().getSocket()
+  }, [])
+
   return {
     connect,
     disconnect,
@@ -185,6 +228,7 @@ export function useChatSocket({
     joinConversation,
     markAsRead,
     isConnected,
+    getSocket,
     waitForConnect: waitForSocketConnect,
   }
 }
