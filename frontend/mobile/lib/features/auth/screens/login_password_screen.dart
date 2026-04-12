@@ -56,16 +56,20 @@ class _LoginPasswordScreenState extends State<LoginPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final t = AuthTexts.of(context);
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final scaffoldBg = isDarkMode ? DarkColors.scaffold : Colors.white;
+    final appBarBg = isDarkMode ? DarkColors.appBarBg : Colors.white;
+    final textColor = isDarkMode ? Colors.white : const Color(0xFF171717);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: scaffoldBg,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
+        backgroundColor: appBarBg,
+        surfaceTintColor: appBarBg,
         elevation: 0,
         title: Text(
           t.enterPasswordTitle,
-          style: const TextStyle(color: Color(0xFF171717)),
+          style: TextStyle(color: textColor),
         ),
       ),
       body: SafeArea(
@@ -78,15 +82,17 @@ class _LoginPasswordScreenState extends State<LoginPasswordScreen> {
               children: [
                 Text(
                   t.accountLabel(widget.phoneNumber),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
+                    color: textColor,
                   ),
                 ),
                 const SizedBox(height: 24),
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
+                  style: TextStyle(color: textColor),
                   validator: (value) {
                     if ((value ?? '').trim().isEmpty) {
                       return 'Vui lòng nhập mật khẩu';
@@ -95,6 +101,9 @@ class _LoginPasswordScreenState extends State<LoginPasswordScreen> {
                   },
                   decoration: InputDecoration(
                     hintText: t.passwordHint,
+                    hintStyle: TextStyle(
+                      color: isDarkMode ? Colors.white38 : const Color(0xFF999999),
+                    ),
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscurePassword
@@ -143,7 +152,7 @@ class _LoginPasswordScreenState extends State<LoginPasswordScreen> {
                                     color: Colors.white,
                                   ),
                                 )
-                                : Text(t.login),
+                                : Text(t.login, style: const TextStyle(color: Colors.white)),
                       ),
                 ),
               ],
