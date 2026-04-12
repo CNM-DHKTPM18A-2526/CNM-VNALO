@@ -448,6 +448,31 @@ export function ChatPage() {
 
   const activeConversationId = routedConversationId || selectedConversationId
 
+  const handleSyncHistory = useCallback(async () => {
+    if (!accessToken || !activeConversationId || !user) {
+      return
+    }
+
+    setIsLoadingMessages(true)
+    try {
+      const rawMessages = await fetchMessages(accessToken, activeConversationId, true)
+      const mapped = sortMessages(
+        rawMessages.map((message) => applyRestrictedMessage(mapRawMessage(message, user.id), isRestrictedMode)),
+      )
+      setMessagesByConversation((prev) => ({
+        ...prev,
+        [activeConversationId]: mapped,
+      }))
+      
+      // Refresh inbox to update previews if needed
+      void loadInbox(accessToken, activeConversationId)
+    } catch (error) {
+      console.error('Failed to sync history', error)
+    } finally {
+      setIsLoadingMessages(false)
+    }
+  }, [accessToken, activeConversationId, isRestrictedMode, loadInbox, user])
+
   useEffect(() => {
     if (!accessToken || !activeConversationId || !user) {
       return
@@ -894,6 +919,7 @@ export function ChatPage() {
         messages={selectedMessages}
         isLoadingMessages={isLoadingMessages}
         onSend={handleSend}
+        onSyncHistory={handleSyncHistory}
         isRestrictedMode={isRestrictedMode}
         peerLastReadSeq={selectedConversationId ? peerLastReadByConversation[selectedConversationId] : undefined}
       />

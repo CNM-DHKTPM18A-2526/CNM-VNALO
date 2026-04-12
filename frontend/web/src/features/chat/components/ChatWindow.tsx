@@ -14,6 +14,7 @@ type ChatWindowProps = {
   messages: ChatMessage[]
   isLoadingMessages: boolean
   onSend: (message: string) => void
+  onSyncHistory?: () => void
   isRestrictedMode?: boolean
   peerLastReadSeq?: number
 }
@@ -23,6 +24,7 @@ export function ChatWindow({
   messages,
   isLoadingMessages,
   onSend,
+  onSyncHistory,
   isRestrictedMode = false,
   peerLastReadSeq,
 }: ChatWindowProps) {
@@ -111,7 +113,13 @@ export function ChatWindow({
       </div>
       {isRestrictedMode ? (
         <div className='chat-restricted-banner'>
-          Đồng bộ đa thiết bị đang tắt. Web chỉ hiển thị dữ liệu giới hạn.
+          <div className='banner-content'>
+            <Icon name='info' />
+            <span>Đồng bộ tin nhắn đang tắt. Web chỉ hiển thị dữ liệu mới.</span>
+          </div>
+          <button className='sync-button' type='button' onClick={onSyncHistory}>
+            Đồng bộ ngay
+          </button>
         </div>
       ) : null}
       <MessageInput

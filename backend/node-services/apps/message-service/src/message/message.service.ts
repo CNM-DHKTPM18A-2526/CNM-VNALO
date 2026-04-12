@@ -131,31 +131,33 @@ export class MessageService {
     before?: number,
     limit = 50,
     access?: AccessPolicyContext,
+    forceSync = false,
   ) {
     await this.conversationService.assertMember(conversationId, userId);
-
+ 
     const qb = this.messageRepo
       .createQueryBuilder('m')
       .where('m.conversation_id = :cid', { cid: conversationId })
       .andWhere(`NOT (:userId::uuid = ANY(COALESCE(m.hidden_by_users, ARRAY[]::uuid[])))`, { userId })
       .orderBy('m.server_seq', 'DESC')
       .take(Math.min(limit, 100));
-
+ 
     // Filter by history cleared threshold
     const inboxEntry = await this.inboxRepo.findOne({ where: { userId, conversationId } });
     if (inboxEntry?.historyClearedAt) {
       qb.andWhere('m.created_at > :clearedAt', { clearedAt: inboxEntry.historyClearedAt });
     }
-
+ 
     if (before !== undefined) {
       qb.andWhere('m.server_seq < :before', { before });
     }
-
-    if (this.isRestrictedWeb(access)) {
+ 
+    // Apply restricted mode only if sync hasn't been forced for this session/request
+    if (this.isRestrictedWeb(access) && !forceSync) {
       const loginAt = this.resolveLoginTime(access?.loginAtEpochSec);
       qb.andWhere('m.created_at >= :loginAt', { loginAt });
     }
-
+ 
     return qb.getMany();
   }
 

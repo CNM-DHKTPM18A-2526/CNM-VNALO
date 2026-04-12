@@ -130,10 +130,11 @@ export function mapRawMessage(raw: RawMessageLike, currentUserId: string): ChatM
   }
 }
 
-export async function fetchMessages(token: string, conversationId: string): Promise<RawMessage[]> {
+export async function fetchMessages(token: string, conversationId: string, forceSync = false): Promise<RawMessage[]> {
+  const query = forceSync ? '&forceSync=true' : ''
   const data = await authorizedFetch<RawMessage[] | { items?: RawMessage[]; content?: RawMessage[] }>(
     token,
-    `/conversations/${conversationId}/messages?limit=50`,
+    `/conversations/${conversationId}/messages?limit=50${query}`,
   )
   console.log('Dữ liệu tin nhắn nhận được:', data)
 

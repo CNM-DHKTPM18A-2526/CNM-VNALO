@@ -34,15 +34,15 @@ class AppColors {
 class DarkColors {
   DarkColors._();
   static const Color scaffold = Color(0xFF000000); // Vnalo deep black
-  static const Color surface = Color(0xFF1A1A1A);
-  static const Color surfaceLight = Color(0xFF242424);
+  static const Color surface = Color(0xFF131313); // Item is lighter than BG
+  static const Color surfaceLight = Color(0xFF1A1A1A);
   static const Color textPrimary = Color(0xFFFFFFFF);
   static const Color textSecondary = Color(0xFFB0B0B0);
   static const Color textHint = Color(0xFF808080);
   static const Color divider = Color(0xFF333333);
   static const Color chatBubbleSent = Color(0xFF374151); // Slate 700
   static const Color chatBubbleReceived = Color(0xFF1F2937); // Slate 800
-  static const Color appBarBg = Color(0xFF1A1A1A);
+  static const Color appBarBg = Color(0xFF222222); // AppBar is lighter than Item
 }
 
 class LightColors {
