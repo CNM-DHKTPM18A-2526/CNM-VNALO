@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
+import 'package:vnalo_mobile/features/contacts/screens/send_request_screen.dart';
 import 'package:vnalo_mobile/features/chat/screens/chat_detail_screen.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
 import 'package:vnalo_mobile/models/user_model.dart';
@@ -108,7 +109,6 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
     Future<User?> phoneTask = Future.value(null);
     if (phoneRegex.hasMatch(q)) {
       phoneTask = userService.getUserByPhone(q).catchError((e) {
-        debugPrint('Phone search failed for $q: $e');
         return null;
       });
     }
@@ -186,7 +186,6 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
   }
 
   Future<void> _handleLocalMessageTap(LocalMessage msg) async {
-    final startTime = DateTime.now();
     try {
       final db = context.read<LocalDatabase>();
       final chatService = context.read<ChatService>();
@@ -200,12 +199,8 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
       if (localConv != null) {
         // Map local model to UI model
         conv = Conversation.fromLocal(localConv);
-        debugPrint(
-          '[UX] Local hit for navigation. Latency: ${DateTime.now().difference(startTime).inMilliseconds}ms',
-        );
       } else {
         // 2. Fallback to API
-        debugPrint('[UX] Local miss. Falling back to API...');
         conv = await chatService.getConversationById(msg.conversationId);
         if (conv == null) {
           final inbox = await chatService.getInbox();
@@ -228,7 +223,6 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
         ),
       );
     } catch (e) {
-      debugPrint('[UX] Navigation failed: $e');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Không thể mở cuộc trò chuyện này.')),
@@ -295,6 +289,8 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                           decoration: const InputDecoration(
                             hintText: 'Tìm kiếm',
                             hintStyle: TextStyle(color: Color(0xFF9E9E9E)),
+                            filled: true,
+                            fillColor: Colors.transparent,
                             border: InputBorder.none,
                             isDense: true,
                             contentPadding: EdgeInsets.zero,
@@ -473,19 +469,11 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
             ),
           ),
           trailing: OutlinedButton(
-            onPressed: () async {
-              try {
-                await context.read<FriendService>().sendFriendRequest(user.id);
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Đã gửi lời mời kết bạn')),
-                );
-              } catch (e) {
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Không thể gửi lời mời')),
-                );
-              }
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => SendRequestScreen(targetUser: user)),
+              );
             },
             style: OutlinedButton.styleFrom(
               backgroundColor: const Color(0xFFE3F2FD),
@@ -666,7 +654,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0091FF).withOpacity(0.1),
+                          color: const Color(0xFF0091FF).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(

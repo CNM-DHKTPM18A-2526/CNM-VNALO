@@ -98,14 +98,21 @@ class FriendService {
 
   Future<User> searchUserByPhone(String phoneNumber) async {
     final normalized = _normalizePhone(phoneNumber);
+    final encodedPhone = Uri.encodeComponent(normalized);
     final response = await _apiService.get(
       _base,
-      '/users/search-by-phone',
-      queryParams: {'phone': normalized},
+      '/users/phone/$encodedPhone',
     );
-    final data = response['data'];
-    if (data is! Map<String, dynamic>) {
-      throw StateError('Invalid phone search response');
+
+    final dynamic data = response['data'] ?? response;
+    if (data is! Map<String, dynamic> || 
+        data.isEmpty || 
+        (data['id'] == null && data['_id'] == null)) {
+       throw ApiException(
+         message: 'Không tìm thấy người dùng với số điện thoại này.',
+         statusCode: 404,
+         code: 'USER_001',
+       );
     }
     return User.fromJson(data);
   }
@@ -131,10 +138,18 @@ class FriendService {
   }
 
   String _normalizePhone(String phone) {
-    final cleaned = phone.replaceAll(RegExp(r'[^+\d]'), '');
-    if (cleaned.startsWith('0')) {
-      return '+84${cleaned.substring(1)}';
+    if (phone.startsWith('+')) return phone.trim();
+
+    final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.startsWith('0') && digits.length >= 10) {
+      return '+84${digits.substring(1)}';
     }
-    return cleaned;
+    if (digits.startsWith('84')) {
+      return '+$digits';
+    }
+    if (digits.startsWith('9') && digits.length == 9) {
+      return '+84$digits';
+    }
+    return phone.trim();
   }
 }
