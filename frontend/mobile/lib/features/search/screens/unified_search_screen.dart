@@ -43,6 +43,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
   List<LocalContact> _localContactResults = [];
   List<LocalMessageSearchResult> _localMessageResults = [];
   bool _isSearching = false;
+  bool _isCancelling = false;
   String _selectedFilter = 'Tất cả'; // 'Tất cả', 'Link', 'File'
 
   int get _mineCount =>
@@ -123,6 +124,25 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
       _strangerFoundByPhone = results[2] as User?;
       _isSearching = false;
     });
+
+    // Fast check for friendship status if stranger found
+    if (_strangerFoundByPhone != null && 
+        _strangerFoundByPhone!.friendshipStatus?.toUpperCase() != 'PENDING_SENT') {
+      _verifyStrangerStatus(_strangerFoundByPhone!.id, requestId);
+    }
+  }
+
+  Future<void> _verifyStrangerStatus(String userId, int requestId) async {
+    final isSent = await context.read<FriendService>().checkSentRequest(userId);
+    if (isSent && mounted && requestId == _searchRequestId) {
+      setState(() {
+        if (_strangerFoundByPhone?.id == userId) {
+          _strangerFoundByPhone = _strangerFoundByPhone?.copyWith(
+            friendshipStatus: 'PENDING_SENT',
+          );
+        }
+      });
+    }
   }
 
   // UI Helper for Highlighting
@@ -227,6 +247,29 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Không thể mở cuộc trò chuyện này.')),
       );
+    }
+  }
+
+  Future<void> _handleStrangerCancel(User user) async {
+    setState(() => _isCancelling = true);
+    try {
+      await context.read<FriendService>().cancelRequestByUserId(user.id);
+      if (!mounted) return;
+      setState(() {
+        _strangerFoundByPhone = _strangerFoundByPhone?.copyWith(
+          friendshipStatus: 'NONE',
+        );
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Đã hủy lời mời đến ${user.displayName}')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Không thể hủy lời mời: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isCancelling = false);
     }
   }
 
@@ -468,24 +511,54 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
               ),
             ),
           ),
-          trailing: OutlinedButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => SendRequestScreen(targetUser: user)),
-              );
-            },
-            style: OutlinedButton.styleFrom(
-              backgroundColor: const Color(0xFFE3F2FD),
-              side: BorderSide.none,
-              foregroundColor: const Color(0xFF0091FF),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
+          trailing: _isCancelling
+              ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0091FF)),
+              )
+              : OutlinedButton(
+                onPressed: () async {
+                  if (user.friendshipStatus == 'PENDING_SENT') {
+                    _handleStrangerCancel(user);
+                  } else {
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => SendRequestScreen(targetUser: user),
+                      ),
+                    );
+                    if (result == true) {
+                      setState(() {
+                        final currentStatus = _strangerFoundByPhone?.friendshipStatus;
+                        _strangerFoundByPhone = _strangerFoundByPhone?.copyWith(
+                          friendshipStatus: currentStatus == 'PENDING_SENT' ? 'NONE' : 'PENDING_SENT',
+                        );
+                      });
+                    }
+                  }
+                },
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: user.friendshipStatus == 'PENDING_SENT'
+                      ? Colors.grey.shade100
+                      : const Color(0xFFE3F2FD),
+                  side: BorderSide.none,
+                  foregroundColor: user.friendshipStatus == 'PENDING_SENT'
+                      ? Colors.grey
+                      : const Color(0xFF0091FF),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+                child: Text(
+                  (_strangerFoundByPhone?.friendshipStatus?.toUpperCase() == 'PENDING_SENT' || 
+                   _strangerFoundByPhone?.friendshipStatus?.toUpperCase() == 'PENDING') 
+                      ? 'Đã gửi' 
+                      : 'Kết bạn',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
-            ),
-            child: const Text('Kết bạn', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
         ),
         const Divider(height: 8, thickness: 8, color: Color(0xFFF4F5F7)),
       ],

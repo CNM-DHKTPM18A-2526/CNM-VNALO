@@ -19,6 +19,7 @@ class SendRequestScreen extends StatefulWidget {
 class _SendRequestScreenState extends State<SendRequestScreen> {
   late TextEditingController _messageController;
   bool _isSending = false;
+  bool _isAlreadySent = false;
 
   @override
   void initState() {
@@ -28,6 +29,39 @@ class _SendRequestScreenState extends State<SendRequestScreen> {
     _messageController = TextEditingController(
       text: 'Xin chào, mình là $myName. Kết bạn với mình nhé!',
     );
+    final status = widget.targetUser.friendshipStatus?.toUpperCase();
+    _isAlreadySent = status == 'PENDING_SENT' || status == 'PENDING';
+    
+    // Fallback: If status is not clearly pending, check against real sent list
+    if (!_isAlreadySent) {
+      _verifyStatus();
+    }
+  }
+
+  Future<void> _verifyStatus() async {
+    final isSent = await context.read<FriendService>().checkSentRequest(widget.targetUser.id);
+    if (isSent && mounted) {
+      setState(() => _isAlreadySent = true);
+    }
+  }
+
+  Future<void> _handleCancel() async {
+    setState(() => _isSending = true);
+    try {
+      await context.read<FriendService>().cancelRequestByUserId(widget.targetUser.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Đã hủy lời mời đến ${widget.targetUser.displayName}')),
+      );
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Không thể hủy lời mời: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
   }
 
   @override
@@ -88,10 +122,10 @@ class _SendRequestScreenState extends State<SendRequestScreen> {
         actions: [
           if (!_isSending)
             TextButton(
-              onPressed: _handleSend,
-              child: const Text(
-                'GỬI',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              onPressed: _isAlreadySent ? _handleCancel : _handleSend,
+              child: Text(
+                _isAlreadySent ? 'HỦY' : 'GỬI',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
             )
           else
@@ -165,6 +199,7 @@ class _SendRequestScreenState extends State<SendRequestScreen> {
                       counterText: '',
                     ),
                     style: const TextStyle(fontSize: 16),
+                    readOnly: _isAlreadySent,
                   ),
                    const SizedBox(height: 8),
                    Text(
@@ -188,7 +223,10 @@ class _SendRequestScreenState extends State<SendRequestScreen> {
                   ),
                   child: _isSending 
                     ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
-                    : const Text('Gửi lời mời', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    : Text(
+                        _isAlreadySent ? 'Hủy lời mời' : 'Gửi lời mời',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
                 ),
               ),
             ),

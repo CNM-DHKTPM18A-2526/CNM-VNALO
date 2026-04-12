@@ -74,6 +74,30 @@ class FriendService {
     await _apiService.delete(_base, '/friends/requests/$requestId');
   }
 
+  Future<void> cancelRequestByUserId(String userId) async {
+    final sent = await getSentRequests();
+    // find request where toUserId == userId
+    final req = sent.firstWhere(
+      (r) => r['toUserId'] == userId || (r['toUser'] != null && r['toUser']['id'] == userId),
+      orElse: () => throw ApiException(message: 'Không tìm thấy lời mời để hủy.', statusCode: 404),
+    );
+    final id = req['id'];
+    if (id == null) throw ApiException(message: 'Dữ liệu lời mời không hợp lệ.', statusCode: 500);
+    await cancelRequest(id.toString());
+  }
+
+  Future<bool> checkSentRequest(String userId) async {
+    try {
+      final sent = await getSentRequests();
+      return sent.any((r) => 
+        r['toUserId'] == userId || 
+        (r['toUser'] != null && r['toUser']['id'] == userId)
+      );
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<int> getPendingRequestCount() async {
     final response = await _apiService.get(_base, '/friends/stats');
     final data = response['data'];
