@@ -11,6 +11,9 @@ import 'package:vnalo_mobile/features/common/widgets/quick_actions_sheet.dart';
 import 'package:vnalo_mobile/features/contacts/screens/add_friend_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/account_security_screen.dart';
 import 'package:vnalo_mobile/features/search/screens/unified_search_screen.dart';
+import 'package:vnalo_mobile/models/conversation_model.dart';
+import 'package:vnalo_mobile/models/conversation_enums.dart';
+import 'package:vnalo_mobile/features/chat/screens/chat_detail_screen.dart';
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
@@ -170,95 +173,59 @@ class _ChatListScreenState extends State<ChatListScreen> {
             );
           }
 
+          final conversations = chatProvider.conversations;
+
           return RefreshIndicator(
             onRefresh: () => chatProvider.loadInbox(),
             color: AppColors.primary,
-            child: ListView(
-              children: [
-                // My Documents Section
-                Container(
-                  color: isDarkMode ? DarkColors.surface : Colors.white,
-                  child: Column(
-                    children: [
-                      ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-                        leading: Container(
-                          width: 52,
-                          height: 52,
-                          decoration: const BoxDecoration(
-                            color: Colors.blue,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              const Icon(Icons.folder, color: Colors.white, size: 32),
-                              const Icon(Icons.cloud, color: Colors.blue, size: 16),
-                              Positioned(
-                                bottom: 0,
-                                right: 0,
-                                child: Container(
-                                  decoration: const BoxDecoration(
-                                    color: Colors.orange,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.check, color: Colors.white, size: 12),
-                                ),
-                              )
-                            ],
-                          ),
-                        ),
-                        title: const Text(
-                          'My Documents',
-                          style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
-                        ),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const MyDocumentsScreen()),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                // Inbox Section
-                if (chatProvider.conversations.isNotEmpty)
-                  Container(
+            child: ListView.builder(
+              itemCount: conversations.length + 2, // 1 for Cloud + 1 for Gap
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  // My Documents / Cloud item
+                  return Container(
                     color: isDarkMode ? DarkColors.surface : Colors.white,
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: chatProvider.conversations.length,
-                      separatorBuilder: (context, index) => Divider(
-                        height: 1,
-                        thickness: 0.5,
-                        indent: 80,
-                        color: dividerColor,
+                    child: ChatListItem(
+                      isVirtualCloud: true,
+                      conversation: Conversation(
+                        id: 'my_documents',
+                        type: ConversationType.DIRECT,
+                        title: 'Cloud của tôi',
                       ),
-                      itemBuilder: (context, index) {
-                        final conversation = chatProvider.conversations[index];
-                        return ChatListItem(
-                          key: ValueKey(conversation.id),
-                          conversation: conversation,
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => ChatDetailScreen(
-                                  conversation: conversation,
-                                ),
-                              ),
-                            );
-                          },
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const MyDocumentsScreen()),
                         );
                       },
                     ),
+                  );
+                }
+
+                if (index == 1) {
+                  // Small Gap between Cloud and rest of chats
+                  return SizedBox(height: 8);
+                }
+
+                // Regular conversations
+                final conversation = conversations[index - 2];
+                return Container(
+                  color: isDarkMode ? DarkColors.surface : Colors.white,
+                  child: ChatListItem(
+                    key: ValueKey(conversation.id),
+                    conversation: conversation,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ChatDetailScreen(
+                            conversation: conversation,
+                          ),
+                        ),
+                      );
+                    },
                   ),
-              ],
+                );
+              },
             ),
           );
         },

@@ -2,7 +2,11 @@ package iuh.cnm.vnalo.mediaservice.service;
 
 import iuh.cnm.vnalo.mediaservice.domain.dto.*;
 import iuh.cnm.vnalo.mediaservice.domain.model.*;
-import iuh.cnm.vnalo.mediaservice.domain.repository.*;
+import iuh.cnm.vnalo.mediaservice.domain.repository.MediaMetadataRepository;
+import iuh.cnm.vnalo.mediaservice.domain.repository.StickerPackRepository;
+import iuh.cnm.vnalo.mediaservice.domain.repository.StickerRepository;
+import iuh.cnm.vnalo.mediaservice.domain.repository.StickerUsageRepository;
+import iuh.cnm.vnalo.mediaservice.domain.repository.UserStickerPackRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,12 +32,12 @@ public class StickerService {
     private final StickerRepository stickerRepository;
     private final UserStickerPackRepository userStickerPackRepository;
     private final StickerUsageRepository stickerUsageRepository;
-    private final MediaObjectRepository mediaObjectRepository;
+    private final MediaMetadataRepository mediaMetadataRepository;
 
     private String getUrl(UUID mediaId) {
         if (mediaId == null) return "";
-        return mediaObjectRepository.findById(mediaId)
-                .map(MediaObject::getUrl)
+        return mediaMetadataRepository.findById(mediaId)
+                .map(MediaMetadata::getUrl)
                 .orElse("");
     }
 

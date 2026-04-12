@@ -78,15 +78,15 @@ class MessageActionMenu extends StatelessWidget {
                   _buildActionItem(context, 'reply', 'Trả lời', Icons.reply_outlined, const Color(0xFF9C27B0)),
                   _buildActionItem(context, 'forward', 'Chuyển tiếp', Icons.forward_rounded, const Color(0xFF2196F3)),
                   _buildActionItem(context, 'save', 'Lưu My Documents', Icons.snippet_folder_outlined, const Color(0xFF03A9F4)),
+                  if (isMine)
+                    _buildActionItem(context, 'recall', 'Thu hồi', Icons.undo_rounded, const Color(0xFFFF6B35)),
                   _buildActionItem(context, 'copy', 'Sao chép', Icons.copy_all_outlined, const Color(0xFF1E88E5)),
-                  
                   _buildActionItem(context, 'pin', 'Ghim', Icons.push_pin_outlined, const Color(0xFFFF9800)),
-                  _buildActionItem(context, 'reminder', 'Nhắc hẹn', Icons.access_time_rounded, const Color(0xFFE65100)),
-                  _buildActionItem(context, 'multi', 'Chọn nhiều', Icons.check_circle_outline_rounded, const Color(0xFF1976D2)),
+                  if (!isMine)
+                    _buildActionItem(context, 'multi', 'Chọn nhiều', Icons.check_circle_outline_rounded, const Color(0xFF1976D2)),
+                  if (isMine)
+                    _buildActionItem(context, 'multi', 'Chọn nhiều', Icons.check_circle_outline_rounded, const Color(0xFF1976D2)),
                   _buildActionItem(context, 'quick', 'Tạo tin nhắn nhanh', Icons.bolt_rounded, const Color(0xFF1976D2)),
-                  
-                  _buildActionItem(context, 'translate', 'Dịch', Icons.translate_rounded, const Color(0xFF4CAF50), labelExtra: 'MỚI'),
-                  _buildActionItem(context, 'tts', 'Đọc văn bản', Icons.volume_up_outlined, const Color(0xFF9C27B0), labelExtra: 'MỚI'),
                   _buildActionItem(context, 'info', 'Chi tiết', Icons.info_outline_rounded, Colors.blueGrey),
                   _buildActionItem(context, 'delete', 'Xóa', Icons.delete_outline_rounded, Colors.redAccent),
                 ],

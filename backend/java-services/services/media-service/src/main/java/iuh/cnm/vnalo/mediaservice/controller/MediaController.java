@@ -326,7 +326,41 @@ public class MediaController {
         headers.setContentLength(fileBytes.length);
         headers.add(HttpHeaders.CACHE_CONTROL, "public, max-age=86400");
 
+    return ResponseEntity.ok().headers(headers).body(fileBytes);
+    }
+
+    /**
+     * Publicly accessible endpoint to serve media files by objectKey.
+     * Used mainly for seeded data or local dev fallback.
+     */
+    @GetMapping("/public-file")
+    public ResponseEntity<byte[]> getPublicFileByKey(@RequestParam("key") String objectKey) {
+        byte[] fileBytes = mediaService.downloadMediaBytesByKey(objectKey);
+        String mimeType = "application/octet-stream";
+        if (objectKey.contains(".")) {
+            String ext = objectKey.substring(objectKey.lastIndexOf(".") + 1).toLowerCase();
+            mimeType = matchMimeType(ext);
+        }
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.add(HttpHeaders.CONTENT_TYPE, mimeType);
+        headers.setContentLength(fileBytes.length);
+        headers.add(HttpHeaders.CACHE_CONTROL, "public, max-age=86400");
+
         return ResponseEntity.ok().headers(headers).body(fileBytes);
+    }
+
+    private String matchMimeType(String ext) {
+        return switch (ext) {
+            case "jpg", "jpeg" -> "image/jpeg";
+            case "png" -> "image/png";
+            case "gif" -> "image/gif";
+            case "webp" -> "image/webp";
+            case "mp4" -> "video/mp4";
+            case "mp3" -> "audio/mpeg";
+            case "pdf" -> "application/pdf";
+            default -> "application/octet-stream";
+        };
     }
 
     // ==================== Helper ====================

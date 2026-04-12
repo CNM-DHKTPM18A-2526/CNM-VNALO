@@ -239,6 +239,10 @@ public class MediaService {
         return s3Service.downloadFile(media.getObjectKey());
     }
 
+    public byte[] downloadMediaBytesByKey(String objectKey) {
+        return s3Service.downloadFile(objectKey);
+    }
+
     public void streamMediaToResponse(UUID id, java.io.OutputStream out) {
         MediaMetadata media = getMedia(id);
         s3Service.streamToResponse(media.getObjectKey(), out);

@@ -3,7 +3,17 @@ CREATE TABLE messages (
     id TEXT NOT NULL PRIMARY KEY,
     conversation_id TEXT NOT NULL,
     sender_id TEXT NOT NULL,
-    content TEXT NOT NULL,
+    client_message_id TEXT,
+    message_type TEXT NOT NULL DEFAULT 'TEXT',
+    content TEXT,
+    media_url TEXT,
+    media_thumbnail_url TEXT,
+    media_mime_type TEXT,
+    media_size_bytes INTEGER,
+    reply_to_message_id TEXT,
+    reply_to_sender_id TEXT,
+    reply_to_content TEXT,
+    status TEXT NOT NULL DEFAULT 'SENT',
     created_at DATETIME NOT NULL
 ) AS LocalMessage;
 

@@ -7,6 +7,9 @@ class ApiErrorMapper {
     if (error is ApiException) {
       return _mapApiException(error);
     }
+    if (error is StateError) {
+      return error.message;
+    }
     return 'Đã xảy ra lỗi không xác định. Vui lòng thử lại sau.';
   }
 
@@ -22,6 +25,8 @@ class ApiErrorMapper {
       case 'AUTH_002': return 'Sai mật khẩu';
       case 'AUTH_006': 
       case 'AUTH_007': return 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại';
+      case 'AUTH_008': return 'Số điện thoại này đã được đăng ký';
+      case 'AUTH_018': return 'Email này đã được đăng ký';
       case 'AUTH_009': return 'Mã OTP đã hết hạn, vui lòng gửi lại';
       case 'AUTH_010': return 'Mã OTP không đúng';
       case 'AUTH_011': return 'Thao tác quá thường xuyên. Vui lòng thử lại sau';

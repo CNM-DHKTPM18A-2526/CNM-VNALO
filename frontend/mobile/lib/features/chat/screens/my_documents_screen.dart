@@ -61,7 +61,9 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
               id: item['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
               conversationId: _convId,
               senderId: myId,
+              messageType: 'TEXT',
               content: item['content'] ?? '',
+              status: 'SENT',
               createdAt: DateTime.tryParse(item['createdAt'] ?? '') ?? DateTime.now(),
             ));
           }
@@ -103,7 +105,9 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       conversationId: _convId,
       senderId: myId,
+      messageType: 'TEXT',
       content: content.trim(),
+      status: 'SENT',
       createdAt: DateTime.now(),
     );
 
@@ -427,7 +431,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
               ),
             ),
             child: Text(
-              msg.content,
+              msg.content ?? '',
               style: TextStyle(
                 fontSize: 15,
                 color: isDarkMode ? Colors.white : const Color(0xFF1F2937),
