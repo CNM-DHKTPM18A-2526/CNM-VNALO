@@ -198,7 +198,10 @@ export const translations = {
     },
     chat: {
       conversationTitle: 'Conversations',
-      searchPlaceholder: 'Search conversations',
+      searchPlaceholder: 'Tìm hội thoại hoặc bạn bè',
+      searchConversationsSection: 'Conversations',
+      searchFriendsSection: 'Friends',
+      searchEmpty: 'Không tìm thấy kết quả',
       quickActions: 'Quick actions',
       addFriend: 'Add friend',
       createGroup: 'Create group',
@@ -606,7 +609,10 @@ export const translations = {
     },
     chat: {
       conversationTitle: 'Hội thoại',
-      searchPlaceholder: 'Tìm hội thoại',
+      searchPlaceholder: 'Tìm hội thoại hoặc bạn bè',
+      searchConversationsSection: 'Hội thoại',
+      searchFriendsSection: 'Bạn bè',
+      searchEmpty: 'Không tìm thấy kết quả',
       quickActions: 'Tác vụ nhanh',
       addFriend: 'Thêm bạn',
       createGroup: 'Tạo nhóm',

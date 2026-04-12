@@ -33,7 +33,7 @@ const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? 'http://localhost:30
     credentials: true,
   },
   namespace: '/chat',
-  transports: ['websocket', 'polling'],
+  transports: ['websocket'],
 })
 @UseGuards(WsJwtGuard)
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -44,6 +44,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   /** Maps userId -> Set of socketIds for multi-device support */
   private readonly userSockets = new Map<string, Set<string>>();
+
+  private getRoomSize(room: string): number {
+    const namespaceAdapter = (this.server as any)?.adapter;
+    const roomClients = namespaceAdapter?.rooms?.get(room);
+    return roomClients?.size ?? 0;
+  }
 
   constructor(
     private readonly jwtService: JwtService,
@@ -57,10 +63,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       const token = client.handshake?.auth?.token || client.handshake?.query?.token;
       if (!token) {
+        this.logger.warn(`[Gateway.conn] Connection rejected: no token`);
         client.disconnect();
         return;
       }
 
+      this.logger.log(`[Gateway.conn] Token present, length: ${(token as string).length}`);
       const payload = this.jwtService.verify(token as string);
       const userId = payload.sub;
       client.data.user = {
@@ -80,12 +88,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
       this.userSockets.get(userId)!.add(client.id);
 
-      this.logger.log(`Client connected: ${client.id} (user: ${userId})`);
+      this.logger.log(`[Gateway.conn] ✅ Connected: client=${client.id} user=${userId} restrictedWebMode=${payload.restrictedWebMode}`);
 
       // Broadcast presence
       this.server.emit('presence.changed', { userId, status: 'online' });
     } catch (err) {
-      this.logger.warn(`Connection rejected: ${err.message}`);
+      this.logger.warn(`[Gateway.conn] Connection rejected: ${err.message}`);
       client.disconnect();
     }
   }
@@ -112,12 +120,39 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() data: { conversationId: string },
   ) {
     const userId = client.data.user.userId;
-    await this.conversationService.assertMember(data.conversationId, userId);
+    const conversationId = data?.conversationId;
 
-    const room = `conversation:${data.conversationId}`;
-    await client.join(room);
-    this.logger.debug(`${userId} joined room ${room}`);
-    return { event: 'conversation.joined', data: { conversationId: data.conversationId } };
+    this.logger.log(
+      `[Gateway.join] Entry: userId=${userId} clientId=${client.id} convId=${conversationId}`,
+    );
+
+    if (!conversationId) {
+      this.logger.error(`[Gateway.join] ❌ Invalid: Missing conversationId`);
+      return { event: 'conversation.error', data: { error: 'Missing conversationId' } };
+    }
+
+    try {
+      this.logger.log(`[Gateway.join] Verifying user is member of conversation...`);
+      await this.conversationService.assertMember(conversationId, userId);
+
+      const room = this.getConversationRoom(conversationId);
+      this.logger.log(`[Gateway.join] Joining room='${room}'...`);
+      
+      await client.join(room);
+      
+      const roomSize = this.getRoomSize(room);
+      
+      this.logger.log(
+        `[Gateway.join] ✅ Successfully joined: room='${room}' now has ${roomSize} client(s)`,
+      );
+      
+      return { event: 'conversation.joined', data: { conversationId } };
+    } catch (err) {
+      this.logger.error(
+        `[Gateway.join] ❌ Failed: ${err.message}`,
+      );
+      return { event: 'conversation.error', data: { error: err.message } };
+    }
   }
 
   /** Leave a conversation room. */
@@ -126,7 +161,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { conversationId: string },
   ) {
-    const room = `conversation:${data.conversationId}`;
+    const room = this.getConversationRoom(data.conversationId);
     await client.leave(room);
   }
 
@@ -146,30 +181,117 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       loginAtEpochSec: client.data.user.loginAtEpochSec,
     };
 
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // STEP 1: LOG ENTRY (verify handler is called)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    this.logger.log(
+      `[Gateway.send] ✅ ENTRY: user=${userId} convId=${dto?.conversationId ?? 'missing'} clientMsgId=${dto?.clientMessageId ?? 'missing'} len=${dto?.content?.length ?? 0} restricted=${access.restrictedWebMode}`,
+    );
+    this.logger.debug(`[Gateway.send] Full payload:`, JSON.stringify(dto, null, 2));
+
+    // Validate DTO
+    if (!dto?.conversationId) {
+      this.logger.error(`[Gateway.send] ❌ INVALID: Missing conversationId`);
+      return { event: 'message.error', data: { error: 'Missing conversationId' } };
+    }
+    if (!dto?.content) {
+      this.logger.error(`[Gateway.send] ❌ INVALID: Missing content`);
+      return { event: 'message.error', data: { error: 'Missing content' } };
+    }
+
     try {
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      // STEP 2: SAVE TO DATABASE
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      this.logger.log(`[Gateway.send] Step 2: Calling messageService.sendMessage...`);
       const message = await this.messageService.sendMessage(userId, dto, access);
-
-      // Broadcast to all clients in the conversation room (for those who have the chat open)
-      const room = `conversation:${dto.conversationId}`;
-      this.server.to(room).emit('message.received', message);
-
-      // Add: also broadcast to all participants of this conversation globally so their inboxes update!
-      try {
-        const conversation = await this.conversationService.getConversation(dto.conversationId, userId);
-        if (conversation && conversation.members) {
-          for (const member of conversation.members) {
-            // we use the emitToUser helper method to reach their personal connected sockets
-            this.emitToUser(member.userId, 'message.received', message);
-          }
-        }
-      } catch (err) {
-        this.logger.error(`Failed to broadcast to individual members: ${err.message}`);
+      
+      if (!message) {
+        this.logger.error(`[Gateway.send] ❌ FAILED: messageService returned null`);
+        return { event: 'message.error', data: { error: 'Message save returned null' } };
       }
 
-      return { event: 'message.sent', data: message };
+      this.logger.log(
+        `[Gateway.send] ✅ Message persisted: id=${message.id} serverSeq=${message.serverSeq} convId=${message.conversationId}`,
+      );
+
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      // STEP 3: EMIT TO CONVERSATION ROOM (BOTH SENDER AND RECEIVER)
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      const room = this.getConversationRoom(message.conversationId);
+      const roomSize = this.getRoomSize(room);
+      
+      this.logger.log(
+        `[Gateway.send] Step 3: EMITTING to room='${room}' (${roomSize} clients online) event='message.received'`,
+      );
+      
+      // Use this.server.to() NOT client.to() - this includes the sender!
+      this.server.to(room).emit('message.received', message);
+      this.logger.log(`[Gateway.send] ✅ Emit to room completed, all ${roomSize} clients should receive message`);
+
+      // Explicit sender confirmation event (in addition to Socket.IO ack callback)
+      client.emit('message.sent', message);
+      this.logger.log(`[Gateway.send] ✅ Emitted sender confirmation event='message.sent' mid=${message.id}`);
+      
+      if (roomSize === 0) {
+        this.logger.warn(`[Gateway.send] ⚠️  WARNING: Room has 0 clients! Message won't be seen immediately.`)
+      }
+
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      // STEP 4: EMIT TO INDIVIDUAL MEMBERS (for inbox updates)
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      try {
+        this.logger.log(`[Gateway.send] Step 4: Fetching conversation members...`);
+        const conversation = await this.conversationService.getConversation(message.conversationId, userId);
+        
+        if (conversation && conversation.members && conversation.members.length > 0) {
+          this.logger.log(
+            `[Gateway.send] ✅ Found ${conversation.members.length} members, broadcasting individ events...`,
+          );
+          
+          for (const member of conversation.members) {
+            const memberSocketIds = this.userSockets.get(member.userId);
+            const socketCount = memberSocketIds?.size ?? 0;
+            this.logger.log(
+              `[Gateway.send]   → Member ${member.userId} has ${socketCount} socket(s)`,
+            );
+            this.emitToUser(member.userId, 'message.received', message);
+          }
+          
+          this.logger.log(`[Gateway.send] ✅ Individual member broadcasts completed`);
+        } else {
+          this.logger.warn(`[Gateway.send] ⚠️  Conversation has no members or not found`);
+        }
+      } catch (err) {
+        this.logger.error(
+          `[Gateway.send] ⚠️  Failed to broadcast to individual members: ${err.message}`,
+        );
+      }
+
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      // STEP 5: SEND ACK BACK TO CLIENT
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      this.logger.log(
+        `[Gateway.send] Step 5: SENDING ACK back to client with event='message.sent' mid=${message.id}`,
+      );
+      
+      const ackResponse = { event: 'message.sent', data: message };
+      this.logger.log(
+        `[Gateway.send] ✅ SUCCESS: Handler returning ACK: ${JSON.stringify({ event: ackResponse.event, messageId: message.id })}`,
+      );
+      
+      return ackResponse;
     } catch (err) {
-      this.logger.error(`Send message failed: ${err.message}`);
-      return { event: 'message.error', data: { error: err.message } };
+      this.logger.error(
+        `[Gateway.send] ❌ EXCEPTION in handler: ${err.message} ${err.stack}`,
+      );
+      
+      const errorResponse = { event: 'message.error', data: { error: err.message } };
+      this.logger.log(
+        `[Gateway.send] Returning error ACK: ${JSON.stringify(errorResponse)}`,
+      );
+      
+      return errorResponse;
     }
   }
 
@@ -184,8 +306,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       const recalled = await this.messageService.recallMessage(userId, data.messageId);
 
-      // Broadcast recall event to all clients in the room
-      const room = `conversation:${recalled.conversationId}`;
+      // Broadcast recall event to all clients in the room (including sender)
+      const room = this.getConversationRoom(recalled.conversationId);
       this.server.to(room).emit('message.recalled', {
         messageId: recalled.id,
         conversationId: recalled.conversationId,
@@ -208,7 +330,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const userId = client.data.user.userId;
     this.conversationService.assertMember(data.conversationId, userId)
       .then(() => {
-        const room = `conversation:${data.conversationId}`;
+        const room = this.getConversationRoom(data.conversationId);
+        // For typing, use client.to() to exclude the sender
         client.to(room).emit('message.typing', {
           userId,
           conversationId: data.conversationId,
@@ -231,8 +354,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       await this.messageService.markAsRead(userId, data.conversationId, data.lastReadSeq);
 
-      // Broadcast read receipt to conversation
-      const room = `conversation:${data.conversationId}`;
+      // Broadcast read receipt to conversation (use client.to() to exclude sender)
+      const room = this.getConversationRoom(data.conversationId);
       client.to(room).emit('message.read', {
         userId,
         conversationId: data.conversationId,
@@ -245,6 +368,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   // ─── Utility ──────────────────────────────────────────────
 
+  /** Get the standard room name for a conversation. */
+  private getConversationRoom(conversationId: string): string {
+    return `conversation:${conversationId}`;
+  }
+
   /** Check if a user is currently online (has at least one active socket). */
   isUserOnline(userId: string): boolean {
     return this.userSockets.has(userId) && this.userSockets.get(userId)!.size > 0;
@@ -253,10 +381,25 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   /** Emit an event to a specific user's sockets. */
   emitToUser(userId: string, event: string, data: any) {
     const sockets = this.userSockets.get(userId);
-    if (sockets) {
-      for (const socketId of sockets) {
-        this.server.to(socketId).emit(event, data);
-      }
+    
+    if (!sockets || sockets.size === 0) {
+      this.logger.warn(
+        `[Gateway.emitToUser] ⚠️  User ${userId} has no active sockets, event='${event}' will not be sent`,
+      );
+      return;
     }
+
+    this.logger.log(
+      `[Gateway.emitToUser] Emitting to ${sockets.size} socket(s) of user=${userId} event='${event}'`,
+    );
+
+    for (const socketId of sockets) {
+      this.logger.log(
+        `[Gateway.emitToUser]   → socketId=${socketId} event='${event}'`,
+      );
+      this.server.to(socketId).emit(event, data);
+    }
+    
+    this.logger.log(`[Gateway.emitToUser] ✅ Emission to user=${userId} completed`);
   }
 }

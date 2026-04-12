@@ -511,7 +511,8 @@ public class AuthService {
         if (!"WEB".equals(normalizedPlatform) && !"PC".equals(normalizedPlatform)) {
             return false;
         }
-        if (!Boolean.TRUE.equals(setting.getSyncEnabled()) || Boolean.TRUE.equals(setting.getWebRestrictedMode())) {
+        // Null syncEnabled should behave as enabled for backward compatibility.
+        if (Boolean.FALSE.equals(setting.getSyncEnabled()) || Boolean.TRUE.equals(setting.getWebRestrictedMode())) {
             return true;
         }
         return isQrWebDevice(deviceId);
@@ -700,4 +701,5 @@ public class AuthService {
     }
 
     private record IssuedRefreshToken(String rawToken, AuthRefreshToken token) {}
+
 }

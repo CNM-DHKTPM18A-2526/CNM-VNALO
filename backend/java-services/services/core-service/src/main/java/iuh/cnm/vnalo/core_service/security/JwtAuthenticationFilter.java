@@ -57,10 +57,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getServletPath();
-        // Some /auth endpoints still require authentication, so do NOT skip JWT filter for them
+        // Some /auth endpoints still require authentication, so do NOT skip JWT filter for them.
+        // Keep this list in sync with SecurityConfig requestMatchers(...).authenticated().
         if (path.equals("/auth/logout-all")
                 || path.equals("/auth/change-password")
-                || path.equals("/auth/password/change")) {
+                || path.equals("/auth/password/change")
+                || path.equals("/auth/login-devices")
+                || path.matches("^/auth/qr/sessions/[^/]+/approve$")) {
             return false;
         }
         return path.startsWith("/auth/") || path.startsWith("/swagger-ui")

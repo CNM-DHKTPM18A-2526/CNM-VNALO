@@ -2,20 +2,35 @@
   display: grid;
   grid-template-columns: 74px 1fr;
   min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background: var(--shell-bg);
 }
 
 .workspace {
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .workspace-main {
   padding: 16px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
 }
 
 .workspace-main-chat {
   padding: 10px 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.workspace-main-chat > .chat-layout {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .sidebar {

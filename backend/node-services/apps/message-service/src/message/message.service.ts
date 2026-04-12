@@ -137,7 +137,7 @@ export class MessageService {
     const qb = this.messageRepo
       .createQueryBuilder('m')
       .where('m.conversation_id = :cid', { cid: conversationId })
-      .andWhere(`NOT (:userId = ANY(m.hidden_by_users))`, { userId })
+      .andWhere(`NOT (:userId::uuid = ANY(COALESCE(m.hidden_by_users, ARRAY[]::uuid[])))`, { userId })
       .orderBy('m.server_seq', 'DESC')
       .take(Math.min(limit, 100));
 
@@ -178,7 +178,7 @@ export class MessageService {
       .createQueryBuilder('m')
       .where('m.conversation_id = :cid', { cid: conversationId })
       .andWhere('m.status != :recalled', { recalled: MessageStatus.RECALLED })
-      .andWhere(`NOT (:userId = ANY(m.hidden_by_users))`, { userId });
+      .andWhere(`NOT (:userId::uuid = ANY(COALESCE(m.hidden_by_users, ARRAY[]::uuid[])))`, { userId });
 
     if (this.isRestrictedWeb(access)) {
       const loginAt = this.resolveLoginTime(access?.loginAtEpochSec);
@@ -563,11 +563,11 @@ export class MessageService {
   }
 
   private isRestrictedWeb(access?: AccessPolicyContext): boolean {
-    if (!access) {
+    if (!access?.restrictedWebMode) {
       return false;
     }
-    const platform = (access.clientPlatform ?? 'WEB').toUpperCase();
-    return Boolean(access.restrictedWebMode) && (platform === 'WEB' || platform === 'PC');
+
+    return access.clientPlatform?.trim().toLowerCase() === 'web';
   }
 
   private resolveLoginTime(epochSec?: number): Date {
