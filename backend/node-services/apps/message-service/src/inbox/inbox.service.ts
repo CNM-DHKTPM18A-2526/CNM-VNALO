@@ -104,12 +104,11 @@ export class InboxService {
   }
 
   private isRestrictedWeb(access?: AccessPolicyContext): boolean {
-    if (!access) {
+    if (!access?.restrictedWebMode) {
       return false;
     }
 
-    const clientPlatform = access.clientPlatform?.trim().toLowerCase();
-    return access.restrictedWebMode === true && clientPlatform === 'web';
+    return access.clientPlatform?.trim().toLowerCase() === 'web';
   }
 
   private resolveLoginTime(epochSec?: number): Date {
