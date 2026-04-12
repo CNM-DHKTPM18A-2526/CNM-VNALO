@@ -10,12 +10,14 @@ import 'package:vnalo_mobile/models/message_model.dart';
 import 'package:vnalo_mobile/services/chat_service.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 import 'package:vnalo_mobile/services/media_service.dart';
+import 'package:vnalo_mobile/core/database/local_database.dart';
 import 'dart:io';
 
 class ChatProvider extends ChangeNotifier {
   final ChatService _chatService;
   final SocketService _socketService;
   final MediaService _mediaService;
+  final LocalDatabase _db;
 
   final Map<String, List<Message>> _messages = {};
   final Map<String, Timer> _retryTimers = {};
@@ -49,7 +51,7 @@ class ChatProvider extends ChangeNotifier {
   List<Message> getMessagesForConversation(String conversationId) =>
       _messages[conversationId] ?? [];
 
-  ChatProvider(this._chatService, this._socketService, this._mediaService)
+  ChatProvider(this._chatService, this._socketService, this._mediaService, this._db)
     : _messageSub = _socketService.onMessage.listen((_) {}),
       _readSub = _socketService.onRead.listen((_) {}),
       _deliveredSub = _socketService.onDelivered.listen((_) {}) {
@@ -87,12 +89,16 @@ class ChatProvider extends ChangeNotifier {
 
   Future<void> loadMessages(String conversationId, {String? before}) async {
     try {
+      // 2. Fetch from API to update and sync
       final response = await _chatService.getMessages(
         conversationId,
         before: before,
       );
+      
       if (before == null) {
         _messages[conversationId] = response;
+        // Sync API messages to local DB in background
+        _db.saveMessagesBatch(response.map(_toLocal).toList());
       } else {
         _messages[conversationId] = [
           ...(_messages[conversationId] ?? []),
@@ -104,6 +110,27 @@ class ChatProvider extends ChangeNotifier {
       debugPrint('loadMessages error: $e');
       debugPrint('Stack trace: $stack');
     }
+  }
+
+  LocalMessage _toLocal(Message m) {
+    return LocalMessage(
+      id: m.id,
+      conversationId: m.conversationId,
+      senderId: m.senderId,
+      content: m.content ?? '',
+      createdAt: m.createdAt,
+    );
+  }
+
+  Message _fromLocal(LocalMessage lm) {
+    return Message(
+      id: lm.id,
+      conversationId: lm.conversationId,
+      senderId: lm.senderId,
+      content: lm.content,
+      createdAt: lm.createdAt,
+      status: MessageStatus.SENT,
+    );
   }
 
   Future<void> openConversation(String conversationId) async {
@@ -122,6 +149,13 @@ class ChatProvider extends ChangeNotifier {
         }
         notifyListeners();
       }
+    }
+
+    // 1. Load from Local Cache FIRST (Optimistic UI)
+    final localMsgs = await _db.getMessagesByConversation(conversationId);
+    if (_activeConversationId == conversationId) {
+      _messages[conversationId] = localMsgs.map(_fromLocal).toList();
+      notifyListeners();
     }
 
     await loadMessages(conversationId);
@@ -205,6 +239,10 @@ class ChatProvider extends ChangeNotifier {
 
     _messages[conversationId] = [optimistic, ...(getMessagesForConversation(conversationId))];
     _replyingTo = null; // Clear reply state after sending
+    
+    // Persist optimistic message locally
+    _db.saveMessage(_toLocal(optimistic));
+    
     notifyListeners();
     _sendWithRetry(optimistic);
   }
@@ -397,6 +435,9 @@ class ChatProvider extends ChangeNotifier {
     if (message.senderId != _currentUserId) {
       _socketService.markDelivered(message.id, conversationId);
     }
+
+    // Persist newly received message to local DB
+    _db.saveMessage(_toLocal(resolvedMessage));
 
     notifyListeners();
   }

@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 import 'connection/connection_stub.dart'
     if (dart.library.io) 'connection/native_connection.dart'
     if (dart.library.html) 'connection/web_connection.dart'
@@ -11,7 +12,7 @@ class LocalDatabase extends _$LocalDatabase {
   LocalDatabase() : super(conn.openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -31,21 +32,39 @@ class LocalDatabase extends _$LocalDatabase {
         await customStatement('DROP TRIGGER IF EXISTS contacts_ai');
         await customStatement('DROP TRIGGER IF EXISTS contacts_ad');
 
-        // 2. Re-create FTS tables (Independent FTS5 schema)
+        // 2. Create base tables if missing (for users upgrading from v1)
+        await m.createTable(messages);
+        await m.createTable(contacts);
+        await m.createTable(conversations);
+
+        // 3. Re-create FTS tables (Independent FTS5 schema)
         await customStatement('DROP TABLE IF EXISTS messages_fts');
         await customStatement('DROP TABLE IF EXISTS contacts_fts');
 
-        // 3. Re-create FTS tables and rebuild indexes from source tables
+        // 4. Re-create FTS tables and rebuild indexes from source tables
         await _createFtsTables();
-        await customStatement(
-          'INSERT INTO messages_fts(content, external_id) SELECT content, id FROM messages',
-        );
-        await customStatement(
-          'INSERT INTO contacts_fts(display_name, external_id) SELECT display_name, id FROM contacts',
-        );
+        
+        // Use try-catch for data migration to avoid blocking startup if tables are empty/corrupt
+        try {
+          await customStatement(
+            'INSERT INTO messages_fts(content, external_id) SELECT content, id FROM messages',
+          );
+          await customStatement(
+            'INSERT INTO contacts_fts(display_name, external_id) SELECT display_name, id FROM contacts',
+          );
+        } catch (e) {
+          debugPrint('FTS indexing failed during migration: $e');
+        }
 
-        // 4. Re-create triggers after rebuild to avoid side effects during migration
+        // 5. Re-create triggers after rebuild to avoid side effects during migration
         await _createFtsTriggers();
+      }
+
+      if (from < 3) {
+        // WIPE poisoned data (ISO strings in INTEGER created_at column)
+        await customStatement('DELETE FROM messages');
+        await customStatement('DELETE FROM messages_fts');
+        debugPrint('[Migration] Database v3: Purged legacy messages to fix formatting errors.');
       }
     },
   );
@@ -85,27 +104,29 @@ class LocalDatabase extends _$LocalDatabase {
 
   // --- SEARCH QUERIES ---
 
-  Future<List<LocalMessage>> searchMessages(String query) async {
-    final results =
-        await customSelect(
-          'SELECT m.* FROM messages m '
-          'JOIN messages_fts f ON m.id = f.external_id '
-          'WHERE f.content MATCH ? '
-          'ORDER BY m.created_at DESC',
-          variables: [Variable.withString('$query*')],
-        ).get();
+  Future<List<LocalMessageSearchResult>> searchMessages(String query) async {
+    final results = await customSelect(
+      'SELECT m.*, c.name as conv_name, c.avatar_url as conv_avatar FROM messages m '
+      'JOIN messages_fts f ON m.id = f.external_id '
+      'LEFT JOIN conversations c ON m.conversation_id = c.id '
+      'WHERE f.content MATCH ? '
+      'ORDER BY m.created_at DESC',
+      variables: [Variable.withString('$query*')],
+    ).get();
 
-    return results
-        .map(
-          (row) => LocalMessage(
-            id: row.read<String>('id'),
-            content: row.read<String>('content'),
-            conversationId: row.read<String>('conversation_id'),
-            createdAt: row.read<DateTime>('created_at'),
-            senderId: row.read<String>('sender_id'),
-          ),
-        )
-        .toList();
+    return results.map((row) {
+      return LocalMessageSearchResult(
+        message: LocalMessage(
+          id: row.read<String>('id'),
+          content: row.read<String>('content'),
+          conversationId: row.read<String>('conversation_id'),
+          createdAt: row.read<DateTime>('created_at'),
+          senderId: row.read<String>('sender_id'),
+        ),
+        conversationName: row.readNullable<String>('conv_name'),
+        conversationAvatar: row.readNullable<String>('conv_avatar'),
+      );
+    }).toList();
   }
 
   Future<List<LocalContact>> searchContacts(String query) async {
@@ -151,4 +172,33 @@ class LocalDatabase extends _$LocalDatabase {
       updatedAt: row.read<DateTime>('updated_at'),
     );
   }
+
+  Future<void> saveMessage(LocalMessage message) async {
+    await into(messages).insert(message, mode: InsertMode.insertOrReplace);
+  }
+
+  Future<void> saveMessagesBatch(List<LocalMessage> messageList) async {
+    await batch((batch) {
+      batch.insertAll(messages, messageList, mode: InsertMode.insertOrReplace);
+    });
+  }
+
+  Future<List<LocalMessage>> getMessagesByConversation(String conversationId) async {
+    return (select(messages)
+          ..where((t) => t.conversationId.equals(conversationId))
+          ..orderBy([(t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc)]))
+        .get();
+  }
+}
+
+class LocalMessageSearchResult {
+  final LocalMessage message;
+  final String? conversationName;
+  final String? conversationAvatar;
+
+  LocalMessageSearchResult({
+    required this.message,
+    this.conversationName,
+    this.conversationAvatar,
+  });
 }

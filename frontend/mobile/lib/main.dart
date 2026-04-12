@@ -19,6 +19,7 @@ import 'package:vnalo_mobile/services/storage_service.dart';
 import 'package:vnalo_mobile/services/user_service.dart';
 import 'package:vnalo_mobile/services/local_sync_service.dart';
 import 'package:vnalo_mobile/core/database/local_database.dart';
+import 'package:vnalo_mobile/features/timeline/providers/post_provider.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -129,7 +130,11 @@ class VnaloApp extends StatelessWidget {
                 context.read<ChatService>(),
                 context.read<SocketService>(),
                 context.read<MediaService>(),
+                context.read<LocalDatabase>(),
               ),
+        ),
+        ChangeNotifierProvider<PostProvider>(
+          create: (_) => PostProvider(),
         ),
       ],
       child: Consumer2<ThemeProvider, LanguageProvider>(

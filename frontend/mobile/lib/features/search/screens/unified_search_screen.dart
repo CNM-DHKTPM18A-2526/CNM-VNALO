@@ -40,8 +40,14 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
   // New states for hybrid search
   User? _strangerFoundByPhone;
   List<LocalContact> _localContactResults = [];
-  List<LocalMessage> _localMessageResults = [];
+  List<LocalMessageSearchResult> _localMessageResults = [];
   bool _isSearching = false;
+  String _selectedFilter = 'Tất cả'; // 'Tất cả', 'Link', 'File'
+
+  int get _mineCount =>
+      _localContactResults.length +
+      _localMessageResults.length +
+      (_strangerFoundByPhone != null ? 1 : 0);
 
   @override
   void initState() {
@@ -97,11 +103,14 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
     final contactsTask = db.searchContacts(q);
     final messagesTask = db.searchMessages(q);
 
-    // 2. Global Phone Search (if 10 digits)
-    final phoneRegex = RegExp(r'^\d{10}$');
+    // 2. Global Phone Search (flexible: 9-15 digits, opt leading '+')
+    final phoneRegex = RegExp(r'^\+?[0-9]{9,15}$');
     Future<User?> phoneTask = Future.value(null);
     if (phoneRegex.hasMatch(q)) {
-      phoneTask = userService.getUserByPhone(q).catchError((_) => null);
+      phoneTask = userService.getUserByPhone(q).catchError((e) {
+        debugPrint('Phone search failed for $q: $e');
+        return null;
+      });
     }
 
     final results = await Future.wait([contactsTask, messagesTask, phoneTask]);
@@ -110,7 +119,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
 
     setState(() {
       _localContactResults = results[0] as List<LocalContact>;
-      _localMessageResults = results[1] as List<LocalMessage>;
+      _localMessageResults = results[1] as List<LocalMessageSearchResult>;
       _strangerFoundByPhone = results[2] as User?;
       _isSearching = false;
     });
@@ -325,32 +334,6 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
     );
   }
 
-  Widget _buildDefaultView() {
-    return Column(
-      children: [
-        Container(
-          color:
-              Theme.of(context).brightness == Brightness.dark
-                  ? const Color(0xFF1A1A1A)
-                  : Colors.white,
-          child: TabBar(
-            controller: _tabController,
-            labelColor: const Color(0xFF0091FF),
-            unselectedLabelColor: Colors.grey,
-            indicatorColor: const Color(0xFF0091FF),
-            tabs: const [Tab(text: 'Của tôi'), Tab(text: 'Khám phá')],
-          ),
-        ),
-        Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: [_buildMineTab(), _buildDiscoverTab()],
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildMineTab() {
     return ListView(
       children: [
@@ -418,23 +401,41 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
         _localContactResults.isEmpty &&
         _localMessageResults.isEmpty) {
       if (_isSearching) {
-        return const Center(child: CircularProgressIndicator());
+        return const Center(
+          child: Padding(
+            padding: EdgeInsets.all(32),
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        );
       }
       return Center(
-        child: Text(
-          'Không tìm thấy liên hệ hay tin nhắn phù hợp',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+        child: Padding(
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.search_off, size: 64, color: Colors.grey.shade300),
+              const SizedBox(height: 16),
+              const Text(
+                'Không tìm thấy liên hệ, tin nhắn\ncó chứa nội dung bạn đang tìm kiếm',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Color(0xFF757575), fontSize: 14),
+              ),
+            ],
+          ),
         ),
       );
     }
 
-    return ListView(
-      children: [
-        if (_strangerFoundByPhone != null) _buildStrangerSection(),
-        if (_localContactResults.isNotEmpty) _buildContactSection(query),
-        if (_localMessageResults.isNotEmpty) _buildMessageSection(query),
-      ],
+    return Container(
+      color: Colors.white,
+      child: ListView(
+        children: [
+          if (_strangerFoundByPhone != null) _buildStrangerSection(),
+          if (_localContactResults.isNotEmpty) _buildContactSection(query),
+          if (_localMessageResults.isNotEmpty) _buildMessageSection(query),
+        ],
+      ),
     );
   }
 
@@ -445,47 +446,60 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
       children: [
         _sectionHeader('Tìm bạn qua số điện thoại (1)', showEdit: false),
         ListTile(
-          tileColor: Colors.white,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           leading: AvatarWidget(
             imageUrl: user.avatarUrl,
             name: user.displayName,
-            size: 48,
+            size: 52,
           ),
           title: Text(
             user.displayName,
-            style: const TextStyle(fontWeight: FontWeight.w500),
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
           ),
-          subtitle: RichText(
-            text: TextSpan(
-              style: const TextStyle(color: Colors.grey, fontSize: 13),
-              children: [
-                const TextSpan(text: 'Số điện thoại: '),
-                _highlightText(
-                  user.phone ?? '',
-                  _queryController.text,
-                  baseStyle: const TextStyle(color: Color(0xFF0091FF)),
-                ),
-              ],
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: RichText(
+              text: TextSpan(
+                style: const TextStyle(color: Color(0xFF757575), fontSize: 14),
+                children: [
+                  const TextSpan(text: 'Số điện thoại: '),
+                  _highlightText(
+                    user.phone ?? '',
+                    _queryController.text,
+                    baseStyle: const TextStyle(color: Color(0xFF0091FF)),
+                  ),
+                ],
+              ),
             ),
           ),
-          trailing: ElevatedButton(
-            onPressed: () {},
-            style: ElevatedButton.styleFrom(
+          trailing: OutlinedButton(
+            onPressed: () async {
+              try {
+                await context.read<FriendService>().sendFriendRequest(user.id);
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Đã gửi lời mời kết bạn')),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Không thể gửi lời mời')),
+                );
+              }
+            },
+            style: OutlinedButton.styleFrom(
               backgroundColor: const Color(0xFFE3F2FD),
+              side: BorderSide.none,
               foregroundColor: const Color(0xFF0091FF),
-              elevation: 0,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
               ),
             ),
-            child: const Text(
-              'Kết bạn',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
+            child: const Text('Kết bạn', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ),
-        const Divider(height: 1),
+        const Divider(height: 8, thickness: 8, color: Color(0xFFF4F5F7)),
       ],
     );
   }
@@ -497,11 +511,10 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
         _sectionHeader('Liên hệ (${_localContactResults.length})'),
         ..._localContactResults.map(
           (contact) => ListTile(
-            tileColor: Colors.white,
             leading: AvatarWidget(
               imageUrl: contact.avatarUrl,
               name: contact.displayName,
-              size: 48,
+              size: 52,
             ),
             title: RichText(
               text: _highlightText(
@@ -509,19 +522,57 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                 query,
                 baseStyle: const TextStyle(
                   color: Colors.black,
-                  fontWeight: FontWeight.normal,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w400,
                 ),
               ),
             ),
             trailing: const Icon(
               Icons.phone_outlined,
               color: Color(0xFF0091FF),
-              size: 22,
+              size: 24,
             ),
             onTap: () => _handleLocalContactTap(contact),
           ),
         ),
+        const Divider(height: 8, thickness: 8, color: Color(0xFFF4F5F7)),
       ],
+    );
+  }
+
+  Widget _buildFilterChips() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: ['Tất cả', 'Link', 'File'].map((filter) {
+          final isSelected = _selectedFilter == filter;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              label: Text(filter),
+              selected: isSelected,
+              onSelected: (val) {
+                if (val) setState(() => _selectedFilter = filter);
+              },
+              selectedColor: const Color(0xFFE3F2FD),
+              backgroundColor: Colors.white,
+              labelStyle: TextStyle(
+                color: isSelected ? const Color(0xFF0091FF) : Colors.grey,
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(
+                  color: isSelected ? const Color(0xFF0091FF) : Colors.grey.shade300,
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 
@@ -529,31 +580,36 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionHeader('Tin nhắn (${_localMessageResults.length}+)'),
+        _sectionHeader('Tin nhắn (${_localMessageResults.length})'),
+        _buildFilterChips(),
         ..._localMessageResults.map(
-          (msg) => ListTile(
-            tileColor: Colors.white,
-            leading: const AvatarWidget(
-              imageUrl: null,
-              name: 'Group',
-              size: 48,
+          (result) => ListTile(
+            leading: AvatarWidget(
+              imageUrl: result.conversationAvatar,
+              name: result.conversationName ?? 'Group',
+              size: 52,
             ),
-            title: const Text(
-              'Cuộc hội thoại',
-              style: TextStyle(fontWeight: FontWeight.w500),
+            title: Text(
+              result.conversationName ?? 'Cuộc hội thoại',
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
             ),
-            subtitle: RichText(
-              text: _highlightText(
-                msg.content,
-                query,
-                baseStyle: const TextStyle(color: Colors.grey, fontSize: 13),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: RichText(
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                text: _highlightText(
+                  result.message.content,
+                  query,
+                  baseStyle: const TextStyle(color: Color(0xFF757575), fontSize: 14),
+                ),
               ),
             ),
             trailing: Text(
-              DateFormat('dd/MM/yy').format(msg.createdAt),
+              DateFormat('dd/MM/yy').format(result.message.createdAt),
               style: const TextStyle(color: Colors.grey, fontSize: 11),
             ),
-            onTap: () => _handleLocalMessageTap(msg),
+            onTap: () => _handleLocalMessageTap(result.message),
           ),
         ),
       ],
@@ -567,7 +623,11 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
         children: [
           Text(
             title,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF757575),
+            ),
           ),
           const Spacer(),
           if (showEdit)
@@ -577,6 +637,62 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
             ),
         ],
       ),
+    );
+  }
+
+  Widget _buildDefaultView() {
+    return Column(
+      children: [
+        Container(
+          color:
+              Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF1A1A1A)
+                  : Colors.white,
+          child: TabBar(
+            controller: _tabController,
+            dividerColor: Colors.transparent,
+            labelColor: const Color(0xFF0091FF),
+            unselectedLabelColor: Colors.grey,
+            indicatorColor: const Color(0xFF0091FF),
+            indicatorWeight: 3,
+            tabs: [
+              Tab(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Của tôi'),
+                    if (_mineCount > 0) ...[
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0091FF).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '$_mineCount',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0091FF),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Tab(text: 'Khám phá'),
+            ],
+          ),
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [_buildMineTab(), _buildDiscoverTab()],
+          ),
+        ),
+      ],
     );
   }
 }
