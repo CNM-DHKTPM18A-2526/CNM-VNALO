@@ -1,0 +1,24 @@
+-- Tables for main data
+CREATE TABLE messages (
+    id TEXT NOT NULL PRIMARY KEY,
+    conversation_id TEXT NOT NULL,
+    sender_id TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at DATETIME NOT NULL
+) AS LocalMessage;
+
+CREATE TABLE contacts (
+    id TEXT NOT NULL PRIMARY KEY,
+    display_name TEXT NOT NULL,
+    phone TEXT,
+    avatar_url TEXT
+) AS LocalContact;
+
+CREATE TABLE conversations (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT,
+    type TEXT NOT NULL,
+    avatar_url TEXT,
+    last_message TEXT,
+    updated_at DATETIME NOT NULL
+) AS LocalConversation;

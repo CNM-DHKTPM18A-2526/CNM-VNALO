@@ -16,6 +16,9 @@ import 'package:vnalo_mobile/services/chat_service.dart';
 import 'package:vnalo_mobile/services/friend_service.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 import 'package:vnalo_mobile/services/storage_service.dart';
+import 'package:vnalo_mobile/services/user_service.dart';
+import 'package:vnalo_mobile/services/local_sync_service.dart';
+import 'package:vnalo_mobile/core/database/local_database.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -88,6 +91,20 @@ class VnaloApp extends StatelessWidget {
         Provider<FriendService>(
           create: (context) => FriendService(context.read<ApiService>()),
         ),
+        Provider<UserService>(
+          create: (context) => UserService(context.read<ApiService>()),
+        ),
+        Provider<LocalDatabase>(
+          create: (_) => LocalDatabase(),
+          dispose: (_, db) => db.close(),
+        ),
+        Provider<LocalSyncService>(
+          create: (context) => LocalSyncService(
+            db: context.read<LocalDatabase>(),
+            chatService: context.read<ChatService>(),
+            friendService: context.read<FriendService>(),
+          ), // Moved sync logic to AuthProvider
+        ),
         ChangeNotifierProvider<ThemeProvider>(
           create: (_) => ThemeProvider()..initialize(),
         ),
@@ -100,6 +117,7 @@ class VnaloApp extends StatelessWidget {
                 context.read<AuthService>(),
                 context.read<StorageService>(),
                 context.read<SocketService>(),
+                context.read<LocalSyncService>(),
               ),
         ),
         ChangeNotifierProvider<ChatProvider>(

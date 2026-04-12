@@ -168,6 +168,21 @@ class Conversation {
     return fallback;
   }
 
+  // Factory constructor to create a Conversation from local database model
+  factory Conversation.fromLocal(dynamic local) {
+    // local is expected to be a LocalConversation from Drift
+    return Conversation(
+      id: local.id,
+      type: local.type == 'GROUP' ? ConversationType.GROUP : ConversationType.DIRECT,
+      title: local.name,
+      avatarUrl: local.avatarUrl,
+      updatedAt: local.updatedAt,
+      lastMessage: local.lastMessage != null 
+          ? Message(id: 'temp', content: local.lastMessage, conversationId: local.id, senderId: '', createdAt: local.updatedAt)
+          : null,
+    );
+  }
+
   // Factory constructor to create a Conversation instance from JSON data
   factory Conversation.fromJson(Map<String, dynamic> json) => Conversation(
     id: json['id'],

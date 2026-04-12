@@ -27,10 +27,10 @@ class ChatService {
       final inboxEntry = Map<String, dynamic>.from(item);
       final nestedConversation =
           inboxEntry['conversation'] is Map<String, dynamic>
-          ? Map<String, dynamic>.from(
-              inboxEntry['conversation'] as Map<String, dynamic>,
-            )
-          : <String, dynamic>{};
+              ? Map<String, dynamic>.from(
+                inboxEntry['conversation'] as Map<String, dynamic>,
+              )
+              : <String, dynamic>{};
 
       final conversationId =
           nestedConversation['id'] ??
@@ -50,8 +50,10 @@ class ChatService {
       };
 
       final preview =
-          inboxEntry['lastMessagePreview'] ?? inboxEntry['last_message_preview'];
-      final messageAt = inboxEntry['lastMessageAt'] ?? inboxEntry['last_message_at'];
+          inboxEntry['lastMessagePreview'] ??
+          inboxEntry['last_message_preview'];
+      final messageAt =
+          inboxEntry['lastMessageAt'] ?? inboxEntry['last_message_at'];
 
       if (preview != null || messageAt != null) {
         json['lastMessage'] = {
@@ -86,38 +88,41 @@ class ChatService {
     // Batch fetch user profiles for all member IDs
     if (allMemberIds.isNotEmpty) {
       final userProfiles = <String, Map<String, dynamic>>{};
-      await Future.wait(allMemberIds.map((uid) async {
-        try {
-          final res = await _apiService.get(_coreBase, '/users/$uid');
-          final data = res['data'];
-          if (data is Map<String, dynamic>) {
-            userProfiles[uid] = data;
-          } else if (res.containsKey('displayName')) {
-            userProfiles[uid] = res;
+      await Future.wait(
+        allMemberIds.map((uid) async {
+          try {
+            final res = await _apiService.get(_coreBase, '/users/$uid');
+            final data = res['data'];
+            if (data is Map<String, dynamic>) {
+              userProfiles[uid] = data;
+            } else if (res.containsKey('displayName')) {
+              userProfiles[uid] = res;
+            }
+          } catch (_) {
+            // User not found or error, skip
           }
-        } catch (_) {
-          // User not found or error, skip
-        }
-      }));
+        }),
+      );
 
       // Enrich conversation members with user profile data
       for (int i = 0; i < conversations.length; i++) {
         final conv = conversations[i];
         if (conv.members.isEmpty) continue;
-        final enrichedMembers = conv.members.map((member) {
-          final profile = userProfiles[member.userId];
-          if (profile != null && member.user == null) {
-            return ConversationMember.fromJson({
-              'conversationId': member.conversationId,
-              'userId': member.userId,
-              'role': member.role.name,
-              'nickname': member.nickname,
-              'joinedAt': member.joinedAt.toIso8601String(),
-              'user': profile,
-            });
-          }
-          return member;
-        }).toList();
+        final enrichedMembers =
+            conv.members.map((member) {
+              final profile = userProfiles[member.userId];
+              if (profile != null && member.user == null) {
+                return ConversationMember.fromJson({
+                  'conversationId': member.conversationId,
+                  'userId': member.userId,
+                  'role': member.role.name,
+                  'nickname': member.nickname,
+                  'joinedAt': member.joinedAt.toIso8601String(),
+                  'user': profile,
+                });
+              }
+              return member;
+            }).toList();
 
         // Rebuild conversation with enriched members
         conversations[i] = Conversation(
@@ -147,6 +152,30 @@ class ChatService {
     }
 
     return conversations;
+  }
+
+  Future<Conversation?> getConversationById(String conversationId) async {
+    try {
+      final response = await _apiService.get(
+        _base,
+        '/conversations/$conversationId',
+      );
+      final data = response['data'];
+      if (data is Map<String, dynamic>) {
+        return Conversation.fromJson(data);
+      }
+      if (response['conversation'] is Map<String, dynamic>) {
+        return Conversation.fromJson(
+          response['conversation'] as Map<String, dynamic>,
+        );
+      }
+      if (response.containsKey('id')) {
+        return Conversation.fromJson(response);
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
   }
 
   // Get or create a direct conversation with another user
