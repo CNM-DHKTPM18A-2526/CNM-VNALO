@@ -11,6 +11,7 @@ class AvatarWidget extends StatelessWidget {
   final String name;
   final double size;
   final bool showOnline;
+  final int cacheVersion;
 
   const AvatarWidget({
     super.key,
@@ -18,12 +19,14 @@ class AvatarWidget extends StatelessWidget {
     required this.name,
     this.size = 48,
     this.showOnline = false,
+    this.cacheVersion = 0,
   });
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final resolvedImage = AvatarResolver.resolveUrl(imageUrl);
+    final resolvedWithVersion = _appendCacheVersion(resolvedImage, cacheVersion);
     final initials = AvatarUtils.getInitials(name);
     final initialsBg = AvatarUtils.getColor(name);
     final auth = context.watch<AuthProvider>();
@@ -35,10 +38,10 @@ class AvatarWidget extends StatelessWidget {
           width: size,
           height: size,
           child: ClipOval(
-            child: resolvedImage == null
+            child: resolvedWithVersion == null
                 ? _initialsAvatar(initials, initialsBg)
                 : CachedNetworkImage(
-                    imageUrl: resolvedImage,
+                imageUrl: resolvedWithVersion,
                     fit: BoxFit.cover,
                     fadeInDuration: Duration.zero,
                     fadeOutDuration: Duration.zero,
@@ -70,6 +73,15 @@ class AvatarWidget extends StatelessWidget {
           ),
       ],
     );
+  }
+
+  String? _appendCacheVersion(String? url, int version) {
+    if (url == null || url.isEmpty || version <= 0) return url;
+    final uri = Uri.tryParse(url);
+    if (uri == null) return url;
+    final params = Map<String, String>.from(uri.queryParameters);
+    params['av'] = version.toString();
+    return uri.replace(queryParameters: params).toString();
   }
 
   Widget _initialsAvatar(String initials, Color bg) {

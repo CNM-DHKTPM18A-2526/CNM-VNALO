@@ -63,6 +63,9 @@ class ChatService {
         json['lastMessage'] = {
           'id': 'inbox-$conversationId',
           'conversationId': conversationId,
+          'serverSeq':
+              inboxEntry['lastMessageSeq'] ??
+              inboxEntry['last_message_seq'],
           'senderId':
               inboxEntry['lastMessageSenderId'] ??
               inboxEntry['last_message_sender_id'] ??

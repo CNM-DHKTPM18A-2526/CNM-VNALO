@@ -6,6 +6,7 @@ import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/utils/date_formatter.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
+import 'package:vnalo_mobile/features/profile/providers/avatar_cache_provider.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
 
@@ -24,6 +25,8 @@ class ChatListItem extends StatelessWidget {
     final currentUserId = context.read<AuthProvider>().user?.id ?? '';
     final displayName = conversation.getDisplayName(currentUserId);
     final displayAvatar = conversation.getDisplayAvatarUrl(currentUserId);
+    final avatarOwnerId = _avatarOwnerId(currentUserId);
+    final avatarVersion = context.watch<AvatarCacheProvider>().versionForUser(avatarOwnerId);
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final common = CommonTexts.of(context);
 
@@ -32,6 +35,7 @@ class ChatListItem extends StatelessWidget {
     final secondaryTextColor = isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary;
     final hintColor = isDarkMode ? DarkColors.textHint : LightColors.textHint;
     final dividerColor = isDarkMode ? DarkColors.divider : const Color(0xFFE9EDF3);
+    final lastPreview = _buildLastMessagePreview(currentUserId);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -70,6 +74,7 @@ class ChatListItem extends StatelessWidget {
                 name: displayName,
                 size: 48,
                 showOnline: conversation.type == ConversationType.DIRECT,
+                cacheVersion: avatarVersion,
               ),
               title: Row(
                 children: [
@@ -94,7 +99,7 @@ class ChatListItem extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      conversation.lastMessage?.content ??
+                      lastPreview ??
                           (conversation.type == ConversationType.DIRECT
                               ? common.sayHelloTo(displayName)
                               : ''),
@@ -136,5 +141,61 @@ class ChatListItem extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  String _avatarOwnerId(String currentUserId) {
+    if (conversation.type != ConversationType.DIRECT) return '';
+    if (conversation.members.isEmpty) return '';
+    final other = conversation.members.firstWhere(
+      (m) => m.userId != currentUserId,
+      orElse: () => conversation.members.first,
+    );
+    return other.userId;
+  }
+
+  String? _buildLastMessagePreview(String currentUserId) {
+    final message = conversation.lastMessage;
+    if (message == null) return null;
+
+    final isMine = message.senderId.isNotEmpty && message.senderId == currentUserId;
+    final prefix = isMine ? 'Bạn: ' : '';
+
+    if (message.status == MessageStatus.RECALLED) {
+      return '${prefix}Tin nhắn đã thu hồi';
+    }
+
+    final content = (message.content ?? '').trim();
+    final mediaUrl = (message.mediaUrl ?? '').trim();
+    final typePreview = switch (message.messageType) {
+      MessageType.TEXT => _textPreview(content),
+      MessageType.IMAGE => '[Hình ảnh]',
+      MessageType.VIDEO => '[Video]',
+      MessageType.FILE => _filePreview(content),
+      MessageType.AUDIO => '[Âm thanh]',
+      MessageType.STICKER => '[Sticker]',
+      MessageType.SYSTEM => content.isNotEmpty ? content : '[Hệ thống]',
+      MessageType.REPLY => content.isNotEmpty ? '[Trả lời] $content' : '[Trả lời]',
+      MessageType.FORWARD => content.isNotEmpty ? '[Chuyển tiếp] $content' : '[Chuyển tiếp]',
+    };
+
+    if (typePreview == null && mediaUrl.isNotEmpty) {
+      return '$prefix[Link] $mediaUrl';
+    }
+
+    return '$prefix${typePreview ?? ''}'.trim();
+  }
+
+  String _filePreview(String content) {
+    if (content.isEmpty) return '[File]';
+    return '[File] $content';
+  }
+
+  String? _textPreview(String content) {
+    if (content.isEmpty) return null;
+    final uri = Uri.tryParse(content);
+    if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
+      return '[Link] $content';
+    }
+    return content;
   }
 }

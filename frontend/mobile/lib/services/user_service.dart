@@ -37,4 +37,17 @@ class UserService {
       return null;
     }
   }
+
+  Future<User?> getUserById(String userId) async {
+    try {
+      final response = await _apiService.get(_base, '/users/$userId');
+      final data = response['data'] ?? response;
+      if (data is Map<String, dynamic>) {
+        return User.fromJson(data);
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
 }
