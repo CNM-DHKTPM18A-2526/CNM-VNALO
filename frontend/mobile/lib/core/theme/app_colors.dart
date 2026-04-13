@@ -8,7 +8,7 @@ class AppColors {
   static const Color primaryLight = Color(0xFF00A2ED);
   static const Color primaryDark = Color(0xFF0050CC);
 
-  // â”€â”€â”€ Semantic â”€â”€â”€
+  // Semantic tokens
   static const Color success = Color(0xFF22C55E);
   static const Color error = Color(0xFFEF4444);
   static const Color warning = Color(0xFFF59E0B);

@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -129,7 +129,7 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
             onPressed: () => Navigator.pop(context),
           ),
           const Text(
-            'Äá»•i hÃ¬nh ná»n',
+            'Change wallpaper',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.black87),
           ),
           TextButton(
@@ -224,7 +224,7 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
             ),
             const SizedBox(width: 10),
             const Text(
-              'Äá»•i hÃ¬nh ná»n cho cáº£ hai bÃªn',
+              'Apply wallpaper for both participants',
               style: TextStyle(fontSize: 14, color: Colors.black87),
             ),
           ],
@@ -263,7 +263,7 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
           return;
         } catch (innerError) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lá»—i: $innerError')));
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $innerError')));
             setState(() => _isSaving = false);
           }
           return;
@@ -271,7 +271,7 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lá»—i: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
         setState(() => _isSaving = false);
       }
     }
@@ -289,8 +289,8 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
             Expanded(
               child: Text(
                 isFallback
-                  ? 'ÄÃ£ Ä‘á»•i hÃ¬nh ná»n cho riÃªng báº¡n (thiáº¿u quyá»n Ä‘á»•i cho cáº£ hai)'
-                  : 'HÃ¬nh ná»n Ä‘Ã£ Ä‘Æ°á»£c thay Ä‘á»•i',
+                  ? 'Wallpaper updated only for you (insufficient permission for both)'
+                  : 'Wallpaper updated successfully',
                 style: const TextStyle(color: Colors.white, fontSize: 13),
               ),
             ),

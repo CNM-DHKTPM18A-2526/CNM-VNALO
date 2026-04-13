@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:vnalo_mobile/config/app_config.dart';
 import 'package:vnalo_mobile/services/api_service.dart';
 
@@ -39,12 +39,12 @@ class MediaService {
     final response = await _apiService.get(_base, '/media?category=${category.name}&page=$page&size=$size');
     final data = response['data'] ?? response;
 
-    // Backend thá»±c táº¿ tráº£ vá» 'content' qua MediaPageResponse DTO
+    // Backend usually returns paged items in `content`.
     if (data is Map && data['content'] is List) {
       return List<Map<String, dynamic>>.from(data['content']);
     }
 
-    // Giá»¯ 'items' lÃ m fallback
+    // Keep `items` as a fallback for older responses.
     if (data is Map && data['items'] is List) {
       return List<Map<String, dynamic>>.from(data['items']);
     }

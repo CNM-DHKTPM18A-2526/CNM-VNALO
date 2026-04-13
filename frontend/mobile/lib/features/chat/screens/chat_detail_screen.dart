@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
@@ -47,7 +47,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       chatProvider.setCurrentUserId(currentUserId);
       chatProvider.openConversation(widget.conversation.id);
 
-      // Tá»± Ä‘á»™ng chuyá»ƒn subtext cho chat nhÃ³m sau 3 giÃ¢y
+      // Auto-switch to group member subtitle after a short delay.
       if (widget.conversation.type == ConversationType.GROUP) {
         _subtextTimer = Timer(const Duration(seconds: 3), () {
           if (mounted) {

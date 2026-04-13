@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
@@ -53,7 +53,7 @@ class MessageBubble extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.12),
+                  color: Colors.black.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -130,7 +130,7 @@ class MessageBubble extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Hiá»ƒn thá»‹ Ä‘áº·c biá»‡t khi tin nháº¯n Ä‘Ã£ bá»‹ thu há»“i
+          // Render a dedicated style for recalled messages.
           if (message.isRecalled)
             _buildRecalledContent(isMine, isDarkMode)
           else ...[
@@ -186,7 +186,7 @@ class MessageBubble extends StatelessWidget {
     final size = renderBox.size;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    // KhÃ´ng hiá»ƒn thá»‹ menu náº¿u tin nháº¯n Ä‘Ã£ bá»‹ thu há»“i
+    // Skip action menu for recalled messages.
     if (message.isRecalled) return;
 
     FocusedMessageDialog.show(
@@ -204,7 +204,7 @@ class MessageBubble extends StatelessWidget {
              Clipboard.setData(ClipboardData(text: message.content ?? ''));
              if (context.mounted) {
                ScaffoldMessenger.of(context).showSnackBar(
-                 const SnackBar(content: Text('ÄÃ£ sao chÃ©p tin nháº¯n')),
+                 const SnackBar(content: Text('Message copied')),
                );
              }
            }
@@ -213,17 +213,17 @@ class MessageBubble extends StatelessWidget {
             final confirmed = await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
-                title: const Text('Thu há»“i tin nháº¯n'),
-                content: const Text('Tin nháº¯n sáº½ Ä‘Æ°á»£c thu há»“i vá»›i táº¥t cáº£ má»i ngÆ°á»i. Báº¡n cÃ³ cháº¯c khÃ´ng?'),
+                title: const Text('Recall message'),
+                content: const Text('This message will be removed for everyone. Continue?'),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text('Há»§y'),
+                    child: const Text('Cancel'),
                   ),
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, true),
                     style: TextButton.styleFrom(foregroundColor: Colors.orange),
-                    child: const Text('Thu há»“i'),
+                    child: const Text('Recall'),
                   ),
                 ],
               ),
@@ -237,17 +237,17 @@ class MessageBubble extends StatelessWidget {
             final confirmed = await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
-                title: const Text('XÃ³a tin nháº¯n'),
-                content: const Text('Tin nháº¯n sáº½ bá»‹ xÃ³a á»Ÿ phÃ­a báº¡n. NgÆ°á»i khÃ¡c váº«n nhÃ¬n tháº¥y tin nháº¯n nÃ y.'),
+                title: const Text('Delete message'),
+                content: const Text('This removes the message only for you.'),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text('Há»§y'),
+                    child: const Text('Cancel'),
                   ),
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, true),
                     style: TextButton.styleFrom(foregroundColor: Colors.red),
-                    child: const Text('XÃ³a'),
+                    child: const Text('Delete'),
                   ),
                 ],
               ),
@@ -271,7 +271,7 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
-  /// Widget hiá»ƒn thá»‹ khi tin nháº¯n Ä‘Ã£ bá»‹ thu há»“i
+  /// Bubble content for a recalled message.
   Widget _buildRecalledContent(bool isMine, bool isDarkMode) {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -283,7 +283,7 @@ class MessageBubble extends StatelessWidget {
         ),
         const SizedBox(width: 4),
         Text(
-          'Tin nháº¯n Ä‘Ã£ Ä‘Æ°á»£c thu há»“i',
+          'Message recalled',
           style: TextStyle(
             fontSize: 14,
             fontStyle: FontStyle.italic,
@@ -446,7 +446,7 @@ class MessageBubble extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  message.content ?? 'TÃ i liá»‡u',
+                  message.content ?? 'Document',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
@@ -508,9 +508,9 @@ class MessageBubble extends StatelessWidget {
         ],
         if (showStatus) ...[
           if (message.status == MessageStatus.SENDING)
-             Text('Äang gá»­i...', style: TextStyle(fontSize: 10, color: Colors.grey))
+             Text('Sending...', style: TextStyle(fontSize: 10, color: Colors.grey))
           else if (message.status == MessageStatus.FAILED)
-             const Text('Lá»—i gá»­i', style: TextStyle(fontSize: 10, color: Colors.red))
+             const Text('Send failed', style: TextStyle(fontSize: 10, color: Colors.red))
           else
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -592,11 +592,11 @@ class MessageBubble extends StatelessWidget {
   String _getStatusText(MessageStatus status) {
     switch (status) {
       case MessageStatus.SENT:
-        return 'ÄÃ£ gá»­i';
+        return 'Sent';
       case MessageStatus.DELIVERED:
-        return 'ÄÃ£ nháº­n';
+        return 'Delivered';
       case MessageStatus.READ:
-        return 'ÄÃ£ xem';
+        return 'Read';
       default:
         return '';
     }
@@ -613,7 +613,7 @@ class MessageBubble extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 6),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: isDarkMode ? Colors.white.withOpacity(0.08) : const Color(0xFFF3F7FF),
+          color: isDarkMode ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFF3F7FF),
           borderRadius: BorderRadius.circular(10),
           border: Border(
             left: BorderSide(
@@ -626,7 +626,7 @@ class MessageBubble extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              message.replyToSenderName ?? 'NgÆ°á»i dÃ¹ng',
+              message.replyToSenderName ?? 'User',
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 12,
@@ -635,7 +635,7 @@ class MessageBubble extends StatelessWidget {
             ),
             const SizedBox(height: 2),
             Text(
-              message.replyToContent ?? '[PhÆ°Æ¡ng tiá»‡n]',
+              message.replyToContent ?? '[Media]',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(

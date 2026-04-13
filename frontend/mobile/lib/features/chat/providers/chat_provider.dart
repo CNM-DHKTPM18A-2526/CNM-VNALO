@@ -25,6 +25,7 @@ class ChatProvider extends ChangeNotifier {
   final StreamSubscription<Message> _messageSub;
   final StreamSubscription<Map<String, dynamic>> _readSub;
   final StreamSubscription<Map<String, dynamic>> _deliveredSub;
+  final StreamSubscription<Map<String, dynamic>> _recalledSub;
   final Random _random = Random.secure();
 
   List<Conversation> _conversations = [];
@@ -62,10 +63,12 @@ class ChatProvider extends ChangeNotifier {
         _db = db,
         _messageSub = socketService.onMessage.listen((_) {}),
         _readSub = socketService.onRead.listen((_) {}),
-        _deliveredSub = socketService.onDelivered.listen((_) {}) {
+        _deliveredSub = socketService.onDelivered.listen((_) {}),
+        _recalledSub = socketService.onRecalled.listen((_) {}) {
     _messageSub.onData(_handleIncomingMessage);
     _readSub.onData(_handleReadEvent);
     _deliveredSub.onData(_handleDeliveredEvent);
+      _recalledSub.onData(_handleRecalledEvent);
   }
 
   List<Message> getMessages(String conversationId) =>
@@ -384,6 +387,97 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Forward one or more source messages to multiple target conversations.
+  Future<void> sendForwardBatch({
+    required List<String> conversationIds,
+    required List<Message> sourceMessages,
+    String? additionalText,
+  }) async {
+    if (conversationIds.isEmpty || sourceMessages.isEmpty) return;
+
+    final extra = additionalText?.trim();
+    for (final conversationId in conversationIds) {
+      if (extra != null && extra.isNotEmpty) {
+        sendMessage(conversationId: conversationId, content: extra);
+      }
+
+      for (final source in sourceMessages) {
+        if (source.messageType == MessageType.TEXT) {
+          final content = (source.content ?? '').trim();
+          if (content.isEmpty) continue;
+          sendMessage(
+            conversationId: conversationId,
+            content: content,
+            messageType: source.messageType.name,
+          );
+          continue;
+        }
+
+        final hasRemoteMedia = (source.mediaUrl ?? '').trim().isNotEmpty;
+        if (hasRemoteMedia) {
+          await sendMediaMessage(
+            conversationId: conversationId,
+            type: source.messageType,
+            mediaUrl: source.mediaUrl,
+          );
+          continue;
+        }
+
+        final fallback = (source.content ?? '').trim();
+        if (fallback.isNotEmpty) {
+          sendMessage(
+            conversationId: conversationId,
+            content: fallback,
+            messageType: source.messageType.name,
+          );
+        }
+      }
+    }
+  }
+
+  // Recall a message for everyone and update UI immediately.
+  void recallMessage(String messageId, String conversationId) {
+    _socketService.recallMessage(messageId, conversationId);
+    final list = _messages[conversationId];
+    if (list == null) return;
+
+    final index = list.indexWhere((m) => m.id == messageId);
+    if (index < 0) return;
+
+    _replaceMessage(
+      conversationId,
+      messageId,
+      list[index].copyWith(status: MessageStatus.RECALLED, content: ''),
+    );
+  }
+
+  // Delete a message only for current user.
+  Future<void> deleteForMe(String messageId, String conversationId) async {
+    await _chatService.deleteForMe(messageId);
+    final list = _messages[conversationId];
+    if (list == null) return;
+
+    _messages[conversationId] = list.where((m) => m.id != messageId).toList();
+    notifyListeners();
+  }
+
+  // Reset in-memory chat state on logout.
+  void reset() {
+    for (final timer in _retryTimers.values) {
+      timer.cancel();
+    }
+    _retryTimers.clear();
+    _retryCounts.clear();
+    _messages.clear();
+    _conversations = [];
+    _activeConversationId = null;
+    _currentUserId = null;
+    _replyingTo = null;
+    _highlightedMessageId = null;
+    _highlightTimer?.cancel();
+    notifyListeners();
+  }
+
   MediaCategory _mapMessageTypeToCategory(MessageType type) {
     switch (type) {
       case MessageType.IMAGE:
@@ -565,6 +659,26 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
+  void _handleRecalledEvent(Map<String, dynamic> data) {
+    final conversationId = data['conversationId']?.toString();
+    final messageId = data['messageId']?.toString();
+    if (conversationId == null || messageId == null) return;
+
+    final msgs = _messages[conversationId];
+    if (msgs == null) return;
+
+    final index = msgs.indexWhere((m) => m.id == messageId);
+    if (index < 0) return;
+
+    final updated = List<Message>.from(msgs);
+    updated[index] = updated[index].copyWith(
+      status: MessageStatus.RECALLED,
+      content: '',
+    );
+    _messages[conversationId] = updated;
+    notifyListeners();
+  }
+
   Future<void> _sendWithRetry(Message message) async {
     final clientMessageId = message.clientMessageId;
     if (clientMessageId == null) {
@@ -698,6 +812,7 @@ class ChatProvider extends ChangeNotifier {
     _messageSub.cancel();
     _readSub.cancel();
     _deliveredSub.cancel();
+    _recalledSub.cancel();
     _highlightTimer?.cancel();
     for (final timer in _retryTimers.values) {
       timer.cancel();
@@ -705,7 +820,7 @@ class ChatProvider extends ChangeNotifier {
     super.dispose();
   }
 
-  // â”€â”€â”€ Settings & Management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Settings and management helpers.
 
   Future<void> updateConversationSettings({
     required String conversationId,
@@ -844,9 +959,9 @@ class ChatProvider extends ChangeNotifier {
       final memberIndex = conv.members.indexWhere((m) => m.userId == senderId);
       if (memberIndex >= 0) {
         final member = conv.members[memberIndex];
-        return member.nickname ?? member.user?.displayName ?? 'NgÆ°á»i dÃ¹ng';
+        return member.nickname ?? member.user?.displayName ?? 'User';
       }
     }
-    return 'NgÆ°á»i dÃ¹ng';
+    return 'User';
   }
 }

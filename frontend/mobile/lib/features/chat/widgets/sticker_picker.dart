@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:vnalo_mobile/core/localization/common_texts.dart';
-import 'package:vnalo_mobile/core/localization/language_provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
@@ -8,7 +7,6 @@ import 'package:vnalo_mobile/services/media_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vnalo_mobile/services/gif_service.dart';
-import 'package:vnalo_mobile/models/conversation_enums.dart';
 
 class StickerPicker extends StatefulWidget {
   final String conversationId;
@@ -40,6 +38,7 @@ class _StickerPickerState extends State<StickerPicker> {
   }
 
   Future<void> _loadInitialData() async {
+    // Load packs, recent stickers, and emoji history in one pass.
     if (!mounted) return;
     await Future.wait([
       _loadMyPacks(),
@@ -49,6 +48,7 @@ class _StickerPickerState extends State<StickerPicker> {
   }
 
   Future<void> _loadMyPacks() async {
+    // Fetch purchased packs, then prefetch stickers per pack.
     if (!mounted) return;
     try {
       final mediaService = context.read<MediaService>();
@@ -80,6 +80,7 @@ class _StickerPickerState extends State<StickerPicker> {
   }
 
   Future<void> _loadStickersForPack(String packId) async {
+    // Cache sticker lists by pack id to keep tab switching snappy.
     try {
       final mediaService = context.read<MediaService>();
       final stickers = await mediaService.getStickersInPack(packId);
@@ -213,6 +214,7 @@ class _StickerPickerState extends State<StickerPicker> {
   }
 
   Widget _buildSmartImage(String url, bool isDarkMode) {
+    // Reuse a resilient thumbnail loader with placeholder/error fallback.
     if (url.isEmpty) return Icon(Icons.style, size: 24, color: isDarkMode ? DarkColors.textHint : Colors.black38);
     return CachedNetworkImage(
       imageUrl: url,

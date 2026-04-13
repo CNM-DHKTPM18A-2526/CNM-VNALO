@@ -1,8 +1,6 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/localization/common_texts.dart';
-import 'package:vnalo_mobile/core/localization/language_provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/chat/widgets/sticker_picker.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
@@ -10,7 +8,6 @@ import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:record/record.dart';
-import 'package:path_provider/path_provider.dart';
 
 class ChatInputBar extends StatefulWidget {
   final String conversationId;
@@ -33,7 +30,6 @@ class _ChatInputBarState extends State<ChatInputBar> {
   
   bool _hasText = false;
   bool _showStickers = false;
-  bool _isRecording = false;
 
   @override
   void dispose() {
@@ -51,6 +47,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
   }
 
   Future<void> _pickImage() async {
+    // Send picked image immediately through chat provider.
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
     if (image != null && mounted) {
       context.read<ChatProvider>().sendImage(
@@ -61,6 +58,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
   }
 
   Future<void> _pickVideo() async {
+    // Send picked video immediately through chat provider.
     final XFile? video = await _picker.pickVideo(source: ImageSource.gallery);
     if (video != null && mounted) {
       context.read<ChatProvider>().sendVideo(
@@ -71,6 +69,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
   }
 
   Future<void> _pickFile() async {
+    // Send selected file as a regular attachment message.
     FilePickerResult? result = await FilePicker.platform.pickFiles();
     if (result != null && mounted) {
       context.read<ChatProvider>().sendFile(
@@ -207,6 +206,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
   }
 
   Widget _buildReplyPreview(BuildContext context) {
+    // Show inline reply context above the input area.
     final chatProvider = context.watch<ChatProvider>();
     final replyMsg = chatProvider.replyingTo;
     if (replyMsg == null) return const SizedBox.shrink();

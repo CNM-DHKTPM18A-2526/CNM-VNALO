@@ -100,8 +100,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     final topInset = MediaQuery.of(context).padding.top;
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
-    final backgroundColor = isDarkMode ? DarkColors.scaffold : Colors.white;
-
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,

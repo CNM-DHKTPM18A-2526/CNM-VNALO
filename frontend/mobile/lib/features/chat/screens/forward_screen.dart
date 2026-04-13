@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
@@ -45,7 +45,7 @@ class _ForwardScreenState extends State<ForwardScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Chia sáº»',
+              'Forward',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
@@ -53,7 +53,7 @@ class _ForwardScreenState extends State<ForwardScreen> {
               ),
             ),
             Text(
-              'ÄÃ£ chá»n: ${forwardProvider.selectedCount}',
+              'Selected: ${forwardProvider.selectedCount}',
               style: TextStyle(
                 fontSize: 13,
                 color: isDarkMode ? DarkColors.textSecondary : Colors.grey.shade600,
@@ -78,7 +78,7 @@ class _ForwardScreenState extends State<ForwardScreen> {
                 controller: _searchController,
                 onChanged: forwardProvider.updateSearch,
                 decoration: InputDecoration(
-                  hintText: 'TÃ¬m kiáº¿m',
+                  hintText: 'Search',
                   hintStyle: TextStyle(color: isDarkMode ? Colors.white38 : Colors.grey.shade500),
                   prefixIcon: Icon(Icons.search, color: isDarkMode ? Colors.white38 : Colors.grey.shade500, size: 22),
                   border: InputBorder.none,
@@ -94,9 +94,9 @@ class _ForwardScreenState extends State<ForwardScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildQuickAction(Icons.group_add_outlined, 'NhÃ³m má»›i', isDarkMode),
-                _buildQuickAction(Icons.history_toggle_off, 'Nháº­t kÃ½', isDarkMode),
-                _buildQuickAction(Icons.ios_share_outlined, 'App khÃ¡c', isDarkMode),
+                _buildQuickAction(Icons.group_add_outlined, 'New group', isDarkMode),
+                _buildQuickAction(Icons.history_toggle_off, 'Saved notes', isDarkMode),
+                _buildQuickAction(Icons.ios_share_outlined, 'Other apps', isDarkMode),
               ],
             ),
           ),
@@ -107,11 +107,11 @@ class _ForwardScreenState extends State<ForwardScreen> {
           Expanded(
             child: ListView(
               children: [
-                _buildSectionTitle('Gáº§n Ä‘Ã¢y', isDarkMode),
+                _buildSectionTitle('Recent', isDarkMode),
                 ...filteredConversations.map((conv) => _buildRecipientItem(conv, currentUserId, forwardProvider, isDarkMode)),
 
                 const SizedBox(height: 16),
-                _buildSectionTitle('NhÃ³m trÃ² chuyá»‡n', isDarkMode),
+                _buildSectionTitle('Groups', isDarkMode),
                 // (Optional: Further categorize if needed)
 
                 const SizedBox(height: 80), // Space for preview/input
@@ -244,7 +244,7 @@ class _ForwardScreenState extends State<ForwardScreen> {
                       child: TextField(
                         controller: _additionalTextController,
                         decoration: InputDecoration(
-                          hintText: 'Nháº­p tin nháº¯n',
+                          hintText: 'Add a message',
                           hintStyle: TextStyle(color: isDarkMode ? Colors.white30 : Colors.grey.shade400),
                           border: InputBorder.none,
                           isDense: true,
@@ -358,7 +358,7 @@ class _ForwardScreenState extends State<ForwardScreen> {
   Future<void> _handleSend(BuildContext context, ForwardProvider provider) async {
     if (provider.selectedCount == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lÃ²ng chá»n ngÆ°á»i nháº­n')),
+        const SnackBar(content: Text('Please select at least one recipient')),
       );
       return;
     }
@@ -370,7 +370,7 @@ class _ForwardScreenState extends State<ForwardScreen> {
     Navigator.pop(context);
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Äang gá»­i tin nháº¯n chuyá»ƒn tiáº¿p...'), duration: Duration(seconds: 1)),
+      const SnackBar(content: Text('Forwarding messages...'), duration: Duration(seconds: 1)),
     );
   }
 }

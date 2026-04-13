@@ -23,7 +23,7 @@ class ProfileMoreSettingsScreen extends StatelessWidget {
         onTap: onTap ??
             () {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('$title Ä‘ang dÃ¹ng fallback táº¡m thá»i.')),
+                SnackBar(content: Text('$title is currently using a temporary fallback.')),
               );
             },
       );
@@ -49,15 +49,15 @@ class ProfileMoreSettingsScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                item('ThÃ´ng tin'),
+                item('Information'),
                 Divider(height: 1, indent: 16, color: dividerColor),
-                item('Äá»•i áº£nh Ä‘áº¡i diá»‡n'),
+                item('Change profile photo'),
                 Divider(height: 1, indent: 16, color: dividerColor),
-                item('Äá»•i áº£nh bÃ¬a'),
+                item('Change cover photo'),
                 Divider(height: 1, indent: 16, color: dividerColor),
-                item('Cáº­p nháº­t giá»›i thiá»‡u báº£n thÃ¢n'),
+                item('Update bio'),
                 Divider(height: 1, indent: 16, color: dividerColor),
-                item('VÃ­ cá»§a tÃ´i'),
+                item('My wallet'),
               ],
             ),
           ),
@@ -69,14 +69,14 @@ class ProfileMoreSettingsScreen extends StatelessWidget {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-                  child: Text('CÃ i Ä‘áº·t', style: TextStyle(color: sectionLabel, fontWeight: FontWeight.w600)),
+                  child: Text('Settings', style: TextStyle(color: sectionLabel, fontWeight: FontWeight.w600)),
                 ),
-                item('MÃ£ QR cá»§a tÃ´i'),
+                item('My QR code'),
                 Divider(height: 1, indent: 16, color: dividerColor),
-                item('Quyá»n riÃªng tÆ°'),
+                item('Privacy'),
                 Divider(height: 1, indent: 16, color: dividerColor),
                 item(
-                  'Quáº£n lÃ½ tÃ i khoáº£n',
+                  'Account management',
                   onTap: () {
                     Navigator.of(context, rootNavigator: true).push(
                       MaterialPageRoute(builder: (_) => const AccountSecurityScreen()),
@@ -84,7 +84,7 @@ class ProfileMoreSettingsScreen extends StatelessWidget {
                   },
                 ),
                 Divider(height: 1, indent: 16, color: dividerColor),
-                item('CÃ i Ä‘áº·t chung'),
+                item('General settings'),
               ],
             ),
           ),
