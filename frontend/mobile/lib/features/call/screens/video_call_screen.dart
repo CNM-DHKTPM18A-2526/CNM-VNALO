@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
+import 'package:vnalo_mobile/features/call/models/call_log_message.dart';
 import 'package:vnalo_mobile/features/call/services/webrtc_call_service.dart';
 import 'package:vnalo_mobile/features/call/utils/call_duration_formatter.dart';
+import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 
 class VideoCallScreen extends StatefulWidget {
@@ -33,6 +35,8 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   late final RTCVideoRenderer _localRenderer;
   late final RTCVideoRenderer _remoteRenderer;
   late final Timer _ticker;
+  bool _logSent = false;
+  String? _initError;
 
   String get _callId =>
       'video-${DateTime.now().millisecondsSinceEpoch}-${widget.currentUserId}';
@@ -60,10 +64,17 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   }
 
   Future<void> _initRenderersAndCall() async {
-    await _localRenderer.initialize();
-    await _remoteRenderer.initialize();
-    await _callService.initialize();
-    _syncRenderers();
+    try {
+      await _localRenderer.initialize();
+      await _remoteRenderer.initialize();
+      await _callService.initialize();
+      _syncRenderers();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _initError = 'Không thể khởi tạo màn hình video: $e';
+      });
+    }
   }
 
   void _syncRenderers() {
@@ -79,8 +90,56 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   Future<void> _endCallAndClose() async {
     await _callService.endCall();
+    _sendCallLogIfNeeded();
     if (!mounted) return;
     Navigator.pop(context);
+  }
+
+  CallOutcome _deriveOutcome() {
+    if (_callService.connectedAt != null) {
+      return CallOutcome.answered;
+    }
+
+    switch (_callService.lastEndReason) {
+      case 'declined':
+        return CallOutcome.declined;
+      case 'missed':
+        return CallOutcome.missed;
+      case 'busy':
+        return CallOutcome.busy;
+      case 'failed':
+      case 'permission-denied':
+        return CallOutcome.failed;
+      default:
+        return CallOutcome.canceled;
+    }
+  }
+
+  void _sendCallLogIfNeeded() {
+    if (_logSent) return;
+    _logSent = true;
+
+    final durationSeconds =
+        _callService.connectedAt == null
+            ? 0
+            : DateTime.now().difference(_callService.connectedAt!).inSeconds;
+
+    final payload = CallLogMessage(
+      callId: _callId,
+      conversationId: widget.conversationId,
+      callerId: widget.currentUserId,
+      calleeId: widget.targetUserId,
+      mediaType: CallMediaType.video,
+      outcome: _deriveOutcome(),
+      durationSeconds: durationSeconds,
+      createdAt: DateTime.now(),
+    );
+
+    context.read<ChatProvider>().sendMessage(
+      conversationId: widget.conversationId,
+      content: payload.toMessageContent(),
+      messageType: 'SYSTEM',
+    );
   }
 
   String _buildStatusText() {
@@ -103,6 +162,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   @override
   void dispose() {
     _ticker.cancel();
+    _sendCallLogIfNeeded();
     _callService.removeListener(_onCallStateChanged);
     _callService.dispose();
     _localRenderer.dispose();
@@ -112,6 +172,38 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_initError != null) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  color: Colors.white70,
+                  size: 42,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _initError!,
+                  style: const TextStyle(color: Colors.white70),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: _endCallAndClose,
+                  child: const Text('Thoát'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     final remoteStream = _callService.remoteStream;
     final localStream = _callService.localStream;
 

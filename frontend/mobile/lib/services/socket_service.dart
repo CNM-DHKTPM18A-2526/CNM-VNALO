@@ -41,6 +41,14 @@ class SocketService {
   }
 
   void connect(String token) {
+    if (_socket != null && _socket!.connected) {
+      return;
+    }
+
+    if (_socket != null) {
+      disconnect();
+    }
+
     _socket = io.io(
       '${AppConfig.instance.socketUrl}/chat',
       io.OptionBuilder()
@@ -204,12 +212,14 @@ class SocketService {
     required String conversationId,
     required String callId,
     required String targetUserId,
+    String? senderUserId,
     required Map<String, dynamic> sdp,
   }) {
     _socket?.emit('call.offer', {
       'conversationId': conversationId,
       'callId': callId,
       'targetUserId': targetUserId,
+      if (senderUserId != null) 'senderUserId': senderUserId,
       'sdp': sdp,
     });
   }
@@ -218,12 +228,14 @@ class SocketService {
     required String conversationId,
     required String callId,
     required String targetUserId,
+    String? senderUserId,
     required Map<String, dynamic> sdp,
   }) {
     _socket?.emit('call.answer', {
       'conversationId': conversationId,
       'callId': callId,
       'targetUserId': targetUserId,
+      if (senderUserId != null) 'senderUserId': senderUserId,
       'sdp': sdp,
     });
   }
@@ -232,12 +244,14 @@ class SocketService {
     required String conversationId,
     required String callId,
     required String targetUserId,
+    String? senderUserId,
     required Map<String, dynamic> candidate,
   }) {
     _socket?.emit('call.ice-candidate', {
       'conversationId': conversationId,
       'callId': callId,
       'targetUserId': targetUserId,
+      if (senderUserId != null) 'senderUserId': senderUserId,
       'candidate': candidate,
     });
   }
@@ -246,11 +260,15 @@ class SocketService {
     required String conversationId,
     required String callId,
     required String targetUserId,
+    String? senderUserId,
+    String? reason,
   }) {
     _socket?.emit('call.end', {
       'conversationId': conversationId,
       'callId': callId,
       'targetUserId': targetUserId,
+      if (senderUserId != null) 'senderUserId': senderUserId,
+      if (reason != null && reason.isNotEmpty) 'reason': reason,
     });
   }
 

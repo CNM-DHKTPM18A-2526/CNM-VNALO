@@ -17,6 +17,7 @@ class WebRtcCallService extends ChangeNotifier {
   MediaStream? _localStream;
   MediaStream? _remoteStream;
   StreamSubscription<Map<String, dynamic>>? _signalSubscription;
+  final List<RTCIceCandidate> _pendingCandidates = [];
 
   bool _isInitializing = false;
   bool _isConnected = false;
@@ -27,6 +28,8 @@ class WebRtcCallService extends ChangeNotifier {
   bool _isUsingFrontCamera = true;
   String? _errorMessage;
   DateTime? _connectedAt;
+  bool _hasRemoteDescription = false;
+  String? _lastEndReason;
 
   WebRtcCallService({
     required SocketService socketService,
@@ -49,6 +52,7 @@ class WebRtcCallService extends ChangeNotifier {
   bool get isUsingFrontCamera => _isUsingFrontCamera;
   String? get errorMessage => _errorMessage;
   DateTime? get connectedAt => _connectedAt;
+  String? get lastEndReason => _lastEndReason;
 
   Future<void> initialize() async {
     if (_isInitializing || _peerConnection != null) return;
@@ -76,11 +80,19 @@ class WebRtcCallService extends ChangeNotifier {
         await _createAndSendOffer();
       }
     } catch (e) {
-      _errorMessage = 'Không thể khởi tạo cuộc gọi: $e';
+      _errorMessage = _mapInitError(e);
     } finally {
       _isInitializing = false;
       notifyListeners();
     }
+  }
+
+  String _mapInitError(Object error) {
+    final text = error.toString().toLowerCase();
+    if (text.contains('permission') || text.contains('notallowed')) {
+      return 'Không có quyền truy cập camera/micro. Vui lòng cấp quyền rồi thử lại.';
+    }
+    return 'Không thể khởi tạo cuộc gọi: $error';
   }
 
   void _registerPeerCallbacks() {
@@ -96,6 +108,7 @@ class WebRtcCallService extends ChangeNotifier {
         conversationId: conversationId,
         callId: callId,
         targetUserId: peerUserId,
+        senderUserId: currentUserId,
         candidate: {
           'candidate': candidate.candidate,
           'sdpMid': candidate.sdpMid,
@@ -158,6 +171,7 @@ class WebRtcCallService extends ChangeNotifier {
       conversationId: conversationId,
       callId: callId,
       targetUserId: peerUserId,
+      senderUserId: currentUserId,
       sdp: {'type': offer.type, 'sdp': offer.sdp},
     );
   }
@@ -168,6 +182,24 @@ class WebRtcCallService extends ChangeNotifier {
     final signalConversationId = signal['conversationId']?.toString();
     final signalCallId = signal['callId']?.toString();
     if (signalConversationId != conversationId || signalCallId != callId) {
+      return;
+    }
+
+    final senderUserId = _extractUserId(signal, [
+      'senderUserId',
+      'senderId',
+      'fromUserId',
+    ]);
+    if (senderUserId != null &&
+        senderUserId.isNotEmpty &&
+        senderUserId != peerUserId) {
+      return;
+    }
+
+    final targetUserId = _extractUserId(signal, ['targetUserId', 'toUserId']);
+    if (targetUserId != null &&
+        targetUserId.isNotEmpty &&
+        targetUserId != currentUserId) {
       return;
     }
 
@@ -190,13 +222,26 @@ class WebRtcCallService extends ChangeNotifier {
           await _handleIceCandidate(signal);
           break;
         case 'end':
-          await endCall(notifyPeer: false);
+          await endCall(
+            notifyPeer: false,
+            reason: signal['reason']?.toString() ?? 'remote-ended',
+          );
           break;
       }
     } catch (e) {
       _errorMessage = 'Lỗi xử lý tín hiệu cuộc gọi: $e';
       notifyListeners();
     }
+  }
+
+  String? _extractUserId(Map<String, dynamic> signal, List<String> keys) {
+    for (final key in keys) {
+      final value = signal[key]?.toString();
+      if (value != null && value.isNotEmpty) {
+        return value;
+      }
+    }
+    return null;
   }
 
   Future<void> _handleOffer(Map<String, dynamic> signal) async {
@@ -210,6 +255,9 @@ class WebRtcCallService extends ChangeNotifier {
     );
 
     await pc.setRemoteDescription(offer);
+    _hasRemoteDescription = true;
+    await _flushPendingCandidates();
+
     final answer = await pc.createAnswer({
       'offerToReceiveAudio': 1,
       'offerToReceiveVideo': audioOnly ? 0 : 1,
@@ -220,6 +268,7 @@ class WebRtcCallService extends ChangeNotifier {
       conversationId: conversationId,
       callId: callId,
       targetUserId: peerUserId,
+      senderUserId: currentUserId,
       sdp: {'type': answer.type, 'sdp': answer.sdp},
     );
   }
@@ -235,6 +284,8 @@ class WebRtcCallService extends ChangeNotifier {
     );
 
     await pc.setRemoteDescription(answer);
+    _hasRemoteDescription = true;
+    await _flushPendingCandidates();
   }
 
   Future<void> _handleIceCandidate(Map<String, dynamic> signal) async {
@@ -250,7 +301,23 @@ class WebRtcCallService extends ChangeNotifier {
           : int.tryParse(candidateMap['sdpMLineIndex']?.toString() ?? ''),
     );
 
+    if (!_hasRemoteDescription) {
+      _pendingCandidates.add(candidate);
+      return;
+    }
+
     await pc.addCandidate(candidate);
+  }
+
+  Future<void> _flushPendingCandidates() async {
+    if (!_hasRemoteDescription || _pendingCandidates.isEmpty) return;
+    final pc = _peerConnection;
+    if (pc == null) return;
+
+    for (final candidate in List<RTCIceCandidate>.from(_pendingCandidates)) {
+      await pc.addCandidate(candidate);
+    }
+    _pendingCandidates.clear();
   }
 
   Future<void> toggleMicrophone() async {
@@ -295,17 +362,23 @@ class WebRtcCallService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> endCall({bool notifyPeer = true}) async {
+  Future<void> endCall({
+    bool notifyPeer = true,
+    String reason = 'hangup',
+  }) async {
     if (_isEnded) return;
 
     _isEnded = true;
     _isConnected = false;
+    _lastEndReason = reason;
 
     if (notifyPeer) {
       _socketService.endCall(
         conversationId: conversationId,
         callId: callId,
         targetUserId: peerUserId,
+        senderUserId: currentUserId,
+        reason: reason,
       );
     }
 
@@ -316,6 +389,8 @@ class WebRtcCallService extends ChangeNotifier {
       await _peerConnection?.close();
     } catch (_) {}
     _peerConnection = null;
+    _pendingCandidates.clear();
+    _hasRemoteDescription = false;
 
     await _disposeStreams();
     notifyListeners();

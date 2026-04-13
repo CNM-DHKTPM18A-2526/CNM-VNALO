@@ -178,6 +178,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         (m) => m.userId != currentUserId,
         orElse: () => conversation.members.first,
       );
+      if (other.userId == currentUserId) {
+        return null;
+      }
       return other.userId;
     }
 
