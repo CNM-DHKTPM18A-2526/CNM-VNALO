@@ -155,6 +155,8 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
     }
   }
 
+  // ========================= BUILD =========================
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ChatProvider>();
@@ -163,58 +165,90 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
     final displayName = currentConv.getDisplayName(currentUserId);
     final avatarUrl = currentConv.getDisplayAvatarUrl(currentUserId);
     final common = CommonTexts.of(context);
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F2F4),
+      backgroundColor: const Color(0xFFEDEDED),
       appBar: AppBar(
-        title: Text(common.options, style: const TextStyle(fontSize: 18, color: Colors.white)),
-        backgroundColor: AppColors.primary,
+        title: Text(common.options, style: const TextStyle(fontSize: 17, color: Colors.white, fontWeight: FontWeight.w500)),
+        backgroundColor: Colors.transparent,
         elevation: 0,
+        centerTitle: false,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: isDarkMode ? null : AppColors.appBarGradient,
+            color: isDarkMode ? DarkColors.appBarBg : null,
+          ),
+        ),
       ),
       body: ListView(
         children: [
+          // ── Header ──
           _buildHeader(displayName, avatarUrl),
-          const SizedBox(height: 1),
+          // ── Quick Actions (no gap, same white card) ──
           _buildQuickActions(currentConv),
           const SizedBox(height: 8),
+          // ── Primary Settings ──
           _buildPrimarySettings(displayName, currentConv),
           const SizedBox(height: 8),
+          // ── Media Section ──
           _buildMediaSection(),
           const SizedBox(height: 8),
+          // ── Interaction Settings ──
           _buildInteractionSettings(displayName),
           const SizedBox(height: 8),
+          // ── Conversation Settings ──
           _buildConversationSettings(currentConv),
           const SizedBox(height: 8),
+          // ── Security / Danger Zone ──
           _buildSecurityActions(),
-          const SizedBox(height: 48),
+          const SizedBox(height: 40),
         ],
       ),
     );
   }
 
+  // ========================= HEADER =========================
+
   Widget _buildHeader(String name, String? avatarUrl) {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 24),
+      padding: const EdgeInsets.only(top: 28, bottom: 20),
+      width: double.infinity,
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          AvatarWidget(imageUrl: avatarUrl, name: name, size: 80),
-          const SizedBox(height: 12),
-          Text(name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+          AvatarWidget(
+            imageUrl: avatarUrl,
+            name: name,
+            size: 80,
+            borderWidth: 0,
+          ),
+          const SizedBox(height: 14),
+          Text(
+            name,
+            style: const TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1A1A1A),
+            ),
+          ),
         ],
       ),
     );
   }
+
+  // ========================= QUICK ACTIONS =========================
 
   Widget _buildQuickActions(Conversation conv) {
     final common = CommonTexts.of(context);
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 16),
+      padding: const EdgeInsets.only(top: 4, bottom: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
@@ -222,7 +256,7 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
           _buildQuickBtn(CupertinoIcons.person, common.viewProfileQuickAction, () => _showComingSoon('Trang cá nhân')),
           _buildQuickBtn(CupertinoIcons.paintbrush, common.changeWallpaperQuickAction, _openWallpaperSelection),
           _buildQuickBtn(
-            conv.isMuted ? CupertinoIcons.bell_slash : CupertinoIcons.bell,
+            conv.isMuted ? CupertinoIcons.bell_slash_fill : CupertinoIcons.bell,
             common.muteNotifsQuickAction,
             () => context.read<ChatProvider>().updateConversationSettings(
               conversationId: conv.id,
@@ -235,26 +269,41 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
   }
 
   Widget _buildQuickBtn(IconData icon, String label, VoidCallback onTap) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
-      child: Column(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: isDarkMode ? DarkColors.surfaceLight : LightColors.scaffold,
-              shape: BoxShape.circle,
+      child: SizedBox(
+        width: 76,
+        child: Column(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFE0E0E0), width: 1),
+              ),
+              child: Icon(icon, color: const Color(0xFF555555), size: 20),
             ),
-            child: Icon(icon, color: isDarkMode ? DarkColors.textPrimary : Colors.black87, size: 22),
-          ),
-          const SizedBox(height: 10),
-          Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, height: 1.2)),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11,
+                height: 1.3,
+                color: Color(0xFF333333),
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
+
+  // ========================= PRIMARY SETTINGS =========================
 
   Widget _buildPrimarySettings(String name, Conversation conv) {
     final common = CommonTexts.of(context);
@@ -262,7 +311,7 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
       color: Colors.white,
       child: Column(
         children: [
-          _buildTile(CupertinoIcons.pencil, common.editNicknameAction, onTap: _editNickname),
+          _buildTile(CupertinoIcons.pencil, common.editNicknameAction, onTap: _editNickname, showChevron: true),
           _buildDivider(),
           _buildTile(CupertinoIcons.star, common.markAsFavoriteAction,
             trailing: CupertinoSwitch(
@@ -271,46 +320,83 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
                 conversationId: conv.id,
                 isFavorite: v,
               ),
-              activeTrackColor: AppColors.primary,
+              activeTrackColor: const Color(0xFF0068FF),
             ),
           ),
           _buildDivider(),
-          _buildTile(CupertinoIcons.clock, common.sharedTimelineAction, onTap: () => _showComingSoon('Nhật ký chung')),
+          _buildTile(CupertinoIcons.clock, common.sharedTimelineAction, onTap: () => _showComingSoon('Nhật ký chung'), showChevron: true),
         ],
       ),
     );
   }
 
+  // ========================= MEDIA SECTION =========================
+
   Widget _buildMediaSection() {
     final common = CommonTexts.of(context);
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildTile(CupertinoIcons.photo, common.mediaDocsLinksAction, onTap: () => _showComingSoon('Kho tư liệu')),
+          _buildTile(CupertinoIcons.photo_on_rectangle, common.mediaDocsLinksAction, showChevron: false),
           if (_isLoadingMedia)
-            const Padding(padding: EdgeInsets.symmetric(horizontal: 56), child: CupertinoActivityIndicator())
+            const Padding(
+              padding: EdgeInsets.only(left: 56, bottom: 16),
+              child: CupertinoActivityIndicator(),
+            )
           else if (_recentMedia.isEmpty)
-            Padding(padding: const EdgeInsets.only(left: 56, top: 4), child: Text(common.noSharedMediaNote, style: const TextStyle(color: Colors.grey, fontSize: 13)))
+            Padding(
+              padding: const EdgeInsets.only(left: 56, bottom: 16, top: 2),
+              child: Text(
+                common.noSharedMediaNote,
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+              ),
+            )
           else
-            SizedBox(
-              height: 70,
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 56),
-                scrollDirection: Axis.horizontal,
-                itemCount: _recentMedia.length,
-                itemBuilder: (context, index) {
-                  final m = _recentMedia[index];
-                  return Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    width: 70,
-                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(4), color: Colors.grey.shade200),
-                    clipBehavior: Clip.antiAlias,
-                    child: CachedNetworkImage(imageUrl: m.mediaUrl ?? '', fit: BoxFit.cover),
-                  );
-                },
+            Container(
+              height: 72,
+              padding: const EdgeInsets.only(left: 56, bottom: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _recentMedia.length.clamp(0, 4),
+                      itemBuilder: (context, index) {
+                        final m = _recentMedia[index];
+                        return Container(
+                          margin: const EdgeInsets.only(right: 4),
+                          width: 72,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(6),
+                            color: Colors.grey.shade200,
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: CachedNetworkImage(
+                            imageUrl: m.mediaUrl ?? '',
+                            fit: BoxFit.cover,
+                            placeholder: (ctx, url) => Container(color: Colors.grey.shade200),
+                            errorWidget: (ctx, url, err) => const Icon(Icons.broken_image, color: Colors.grey),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => _showComingSoon('Kho tư liệu'),
+                    child: Container(
+                      width: 44,
+                      height: 72,
+                      margin: const EdgeInsets.only(left: 4, right: 16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0F6FF),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(Icons.arrow_forward, color: Color(0xFF0068FF), size: 22),
+                    ),
+                  ),
+                ],
               ),
             ),
         ],
@@ -318,21 +404,25 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
     );
   }
 
+  // ========================= INTERACTION SETTINGS =========================
+
   Widget _buildInteractionSettings(String name) {
     final common = CommonTexts.of(context);
     return Container(
       color: Colors.white,
       child: Column(
         children: [
-          _buildTile(CupertinoIcons.group, common.createGroupWithLabel(name)),
+          _buildTile(CupertinoIcons.person_2, common.createGroupWithLabel(name), showChevron: false),
           _buildDivider(),
-          _buildTile(CupertinoIcons.person_add, common.addToGroupLabel(name)),
+          _buildTile(CupertinoIcons.person_badge_plus, common.addToGroupLabel(name), showChevron: false),
           _buildDivider(),
-          _buildTile(CupertinoIcons.person_3, common.viewSharedGroupsAction, trailing: const Text('24', style: TextStyle(color: Colors.grey))),
+          _buildTile(CupertinoIcons.person_2_fill, common.viewSharedGroupsAction, showChevron: false),
         ],
       ),
     );
   }
+
+  // ========================= CONVERSATION SETTINGS =========================
 
   Widget _buildConversationSettings(Conversation conv) {
     final common = CommonTexts.of(context);
@@ -344,39 +434,39 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
             trailing: CupertinoSwitch(
               value: conv.isPinned,
               onChanged: (v) => context.read<ChatProvider>().updateConversationSettings(conversationId: conv.id, isPinned: v),
-              activeTrackColor: AppColors.primary,
-            )
+              activeTrackColor: const Color(0xFF0068FF),
+            ),
           ),
           _buildDivider(),
           _buildTile(CupertinoIcons.eye_slash, common.hideConversationAction,
             trailing: CupertinoSwitch(
               value: conv.isHidden,
               onChanged: (v) => context.read<ChatProvider>().updateConversationSettings(conversationId: conv.id, isHidden: v),
-              activeTrackColor: AppColors.primary,
-            )
+              activeTrackColor: const Color(0xFF0068FF),
+            ),
           ),
           _buildDivider(),
           _buildTile(CupertinoIcons.phone, common.notifyCallsAction,
             trailing: CupertinoSwitch(
               value: conv.notifyCall,
               onChanged: (v) => context.read<ChatProvider>().updateConversationSettings(conversationId: conv.id, notifyCall: v),
-              activeTrackColor: AppColors.primary,
-            )
+              activeTrackColor: const Color(0xFF0068FF),
+            ),
           ),
-          _buildZaloDivider(),
-          _buildTile(CupertinoIcons.timer, common.autoDeleteMessages,
+          _buildDivider(),
+          _buildTile(CupertinoIcons.time, common.autoDeleteMessages,
             onTap: _showAutoDeletePicker,
-            trailing: Text(
-              _formatAutoDelete(context, conv.autoDeleteSeconds),
-              style: const TextStyle(color: Colors.grey, fontSize: 13)
-            )
+            subtitle: _formatAutoDelete(context, conv.autoDeleteSeconds),
+            showChevron: false,
           ),
-          _buildZaloDivider(),
-          _buildTile(CupertinoIcons.settings, common.personalSettingsAction),
+          _buildDivider(),
+          _buildTile(CupertinoIcons.person_crop_circle, common.personalSettingsAction, showChevron: false),
         ],
       ),
     );
   }
+
+  // ========================= SECURITY / DANGER ZONE =========================
 
   Widget _buildSecurityActions() {
     final common = CommonTexts.of(context);
@@ -384,33 +474,87 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
       color: Colors.white,
       child: Column(
         children: [
-          _buildTile(CupertinoIcons.exclamationmark_triangle, common.reportUserAction),
+          _buildTile(CupertinoIcons.exclamationmark_triangle, common.reportUserAction, showChevron: false),
           _buildDivider(),
-          _buildTile(CupertinoIcons.slash_circle, common.blockMgmtAction),
+          _buildTile(CupertinoIcons.nosign, common.blockMgmtAction, showChevron: true),
           _buildDivider(),
-          _buildTile(CupertinoIcons.chart_pie, common.chatStorageAction),
+          _buildTile(CupertinoIcons.clock, common.chatStorageAction, showChevron: false),
           _buildDivider(),
-          _buildTile(CupertinoIcons.trash, common.deleteHistoryAction, textColor: Colors.red, iconColor: Colors.red, onTap: _deleteHistory),
+          _buildTile(CupertinoIcons.trash, common.deleteHistoryAction,
+            textColor: const Color(0xFFE04040),
+            iconColor: const Color(0xFFE04040),
+            onTap: _deleteHistory,
+            showChevron: false,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildTile(IconData icon, String title, {Widget? trailing, VoidCallback? onTap, Color? textColor, Color? iconColor}) {
+  // ========================= SHARED WIDGETS =========================
+
+  Widget _buildTile(
+    IconData icon,
+    String title, {
+    Widget? trailing,
+    VoidCallback? onTap,
+    Color? textColor,
+    Color? iconColor,
+    String? subtitle,
+    bool showChevron = false,
+  }) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    return ListTile(
+
+    Widget? trailingWidget;
+    if (trailing != null) {
+      trailingWidget = trailing;
+    } else if (showChevron) {
+      trailingWidget = Icon(CupertinoIcons.chevron_right, size: 15, color: Colors.grey.shade400);
+    } else {
+      trailingWidget = null;
+    }
+
+    return InkWell(
       onTap: onTap,
-      dense: true,
-      leading: Icon(icon, color: iconColor ?? (isDarkMode ? DarkColors.textSecondary : Colors.black54), size: 22),
-      title: Text(title, style: TextStyle(fontSize: 15, color: textColor ?? (isDarkMode ? DarkColors.textPrimary : Colors.black87))),
-      trailing: trailing ?? const Icon(CupertinoIcons.chevron_right, size: 14, color: Colors.black26),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-      minLeadingWidth: 24,
+      child: Container(
+        color: isDarkMode ? DarkColors.surface : Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        child: Row(
+          children: [
+            Icon(icon, color: iconColor ?? (isDarkMode ? DarkColors.textSecondary : const Color(0xFF666666)), size: 22),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: textColor ?? (isDarkMode ? DarkColors.textPrimary : const Color(0xFF1A1A1A)),
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                  ],
+                ],
+              ),
+            ),
+            if (trailingWidget != null) trailingWidget,
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildDivider() => const Divider(height: 0.5, thickness: 0.5, indent: 56);
-  Widget _buildZaloDivider() => const Divider(height: 0.5, thickness: 0.5, indent: 56);
+  Widget _buildDivider() => Divider(
+    height: 0.5,
+    thickness: 0.5,
+    indent: 54,
+    color: Colors.grey.shade200,
+  );
 
   String _formatAutoDelete(BuildContext context, int seconds) {
     final common = CommonTexts.of(context, listen: false);

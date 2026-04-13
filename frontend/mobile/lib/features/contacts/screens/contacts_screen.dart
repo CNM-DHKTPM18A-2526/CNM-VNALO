@@ -10,6 +10,7 @@ import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/user_model.dart';
 import 'package:vnalo_mobile/services/chat_service.dart';
 import 'package:vnalo_mobile/services/friend_service.dart';
+import 'package:vnalo_mobile/features/chat/screens/create_group_screen.dart';
 import 'package:vnalo_mobile/features/search/screens/unified_search_screen.dart';
 import 'package:vnalo_mobile/core/localization/common_texts.dart';
 
@@ -333,7 +334,11 @@ class _ContactsScreenState extends State<ContactsScreen> {
                 child: Icon(Icons.group_add, color: isDarkMode ? DarkColors.primary : AppColors.primary),
               ),
               title: Text(CommonTexts.of(context).createNewGroup, style: TextStyle(color: isDarkMode ? DarkColors.primary : AppColors.primary, fontWeight: FontWeight.normal)),
-              onTap: () {},
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const CreateGroupScreen()),
+                );
+              },
             ),
           ),
           const SizedBox(height: 8),

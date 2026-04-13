@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
+import 'package:vnalo_mobile/core/widgets/group_avatar.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/features/chat/widgets/chat_input_bar.dart';
@@ -13,6 +14,7 @@ import 'package:vnalo_mobile/models/conversation_member_model.dart';
 import 'package:vnalo_mobile/models/user_model.dart';
 import 'package:vnalo_mobile/core/utils/date_formatter.dart';
 import 'package:vnalo_mobile/features/chat/screens/chat_options_screen.dart';
+import 'package:vnalo_mobile/features/chat/screens/group_chat_options_screen.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:async';
@@ -174,6 +176,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         final isDirect = conv.type == ConversationType.DIRECT || widget.friendUser != null;
         final wallpaperUrl = conv.personalWallpaperUrl ?? conv.wallpaperUrl;
 
+        final isRestrictedSending = conv.type == ConversationType.GROUP && chat.isReadOnlyForMembers(conv.id);
+        final myMember = conv.members.firstWhere((m) => m.userId == currentUserId, orElse: () => conv.members.first);
+        final canSend = !isRestrictedSending || myMember.role == MemberRole.OWNER || myMember.role == MemberRole.ADMIN;
+
         return Scaffold(
           backgroundColor: wallpaperUrl != null
               ? (isDarkMode ? Colors.black : LightColors.scaffold)
@@ -194,6 +200,29 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   ),
             title: Row(
               children: [
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 1),
+                  ),
+                  child: conv.type == ConversationType.GROUP
+                      ? GroupAvatar(
+                          members: conv.members
+                              .map((m) => (
+                                    imageUrl: m.user?.avatarUrl,
+                                    name: m.user?.displayName ?? m.nickname ?? 'User',
+                                  ))
+                              .toList(),
+                          size: 36,
+                        )
+                      : AvatarWidget(
+                          name: displayName,
+                          imageUrl: avatarUrl,
+                          size: 36,
+                          // cacheVersion: avatarVersion, // Ignore for now
+                        ),
+                ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -236,7 +265,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => ChatOptionsScreen(conversation: conv),
+                      builder: (context) => conv.type == ConversationType.GROUP 
+                        ? GroupChatOptionsScreen(conversation: conv)
+                        : ChatOptionsScreen(conversation: conv),
                     ),
                   );
                 },
@@ -265,7 +296,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       final List<dynamic> items = [];
                       for (int i = 0; i < rawItems.length; i++) {
                          final msg = rawItems[i];
-                         if (msg.messageType == MessageType.IMAGE) {
+                         if (msg.messageType == MessageType.IMAGE && msg.status != MessageStatus.RECALLED) {
                             if (items.isNotEmpty && items.last is List<Message>) {
                                final group = items.last as List<Message>;
                                final newestInGroup = group.first;
@@ -291,10 +322,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         controller: _scrollController,
                         reverse: true,
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                        itemCount: items.length + (isDirect ? 1 : 0),
+                        itemCount: items.length + 1,
                         itemBuilder: (context, index) {
-                          if (isDirect && index == items.length) {
-                            return _buildFriendProfileCard(displayName, avatarUrl, coverUrl);
+                          if (index == items.length) {
+                            if (isDirect) {
+                              return _buildFriendProfileCard(displayName, avatarUrl, coverUrl);
+                            } else {
+                              return _buildGroupProfileCard(displayName, conv);
+                            }
                           }
 
                           final item = items[index];
@@ -349,10 +384,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     },
                   ),
                 ),
-                ChatInputBar(
-                  conversationId: conv.id,
-                  onSend: (text) => chat.sendMessage(conversationId: conv.id, content: text),
-                ),
+                if (canSend)
+                  ChatInputBar(
+                    conversationId: conv.id,
+                    onSend: (text) => chat.sendMessage(conversationId: conv.id, content: text),
+                  )
+                else
+                  _buildReadOnlyBanner(),
               ],
             ),
           ),
@@ -467,6 +505,115 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     );
   }
 
+  Widget _buildGroupProfileCard(String displayName, Conversation conv) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final common = CommonTexts.of(context);
+    final currentUserId = context.read<AuthProvider>().user?.id ?? '';
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24, top: 16),
+      child: Column(
+        children: [
+          // Large Group Avatar
+          if (conv.avatarUrl != null && conv.avatarUrl!.isNotEmpty)
+            AvatarWidget(imageUrl: conv.avatarUrl, name: displayName, size: 80)
+          else
+            GroupAvatar(
+              members: conv.members
+                  .where((m) => m.userId != currentUserId)
+                  .take(4)
+                  .map((m) => (imageUrl: m.user?.avatarUrl, name: m.user?.displayName ?? 'User'))
+                  .toList(),
+              size: 80,
+            ),
+          const SizedBox(height: 12),
+          Text(
+            displayName,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            common.startConversationNote,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+          ),
+          const SizedBox(height: 20),
+          // Action card like Image 4
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: isDarkMode ? DarkColors.surface : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: isDarkMode ? null : [
+                BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4)),
+              ],
+            ),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.camera_alt, color: Colors.grey.shade400, size: 28),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text('Đặt tên nhóm', style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+                    Icon(Icons.chevron_right, size: 18, color: Colors.grey.shade400),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text('Bạn vừa tạo nhóm', style: TextStyle(color: Colors.grey.shade400, fontSize: 13)),
+                const SizedBox(height: 16),
+                // Tiny avatars row
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      ...conv.members.take(4).map((m) => Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: AvatarWidget(
+                          imageUrl: m.user?.avatarUrl, 
+                          name: m.user?.displayName ?? m.nickname ?? 'Thành viên', 
+                          size: 32
+                        ),
+                      )),
+                      Container(
+                        margin: const EdgeInsets.only(left: 4),
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          border: Border.all(color: Colors.blue.shade100),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.person_add, size: 16, color: Colors.blue),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                _buildActionChip('👋', 'Vẫy tay chào'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextButton(
+            onPressed: () {},
+            child: Text('Xem mã QR tham gia nhóm', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildActionChip(String emoji, String label) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
@@ -490,6 +637,38 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             color: isDarkMode ? DarkColors.primary : AppColors.primary,
             fontWeight: FontWeight.w500,
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReadOnlyBanner() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      width: double.infinity,
+      color: isDarkMode ? DarkColors.surface : Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.info, color: Colors.blue, size: 24),
+            const SizedBox(width: 12),
+            Expanded(
+              child: RichText(
+                text: TextSpan(
+                  style: TextStyle(fontSize: 14, color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade700, height: 1.4),
+                  children: const [
+                    TextSpan(text: 'Chỉ '),
+                    TextSpan(text: 'trưởng và phó cộng đồng', style: TextStyle(fontWeight: FontWeight.bold)),
+                    TextSpan(text: ' được gửi tin nhắn vào cộng đồng. '),
+                    TextSpan(text: 'Tìm hiểu thêm', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.w500)),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

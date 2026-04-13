@@ -46,37 +46,42 @@ class LocalSyncService {
       // 2. Sync recent conversations and messages.
       final conversations = await chatService.getInbox();
       for (final conv in conversations) {
-        await db.into(db.conversations).insert(
-          ConversationsCompanion.insert(
-            id: conv.id,
-            name: Value(conv.title ?? 'Cuộc hội thoại'),
-            type: conv.type.name,
-            avatarUrl: Value(conv.avatarUrl),
-            lastMessage: Value(conv.lastMessage?.content),
-            updatedAt: conv.updatedAt ?? conv.createdAt ?? DateTime.now(),
-          ),
-          mode: InsertMode.insertOrReplace,
-        );
-
-        // Fetch a recent message slice for each conversation.
-        final messages = await chatService.getMessages(conv.id, limit: 100);
-        await db.batch((batch) {
-          batch.insertAll(
-            db.messages,
-            messages.map((m) => MessagesCompanion.insert(
-              id: m.id,
-              conversationId: conv.id,
-              senderId: m.senderId,
-              content: m.content ?? '',
-              createdAt: m.createdAt,
-              messageType: Value(m.messageType.name),
-              mediaUrl: Value(m.mediaUrl),
-              mediaMimeType: Value(m.mediaMimeType),
-              mediaSizeBytes: Value(m.mediaSizeBytes),
-            )),
+        try {
+          await db.into(db.conversations).insert(
+            ConversationsCompanion.insert(
+              id: conv.id,
+              name: Value(conv.title ?? 'Cuộc hội thoại'),
+              type: conv.type.name,
+              avatarUrl: Value(conv.avatarUrl),
+              lastMessage: Value(conv.lastMessage?.content),
+              updatedAt: conv.updatedAt ?? conv.createdAt ?? DateTime.now(),
+            ),
             mode: InsertMode.insertOrReplace,
           );
-        });
+
+          // Fetch a recent message slice for each conversation.
+          final messages = await chatService.getMessages(conv.id, limit: 100);
+          await db.batch((batch) {
+            batch.insertAll(
+              db.messages,
+              messages.map((m) => MessagesCompanion.insert(
+                id: m.id,
+                conversationId: conv.id,
+                senderId: m.senderId,
+                content: m.content ?? '',
+                createdAt: m.createdAt,
+                messageType: Value(m.messageType.name),
+                mediaUrl: Value(m.mediaUrl),
+                mediaMimeType: Value(m.mediaMimeType),
+                mediaSizeBytes: Value(m.mediaSizeBytes),
+              )),
+              mode: InsertMode.insertOrReplace,
+            );
+          });
+        } catch (e) {
+          // Skip conversations that return 403 (user already left)
+          debugPrint('[Sync] Skipping conv ${conv.id}: $e');
+        }
       }
       
       debugPrint('[Sync] Sync completed.');

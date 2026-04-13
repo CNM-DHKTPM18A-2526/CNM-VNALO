@@ -94,7 +94,7 @@ class ChatService {
     }
 
     if (allMemberIds.isNotEmpty) {
-      await _enrichConversationMembers(conversations, allMemberIds);
+      await _enrichConversations(conversations, allMemberIds);
     }
 
     // Some inbox entries may come with incomplete conversation payload
@@ -200,26 +200,84 @@ class ChatService {
 
   Future<Conversation?> getConversationById(String conversationId) async {
     try {
-      final response = await _apiService.get(
-        _base,
-        '/conversations/$conversationId',
-      );
-      final data = response['data'];
-      if (data is Map<String, dynamic>) {
-        return Conversation.fromJson(data);
-      }
-      if (response['conversation'] is Map<String, dynamic>) {
-        return Conversation.fromJson(
-          response['conversation'] as Map<String, dynamic>,
-        );
-      }
-      if (response.containsKey('id')) {
-        return Conversation.fromJson(response);
-      }
-      return null;
+      final response = await _apiService.get(_base, '/conversations/$conversationId');
+      final data = response['data'] ?? response;
+      if (data is! Map<String, dynamic>) return null;
+
+      final conversation = Conversation.fromJson(data);
+      return await _enrichConversation(conversation);
     } catch (_) {
       return null;
     }
+  }
+
+  // Helper to enrich a single conversation
+  Future<Conversation> _enrichConversation(Conversation conversation) async {
+    if (conversation.members.isEmpty) return conversation;
+    final missingIds = conversation.members
+        .where((m) => m.user == null)
+        .map((m) => m.userId)
+        .toSet();
+    
+    if (missingIds.isEmpty) return conversation;
+    
+    final profiles = await _fetchUserProfiles(missingIds);
+    final enrichedMembers = conversation.members.map((m) {
+      final profile = profiles[m.userId];
+      if (profile != null && m.user == null) {
+        return ConversationMember.fromJson({
+          'conversationId': m.conversationId,
+          'userId': m.userId,
+          'role': m.role.name,
+          'nickname': m.nickname,
+          'joinedAt': m.joinedAt.toIso8601String(),
+          'user': profile,
+        });
+      }
+      return m;
+    }).toList();
+    
+    return conversation.copyWith(members: enrichedMembers);
+  }
+
+  // Helper to enrich a list of conversations
+  Future<void> _enrichConversations(List<Conversation> conversations, Set<String> memberIds) async {
+    final profiles = await _fetchUserProfiles(memberIds);
+    
+    for (int i = 0; i < conversations.length; i++) {
+      final conv = conversations[i];
+      if (conv.members.isEmpty) continue;
+      
+      final enrichedMembers = conv.members.map((m) {
+        final profile = profiles[m.userId];
+        if (profile != null && m.user == null) {
+          return ConversationMember.fromJson({
+            'conversationId': m.conversationId,
+            'userId': m.userId,
+            'role': m.role.name,
+            'nickname': m.nickname,
+            'joinedAt': m.joinedAt.toIso8601String(),
+            'user': profile,
+          });
+        }
+        return m;
+      }).toList();
+      
+      conversations[i] = conv.copyWith(members: enrichedMembers);
+    }
+  }
+
+  // Shared user profile fetcher
+  Future<Map<String, Map<String, dynamic>>> _fetchUserProfiles(Set<String> userIds) async {
+    final results = <String, Map<String, dynamic>>{};
+    await Future.wait(userIds.map((uid) async {
+      try {
+        final res = await _apiService.get(_coreBase, '/users/$uid');
+        final uData = res['data'] ?? res;
+        if (uData is Map<String, dynamic>) results[uid] = uData;
+      } catch (_) {}
+    }));
+    return results;
   }
 
   // Get or create a direct conversation with another user
@@ -230,35 +288,79 @@ class ChatService {
       body: {'targetUserId': otherUserId},
     );
 
-    debugPrint('[CHAT] getOrCreateDirect response: $response');
     final data = response['data'];
+    Conversation conversation;
     if (data is Map<String, dynamic>) {
-      return Conversation.fromJson(data);
+      conversation = Conversation.fromJson(data);
+    } else if (response.containsKey('id')) {
+      conversation = Conversation.fromJson(response);
+    } else if (response['conversation'] is Map<String, dynamic>) {
+      conversation = Conversation.fromJson(response['conversation']);
+    } else {
+      throw Exception('Invalid response format from conversations/direct');
     }
-    // If 'data' is null, the response itself might be the conversation
-    if (response.containsKey('id')) {
-      return Conversation.fromJson(response);
-    }
-    // Try 'conversation' key
-    final conv = response['conversation'];
-    if (conv is Map<String, dynamic>) {
-      return Conversation.fromJson(conv);
-    }
-    throw Exception('Invalid response format from conversations/direct');
+    
+    return await _enrichConversation(conversation);
   }
 
   // Create a new group conversation with a name and a list of member IDs
   Future<Conversation> createGroup({
     required String title,
     required List<String> memberIds,
+    String? avatarUrl,
   }) async {
     final response = await _apiService.post(
       _base,
       '/conversations/group',
-      body: {'title': title, 'memberIds': memberIds},
+      body: {
+        'title': title, 
+        'memberIds': memberIds,
+        if (avatarUrl != null) 'avatarUrl': avatarUrl,
+      },
     );
 
-    return Conversation.fromJson(response['data']);
+    final conversation = Conversation.fromJson(response['data'] ?? response);
+    return await _enrichConversation(conversation);
+  }
+
+  Future<Conversation> updateGroup(String conversationId, Map<String, dynamic> body) async {
+    final response = await _apiService.patch(
+      _base,
+      '/conversations/$conversationId',
+      body: body,
+    );
+    return Conversation.fromJson(response['data'] ?? response);
+  }
+
+  Future<void> addMembers(String conversationId, List<String> memberIds) async {
+    await _apiService.post(
+      _base,
+      '/conversations/$conversationId/members',
+      body: {'memberIds': memberIds},
+    );
+  }
+
+  Future<void> removeMember(String conversationId, String userId) async {
+    await _apiService.delete(_base, '/conversations/$conversationId/members/$userId');
+  }
+
+  Future<List<dynamic>> getJoinRequests(String conversationId) async {
+    final response = await _apiService.get(_base, '/conversations/$conversationId/join-requests');
+    return response['data'] ?? response;
+  }
+
+  Future<void> approveJoinRequest(String conversationId, String userId) async {
+    await _apiService.post(_base, '/conversations/$conversationId/join-requests/$userId/approve');
+  }
+
+  Future<void> rejectJoinRequest(String conversationId, String userId) async {
+    await _apiService.delete(_base, '/conversations/$conversationId/join-requests/$userId');
+  }
+
+  Future<void> updateMemberRole(String conversationId, String userId, String role) async {
+    await _apiService.patch(_base, '/conversations/$conversationId/member/$userId', body: {
+      'role': role,
+    });
   }
 
   // Get messages for a conversation, with optional pagination parameters
@@ -348,5 +450,9 @@ class ChatService {
     final response = await _apiService.get(_base, '/messages/search/$conversationId', queryParams: queryParams);
     final List items = response['items'] ?? [];
     return items.map((m) => Message.fromJson(m)).toList();
+  }
+  Future<Map<String, dynamic>> requestJoin(String conversationId) async {
+    final response = await _apiService.post(_base, '/conversations/$conversationId/join', body: {});
+    return response['data'] ?? response;
   }
 }
