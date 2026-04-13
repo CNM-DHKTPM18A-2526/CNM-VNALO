@@ -196,12 +196,11 @@ class AuthService {
 
     debugPrint('[AVATAR] Upload response data: ${response['data']}');
 
-    // Use the media-service save endpoint URL (existing, deployed, auth-protected).
-    // AvatarWidget passes auth headers so this works without needing public endpoint.
+    // Use the public media endpoint for image display to avoid 403 on /save.
     final mediaId = _parseMediaId(response);
     if (mediaId != null) {
-      final avatarUrl = '$_mediaBase/media/$mediaId/save';
-      debugPrint('[AVATAR] Constructed save URL: $avatarUrl');
+      final avatarUrl = '$_mediaBase/media/public/$mediaId';
+      debugPrint('[AVATAR] Constructed public URL: $avatarUrl');
       return avatarUrl;
     }
 
@@ -276,8 +275,8 @@ class AuthService {
 
     final mediaId = _parseMediaId(response);
     if (mediaId != null) {
-      final coverUrl = '$_mediaBase/media/$mediaId/save';
-      debugPrint('[COVER] Constructed save URL: $coverUrl');
+      final coverUrl = '$_mediaBase/media/public/$mediaId';
+      debugPrint('[COVER] Constructed public URL: $coverUrl');
       return coverUrl;
     }
 

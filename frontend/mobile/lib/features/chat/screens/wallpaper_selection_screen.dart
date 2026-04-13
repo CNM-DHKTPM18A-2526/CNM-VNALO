@@ -236,29 +236,33 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
   Future<void> _save() async {
     if (_selectedUrl == null) return;
     setState(() => _isSaving = true);
+    final chatProvider = context.read<ChatProvider>();
+
     try {
-      await context.read<ChatProvider>().updateWallpaperUrl(
+      await chatProvider.updateWallpaperUrl(
         widget.conversation.id,
         _selectedUrl!,
         isGlobal: _applyToBoth,
       );
 
       if (mounted) {
-        Navigator.pop(context);
         _showSuccessToast();
+        Navigator.pop(context);
       }
     } catch (e) {
+      if (!mounted) return;
+
       if (e is ApiException && e.statusCode == 403 && _applyToBoth) {
         // Fallback to personal wallpaper if global fails due to permissions
         try {
-          await context.read<ChatProvider>().updateWallpaperUrl(
+          await chatProvider.updateWallpaperUrl(
             widget.conversation.id,
             _selectedUrl!,
             isGlobal: false,
           );
           if (mounted) {
-            Navigator.pop(context);
             _showSuccessToast(isFallback: true);
+            Navigator.pop(context);
           }
           return;
         } catch (innerError) {
@@ -278,7 +282,10 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
   }
 
   void _showSuccessToast({bool isFallback = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) return;
+
+    messenger.showSnackBar(
       SnackBar(
         content: Row(
           mainAxisSize: MainAxisSize.min,
