@@ -54,7 +54,7 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
         if (mounted) Navigator.pop(context);
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lá»—i: $e')));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
           setState(() => _isSaving = false);
         }
       }

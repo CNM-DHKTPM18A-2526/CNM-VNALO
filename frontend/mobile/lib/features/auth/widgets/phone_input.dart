@@ -14,28 +14,28 @@ class PhoneInput extends StatelessWidget {
     super.key,
     required this.controller,
     this.onChanged,
-    this.hintText = 'Sá»‘ Ä‘iá»‡n thoáº¡i',
+    this.hintText = 'Số điện thoại',
     this.selectedCountryCode = '+84',
     this.onCountryCodeChanged,
   });
 
   static const List<({String flag, String name, String code})> _countryCodes = [
-    (flag: 'ðŸ‡»ðŸ‡³', name: 'Viá»‡t Nam', code: '+84'),
-    (flag: 'ðŸ‡ºðŸ‡¸', name: 'United States', code: '+1'),
-    (flag: 'ðŸ‡¸ðŸ‡¬', name: 'Singapore', code: '+65'),
-    (flag: 'ðŸ‡¹ðŸ‡­', name: 'Thailand', code: '+66'),
-    (flag: 'ðŸ‡®ðŸ‡©', name: 'Indonesia', code: '+62'),
-    (flag: 'ðŸ‡¯ðŸ‡µ', name: 'Japan', code: '+81'),
-    (flag: 'ðŸ‡°ðŸ‡·', name: 'Korea', code: '+82'),
-    (flag: 'ðŸ‡¬ðŸ‡§', name: 'United Kingdom', code: '+44'),
-    (flag: 'ðŸ‡¦ðŸ‡º', name: 'Australia', code: '+61'),
-    (flag: 'ðŸ‡¨ðŸ‡³', name: 'China', code: '+86'),
+    (flag: '🇻🇳', name: 'Việt Nam', code: '+84'),
+    (flag: '🇺🇸', name: 'United States', code: '+1'),
+    (flag: '🇸🇬', name: 'Singapore', code: '+65'),
+    (flag: '🇹🇭', name: 'Thailand', code: '+66'),
+    (flag: '🇮🇩', name: 'Indonesia', code: '+62'),
+    (flag: '🇯🇵', name: 'Japan', code: '+81'),
+    (flag: '🇰🇷', name: 'Korea', code: '+82'),
+    (flag: '🇬🇧', name: 'United Kingdom', code: '+44'),
+    (flag: '🇦🇺', name: 'Australia', code: '+61'),
+    (flag: '🇨🇳', name: 'China', code: '+86'),
   ];
 
   /// Returns the flag emoji for the currently selected country code.
   String get _selectedFlag {
     final match = _countryCodes.where((c) => c.code == selectedCountryCode);
-    return match.isNotEmpty ? match.first.flag : 'ðŸŒ';
+    return match.isNotEmpty ? match.first.flag : '🌐';
   }
 
   void _showCountryCodePicker(BuildContext context) {
@@ -73,7 +73,7 @@ class PhoneInput extends StatelessWidget {
                       ),
                       const SizedBox(height: 14),
                       Text(
-                        'Chá»n mÃ£ vÃ¹ng',
+                        'Chọn mã vùng',
                         style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.w600,

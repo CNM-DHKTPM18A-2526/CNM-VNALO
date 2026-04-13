@@ -452,11 +452,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _buildActionChip('ðŸ‘‹', common.helloAction),
+                    _buildActionChip('👋', common.helloAction),
                     const SizedBox(width: 8),
-                    _buildActionChip('ðŸ˜Š', common.niceToMeetAction),
+                    _buildActionChip('😊', common.niceToMeetAction),
                     const SizedBox(width: 8),
-                    _buildActionChip('ðŸŽ‰', common.hiAction),
+                    _buildActionChip('🎉', common.hiAction),
                   ],
                 ),
               ],
