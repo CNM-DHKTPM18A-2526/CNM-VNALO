@@ -288,6 +288,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                         child: Text(letter, style: const TextStyle(fontWeight: FontWeight.bold)),
                       ),
                       ...grouped[letter]!.map((user) => ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                             leading: AvatarWidget(
                               imageUrl: user.avatarUrl,
                               name: user.displayName,

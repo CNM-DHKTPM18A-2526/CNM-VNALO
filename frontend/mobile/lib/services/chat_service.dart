@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:vnalo_mobile/config/app_config.dart';
+import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/conversation_member_model.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
@@ -159,6 +160,48 @@ class ChatService {
           notifyCall: conv.notifyCall,
           personalWallpaperUrl: conv.personalWallpaperUrl,
         );
+      }
+    }
+
+    // Some inbox entries may come with incomplete conversation payload
+    // (missing members/title/avatar), causing direct chats to fall back to
+    // generic labels. Fetch conversation detail for those entries only.
+    final missingDetailIds = conversations
+        .where(
+          (c) => c.members.isEmpty ||
+              ((c.title == null || c.title!.trim().isEmpty) &&
+                  c.type == ConversationType.DIRECT),
+        )
+        .map((c) => c.id)
+        .toSet()
+        .toList();
+
+    if (missingDetailIds.isNotEmpty) {
+      final detailMap = <String, Conversation>{};
+      await Future.wait(
+        missingDetailIds.map((id) async {
+          final detail = await getConversationById(id);
+          if (detail != null) {
+            detailMap[id] = detail;
+          }
+        }),
+      );
+
+      if (detailMap.isNotEmpty) {
+        for (int i = 0; i < conversations.length; i++) {
+          final existing = conversations[i];
+          final detail = detailMap[existing.id];
+          if (detail == null) continue;
+
+          conversations[i] = existing.copyWith(
+            type: detail.type,
+            title: (existing.title == null || existing.title!.trim().isEmpty)
+                ? detail.title
+                : existing.title,
+            avatarUrl: existing.avatarUrl ?? detail.avatarUrl,
+            members: detail.members.isNotEmpty ? detail.members : existing.members,
+          );
+        }
       }
     }
 
