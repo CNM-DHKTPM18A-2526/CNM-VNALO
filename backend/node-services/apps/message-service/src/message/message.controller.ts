@@ -14,7 +14,7 @@ import { SearchMessagesDto } from '../dto/search-messages.dto';
 @Controller()
 @UseGuards(JwtAuthGuard)
 export class MessageController {
-  constructor(private readonly messageService: MessageService) {}
+  constructor(private readonly messageService: MessageService) { }
 
   private buildAccessContext(user: AuthUser) {
     return {
@@ -37,6 +37,7 @@ export class MessageController {
     @Param('id') id: string,
     @Query() pagination: PaginationDto,
   ) {
+    return this.messageService.getMessages(
       id,
       user.userId,
       pagination.before,

@@ -221,9 +221,8 @@ class Messages extends Table with TableInfo<Messages, LocalMessage> {
         _contentMeta,
         content.isAcceptableOrUnknown(data['content']!, _contentMeta),
       );
-    } else if (isInserting) {
-      context.missing(_contentMeta);
     }
+    // Note: content is nullable, no 'missing' error needed
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,

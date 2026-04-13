@@ -20,6 +20,7 @@ import 'package:vnalo_mobile/services/user_service.dart';
 import 'package:vnalo_mobile/services/local_sync_service.dart';
 import 'package:vnalo_mobile/core/database/local_database.dart';
 import 'package:vnalo_mobile/features/timeline/providers/post_provider.dart';
+import 'package:vnalo_mobile/features/chat/providers/forward_provider.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -135,6 +136,10 @@ class VnaloApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<PostProvider>(
           create: (_) => PostProvider(),
+        ),
+        ChangeNotifierProxyProvider<ChatProvider, ForwardProvider>(
+          create: (context) => ForwardProvider(context.read<ChatProvider>()),
+          update: (context, chat, previous) => previous ?? ForwardProvider(chat),
         ),
       ],
       child: Consumer2<ThemeProvider, LanguageProvider>(
