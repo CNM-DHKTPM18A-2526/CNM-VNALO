@@ -286,6 +286,10 @@ class ChatService {
     await _apiService.delete(_base, '/inbox/$conversationId/history');
   }
 
+  Future<void> deleteForMe(String messageId) async {
+    await _apiService.delete(_base, '/messages/$messageId/for-me');
+  }
+
   Future<void> updateMemberNickname(String conversationId, String targetUserId, String nickname) async {
     await _apiService.patch(_base, '/conversations/$conversationId/member/$targetUserId', body: {
       'nickname': nickname,

@@ -182,6 +182,9 @@ public class S3Service {
     }
 
     public String getFileUrl(String objectKey) {
+        if (isLocalStorageMode()) {
+            return "/api/v1/media/public-file?key=" + objectKey;
+        }
         if (publicEndpoint.endsWith("/")) {
             return publicEndpoint + objectKey;
         }

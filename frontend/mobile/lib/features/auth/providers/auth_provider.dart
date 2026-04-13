@@ -125,7 +125,8 @@ class AuthProvider extends ChangeNotifier {
       await _authService.sendRegisterOtp(phone: phone, email: email);
     } catch (e) {
       _error = _friendlyAuthError(e);
-      throw StateError(_error ?? 'Gửi OTP thất bại');
+      notifyListeners();
+      rethrow; // Rethrow to let UI handle mapping with ApiErrorMapper
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -265,7 +266,7 @@ class AuthProvider extends ChangeNotifier {
       _error = _friendlyAuthError(e);
       _isLoading = false;
       notifyListeners();
-      return false;
+      rethrow; // Rethrow to let UI handle mapping with ApiErrorMapper
     }
   }
 
@@ -280,6 +281,8 @@ class AuthProvider extends ChangeNotifier {
           return 'Tài khoản tạm thời bị khóa';
         case 'AUTH_008':
           return 'Số điện thoại đã được đăng ký';
+        case 'AUTH_018':
+          return 'Email này đã được đăng ký';
         case 'AUTH_009':
           return 'Mã OTP đã hết hạn';
         case 'AUTH_010':

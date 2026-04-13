@@ -34,6 +34,7 @@ class UnifiedSearchScreen extends StatefulWidget {
 class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
     with SingleTickerProviderStateMixin {
   bool get isDarkMode => Theme.of(context).brightness == Brightness.dark;
+  Color get _primaryColor => isDarkMode ? DarkColors.primary : AppColors.primary;
   final TextEditingController _queryController = TextEditingController();
   late final TabController _tabController;
   int _searchRequestId = 0;
@@ -150,7 +151,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
     required TextStyle baseStyle,
     Color? highlightColor,
   }) {
-    final effectiveHighlightColor = highlightColor ?? (Theme.of(context).brightness == Brightness.dark ? DarkColors.primary : const Color(0xFF0091FF));
+    final effectiveHighlightColor = highlightColor ?? _primaryColor;
     if (query.isEmpty) return TextSpan(text: text, style: baseStyle);
 
     final String lowerText = text.toLowerCase();
@@ -366,9 +367,9 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
           child: TabBar(
             controller: _tabController,
             dividerColor: isDarkMode ? DarkColors.divider : AppColors.sectionDivider,
-            labelColor: isDarkMode ? DarkColors.primary : const Color(0xFF0091FF),
+            labelColor: _primaryColor,
             unselectedLabelColor: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary,
-            indicatorColor: isDarkMode ? DarkColors.primary : const Color(0xFF0091FF),
+            indicatorColor: _primaryColor,
             indicatorWeight: 3,
             labelStyle: const TextStyle(fontWeight: FontWeight.bold),
             tabs: [
@@ -382,7 +383,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0091FF).withValues(alpha: 0.1),
+                          color: _primaryColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
@@ -390,7 +391,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
-                            color: isDarkMode ? DarkColors.primary : const Color(0xFF0091FF),
+                            color: _primaryColor,
                           ),
                         ),
                       ),
@@ -549,14 +550,14 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                     _highlightText(
                       user.phone ?? '',
                       _queryController.text,
-                      baseStyle: TextStyle(color: isDarkMode ? DarkColors.primary : const Color(0xFF0091FF)),
+                      baseStyle: TextStyle(color: _primaryColor),
                     ),
                   ],
                 ),
               ),
             ),
             trailing: _isCancelling
-                ? SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: isDarkMode ? DarkColors.primary : const Color(0xFF0091FF)))
+                ? SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: _primaryColor))
                 : OutlinedButton(
                     onPressed: () async {
                       if (user.friendshipStatus == 'PENDING_SENT') {
@@ -585,7 +586,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                       side: BorderSide.none,
                       foregroundColor: user.friendshipStatus == 'PENDING_SENT'
                           ? Colors.grey
-                          : (isDarkMode ? DarkColors.primary : const Color(0xFF0091FF)),
+                          : _primaryColor,
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                     ),
@@ -635,7 +636,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                     ),
                     trailing: Icon(
                       Icons.phone_outlined,
-                      color: isDarkMode ? DarkColors.primary : const Color(0xFF0091FF),
+                      color: _primaryColor,
                       size: 24,
                     ),
                     onTap: () => _handleLocalContactTap(contact),
@@ -747,7 +748,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
               backgroundColor: isDarkMode ? DarkColors.surfaceLight : Colors.white,
               labelStyle: TextStyle(
                 color: isSelected
-                    ? (isDarkMode ? Colors.lightBlueAccent : const Color(0xFF0091FF))
+                    ? _primaryColor
                     : (isDarkMode ? DarkColors.textSecondary : Colors.grey),
                 fontSize: 13,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
@@ -757,7 +758,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                 borderRadius: BorderRadius.circular(20),
                 side: BorderSide(
                   color: isSelected
-                      ? (isDarkMode ? Colors.lightBlueAccent : const Color(0xFF0091FF))
+                      ? _primaryColor
                       : (isDarkMode ? DarkColors.divider : Colors.grey.shade300),
                 ),
               ),
@@ -790,7 +791,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
               child: Text(
                 isVi ? 'SỬA' : 'EDIT',
                 style: const TextStyle(
-                  color: Color(0xFF0091FF),
+                  color: AppColors.primary,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),

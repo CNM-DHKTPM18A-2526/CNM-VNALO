@@ -17,6 +17,7 @@ class SocketService {
       StreamController<Map<String, dynamic>>.broadcast();
   final _readController = StreamController<Map<String, dynamic>>.broadcast();
   final _deliveredController = StreamController<Map<String, dynamic>>.broadcast();
+  final _recalledController = StreamController<Map<String, dynamic>>.broadcast();
 
 
   Stream<Message> get onMessage =>
@@ -27,6 +28,7 @@ class SocketService {
       _presenceController.stream; // Stream for presence updates
   Stream<Map<String, dynamic>> get onRead => _readController.stream;
   Stream<Map<String, dynamic>> get onDelivered => _deliveredController.stream;
+  Stream<Map<String, dynamic>> get onRecalled => _recalledController.stream;
 
 
   void connect(String token) {
@@ -79,6 +81,10 @@ class SocketService {
 
     _socket!.on('message.delivered', (data) {
       _deliveredController.add(Map<String, dynamic>.from(data));
+    });
+
+    _socket!.on('message.recalled', (data) {
+      _recalledController.add(Map<String, dynamic>.from(data));
     });
   }
 
@@ -163,6 +169,13 @@ class SocketService {
     });
   }
 
+  void recallMessage(String messageId, String conversationId) {
+    _socket?.emit('message.recall', {
+      'messageId': messageId,
+      'conversationId': conversationId,
+    });
+  }
+
   void disconnect() {
     _socket?.disconnect(); // Disconnect from the socket server
     _socket?.dispose(); // Dispose the socket instance to free up resources
@@ -176,5 +189,6 @@ class SocketService {
     _presenceController.close(); // Close the presence stream controller
     _readController.close();
     _deliveredController.close();
+    _recalledController.close();
   }
 }

@@ -1,9 +1,9 @@
-package iuh.cnm.vnalo.mediaservice.config;
+﻿package iuh.cnm.vnalo.mediaservice.config;
 
 import iuh.cnm.vnalo.mediaservice.domain.model.MediaCategory;
-import iuh.cnm.vnalo.mediaservice.domain.model.MediaObject;
+import iuh.cnm.vnalo.mediaservice.domain.model.MediaMetadata;
 import iuh.cnm.vnalo.mediaservice.domain.model.MediaStatus;
-import iuh.cnm.vnalo.mediaservice.domain.repository.MediaObjectRepository;
+import iuh.cnm.vnalo.mediaservice.domain.repository.MediaMetadataRepository;
 import iuh.cnm.vnalo.mediaservice.service.S3Service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,17 +23,16 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * DataSeeder — downloads sample files from public CDN and uploads to S3.
+ * DataSeeder â€” downloads sample files from public CDN and uploads to S3.
  * Runs only with @Profile("dev"), skips if DB already has data.
  * Seeds 10 real files per MediaCategory (8 categories = 80 total).
  */
 @Component
-@Profile("legacy-seeder") // Deactivate default seeding from external CDNs
 @RequiredArgsConstructor
 @Slf4j
 public class DataSeeder implements ApplicationRunner {
 
-    private final MediaObjectRepository mediaObjectRepository;
+    private final MediaMetadataRepository mediaMetadataRepository;
     private final S3Service s3Service;
 
     private static final UUID USER_1 = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -53,20 +52,20 @@ public class DataSeeder implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        long count = mediaObjectRepository.count();
+        long count = mediaMetadataRepository.count();
         if (count > 0) {
-            log.info("DataSeeder: skipping — {} records already exist", count);
+            log.info("DataSeeder: skipping â€” {} records already exist", count);
             return;
         }
 
-        log.info("DataSeeder: starting S3 seed ({} categories × {} files)...", 8, SEED_COUNT);
+        log.info("DataSeeder: starting S3 seed ({} categories Ã— {} files)...", 8, SEED_COUNT);
 
         HttpClient http = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .followRedirects(HttpClient.Redirect.ALWAYS)
                 .build();
 
-        List<MediaObject> saved = new ArrayList<>();
+        List<MediaMetadata> saved = new ArrayList<>();
 
         saved.addAll(seedImages(http, MediaCategory.AVATAR,     400,  400));
         saved.addAll(seedImages(http, MediaCategory.COVER,      1920, 640));
@@ -77,18 +76,18 @@ public class DataSeeder implements ApplicationRunner {
         saved.addAll(seedPdfs  (http, MediaCategory.CHAT_FILE));
         saved.addAll(seedVideos(http, MediaCategory.CHAT_VIDEO));
 
-        mediaObjectRepository.saveAll(saved);
-        log.info("DataSeeder: completed — {} records seeded", saved.size());
+        mediaMetadataRepository.saveAll(saved);
+        log.info("DataSeeder: completed â€” {} records seeded", saved.size());
     }
 
     // --- IMAGE: picsum.photos generates unique image per seed ID ------------
 
-    private List<MediaObject> seedImages(HttpClient http, MediaCategory category, int w, int h) {
-        List<MediaObject> list = new ArrayList<>();
+    private List<MediaMetadata> seedImages(HttpClient http, MediaCategory category, int w, int h) {
+        List<MediaMetadata> list = new ArrayList<>();
         String folder = folder(category);
 
         for (int i = 1; i <= SEED_COUNT; i++) {
-            // picsum.photos/seed/{n}/{w}/{h} — always returns the same image for same seed
+            // picsum.photos/seed/{n}/{w}/{h} â€” always returns the same image for same seed
             String sourceUrl = String.format("https://picsum.photos/seed/%s-%d/%d/%d", folder, i, w, h);
             String objectKey = String.format("demo/%s/sample-%02d.jpg", folder, i);
 
@@ -109,8 +108,8 @@ public class DataSeeder implements ApplicationRunner {
 
     // --- AUDIO: small OGG from Wikimedia ------------------------------------
 
-    private List<MediaObject> seedAudio(HttpClient http, MediaCategory category) {
-        List<MediaObject> list = new ArrayList<>();
+    private List<MediaMetadata> seedAudio(HttpClient http, MediaCategory category) {
+        List<MediaMetadata> list = new ArrayList<>();
         String folder = folder(category);
 
         // Public domain OGG clips from Wikimedia
@@ -145,8 +144,8 @@ public class DataSeeder implements ApplicationRunner {
 
     // --- PDF: W3C sample PDF (small, ~10KB) ---------------------------------
 
-    private List<MediaObject> seedPdfs(HttpClient http, MediaCategory category) {
-        List<MediaObject> list = new ArrayList<>();
+    private List<MediaMetadata> seedPdfs(HttpClient http, MediaCategory category) {
+        List<MediaMetadata> list = new ArrayList<>();
         String folder = folder(category);
         String sourceUrl = "https://www.w3.org/WAI/WCAG21/Techniques/pdf/W3C_Sample.pdf";
 
@@ -171,15 +170,15 @@ public class DataSeeder implements ApplicationRunner {
         return list;
     }
 
-    // --- VIDEO: small MP4 samples, tất cả < 5MB ---------------------------
-    // Rotate qua 5 nguồn để tạo 10 S3 object khác nhau
+    // --- VIDEO: small MP4 samples, táº¥t cáº£ < 5MB ---------------------------
+    // Rotate qua 5 nguá»“n Ä‘á»ƒ táº¡o 10 S3 object khÃ¡c nhau
 
     private static final String[] VIDEO_SOURCES = {
         // 1.5MB - file-examples.com (stable, explicitly sized)
         "https://file-examples.com/storage/fec42edfc96372ff7d3e958/2017/04/file_example_MP4_480_1_5MG.mp4",
         // 3MB - file-examples.com
         "https://file-examples.com/storage/fec42edfc96372ff7d3e958/2017/04/file_example_MP4_640_3MG.mp4",
-        // ~1.2MB - W3Schools Big Buck Bunny clip (rất ổn định)
+        // ~1.2MB - W3Schools Big Buck Bunny clip (ráº¥t á»•n Ä‘á»‹nh)
         "https://www.w3schools.com/html/mov_bbb.mp4",
         // 1MB - Big Buck Bunny 240p (sample-videos.com)
         "https://sample-videos.com/video321/mp4/240/big_buck_bunny_240p_1mb.mp4",
@@ -187,12 +186,12 @@ public class DataSeeder implements ApplicationRunner {
         "https://sample-videos.com/video321/mp4/360/big_buck_bunny_360p_2mb.mp4"
     };
 
-    private List<MediaObject> seedVideos(HttpClient http, MediaCategory category) {
-        List<MediaObject> list = new ArrayList<>();
+    private List<MediaMetadata> seedVideos(HttpClient http, MediaCategory category) {
+        List<MediaMetadata> list = new ArrayList<>();
         String folder = folder(category);
 
         for (int i = 1; i <= SEED_COUNT; i++) {
-            // Rotate qua 5 nguồn → 10 object S3 khác nhau
+            // Rotate qua 5 nguá»“n â†’ 10 object S3 khÃ¡c nhau
             String sourceUrl = VIDEO_SOURCES[(i - 1) % VIDEO_SOURCES.length];
             String objectKey = String.format("demo/%s/sample-%02d.mp4", folder, i);
             try {
@@ -229,14 +228,14 @@ public class DataSeeder implements ApplicationRunner {
         return response.body();
     }
 
-    private MediaObject buildRecord(
+    private MediaMetadata buildRecord(
             MediaCategory category, String objectKey, String url,
             String mimeType, long sizeBytes,
             Integer width, Integer height, Integer durationMs,
             int index, String filename) {
 
         UUID owner = USERS[(index - 1) % USERS.length];
-        return MediaObject.builder()
+        return MediaMetadata.builder()
                 .ownerUserId(owner)
                 .bucket(s3Service.getBucketName())
                 .objectKey(objectKey)
@@ -247,7 +246,7 @@ public class DataSeeder implements ApplicationRunner {
                 .height(height)
                 .durationMs(durationMs)
                 .originalFilename(filename)
-                .mediaCategory(category)
+                .category(category)
                 .status(MediaStatus.READY)
                 .build();
     }

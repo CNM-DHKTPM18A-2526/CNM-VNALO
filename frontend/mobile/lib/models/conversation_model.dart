@@ -94,8 +94,8 @@ class Conversation {
     bool? isFavorite,
     int? autoDeleteSeconds,
     bool? notifyCall,
-    String? personalWallpaperUrl,
-    String? wallpaperUrl,
+    Object? personalWallpaperUrl = _undefined,
+    Object? wallpaperUrl = _undefined,
     DateTime? historyClearedAt,
   }) {
     return Conversation(
@@ -125,11 +125,13 @@ class Conversation {
       isFavorite: isFavorite ?? this.isFavorite,
       autoDeleteSeconds: autoDeleteSeconds ?? this.autoDeleteSeconds,
       notifyCall: notifyCall ?? this.notifyCall,
-      personalWallpaperUrl: personalWallpaperUrl ?? this.personalWallpaperUrl,
-      wallpaperUrl: wallpaperUrl ?? this.wallpaperUrl,
+      personalWallpaperUrl: personalWallpaperUrl == _undefined ? this.personalWallpaperUrl : personalWallpaperUrl as String?,
+      wallpaperUrl: wallpaperUrl == _undefined ? this.wallpaperUrl : wallpaperUrl as String?,
       historyClearedAt: historyClearedAt ?? this.historyClearedAt,
     );
   }
+
+  static const _undefined = Object();
 
   // Method to get display name for the conversation based on its type and members
   String getDisplayName(String currentUserId, {int maxWidth = 0}) {

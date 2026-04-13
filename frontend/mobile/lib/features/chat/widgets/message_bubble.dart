@@ -1,8 +1,6 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:vnalo_mobile/core/localization/common_texts.dart';
-import 'package:vnalo_mobile/core/localization/language_provider.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/features/chat/widgets/focused_message_dialog.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
@@ -15,330 +13,74 @@ import 'package:open_file/open_file.dart';
 import 'package:vnalo_mobile/features/chat/widgets/full_screen_image_viewer.dart';
 import 'package:vnalo_mobile/features/chat/widgets/audio_player_widget.dart';
 import 'package:flutter/services.dart';
+import 'package:vnalo_mobile/features/chat/providers/forward_provider.dart';
+import 'package:vnalo_mobile/features/chat/screens/forward_screen.dart';
 
 class MessageBubble extends StatelessWidget {
   final Message message;
   final bool isMine;
-  final bool showSender;
-  final bool showAvatar;
+  final List<ConversationMember>? readByMembers;
+  final VoidCallback? onRetry;
   final bool showTime;
   final bool showStatus;
   final String? milestoneText;
   final List<Message>? groupedMessages;
-  final List<ConversationMember>? readByMembers;
-  final ValueChanged<String>? onReplyTap;
-  final VoidCallback? onRetry;
-  final VoidCallback? onLongPress;
+  final Function(String)? onReplyTap;
 
   const MessageBubble({
     super.key,
     required this.message,
     required this.isMine,
-    this.showSender = false,
-    this.showAvatar = false,
+    this.readByMembers,
+    this.onRetry,
     this.showTime = true,
     this.showStatus = false,
     this.milestoneText,
     this.groupedMessages,
-    this.readByMembers,
     this.onReplyTap,
-    this.onRetry,
-    this.onLongPress,
   });
 
   @override
   Widget build(BuildContext context) {
-    final common = CommonTexts.of(context);
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: Column(
-        crossAxisAlignment: isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-        children: [
-          if (milestoneText != null)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    milestoneText!,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isDarkMode ? DarkColors.textHint : Colors.grey[600],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
+    return Column(
+      children: [
+        if (milestoneText != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  milestoneText!,
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
                 ),
               ),
             ),
-          if (!isMine && showSender)
-            Padding(
-              padding: const EdgeInsets.only(left: 42, bottom: 4),
-              child: Text(
-                message.senderName ?? common.unknownUser,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isDarkMode ? DarkColors.textHint : Colors.grey[600],
-                ),
-              ),
-            ),
-          Row(
-            mainAxisAlignment: isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              if (!isMine) _buildAvatar(),
-              _buildContent(context, common),
-            ],
           ),
-          if (showTime && message.createdAt != null)
-            Padding(
-              padding: EdgeInsets.only(
-                left: isMine ? 0 : 42,
-                top: 2,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          child: Column(
+            crossAxisAlignment: isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
-                    DateFormatter.formatChatDate(message.createdAt!),
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: isDarkMode ? DarkColors.textHint : Colors.grey[500],
-                    ),
+                  Flexible(
+                    child: _buildBubbleWrapper(context, isDarkMode),
                   ),
-                  if (isMine && message.status == MessageStatus.FAILED && onRetry != null) ...[
-                    const SizedBox(width: 4),
-                    GestureDetector(
-                      onTap: onRetry,
-                      child: const Icon(Icons.error_outline, color: Colors.red, size: 14),
-                    ),
-                  ],
                 ],
               ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAvatar() {
-    if (!showAvatar) return const SizedBox(width: 38);
-    return Padding(
-      padding: const EdgeInsets.only(right: 6),
-      child: CircleAvatar(
-        radius: 16,
-        backgroundImage: message.senderAvatarUrl != null && message.senderAvatarUrl!.isNotEmpty
-            ? CachedNetworkImageProvider(message.senderAvatarUrl!)
-            : null,
-        child: message.senderAvatarUrl == null || message.senderAvatarUrl!.isEmpty
-            ? const Icon(Icons.person, size: 20)
-            : null,
-      ),
-    );
-  }
-
-  Widget _buildContent(BuildContext context, CommonTexts common) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
-    return Flexible(
-      child: GestureDetector(
-        onLongPress: () {
-          if (onLongPress != null) {
-            onLongPress!();
-          } else {
-            _showContextMenu(context);
-          }
-        },
-        child: Container(
-          padding: _getPadding(),
-          decoration: BoxDecoration(
-            color: _getBubbleColor(isDarkMode),
-            borderRadius: _getBorderRadius(),
-          ),
-          child: _buildMessageBody(context, common),
-        ),
-      ),
-    );
-  }
-
-  void _showContextMenu(BuildContext context) {
-    final common = CommonTexts.of(context, listen: false);
-    
-    RenderBox renderBox = context.findRenderObject() as RenderBox;
-    Offset position = renderBox.localToGlobal(Offset.zero);
-    Size size = renderBox.size;
-
-    FocusedMessageDialog.show(
-      context,
-      message: message,
-      isMine: isMine,
-      position: position,
-      size: size,
-      onAction: (action) {
-        if (action == 'copy') {
-           if (message.messageType == MessageType.TEXT) {
-             Clipboard.setData(ClipboardData(text: message.content ?? ''));
-             ScaffoldMessenger.of(context).showSnackBar(
-               SnackBar(content: Text(common.msgCopied)),
-             );
-           }
-        } else if (action == 'reply') {
-           context.read<ChatProvider>().setReplyTo(message);
-        } else if (action == 'delete') {
-           context.read<ChatProvider>().deleteMessage(message.id);
-        }
-      },
-      child: this,
-    );
-  }
-
-  EdgeInsets _getPadding() {
-    if (message.messageType == MessageType.IMAGE || message.messageType == MessageType.VIDEO) {
-      return EdgeInsets.zero;
-    }
-    return const EdgeInsets.symmetric(horizontal: 12, vertical: 8);
-  }
-
-  Color _getBubbleColor(bool isDarkMode) {
-    if (message.messageType == MessageType.IMAGE || message.messageType == MessageType.VIDEO) {
-      return Colors.transparent;
-    }
-    if (isMine) {
-      return isDarkMode ? DarkColors.chatBubbleSent : LightColors.chatBubbleSent;
-    }
-    return isDarkMode ? DarkColors.chatBubbleReceived : LightColors.chatBubbleReceived;
-  }
-
-  BorderRadius _getBorderRadius() {
-    if (isMine) {
-      return const BorderRadius.only(
-        topLeft: Radius.circular(16),
-        topRight: Radius.circular(4),
-        bottomLeft: Radius.circular(16),
-        bottomRight: Radius.circular(16),
-      );
-    }
-    return const BorderRadius.only(
-      topLeft: Radius.circular(4),
-      topRight: Radius.circular(16),
-      bottomLeft: Radius.circular(16),
-      bottomRight: Radius.circular(16),
-    );
-  }
-
-  Widget _buildMessageBody(BuildContext context, CommonTexts common) {
-    switch (message.messageType) {
-      case MessageType.IMAGE:
-        return _buildImageMessage(context);
-      case MessageType.VIDEO:
-        return _buildVideoMessage(context);
-      case MessageType.FILE:
-        return _buildFileMessage(context, common);
-      case MessageType.AUDIO:
-        return _buildAudioMessage(context);
-      case MessageType.STICKER:
-        return _buildStickerMessage(context);
-      case MessageType.TEXT:
-      default:
-        return _buildTextMessage(context);
-    }
-  }
-
-  Widget _buildTextMessage(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    return Text(
-      message.content ?? '',
-      style: TextStyle(
-        fontSize: 16,
-        color: isMine 
-            ? (isDarkMode ? Colors.white : Colors.black87)
-            : (isDarkMode ? Colors.white : Colors.black87),
-      ),
-    );
-  }
-
-  Widget _buildImageMessage(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => FullScreenImageViewer(
-              imageUrl: message.mediaUrl ?? message.content ?? '',
-              isLocal: message.mediaUrl?.startsWith('http') == false,
-            ),
-          ),
-        );
-      },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: CachedNetworkImage(
-          imageUrl: message.content ?? '',
-          placeholder: (context, url) => Container(
-            width: 200,
-            height: 200,
-            color: Colors.grey[200],
-            child: const Center(child: CircularProgressIndicator()),
-          ),
-          errorWidget: (context, url, error) => const Icon(Icons.error),
-          fit: BoxFit.cover,
-          maxWidthDiskCache: 1000,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildVideoMessage(BuildContext context) {
-    return Container(
-      width: 200,
-      height: 200,
-      decoration: BoxDecoration(
-        color: Colors.black12,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: const Center(
-        child: Icon(Icons.play_circle_outline, size: 48, color: Colors.white),
-      ),
-    );
-  }
-
-  Widget _buildFileMessage(BuildContext context, CommonTexts common) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          Icons.insert_drive_file,
-          color: isMine ? Colors.white : (isDarkMode ? DarkColors.primary : AppColors.primary),
-        ),
-        const SizedBox(width: 8),
-        Flexible(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                message.content ?? common.documentLabel,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: isMine ? Colors.white : (isDarkMode ? Colors.white : Colors.black87),
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              if (message.mediaSizeBytes != null)
-                Text(
-                  '${(message.mediaSizeBytes! / 1024).toStringAsFixed(1)} KB',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isMine ? Colors.white70 : Colors.grey[600],
-                  ),
-                ),
+              if (isMine || showTime || (readByMembers != null && readByMembers!.isNotEmpty)) ...[
+                const SizedBox(height: 4),
+                _buildStatusLabel(isDarkMode),
+              ],
             ],
           ),
         ),
@@ -346,20 +88,564 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildAudioMessage(BuildContext context) {
+  Widget _buildBubbleContent(BuildContext context, bool isDarkMode) {
+    if (groupedMessages != null && groupedMessages!.isNotEmpty) {
+      return _buildImageGrid(context, isDarkMode);
+    }
+
+    if (message.messageType == MessageType.STICKER) {
+      return _buildSticker();
+    }
+
+    final bubbleColor = isMine
+        ? (isDarkMode ? DarkColors.chatBubbleSent : LightColors.chatBubbleSent)
+        : (isDarkMode ? DarkColors.chatBubbleReceived : LightColors.chatBubbleReceived);
+
+    return Container(
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.of(context).size.width * 0.75,
+      ),
+      padding: message.messageType == MessageType.IMAGE
+          ? EdgeInsets.zero
+          : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: bubbleColor,
+        borderRadius: BorderRadius.only(
+          topLeft: const Radius.circular(16),
+          topRight: const Radius.circular(16),
+          bottomLeft: Radius.circular(isMine ? 16 : 4),
+          bottomRight: Radius.circular(isMine ? 4 : 16),
+        ),
+        boxShadow: [
+          if (!isDarkMode && !isMine)
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 2,
+              offset: const Offset(0, 1),
+            ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Hiá»ƒn thá»‹ Ä‘áº·c biá»‡t khi tin nháº¯n Ä‘Ã£ bá»‹ thu há»“i
+          if (message.isRecalled)
+            _buildRecalledContent(isMine, isDarkMode)
+          else ...[
+            if (message.replyToMessageId != null) _buildReplyQuote(context, isDarkMode),
+            _renderTypeSpecificContent(context, isDarkMode),
+            if (showTime && message.messageType != MessageType.IMAGE)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  DateFormatter.time(message.createdAt),
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: isDarkMode ? DarkColors.textHint : Colors.grey.shade500,
+                  ),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBubbleWrapper(BuildContext context, bool isDarkMode) {
+    final chatProvider = context.read<ChatProvider>();
+    final isHighlighted = context.watch<ChatProvider>().highlightedMessageId == message.id;
+
+    return GestureDetector(
+      onLongPress: () => _showActionMenu(context, chatProvider),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 500),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(16),
+            topRight: const Radius.circular(16),
+            bottomLeft: Radius.circular(isMine ? 16 : 4),
+            bottomRight: Radius.circular(isMine ? 4 : 16),
+          ),
+          border: isHighlighted
+              ? Border.all(color: AppColors.primary, width: 3)
+              : null,
+        ),
+        child: _buildBubbleContent(context, isDarkMode),
+      ),
+    );
+  }
+
+  void _showActionMenu(BuildContext context, ChatProvider chatProvider) {
+    // Find bubble position
+    final RenderBox? renderBox = context.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+
+    final position = renderBox.localToGlobal(Offset.zero);
+    final size = renderBox.size;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    // KhÃ´ng hiá»ƒn thá»‹ menu náº¿u tin nháº¯n Ä‘Ã£ bá»‹ thu há»“i
+    if (message.isRecalled) return;
+
+    FocusedMessageDialog.show(
+      context,
+      message: message,
+      isMine: isMine,
+      position: position,
+      size: size,
+      child: _buildBubbleContent(context, isDarkMode),
+      onAction: (action) async {
+        if (action == 'reply') {
+          chatProvider.setReplyTo(message);
+        } else if (action == 'copy') {
+           if (message.messageType == MessageType.TEXT) {
+             Clipboard.setData(ClipboardData(text: message.content ?? ''));
+             if (context.mounted) {
+               ScaffoldMessenger.of(context).showSnackBar(
+                 const SnackBar(content: Text('ÄÃ£ sao chÃ©p tin nháº¯n')),
+               );
+             }
+           }
+        } else if (action == 'recall') {
+          if (context.mounted) {
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Thu há»“i tin nháº¯n'),
+                content: const Text('Tin nháº¯n sáº½ Ä‘Æ°á»£c thu há»“i vá»›i táº¥t cáº£ má»i ngÆ°á»i. Báº¡n cÃ³ cháº¯c khÃ´ng?'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Há»§y'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    style: TextButton.styleFrom(foregroundColor: Colors.orange),
+                    child: const Text('Thu há»“i'),
+                  ),
+                ],
+              ),
+            );
+            if (confirmed == true) {
+              chatProvider.recallMessage(message.id, message.conversationId);
+            }
+          }
+        } else if (action == 'delete') {
+          if (context.mounted) {
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('XÃ³a tin nháº¯n'),
+                content: const Text('Tin nháº¯n sáº½ bá»‹ xÃ³a á»Ÿ phÃ­a báº¡n. NgÆ°á»i khÃ¡c váº«n nhÃ¬n tháº¥y tin nháº¯n nÃ y.'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Há»§y'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    style: TextButton.styleFrom(foregroundColor: Colors.red),
+                    child: const Text('XÃ³a'),
+                  ),
+                ],
+              ),
+            );
+            if (confirmed == true && context.mounted) {
+              await chatProvider.deleteForMe(message.id, message.conversationId);
+            }
+          }
+        } else if (action == 'forward') {
+          final forwardProvider = context.read<ForwardProvider>();
+          forwardProvider.startForwarding([message]);
+
+          if (context.mounted) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ForwardScreen()),
+            );
+          }
+        }
+      },
+    );
+  }
+
+  /// Widget hiá»ƒn thá»‹ khi tin nháº¯n Ä‘Ã£ bá»‹ thu há»“i
+  Widget _buildRecalledContent(bool isMine, bool isDarkMode) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.undo_rounded,
+          size: 14,
+          color: isDarkMode ? Colors.white38 : Colors.grey.shade400,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          'Tin nháº¯n Ä‘Ã£ Ä‘Æ°á»£c thu há»“i',
+          style: TextStyle(
+            fontSize: 14,
+            fontStyle: FontStyle.italic,
+            color: isDarkMode ? Colors.white38 : Colors.grey.shade500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _renderTypeSpecificContent(BuildContext context, bool isDarkMode) {
+    switch (message.messageType) {
+      case MessageType.IMAGE:
+        return _buildImage(context);
+      case MessageType.FILE:
+        return _buildFileCard(context, isDarkMode);
+      case MessageType.AUDIO:
+        return _buildAudioPlayer(context);
+      default:
+        return Text(
+          message.content ?? '',
+          style: TextStyle(
+            fontSize: 15,
+            color: isMine
+                ? (isDarkMode ? Colors.white : const Color(0xFF1F2937))
+                : (isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary),
+            height: 1.3,
+          ),
+        );
+    }
+  }
+
+  Widget _buildImageGrid(BuildContext context, bool isDarkMode) {
+    final images = groupedMessages!;
+    int crossAxisCount = 3;
+    if (images.length == 2 || images.length == 4) crossAxisCount = 2;
+    if (images.length == 1) crossAxisCount = 1;
+
+    return Container(
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.of(context).size.width * 0.75,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.only(
+          topLeft: const Radius.circular(16),
+          topRight: const Radius.circular(16),
+          bottomLeft: Radius.circular(isMine ? 16 : 4),
+          bottomRight: Radius.circular(isMine ? 4 : 16),
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        padding: EdgeInsets.zero,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
+          crossAxisSpacing: 2,
+          mainAxisSpacing: 2,
+        ),
+        itemCount: images.length,
+        itemBuilder: (context, index) {
+          final url = images[index].mediaUrl ?? '';
+          if (url.isEmpty) return const SizedBox.shrink();
+          final isLocal = url.startsWith('/') || url.contains('Users') || url.contains('storage');
+          return GestureDetector(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => FullScreenImageViewer(imageUrl: url, isLocal: isLocal),
+                ),
+              );
+            },
+            child: isLocal
+                ? Image.file(File(url), fit: BoxFit.cover)
+                : Image.network(
+                    url,
+                    headers: const {
+                      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                    },
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, loadingProgress) => loadingProgress == null ? child : Container(color: Colors.grey.shade200),
+                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image),
+                  ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildImage(BuildContext context) {
+    final url = message.mediaUrl ?? '';
+    if (url.isEmpty) return const SizedBox.shrink();
+
+    return GestureDetector(
+      onTap: () {
+        final isLocal = url.startsWith('/') || url.contains('Users') || url.contains('storage');
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => FullScreenImageViewer(
+              imageUrl: url,
+              isLocal: isLocal,
+            ),
+          ),
+        );
+      },
+      child: url.startsWith('/') || url.contains('Users') || url.contains('storage') // Basic check for local path
+          ? Image.file(File(url), fit: BoxFit.cover)
+          : Image.network(
+              url,
+              headers: const {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+              },
+              fit: BoxFit.cover,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Container(
+                  height: 200,
+                  color: Colors.grey.shade200,
+                  child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                );
+              },
+              errorBuilder: (context, error, stackTrace) => const Center(
+                child: Icon(Icons.broken_image, size: 40, color: Colors.grey),
+              ),
+            ),
+    );
+  }
+
+  Widget _buildSticker() {
+    final url = message.mediaUrl ?? '';
+    return Container(
+      width: 120,
+      height: 120,
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: CachedNetworkImage(
+        imageUrl: url,
+        fit: BoxFit.contain,
+        placeholder: (context, url) => const SizedBox.shrink(),
+        errorWidget: (context, url, error) => const Icon(Icons.error_outline, color: Colors.grey),
+      ),
+    );
+  }
+
+  Widget _buildFileCard(BuildContext context, bool isDarkMode) {
+    return InkWell(
+      onTap: () {
+        if (message.mediaUrl != null) {
+          OpenFile.open(message.mediaUrl);
+        }
+      },
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.insert_drive_file, color: Colors.blue, size: 32),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  message.content ?? 'TÃ i liá»‡u',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  message.mediaSizeBytes != null
+                      ? '${(message.mediaSizeBytes! / (1024 * 1024)).toStringAsFixed(2)} MB'
+                      : 'File',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDarkMode ? DarkColors.textHint : Colors.grey.shade500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAudioPlayer(BuildContext context) {
     return AudioPlayerWidget(
-      audioUrl: message.mediaUrl ?? message.content ?? '',
+      audioUrl: message.mediaUrl ?? '',
       isMine: isMine,
     );
   }
 
-  Widget _buildStickerMessage(BuildContext context) {
-    return CachedNetworkImage(
-      imageUrl: message.content ?? '',
-      width: 120,
-      height: 120,
-      placeholder: (context, url) => const SizedBox(width: 120, height: 120),
-      errorWidget: (context, url, error) => const Icon(Icons.error),
+  Widget _buildStatusLabel(bool isDarkMode) {
+    if (!showStatus && !showTime && readByMembers?.isEmpty == true) {
+      return const SizedBox.shrink();
+    }
+
+    final bool isImage = message.messageType == MessageType.IMAGE || (groupedMessages != null && groupedMessages!.isNotEmpty);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (showTime && isImage) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: isDarkMode ? Colors.white10 : Colors.black.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              DateFormatter.time(message.createdAt),
+              style: TextStyle(
+                fontSize: 10,
+                color: isDarkMode ? Colors.white70 : Colors.black54,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+        ],
+        if (showStatus) ...[
+          if (message.status == MessageStatus.SENDING)
+             Text('Äang gá»­i...', style: TextStyle(fontSize: 10, color: Colors.grey))
+          else if (message.status == MessageStatus.FAILED)
+             const Text('Lá»—i gá»­i', style: TextStyle(fontSize: 10, color: Colors.red))
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: isDarkMode ? Colors.white10 : Colors.black.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    message.status == MessageStatus.DELIVERED || message.status == MessageStatus.READ
+                        ? Icons.done_all : Icons.done,
+                    size: 12,
+                    color: message.status == MessageStatus.READ ? Colors.blue : (isDarkMode ? Colors.white70 : Colors.black54),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    _getStatusText(message.status),
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: message.status == MessageStatus.READ ? Colors.blue : (isDarkMode ? Colors.white70 : Colors.black54),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+        if (readByMembers != null && readByMembers!.isNotEmpty) ...[
+          const SizedBox(width: 8),
+          _buildReadAvatars(),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildReadAvatars() {
+    if (readByMembers == null || readByMembers!.isEmpty) return const SizedBox.shrink();
+
+    final displayed = readByMembers!.take(4).toList();
+    final remainingCount = readByMembers!.length - displayed.length;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 2, right: 4),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ...displayed.map((m) => Padding(
+                padding: const EdgeInsets.only(left: 2),
+                child: ClipOval(
+                  child: Image.network(
+                    m.user?.avatarUrl ?? 'https://ui-avatars.com/api/?name=${m.user?.displayName ?? 'U'}',
+                    width: 14,
+                    height: 14,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      width: 14,
+                      height: 14,
+                      color: Colors.grey,
+                      child: const Icon(Icons.person, size: 10, color: Colors.white),
+                    ),
+                  ),
+                ),
+              )),
+          if (remainingCount > 0)
+            Padding(
+              padding: const EdgeInsets.only(left: 2),
+              child: Text(
+                '+$remainingCount',
+                style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _getStatusText(MessageStatus status) {
+    switch (status) {
+      case MessageStatus.SENT:
+        return 'ÄÃ£ gá»­i';
+      case MessageStatus.DELIVERED:
+        return 'ÄÃ£ nháº­n';
+      case MessageStatus.READ:
+        return 'ÄÃ£ xem';
+      default:
+        return '';
+    }
+  }
+
+  Widget _buildReplyQuote(BuildContext context, bool isDarkMode) {
+    return GestureDetector(
+      onTap: () {
+        if (message.replyToMessageId != null) {
+          onReplyTap?.call(message.replyToMessageId!);
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: isDarkMode ? Colors.white.withOpacity(0.08) : const Color(0xFFF3F7FF),
+          borderRadius: BorderRadius.circular(10),
+          border: Border(
+            left: BorderSide(
+              color: isDarkMode ? Colors.blue[300]! : const Color(0xFF0068FF),
+              width: 2.5
+            ),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              message.replyToSenderName ?? 'NgÆ°á»i dÃ¹ng',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+                color: isDarkMode ? Colors.blue[300] : const Color(0xFF0068FF),
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              message.replyToContent ?? '[PhÆ°Æ¡ng tiá»‡n]',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                color: isDarkMode ? DarkColors.textSecondary : const Color(0xFF4A4A4A),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
@@ -35,6 +35,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   Timer? _subtextTimer;
   bool _showGroupMembers = false;
   final ScrollController _scrollController = ScrollController();
+  bool _isLoadingMore = false;
 
   @override
   void initState() {
@@ -46,7 +47,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       chatProvider.setCurrentUserId(currentUserId);
       chatProvider.openConversation(widget.conversation.id);
 
-      // Tự động chuyển subtext cho chat nhóm sau 3 giây
+      // Tá»± Ä‘á»™ng chuyá»ƒn subtext cho chat nhÃ³m sau 3 giÃ¢y
       if (widget.conversation.type == ConversationType.GROUP) {
         _subtextTimer = Timer(const Duration(seconds: 3), () {
           if (mounted) {
@@ -54,7 +55,30 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           }
         });
       }
+
+      _scrollController.addListener(_onScroll);
     });
+  }
+
+  void _onScroll() {
+    if (_isLoadingMore) return;
+
+    // In reverse mode, scroll position increases as we scroll UP
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      final chatProvider = context.read<ChatProvider>();
+      final messages = chatProvider.getMessagesForConversation(widget.conversation.id);
+
+      if (messages.isNotEmpty) {
+        setState(() => _isLoadingMore = true);
+        final oldestId = messages.last.id;
+
+        chatProvider.loadMessages(widget.conversation.id, before: oldestId).then((_) {
+          if (mounted) setState(() => _isLoadingMore = false);
+        }).catchError((_) {
+          if (mounted) setState(() => _isLoadingMore = false);
+        });
+      }
+    }
   }
 
   @override
@@ -87,29 +111,29 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
   }
 
-  String _getDisplayName(String currentUserId) {
+  String _getDisplayName(String currentUserId, Conversation conversation) {
     if (widget.friendUser != null) {
       return widget.friendUser!.displayName;
     }
-    return widget.conversation.getDisplayName(currentUserId);
+    return conversation.getDisplayName(currentUserId);
   }
 
-  String? _getAvatarUrl(String currentUserId) {
+  String? _getAvatarUrl(String currentUserId, Conversation conversation) {
     if (widget.friendUser != null) {
       return widget.friendUser!.avatarUrl;
     }
-    return widget.conversation.getDisplayAvatarUrl(currentUserId);
+    return conversation.getDisplayAvatarUrl(currentUserId);
   }
 
-  String? _getCoverUrl(String currentUserId) {
+  String? _getCoverUrl(String currentUserId, Conversation conversation) {
     if (widget.friendUser != null) {
       return widget.friendUser!.coverUrl;
     }
-    final isDirect = widget.conversation.type == ConversationType.DIRECT;
-    if (isDirect && widget.conversation.members.isNotEmpty) {
-      final other = widget.conversation.members.firstWhere(
+    final isDirect = conversation.type == ConversationType.DIRECT;
+    if (isDirect && conversation.members.isNotEmpty) {
+      final other = conversation.members.firstWhere(
         (m) => m.userId != currentUserId,
-        orElse: () => widget.conversation.members.first,
+        orElse: () => conversation.members.first,
       );
       return other.user?.coverUrl;
     }
@@ -129,15 +153,15 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           orElse: () => widget.conversation,
         );
 
-        final displayName = _getDisplayName(currentUserId);
-        final avatarUrl = _getAvatarUrl(currentUserId);
-        final coverUrl = _getCoverUrl(currentUserId);
+        final displayName = _getDisplayName(currentUserId, conv);
+        final avatarUrl = _getAvatarUrl(currentUserId, conv);
+        final coverUrl = _getCoverUrl(currentUserId, conv);
         final isDirect = conv.type == ConversationType.DIRECT || widget.friendUser != null;
         final wallpaperUrl = conv.personalWallpaperUrl ?? conv.wallpaperUrl;
 
         return Scaffold(
-          backgroundColor: wallpaperUrl != null 
-              ? (isDarkMode ? Colors.black : LightColors.scaffold) 
+          backgroundColor: wallpaperUrl != null
+              ? (isDarkMode ? Colors.black : LightColors.scaffold)
               : (isDarkMode ? Colors.black : const Color(0xFFEBEDF0)),
           appBar: AppBar(
             titleSpacing: 0,
@@ -238,7 +262,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                             if (items.isNotEmpty && items.last is List<Message>) {
                                final group = items.last as List<Message>;
                                final newestInGroup = group.first;
-                               if (newestInGroup.senderId == msg.senderId && 
+                               if (newestInGroup.senderId == msg.senderId &&
                                    newestInGroup.createdAt.difference(msg.createdAt).inMinutes.abs() < 2) {
                                    group.add(msg);
                                    continue;
@@ -249,7 +273,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                             items.add(msg);
                          }
                       }
-                      
+
                       for (int i = 0; i < items.length; i++) {
                          if (items[i] is List<Message> && (items[i] as List<Message>).length == 1) {
                              items[i] = (items[i] as List<Message>).first;
@@ -382,8 +406,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   : null,
               gradient: coverUrl == null
                   ? LinearGradient(
-                      colors: isDarkMode 
-                          ? [DarkColors.primary, DarkColors.primary.withValues(alpha: 0.8)] 
+                      colors: isDarkMode
+                          ? [DarkColors.primary, DarkColors.primary.withValues(alpha: 0.8)]
                           : [const Color(0xFF0068FF), const Color(0xFF00A2ED)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
@@ -428,11 +452,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _buildActionChip('👋', common.helloAction),
+                    _buildActionChip('ðŸ‘‹', common.helloAction),
                     const SizedBox(width: 8),
-                    _buildActionChip('😊', common.niceToMeetAction),
+                    _buildActionChip('ðŸ˜Š', common.niceToMeetAction),
                     const SizedBox(width: 8),
-                    _buildActionChip('🎉', common.hiAction),
+                    _buildActionChip('ðŸŽ‰', common.hiAction),
                   ],
                 ),
               ],
@@ -462,7 +486,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         child: Text(
           '$emoji $label',
           style: TextStyle(
-            fontSize: 13, 
+            fontSize: 13,
             color: isDarkMode ? DarkColors.primary : AppColors.primary,
             fontWeight: FontWeight.w500,
           ),

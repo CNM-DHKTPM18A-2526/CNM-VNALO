@@ -1,7 +1,7 @@
 package iuh.cnm.vnalo.mediaservice.config;
 
 import iuh.cnm.vnalo.mediaservice.domain.model.*;
-import iuh.cnm.vnalo.mediaservice.domain.repository.MediaObjectRepository;
+import iuh.cnm.vnalo.mediaservice.domain.repository.MediaMetadataRepository;
 import iuh.cnm.vnalo.mediaservice.domain.repository.StickerPackRepository;
 import iuh.cnm.vnalo.mediaservice.domain.repository.StickerRepository;
 import lombok.RequiredArgsConstructor;
@@ -16,13 +16,12 @@ import java.util.UUID;
 
 @Slf4j
 @Component
-@Profile("legacy-seeder")
 @RequiredArgsConstructor
 public class StickerDataSeeder implements CommandLineRunner {
 
     private final StickerPackRepository stickerPackRepository;
     private final StickerRepository stickerRepository;
-    private final MediaObjectRepository mediaObjectRepository;
+    private final MediaMetadataRepository mediaMetadataRepository;
 
     // We use a fixed system UUID for seeded packs
     private final UUID SYSTEM_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000000");
@@ -128,7 +127,7 @@ public class StickerDataSeeder implements CommandLineRunner {
 
     private void seedPack(String name, String description, String coverUrl, List<String> stickerUrls) {
         // Create cover media
-        MediaObject coverMedia = createMockMedia(coverUrl, name + " Cover");
+        MediaMetadata coverMedia = createMockMedia(coverUrl, name + " Cover");
         
         // Create Pack
         StickerPack pack = StickerPack.builder()
@@ -146,7 +145,7 @@ public class StickerDataSeeder implements CommandLineRunner {
         // Add stickers
         int displayOrder = 0;
         for (String url : stickerUrls) {
-            MediaObject sm = createMockMedia(url, "Sticker " + displayOrder);
+            MediaMetadata sm = createMockMedia(url, "Sticker " + displayOrder);
             Sticker sticker = Sticker.builder()
                     .packId(pack.getStickerPackId())
                     .mediaId(sm.getId())
@@ -159,8 +158,8 @@ public class StickerDataSeeder implements CommandLineRunner {
         }
     }
 
-    private MediaObject createMockMedia(String url, String title) {
-        MediaObject media = MediaObject.builder()
+    private MediaMetadata createMockMedia(String url, String title) {
+        MediaMetadata media = MediaMetadata.builder()
                 .ownerUserId(SYSTEM_USER_ID)
                 .bucket("vnalo-public-mocks")
                 .objectKey(UUID.randomUUID().toString() + "-" + title)
@@ -168,10 +167,10 @@ public class StickerDataSeeder implements CommandLineRunner {
                 .thumbnailUrl(url)
                 .mimeType(url.endsWith(".gif") ? "image/gif" : "image/png")
                 .sizeBytes(102400L) // 100KB mock
-                .mediaCategory(MediaCategory.STICKER)
+                .category(MediaCategory.STICKER)
                 .status(MediaStatus.READY)
                 .build();
         
-        return mediaObjectRepository.save(media);
+        return mediaMetadataRepository.save(media);
     }
 }

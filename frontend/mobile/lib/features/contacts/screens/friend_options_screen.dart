@@ -6,6 +6,7 @@ import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/features/chat/screens/chat_detail_screen.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
+import 'package:vnalo_mobile/models/user_model.dart';
 import 'package:vnalo_mobile/services/chat_service.dart';
 
 class FriendOptionsScreen extends StatefulWidget {
@@ -77,7 +78,14 @@ class _FriendOptionsScreenState extends State<FriendOptionsScreen> {
       context.read<ChatProvider>().loadInbox();
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
-          builder: (_) => ChatDetailScreen(conversation: widget.conversation!),
+          builder: (_) => ChatDetailScreen(
+            conversation: widget.conversation!,
+            friendUser: User(
+              id: widget.friendUserId!,
+              displayName: _displayName,
+              avatarUrl: widget.friendAvatarUrl,
+            ),
+          ),
         ),
         (route) => route.isFirst,
       );
@@ -88,7 +96,14 @@ class _FriendOptionsScreenState extends State<FriendOptionsScreen> {
         context.read<ChatProvider>().loadInbox();
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
-            builder: (_) => ChatDetailScreen(conversation: conversation),
+          builder: (_) => ChatDetailScreen(
+            conversation: conversation,
+            friendUser: User(
+              id: widget.friendUserId!,
+              displayName: _displayName,
+              avatarUrl: widget.friendAvatarUrl,
+            ),
+          ),
           ),
           (route) => route.isFirst,
         );

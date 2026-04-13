@@ -1,38 +1,13 @@
-import 'dart:convert';
-
+﻿import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:vnalo_mobile/core/localization/common_texts.dart';
+import 'package:vnalo_mobile/core/database/local_database.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
+import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 
 // A simple local message model for self-storage
-class _LocalMessage {
-  final String id;
-  final String content;
-  final String type; // 'text', 'image', 'file', 'link'
-  final DateTime createdAt;
-
-  _LocalMessage({
-    required this.id,
-    required this.content,
-    required this.type,
-    required this.createdAt,
-  });
-
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'content': content,
-    'type': type,
-    'createdAt': createdAt.toIso8601String(),
-  };
-
-  factory _LocalMessage.fromJson(Map<String, dynamic> json) => _LocalMessage(
-    id: json['id'],
-    content: json['content'],
-    type: json['type'] ?? 'text',
-    createdAt: DateTime.parse(json['createdAt']),
-  );
-}
+// Migrated from private _LocalMessage to global LocalMessage
 
 class MyDocumentsScreen extends StatefulWidget {
   const MyDocumentsScreen({super.key});
@@ -43,9 +18,11 @@ class MyDocumentsScreen extends StatefulWidget {
 
 class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
   static const _storageKey = 'my_documents_messages';
+  static const _convId = 'MY_DOCUMENTS';
+  static const List<String> _tabs = ['Táº¥t cáº£', 'VÄƒn báº£n', 'áº¢nh', 'File', 'Link'];
 
   int _selectedTabIndex = 0;
-  final List<_LocalMessage> _messages = [];
+  final List<LocalMessage> _messages = [];
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _hasText = false;
@@ -65,57 +42,84 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
   }
 
   Future<void> _loadMessages() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_storageKey);
-    if (raw != null) {
-      final List<dynamic> decoded = jsonDecode(raw);
+    try {
+      final db = context.read<LocalDatabase>();
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
+
+      // 1. One-time Migration from SharedPreferences to SQLite
+      final raw = prefs.getString(_storageKey);
+      if (raw != null) {
+        try {
+          final List<dynamic> decoded = jsonDecode(raw);
+          final auth = context.read<AuthProvider>();
+          final myId = auth.user?.id ?? 'ME';
+
+          final List<LocalMessage> toMigrate = [];
+          for (final item in decoded) {
+            toMigrate.add(LocalMessage(
+              id: item['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+              conversationId: _convId,
+              senderId: myId,
+              messageType: 'TEXT',
+              content: item['content'] ?? '',
+              status: 'SENT',
+              createdAt: DateTime.tryParse(item['createdAt'] ?? '') ?? DateTime.now(),
+            ));
+          }
+          if (toMigrate.isNotEmpty) {
+            await db.saveMessagesBatch(toMigrate);
+          }
+          await prefs.remove(_storageKey); // Clear legacy storage
+        } catch (e) {
+          debugPrint('Migration failed: $e');
+        }
+      }
+
+      // 2. Fetch from SQLite
+      final msgs = await db.getMessagesByConversation(_convId);
+      if (!mounted) return;
       setState(() {
-        _messages.addAll(decoded.map((e) => _LocalMessage.fromJson(e)));
-        _isLoading = false;
+        _messages.clear();
+        _messages.addAll(msgs);
       });
-    } else {
-      setState(() => _isLoading = false);
+    } catch (e) {
+      debugPrint('Error loading messages: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
-  Future<void> _saveMessages() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _storageKey,
-      jsonEncode(_messages.map((m) => m.toJson()).toList()),
-    );
-  }
-
-  void _sendMessage(String content) {
+  void _sendMessage(String content) async {
     if (content.trim().isEmpty) return;
 
-    final String type = _detectType(content);
-    final msg = _LocalMessage(
+    final db = context.read<LocalDatabase>();
+    final auth = context.read<AuthProvider>();
+    final myId = auth.user?.id ?? 'ME';
+
+    final msg = LocalMessage(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
+      conversationId: _convId,
+      senderId: myId,
+      messageType: 'TEXT',
       content: content.trim(),
-      type: type,
+      status: 'SENT',
       createdAt: DateTime.now(),
     );
 
+    await db.saveMessage(msg);
+    if (!mounted) return;
     setState(() => _messages.insert(0, msg));
     _inputController.clear();
     setState(() => _hasText = false);
-    _saveMessages();
   }
 
-  String _detectType(String content) {
-    final trimmed = content.trim();
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-      return 'link';
-    }
-    return 'text';
-  }
-
-  List<_LocalMessage> get _filteredMessages {
-    if (_selectedTabIndex == 0) return _messages;
-    final typeMap = ['', 'text', 'image', 'file', 'link'];
-    final targetType = typeMap[_selectedTabIndex];
-    return _messages.where((m) => m.type == targetType).toList();
+  List<LocalMessage> get _filteredMessages {
+    return _messages; // SQLite query should handle filtering in the future
   }
 
   String _formatTime(DateTime dt) {
@@ -125,14 +129,13 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
   }
 
   String _formatDateGroup(DateTime dt) {
-    final common = CommonTexts.of(context, listen: false);
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final msgDay = DateTime(dt.year, dt.month, dt.day);
     final diff = today.difference(msgDay).inDays;
-    if (diff == 0) return common.today;
-    if (diff == 1) return common.yesterday;
-    return common.formatDocDate(dt);
+    if (diff == 0) return 'HÃ´m nay';
+    if (diff == 1) return 'HÃ´m qua';
+    return '${dt.day} thÃ¡ng ${dt.month}, ${dt.year}';
   }
 
   @override
@@ -141,8 +144,6 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
     final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
     final bgColor = isDarkMode ? Colors.black : const Color(0xFFEBEDF0);
     final cardColor = isDarkMode ? const Color(0xFF1E1E1E) : Colors.white;
-    final common = CommonTexts.of(context);
-    final tabs = common.docTabs;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -156,17 +157,21 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
             ? null
             : Container(
                 decoration: const BoxDecoration(
-                  gradient: AppColors.appBarGradient,
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF0068FF), Color(0xFF00A2ED)],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  ),
                 ),
               ),
-        title: Row(
+        title: const Row(
           children: [
             Text(
-              common.myDocumentsHeader,
-              style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w600),
+              'My Documents',
+              style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w600),
             ),
-            const SizedBox(width: 6),
-            const Icon(Icons.verified, color: Colors.orange, size: 18),
+            SizedBox(width: 6),
+            Icon(Icons.verified, color: Colors.orange, size: 18),
           ],
         ),
         actions: [
@@ -184,7 +189,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
-                children: List.generate(tabs.length, (i) {
+                children: List.generate(_tabs.length, (i) {
                   final isSelected = _selectedTabIndex == i;
                   return GestureDetector(
                     onTap: () => setState(() => _selectedTabIndex = i),
@@ -201,7 +206,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
                             : Border.all(color: Colors.grey.withOpacity(0.4)),
                       ),
                       child: Text(
-                        tabs[i],
+                        _tabs[i],
                         style: TextStyle(
                           color: isSelected
                               ? (isDarkMode ? Colors.white : Colors.black87)
@@ -222,8 +227,11 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _filteredMessages.isEmpty
-                    ? _buildEmpty(common)
-                    : _buildMessageList(isDarkMode),
+                    ? _buildEmpty()
+                    : RefreshIndicator(
+                        onRefresh: _loadMessages,
+                        child: _buildMessageList(isDarkMode),
+                      ),
           ),
         ],
       ),
@@ -244,7 +252,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 IconButton(
-                  icon: Icon(Icons.emoji_emotions_outlined, 
+                  icon: Icon(Icons.emoji_emotions_outlined,
                     color: isDarkMode ? DarkColors.textHint : const Color(0xFF5D6470)),
                   onPressed: () {},
                   padding: EdgeInsets.zero,
@@ -262,7 +270,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
                       color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
                     ),
                     decoration: InputDecoration(
-                      hintText: common.messageHint,
+                      hintText: 'Tin nháº¯n',
                       hintStyle: TextStyle(
                         color: isDarkMode ? DarkColors.textHint : const Color(0xFFA1A3A7),
                         fontSize: 16,
@@ -275,7 +283,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
                 ),
                 if (_hasText)
                   IconButton(
-                    icon: Icon(Icons.send, color: isDarkMode ? DarkColors.primary : AppColors.primary),
+                    icon: const Icon(Icons.send, color: AppColors.primary),
                     onPressed: () => _sendMessage(_inputController.text),
                   )
                 else
@@ -310,7 +318,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
     );
   }
 
-  Widget _buildEmpty(CommonTexts common) {
+  Widget _buildEmpty() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -318,12 +326,12 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
           Icon(Icons.folder_open_outlined, size: 64, color: Colors.grey[400]),
           const SizedBox(height: 12),
           Text(
-            common.noContentYet,
+            'ChÆ°a cÃ³ ná»™i dung nÃ o',
             style: TextStyle(color: Colors.grey[600], fontSize: 16),
           ),
           const SizedBox(height: 8),
           Text(
-            common.saveContentNote,
+            'HÃ£y gá»­i tin nháº¯n, áº£nh hoáº·c file Ä‘á»ƒ lÆ°u trá»¯',
             style: TextStyle(color: Colors.grey[400], fontSize: 13),
           ),
         ],
@@ -335,7 +343,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
     final msgs = _filteredMessages;
 
     // Group by date
-    final Map<String, List<_LocalMessage>> grouped = {};
+    final Map<String, List<LocalMessage>> grouped = {};
     for (final m in msgs) {
       final key = _formatDateGroup(m.createdAt);
       grouped.putIfAbsent(key, () => []);
@@ -366,16 +374,19 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
 
       for (int i = 0; i < messages.length; i++) {
         final msg = messages[i];
-        
+
+        // Grouping logic for MyDocuments (all messages are 'Mine')
+        // showTime: if it's the newest message (i == 0) OR gap with message above it (i-1) is > 5 mins
         bool showTime = true;
         if (i > 0) {
-          final nextRecent = messages[i - 1];
+          final nextRecent = messages[i - 1]; // nextRecent is "below" in UI (reverse: true)
           final gap = nextRecent.createdAt.difference(msg.createdAt).inMinutes.abs();
           if (gap < 5) {
             showTime = false;
           }
         }
 
+        // showStatus: only for the absolute newest message in the newest date group
         bool showStatus = false;
         if (i == 0 && date == _formatDateGroup(msgs.first.createdAt)) {
           showStatus = true;
@@ -393,9 +404,8 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
     );
   }
 
-  Widget _buildBubble(_LocalMessage msg, bool isDarkMode, bool showTime, bool showStatus) {
+  Widget _buildBubble(LocalMessage msg, bool isDarkMode, bool showTime, bool showStatus) {
     final bubbleColor = isDarkMode ? DarkColors.chatBubbleSent : LightColors.chatBubbleSent;
-    final common = CommonTexts.of(context);
 
     return Align(
       alignment: Alignment.centerRight,
@@ -421,7 +431,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
               ),
             ),
             child: Text(
-              msg.content,
+              msg.content ?? '',
               style: TextStyle(
                 fontSize: 15,
                 color: isDarkMode ? Colors.white : const Color(0xFF1F2937),
@@ -444,11 +454,11 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
                     ),
                   if (showStatus) ...[
                     if (showTime) const SizedBox(width: 6),
-                    Icon(Icons.done_all, size: 14, color: isDarkMode ? DarkColors.primary : Colors.blue),
+                    const Icon(Icons.done_all, size: 14, color: Colors.blue),
                     const SizedBox(width: 4),
-                    Text(
-                      common.msgDeliveredStatus,
-                      style: const TextStyle(
+                    const Text(
+                      'ÄÃ£ nháº­n',
+                      style: TextStyle(
                         fontSize: 11,
                         color: Colors.grey,
                       ),

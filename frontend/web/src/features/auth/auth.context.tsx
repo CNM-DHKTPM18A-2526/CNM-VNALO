@@ -6,6 +6,7 @@ import type { AuthContextValue } from './auth.context-value'
 import type { AuthUser, LoginPayload } from './auth.types'
 
 const ACCESS_TOKEN_KEY = 'vnalo_access_token'
+const AUTH_LOGOUT_EVENT = 'vnalo:auth-logout'
 
 type AuthProviderProps = {
   children: React.ReactNode
@@ -37,6 +38,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
       })
   }, [accessToken])
 
+  useEffect(() => {
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== ACCESS_TOKEN_KEY) {
+        return
+      }
+
+      const nextToken = event.newValue
+      if (nextToken === accessToken) {
+        return
+      }
+
+      setAccessToken(nextToken)
+      setUser(null)
+      setIsBootstrapping(Boolean(nextToken))
+    }
+
+    window.addEventListener('storage', handleStorage)
+    return () => {
+      window.removeEventListener('storage', handleStorage)
+    }
+  }, [accessToken])
+
   const login = async (payload: LoginPayload) => {
     const token = await loginApi(payload)
     const profile = await getMe(token)
@@ -44,6 +67,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     localStorage.setItem(ACCESS_TOKEN_KEY, token)
     setAccessToken(token)
     setUser(profile)
+    setIsBootstrapping(false)
   }
 
   const loginWithAccessToken = async (token: string) => {
@@ -51,6 +75,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     localStorage.setItem(ACCESS_TOKEN_KEY, token)
     setAccessToken(token)
     setUser(profile)
+    setIsBootstrapping(false)
   }
 
   const updateUser = (patch: Partial<AuthUser>) => {
@@ -70,6 +95,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     localStorage.removeItem(ACCESS_TOKEN_KEY)
     setAccessToken(null)
     setUser(null)
+    setIsBootstrapping(false)
+    window.dispatchEvent(new CustomEvent(AUTH_LOGOUT_EVENT))
   }
 
   const value = useMemo<AuthContextValue>(
