@@ -22,6 +22,8 @@ class ChatProvider extends ChangeNotifier {
   final Map<String, List<Message>> _messages = {};
   final Map<String, Timer> _retryTimers = {};
   final Map<String, int> _retryCounts = {};
+  // Track messages deleted "for me" to prevent server reload from restoring them
+  final Set<String> _deletedForMeIds = {};
   final StreamSubscription<Message> _messageSub;
   final StreamSubscription<Map<String, dynamic>> _readSub;
   final StreamSubscription<Map<String, dynamic>> _deliveredSub;
@@ -90,6 +92,32 @@ class ChatProvider extends ChangeNotifier {
     });
   }
 
+  /// Xóa toàn bộ dữ liệu phiên khi đăng xuất (Session Cleanup)
+  void reset() {
+    // 1. Cancel all active timers
+    for (final timer in _retryTimers.values) {
+      timer.cancel();
+    }
+    _highlightTimer?.cancel();
+    
+    // 2. Clear maps and collections
+    _messages.clear();
+    _retryTimers.clear();
+    _retryCounts.clear();
+    _deletedForMeIds.clear();
+    _conversations = [];
+    
+    // 3. Reset state variables
+    _activeConversationId = null;
+    _currentUserId = null;
+    _replyingTo = null;
+    _highlightedMessageId = null;
+    _isLoading = false;
+    
+    debugPrint('[ChatProvider] State reset complete.');
+    notifyListeners();
+  }
+
   Future<void> loadMessages(String conversationId, {String? before}) async {
     try {
       // 2. Fetch from API to update and sync
@@ -123,12 +151,25 @@ class ChatProvider extends ChangeNotifier {
           messageMap[serverMsg.id] = serverMsg;
         }
 
-        final mergedList = messageMap.values.toList();
+        final mergedList = messageMap.values
+            .where((m) => !_deletedForMeIds.contains(m.id))
+            .toList();
         // Sort by createdAt descending (newest first for reverse ListView)
         mergedList.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         
         _messages[conversationId] = mergedList;
-        _db.saveMessagesBatch(response.map(_toLocal).toList());
+        // Filter deleted messages before saving to DB to prevent them from being restored
+        final toSave = response
+            .where((m) => !_deletedForMeIds.contains(m.id))
+            .map(_toLocal)
+            .toList();
+        if (toSave.isNotEmpty) {
+          try {
+            _db.saveMessagesBatch(toSave);
+          } catch (e) {
+            debugPrint('DEBUG: [ChatProvider] saveMessagesBatch error: $e');
+          }
+        }
       } else {
         // Appending older messages
         final current = _messages[conversationId] ?? [];
@@ -138,10 +179,23 @@ class ChatProvider extends ChangeNotifier {
         for (var m in response) {
           messageMap[m.id] = m;
         }
-        final merged = messageMap.values.toList();
+        final merged = messageMap.values
+            .where((m) => !_deletedForMeIds.contains(m.id))
+            .toList();
         merged.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         _messages[conversationId] = merged;
-        _db.saveMessagesBatch(response.map(_toLocal).toList());
+        // Filter deleted messages before saving to DB
+        final toSave = response
+            .where((m) => !_deletedForMeIds.contains(m.id))
+            .map(_toLocal)
+            .toList();
+        if (toSave.isNotEmpty) {
+          try {
+            _db.saveMessagesBatch(toSave);
+          } catch (e) {
+            debugPrint('DEBUG: [ChatProvider] saveMessagesBatch error (pagination): $e');
+          }
+        }
       }
       notifyListeners();
     } catch (e, stack) {
@@ -157,7 +211,7 @@ class ChatProvider extends ChangeNotifier {
       senderId: m.senderId,
       clientMessageId: m.clientMessageId,
       messageType: m.messageType.name,
-      content: m.content,
+      content: m.content ?? '',  // SQLite schema has NOT NULL, use empty string as fallback
       mediaUrl: m.mediaUrl,
       mediaThumbnailUrl: m.mediaThumbnailUrl,
       mediaMimeType: m.mediaMimeType,
@@ -214,7 +268,10 @@ class ChatProvider extends ChangeNotifier {
     
     if (_activeConversationId == conversationId) {
       try {
-        _messages[conversationId] = localMsgs.map(_fromLocal).toList();
+        _messages[conversationId] = localMsgs
+            .where((lm) => !_deletedForMeIds.contains(lm.id))
+            .map(_fromLocal)
+            .toList();
         debugPrint('DEBUG: [ChatProvider] openConversation ($conversationId): Successfully mapped ${localMsgs.length} messages');
       } catch (e) {
         debugPrint('DEBUG: [ChatProvider] openConversation mapping error: $e');
@@ -264,13 +321,20 @@ class ChatProvider extends ChangeNotifier {
     });
   }
 
-  void sendMessage({
+  Future<void> sendMessage({
     required String conversationId,
     required String content,
-    String messageType = 'TEXT',
+    MessageType messageType = MessageType.TEXT,
     String? replyToMessageId,
-  }) {
-    if (content.trim().isEmpty) return;
+    // Add forward fields
+    String? forwardFromMessageId,
+    String? forwardFromConversationId,
+    String? mediaUrl,
+    String? mediaThumbnailUrl,
+    String? mediaMimeType,
+    int? mediaSizeBytes,
+  }) async {
+    if (content.trim().isEmpty && mediaUrl == null) return;
 
     final clientMessageId = _generateUuidV4();
     
@@ -293,13 +357,20 @@ class ChatProvider extends ChangeNotifier {
       senderId: _currentUserId ?? '',
       clientMessageId: clientMessageId,
       content: content.trim(),
-      messageType: enumFromString(MessageType.values, messageType),
+      messageType: messageType,
       status: MessageStatus.SENDING,
       createdAt: DateTime.now(),
       replyToMessageId: actualReplyId,
       replyToSenderId: replySenderId,
       replyToSenderName: replySenderName,
       replyToContent: replyContent,
+      // Forwards
+      forwardFromMessageId: forwardFromMessageId,
+      forwardFromConversationId: forwardFromConversationId,
+      mediaUrl: mediaUrl,
+      mediaThumbnailUrl: mediaThumbnailUrl,
+      mediaMimeType: mediaMimeType,
+      mediaSizeBytes: mediaSizeBytes,
     );
 
     _messages[conversationId] = [optimistic, ...(getMessagesForConversation(conversationId))];
@@ -309,7 +380,7 @@ class ChatProvider extends ChangeNotifier {
     _db.saveMessage(_toLocal(optimistic));
     
     notifyListeners();
-    _sendWithRetry(optimistic);
+    await _sendWithRetry(optimistic);
   }
 
   Future<void> sendMediaMessage({
@@ -389,6 +460,74 @@ class ChatProvider extends ChangeNotifier {
     _sendWithRetry(message);
   }
 
+  /// Gửi chuyển tiếp hàng loạt tối ưu hóa hiệu năng (Batch Forwarding optimization)
+  Future<void> sendForwardBatch({
+    required List<String> conversationIds,
+    required List<Message> sourceMessages,
+    String? additionalText,
+  }) async {
+    final currentUserId = _currentUserId ?? '';
+    if (currentUserId.isEmpty) return;
+
+    // 1. Perform all data updates without notifying listeners in the loop
+    for (final convId in conversationIds) {
+      final List<Message> optimisticMsgs = [];
+      
+      // Create optimistic messages for source content
+      for (final msg in sourceMessages) {
+        final clientMsgId = _generateUuidV4();
+        final optimistic = Message(
+          id: 'local-$clientMsgId',
+          conversationId: convId,
+          senderId: currentUserId,
+          clientMessageId: clientMsgId,
+          content: msg.content ?? '',
+          messageType: msg.messageType,
+          status: MessageStatus.SENDING,
+          createdAt: DateTime.now(),
+          forwardFromMessageId: msg.id,
+          forwardFromConversationId: msg.conversationId,
+          mediaUrl: msg.mediaUrl,
+          mediaThumbnailUrl: msg.mediaThumbnailUrl,
+          mediaMimeType: msg.mediaMimeType,
+          mediaSizeBytes: msg.mediaSizeBytes,
+        );
+        optimisticMsgs.add(optimistic);
+        _db.saveMessage(_toLocal(optimistic));
+      }
+
+      // Add additional text message if provided
+      if (additionalText != null && additionalText.trim().isNotEmpty) {
+        final clientMsgId = _generateUuidV4();
+        final optimistic = Message(
+          id: 'local-$clientMsgId',
+          conversationId: convId,
+          senderId: currentUserId,
+          clientMessageId: clientMsgId,
+          content: additionalText.trim(),
+          messageType: MessageType.TEXT,
+          status: MessageStatus.SENDING,
+          createdAt: DateTime.now(),
+        );
+        optimisticMsgs.add(optimistic);
+        _db.saveMessage(_toLocal(optimistic));
+      }
+
+      // Update the maps for all conversations at once
+      if (optimisticMsgs.isNotEmpty) {
+        _messages[convId] = [...optimisticMsgs, ...(getMessagesForConversation(convId))];
+      }
+      
+      // Start background sending for each message
+      for (final m in optimisticMsgs) {
+        _sendWithRetry(m);
+      }
+    }
+
+    // 2. Notify once at the very end to prevent UI jank
+    notifyListeners();
+  }
+
   MediaCategory _mapMessageTypeToCategory(MessageType type) {
     switch (type) {
       case MessageType.IMAGE:
@@ -428,18 +567,27 @@ class ChatProvider extends ChangeNotifier {
 
   /// Xóa tin nhắn phía mình — gọi HTTP, cập nhật state local ngay lập tức
   Future<void> deleteForMe(String messageId, String conversationId) async {
-    // Optimistic update: xóa ngay khỏi UI
+    // 1. Track this deletion to prevent server refresh from restoring it
+    _deletedForMeIds.add(messageId);
+
+    // 2. Optimistic update: remove from UI immediately
     final msgs = _messages[conversationId];
     if (msgs != null) {
       _messages[conversationId] = msgs.where((m) => m.id != messageId).toList();
       notifyListeners();
     }
+
+    // 3. We do NOT remove from local DB here to avoid affecting other accounts 
+    // sharing the same SQLite file on a developer device. 
+    // Instead, we rely on server sync and in-memory filtering.
+
     try {
       await _chatService.deleteForMe(messageId);
     } catch (e) {
       debugPrint('deleteForMe error: $e');
-      // Nếu lỗi thì reload lại messages
-      loadMessages(conversationId);
+      // Keep the message deleted from UI even if server fails.
+      // The deletion is a client-side action ("for me"), so we respect user intent.
+      // Do NOT reload or remove from _deletedForMeIds here.
     }
   }
 
@@ -483,7 +631,11 @@ class ChatProvider extends ChangeNotifier {
       resolvedMessage = resolvedMessage.copyWith(replyToSenderName: resolvedReplyName);
     }
 
+    // Ignore messages that were deleted for me
+    if (_deletedForMeIds.contains(resolvedMessage.id)) return;
+
     final existing = _messages[conversationId] ?? [];
+
     final clientMessageId = resolvedMessage.clientMessageId;
     if (clientMessageId != null) {
       _clearRetry(clientMessageId);
@@ -849,7 +1001,10 @@ class ChatProvider extends ChangeNotifier {
       final index = _conversations.indexWhere((c) => c.id == conversationId);
       if (index >= 0) {
         if (isGlobal) {
-          _conversations[index] = _conversations[index].copyWith(wallpaperUrl: wallpaperUrl);
+          _conversations[index] = _conversations[index].copyWith(
+            wallpaperUrl: wallpaperUrl,
+            personalWallpaperUrl: null,
+          );
         } else {
           _conversations[index] = _conversations[index].copyWith(personalWallpaperUrl: wallpaperUrl);
         }
@@ -868,7 +1023,10 @@ class ChatProvider extends ChangeNotifier {
       final index = _conversations.indexWhere((c) => c.id == conversationId);
       if (index >= 0) {
         if (isGlobal) {
-          _conversations[index] = _conversations[index].copyWith(wallpaperUrl: wallpaperUrl);
+          _conversations[index] = _conversations[index].copyWith(
+            wallpaperUrl: wallpaperUrl,
+            personalWallpaperUrl: null,
+          );
         } else {
           _conversations[index] = _conversations[index].copyWith(personalWallpaperUrl: wallpaperUrl);
         }

@@ -49,10 +49,15 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
   }
 
   void _openWallpaperSelection() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => WallpaperSelectionScreen(conversation: widget.conversation),
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierDismissible: true,
+        barrierColor: Colors.black.withValues(alpha: 0.1),
+        pageBuilder: (context, _, __) => WallpaperSelectionScreen(conversation: widget.conversation),
+        transitionsBuilder: (context, animation, secondAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
       ),
     );
   }
@@ -161,12 +166,19 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F2F4),
       appBar: AppBar(
-        title: const Text('Tùy chọn', style: TextStyle(fontSize: 18, color: Colors.white)),
-        backgroundColor: AppColors.primary,
+        title: const Text('Tùy chọn', style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w600)),
+        backgroundColor: Colors.transparent,
         elevation: 0,
+        centerTitle: false,
+        titleSpacing: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
+        ),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: AppColors.appBarGradient,
+          ),
         ),
       ),
       body: ListView(
@@ -193,12 +205,15 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
   Widget _buildHeader(String name, String? avatarUrl) {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 24),
+      padding: const EdgeInsets.symmetric(vertical: 20),
       child: Column(
         children: [
           AvatarWidget(imageUrl: avatarUrl, name: name, size: 80),
           const SizedBox(height: 12),
-          Text(name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+          Text(
+            name,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.black),
+          ),
         ],
       ),
     );
@@ -233,13 +248,21 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
       child: Column(
         children: [
           Container(
-            width: 44,
-            height: 44,
-            decoration: const BoxDecoration(color: Color(0xFFF4F5F7), shape: BoxShape.circle),
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.grey.shade200),
+            ),
             child: Icon(icon, color: Colors.black87, size: 22),
           ),
-          const SizedBox(height: 10),
-          Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, height: 1.2)),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 12, height: 1.2, color: Colors.black87),
+          ),
         ],
       ),
     );
@@ -272,35 +295,64 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
   Widget _buildMediaSection() {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildTile(CupertinoIcons.photo, 'Ảnh, file, link', onTap: () => _showComingSoon('Kho tư liệu')),
           if (_isLoadingMedia)
-            const Padding(padding: EdgeInsets.symmetric(horizontal: 56), child: CupertinoActivityIndicator())
+            const Padding(padding: EdgeInsets.only(left: 56, bottom: 16), child: CupertinoActivityIndicator())
           else if (_recentMedia.isEmpty)
-            const Padding(padding: EdgeInsets.only(left: 56, top: 4), child: Text('Chưa có phương tiện nào được chia sẻ', style: TextStyle(color: Colors.grey, fontSize: 13)))
+            const Padding(
+              padding: EdgeInsets.only(left: 56, bottom: 16),
+              child: Text('Chưa có phương tiện nào được chia sẻ', style: TextStyle(color: Colors.grey, fontSize: 13))
+            )
           else
-            SizedBox(
+            Container(
               height: 70,
+              margin: const EdgeInsets.only(bottom: 16, left: 16, right: 16),
               child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 56),
                 scrollDirection: Axis.horizontal,
-                itemCount: _recentMedia.length,
+                itemCount: _recentMedia.length + 1,
                 itemBuilder: (context, index) {
+                  if (index == _recentMedia.length) {
+                    return _buildMediaNextBtn();
+                  }
                   final m = _recentMedia[index];
                   return Container(
                     margin: const EdgeInsets.only(right: 8),
                     width: 70,
-                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(4), color: Colors.grey.shade200),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      color: Colors.grey.shade100,
+                    ),
                     clipBehavior: Clip.antiAlias,
-                    child: CachedNetworkImage(imageUrl: m.mediaUrl ?? '', fit: BoxFit.cover),
+                    child: CachedNetworkImage(
+                      imageUrl: m.mediaUrl ?? '',
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(color: Colors.grey.shade200),
+                      errorWidget: (context, url, error) => const Icon(Icons.error),
+                    ),
                   );
                 },
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMediaNextBtn() {
+    return GestureDetector(
+      onTap: () => _showComingSoon('Kho tư liệu'),
+      child: Container(
+        width: 44,
+        height: 44,
+        margin: const EdgeInsets.symmetric(vertical: 13),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0F4FF),
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: const Icon(Icons.arrow_forward, color: AppColors.primary, size: 20),
       ),
     );
   }
@@ -314,7 +366,14 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
           _buildDivider(),
           _buildTile(CupertinoIcons.person_add, 'Thêm $name vào nhóm'),
           _buildDivider(),
-          _buildTile(CupertinoIcons.person_3, 'Xem nhóm chung', trailing: const Text('24', style: TextStyle(color: Colors.grey))),
+          _buildTile(CupertinoIcons.person_3, 'Xem nhóm chung', trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+               const Text('24', style: TextStyle(color: Colors.grey)),
+               const SizedBox(width: 4),
+               const Icon(CupertinoIcons.chevron_right, size: 14, color: Colors.black26),
+            ],
+          )),
         ],
       ),
     );
@@ -328,6 +387,7 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
           _buildTile(CupertinoIcons.pin, 'Ghim trò chuyện', 
             trailing: CupertinoSwitch(
               value: conv.isPinned, 
+              trackColor: Colors.grey.shade200,
               onChanged: (v) => context.read<ChatProvider>().updateConversationSettings(conversationId: conv.id, isPinned: v),
               activeColor: AppColors.primary,
             )
@@ -336,6 +396,7 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
           _buildTile(CupertinoIcons.eye_slash, 'Ẩn trò chuyện', 
             trailing: CupertinoSwitch(
               value: conv.isHidden, 
+              trackColor: Colors.grey.shade200,
               onChanged: (v) => context.read<ChatProvider>().updateConversationSettings(conversationId: conv.id, isHidden: v),
               activeColor: AppColors.primary,
             )
@@ -344,19 +405,27 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
           _buildTile(CupertinoIcons.phone, 'Báo cuộc gọi đến', 
             trailing: CupertinoSwitch(
               value: conv.notifyCall, 
+              trackColor: Colors.grey.shade200,
               onChanged: (v) => context.read<ChatProvider>().updateConversationSettings(conversationId: conv.id, notifyCall: v),
               activeColor: AppColors.primary,
             )
           ),
-          _buildZaloDivider(),
+          _buildDivider(),
           _buildTile(CupertinoIcons.timer, 'Tin nhắn tự xóa', 
             onTap: _showAutoDeletePicker,
-            trailing: Text(
-              _formatAutoDelete(conv.autoDeleteSeconds), 
-              style: const TextStyle(color: Colors.grey, fontSize: 13)
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _formatAutoDelete(conv.autoDeleteSeconds), 
+                  style: const TextStyle(color: Colors.grey, fontSize: 13)
+                ),
+                const SizedBox(width: 4),
+                const Icon(CupertinoIcons.chevron_right, size: 14, color: Colors.black26),
+              ],
             )
           ),
-          _buildZaloDivider(),
+          _buildDivider(),
           _buildTile(CupertinoIcons.settings, 'Cài đặt cá nhân'),
         ],
       ),
@@ -374,26 +443,25 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
           _buildDivider(),
           _buildTile(CupertinoIcons.chart_pie, 'Dung lượng trò chuyện'),
           _buildDivider(),
-          _buildTile(CupertinoIcons.trash, 'Xóa lịch sử trò chuyện', textColor: Colors.red, iconColor: Colors.red, onTap: _deleteHistory),
+          _buildTile(CupertinoIcons.trash, 'Xóa lịch sử trò chuyện', textColor: Colors.red, iconColor: Colors.red, onTap: _deleteHistory, showTrailing: false),
         ],
       ),
     );
   }
 
-  Widget _buildTile(IconData icon, String title, {Widget? trailing, VoidCallback? onTap, Color? textColor, Color? iconColor}) {
+  Widget _buildTile(IconData icon, String title, {Widget? trailing, VoidCallback? onTap, Color? textColor, Color? iconColor, bool showTrailing = true}) {
     return ListTile(
       onTap: onTap,
       dense: true,
       leading: Icon(icon, color: iconColor ?? Colors.black54, size: 22),
-      title: Text(title, style: TextStyle(fontSize: 15, color: textColor ?? Colors.black87)),
-      trailing: trailing ?? const Icon(CupertinoIcons.chevron_right, size: 14, color: Colors.black26),
+      title: Text(title, style: TextStyle(fontSize: 15, color: textColor ?? Colors.black87, fontWeight: FontWeight.w400)),
+      trailing: trailing ?? (showTrailing ? const Icon(CupertinoIcons.chevron_right, size: 14, color: Colors.black26) : null),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16),
       minLeadingWidth: 24,
     );
   }
 
-  Widget _buildDivider() => const Divider(height: 0.5, thickness: 0.5, indent: 56);
-  Widget _buildZaloDivider() => const Divider(height: 0.5, thickness: 0.5, indent: 56);
+  Widget _buildDivider() => const Divider(height: 1, thickness: 0.5, indent: 56, color: Color(0xFFEEEEEE));
 
   String _formatAutoDelete(int seconds) {
     if (seconds == 0) return 'Không tự xóa';

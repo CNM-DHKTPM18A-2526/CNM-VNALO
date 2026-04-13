@@ -7,6 +7,7 @@ import 'package:vnalo_mobile/features/profile/screens/account_security_screen.da
 import 'package:vnalo_mobile/features/profile/screens/appearance_settings_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/personal_info_screen.dart';
 import 'package:vnalo_mobile/core/models/menu_item_model.dart';
+import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -306,6 +307,9 @@ class SettingsScreen extends StatelessWidget {
     );
 
     try {
+      if (context.mounted) {
+        context.read<ChatProvider>().reset();
+      }
       await context.read<AuthProvider>().logout();
     } finally {
       if (context.mounted) {

@@ -179,7 +179,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
             onRefresh: () => chatProvider.loadInbox(),
             color: AppColors.primary,
             child: ListView.builder(
-              itemCount: conversations.length + 2, // 1 for Cloud + 1 for Gap
+              itemCount: conversations.length + 1, // 1 for Cloud + conversations
               itemBuilder: (context, index) {
                 if (index == 0) {
                   // My Documents / Cloud item
@@ -190,7 +190,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                       conversation: Conversation(
                         id: 'my_documents',
                         type: ConversationType.DIRECT,
-                        title: 'Cloud của tôi',
+                        title: 'My Documents',
                       ),
                       onTap: () {
                         Navigator.push(
@@ -202,13 +202,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   );
                 }
 
-                if (index == 1) {
-                  // Small Gap between Cloud and rest of chats
-                  return SizedBox(height: 8);
-                }
-
                 // Regular conversations
-                final conversation = conversations[index - 2];
+                final conversation = conversations[index - 1];
                 return Container(
                   color: isDarkMode ? DarkColors.surface : Colors.white,
                   child: ChatListItem(

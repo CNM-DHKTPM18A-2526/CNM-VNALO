@@ -13,6 +13,8 @@ import 'package:open_file/open_file.dart';
 import 'package:vnalo_mobile/features/chat/widgets/full_screen_image_viewer.dart';
 import 'package:vnalo_mobile/features/chat/widgets/audio_player_widget.dart';
 import 'package:flutter/services.dart';
+import 'package:vnalo_mobile/features/chat/providers/forward_provider.dart';
+import 'package:vnalo_mobile/features/chat/screens/forward_screen.dart';
 
 class MessageBubble extends StatelessWidget {
   final Message message;
@@ -253,6 +255,16 @@ class MessageBubble extends StatelessWidget {
             if (confirmed == true && context.mounted) {
               await chatProvider.deleteForMe(message.id, message.conversationId);
             }
+          }
+        } else if (action == 'forward') {
+          final forwardProvider = context.read<ForwardProvider>();
+          forwardProvider.startForwarding([message]);
+          
+          if (context.mounted) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ForwardScreen()),
+            );
           }
         }
       },
