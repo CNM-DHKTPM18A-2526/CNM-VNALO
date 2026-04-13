@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
+import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 
 class QrLoginApprovalScreen extends StatefulWidget {
@@ -51,6 +52,7 @@ class _QrLoginApprovalScreenState extends State<QrLoginApprovalScreen> {
     await _scannerController.stop();
     if (!mounted) return;
 
+    final common = CommonTexts.of(context, listen: false);
     setState(() {
       _token = token;
       _isLoadingPreview = true;
@@ -64,7 +66,7 @@ class _QrLoginApprovalScreenState extends State<QrLoginApprovalScreen> {
       final status = preview['status']?.toString() ?? 'PENDING';
       if (status == 'EXPIRED') {
         setState(() {
-          _error = 'Mã QR đã hết hạn. Vui lòng quét mã mới.';
+          _error = common.qrExpired;
           _preview = null;
           _token = null;
         });
@@ -80,7 +82,7 @@ class _QrLoginApprovalScreenState extends State<QrLoginApprovalScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Không thể đọc phiên đăng nhập QR: $e';
+        _error = '${common.cannotReadQrSession}: $e';
         _token = null;
       });
       await _scannerController.start();
@@ -105,8 +107,9 @@ class _QrLoginApprovalScreenState extends State<QrLoginApprovalScreen> {
 
     final token = _extractToken(rawValue);
     if (token == null) {
+      final common = CommonTexts.of(context, listen: false);
       setState(() {
-        _error = 'Mã QR không hợp lệ cho đăng nhập web.';
+        _error = common.invalidLoginQr;
       });
       return;
     }
@@ -163,6 +166,7 @@ class _QrLoginApprovalScreenState extends State<QrLoginApprovalScreen> {
       return;
     }
 
+    final common = CommonTexts.of(context, listen: false);
     setState(() {
       _isApproving = true;
       _error = null;
@@ -179,13 +183,13 @@ class _QrLoginApprovalScreenState extends State<QrLoginApprovalScreen> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã xác nhận đăng nhập web thành công.')),
+        SnackBar(content: Text(common.loginConfirmedSuccess)),
       );
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Xác nhận đăng nhập thất bại: $e';
+        _error = '${common.loginConfirmationFailed}: $e';
       });
     } finally {
       if (mounted) {
@@ -211,11 +215,12 @@ class _QrLoginApprovalScreenState extends State<QrLoginApprovalScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final common = CommonTexts.of(context);
     final preview = _preview;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Quét QR đăng nhập web'),
+        title: Text(common.qrLoginHeader),
       ),
       body: Column(
         children: [
@@ -233,20 +238,20 @@ class _QrLoginApprovalScreenState extends State<QrLoginApprovalScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Xác nhận đăng nhập trên thiết bị',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    Text(
+                      common.confirmLoginOnDevice,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 12),
-                    _infoRow('Thiết bị', preview['webDeviceName']?.toString() ?? 'Không rõ'),
-                    _infoRow('IP', preview['webIpAddress']?.toString() ?? 'Không rõ'),
-                    _infoRow('Địa điểm', preview['webLocation']?.toString() ?? 'Không rõ'),
-                    _infoRow('Nền tảng', preview['webPlatform']?.toString() ?? 'WEB'),
+                    _infoRow(common.deviceLabel, preview['webDeviceName']?.toString() ?? common.unknownValue),
+                    _infoRow('IP', preview['webIpAddress']?.toString() ?? common.unknownValue),
+                    _infoRow(common.locationLabel, preview['webLocation']?.toString() ?? common.unknownValue),
+                    _infoRow(common.platformLabel, preview['webPlatform']?.toString() ?? 'WEB'),
                     const SizedBox(height: 16),
                     Text(
                       _cooldownSeconds > 0
-                          ? 'Vui lòng chờ $_cooldownSeconds giây trước khi đồng ý.'
-                          : 'Bạn có thể nhấn Đồng ý để đăng nhập web.',
+                          ? common.waitToApprove(_cooldownSeconds)
+                          : common.canApproveNow,
                       style: TextStyle(
                         color: _cooldownSeconds > 0 ? Colors.orange.shade700 : Colors.green.shade700,
                       ),
@@ -257,7 +262,7 @@ class _QrLoginApprovalScreenState extends State<QrLoginApprovalScreen> {
                         Expanded(
                           child: OutlinedButton(
                             onPressed: _isApproving ? null : _scanAgain,
-                            child: const Text('Quét lại'),
+                            child: Text(common.scanAgainAction),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -270,7 +275,7 @@ class _QrLoginApprovalScreenState extends State<QrLoginApprovalScreen> {
                                     height: 18,
                                     child: CircularProgressIndicator(strokeWidth: 2),
                                   )
-                                : const Text('Đồng ý'),
+                                : Text(common.agreeAction),
                           ),
                         ),
                       ],
@@ -304,7 +309,7 @@ class _QrLoginApprovalScreenState extends State<QrLoginApprovalScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 86,
+            width: 96,
             child: Text(
               '$label:',
               style: const TextStyle(fontWeight: FontWeight.w600),

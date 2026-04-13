@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/models/quick_action_item.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 
@@ -11,6 +12,7 @@ Future<void> showQuickActionsSheet(
     context: context,
     backgroundColor: Colors.transparent,
     builder: (sheetContext) {
+      final common = CommonTexts.of(sheetContext);
       final sheetBg = isDarkMode ? DarkColors.surface : Colors.white;
       final dividerColor = isDarkMode ? DarkColors.divider : AppColors.sectionDivider;
       final titleColor = isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary;
@@ -51,7 +53,7 @@ Future<void> showQuickActionsSheet(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                           child: Row(
                             children: [
-                              Icon(item.icon, size: 22, color: iconColor),
+                               Icon(item.icon, size: 22, color: iconColor),
                               const SizedBox(width: 14),
                               Expanded(
                                 child: Text(
@@ -85,7 +87,7 @@ Future<void> showQuickActionsSheet(
                       foregroundColor: titleColor,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                     ),
-                    child: const Text('Hủy'),
+                    child: Text(common.cancelActionLabel),
                   ),
                 ),
               ),

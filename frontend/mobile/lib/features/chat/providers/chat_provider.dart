@@ -22,8 +22,6 @@ class ChatProvider extends ChangeNotifier {
   final Map<String, List<Message>> _messages = {};
   final Map<String, Timer> _retryTimers = {};
   final Map<String, int> _retryCounts = {};
-  // Track messages deleted "for me" to prevent server reload from restoring them
-  final Set<String> _deletedForMeIds = {};
   final StreamSubscription<Message> _messageSub;
   final StreamSubscription<Map<String, dynamic>> _readSub;
   final StreamSubscription<Map<String, dynamic>> _deliveredSub;
@@ -54,15 +52,23 @@ class ChatProvider extends ChangeNotifier {
   List<Message> getMessagesForConversation(String conversationId) =>
       _messages[conversationId] ?? [];
 
-  ChatProvider(this._chatService, this._socketService, this._mediaService, this._db)
-    : _messageSub = _socketService.onMessage.listen((_) {}),
-      _readSub = _socketService.onRead.listen((_) {}),
-      _deliveredSub = _socketService.onDelivered.listen((_) {}),
-      _recalledSub = _socketService.onRecalled.listen((_) {}) {
+  ChatProvider({
+    required ChatService chatService,
+    required SocketService socketService,
+    required MediaService mediaService,
+    required LocalDatabase db,
+  })  : _chatService = chatService,
+        _socketService = socketService,
+        _mediaService = mediaService,
+        _db = db,
+        _messageSub = socketService.onMessage.listen((_) {}),
+        _readSub = socketService.onRead.listen((_) {}),
+        _deliveredSub = socketService.onDelivered.listen((_) {}),
+        _recalledSub = socketService.onRecalled.listen((_) {}) {
     _messageSub.onData(_handleIncomingMessage);
     _readSub.onData(_handleReadEvent);
     _deliveredSub.onData(_handleDeliveredEvent);
-    _recalledSub.onData(_handleRecalledMessage);
+      _recalledSub.onData(_handleRecalledEvent);
   }
 
   List<Message> getMessages(String conversationId) =>
@@ -92,115 +98,28 @@ class ChatProvider extends ChangeNotifier {
     });
   }
 
-  /// Xóa toàn bộ dữ liệu phiên khi đăng xuất (Session Cleanup)
-  void reset() {
-    // 1. Cancel all active timers
-    for (final timer in _retryTimers.values) {
-      timer.cancel();
-    }
-    _highlightTimer?.cancel();
-    
-    // 2. Clear maps and collections
-    _messages.clear();
-    _retryTimers.clear();
-    _retryCounts.clear();
-    _deletedForMeIds.clear();
-    _conversations = [];
-    
-    // 3. Reset state variables
-    _activeConversationId = null;
-    _currentUserId = null;
-    _replyingTo = null;
-    _highlightedMessageId = null;
-    _isLoading = false;
-    
-    debugPrint('[ChatProvider] State reset complete.');
-    notifyListeners();
-  }
-
   Future<void> loadMessages(String conversationId, {String? before}) async {
     try {
       // 2. Fetch from API to update and sync
-      debugPrint('DEBUG: [ChatProvider] loadMessages ($conversationId): Fetching from server (before: $before)...');
       final response = await _chatService.getMessages(
         conversationId,
         before: before,
       );
-      debugPrint('DEBUG: [ChatProvider] loadMessages ($conversationId): Server returned ${response.length} messages');
-      
+
       if (before == null) {
-        // Merge strategy for initial load
-        final currentMessages = _messages[conversationId] ?? [];
-        final Map<String, Message> messageMap = {};
-        
-        // Use clientMessageId as a secondary key for merging optimistic UI
-        final Map<String, String> clientToId = {};
-
-        for (var m in currentMessages) {
-          messageMap[m.id] = m;
-          if (m.clientMessageId != null) {
-            clientToId[m.clientMessageId!] = m.id;
-          }
-        }
-
-        for (var serverMsg in response) {
-          // If this server message matches an optimistic one, remove the optimistic one
-          if (serverMsg.clientMessageId != null && clientToId.containsKey(serverMsg.clientMessageId)) {
-            messageMap.remove(clientToId[serverMsg.clientMessageId]);
-          }
-          messageMap[serverMsg.id] = serverMsg;
-        }
-
-        final mergedList = messageMap.values
-            .where((m) => !_deletedForMeIds.contains(m.id))
-            .toList();
-        // Sort by createdAt descending (newest first for reverse ListView)
-        mergedList.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        
-        _messages[conversationId] = mergedList;
-        // Filter deleted messages before saving to DB to prevent them from being restored
-        final toSave = response
-            .where((m) => !_deletedForMeIds.contains(m.id))
-            .map(_toLocal)
-            .toList();
-        if (toSave.isNotEmpty) {
-          try {
-            _db.saveMessagesBatch(toSave);
-          } catch (e) {
-            debugPrint('DEBUG: [ChatProvider] saveMessagesBatch error: $e');
-          }
-        }
+        _messages[conversationId] = response;
+        // Sync API messages to local DB in background
+        _db.saveMessagesBatch(response.map(_toLocal).toList());
       } else {
-        // Appending older messages
-        final current = _messages[conversationId] ?? [];
-        final Map<String, Message> messageMap = {
-          for (var m in current) m.id: m
-        };
-        for (var m in response) {
-          messageMap[m.id] = m;
-        }
-        final merged = messageMap.values
-            .where((m) => !_deletedForMeIds.contains(m.id))
-            .toList();
-        merged.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        _messages[conversationId] = merged;
-        // Filter deleted messages before saving to DB
-        final toSave = response
-            .where((m) => !_deletedForMeIds.contains(m.id))
-            .map(_toLocal)
-            .toList();
-        if (toSave.isNotEmpty) {
-          try {
-            _db.saveMessagesBatch(toSave);
-          } catch (e) {
-            debugPrint('DEBUG: [ChatProvider] saveMessagesBatch error (pagination): $e');
-          }
-        }
+        _messages[conversationId] = [
+          ...(_messages[conversationId] ?? []),
+          ...response,
+        ];
       }
       notifyListeners();
     } catch (e, stack) {
-      debugPrint('DEBUG: [ChatProvider] loadMessages error: $e');
-      debugPrint('DEBUG: [ChatProvider] Stack trace: $stack');
+      debugPrint('loadMessages error: $e');
+      debugPrint('Stack trace: $stack');
     }
   }
 
@@ -209,18 +128,12 @@ class ChatProvider extends ChangeNotifier {
       id: m.id,
       conversationId: m.conversationId,
       senderId: m.senderId,
-      clientMessageId: m.clientMessageId,
+      content: m.content ?? '',
+      createdAt: m.createdAt,
       messageType: m.messageType.name,
-      content: m.content ?? '',  // SQLite schema has NOT NULL, use empty string as fallback
       mediaUrl: m.mediaUrl,
-      mediaThumbnailUrl: m.mediaThumbnailUrl,
       mediaMimeType: m.mediaMimeType,
       mediaSizeBytes: m.mediaSizeBytes,
-      replyToMessageId: m.replyToMessageId,
-      replyToSenderId: m.replyToSenderId,
-      replyToContent: m.replyToContent,
-      status: m.status.name,
-      createdAt: m.createdAt,
     );
   }
 
@@ -229,18 +142,13 @@ class ChatProvider extends ChangeNotifier {
       id: lm.id,
       conversationId: lm.conversationId,
       senderId: lm.senderId,
-      clientMessageId: lm.clientMessageId,
-      messageType: enumFromString(MessageType.values, lm.messageType),
       content: lm.content,
+      createdAt: lm.createdAt,
+      messageType: enumFromString(MessageType.values, lm.messageType),
       mediaUrl: lm.mediaUrl,
-      mediaThumbnailUrl: lm.mediaThumbnailUrl,
       mediaMimeType: lm.mediaMimeType,
       mediaSizeBytes: lm.mediaSizeBytes,
-      replyToMessageId: lm.replyToMessageId,
-      replyToSenderId: lm.replyToSenderId,
-      replyToContent: lm.replyToContent,
-      status: enumFromString(MessageStatus.values, lm.status),
-      createdAt: lm.createdAt,
+      status: MessageStatus.SENT,
     );
   }
 
@@ -264,22 +172,11 @@ class ChatProvider extends ChangeNotifier {
 
     // 1. Load from Local Cache FIRST (Optimistic UI)
     final localMsgs = await _db.getMessagesByConversation(conversationId);
-    debugPrint('DEBUG: [ChatProvider] openConversation ($conversationId): Found ${localMsgs.length} messages in DB');
-    
     if (_activeConversationId == conversationId) {
-      try {
-        _messages[conversationId] = localMsgs
-            .where((lm) => !_deletedForMeIds.contains(lm.id))
-            .map(_fromLocal)
-            .toList();
-        debugPrint('DEBUG: [ChatProvider] openConversation ($conversationId): Successfully mapped ${localMsgs.length} messages');
-      } catch (e) {
-        debugPrint('DEBUG: [ChatProvider] openConversation mapping error: $e');
-      }
+      _messages[conversationId] = localMsgs.map(_fromLocal).toList();
       notifyListeners();
     }
 
-    debugPrint('DEBUG: [ChatProvider] openConversation ($conversationId): Calling loadMessages (fetch from server)...');
     await loadMessages(conversationId);
   }
 
@@ -313,7 +210,7 @@ class ChatProvider extends ChangeNotifier {
     _highlightedMessageId = messageId;
     _highlightTimer?.cancel();
     notifyListeners();
-    
+
     // Auto clear highlight after 2 seconds
     _highlightTimer = Timer(const Duration(seconds: 2), () {
       _highlightedMessageId = null;
@@ -321,26 +218,19 @@ class ChatProvider extends ChangeNotifier {
     });
   }
 
-  Future<void> sendMessage({
+  void sendMessage({
     required String conversationId,
     required String content,
-    MessageType messageType = MessageType.TEXT,
+    String messageType = 'TEXT',
     String? replyToMessageId,
-    // Add forward fields
-    String? forwardFromMessageId,
-    String? forwardFromConversationId,
-    String? mediaUrl,
-    String? mediaThumbnailUrl,
-    String? mediaMimeType,
-    int? mediaSizeBytes,
-  }) async {
-    if (content.trim().isEmpty && mediaUrl == null) return;
+  }) {
+    if (content.trim().isEmpty) return;
 
     final clientMessageId = _generateUuidV4();
-    
+
     // Auto-resolve reply ID if not provided but we are in reply mode
     final actualReplyId = replyToMessageId ?? _replyingTo?.id;
-    
+
     // If it's a reply, populate the replyTo fields for optimistic UI
     String? replySenderId;
     String? replySenderName;
@@ -357,30 +247,23 @@ class ChatProvider extends ChangeNotifier {
       senderId: _currentUserId ?? '',
       clientMessageId: clientMessageId,
       content: content.trim(),
-      messageType: messageType,
+      messageType: enumFromString(MessageType.values, messageType),
       status: MessageStatus.SENDING,
       createdAt: DateTime.now(),
       replyToMessageId: actualReplyId,
       replyToSenderId: replySenderId,
       replyToSenderName: replySenderName,
       replyToContent: replyContent,
-      // Forwards
-      forwardFromMessageId: forwardFromMessageId,
-      forwardFromConversationId: forwardFromConversationId,
-      mediaUrl: mediaUrl,
-      mediaThumbnailUrl: mediaThumbnailUrl,
-      mediaMimeType: mediaMimeType,
-      mediaSizeBytes: mediaSizeBytes,
     );
 
     _messages[conversationId] = [optimistic, ...(getMessagesForConversation(conversationId))];
     _replyingTo = null; // Clear reply state after sending
-    
+
     // Persist optimistic message locally
     _db.saveMessage(_toLocal(optimistic));
-    
+
     notifyListeners();
-    await _sendWithRetry(optimistic);
+    _sendWithRetry(optimistic);
   }
 
   Future<void> sendMediaMessage({
@@ -392,7 +275,7 @@ class ChatProvider extends ChangeNotifier {
     final clientMessageId = _generateUuidV4();
     final fileName = file?.path.split('/').last ?? 'media';
     final fileSize = file?.lengthSync() ?? 0;
-    
+
     final optimistic = Message(
       id: 'local-$clientMessageId',
       conversationId: conversationId,
@@ -404,7 +287,7 @@ class ChatProvider extends ChangeNotifier {
       status: MessageStatus.SENDING,
       createdAt: DateTime.now(),
       // Temp local path for preview or remote URL
-      mediaUrl: file?.path ?? mediaUrl, 
+      mediaUrl: file?.path ?? mediaUrl,
     );
 
     _messages[conversationId] = [optimistic, ...(getMessagesForConversation(conversationId))];
@@ -419,7 +302,7 @@ class ChatProvider extends ChangeNotifier {
       final category = _mapMessageTypeToCategory(type);
       final mediaId = await _mediaService.uploadFile(file!, category);
       final publicUrl = _mediaService.getPublicUrl(mediaId);
-      
+
       final updated = optimistic.copyWith(
         mediaUrl: publicUrl,
         content: fileName,
@@ -460,71 +343,138 @@ class ChatProvider extends ChangeNotifier {
     _sendWithRetry(message);
   }
 
-  /// Gửi chuyển tiếp hàng loạt tối ưu hóa hiệu năng (Batch Forwarding optimization)
+  void sendGif({
+    required String conversationId,
+    required String gifUrl,
+  }) {
+    sendMediaMessage(
+      conversationId: conversationId,
+      mediaUrl: gifUrl,
+      type: MessageType.IMAGE,
+    );
+  }
+
+  void sendImage({required String conversationId, required String imagePath}) {
+    sendMediaMessage(
+      conversationId: conversationId,
+      file: File(imagePath),
+      type: MessageType.IMAGE,
+    );
+  }
+
+  void sendVideo({required String conversationId, required String videoPath}) {
+    sendMediaMessage(
+      conversationId: conversationId,
+      file: File(videoPath),
+      type: MessageType.VIDEO,
+    );
+  }
+
+  void sendFile({required String conversationId, required String filePath}) {
+    sendMediaMessage(
+      conversationId: conversationId,
+      file: File(filePath),
+      type: MessageType.FILE,
+    );
+  }
+
+  void deleteMessage(String messageId) {
+    if (_activeConversationId == null) return;
+    final cid = _activeConversationId!;
+    final list = _messages[cid] ?? [];
+    final updated = list.where((m) => m.id != messageId).toList();
+    _messages[cid] = updated;
+    notifyListeners();
+  }
+
+  // Forward one or more source messages to multiple target conversations.
   Future<void> sendForwardBatch({
     required List<String> conversationIds,
     required List<Message> sourceMessages,
     String? additionalText,
   }) async {
-    final currentUserId = _currentUserId ?? '';
-    if (currentUserId.isEmpty) return;
+    if (conversationIds.isEmpty || sourceMessages.isEmpty) return;
 
-    // 1. Perform all data updates without notifying listeners in the loop
-    for (final convId in conversationIds) {
-      final List<Message> optimisticMsgs = [];
-      
-      // Create optimistic messages for source content
-      for (final msg in sourceMessages) {
-        final clientMsgId = _generateUuidV4();
-        final optimistic = Message(
-          id: 'local-$clientMsgId',
-          conversationId: convId,
-          senderId: currentUserId,
-          clientMessageId: clientMsgId,
-          content: msg.content ?? '',
-          messageType: msg.messageType,
-          status: MessageStatus.SENDING,
-          createdAt: DateTime.now(),
-          forwardFromMessageId: msg.id,
-          forwardFromConversationId: msg.conversationId,
-          mediaUrl: msg.mediaUrl,
-          mediaThumbnailUrl: msg.mediaThumbnailUrl,
-          mediaMimeType: msg.mediaMimeType,
-          mediaSizeBytes: msg.mediaSizeBytes,
-        );
-        optimisticMsgs.add(optimistic);
-        _db.saveMessage(_toLocal(optimistic));
+    final extra = additionalText?.trim();
+    for (final conversationId in conversationIds) {
+      if (extra != null && extra.isNotEmpty) {
+        sendMessage(conversationId: conversationId, content: extra);
       }
 
-      // Add additional text message if provided
-      if (additionalText != null && additionalText.trim().isNotEmpty) {
-        final clientMsgId = _generateUuidV4();
-        final optimistic = Message(
-          id: 'local-$clientMsgId',
-          conversationId: convId,
-          senderId: currentUserId,
-          clientMessageId: clientMsgId,
-          content: additionalText.trim(),
-          messageType: MessageType.TEXT,
-          status: MessageStatus.SENDING,
-          createdAt: DateTime.now(),
-        );
-        optimisticMsgs.add(optimistic);
-        _db.saveMessage(_toLocal(optimistic));
-      }
+      for (final source in sourceMessages) {
+        if (source.messageType == MessageType.TEXT) {
+          final content = (source.content ?? '').trim();
+          if (content.isEmpty) continue;
+          sendMessage(
+            conversationId: conversationId,
+            content: content,
+            messageType: source.messageType.name,
+          );
+          continue;
+        }
 
-      // Update the maps for all conversations at once
-      if (optimisticMsgs.isNotEmpty) {
-        _messages[convId] = [...optimisticMsgs, ...(getMessagesForConversation(convId))];
-      }
-      
-      // Start background sending for each message
-      for (final m in optimisticMsgs) {
-        _sendWithRetry(m);
+        final hasRemoteMedia = (source.mediaUrl ?? '').trim().isNotEmpty;
+        if (hasRemoteMedia) {
+          await sendMediaMessage(
+            conversationId: conversationId,
+            type: source.messageType,
+            mediaUrl: source.mediaUrl,
+          );
+          continue;
+        }
+
+        final fallback = (source.content ?? '').trim();
+        if (fallback.isNotEmpty) {
+          sendMessage(
+            conversationId: conversationId,
+            content: fallback,
+            messageType: source.messageType.name,
+          );
+        }
       }
     }
+  }
 
-    // 2. Notify once at the very end to prevent UI jank
+  // Recall a message for everyone and update UI immediately.
+  void recallMessage(String messageId, String conversationId) {
+    _socketService.recallMessage(messageId, conversationId);
+    final list = _messages[conversationId];
+    if (list == null) return;
+
+    final index = list.indexWhere((m) => m.id == messageId);
+    if (index < 0) return;
+
+    _replaceMessage(
+      conversationId,
+      messageId,
+      list[index].copyWith(status: MessageStatus.RECALLED, content: ''),
+    );
+  }
+
+  // Delete a message only for current user.
+  Future<void> deleteForMe(String messageId, String conversationId) async {
+    await _chatService.deleteForMe(messageId);
+    final list = _messages[conversationId];
+    if (list == null) return;
+
+    _messages[conversationId] = list.where((m) => m.id != messageId).toList();
+    notifyListeners();
+  }
+
+  // Reset in-memory chat state on logout.
+  void reset() {
+    for (final timer in _retryTimers.values) {
+      timer.cancel();
+    }
+    _retryTimers.clear();
+    _retryCounts.clear();
+    _messages.clear();
+    _conversations = [];
+    _activeConversationId = null;
+    _currentUserId = null;
+    _replyingTo = null;
+    _highlightedMessageId = null;
+    _highlightTimer?.cancel();
     notifyListeners();
   }
 
@@ -560,58 +510,6 @@ class ChatProvider extends ChangeNotifier {
     _sendWithRetry(message.copyWith(status: MessageStatus.SENDING));
   }
 
-  /// Thu hồi tin nhắn — emit socket event, backend sẽ broadcast lại
-  void recallMessage(String messageId, String conversationId) {
-    _socketService.recallMessage(messageId, conversationId);
-  }
-
-  /// Xóa tin nhắn phía mình — gọi HTTP, cập nhật state local ngay lập tức
-  Future<void> deleteForMe(String messageId, String conversationId) async {
-    // 1. Track this deletion to prevent server refresh from restoring it
-    _deletedForMeIds.add(messageId);
-
-    // 2. Optimistic update: remove from UI immediately
-    final msgs = _messages[conversationId];
-    if (msgs != null) {
-      _messages[conversationId] = msgs.where((m) => m.id != messageId).toList();
-      notifyListeners();
-    }
-
-    // 3. We do NOT remove from local DB here to avoid affecting other accounts 
-    // sharing the same SQLite file on a developer device. 
-    // Instead, we rely on server sync and in-memory filtering.
-
-    try {
-      await _chatService.deleteForMe(messageId);
-    } catch (e) {
-      debugPrint('deleteForMe error: $e');
-      // Keep the message deleted from UI even if server fails.
-      // The deletion is a client-side action ("for me"), so we respect user intent.
-      // Do NOT reload or remove from _deletedForMeIds here.
-    }
-  }
-
-  /// Xử lý sự kiện message.recalled từ socket
-  void _handleRecalledMessage(Map<String, dynamic> data) {
-    final String messageId = data['messageId'] as String? ?? '';
-    final String conversationId = data['conversationId'] as String? ?? '';
-    if (messageId.isEmpty || conversationId.isEmpty) return;
-
-    final msgs = _messages[conversationId];
-    if (msgs != null) {
-      final index = msgs.indexWhere((m) => m.id == messageId);
-      if (index >= 0) {
-        final updated = List<Message>.from(msgs);
-        updated[index] = updated[index].copyWith(
-          status: MessageStatus.RECALLED,
-          content: 'Tin nhắn đã được thu hồi',
-        );
-        _messages[conversationId] = updated;
-        notifyListeners();
-      }
-    }
-  }
-
   void _handleIncomingMessage(Message message) {
     final conversationId = message.conversationId;
 
@@ -631,11 +529,7 @@ class ChatProvider extends ChangeNotifier {
       resolvedMessage = resolvedMessage.copyWith(replyToSenderName: resolvedReplyName);
     }
 
-    // Ignore messages that were deleted for me
-    if (_deletedForMeIds.contains(resolvedMessage.id)) return;
-
     final existing = _messages[conversationId] ?? [];
-
     final clientMessageId = resolvedMessage.clientMessageId;
     if (clientMessageId != null) {
       _clearRetry(clientMessageId);
@@ -645,10 +539,7 @@ class ChatProvider extends ChangeNotifier {
       if (optimisticIndex >= 0) {
         final updated = List<Message>.from(existing);
         final oldMessage = updated[optimisticIndex];
-        
-        // Remove old optimistic message from local DB to prevent duplicates
-        _db.deleteMessage(oldMessage.id);
-        
+
         // MERGE metadata: Keep reply info if already present in optimistic but missing in resolved
         Message merged = resolvedMessage;
         if (oldMessage.replyToMessageId != null && merged.replyToMessageId == null) {
@@ -731,9 +622,9 @@ class ChatProvider extends ChangeNotifier {
     if (msgs != null && msgs.isNotEmpty) {
       bool changed = false;
       final updatedMsgs = msgs.map((m) {
-        if (m.senderId == _currentUserId && 
-            m.status != MessageStatus.READ && 
-            m.serverSeq != null && 
+        if (m.senderId == _currentUserId &&
+            m.status != MessageStatus.READ &&
+            m.serverSeq != null &&
             m.serverSeq! <= lastReadSeq) {
           changed = true;
           return m.copyWith(status: MessageStatus.READ);
@@ -766,6 +657,26 @@ class ChatProvider extends ChangeNotifier {
         }
       }
     }
+  }
+
+  void _handleRecalledEvent(Map<String, dynamic> data) {
+    final conversationId = data['conversationId']?.toString();
+    final messageId = data['messageId']?.toString();
+    if (conversationId == null || messageId == null) return;
+
+    final msgs = _messages[conversationId];
+    if (msgs == null) return;
+
+    final index = msgs.indexWhere((m) => m.id == messageId);
+    if (index < 0) return;
+
+    final updated = List<Message>.from(msgs);
+    updated[index] = updated[index].copyWith(
+      status: MessageStatus.RECALLED,
+      content: '',
+    );
+    _messages[conversationId] = updated;
+    notifyListeners();
   }
 
   Future<void> _sendWithRetry(Message message) async {
@@ -909,7 +820,7 @@ class ChatProvider extends ChangeNotifier {
     super.dispose();
   }
 
-  // ─── Settings & Management ────────────────────────────────
+  // Settings and management helpers.
 
   Future<void> updateConversationSettings({
     required String conversationId,
@@ -954,7 +865,7 @@ class ChatProvider extends ChangeNotifier {
     try {
       await _chatService.deleteChatHistory(conversationId);
       _messages[conversationId] = [];
-      
+
       final index = _conversations.indexWhere((c) => c.id == conversationId);
       if (index >= 0) {
         _conversations[index] = _conversations[index].copyWith(
@@ -972,7 +883,7 @@ class ChatProvider extends ChangeNotifier {
   Future<void> updateMemberNickname(String conversationId, String userId, String nickname) async {
     try {
       await _chatService.updateMemberNickname(conversationId, userId, nickname);
-      
+
       final index = _conversations.indexWhere((c) => c.id == conversationId);
       if (index >= 0) {
         final conv = _conversations[index];
@@ -995,16 +906,13 @@ class ChatProvider extends ChangeNotifier {
     try {
       final mediaId = await _mediaService.uploadFile(file, MediaCategory.CHAT_IMAGE);
       final wallpaperUrl = _mediaService.getPublicUrl(mediaId);
-      
+
       await _chatService.updateWallpaper(conversationId, wallpaperUrl, isGlobal: isGlobal);
-      
+
       final index = _conversations.indexWhere((c) => c.id == conversationId);
       if (index >= 0) {
         if (isGlobal) {
-          _conversations[index] = _conversations[index].copyWith(
-            wallpaperUrl: wallpaperUrl,
-            personalWallpaperUrl: null,
-          );
+          _conversations[index] = _conversations[index].copyWith(wallpaperUrl: wallpaperUrl);
         } else {
           _conversations[index] = _conversations[index].copyWith(personalWallpaperUrl: wallpaperUrl);
         }
@@ -1019,14 +927,11 @@ class ChatProvider extends ChangeNotifier {
   Future<void> updateWallpaperUrl(String conversationId, String wallpaperUrl, {bool isGlobal = true}) async {
     try {
       await _chatService.updateWallpaper(conversationId, wallpaperUrl, isGlobal: isGlobal);
-      
+
       final index = _conversations.indexWhere((c) => c.id == conversationId);
       if (index >= 0) {
         if (isGlobal) {
-          _conversations[index] = _conversations[index].copyWith(
-            wallpaperUrl: wallpaperUrl,
-            personalWallpaperUrl: null,
-          );
+          _conversations[index] = _conversations[index].copyWith(wallpaperUrl: wallpaperUrl);
         } else {
           _conversations[index] = _conversations[index].copyWith(personalWallpaperUrl: wallpaperUrl);
         }
@@ -1054,9 +959,9 @@ class ChatProvider extends ChangeNotifier {
       final memberIndex = conv.members.indexWhere((m) => m.userId == senderId);
       if (memberIndex >= 0) {
         final member = conv.members[memberIndex];
-        return member.nickname ?? member.user?.displayName ?? 'Người dùng';
+        return member.nickname ?? member.user?.displayName ?? 'User';
       }
     }
-    return 'Người dùng';
+    return 'User';
   }
 }

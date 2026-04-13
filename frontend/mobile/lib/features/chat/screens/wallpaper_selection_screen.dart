@@ -54,7 +54,7 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
         if (mounted) Navigator.pop(context);
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lá»—i: $e')));
           setState(() => _isSaving = false);
         }
       }
@@ -129,7 +129,7 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
             onPressed: () => Navigator.pop(context),
           ),
           const Text(
-            'Đổi hình nền',
+            'Change wallpaper',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.black87),
           ),
           TextButton(
@@ -218,13 +218,13 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
                   width: 1.5,
                 ),
               ),
-              child: _applyToBoth 
-                ? const Icon(Icons.check, color: Colors.white, size: 14) 
+              child: _applyToBoth
+                ? const Icon(Icons.check, color: Colors.white, size: 14)
                 : null,
             ),
             const SizedBox(width: 10),
             const Text(
-              'Đổi hình nền cho cả hai bên',
+              'Apply wallpaper for both participants',
               style: TextStyle(fontSize: 14, color: Colors.black87),
             ),
           ],
@@ -242,7 +242,7 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
         _selectedUrl!,
         isGlobal: _applyToBoth,
       );
-      
+
       if (mounted) {
         Navigator.pop(context);
         _showSuccessToast();
@@ -263,15 +263,15 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
           return;
         } catch (innerError) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi: $innerError')));
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $innerError')));
             setState(() => _isSaving = false);
           }
           return;
         }
       }
-      
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
         setState(() => _isSaving = false);
       }
     }
@@ -288,9 +288,9 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                isFallback 
-                  ? 'Đã đổi hình nền cho riêng bạn (thiếu quyền đổi cho cả hai)' 
-                  : 'Hình nền đã được thay đổi', 
+                isFallback
+                  ? 'Wallpaper updated only for you (insufficient permission for both)'
+                  : 'Wallpaper updated successfully',
                 style: const TextStyle(color: Colors.white, fontSize: 13),
               ),
             ),

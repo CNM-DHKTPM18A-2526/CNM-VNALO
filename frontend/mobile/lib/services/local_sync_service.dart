@@ -28,7 +28,7 @@ class LocalSyncService {
     try {
       debugPrint('[Sync] Starting... (60-day sync)');
       
-      // 1. Sync Contacts
+      // 1. Sync contacts into local cache.
       final friends = await friendService.getFriends();
       await db.batch((batch) {
         batch.insertAll(
@@ -43,7 +43,7 @@ class LocalSyncService {
         );
       });
 
-      // 2. Sync Conversations & Messages (Top recent)
+      // 2. Sync recent conversations and messages.
       final conversations = await chatService.getInbox();
       for (final conv in conversations) {
         await db.into(db.conversations).insert(
@@ -58,7 +58,7 @@ class LocalSyncService {
           mode: InsertMode.insertOrReplace,
         );
 
-        // Fetch messages for the last 60 days
+        // Fetch a recent message slice for each conversation.
         final messages = await chatService.getMessages(conv.id, limit: 100);
         await db.batch((batch) {
           batch.insertAll(
@@ -67,10 +67,12 @@ class LocalSyncService {
               id: m.id,
               conversationId: conv.id,
               senderId: m.senderId,
-              messageType: Value(m.messageType.name),
-              content: Value(m.content),
-              status: Value(m.status.name),
+              content: m.content ?? '',
               createdAt: m.createdAt,
+              messageType: Value(m.messageType.name),
+              mediaUrl: Value(m.mediaUrl),
+              mediaMimeType: Value(m.mediaMimeType),
+              mediaSizeBytes: Value(m.mediaSizeBytes),
             )),
             mode: InsertMode.insertOrReplace,
           );

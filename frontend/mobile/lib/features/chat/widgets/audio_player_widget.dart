@@ -92,10 +92,19 @@ class _AudioPlayerWidgetState extends State<AudioPlayerWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final textColor = widget.isMine ? const Color(0xFF1A1A1A) : Colors.black87;
-    final iconColor = widget.isMine ? AppColors.primary : Colors.black87;
-    final sliderActiveColor = widget.isMine ? AppColors.primary : Colors.grey.shade700;
-    final sliderInactiveColor = widget.isMine ? Colors.white.withValues(alpha: 0.5) : Colors.grey.shade300;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDarkMode 
+        ? Colors.white 
+        : (widget.isMine ? const Color(0xFF1A1A1A) : Colors.black87);
+    final iconColor = isDarkMode 
+        ? Colors.white 
+        : (widget.isMine ? AppColors.primary : Colors.black87);
+    final sliderActiveColor = isDarkMode 
+        ? Colors.white 
+        : (widget.isMine ? AppColors.primary : Colors.grey.shade700);
+    final sliderInactiveColor = isDarkMode 
+        ? Colors.white24 
+        : (widget.isMine ? Colors.white.withValues(alpha: 0.5) : Colors.grey.shade300);
 
     return Row(
       mainAxisSize: MainAxisSize.min,

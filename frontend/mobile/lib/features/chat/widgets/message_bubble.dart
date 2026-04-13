@@ -53,7 +53,7 @@ class MessageBubble extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.12),
+                  color: Colors.black.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -130,7 +130,7 @@ class MessageBubble extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Hiển thị đặc biệt khi tin nhắn đã bị thu hồi
+          // Render a dedicated style for recalled messages.
           if (message.isRecalled)
             _buildRecalledContent(isMine, isDarkMode)
           else ...[
@@ -181,12 +181,12 @@ class MessageBubble extends StatelessWidget {
     // Find bubble position
     final RenderBox? renderBox = context.findRenderObject() as RenderBox?;
     if (renderBox == null) return;
-    
+
     final position = renderBox.localToGlobal(Offset.zero);
     final size = renderBox.size;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    // Không hiển thị menu nếu tin nhắn đã bị thu hồi
+    // Skip action menu for recalled messages.
     if (message.isRecalled) return;
 
     FocusedMessageDialog.show(
@@ -204,7 +204,7 @@ class MessageBubble extends StatelessWidget {
              Clipboard.setData(ClipboardData(text: message.content ?? ''));
              if (context.mounted) {
                ScaffoldMessenger.of(context).showSnackBar(
-                 const SnackBar(content: Text('Đã sao chép tin nhắn')),
+                 const SnackBar(content: Text('Message copied')),
                );
              }
            }
@@ -213,17 +213,17 @@ class MessageBubble extends StatelessWidget {
             final confirmed = await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
-                title: const Text('Thu hồi tin nhắn'),
-                content: const Text('Tin nhắn sẽ được thu hồi với tất cả mọi người. Bạn có chắc không?'),
+                title: const Text('Recall message'),
+                content: const Text('This message will be removed for everyone. Continue?'),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text('Hủy'),
+                    child: const Text('Cancel'),
                   ),
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, true),
                     style: TextButton.styleFrom(foregroundColor: Colors.orange),
-                    child: const Text('Thu hồi'),
+                    child: const Text('Recall'),
                   ),
                 ],
               ),
@@ -237,17 +237,17 @@ class MessageBubble extends StatelessWidget {
             final confirmed = await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
-                title: const Text('Xóa tin nhắn'),
-                content: const Text('Tin nhắn sẽ bị xóa ở phía bạn. Người khác vẫn nhìn thấy tin nhắn này.'),
+                title: const Text('Delete message'),
+                content: const Text('This removes the message only for you.'),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text('Hủy'),
+                    child: const Text('Cancel'),
                   ),
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, true),
                     style: TextButton.styleFrom(foregroundColor: Colors.red),
-                    child: const Text('Xóa'),
+                    child: const Text('Delete'),
                   ),
                 ],
               ),
@@ -259,7 +259,7 @@ class MessageBubble extends StatelessWidget {
         } else if (action == 'forward') {
           final forwardProvider = context.read<ForwardProvider>();
           forwardProvider.startForwarding([message]);
-          
+
           if (context.mounted) {
             Navigator.push(
               context,
@@ -271,7 +271,7 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
-  /// Widget hiển thị khi tin nhắn đã bị thu hồi
+  /// Bubble content for a recalled message.
   Widget _buildRecalledContent(bool isMine, bool isDarkMode) {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -283,7 +283,7 @@ class MessageBubble extends StatelessWidget {
         ),
         const SizedBox(width: 4),
         Text(
-          'Tin nhắn đã được thu hồi',
+          'Message recalled',
           style: TextStyle(
             fontSize: 14,
             fontStyle: FontStyle.italic,
@@ -446,7 +446,7 @@ class MessageBubble extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  message.content ?? 'Tài liệu',
+                  message.content ?? 'Document',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
@@ -482,9 +482,9 @@ class MessageBubble extends StatelessWidget {
     if (!showStatus && !showTime && readByMembers?.isEmpty == true) {
       return const SizedBox.shrink();
     }
-    
+
     final bool isImage = message.messageType == MessageType.IMAGE || (groupedMessages != null && groupedMessages!.isNotEmpty);
-    
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -508,9 +508,9 @@ class MessageBubble extends StatelessWidget {
         ],
         if (showStatus) ...[
           if (message.status == MessageStatus.SENDING)
-             Text('Đang gửi...', style: TextStyle(fontSize: 10, color: Colors.grey))
+             Text('Sending...', style: TextStyle(fontSize: 10, color: Colors.grey))
           else if (message.status == MessageStatus.FAILED)
-             const Text('Lỗi gửi', style: TextStyle(fontSize: 10, color: Colors.red))
+             const Text('Send failed', style: TextStyle(fontSize: 10, color: Colors.red))
           else
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -592,11 +592,11 @@ class MessageBubble extends StatelessWidget {
   String _getStatusText(MessageStatus status) {
     switch (status) {
       case MessageStatus.SENT:
-        return 'Đã gửi';
+        return 'Sent';
       case MessageStatus.DELIVERED:
-        return 'Đã nhận';
+        return 'Delivered';
       case MessageStatus.READ:
-        return 'Đã xem';
+        return 'Read';
       default:
         return '';
     }
@@ -613,11 +613,11 @@ class MessageBubble extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 6),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: isDarkMode ? Colors.white.withOpacity(0.08) : const Color(0xFFF3F7FF),
+          color: isDarkMode ? Colors.white.withValues(alpha: 0.08) : const Color(0xFFF3F7FF),
           borderRadius: BorderRadius.circular(10),
           border: Border(
             left: BorderSide(
-              color: isDarkMode ? Colors.blue[300]! : const Color(0xFF0068FF), 
+              color: isDarkMode ? Colors.blue[300]! : const Color(0xFF0068FF),
               width: 2.5
             ),
           ),
@@ -626,7 +626,7 @@ class MessageBubble extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              message.replyToSenderName ?? 'Người dùng',
+              message.replyToSenderName ?? 'User',
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 12,
@@ -635,7 +635,7 @@ class MessageBubble extends StatelessWidget {
             ),
             const SizedBox(height: 2),
             Text(
-              message.replyToContent ?? '[Phương tiện]',
+              message.replyToContent ?? '[Media]',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(

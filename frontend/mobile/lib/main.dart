@@ -19,6 +19,7 @@ import 'package:vnalo_mobile/services/storage_service.dart';
 import 'package:vnalo_mobile/services/user_service.dart';
 import 'package:vnalo_mobile/services/local_sync_service.dart';
 import 'package:vnalo_mobile/core/database/local_database.dart';
+import 'package:vnalo_mobile/services/media_cache_service.dart';
 import 'package:vnalo_mobile/features/timeline/providers/post_provider.dart';
 import 'package:vnalo_mobile/features/chat/providers/forward_provider.dart';
 
@@ -110,6 +111,9 @@ class VnaloApp extends StatelessWidget {
         Provider<MediaService>(
           create: (context) => MediaService(context.read<ApiService>()),
         ),
+        Provider<MediaCacheService>(
+          create: (context) => MediaCacheService(context.read<LocalDatabase>()),
+        ),
         ChangeNotifierProvider<ThemeProvider>(
           create: (_) => ThemeProvider()..initialize(),
         ),
@@ -128,10 +132,10 @@ class VnaloApp extends StatelessWidget {
         ChangeNotifierProvider<ChatProvider>(
           create:
               (context) => ChatProvider(
-                context.read<ChatService>(),
-                context.read<SocketService>(),
-                context.read<MediaService>(),
-                context.read<LocalDatabase>(),
+                chatService: context.read<ChatService>(),
+                socketService: context.read<SocketService>(),
+                mediaService: context.read<MediaService>(),
+                db: context.read<LocalDatabase>(),
               ),
         ),
         ChangeNotifierProvider<PostProvider>(

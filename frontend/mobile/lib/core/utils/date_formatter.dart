@@ -43,4 +43,24 @@ class DateFormatter {
 
     return '$timeStr ${DateFormat('dd/MM/yyyy').format(local)}';
   }
+
+  static String formatChatDate(DateTime dateTime) {
+    final local = dateTime.toLocal();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final date = DateTime(local.year, local.month, local.day);
+
+    final timeStr = DateFormat('HH:mm').format(local);
+
+    if (date == today) {
+      return timeStr;
+    }
+    
+    final yesterday = today.subtract(const Duration(days: 1));
+    if (date == yesterday) {
+      return 'Hôm qua $timeStr';
+    }
+
+    return '$timeStr ${DateFormat('dd/MM').format(local)}';
+  }
 }

@@ -39,7 +39,7 @@ class AccountSecurityScreen extends StatelessWidget {
       ),
       body: ListView(
         children: [
-          _sectionTitle('Tài khoản'),
+          _sectionTitle('Tài khoản', isDarkMode),
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 14),
             decoration: BoxDecoration(
@@ -95,7 +95,7 @@ class AccountSecurityScreen extends StatelessWidget {
             isDarkMode: isDarkMode,
           ),
           const SizedBox(height: 10),
-          _sectionTitle('Bảo mật'),
+          _sectionTitle('Bảo mật', isDarkMode),
           _tile(
             context,
             icon: Icons.verified_user_outlined,
@@ -124,7 +124,7 @@ class AccountSecurityScreen extends StatelessWidget {
             trailingText: 'Đang tắt',
           ),
           const SizedBox(height: 10),
-          _sectionTitle('Đăng nhập'),
+          _sectionTitle('Đăng nhập', isDarkMode),
           _tile(
             context,
             icon: Icons.security_outlined,
@@ -135,7 +135,7 @@ class AccountSecurityScreen extends StatelessWidget {
             trailing: Switch(
               value: false,
               onChanged: (_) {},
-              activeColor: AppColors.primary,
+              activeThumbColor: isDarkMode ? DarkColors.primary : AppColors.primary,
             ),
           ),
           _divider(dividerColor),
@@ -174,13 +174,13 @@ class AccountSecurityScreen extends StatelessWidget {
     );
   }
 
-  Widget _sectionTitle(String title) {
+  Widget _sectionTitle(String title, bool isDarkMode) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       child: Text(
         title,
-        style: const TextStyle(
-          color: AppColors.primary,
+        style: TextStyle(
+          color: isDarkMode ? DarkColors.primary : AppColors.primary,
           fontSize: 18,
           fontWeight: FontWeight.w700,
         ),
@@ -207,8 +207,8 @@ class AccountSecurityScreen extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          highlightColor: AppColors.itemPressBackground,
-          splashColor: AppColors.itemPressBackground.withValues(alpha: 0.7),
+          highlightColor: isDarkMode ? Colors.white.withValues(alpha: 0.05) : AppColors.itemPressBackground,
+          splashColor: isDarkMode ? Colors.white.withValues(alpha: 0.1) : AppColors.itemPressBackground.withValues(alpha: 0.7),
           onTap: onTap,
           child: ListTile(
             leading: Icon(icon, color: iconColor),

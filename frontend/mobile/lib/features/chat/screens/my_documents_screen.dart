@@ -17,9 +17,10 @@ class MyDocumentsScreen extends StatefulWidget {
 }
 
 class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
+  // Dedicated local conversation key for self-saved messages.
   static const _storageKey = 'my_documents_messages';
   static const _convId = 'MY_DOCUMENTS';
-  static const List<String> _tabs = ['Tất cả', 'Văn bản', 'Ảnh', 'File', 'Link'];
+  static const List<String> _tabs = ['All', 'Text', 'Images', 'Files', 'Links'];
 
   int _selectedTabIndex = 0;
   final List<LocalMessage> _messages = [];
@@ -43,10 +44,11 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
 
   Future<void> _loadMessages() async {
     try {
+      // Load from DB and migrate any legacy SharedPreferences payload once.
       final db = context.read<LocalDatabase>();
       final prefs = await SharedPreferences.getInstance();
       if (!mounted) return;
-      
+
       // 1. One-time Migration from SharedPreferences to SQLite
       final raw = prefs.getString(_storageKey);
       if (raw != null) {
@@ -54,7 +56,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
           final List<dynamic> decoded = jsonDecode(raw);
           final auth = context.read<AuthProvider>();
           final myId = auth.user?.id ?? 'ME';
-          
+
           final List<LocalMessage> toMigrate = [];
           for (final item in decoded) {
             toMigrate.add(LocalMessage(
@@ -63,7 +65,6 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
               senderId: myId,
               messageType: 'TEXT',
               content: item['content'] ?? '',
-              status: 'SENT',
               createdAt: DateTime.tryParse(item['createdAt'] ?? '') ?? DateTime.now(),
             ));
           }
@@ -97,17 +98,17 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
   void _sendMessage(String content) async {
     if (content.trim().isEmpty) return;
 
+    // Persist immediately so this screen works offline by default.
     final db = context.read<LocalDatabase>();
     final auth = context.read<AuthProvider>();
     final myId = auth.user?.id ?? 'ME';
-    
+
     final msg = LocalMessage(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       conversationId: _convId,
       senderId: myId,
       messageType: 'TEXT',
       content: content.trim(),
-      status: 'SENT',
       createdAt: DateTime.now(),
     );
 
@@ -133,9 +134,9 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
     final today = DateTime(now.year, now.month, now.day);
     final msgDay = DateTime(dt.year, dt.month, dt.day);
     final diff = today.difference(msgDay).inDays;
-    if (diff == 0) return 'Hôm nay';
-    if (diff == 1) return 'Hôm qua';
-    return '${dt.day} tháng ${dt.month}, ${dt.year}';
+    if (diff == 0) return 'Today';
+    if (diff == 1) return 'Yesterday';
+    return '${dt.day}/${dt.month}/${dt.year}';
   }
 
   @override
@@ -203,7 +204,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
                         borderRadius: BorderRadius.circular(20),
                         border: isSelected
                             ? null
-                            : Border.all(color: Colors.grey.withOpacity(0.4)),
+                            : Border.all(color: Colors.grey.withValues(alpha: 0.4)),
                       ),
                       child: Text(
                         _tabs[i],
@@ -252,7 +253,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 IconButton(
-                  icon: Icon(Icons.emoji_emotions_outlined, 
+                  icon: Icon(Icons.emoji_emotions_outlined,
                     color: isDarkMode ? DarkColors.textHint : const Color(0xFF5D6470)),
                   onPressed: () {},
                   padding: EdgeInsets.zero,
@@ -270,7 +271,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
                       color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
                     ),
                     decoration: InputDecoration(
-                      hintText: 'Tin nhắn',
+                      hintText: 'Message',
                       hintStyle: TextStyle(
                         color: isDarkMode ? DarkColors.textHint : const Color(0xFFA1A3A7),
                         fontSize: 16,
@@ -326,12 +327,12 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
           Icon(Icons.folder_open_outlined, size: 64, color: Colors.grey[400]),
           const SizedBox(height: 12),
           Text(
-            'Chưa có nội dung nào',
+            'No content yet',
             style: TextStyle(color: Colors.grey[600], fontSize: 16),
           ),
           const SizedBox(height: 8),
           Text(
-            'Hãy gửi tin nhắn, ảnh hoặc file để lưu trữ',
+            'Send a message, image, or file to store it here',
             style: TextStyle(color: Colors.grey[400], fontSize: 13),
           ),
         ],
@@ -360,7 +361,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.12),
+                color: Colors.black.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
@@ -374,7 +375,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
 
       for (int i = 0; i < messages.length; i++) {
         final msg = messages[i];
-        
+
         // Grouping logic for MyDocuments (all messages are 'Mine')
         // showTime: if it's the newest message (i == 0) OR gap with message above it (i-1) is > 5 mins
         bool showTime = true;
@@ -431,7 +432,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
               ),
             ),
             child: Text(
-              msg.content ?? '',
+              msg.content,
               style: TextStyle(
                 fontSize: 15,
                 color: isDarkMode ? Colors.white : const Color(0xFF1F2937),
@@ -457,7 +458,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
                     const Icon(Icons.done_all, size: 14, color: Colors.blue),
                     const SizedBox(width: 4),
                     const Text(
-                      'Đã nhận',
+                      'Received',
                       style: TextStyle(
                         fontSize: 11,
                         color: Colors.grey,

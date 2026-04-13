@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/models/quick_action_item.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
@@ -11,9 +12,6 @@ import 'package:vnalo_mobile/features/common/widgets/quick_actions_sheet.dart';
 import 'package:vnalo_mobile/features/contacts/screens/add_friend_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/account_security_screen.dart';
 import 'package:vnalo_mobile/features/search/screens/unified_search_screen.dart';
-import 'package:vnalo_mobile/models/conversation_model.dart';
-import 'package:vnalo_mobile/models/conversation_enums.dart';
-import 'package:vnalo_mobile/features/chat/screens/chat_detail_screen.dart';
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
@@ -39,12 +37,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   void _openQuickActions() {
+    final common = CommonTexts.of(context, listen: false);
     showQuickActionsSheet(
       context,
       items: [
         QuickActionItem(
           icon: Icons.person_add_alt_1_outlined,
-          title: 'Thêm bạn',
+          title: common.addFriendAction,
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const AddFriendScreen()),
@@ -53,16 +52,16 @@ class _ChatListScreenState extends State<ChatListScreen> {
         ),
         QuickActionItem(
           icon: Icons.group_add_outlined,
-          title: 'Tạo nhóm',
+          title: common.createGroupAction,
           onTap: () {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Luồng tạo nhóm sẽ được nối ở bước message/group tiếp theo.')),
+              SnackBar(content: Text(common.groupFlowPlaceholder)),
             );
           },
         ),
         QuickActionItem(
           icon: Icons.folder_copy_outlined,
-          title: 'My Documents',
+          title: common.myDocumentsSubtitle,
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const MyDocumentsScreen()),
@@ -71,25 +70,16 @@ class _ChatListScreenState extends State<ChatListScreen> {
         ),
         QuickActionItem(
           icon: Icons.calendar_month_outlined,
-          title: 'Lịch Vnalo',
+          title: common.vnaloCalendar,
           onTap: () {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Lịch Vnalo sẽ được tích hợp ở bước lịch/message tiếp theo.')),
-            );
-          },
-        ),
-        QuickActionItem(
-          icon: Icons.video_call_outlined,
-          title: 'Tạo cuộc gọi nhóm',
-          onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Tạo cuộc gọi nhóm sẽ được triển khai ở module call.')),
+              SnackBar(content: Text(common.calendarFlowPlaceholder)),
             );
           },
         ),
         QuickActionItem(
           icon: Icons.devices_outlined,
-          title: 'Thiết bị đăng nhập',
+          title: common.loggedInDevices,
           onTap: () {
             Navigator.of(context, rootNavigator: true).push(
               MaterialPageRoute(builder: (_) => const AccountSecurityScreen()),
@@ -103,9 +93,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final common = CommonTexts.of(context);
     final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
     final searchHint = isDarkMode
-        ? DarkColors.textHint
+        ? DarkColors.textSecondary
         : Colors.white.withValues(alpha: 0.8);
     final dividerColor = isDarkMode
       ? DarkColors.divider
@@ -116,7 +107,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
       appBar: AppBar(
         backgroundColor: isDarkMode ? appBarBg : Colors.transparent,
         elevation: 0,
-        forceMaterialTransparency: true,
+        forceMaterialTransparency: !isDarkMode, // Only transparent in light mode to show gradient
         flexibleSpace: isDarkMode
             ? null
             : Container(
@@ -142,7 +133,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   Icon(Icons.search, size: 24, color: isDarkMode ? searchHint : Colors.white),
                   const SizedBox(width: 8),
                   Text(
-                    'Tìm kiếm',
+                    common.search,
                     style: TextStyle(
                       color: searchHint,
                       fontSize: 16,
@@ -156,11 +147,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
+            icon: Icon(Icons.qr_code_scanner, color: isDarkMode ? DarkColors.textPrimary : Colors.white),
             onPressed: _openQrScanner,
           ),
           IconButton(
-            icon: const Icon(Icons.add, color: Colors.white),
+            icon: Icon(Icons.add, color: isDarkMode ? DarkColors.textPrimary : Colors.white),
             onPressed: _openQuickActions,
           ),
         ],
@@ -173,54 +164,99 @@ class _ChatListScreenState extends State<ChatListScreen> {
             );
           }
 
-          final conversations = chatProvider.conversations;
-
           return RefreshIndicator(
             onRefresh: () => chatProvider.loadInbox(),
             color: AppColors.primary,
-            child: ListView.builder(
-              itemCount: conversations.length + 1, // 1 for Cloud + conversations
-              itemBuilder: (context, index) {
-                if (index == 0) {
-                  // My Documents / Cloud item
-                  return Container(
-                    color: isDarkMode ? DarkColors.surface : Colors.white,
-                    child: ChatListItem(
-                      isVirtualCloud: true,
-                      conversation: Conversation(
-                        id: 'my_documents',
-                        type: ConversationType.DIRECT,
-                        title: 'My Documents',
+            child: ListView(
+              children: [
+                // My Documents Section
+                Container(
+                  color: isDarkMode ? DarkColors.surface : Colors.white,
+                  child: Column(
+                    children: [
+                      ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                        leading: Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: isDarkMode ? DarkColors.primary : Colors.blue,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Icon(Icons.folder, color: Colors.white, size: 32),
+                              Icon(Icons.cloud, color: isDarkMode ? DarkColors.primary : Colors.blue, size: 16),
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: Container(
+                                  decoration: const BoxDecoration(
+                                    color: Colors.orange,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.check, color: Colors.white, size: 12),
+                                ),
+                              )
+                            ],
+                          ),
+                        ),
+                        title: Text(
+                          common.myDocumentsHeader,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
+                          ),
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const MyDocumentsScreen()),
+                          );
+                        },
                       ),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const MyDocumentsScreen()),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Inbox Section
+                if (chatProvider.conversations.isNotEmpty)
+                  Container(
+                    color: isDarkMode ? DarkColors.surface : Colors.white,
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: chatProvider.conversations.length,
+                      separatorBuilder: (context, index) => Divider(
+                        height: 1,
+                        thickness: 0.5,
+                        indent: 80,
+                        color: dividerColor,
+                      ),
+                      itemBuilder: (context, index) {
+                        final conversation = chatProvider.conversations[index];
+                        return ChatListItem(
+                          key: ValueKey(conversation.id),
+                          conversation: conversation,
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => ChatDetailScreen(
+                                  conversation: conversation,
+                                ),
+                              ),
+                            );
+                          },
                         );
                       },
                     ),
-                  );
-                }
-
-                // Regular conversations
-                final conversation = conversations[index - 1];
-                return Container(
-                  color: isDarkMode ? DarkColors.surface : Colors.white,
-                  child: ChatListItem(
-                    key: ValueKey(conversation.id),
-                    conversation: conversation,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => ChatDetailScreen(
-                            conversation: conversation,
-                          ),
-                        ),
-                      );
-                    },
                   ),
-                );
-              },
+              ],
             ),
           );
         },

@@ -26,29 +26,29 @@ class MediaService {
   String getPublicUrl(String mediaId) {
     if (mediaId.isEmpty) return '';
     if (mediaId.startsWith('http')) return mediaId;
-    
+
     if (mediaId.startsWith('/')) {
       final baseUri = Uri.parse(_base);
       return '${baseUri.scheme}://${baseUri.authority}$mediaId';
     }
-    
+
     return '$_base/media/public/$mediaId';
   }
 
   Future<List<Map<String, dynamic>>> getMediaByCategory(MediaCategory category, {int page = 0, int size = 50}) async {
     final response = await _apiService.get(_base, '/media?category=${category.name}&page=$page&size=$size');
     final data = response['data'] ?? response;
-    
-    // Backend thực tế trả về 'content' qua MediaPageResponse DTO
+
+    // Backend usually returns paged items in `content`.
     if (data is Map && data['content'] is List) {
       return List<Map<String, dynamic>>.from(data['content']);
     }
-    
-    // Giữ 'items' làm fallback
+
+    // Keep `items` as a fallback for older responses.
     if (data is Map && data['items'] is List) {
       return List<Map<String, dynamic>>.from(data['items']);
     }
-    
+
     return [];
   }
 

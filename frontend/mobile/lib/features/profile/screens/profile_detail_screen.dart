@@ -3,9 +3,12 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:vnalo_mobile/core/localization/common_texts.dart';
+import 'package:vnalo_mobile/core/localization/language_provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
+import 'package:vnalo_mobile/features/profile/localization/profile_texts.dart';
 import 'package:vnalo_mobile/features/profile/screens/profile_more_settings_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/personal_info_screen.dart';
 
@@ -14,11 +17,15 @@ import 'package:vnalo_mobile/features/profile/screens/personal_info_screen.dart'
 class ProfileDetailScreen extends StatelessWidget {
   const ProfileDetailScreen({super.key});
 
-  // ─── Avatar Bottom Sheet ───
+  // ——— Avatar Bottom Sheet ———
   void _showAvatarOptions(BuildContext context) {
     final auth = context.read<AuthProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final t = ProfileTexts.of(context, listen: false);
+
     showModalBottomSheet(
       context: context,
+      backgroundColor: isDark ? DarkColors.surface : LightColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -32,47 +39,65 @@ class ProfileDetailScreen extends StatelessWidget {
                 margin: const EdgeInsets.only(top: 10, bottom: 6),
                 width: 40, height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey[300],
+                  color: isDark ? DarkColors.divider : Colors.grey[300],
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 8, 20, 8),
-              child: Text('Ảnh đại diện',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.primary)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+              child: Text(
+                t.language == AppLanguage.vi ? 'Ảnh đại diện' : 'Profile picture',
+                style: TextStyle(
+                  fontSize: 17, 
+                  fontWeight: FontWeight.w600, 
+                  color: isDark ? DarkColors.primary : AppColors.primary
+                )
+              ),
             ),
             const SizedBox(height: 8),
             ListTile(
-              leading: const Icon(Icons.account_circle_outlined, size: 28, color: Colors.black87),
-              title: const Text('Xem ảnh đại diện', style: TextStyle(fontSize: 15)),
+              leading: Icon(Icons.account_circle_outlined, size: 28, color: isDark ? DarkColors.textPrimary : Colors.black87),
+              title: Text(
+                t.language == AppLanguage.vi ? 'Xem ảnh đại diện' : 'View profile picture',
+                style: TextStyle(fontSize: 15, color: isDark ? DarkColors.textPrimary : Colors.black87)
+              ),
               onTap: () {
                 Navigator.pop(ctx);
-                _viewImage(context, auth.user?.avatarUrl, 'Ảnh đại diện');
+                _viewImage(context, auth.user?.avatarUrl, t.language == AppLanguage.vi ? 'Ảnh đại diện' : 'Profile picture');
               },
             ),
             ListTile(
-              leading: const Icon(Icons.add_photo_alternate_outlined, size: 28, color: Colors.black87),
-              title: const Text('Chọn ảnh trên máy', style: TextStyle(fontSize: 15)),
+              leading: Icon(Icons.add_photo_alternate_outlined, size: 28, color: isDark ? DarkColors.textPrimary : Colors.black87),
+              title: Text(
+                t.language == AppLanguage.vi ? 'Chọn ảnh từ máy' : 'Choose from gallery',
+                style: TextStyle(fontSize: 15, color: isDark ? DarkColors.textPrimary : Colors.black87)
+              ),
               onTap: () {
                 Navigator.pop(ctx);
                 _pickAndUpdateAvatar(context);
               },
             ),
             ListTile(
-              leading: const Icon(Icons.filter_frames_outlined, size: 28, color: Colors.black87),
-              title: const Text('Chọn khung ảnh đại diện', style: TextStyle(fontSize: 15)),
+              leading: Icon(Icons.filter_frames_outlined, size: 28, color: isDark ? DarkColors.textPrimary : Colors.black87),
+              title: Text(
+                t.language == AppLanguage.vi ? 'Chọn khung ảnh đại diện' : 'Choose avatar frame',
+                style: TextStyle(fontSize: 15, color: isDark ? DarkColors.textPrimary : Colors.black87)
+              ),
               onTap: () {
                 Navigator.pop(ctx);
-                _showComingSoon(context, 'Chọn khung ảnh đại diện');
+                _showComingSoon(context, t.language == AppLanguage.vi ? 'Chọn khung ảnh' : 'Choose frame');
               },
             ),
             ListTile(
-              leading: const Icon(Icons.auto_awesome_outlined, size: 28, color: Colors.black87),
-              title: const Text('Chọn trang trí ảnh đại diện vnStyle', style: TextStyle(fontSize: 15)),
+              leading: Icon(Icons.auto_awesome_outlined, size: 28, color: isDark ? DarkColors.textPrimary : Colors.black87),
+              title: Text(
+                t.language == AppLanguage.vi ? 'Trang trí vnStyle' : 'vnStyle Decoration',
+                style: TextStyle(fontSize: 15, color: isDark ? DarkColors.textPrimary : Colors.black87)
+              ),
               onTap: () {
                 Navigator.pop(ctx);
-                _showComingSoon(context, 'Trang trí vnStyle');
+                _showComingSoon(context, 'vnStyle');
               },
             ),
             const SizedBox(height: 8),
@@ -82,11 +107,15 @@ class ProfileDetailScreen extends StatelessWidget {
     );
   }
 
-  // ─── Cover Photo Bottom Sheet ───
+  // ——— Cover Photo Bottom Sheet ———
   void _showCoverOptions(BuildContext context) {
     final auth = context.read<AuthProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final t = ProfileTexts.of(context, listen: false);
+
     showModalBottomSheet(
       context: context,
+      backgroundColor: isDark ? DarkColors.surface : LightColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -100,28 +129,40 @@ class ProfileDetailScreen extends StatelessWidget {
                 margin: const EdgeInsets.only(top: 10, bottom: 6),
                 width: 40, height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey[300],
+                  color: isDark ? DarkColors.divider : Colors.grey[300],
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 8, 20, 8),
-              child: Text('Ảnh bìa',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.primary)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+              child: Text(
+                t.language == AppLanguage.vi ? 'Ảnh bìa' : 'Cover photo',
+                style: TextStyle(
+                  fontSize: 17, 
+                  fontWeight: FontWeight.w600, 
+                  color: isDark ? DarkColors.textPrimary : AppColors.primary
+                )
+              ),
             ),
             const SizedBox(height: 8),
             ListTile(
-              leading: const Icon(Icons.panorama_outlined, size: 28, color: Colors.black87),
-              title: const Text('Xem ảnh bìa', style: TextStyle(fontSize: 15)),
+              leading: Icon(Icons.panorama_outlined, size: 28, color: isDark ? DarkColors.textPrimary : Colors.black87),
+              title: Text(
+                t.language == AppLanguage.vi ? 'Xem ảnh bìa' : 'View cover photo',
+                style: TextStyle(fontSize: 15, color: isDark ? DarkColors.textPrimary : Colors.black87)
+              ),
               onTap: () {
                 Navigator.pop(ctx);
-                _viewImage(context, auth.user?.coverUrl, 'Ảnh bìa');
+                _viewImage(context, auth.user?.coverUrl, t.language == AppLanguage.vi ? 'Ảnh bìa' : 'Cover photo');
               },
             ),
             ListTile(
-              leading: const Icon(Icons.add_photo_alternate_outlined, size: 28, color: Colors.black87),
-              title: const Text('Chọn ảnh bìa từ máy', style: TextStyle(fontSize: 15)),
+              leading: Icon(Icons.add_photo_alternate_outlined, size: 28, color: isDark ? DarkColors.textPrimary : Colors.black87),
+              title: Text(
+                t.language == AppLanguage.vi ? 'Chọn ảnh bìa từ máy' : 'Choose cover from gallery',
+                style: TextStyle(fontSize: 15, color: isDark ? DarkColors.textPrimary : Colors.black87)
+              ),
               onTap: () {
                 Navigator.pop(ctx);
                 _pickAndUpdateCover(context);
@@ -134,11 +175,15 @@ class ProfileDetailScreen extends StatelessWidget {
     );
   }
 
-  // ─── View image fullscreen ───
+  // ——— View image fullscreen ———
   void _viewImage(BuildContext context, String? imageUrl, String title) {
     if (imageUrl == null || imageUrl.isEmpty) {
+      final t = ProfileTexts.of(context, listen: false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Chưa có ảnh'), backgroundColor: Colors.orange),
+        SnackBar(
+          content: Text(t.language == AppLanguage.vi ? 'Chưa có ảnh' : 'No image available'), 
+          backgroundColor: Colors.orange
+        ),
       );
       return;
     }
@@ -155,7 +200,7 @@ class ProfileDetailScreen extends StatelessWidget {
     );
   }
 
-  // ─── Pick & update avatar ───
+  // ——— Pick & update avatar ———
   Future<void> _pickAndUpdateAvatar(BuildContext context) async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(
@@ -165,18 +210,19 @@ class ProfileDetailScreen extends StatelessWidget {
 
     final auth = context.read<AuthProvider>();
     final success = await auth.updateAvatar(File(picked.path));
+    final t = ProfileTexts.of(context, listen: false);
 
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(success ? 'Cập nhật ảnh đại diện thành công!' : auth.error ?? 'Cập nhật thất bại'),
+          content: Text(success ? t.updateSuccess : auth.error ?? t.updateFailed),
           backgroundColor: success ? Colors.green : Colors.red,
         ),
       );
     }
   }
 
-  // ─── Pick & update cover ───
+  // ——— Pick & update cover ———
   Future<void> _pickAndUpdateCover(BuildContext context) async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(
@@ -186,11 +232,12 @@ class ProfileDetailScreen extends StatelessWidget {
 
     final auth = context.read<AuthProvider>();
     final success = await auth.updateCover(File(picked.path));
+    final t = ProfileTexts.of(context, listen: false);
 
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(success ? 'Cập nhật ảnh bìa thành công!' : auth.error ?? 'Cập nhật thất bại'),
+          content: Text(success ? t.updateSuccess : auth.error ?? t.updateFailed),
           backgroundColor: success ? Colors.green : Colors.red,
         ),
       );
@@ -198,16 +245,21 @@ class ProfileDetailScreen extends StatelessWidget {
   }
 
   void _showComingSoon(BuildContext context, String feature) {
+    final common = CommonTexts.of(context, listen: false);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$feature — tính năng đang phát triển'), backgroundColor: Colors.orange),
+      SnackBar(content: Text('$feature — ${common.comingSoon}'), backgroundColor: Colors.orange),
     );
   }
 
   void _showTimelineVisibilitySheet(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final t = ProfileTexts.of(context, listen: false);
     String selected = 'all';
+    
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      backgroundColor: isDark ? DarkColors.surface : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -223,7 +275,7 @@ class ProfileDetailScreen extends StatelessWidget {
               return RadioListTile<String>(
                 value: value,
                 groupValue: selected,
-                activeColor: AppColors.primary,
+                activeColor: isDark ? DarkColors.primary : AppColors.primary,
                 onChanged: (v) => setSheetState(() => selected = v ?? selected),
                 title: Row(
                   children: [
@@ -231,16 +283,16 @@ class ProfileDetailScreen extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(label),
+                          Text(label, style: TextStyle(color: isDark ? DarkColors.textPrimary : LightColors.textPrimary)),
                           if (subtitle != null)
                             Text(
                               subtitle,
-                              style: const TextStyle(fontSize: 13, color: LightColors.textSecondary),
+                              style: TextStyle(fontSize: 13, color: isDark ? DarkColors.textSecondary : LightColors.textSecondary),
                             ),
                         ],
                       ),
                     ),
-                    if (showChevron) const Icon(Icons.chevron_right, color: LightColors.textHint),
+                    if (showChevron) Icon(Icons.chevron_right, color: isDark ? DarkColors.textHint : LightColors.textHint),
                   ],
                 ),
               );
@@ -255,29 +307,33 @@ class ProfileDetailScreen extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Center(
                             child: Text(
-                              'Cho phép bạn bè xem nhật ký',
-                              style: TextStyle(fontSize: 24 / 1.2, fontWeight: FontWeight.w600),
+                              t.language == AppLanguage.vi ? 'Cho phép bạn bè xem nhật ký' : 'Allow friends to view timeline',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? DarkColors.textPrimary : LightColors.textPrimary,
+                              ),
                             ),
                           ),
                         ),
                         IconButton(
                           onPressed: () => Navigator.pop(sheetContext),
-                          icon: const Icon(Icons.close),
+                          icon: Icon(Icons.close, color: isDark ? DarkColors.textPrimary : LightColors.textPrimary),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
-                    option(value: 'all', label: 'Toàn bộ bài đăng'),
-                    option(value: '7d', label: 'Trong 7 ngày gần nhất'),
-                    option(value: '1m', label: 'Trong 1 tháng gần nhất'),
-                    option(value: '6m', label: 'Trong 6 tháng gần nhất'),
+                    option(value: 'all', label: t.language == AppLanguage.vi ? 'Toàn bộ bài đăng' : 'All posts'),
+                    option(value: '7d', label: t.language == AppLanguage.vi ? 'Trong 7 ngày gần nhất' : 'Last 7 days'),
+                    option(value: '1m', label: t.language == AppLanguage.vi ? 'Trong 1 tháng gần nhất' : 'Last month'),
+                    option(value: '6m', label: t.language == AppLanguage.vi ? 'Trong 6 tháng gần nhất' : 'Last 6 months'),
                     option(
                       value: 'custom',
-                      label: 'Tùy chỉnh',
-                      subtitle: 'Bấm chọn khoảng thời gian',
+                      label: t.language == AppLanguage.vi ? 'Tùy chỉnh' : 'Custom',
+                      subtitle: t.language == AppLanguage.vi ? 'Bấm chọn khoảng thời gian' : 'Select date range',
                       showChevron: true,
                     ),
                     const SizedBox(height: 8),
@@ -286,10 +342,12 @@ class ProfileDetailScreen extends StatelessWidget {
                       child: ElevatedButton(
                         onPressed: () => Navigator.pop(sheetContext),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary.withOpacity(0.2),
+                          backgroundColor: isDark ? DarkColors.primary : AppColors.primary,
                           foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          elevation: 0,
                         ),
-                        child: const Text('LƯU'),
+                        child: Text(t.saveAction, style: const TextStyle(fontWeight: FontWeight.bold)),
                       ),
                     ),
                   ],
@@ -306,7 +364,8 @@ class ProfileDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final user = auth.user;
-    final displayName = user?.displayName ?? 'Người dùng';
+    final t = ProfileTexts.of(context);
+    final displayName = user?.displayName ?? t.notUpdated;
     final token = auth.accessToken;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -314,7 +373,7 @@ class ProfileDetailScreen extends StatelessWidget {
       backgroundColor: isDark ? DarkColors.scaffold : LightColors.scaffold,
       body: CustomScrollView(
         slivers: [
-          // ─── Cover + Avatar Header ───
+          // ——— Cover + Avatar Header ———
           SliverToBoxAdapter(
             child: Stack(
               clipBehavior: Clip.none,
@@ -378,7 +437,7 @@ class ProfileDetailScreen extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: Colors.black.withValues(alpha: 0.3),
                             shape: BoxShape.circle,
-                          ),
+                      ),
                           child: const Icon(Icons.remove_red_eye_outlined, color: Colors.white, size: 20),
                         ),
                         onPressed: () => _showTimelineVisibilitySheet(context),
@@ -411,16 +470,23 @@ class ProfileDetailScreen extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: isDark ? DarkColors.surface : Colors.white,
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
-                        BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 8, offset: const Offset(0, 2)),
+                        BoxShadow(
+                          color: isDark ? Colors.black.withValues(alpha: 0.3) : Colors.black.withValues(alpha: 0.15),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
                       ],
                     ),
                     child: Text(
-                      user?.statusMessage ?? 'Trạng thái\nhiện tại',
+                      user?.statusMessage ?? (t.language == AppLanguage.vi ? 'Trạng thái\nhiện tại' : 'Current\nstatus'),
                       textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 12, color: Colors.black87),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? DarkColors.textPrimary : Colors.black87
+                      ),
                     ),
                   ),
                 ),
@@ -437,7 +503,7 @@ class ProfileDetailScreen extends StatelessWidget {
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 3),
                           boxShadow: [
-                            BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4)),
+                            BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4)),
                           ],
                         ),
                         child: AvatarWidget(imageUrl: user?.avatarUrl, name: displayName, size: 100),
@@ -449,7 +515,7 @@ class ProfileDetailScreen extends StatelessWidget {
             ),
           ),
 
-          // ─── Name + Bio Section ───
+          // ——— Name + Bio Section ———
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.only(top: 50),
@@ -460,15 +526,15 @@ class ProfileDetailScreen extends StatelessWidget {
                       color: isDark ? DarkColors.textPrimary : LightColors.textPrimary)),
                   const SizedBox(height: 8),
                   GestureDetector(
-                    onTap: () => _showComingSoon(context, 'Cập nhật giới thiệu'),
+                    onTap: () => _showComingSoon(context, t.language == AppLanguage.vi ? 'Cập nhật giới thiệu' : 'Update bio'),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.edit_outlined, size: 16, color: AppColors.primary),
+                        Icon(Icons.edit_outlined, size: 16, color: isDark ? DarkColors.primary : AppColors.primary),
                         const SizedBox(width: 4),
-                        Text(user?.bio ?? 'Cập nhật giới thiệu bản thân',
-                          style: const TextStyle(fontSize: 14, color: AppColors.primary)),
+                        Text(user?.bio ?? (t.language == AppLanguage.vi ? 'Cập nhật giới thiệu bản thân' : 'Update your bio'),
+                          style: TextStyle(fontSize: 14, color: isDark ? DarkColors.primary : AppColors.primary)),
                       ],
                     ),
                   ),
@@ -480,14 +546,14 @@ class ProfileDetailScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Row(
                       children: [
-                        _actionChip(icon: Icons.auto_awesome, label: 'Cài vnStyle',
-                          color: const Color(0xFFFFA726), onTap: () => _showComingSoon(context, 'Cài vnStyle')),
+                        _actionChip(context, icon: Icons.auto_awesome, label: t.language == AppLanguage.vi ? 'Cài vnStyle' : 'Set vnStyle',
+                          color: const Color(0xFFFFA726), onTap: () => _showComingSoon(context, 'vnStyle')),
                         const SizedBox(width: 10),
-                        _actionChip(icon: Icons.photo_library, label: 'Ảnh của tôi',
-                          color: AppColors.primary, onTap: () => _showComingSoon(context, 'Ảnh của tôi')),
+                        _actionChip(context, icon: Icons.photo_library, label: t.language == AppLanguage.vi ? 'Ảnh của tôi' : 'My photos',
+                          color: isDark ? DarkColors.primary : AppColors.primary, onTap: () => _showComingSoon(context, 'Photos')),
                         const SizedBox(width: 10),
-                        _actionChip(icon: Icons.inventory_2_outlined, label: 'Kho khoảnh khắc',
-                          color: AppColors.primary, onTap: () => _showComingSoon(context, 'Kho khoảnh khắc')),
+                        _actionChip(context, icon: Icons.inventory_2_outlined, label: t.language == AppLanguage.vi ? 'Kho khoảnh khắc' : 'Moments',
+                          color: isDark ? DarkColors.primary : AppColors.primary, onTap: () => _showComingSoon(context, 'Moments')),
                       ],
                     ),
                   ),
@@ -497,7 +563,7 @@ class ProfileDetailScreen extends StatelessWidget {
             ),
           ),
 
-          // ─── Personal Info Navigation ───
+          // ——— Personal Info Navigation ———
           SliverToBoxAdapter(
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -506,10 +572,10 @@ class ProfileDetailScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: ListTile(
-                leading: const Icon(Icons.person_outline, color: Color(0xFF9CA3AF)),
-                title: const Text('Thông tin cá nhân',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
-                trailing: const Icon(Icons.chevron_right, color: Color(0xFFD1D5DB)),
+                leading: Icon(Icons.person_outline, color: isDark ? DarkColors.textHint : const Color(0xFF9CA3AF)),
+                title: Text(t.personalInfo,
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: isDark ? DarkColors.textPrimary : LightColors.textPrimary)),
+                trailing: Icon(Icons.chevron_right, color: isDark ? DarkColors.divider : const Color(0xFFD1D5DB)),
                 onTap: () {
                   Navigator.push(
                     context,
@@ -520,7 +586,7 @@ class ProfileDetailScreen extends StatelessWidget {
             ),
           ),
 
-          // ─── Timeline Section ───
+          // ——— Timeline Section ———
           SliverToBoxAdapter(
             child: Container(
               margin: const EdgeInsets.all(16),
@@ -529,7 +595,7 @@ class ProfileDetailScreen extends StatelessWidget {
                 color: isDark ? DarkColors.surface : LightColors.surface,
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 2)),
+                  BoxShadow(color: isDark ? Colors.black.withValues(alpha: 0.3) : Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 2)),
                 ],
               ),
               child: Column(
@@ -537,33 +603,43 @@ class ProfileDetailScreen extends StatelessWidget {
                   Stack(
                     alignment: Alignment.center,
                     children: [
-                      Icon(Icons.person_outline, size: 64, color: AppColors.primary.withOpacity(0.3)),
+                      Icon(Icons.person_outline, size: 64, color: (isDark ? DarkColors.primary : AppColors.primary).withValues(alpha: 0.3)),
                       Positioned(left: -10, top: 5,
-                        child: Icon(Icons.favorite, size: 24, color: Colors.red.withOpacity(0.6))),
+                        child: Icon(Icons.favorite, size: 24, color: Colors.red.withValues(alpha: 0.6))),
                       Positioned(right: -10, top: 0,
-                        child: Icon(Icons.chat_bubble, size: 24, color: AppColors.primary.withOpacity(0.6))),
+                        child: Icon(Icons.chat_bubble, size: 24, color: (isDark ? DarkColors.primary : AppColors.primary).withValues(alpha: 0.6))),
                     ],
                   ),
                   const SizedBox(height: 16),
-                  Text('Hôm nay $displayName có gì vui?',
+                  Text(
+                    t.language == AppLanguage.vi ? 'Hôm nay $displayName có gì vui?' : 'What\'s new with $displayName today?',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600,
-                      color: isDark ? DarkColors.textPrimary : LightColors.textPrimary)),
+                      color: isDark ? DarkColors.textPrimary : LightColors.textPrimary)
+                  ),
                   const SizedBox(height: 8),
-                  Text('Đây là Nhật ký của bạn - Hãy làm đầy Nhật ký với những dấu ấn cuộc đời và kỷ niệm',
+                  Text(
+                    t.language == AppLanguage.vi 
+                      ? 'Đây là Nhật ký của bạn - Hãy làm đầy Nhật ký với những dấu ấn cuộc đời và kỷ niệm'
+                      : 'This is your Timeline - Fill it with your life marks and memories',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 13,
-                      color: isDark ? DarkColors.textSecondary : LightColors.textSecondary)),
+                      color: isDark ? DarkColors.textSecondary : LightColors.textSecondary)
+                  ),
                   const SizedBox(height: 16),
                   SizedBox(
-                    width: 190,
+                    width: 220,
                     child: ElevatedButton(
-                      onPressed: () => _showComingSoon(context, 'Đăng lên Nhật ký'),
+                      onPressed: () => _showComingSoon(context, t.language == AppLanguage.vi ? 'Đăng lên Nhật ký' : 'Post to timeline'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
+                        backgroundColor: isDark ? DarkColors.primary : AppColors.primary,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                        elevation: 0,
                       ),
-                      child: const Text('Đăng lên Nhật ký'),
+                      child: Text(
+                        t.language == AppLanguage.vi ? 'Đăng lên Nhật ký' : 'Post to timeline', 
+                        style: const TextStyle(fontWeight: FontWeight.bold)
+                      ),
                     ),
                   ),
                 ],
@@ -596,10 +672,11 @@ class ProfileDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _actionChip({
+  Widget _actionChip(BuildContext context, {
     required IconData icon, required String label,
     required Color color, required VoidCallback onTap,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -608,7 +685,7 @@ class ProfileDetailScreen extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? DarkColors.surface : Colors.white,
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
@@ -625,10 +702,10 @@ class ProfileDetailScreen extends StatelessWidget {
               const SizedBox(width: 6),
               Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: LightColors.textPrimary,
+                  color: isDark ? DarkColors.textPrimary : LightColors.textPrimary,
                 ),
               ),
             ],
@@ -640,7 +717,7 @@ class ProfileDetailScreen extends StatelessWidget {
 
 }
 
-// ─── Fullscreen Image Viewer ───
+// ——— Fullscreen Image Viewer ———
 class _FullScreenImageView extends StatelessWidget {
   final String imageUrl;
   final String title;
@@ -675,8 +752,10 @@ class _FullScreenImageView extends StatelessWidget {
               children: [
                 const Icon(Icons.broken_image, size: 64, color: Colors.white54),
                 const SizedBox(height: 16),
-                Text('Không thể tải ảnh',
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.7))),
+                Text(
+                  ProfileTexts.of(context).language == AppLanguage.vi ? 'Không thể tải ảnh' : 'Failed to load image',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.7))
+                ),
               ],
             ),
           ),

@@ -45,7 +45,7 @@ class _ForwardScreenState extends State<ForwardScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Chia sẻ',
+              'Forward',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
@@ -53,7 +53,7 @@ class _ForwardScreenState extends State<ForwardScreen> {
               ),
             ),
             Text(
-              'Đã chọn: ${forwardProvider.selectedCount}',
+              'Selected: ${forwardProvider.selectedCount}',
               style: TextStyle(
                 fontSize: 13,
                 color: isDarkMode ? DarkColors.textSecondary : Colors.grey.shade600,
@@ -78,7 +78,7 @@ class _ForwardScreenState extends State<ForwardScreen> {
                 controller: _searchController,
                 onChanged: forwardProvider.updateSearch,
                 decoration: InputDecoration(
-                  hintText: 'Tìm kiếm',
+                  hintText: 'Search',
                   hintStyle: TextStyle(color: isDarkMode ? Colors.white38 : Colors.grey.shade500),
                   prefixIcon: Icon(Icons.search, color: isDarkMode ? Colors.white38 : Colors.grey.shade500, size: 22),
                   border: InputBorder.none,
@@ -94,9 +94,9 @@ class _ForwardScreenState extends State<ForwardScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _buildQuickAction(Icons.group_add_outlined, 'Nhóm mới', isDarkMode),
-                _buildQuickAction(Icons.history_toggle_off, 'Nhật ký', isDarkMode),
-                _buildQuickAction(Icons.ios_share_outlined, 'App khác', isDarkMode),
+                _buildQuickAction(Icons.group_add_outlined, 'New group', isDarkMode),
+                _buildQuickAction(Icons.history_toggle_off, 'Saved notes', isDarkMode),
+                _buildQuickAction(Icons.ios_share_outlined, 'Other apps', isDarkMode),
               ],
             ),
           ),
@@ -107,13 +107,13 @@ class _ForwardScreenState extends State<ForwardScreen> {
           Expanded(
             child: ListView(
               children: [
-                _buildSectionTitle('Gần đây', isDarkMode),
+                _buildSectionTitle('Recent', isDarkMode),
                 ...filteredConversations.map((conv) => _buildRecipientItem(conv, currentUserId, forwardProvider, isDarkMode)),
-                
+
                 const SizedBox(height: 16),
-                _buildSectionTitle('Nhóm trò chuyện', isDarkMode),
+                _buildSectionTitle('Groups', isDarkMode),
                 // (Optional: Further categorize if needed)
-                
+
                 const SizedBox(height: 80), // Space for preview/input
               ],
             ),
@@ -244,7 +244,7 @@ class _ForwardScreenState extends State<ForwardScreen> {
                       child: TextField(
                         controller: _additionalTextController,
                         decoration: InputDecoration(
-                          hintText: 'Nhập tin nhắn',
+                          hintText: 'Add a message',
                           hintStyle: TextStyle(color: isDarkMode ? Colors.white30 : Colors.grey.shade400),
                           border: InputBorder.none,
                           isDense: true,
@@ -328,7 +328,7 @@ class _ForwardScreenState extends State<ForwardScreen> {
   Widget _buildMessagePreview(List<Message> messages, bool isDarkMode) {
     final message = messages.first;
     String contentSnippet = '';
-    
+
     if (message.messageType == MessageType.TEXT) {
       contentSnippet = message.content ?? '';
     } else {
@@ -358,19 +358,19 @@ class _ForwardScreenState extends State<ForwardScreen> {
   Future<void> _handleSend(BuildContext context, ForwardProvider provider) async {
     if (provider.selectedCount == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng chọn người nhận')),
+        const SnackBar(content: Text('Please select at least one recipient')),
       );
       return;
     }
 
     // Trigger send in background
     provider.sendForward(_additionalTextController.text);
-    
+
     // Close screen immediately for instant feel
     Navigator.pop(context);
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đang gửi tin nhắn chuyển tiếp...'), duration: Duration(seconds: 1)),
+      const SnackBar(content: Text('Forwarding messages...'), duration: Duration(seconds: 1)),
     );
   }
 }

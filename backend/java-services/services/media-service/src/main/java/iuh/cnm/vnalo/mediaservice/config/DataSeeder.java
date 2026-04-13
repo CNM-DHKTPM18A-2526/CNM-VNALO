@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * DataSeeder — downloads sample files from public CDN and uploads to S3.
+ * DataSeeder - downloads sample files from public CDN and uploads to S3.
  * Runs only with @Profile("dev"), skips if DB already has data.
  * Seeds 10 real files per MediaCategory (8 categories = 80 total).
  */
@@ -54,11 +54,11 @@ public class DataSeeder implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         long count = mediaMetadataRepository.count();
         if (count > 0) {
-            log.info("DataSeeder: skipping — {} records already exist", count);
+            log.info("DataSeeder: skipping - {} records already exist", count);
             return;
         }
 
-        log.info("DataSeeder: starting S3 seed ({} categories × {} files)...", 8, SEED_COUNT);
+        log.info("DataSeeder: starting S3 seed ({} categories x {} files)...", 8, SEED_COUNT);
 
         HttpClient http = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
@@ -77,7 +77,7 @@ public class DataSeeder implements ApplicationRunner {
         saved.addAll(seedVideos(http, MediaCategory.CHAT_VIDEO));
 
         mediaMetadataRepository.saveAll(saved);
-        log.info("DataSeeder: completed — {} records seeded", saved.size());
+        log.info("DataSeeder: completed - {} records seeded", saved.size());
     }
 
     // --- IMAGE: picsum.photos generates unique image per seed ID ------------
@@ -87,7 +87,7 @@ public class DataSeeder implements ApplicationRunner {
         String folder = folder(category);
 
         for (int i = 1; i <= SEED_COUNT; i++) {
-            // picsum.photos/seed/{n}/{w}/{h} — always returns the same image for same seed
+            // picsum.photos/seed/{n}/{w}/{h} - stable image for each seed id
             String sourceUrl = String.format("https://picsum.photos/seed/%s-%d/%d/%d", folder, i, w, h);
             String objectKey = String.format("demo/%s/sample-%02d.jpg", folder, i);
 
@@ -170,15 +170,15 @@ public class DataSeeder implements ApplicationRunner {
         return list;
     }
 
-    // --- VIDEO: small MP4 samples, tất cả < 5MB ---------------------------
-    // Rotate qua 5 nguồn để tạo 10 S3 object khác nhau
+    // --- VIDEO: small MP4 samples, all < 5MB -------------------------------
+    // Rotate across 5 sources to produce 10 distinct S3 objects.
 
     private static final String[] VIDEO_SOURCES = {
         // 1.5MB - file-examples.com (stable, explicitly sized)
         "https://file-examples.com/storage/fec42edfc96372ff7d3e958/2017/04/file_example_MP4_480_1_5MG.mp4",
         // 3MB - file-examples.com
         "https://file-examples.com/storage/fec42edfc96372ff7d3e958/2017/04/file_example_MP4_640_3MG.mp4",
-        // ~1.2MB - W3Schools Big Buck Bunny clip (rất ổn định)
+        // ~1.2MB - W3Schools Big Buck Bunny clip (stable source)
         "https://www.w3schools.com/html/mov_bbb.mp4",
         // 1MB - Big Buck Bunny 240p (sample-videos.com)
         "https://sample-videos.com/video321/mp4/240/big_buck_bunny_240p_1mb.mp4",
@@ -191,7 +191,7 @@ public class DataSeeder implements ApplicationRunner {
         String folder = folder(category);
 
         for (int i = 1; i <= SEED_COUNT; i++) {
-            // Rotate qua 5 nguồn → 10 object S3 khác nhau
+            // Rotate across 5 sources -> 10 distinct S3 objects.
             String sourceUrl = VIDEO_SOURCES[(i - 1) % VIDEO_SOURCES.length];
             String objectKey = String.format("demo/%s/sample-%02d.mp4", folder, i);
             try {
@@ -233,7 +233,7 @@ public class DataSeeder implements ApplicationRunner {
             String mimeType, long sizeBytes,
             Integer width, Integer height, Integer durationMs,
             int index, String filename) {
- 
+
         UUID owner = USERS[(index - 1) % USERS.length];
         return MediaMetadata.builder()
                 .ownerUserId(owner)

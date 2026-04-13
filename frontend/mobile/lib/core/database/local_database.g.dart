@@ -39,108 +39,16 @@ class Messages extends Table with TableInfo<Messages, LocalMessage> {
     requiredDuringInsert: true,
     $customConstraints: 'NOT NULL',
   );
-  static const VerificationMeta _clientMessageIdMeta = const VerificationMeta(
-    'clientMessageId',
-  );
-  late final GeneratedColumn<String> clientMessageId = GeneratedColumn<String>(
-    'client_message_id',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    $customConstraints: '',
-  );
   static const VerificationMeta _contentMeta = const VerificationMeta(
     'content',
   );
   late final GeneratedColumn<String> content = GeneratedColumn<String>(
     'content',
     aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    $customConstraints: '',
-  );
-  static const VerificationMeta _messageTypeMeta = const VerificationMeta('messageType');
-  late final GeneratedColumn<String> messageType = GeneratedColumn<String>(
-    'message_type',
-    aliasedName,
     false,
     type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    $customConstraints: "NOT NULL DEFAULT 'TEXT'",
-  );
-  static const VerificationMeta _mediaUrlMeta = const VerificationMeta('mediaUrl');
-  late final GeneratedColumn<String> mediaUrl = GeneratedColumn<String>(
-    'media_url',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    $customConstraints: '',
-  );
-  static const VerificationMeta _mediaThumbnailUrlMeta = const VerificationMeta('mediaThumbnailUrl');
-  late final GeneratedColumn<String> mediaThumbnailUrl = GeneratedColumn<String>(
-    'media_thumbnail_url',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    $customConstraints: '',
-  );
-  static const VerificationMeta _mediaMimeTypeMeta = const VerificationMeta('mediaMimeType');
-  late final GeneratedColumn<String> mediaMimeType = GeneratedColumn<String>(
-    'media_mime_type',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    $customConstraints: '',
-  );
-  static const VerificationMeta _mediaSizeBytesMeta = const VerificationMeta('mediaSizeBytes');
-  late final GeneratedColumn<int> mediaSizeBytes = GeneratedColumn<int>(
-    'media_size_bytes',
-    aliasedName,
-    true,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    $customConstraints: '',
-  );
-  static const VerificationMeta _replyToMessageIdMeta = const VerificationMeta('replyToMessageId');
-  late final GeneratedColumn<String> replyToMessageId = GeneratedColumn<String>(
-    'reply_to_message_id',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    $customConstraints: '',
-  );
-  static const VerificationMeta _replyToSenderIdMeta = const VerificationMeta('replyToSenderId');
-  late final GeneratedColumn<String> replyToSenderId = GeneratedColumn<String>(
-    'reply_to_sender_id',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    $customConstraints: '',
-  );
-  static const VerificationMeta _replyToContentMeta = const VerificationMeta('replyToContent');
-  late final GeneratedColumn<String> replyToContent = GeneratedColumn<String>(
-    'reply_to_content',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    $customConstraints: '',
-  );
-  static const VerificationMeta _statusMeta = const VerificationMeta('status');
-  late final GeneratedColumn<String> status = GeneratedColumn<String>(
-    'status',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    $customConstraints: "NOT NULL DEFAULT 'SENT'",
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
   );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
@@ -153,23 +61,86 @@ class Messages extends Table with TableInfo<Messages, LocalMessage> {
     requiredDuringInsert: true,
     $customConstraints: 'NOT NULL',
   );
+  static const VerificationMeta _messageTypeMeta = const VerificationMeta(
+    'messageType',
+  );
+  late final GeneratedColumn<String> messageType = GeneratedColumn<String>(
+    'message_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL DEFAULT \'TEXT\'',
+    defaultValue: const CustomExpression('\'TEXT\''),
+  );
+  static const VerificationMeta _mediaUrlMeta = const VerificationMeta(
+    'mediaUrl',
+  );
+  late final GeneratedColumn<String> mediaUrl = GeneratedColumn<String>(
+    'media_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: '',
+  );
+  static const VerificationMeta _thumbUrlMeta = const VerificationMeta(
+    'thumbUrl',
+  );
+  late final GeneratedColumn<String> thumbUrl = GeneratedColumn<String>(
+    'thumb_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: '',
+  );
+  static const VerificationMeta _localPathMeta = const VerificationMeta(
+    'localPath',
+  );
+  late final GeneratedColumn<String> localPath = GeneratedColumn<String>(
+    'local_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: '',
+  );
+  static const VerificationMeta _mediaMimeTypeMeta = const VerificationMeta(
+    'mediaMimeType',
+  );
+  late final GeneratedColumn<String> mediaMimeType = GeneratedColumn<String>(
+    'media_mime_type',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: '',
+  );
+  static const VerificationMeta _mediaSizeBytesMeta = const VerificationMeta(
+    'mediaSizeBytes',
+  );
+  late final GeneratedColumn<int> mediaSizeBytes = GeneratedColumn<int>(
+    'media_size_bytes',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: '',
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
     conversationId,
     senderId,
-    clientMessageId,
-    messageType,
     content,
+    createdAt,
+    messageType,
     mediaUrl,
-    mediaThumbnailUrl,
+    thumbUrl,
+    localPath,
     mediaMimeType,
     mediaSizeBytes,
-    replyToMessageId,
-    replyToSenderId,
-    replyToContent,
-    status,
-    createdAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -207,22 +178,14 @@ class Messages extends Table with TableInfo<Messages, LocalMessage> {
     } else if (isInserting) {
       context.missing(_senderIdMeta);
     }
-    if (data.containsKey('client_message_id')) {
-      context.handle(
-        _clientMessageIdMeta,
-        clientMessageId.isAcceptableOrUnknown(
-          data['client_message_id']!,
-          _clientMessageIdMeta,
-        ),
-      );
-    }
     if (data.containsKey('content')) {
       context.handle(
         _contentMeta,
         content.isAcceptableOrUnknown(data['content']!, _contentMeta),
       );
+    } else if (isInserting) {
+      context.missing(_contentMeta);
     }
-    // Note: content is nullable, no 'missing' error needed
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -230,6 +193,51 @@ class Messages extends Table with TableInfo<Messages, LocalMessage> {
       );
     } else if (isInserting) {
       context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('message_type')) {
+      context.handle(
+        _messageTypeMeta,
+        messageType.isAcceptableOrUnknown(
+          data['message_type']!,
+          _messageTypeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('media_url')) {
+      context.handle(
+        _mediaUrlMeta,
+        mediaUrl.isAcceptableOrUnknown(data['media_url']!, _mediaUrlMeta),
+      );
+    }
+    if (data.containsKey('thumb_url')) {
+      context.handle(
+        _thumbUrlMeta,
+        thumbUrl.isAcceptableOrUnknown(data['thumb_url']!, _thumbUrlMeta),
+      );
+    }
+    if (data.containsKey('local_path')) {
+      context.handle(
+        _localPathMeta,
+        localPath.isAcceptableOrUnknown(data['local_path']!, _localPathMeta),
+      );
+    }
+    if (data.containsKey('media_mime_type')) {
+      context.handle(
+        _mediaMimeTypeMeta,
+        mediaMimeType.isAcceptableOrUnknown(
+          data['media_mime_type']!,
+          _mediaMimeTypeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('media_size_bytes')) {
+      context.handle(
+        _mediaSizeBytesMeta,
+        mediaSizeBytes.isAcceptableOrUnknown(
+          data['media_size_bytes']!,
+          _mediaSizeBytesMeta,
+        ),
+      );
     }
     return context;
   }
@@ -240,36 +248,56 @@ class Messages extends Table with TableInfo<Messages, LocalMessage> {
   LocalMessage map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return LocalMessage(
-      id: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
-      conversationId: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}conversation_id'])!,
-      senderId: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}sender_id'])!,
-      clientMessageId: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}client_message_id']),
-      messageType: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}message_type'])!,
-      content: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}content']),
-      mediaUrl: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}media_url']),
-      mediaThumbnailUrl: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}media_thumbnail_url']),
-      mediaMimeType: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}media_mime_type']),
-      mediaSizeBytes: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}media_size_bytes']),
-      replyToMessageId: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}reply_to_message_id']),
-      replyToSenderId: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}reply_to_sender_id']),
-      replyToContent: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}reply_to_content']),
-      status: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}status'])!,
-      createdAt: attachedDatabase.typeMapping
-          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+      id:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}id'],
+          )!,
+      conversationId:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}conversation_id'],
+          )!,
+      senderId:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}sender_id'],
+          )!,
+      content:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}content'],
+          )!,
+      createdAt:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.dateTime,
+            data['${effectivePrefix}created_at'],
+          )!,
+      messageType:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}message_type'],
+          )!,
+      mediaUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}media_url'],
+      ),
+      thumbUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}thumb_url'],
+      ),
+      localPath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}local_path'],
+      ),
+      mediaMimeType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}media_mime_type'],
+      ),
+      mediaSizeBytes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}media_size_bytes'],
+      ),
     );
   }
 
@@ -286,34 +314,28 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
   final String id;
   final String conversationId;
   final String senderId;
-  final String? clientMessageId;
+  final String content;
+  final DateTime createdAt;
+
+  /// Media fields (nullable, only populated for IMAGE/FILE/AUDIO messages)
   final String messageType;
-  final String? content;
   final String? mediaUrl;
-  final String? mediaThumbnailUrl;
+  final String? thumbUrl;
+  final String? localPath;
   final String? mediaMimeType;
   final int? mediaSizeBytes;
-  final String? replyToMessageId;
-  final String? replyToSenderId;
-  final String? replyToContent;
-  final String status;
-  final DateTime createdAt;
   const LocalMessage({
     required this.id,
     required this.conversationId,
     required this.senderId,
-    this.clientMessageId,
+    required this.content,
+    required this.createdAt,
     required this.messageType,
-    this.content,
     this.mediaUrl,
-    this.mediaThumbnailUrl,
+    this.thumbUrl,
+    this.localPath,
     this.mediaMimeType,
     this.mediaSizeBytes,
-    this.replyToMessageId,
-    this.replyToSenderId,
-    this.replyToContent,
-    required this.status,
-    required this.createdAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -321,18 +343,17 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
     map['id'] = Variable<String>(id);
     map['conversation_id'] = Variable<String>(conversationId);
     map['sender_id'] = Variable<String>(senderId);
-    if (!nullToAbsent || clientMessageId != null) {
-      map['client_message_id'] = Variable<String>(clientMessageId);
-    }
+    map['content'] = Variable<String>(content);
+    map['created_at'] = Variable<DateTime>(createdAt);
     map['message_type'] = Variable<String>(messageType);
-    if (!nullToAbsent || content != null) {
-      map['content'] = Variable<String>(content);
-    }
     if (!nullToAbsent || mediaUrl != null) {
       map['media_url'] = Variable<String>(mediaUrl);
     }
-    if (!nullToAbsent || mediaThumbnailUrl != null) {
-      map['media_thumbnail_url'] = Variable<String>(mediaThumbnailUrl);
+    if (!nullToAbsent || thumbUrl != null) {
+      map['thumb_url'] = Variable<String>(thumbUrl);
+    }
+    if (!nullToAbsent || localPath != null) {
+      map['local_path'] = Variable<String>(localPath);
     }
     if (!nullToAbsent || mediaMimeType != null) {
       map['media_mime_type'] = Variable<String>(mediaMimeType);
@@ -340,17 +361,6 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
     if (!nullToAbsent || mediaSizeBytes != null) {
       map['media_size_bytes'] = Variable<int>(mediaSizeBytes);
     }
-    if (!nullToAbsent || replyToMessageId != null) {
-      map['reply_to_message_id'] = Variable<String>(replyToMessageId);
-    }
-    if (!nullToAbsent || replyToSenderId != null) {
-      map['reply_to_sender_id'] = Variable<String>(replyToSenderId);
-    }
-    if (!nullToAbsent || replyToContent != null) {
-      map['reply_to_content'] = Variable<String>(replyToContent);
-    }
-    map['status'] = Variable<String>(status);
-    map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
 
@@ -359,36 +369,29 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
       id: Value(id),
       conversationId: Value(conversationId),
       senderId: Value(senderId),
-      clientMessageId: clientMessageId == null && nullToAbsent
-          ? const Value.absent()
-          : Value(clientMessageId),
-      messageType: Value(messageType),
-      content: content == null && nullToAbsent
-          ? const Value.absent()
-          : Value(content),
-      mediaUrl: mediaUrl == null && nullToAbsent
-          ? const Value.absent()
-          : Value(mediaUrl),
-      mediaThumbnailUrl: mediaThumbnailUrl == null && nullToAbsent
-          ? const Value.absent()
-          : Value(mediaThumbnailUrl),
-      mediaMimeType: mediaMimeType == null && nullToAbsent
-          ? const Value.absent()
-          : Value(mediaMimeType),
-      mediaSizeBytes: mediaSizeBytes == null && nullToAbsent
-          ? const Value.absent()
-          : Value(mediaSizeBytes),
-      replyToMessageId: replyToMessageId == null && nullToAbsent
-          ? const Value.absent()
-          : Value(replyToMessageId),
-      replyToSenderId: replyToSenderId == null && nullToAbsent
-          ? const Value.absent()
-          : Value(replyToSenderId),
-      replyToContent: replyToContent == null && nullToAbsent
-          ? const Value.absent()
-          : Value(replyToContent),
-      status: Value(status),
+      content: Value(content),
       createdAt: Value(createdAt),
+      messageType: Value(messageType),
+      mediaUrl:
+          mediaUrl == null && nullToAbsent
+              ? const Value.absent()
+              : Value(mediaUrl),
+      thumbUrl:
+          thumbUrl == null && nullToAbsent
+              ? const Value.absent()
+              : Value(thumbUrl),
+      localPath:
+          localPath == null && nullToAbsent
+              ? const Value.absent()
+              : Value(localPath),
+      mediaMimeType:
+          mediaMimeType == null && nullToAbsent
+              ? const Value.absent()
+              : Value(mediaMimeType),
+      mediaSizeBytes:
+          mediaSizeBytes == null && nullToAbsent
+              ? const Value.absent()
+              : Value(mediaSizeBytes),
     );
   }
 
@@ -401,18 +404,14 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
       id: serializer.fromJson<String>(json['id']),
       conversationId: serializer.fromJson<String>(json['conversation_id']),
       senderId: serializer.fromJson<String>(json['sender_id']),
-      clientMessageId: serializer.fromJson<String?>(json['client_message_id']),
+      content: serializer.fromJson<String>(json['content']),
+      createdAt: serializer.fromJson<DateTime>(json['created_at']),
       messageType: serializer.fromJson<String>(json['message_type']),
-      content: serializer.fromJson<String?>(json['content']),
       mediaUrl: serializer.fromJson<String?>(json['media_url']),
-      mediaThumbnailUrl: serializer.fromJson<String?>(json['media_thumbnail_url']),
+      thumbUrl: serializer.fromJson<String?>(json['thumb_url']),
+      localPath: serializer.fromJson<String?>(json['local_path']),
       mediaMimeType: serializer.fromJson<String?>(json['media_mime_type']),
       mediaSizeBytes: serializer.fromJson<int?>(json['media_size_bytes']),
-      replyToMessageId: serializer.fromJson<String?>(json['reply_to_message_id']),
-      replyToSenderId: serializer.fromJson<String?>(json['reply_to_sender_id']),
-      replyToContent: serializer.fromJson<String?>(json['reply_to_content']),
-      status: serializer.fromJson<String>(json['status']),
-      createdAt: serializer.fromJson<DateTime>(json['created_at']),
     );
   }
   @override
@@ -422,18 +421,14 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
       'id': serializer.toJson<String>(id),
       'conversation_id': serializer.toJson<String>(conversationId),
       'sender_id': serializer.toJson<String>(senderId),
-      'client_message_id': serializer.toJson<String?>(clientMessageId),
+      'content': serializer.toJson<String>(content),
+      'created_at': serializer.toJson<DateTime>(createdAt),
       'message_type': serializer.toJson<String>(messageType),
-      'content': serializer.toJson<String?>(content),
       'media_url': serializer.toJson<String?>(mediaUrl),
-      'media_thumbnail_url': serializer.toJson<String?>(mediaThumbnailUrl),
+      'thumb_url': serializer.toJson<String?>(thumbUrl),
+      'local_path': serializer.toJson<String?>(localPath),
       'media_mime_type': serializer.toJson<String?>(mediaMimeType),
       'media_size_bytes': serializer.toJson<int?>(mediaSizeBytes),
-      'reply_to_message_id': serializer.toJson<String?>(replyToMessageId),
-      'reply_to_sender_id': serializer.toJson<String?>(replyToSenderId),
-      'reply_to_content': serializer.toJson<String?>(replyToContent),
-      'status': serializer.toJson<String>(status),
-      'created_at': serializer.toJson<DateTime>(createdAt),
     };
   }
 
@@ -441,78 +436,52 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
     String? id,
     String? conversationId,
     String? senderId,
-    Value<String?> clientMessageId = const Value.absent(),
+    String? content,
+    DateTime? createdAt,
     String? messageType,
-    Value<String?> content = const Value.absent(),
     Value<String?> mediaUrl = const Value.absent(),
-    Value<String?> mediaThumbnailUrl = const Value.absent(),
+    Value<String?> thumbUrl = const Value.absent(),
+    Value<String?> localPath = const Value.absent(),
     Value<String?> mediaMimeType = const Value.absent(),
     Value<int?> mediaSizeBytes = const Value.absent(),
-    Value<String?> replyToMessageId = const Value.absent(),
-    Value<String?> replyToSenderId = const Value.absent(),
-    Value<String?> replyToContent = const Value.absent(),
-    String? status,
-    DateTime? createdAt,
-  }) =>
-      LocalMessage(
-        id: id ?? this.id,
-        conversationId: conversationId ?? this.conversationId,
-        senderId: senderId ?? this.senderId,
-        clientMessageId: clientMessageId.present
-            ? clientMessageId.value
-            : this.clientMessageId,
-        messageType: messageType ?? this.messageType,
-        content: content.present ? content.value : this.content,
-        mediaUrl: mediaUrl.present ? mediaUrl.value : this.mediaUrl,
-        mediaThumbnailUrl: mediaThumbnailUrl.present
-            ? mediaThumbnailUrl.value
-            : this.mediaThumbnailUrl,
-        mediaMimeType:
-            mediaMimeType.present ? mediaMimeType.value : this.mediaMimeType,
-        mediaSizeBytes:
-            mediaSizeBytes.present ? mediaSizeBytes.value : this.mediaSizeBytes,
-        replyToMessageId: replyToMessageId.present
-            ? replyToMessageId.value
-            : this.replyToMessageId,
-        replyToSenderId: replyToSenderId.present
-            ? replyToSenderId.value
-            : this.replyToSenderId,
-        replyToContent:
-            replyToContent.present ? replyToContent.value : this.replyToContent,
-        status: status ?? this.status,
-        createdAt: createdAt ?? this.createdAt,
-      );
+  }) => LocalMessage(
+    id: id ?? this.id,
+    conversationId: conversationId ?? this.conversationId,
+    senderId: senderId ?? this.senderId,
+    content: content ?? this.content,
+    createdAt: createdAt ?? this.createdAt,
+    messageType: messageType ?? this.messageType,
+    mediaUrl: mediaUrl.present ? mediaUrl.value : this.mediaUrl,
+    thumbUrl: thumbUrl.present ? thumbUrl.value : this.thumbUrl,
+    localPath: localPath.present ? localPath.value : this.localPath,
+    mediaMimeType:
+        mediaMimeType.present ? mediaMimeType.value : this.mediaMimeType,
+    mediaSizeBytes:
+        mediaSizeBytes.present ? mediaSizeBytes.value : this.mediaSizeBytes,
+  );
   LocalMessage copyWithCompanion(MessagesCompanion data) {
     return LocalMessage(
       id: data.id.present ? data.id.value : this.id,
-      conversationId: data.conversationId.present
-          ? data.conversationId.value
-          : this.conversationId,
+      conversationId:
+          data.conversationId.present
+              ? data.conversationId.value
+              : this.conversationId,
       senderId: data.senderId.present ? data.senderId.value : this.senderId,
-      clientMessageId: data.clientMessageId.present
-          ? data.clientMessageId.value
-          : this.clientMessageId,
+      content: data.content.present ? data.content.value : this.content,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       messageType:
           data.messageType.present ? data.messageType.value : this.messageType,
-      content: data.content.present ? data.content.value : this.content,
       mediaUrl: data.mediaUrl.present ? data.mediaUrl.value : this.mediaUrl,
-      mediaThumbnailUrl: data.mediaThumbnailUrl.present
-          ? data.mediaThumbnailUrl.value
-          : this.mediaThumbnailUrl,
+      thumbUrl: data.thumbUrl.present ? data.thumbUrl.value : this.thumbUrl,
+      localPath: data.localPath.present ? data.localPath.value : this.localPath,
       mediaMimeType:
-          data.mediaMimeType.present ? data.mediaMimeType.value : this.mediaMimeType,
+          data.mediaMimeType.present
+              ? data.mediaMimeType.value
+              : this.mediaMimeType,
       mediaSizeBytes:
-          data.mediaSizeBytes.present ? data.mediaSizeBytes.value : this.mediaSizeBytes,
-      replyToMessageId: data.replyToMessageId.present
-          ? data.replyToMessageId.value
-          : this.replyToMessageId,
-      replyToSenderId: data.replyToSenderId.present
-          ? data.replyToSenderId.value
-          : this.replyToSenderId,
-      replyToContent:
-          data.replyToContent.present ? data.replyToContent.value : this.replyToContent,
-      status: data.status.present ? data.status.value : this.status,
-      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+          data.mediaSizeBytes.present
+              ? data.mediaSizeBytes.value
+              : this.mediaSizeBytes,
     );
   }
 
@@ -522,30 +491,32 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
           ..write('id: $id, ')
           ..write('conversationId: $conversationId, ')
           ..write('senderId: $senderId, ')
-          ..write('clientMessageId: $clientMessageId, ')
           ..write('content: $content, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('messageType: $messageType, ')
+          ..write('mediaUrl: $mediaUrl, ')
+          ..write('thumbUrl: $thumbUrl, ')
+          ..write('localPath: $localPath, ')
+          ..write('mediaMimeType: $mediaMimeType, ')
+          ..write('mediaSizeBytes: $mediaSizeBytes')
           ..write(')'))
         .toString();
   }
 
   @override
   int get hashCode => Object.hash(
-      id,
-      conversationId,
-      senderId,
-      clientMessageId,
-      messageType,
-      content,
-      mediaUrl,
-      mediaThumbnailUrl,
-      mediaMimeType,
-      mediaSizeBytes,
-      replyToMessageId,
-      replyToSenderId,
-      replyToContent,
-      status,
-      createdAt);
+    id,
+    conversationId,
+    senderId,
+    content,
+    createdAt,
+    messageType,
+    mediaUrl,
+    thumbUrl,
+    localPath,
+    mediaMimeType,
+    mediaSizeBytes,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -553,110 +524,87 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
           other.id == this.id &&
           other.conversationId == this.conversationId &&
           other.senderId == this.senderId &&
-          other.clientMessageId == this.clientMessageId &&
-          other.messageType == this.messageType &&
           other.content == this.content &&
+          other.createdAt == this.createdAt &&
+          other.messageType == this.messageType &&
           other.mediaUrl == this.mediaUrl &&
-          other.mediaThumbnailUrl == this.mediaThumbnailUrl &&
+          other.thumbUrl == this.thumbUrl &&
+          other.localPath == this.localPath &&
           other.mediaMimeType == this.mediaMimeType &&
-          other.mediaSizeBytes == this.mediaSizeBytes &&
-          other.replyToMessageId == this.replyToMessageId &&
-          other.replyToSenderId == this.replyToSenderId &&
-          other.replyToContent == this.replyToContent &&
-          other.status == this.status &&
-          other.createdAt == this.createdAt);
+          other.mediaSizeBytes == this.mediaSizeBytes);
 }
 
 class MessagesCompanion extends UpdateCompanion<LocalMessage> {
   final Value<String> id;
   final Value<String> conversationId;
   final Value<String> senderId;
-  final Value<String?> clientMessageId;
+  final Value<String> content;
+  final Value<DateTime> createdAt;
   final Value<String> messageType;
-  final Value<String?> content;
   final Value<String?> mediaUrl;
-  final Value<String?> mediaThumbnailUrl;
+  final Value<String?> thumbUrl;
+  final Value<String?> localPath;
   final Value<String?> mediaMimeType;
   final Value<int?> mediaSizeBytes;
-  final Value<String?> replyToMessageId;
-  final Value<String?> replyToSenderId;
-  final Value<String?> replyToContent;
-  final Value<String> status;
-  final Value<DateTime> createdAt;
   final Value<int> rowid;
   const MessagesCompanion({
     this.id = const Value.absent(),
     this.conversationId = const Value.absent(),
     this.senderId = const Value.absent(),
-    this.clientMessageId = const Value.absent(),
-    this.messageType = const Value.absent(),
     this.content = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.messageType = const Value.absent(),
     this.mediaUrl = const Value.absent(),
-    this.mediaThumbnailUrl = const Value.absent(),
+    this.thumbUrl = const Value.absent(),
+    this.localPath = const Value.absent(),
     this.mediaMimeType = const Value.absent(),
     this.mediaSizeBytes = const Value.absent(),
-    this.replyToMessageId = const Value.absent(),
-    this.replyToSenderId = const Value.absent(),
-    this.replyToContent = const Value.absent(),
-    this.status = const Value.absent(),
-    this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   MessagesCompanion.insert({
     required String id,
     required String conversationId,
     required String senderId,
-    this.clientMessageId = const Value.absent(),
+    required String content,
+    required DateTime createdAt,
     this.messageType = const Value.absent(),
-    this.content = const Value.absent(),
     this.mediaUrl = const Value.absent(),
-    this.mediaThumbnailUrl = const Value.absent(),
+    this.thumbUrl = const Value.absent(),
+    this.localPath = const Value.absent(),
     this.mediaMimeType = const Value.absent(),
     this.mediaSizeBytes = const Value.absent(),
-    this.replyToMessageId = const Value.absent(),
-    this.replyToSenderId = const Value.absent(),
-    this.replyToContent = const Value.absent(),
-    this.status = const Value.absent(),
-    required DateTime createdAt,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        conversationId = Value(conversationId),
        senderId = Value(senderId),
+       content = Value(content),
        createdAt = Value(createdAt);
   static Insertable<LocalMessage> custom({
     Expression<String>? id,
     Expression<String>? conversationId,
     Expression<String>? senderId,
-    Expression<String>? clientMessageId,
-    Expression<String>? messageType,
     Expression<String>? content,
+    Expression<DateTime>? createdAt,
+    Expression<String>? messageType,
     Expression<String>? mediaUrl,
-    Expression<Expression<String>>? mediaThumbnailUrl,
+    Expression<String>? thumbUrl,
+    Expression<String>? localPath,
     Expression<String>? mediaMimeType,
     Expression<int>? mediaSizeBytes,
-    Expression<String>? replyToMessageId,
-    Expression<String>? replyToSenderId,
-    Expression<String>? replyToContent,
-    Expression<String>? status,
-    Expression<DateTime>? createdAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (conversationId != null) 'conversation_id': conversationId,
       if (senderId != null) 'sender_id': senderId,
-      if (clientMessageId != null) 'client_message_id': clientMessageId,
-      if (messageType != null) 'message_type': messageType,
       if (content != null) 'content': content,
+      if (createdAt != null) 'created_at': createdAt,
+      if (messageType != null) 'message_type': messageType,
       if (mediaUrl != null) 'media_url': mediaUrl,
-      if (mediaThumbnailUrl != null) 'media_thumbnail_url': mediaThumbnailUrl,
+      if (thumbUrl != null) 'thumb_url': thumbUrl,
+      if (localPath != null) 'local_path': localPath,
       if (mediaMimeType != null) 'media_mime_type': mediaMimeType,
       if (mediaSizeBytes != null) 'media_size_bytes': mediaSizeBytes,
-      if (replyToMessageId != null) 'reply_to_message_id': replyToMessageId,
-      if (replyToSenderId != null) 'reply_to_sender_id': replyToSenderId,
-      if (replyToContent != null) 'reply_to_content': replyToContent,
-      if (status != null) 'status': status,
-      if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -665,36 +613,28 @@ class MessagesCompanion extends UpdateCompanion<LocalMessage> {
     Value<String>? id,
     Value<String>? conversationId,
     Value<String>? senderId,
-    Value<String?>? clientMessageId,
+    Value<String>? content,
+    Value<DateTime>? createdAt,
     Value<String>? messageType,
-    Value<String?>? content,
     Value<String?>? mediaUrl,
-    Value<String?>? mediaThumbnailUrl,
+    Value<String?>? thumbUrl,
+    Value<String?>? localPath,
     Value<String?>? mediaMimeType,
     Value<int?>? mediaSizeBytes,
-    Value<String?>? replyToMessageId,
-    Value<String?>? replyToSenderId,
-    Value<String?>? replyToContent,
-    Value<String>? status,
-    Value<DateTime>? createdAt,
     Value<int>? rowid,
   }) {
     return MessagesCompanion(
       id: id ?? this.id,
       conversationId: conversationId ?? this.conversationId,
       senderId: senderId ?? this.senderId,
-      clientMessageId: clientMessageId ?? this.clientMessageId,
-      messageType: messageType ?? this.messageType,
       content: content ?? this.content,
+      createdAt: createdAt ?? this.createdAt,
+      messageType: messageType ?? this.messageType,
       mediaUrl: mediaUrl ?? this.mediaUrl,
-      mediaThumbnailUrl: mediaThumbnailUrl ?? this.mediaThumbnailUrl,
+      thumbUrl: thumbUrl ?? this.thumbUrl,
+      localPath: localPath ?? this.localPath,
       mediaMimeType: mediaMimeType ?? this.mediaMimeType,
       mediaSizeBytes: mediaSizeBytes ?? this.mediaSizeBytes,
-      replyToMessageId: replyToMessageId ?? this.replyToMessageId,
-      replyToSenderId: replyToSenderId ?? this.replyToSenderId,
-      replyToContent: replyToContent ?? this.replyToContent,
-      status: status ?? this.status,
-      createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -711,41 +651,29 @@ class MessagesCompanion extends UpdateCompanion<LocalMessage> {
     if (senderId.present) {
       map['sender_id'] = Variable<String>(senderId.value);
     }
-    if (clientMessageId.present) {
-      map['client_message_id'] = Variable<String>(clientMessageId.value);
+    if (content.present) {
+      map['content'] = Variable<String>(content.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
     }
     if (messageType.present) {
       map['message_type'] = Variable<String>(messageType.value);
     }
-    if (content.present) {
-      map['content'] = Variable<String>(content.value);
-    }
     if (mediaUrl.present) {
       map['media_url'] = Variable<String>(mediaUrl.value);
     }
-    if (mediaThumbnailUrl.present) {
-      map['media_thumbnail_url'] = Variable<String>(mediaThumbnailUrl.value);
+    if (thumbUrl.present) {
+      map['thumb_url'] = Variable<String>(thumbUrl.value);
+    }
+    if (localPath.present) {
+      map['local_path'] = Variable<String>(localPath.value);
     }
     if (mediaMimeType.present) {
       map['media_mime_type'] = Variable<String>(mediaMimeType.value);
     }
     if (mediaSizeBytes.present) {
       map['media_size_bytes'] = Variable<int>(mediaSizeBytes.value);
-    }
-    if (replyToMessageId.present) {
-      map['reply_to_message_id'] = Variable<String>(replyToMessageId.value);
-    }
-    if (replyToSenderId.present) {
-      map['reply_to_sender_id'] = Variable<String>(replyToSenderId.value);
-    }
-    if (replyToContent.present) {
-      map['reply_to_content'] = Variable<String>(replyToContent.value);
-    }
-    if (status.present) {
-      map['status'] = Variable<String>(status.value);
-    }
-    if (createdAt.present) {
-      map['created_at'] = Variable<DateTime>(createdAt.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -759,18 +687,14 @@ class MessagesCompanion extends UpdateCompanion<LocalMessage> {
           ..write('id: $id, ')
           ..write('conversationId: $conversationId, ')
           ..write('senderId: $senderId, ')
-          ..write('clientMessageId: $clientMessageId, ')
-          ..write('messageType: $messageType, ')
           ..write('content: $content, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('messageType: $messageType, ')
           ..write('mediaUrl: $mediaUrl, ')
-          ..write('mediaThumbnailUrl: $mediaThumbnailUrl, ')
+          ..write('thumbUrl: $thumbUrl, ')
+          ..write('localPath: $localPath, ')
           ..write('mediaMimeType: $mediaMimeType, ')
           ..write('mediaSizeBytes: $mediaSizeBytes, ')
-          ..write('replyToMessageId: $replyToMessageId, ')
-          ..write('replyToSenderId: $replyToSenderId, ')
-          ..write('replyToContent: $replyToContent, ')
-          ..write('status: $status, ')
-          ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1537,9 +1461,14 @@ typedef $MessagesCreateCompanionBuilder =
       required String id,
       required String conversationId,
       required String senderId,
-      Value<String?> clientMessageId,
       required String content,
       required DateTime createdAt,
+      Value<String> messageType,
+      Value<String?> mediaUrl,
+      Value<String?> thumbUrl,
+      Value<String?> localPath,
+      Value<String?> mediaMimeType,
+      Value<int?> mediaSizeBytes,
       Value<int> rowid,
     });
 typedef $MessagesUpdateCompanionBuilder =
@@ -1547,9 +1476,14 @@ typedef $MessagesUpdateCompanionBuilder =
       Value<String> id,
       Value<String> conversationId,
       Value<String> senderId,
-      Value<String?> clientMessageId,
       Value<String> content,
       Value<DateTime> createdAt,
+      Value<String> messageType,
+      Value<String?> mediaUrl,
+      Value<String?> thumbUrl,
+      Value<String?> localPath,
+      Value<String?> mediaMimeType,
+      Value<int?> mediaSizeBytes,
       Value<int> rowid,
     });
 
@@ -1576,11 +1510,6 @@ class $MessagesFilterComposer extends Composer<_$LocalDatabase, Messages> {
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get clientMessageId => $composableBuilder(
-    column: $table.clientMessageId,
-    builder: (column) => ColumnFilters(column),
-  );
-
   ColumnFilters<String> get content => $composableBuilder(
     column: $table.content,
     builder: (column) => ColumnFilters(column),
@@ -1588,6 +1517,36 @@ class $MessagesFilterComposer extends Composer<_$LocalDatabase, Messages> {
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get messageType => $composableBuilder(
+    column: $table.messageType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mediaUrl => $composableBuilder(
+    column: $table.mediaUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get thumbUrl => $composableBuilder(
+    column: $table.thumbUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get localPath => $composableBuilder(
+    column: $table.localPath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mediaMimeType => $composableBuilder(
+    column: $table.mediaMimeType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get mediaSizeBytes => $composableBuilder(
+    column: $table.mediaSizeBytes,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -1615,11 +1574,6 @@ class $MessagesOrderingComposer extends Composer<_$LocalDatabase, Messages> {
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get clientMessageId => $composableBuilder(
-    column: $table.clientMessageId,
-    builder: (column) => ColumnOrderings(column),
-  );
-
   ColumnOrderings<String> get content => $composableBuilder(
     column: $table.content,
     builder: (column) => ColumnOrderings(column),
@@ -1627,6 +1581,36 @@ class $MessagesOrderingComposer extends Composer<_$LocalDatabase, Messages> {
 
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get messageType => $composableBuilder(
+    column: $table.messageType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mediaUrl => $composableBuilder(
+    column: $table.mediaUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get thumbUrl => $composableBuilder(
+    column: $table.thumbUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get localPath => $composableBuilder(
+    column: $table.localPath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mediaMimeType => $composableBuilder(
+    column: $table.mediaMimeType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get mediaSizeBytes => $composableBuilder(
+    column: $table.mediaSizeBytes,
     builder: (column) => ColumnOrderings(column),
   );
 }
@@ -1650,16 +1634,35 @@ class $MessagesAnnotationComposer extends Composer<_$LocalDatabase, Messages> {
   GeneratedColumn<String> get senderId =>
       $composableBuilder(column: $table.senderId, builder: (column) => column);
 
-  GeneratedColumn<String> get clientMessageId => $composableBuilder(
-    column: $table.clientMessageId,
-    builder: (column) => column,
-  );
-
   GeneratedColumn<String> get content =>
       $composableBuilder(column: $table.content, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get messageType => $composableBuilder(
+    column: $table.messageType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get mediaUrl =>
+      $composableBuilder(column: $table.mediaUrl, builder: (column) => column);
+
+  GeneratedColumn<String> get thumbUrl =>
+      $composableBuilder(column: $table.thumbUrl, builder: (column) => column);
+
+  GeneratedColumn<String> get localPath =>
+      $composableBuilder(column: $table.localPath, builder: (column) => column);
+
+  GeneratedColumn<String> get mediaMimeType => $composableBuilder(
+    column: $table.mediaMimeType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get mediaSizeBytes => $composableBuilder(
+    column: $table.mediaSizeBytes,
+    builder: (column) => column,
+  );
 }
 
 class $MessagesTableManager
@@ -1696,17 +1699,27 @@ class $MessagesTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> conversationId = const Value.absent(),
                 Value<String> senderId = const Value.absent(),
-                Value<String?> clientMessageId = const Value.absent(),
                 Value<String> content = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<String> messageType = const Value.absent(),
+                Value<String?> mediaUrl = const Value.absent(),
+                Value<String?> thumbUrl = const Value.absent(),
+                Value<String?> localPath = const Value.absent(),
+                Value<String?> mediaMimeType = const Value.absent(),
+                Value<int?> mediaSizeBytes = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MessagesCompanion(
                 id: id,
                 conversationId: conversationId,
                 senderId: senderId,
-                clientMessageId: clientMessageId,
                 content: content,
                 createdAt: createdAt,
+                messageType: messageType,
+                mediaUrl: mediaUrl,
+                thumbUrl: thumbUrl,
+                localPath: localPath,
+                mediaMimeType: mediaMimeType,
+                mediaSizeBytes: mediaSizeBytes,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -1714,19 +1727,27 @@ class $MessagesTableManager
                 required String id,
                 required String conversationId,
                 required String senderId,
-                Value<String?> clientMessageId = const Value.absent(),
                 required String content,
                 required DateTime createdAt,
+                Value<String> messageType = const Value.absent(),
+                Value<String?> mediaUrl = const Value.absent(),
+                Value<String?> thumbUrl = const Value.absent(),
+                Value<String?> localPath = const Value.absent(),
+                Value<String?> mediaMimeType = const Value.absent(),
+                Value<int?> mediaSizeBytes = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MessagesCompanion.insert(
                 id: id,
                 conversationId: conversationId,
                 senderId: senderId,
-                clientMessageId: clientMessageId,
-                messageType: const Value.absent(), // Default for manager
-                content: Value(content),
-                status: const Value.absent(), // Default for manager
+                content: content,
                 createdAt: createdAt,
+                messageType: messageType,
+                mediaUrl: mediaUrl,
+                thumbUrl: thumbUrl,
+                localPath: localPath,
+                mediaMimeType: mediaMimeType,
+                mediaSizeBytes: mediaSizeBytes,
                 rowid: rowid,
               ),
           withReferenceMapper:

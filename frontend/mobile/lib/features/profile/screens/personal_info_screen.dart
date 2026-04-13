@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
+import 'package:vnalo_mobile/features/profile/localization/profile_texts.dart';
 import 'package:vnalo_mobile/features/profile/screens/edit_personal_info_screen.dart';
 
 /// "Thông tin cá nhân" screen — displays user's personal info in Vnalo style.
@@ -11,36 +12,38 @@ import 'package:vnalo_mobile/features/profile/screens/edit_personal_info_screen.
 class PersonalInfoScreen extends StatelessWidget {
   const PersonalInfoScreen({super.key});
 
-  String _formatGender(String? gender) {
+  String _formatGender(BuildContext context, String? gender) {
+    final t = ProfileTexts.of(context, listen: false);
     switch (gender?.toUpperCase()) {
       case 'MALE':
-        return 'Nam';
+        return t.male;
       case 'FEMALE':
-        return 'Nữ';
+        return t.female;
       case 'UNKNOWN':
       case 'OTHER':
-        return 'Khác';
+        return t.otherGender;
       default:
-        return 'Chưa cập nhật';
+        return t.notUpdated;
     }
   }
 
-  String _formatDob(DateTime? dob) {
-    if (dob == null) return 'Chưa cập nhật';
+  String _formatDob(BuildContext context, DateTime? dob) {
+    if (dob == null) return ProfileTexts.of(context, listen: false).notUpdated;
     return '${dob.day.toString().padLeft(2, '0')}/${dob.month.toString().padLeft(2, '0')}/${dob.year}';
   }
 
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final t = ProfileTexts.of(context);
     final auth = context.watch<AuthProvider?>();
     final user = auth?.user;
-    final displayName = user?.displayName ?? 'Người dùng';
+    final displayName = user?.displayName ?? t.notUpdated;
 
     final sectionBg = isDarkMode ? DarkColors.surface : LightColors.surface;
 
     return Scaffold(
-      backgroundColor: isDarkMode ? DarkColors.scaffold : const Color(0xFFF3F4F6),
+      backgroundColor: isDarkMode ? DarkColors.scaffold : LightColors.scaffold,
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -49,7 +52,7 @@ class PersonalInfoScreen extends StatelessWidget {
               clipBehavior: Clip.none,
               children: [
                 // Cover Photo
-                Container(
+                SizedBox(
                   height: 220,
                   width: double.infinity,
                   child: user?.coverUrl != null && user!.coverUrl!.isNotEmpty
@@ -126,29 +129,33 @@ class PersonalInfoScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Thông tin cá nhân',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  Text(
+                    t.personalInfo,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
+                    ),
                   ),
                   const SizedBox(height: 16),
                   _buildInfoRow(
                     context,
-                    label: 'Giới tính',
-                    value: _formatGender(user?.gender),
+                    label: t.gender,
+                    value: _formatGender(context, user?.gender),
                     showDivider: true,
                   ),
                   _buildInfoRow(
                     context,
-                    label: 'Ngày sinh',
-                    value: _formatDob(user?.dob),
+                    label: t.birthday,
+                    value: _formatDob(context, user?.dob),
                     showDivider: true,
                   ),
                   _buildInfoRow(
                     context,
-                    label: 'Điện thoại',
-                    value: user?.phone ?? 'Chưa cập nhật',
+                    label: t.phone,
+                    value: user?.phone ?? t.notUpdated,
                     showDivider: false,
-                    subtext: 'Số điện thoại chỉ hiển thị với người có lưu số bạn trong danh bạ máy',
+                    subtext: t.phoneVisibilityNote,
                   ),
                   const SizedBox(height: 24),
                   Center(
@@ -162,10 +169,10 @@ class PersonalInfoScreen extends StatelessWidget {
                           );
                         },
                         icon: const Icon(Icons.edit_outlined, size: 18),
-                        label: const Text('Chỉnh sửa', style: TextStyle(fontWeight: FontWeight.w600)),
+                        label: Text(t.editInfo, style: const TextStyle(fontWeight: FontWeight.w600)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: isDarkMode ? DarkColors.surfaceLight : const Color(0xFFE5E7EB).withValues(alpha: 0.6),
-                          foregroundColor: isDarkMode ? DarkColors.textPrimary : Colors.black87,
+                          foregroundColor: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
                           elevation: 0,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
                         ),
@@ -225,7 +232,7 @@ class PersonalInfoScreen extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         subtext,
-                        style: const TextStyle(fontSize: 12, color: Colors.grey, height: 1.3),
+                        style: TextStyle(fontSize: 12, color: isDarkMode ? DarkColors.textHint : Colors.grey, height: 1.3),
                       ),
                     ],
                   ],

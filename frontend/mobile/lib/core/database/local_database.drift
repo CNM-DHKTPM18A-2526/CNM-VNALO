@@ -3,18 +3,15 @@ CREATE TABLE messages (
     id TEXT NOT NULL PRIMARY KEY,
     conversation_id TEXT NOT NULL,
     sender_id TEXT NOT NULL,
-    client_message_id TEXT,
+    content TEXT NOT NULL,
+    created_at DATETIME NOT NULL,
+    -- Media fields (nullable, only populated for IMAGE/FILE/AUDIO messages)
     message_type TEXT NOT NULL DEFAULT 'TEXT',
-    content TEXT,
     media_url TEXT,
-    media_thumbnail_url TEXT,
+    thumb_url TEXT,
+    local_path TEXT,
     media_mime_type TEXT,
-    media_size_bytes INTEGER,
-    reply_to_message_id TEXT,
-    reply_to_sender_id TEXT,
-    reply_to_content TEXT,
-    status TEXT NOT NULL DEFAULT 'SENT',
-    created_at DATETIME NOT NULL
+    media_size_bytes INTEGER
 ) AS LocalMessage;
 
 CREATE TABLE contacts (

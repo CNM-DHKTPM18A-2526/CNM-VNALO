@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
@@ -11,7 +11,6 @@ import 'package:vnalo_mobile/models/user_model.dart';
 import 'package:vnalo_mobile/services/chat_service.dart';
 import 'package:vnalo_mobile/services/friend_service.dart';
 import 'package:vnalo_mobile/features/search/screens/unified_search_screen.dart';
-import 'package:vnalo_mobile/core/localization/common_texts.dart';
 
 class ContactsScreen extends StatefulWidget {
   const ContactsScreen({super.key});
@@ -39,7 +38,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
     } catch (_) {}
   }
 
-  Future<void> _loadFriends() async {
+   Future<void> _loadFriends() async {
     try {
       _friends = await context.read<FriendService>().getFriends();
     } catch (_) {
@@ -64,12 +63,10 @@ class _ContactsScreenState extends State<ContactsScreen> {
         ),
       );
     } catch (e) {
-      if (mounted) {
-        final common = CommonTexts.of(context, listen: false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${common.cannotOpenChat}: $e')),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Kh├┤ng thß╗â mß╗ƒ cuß╗Öc tr├▓ chuyß╗çn: $e')),
+      );
     }
   }
 
@@ -99,19 +96,19 @@ class _ContactsScreenState extends State<ContactsScreen> {
               );
             },
             child: Row(
-              children: [
-                Icon(Icons.search, size: 24, color: isDarkMode ? searchHint : Colors.white),
-                const SizedBox(width: 8),
-                Text(
-                  CommonTexts.of(context).search,
-                  style: TextStyle(color: searchHint, fontSize: 16, fontWeight: FontWeight.w400),
-                ),
-              ],
+            children: [
+              Icon(Icons.search, size: 24, color: searchHint),
+              const SizedBox(width: 8),
+              Text(
+                'T├¼m kiß║┐m',
+                style: TextStyle(color: searchHint, fontSize: 16, fontWeight: FontWeight.w400),
+              ),
+            ],
             ),
           ),
           actions: [
             IconButton(
-              icon: const Icon(Icons.person_add_outlined, color: Colors.white),
+              icon: Icon(Icons.person_add_outlined, color: searchHint),
               onPressed: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const AddFriendScreen()),
@@ -128,13 +125,13 @@ class _ContactsScreenState extends State<ContactsScreen> {
                 dividerColor: Colors.transparent,
                 labelColor: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
                 unselectedLabelColor: isDarkMode ? DarkColors.textSecondary : Colors.grey.shade400,
-                indicatorColor: isDarkMode ? DarkColors.primary : AppColors.primary,
+                indicatorColor: AppColors.primary,
                 indicatorWeight: 3,
                 labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                tabs: [
-                  Tab(text: CommonTexts.of(context).friends),
-                  Tab(text: CommonTexts.of(context).groups),
-                  Tab(text: CommonTexts.of(context).officialAccount),
+                tabs: const [
+                  Tab(text: 'Bß║ín b├¿'),
+                  Tab(text: 'Nh├│m'),
+                  Tab(text: 'OA'),
                 ],
               ),
             ),
@@ -157,7 +154,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
     if (_isLoading) return const Center(child: CircularProgressIndicator());
 
     _friends.sort((a, b) => a.displayName.compareTo(b.displayName));
-
+    
     final Map<String, List<User>> grouped = {};
     for (var user in _friends) {
       final String firstLetter = user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : '#';
@@ -171,8 +168,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
     final sortedKeys = grouped.keys.toList()..sort();
 
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDarkMode ? DarkColors.scaffold : const Color(0xFFF4F5F7);
-    final sectionColor = isDarkMode ? DarkColors.surface : Colors.white;
+    final bgColor = isDarkMode ? Colors.black : const Color(0xFFF4F5F7);
+    final sectionColor = isDarkMode ? const Color(0xFF1E1E1E) : Colors.white;
 
     return Container(
       color: bgColor,
@@ -187,14 +184,14 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: (isDarkMode ? DarkColors.primary : AppColors.primary).withValues(alpha: 0.1),
+                      color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(Icons.person_add_outlined, color: isDarkMode ? DarkColors.primary : AppColors.primary),
+                    child: const Icon(Icons.group_add, color: AppColors.primary),
                   ),
-                  title: Text(
-                    CommonTexts.of(context).friendRequests,
-                    style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
+                  title: const Text(
+                    'Lß╗¥i mß╗¥i kß║┐t bß║ín',
+                    style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
                   ),
                   trailing: _pendingCount > 0
                       ? Container(
@@ -213,6 +210,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     await Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const FriendRequestsScreen()),
                     );
+                    // Refresh after returning
                     _loadPendingCount();
                     _loadFriends();
                   },
@@ -222,14 +220,14 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: (isDarkMode ? DarkColors.primary : AppColors.primary).withValues(alpha: 0.1),
+                      color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(Icons.cake, color: isDarkMode ? DarkColors.primary : AppColors.primary),
+                    child: const Icon(Icons.cake, color: AppColors.primary),
                   ),
-                  title: Text(
-                    CommonTexts.of(context).birthday,
-                    style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
+                  title: const Text(
+                    'Sinh nhß║¡t',
+                    style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
                   ),
                   onTap: () {},
                 ),
@@ -246,40 +244,40 @@ class _ContactsScreenState extends State<ContactsScreen> {
                   padding: const EdgeInsets.all(16.0),
                   child: Row(
                     children: [
-                      _buildFilterChip('${CommonTexts.of(context).filterAll} ${_friends.length}', true),
+                      _buildFilterChip('Tß║Ñt cß║ú ${_friends.length}', true),
                       const SizedBox(width: 8),
-                      _buildFilterChip(CommonTexts.of(context).recentlyActive, false),
+                      _buildFilterChip('Mß╗¢i truy cß║¡p', false),
                     ],
                   ),
                 ),
                 ...sortedKeys.map((letter) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        child: Text(letter, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      ),
-                      ...grouped[letter]!.map((user) => ListTile(
-                            leading: AvatarWidget(
-                              imageUrl: user.avatarUrl,
-                              name: user.displayName,
-                              size: 44,
-                              showOnline: user.isOnline,
-                            ),
-                            title: Text(user.displayName),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(icon: const Icon(Icons.call_outlined), onPressed: () {}),
-                                IconButton(icon: const Icon(Icons.videocam_outlined), onPressed: () {}),
-                              ],
-                            ),
-                            onTap: () => _openChat(user),
-                          )),
-                    ],
-                  );
-                }),
+                   return Column(
+                     crossAxisAlignment: CrossAxisAlignment.start,
+                     children: [
+                       Padding(
+                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                         child: Text(letter, style: const TextStyle(fontWeight: FontWeight.bold)),
+                       ),
+                       ...grouped[letter]!.map((user) => ListTile(
+                         leading: AvatarWidget(
+                           imageUrl: user.avatarUrl,
+                           name: user.displayName,
+                           size: 44,
+                           showOnline: user.isOnline,
+                         ),
+                         title: Text(user.displayName),
+                         trailing: Row(
+                           mainAxisSize: MainAxisSize.min,
+                           children: [
+                             IconButton(icon: const Icon(Icons.call_outlined), onPressed: () {}),
+                             IconButton(icon: const Icon(Icons.videocam_outlined), onPressed: () {}),
+                           ],
+                         ),
+                         onTap: () => _openChat(user),
+                       )),
+                     ],
+                   );
+                }).expand((e) => [e]), // flatten
               ],
             ),
           ),
@@ -293,14 +291,18 @@ class _ContactsScreenState extends State<ContactsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: isActive ? (isDarkMode ? const Color(0xFF333333) : const Color(0xFFE5E7EB)) : Colors.transparent,
+        color: isActive 
+            ? (isDarkMode ? const Color(0xFF333333) : const Color(0xFFE5E7EB))
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(20),
         border: isActive ? null : Border.all(color: Colors.grey.withValues(alpha: 0.5)),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: isActive ? (isDarkMode ? Colors.white : Colors.black87) : Colors.grey,
+          color: isActive 
+              ? (isDarkMode ? Colors.white : Colors.black87)
+              : Colors.grey,
           fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
         ),
       ),
@@ -309,8 +311,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
   Widget _buildGroupsTab(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final sectionColor = isDarkMode ? DarkColors.surface : Colors.white;
-    final bgColor = isDarkMode ? DarkColors.scaffold : const Color(0xFFF4F5F7);
+    final sectionColor = isDarkMode ? const Color(0xFF1E1E1E) : Colors.white;
+    final bgColor = isDarkMode ? Colors.black : const Color(0xFFF4F5F7);
 
     final chatProvider = context.watch<ChatProvider>();
     final groups = chatProvider.conversations.where((c) => c.type == ConversationType.GROUP).toList();
@@ -326,12 +328,12 @@ class _ContactsScreenState extends State<ContactsScreen> {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: (isDarkMode ? DarkColors.primary : AppColors.primary).withValues(alpha: 0.1),
+                  color: AppColors.primary.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.group_add, color: isDarkMode ? DarkColors.primary : AppColors.primary),
+                child: const Icon(Icons.group_add, color: AppColors.primary),
               ),
-              title: Text(CommonTexts.of(context).createNewGroup, style: TextStyle(color: isDarkMode ? DarkColors.primary : AppColors.primary, fontWeight: FontWeight.normal)),
+              title: const Text('Tß║ío nh├│m mß╗¢i', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.normal)),
               onTap: () {},
             ),
           ),
@@ -346,22 +348,22 @@ class _ContactsScreenState extends State<ContactsScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(CommonTexts.of(context).joinedGroups(groups.length), style: const TextStyle(fontWeight: FontWeight.bold)),
-                      Row(
+                      Text('Nh├│m ─æang tham gia (${groups.length})', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      const Row(
                         children: [
-                          const Icon(Icons.swap_vert, size: 16, color: Colors.grey),
-                          const SizedBox(width: 4),
-                          Text(CommonTexts.of(context).sort, style: const TextStyle(color: Colors.grey)),
+                          Icon(Icons.swap_vert, size: 16, color: Colors.grey),
+                          SizedBox(width: 4),
+                          Text('Sß║»p xß║┐p', style: TextStyle(color: Colors.grey)),
                         ],
                       )
                     ],
                   ),
                 ),
                 if (groups.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(32.0),
+                  const Padding(
+                    padding: EdgeInsets.all(32.0),
                     child: Center(
-                      child: Text(CommonTexts.of(context).noGroupsJoined, style: const TextStyle(color: Colors.grey)),
+                      child: Text('Bß║ín ch╞░a tham gia nh├│m n├áo', style: TextStyle(color: Colors.grey)),
                     ),
                   )
                 else
@@ -370,11 +372,11 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     return ListTile(
                       leading: AvatarWidget(
                         imageUrl: group.avatarUrl,
-                        name: group.title ?? 'Nhóm',
+                        name: group.title ?? 'Nh├│m',
                         size: 48,
                         showOnline: isOnline,
                       ),
-                      title: Text(group.title ?? 'Nhóm', style: const TextStyle(fontWeight: FontWeight.w500)),
+                      title: Text(group.title ?? 'Nh├│m', style: const TextStyle(fontWeight: FontWeight.w500)),
                       subtitle: Text(group.lastMessage?.content ?? '', maxLines: 1, overflow: TextOverflow.ellipsis),
                       onTap: () {
                         Navigator.of(context).push(
@@ -395,8 +397,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
   Widget _buildOATab(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final sectionColor = isDarkMode ? DarkColors.surface : Colors.white;
-    final bgColor = isDarkMode ? DarkColors.scaffold : const Color(0xFFF4F5F7);
+    final sectionColor = isDarkMode ? const Color(0xFF1E1E1E) : Colors.white;
+    final bgColor = isDarkMode ? Colors.black : const Color(0xFFF4F5F7);
     return Container(
       color: bgColor,
       child: ListView(
@@ -413,24 +415,24 @@ class _ContactsScreenState extends State<ContactsScreen> {
                 ),
                 child: const Icon(Icons.wifi_tethering, color: Colors.white),
               ),
-              title: Text(CommonTexts.of(context).findMoreOA),
+              title: const Text('T├¼m th├¬m Official Account'),
               onTap: () {},
             ),
           ),
           const SizedBox(height: 8),
           Container(
             color: sectionColor,
-            child: Column(
+            child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text(CommonTexts.of(context).followedOA(0), style: const TextStyle(fontWeight: FontWeight.bold)),
+                  padding: EdgeInsets.all(16.0),
+                  child: Text('Official Account ─æ├ú quan t├óm (0)', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
                 Padding(
-                  padding: const EdgeInsets.all(32.0),
+                  padding: EdgeInsets.all(32.0),
                   child: Center(
-                    child: Text(CommonTexts.of(context).noOAFollowed, style: const TextStyle(color: Colors.grey)),
+                    child: Text('Bß║ín ch╞░a quan t├óm Official Account n├áo', style: TextStyle(color: Colors.grey)),
                   ),
                 ),
               ],

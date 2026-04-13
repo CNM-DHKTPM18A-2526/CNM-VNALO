@@ -105,8 +105,8 @@ class FocusedMessageDialog extends StatelessWidget {
           isMine: isMine,
           position: position,
           size: size,
-          child: child,
           onAction: onAction,
+          child: child,
         ),
         transitionsBuilder: (context, animation, secondAnimation, child) {
           return FadeTransition(opacity: animation, child: child);

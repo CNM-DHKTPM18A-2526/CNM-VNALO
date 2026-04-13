@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:vnalo_mobile/core/localization/common_texts.dart';
+import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/services/media_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vnalo_mobile/services/gif_service.dart';
-import 'package:vnalo_mobile/models/conversation_enums.dart';
 
 class StickerPicker extends StatefulWidget {
   final String conversationId;
@@ -37,6 +38,7 @@ class _StickerPickerState extends State<StickerPicker> {
   }
 
   Future<void> _loadInitialData() async {
+    // Load packs, recent stickers, and emoji history in one pass.
     if (!mounted) return;
     await Future.wait([
       _loadMyPacks(),
@@ -46,6 +48,7 @@ class _StickerPickerState extends State<StickerPicker> {
   }
 
   Future<void> _loadMyPacks() async {
+    // Fetch purchased packs, then prefetch stickers per pack.
     if (!mounted) return;
     try {
       final mediaService = context.read<MediaService>();
@@ -77,21 +80,15 @@ class _StickerPickerState extends State<StickerPicker> {
   }
 
   Future<void> _loadStickersForPack(String packId) async {
+    // Cache sticker lists by pack id to keep tab switching snappy.
     try {
       final mediaService = context.read<MediaService>();
       final stickers = await mediaService.getStickersInPack(packId);
       if (mounted) {
-        setState(() {
-          _stickersCache[packId] = stickers;
-        });
+        setState(() { _stickersCache[packId] = stickers; });
       }
     } catch (e) {
       debugPrint('Error loading stickers for pack $packId: $e');
-      if (mounted) {
-        setState(() {
-          _stickersCache[packId] = [];
-        });
-      }
     }
   }
 
@@ -124,8 +121,8 @@ class _StickerPickerState extends State<StickerPicker> {
       height: 350,
       key: ValueKey('sticker_picker_${_myPacks.length}'),
       decoration: BoxDecoration(
-        color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
-        border: Border(top: BorderSide(color: isDarkMode ? Colors.white12 : Colors.grey.shade300)),
+        color: isDarkMode ? DarkColors.surface : Colors.white,
+        border: Border(top: BorderSide(color: isDarkMode ? DarkColors.divider : Colors.grey.shade300)),
       ),
       child: DefaultTabController(
         length: tabCount,
@@ -135,13 +132,13 @@ class _StickerPickerState extends State<StickerPicker> {
             Container(
               height: 54,
               decoration: BoxDecoration(
-                color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
-                border: Border(bottom: BorderSide(color: isDarkMode ? Colors.white12 : Colors.grey.shade100)),
+                color: isDarkMode ? DarkColors.surface : Colors.white,
+                border: Border(bottom: BorderSide(color: isDarkMode ? DarkColors.divider : Colors.grey.shade100)),
               ),
               child: TabBar(
                 isScrollable: true,
                 indicator: BoxDecoration(
-                  color: isDarkMode ? Colors.white10 : Colors.black.withOpacity(0.05),
+                  color: isDarkMode ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 indicatorSize: TabBarIndicatorSize.tab,
@@ -154,7 +151,8 @@ class _StickerPickerState extends State<StickerPicker> {
                   _buildTabItem(Icons.sticky_note_2, true, isDarkMode, ""),
                   _buildTabItem(Icons.access_time_filled, false, isDarkMode, ""),
                   ..._myPacks.map((pack) {
-                    return _buildPackTabItem(pack, isDarkMode);
+                    final url = pack['coverUrl'] ?? pack['thumbnailUrl'] ?? '';
+                    return _buildPackTabItem(url, isDarkMode);
                   }),
                 ],
               ),
@@ -168,7 +166,7 @@ class _StickerPickerState extends State<StickerPicker> {
                   _buildRecentTab(),
                   ..._myPacks.map((pack) {
                     final id = pack['stickerPackId'] ?? pack['id'];
-                    return _buildStickerGrid(id.toString(), pack['name'] ?? 'Bộ sticker');
+                    return _buildStickerGrid(id.toString(), pack['name'] ?? 'Sticker Pack');
                   }),
                 ],
               ),
@@ -186,7 +184,13 @@ class _StickerPickerState extends State<StickerPicker> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 26, color: colored ? Colors.orange : (isDarkMode ? Colors.white70 : Colors.black45)),
+            Icon(
+              icon,
+              size: 26,
+              color: colored
+                  ? Colors.orange
+                  : (isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary)
+            ),
             if (label.isNotEmpty) ...[
               const SizedBox(width: 4),
               Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
@@ -197,43 +201,40 @@ class _StickerPickerState extends State<StickerPicker> {
     );
   }
 
-  Widget _buildPackTabItem(Map<String, dynamic> pack, bool isDarkMode) {
-    final url = pack['coverUrl'] ?? pack['thumbnailUrl'] ?? pack['coverMediaId'] ?? '';
+  Widget _buildPackTabItem(String url, bool isDarkMode) {
     return Tab(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(4),
-          child: SizedBox(
-          width: 30,
-          height: 30,
-          child: _buildSmartImage(
-            (url ?? '').toString(),
-            isDarkMode,
-          ),
-        ),
+          child: SizedBox(width: 30, height: 30, child: _buildSmartImage(url, isDarkMode)),
         ),
       ),
     );
   }
 
   Widget _buildSmartImage(String url, bool isDarkMode) {
-    if (url.isEmpty) return Icon(Icons.style, size: 24, color: isDarkMode ? Colors.white54 : Colors.black38);
-    
-    final fullUrl = context.read<MediaService>().getPublicUrl(url);
-    
+    // Reuse a resilient thumbnail loader with placeholder/error fallback.
+    if (url.isEmpty) return Icon(Icons.style, size: 24, color: isDarkMode ? DarkColors.textHint : Colors.black38);
     return CachedNetworkImage(
-      imageUrl: fullUrl,
+      imageUrl: url,
       fit: BoxFit.cover,
-      placeholder: (context, url) => Container(color: Colors.grey.withOpacity(0.1)),
-      errorWidget: (context, error, stackTrace) => Icon(Icons.style, size: 24, color: isDarkMode ? Colors.white54 : Colors.black38),
+      placeholder: (context, url) => Container(color: Colors.grey.withValues(alpha: 0.1)),
+      errorWidget: (context, error, stackTrace) => Icon(Icons.style, size: 24, color: isDarkMode ? DarkColors.textHint : Colors.black38),
     );
   }
 
   Widget _buildRecentTab() {
+    final common = CommonTexts.of(context);
+    
     if (_isLoadingRecent) return const Center(child: CircularProgressIndicator());
     if (_recentStickers.isEmpty) {
-      return const Center(child: Text('Chưa có sticker gần đây', style: TextStyle(color: Colors.grey, fontSize: 13)));
+      return Center(
+        child: Text(
+          common.noRecentStickersLabel,
+          style: const TextStyle(color: Colors.grey, fontSize: 13)
+        )
+      );
     }
     return GridView.builder(
       padding: const EdgeInsets.all(12),
@@ -244,15 +245,17 @@ class _StickerPickerState extends State<StickerPicker> {
   }
 
   Widget _buildEmojiTab(bool isDarkMode) {
+    final common = CommonTexts.of(context);
+
     return Stack(
       children: [
         CustomScrollView(
           slivers: [
             if (_recentEmojis.isNotEmpty) ...[
-              const SliverToBoxAdapter(
+              SliverToBoxAdapter(
                 child: Padding(
-                  padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
-                  child: Text('Gần đây', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Text(common.recentEmojiLabel, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
                 ),
               ),
               SliverPadding(
@@ -266,10 +269,10 @@ class _StickerPickerState extends State<StickerPicker> {
                 ),
               ),
             ],
-            const SliverToBoxAdapter(
+            SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(16, 20, 16, 8),
-                child: Text('Biểu cảm', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+                child: Text(common.commonEmojiLabel, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
               ),
             ),
             SliverPadding(
@@ -280,7 +283,7 @@ class _StickerPickerState extends State<StickerPicker> {
                   (context, index) {
                     final List<String> emojis = [
                       '😀','😃','😄','😁','😆','😅','😂','🤣','😊','😇','🙂','🙃','😉','😌','😍','🥰','😘','😗','😙','😚',
-                      '😋','😛','😝','😜','🤪','🤨','🧐','🤓','😎','🤩','🥳','😏','😒','😞','😔','😟','😕','🙁','☹️','😣',
+                      '😋','😛','😜','😝','🤪','🤨','🧐','🤓','😎','🤩','🥳','😏','😒','😞','😔','😟','😕','🙁','☹️','😣',
                       '😖','😫','😩','🥺','😢','😭','😤','😠','😡','🤬','🤯','😳','🥵','🥶','😱','😨','😰','😥','😓','🤗',
                       '🤔','🤭','🤫','🤥','😶','😐','😑','😬','🙄','😯','😦','😧','😮','😲','🥱','😴','🤤','😪','😵','🤐'
                     ];
@@ -297,11 +300,11 @@ class _StickerPickerState extends State<StickerPicker> {
           right: 16, bottom: 16,
           child: Material(
             elevation: 4, borderRadius: BorderRadius.circular(24),
-            color: isDarkMode ? Colors.grey.shade800 : Colors.white,
+            color: isDarkMode ? DarkColors.surfaceLight : Colors.white,
             child: InkWell(
               onTap: () => widget.onEmojiSelected('\b'),
               borderRadius: BorderRadius.circular(24),
-              child: Container(padding: const EdgeInsets.all(12), child: Icon(Icons.backspace_outlined, size: 24, color: isDarkMode ? Colors.white70 : Colors.black54)),
+              child: Container(padding: const EdgeInsets.all(12), child: Icon(Icons.backspace_outlined, size: 24, color: isDarkMode ? DarkColors.textSecondary : Colors.black54)),
             ),
           ),
         ),
@@ -319,13 +322,16 @@ class _StickerPickerState extends State<StickerPicker> {
   Widget _buildStickerGrid(String packId, String packName) {
     final stickers = _stickersCache[packId];
     if (stickers == null) return const Center(child: CircularProgressIndicator());
-    if (stickers.isEmpty) return const Center(child: Text('Gói này trống', style: TextStyle(color: Colors.grey, fontSize: 13)));
+    final common = CommonTexts.of(context);
+    if (stickers.isEmpty) {
+        return Center(child: Text(common.stickerPackEmptyNote, style: const TextStyle(color: Colors.grey, fontSize: 13)));
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Text(packName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+          child: Text(packName.toUpperCase(), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
         ),
         Expanded(
           child: GridView.builder(
@@ -341,57 +347,78 @@ class _StickerPickerState extends State<StickerPicker> {
 
   Widget _stickerItem(Map<String, dynamic> sticker) {
     final id = sticker['stickerId'] ?? sticker['id'];
-    final url = sticker['url'] ?? sticker['mediaUrl'] ?? sticker['mediaId'] ?? '';
+    final url = sticker['url'] ?? sticker['mediaUrl'] ?? '';
     return GestureDetector(
       onTap: () {
         context.read<MediaService>().recordStickerUsage(id.toString());
-        context.read<ChatProvider>().sendSticker(conversationId: widget.conversationId, stickerId: id.toString(), stickerUrl: (url ?? '').toString());
+        context.read<ChatProvider>().sendSticker(conversationId: widget.conversationId, stickerId: id.toString(), stickerUrl: url);
         widget.onSelected();
         _loadRecentStickers();
       },
-      child: _buildSmartImage(
-        (url ?? '').toString(),
-        Theme.of(context).brightness == Brightness.dark,
-      ),
+      child: _buildSmartImage(url, Theme.of(context).brightness == Brightness.dark),
     );
   }
 
   void _showStickerStore(BuildContext context) async {
     final mediaService = context.read<MediaService>();
+    final common = CommonTexts.of(context, listen: false);
+    
     final allPacks = await mediaService.getStickerPacks();
     if (!context.mounted) return;
+    
     showModalBottomSheet(
       context: context, isScrollControlled: true, backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.75,
-        decoration: BoxDecoration(color: Theme.of(context).scaffoldBackgroundColor, borderRadius: const BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) {
+        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.75,
+          decoration: BoxDecoration(
+          color: isDarkMode ? DarkColors.surface : LightColors.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20))
+        ),
         child: Column(
           children: [
-            Container(margin: const EdgeInsets.symmetric(vertical: 12), width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
-            const Text('Kho Sticker', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const Divider(),
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: isDarkMode ? DarkColors.divider : Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2)
+              )
+            ),
+            Text(common.stickerStoreTitle,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
+              )
+            ),
+            Divider(color: isDarkMode ? DarkColors.divider : Colors.grey.shade200),
             Expanded(
               child: ListView.separated(
                 itemCount: allPacks.length,
-                separatorBuilder: (context, index) => const Divider(indent: 70),
+                separatorBuilder: (context, index) => Divider(
+                  indent: 70,
+                  color: isDarkMode ? DarkColors.divider : Colors.grey.shade100,
+                ),
                 itemBuilder: (context, index) {
-                  final isDarkMode = Theme.of(context).brightness == Brightness.dark;
                   final pack = allPacks[index];
                   final id = pack['stickerPackId'] ?? pack['id'];
                   final isInstalled = _myPacks.any((p) => (p['stickerPackId'] ?? p['id']).toString() == id.toString());
                   return ListTile(
-                    leading: ClipRRect(
-                      borderRadius: BorderRadius.circular(8), 
-                      child: SizedBox(
-                        width: 50,
-                        height: 50,
-                        child: _buildSmartImage((pack['coverUrl'] ?? pack['thumbnailUrl'] ?? pack['coverMediaId'] ?? '').toString(), isDarkMode),
-                      )
+                    leading: ClipRRect(borderRadius: BorderRadius.circular(8), child: CachedNetworkImage(imageUrl: pack['coverUrl'] ?? pack['thumbnailUrl'] ?? '', width: 50, height: 50, fit: BoxFit.cover)),
+                    title: Text(pack['name'] ?? '',
+                      style: TextStyle(color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary)
                     ),
-                    title: Text(pack['name'] ?? ''),
                     trailing: isInstalled ? const Icon(Icons.check_circle, color: Colors.green) : ElevatedButton(
                       onPressed: () async { await mediaService.installPack(id.toString()); _loadMyPacks(); Navigator.pop(context); },
-                      child: const Text('Tải về'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isDarkMode ? DarkColors.primary : AppColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                      ),
+                      child: Text(common.downloadStickerAction),
                     ),
                   );
                 },
@@ -399,8 +426,8 @@ class _StickerPickerState extends State<StickerPicker> {
             ),
           ],
         ),
-      ),
-    );
+      );
+    });
   }
 }
 
@@ -422,51 +449,52 @@ class _GifTabContentState extends State<_GifTabContent> {
 
   Future<void> _loadTrending() async {
     setState(() => _isLoading = true);
-    try {
-      final gifs = await GifService(context.read<MediaService>()).getTrendingGifs();
-      if (mounted) setState(() { _gifs = gifs; _isLoading = false; });
-    } catch (e) {
-      debugPrint('Error loading GIFs: $e');
-      if (mounted) setState(() => _isLoading = false);
-    }
+    final gifs = await GifService(context.read<MediaService>()).getTrendingGifs();
+    if (mounted) setState(() { _gifs = gifs; _isLoading = false; });
   }
 
   Future<void> _search(String query) async {
     setState(() => _isLoading = true);
-    try {
-      final gifs = await GifService(context.read<MediaService>()).searchGifs(query);
-      if (mounted) setState(() { _gifs = gifs; _isLoading = false; });
-    } catch (e) {
-      debugPrint('Error searching GIFs: $e');
-      if (mounted) setState(() => _isLoading = false);
-    }
+    final gifs = await GifService(context.read<MediaService>()).searchGifs(query);
+    if (mounted) setState(() { _gifs = gifs; _isLoading = false; });
   }
 
   @override
   Widget build(BuildContext context) {
     bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final common = CommonTexts.of(context);
+
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.all(12),
           child: TextField(
             controller: _gifController, onSubmitted: _search,
-            decoration: InputDecoration(hintText: 'Tìm kiếm GIF trên VNALO', prefixIcon: const Icon(Icons.search), border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none), filled: true, fillColor: isDarkMode ? Colors.white10 : Colors.grey.shade100),
+            decoration: InputDecoration(
+              hintText: common.searchGifsHint,
+              prefixIcon: Icon(Icons.search, color: isDarkMode ? DarkColors.textHint : Colors.grey),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+              filled: true,
+              fillColor: isDarkMode ? Colors.white.withValues(alpha: 0.1) : Colors.grey.shade100,
+            ),
           ),
         ),
         Expanded(
           child: _isLoading ? const Center(child: CircularProgressIndicator()) : GridView.builder(
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: 1.5, mainAxisSpacing: 8, crossAxisSpacing: 8),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, mainAxisSpacing: 8, crossAxisSpacing: 8, childAspectRatio: 1.5),
             itemCount: _gifs.length,
             itemBuilder: (context, index) {
-              final url = _gifs[index]['media_formats']?['tinygif']?['url'] ?? '';
+              final gif = _gifs[index];
               return GestureDetector(
                 onTap: () {
-                  context.read<ChatProvider>().sendMediaMessage(conversationId: widget.conversationId, file: null, type: MessageType.IMAGE, mediaUrl: url);
+                  context.read<ChatProvider>().sendGif(conversationId: widget.conversationId, gifUrl: gif['url']);
                   widget.onSelected();
                 },
-                child: ClipRRect(borderRadius: BorderRadius.circular(8), child: CachedNetworkImage(imageUrl: url, fit: BoxFit.cover)),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: CachedNetworkImage(imageUrl: gif['url'], fit: BoxFit.cover, placeholder: (context, url) => Container(color: Colors.grey.withValues(alpha: 0.1))),
+                ),
               );
             },
           ),
@@ -476,41 +504,33 @@ class _GifTabContentState extends State<_GifTabContent> {
   }
 }
 
-class _TrendingTabContent extends StatefulWidget {
+class _TrendingTabContent extends StatelessWidget {
   final VoidCallback onShowStore;
   final Widget Function(String, bool) buildSmartImage;
   const _TrendingTabContent({required this.onShowStore, required this.buildSmartImage});
-  @override
-  State<_TrendingTabContent> createState() => _TrendingTabContentState();
-}
 
-class _TrendingTabContentState extends State<_TrendingTabContent> {
-  List<Map<String, dynamic>> _packs = [];
-  bool _isLoading = false;
-  @override
-  void initState() { super.initState(); _load(); }
-  Future<void> _load() async {
-    setState(() => _isLoading = true);
-    final packs = await context.read<MediaService>().getStickerPacks();
-    if (mounted) setState(() { _packs = packs; _isLoading = false; });
-  }
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
-    return GridView.builder(
-      padding: const EdgeInsets.all(12),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 0.8),
-      itemCount: _packs.length,
-      itemBuilder: (context, index) {
-        final pack = _packs[index];
-        return GestureDetector(
-          onTap: widget.onShowStore,
-          child: Column(children: [
-            Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(8), child: widget.buildSmartImage(pack['coverUrl'] ?? '', Theme.of(context).brightness == Brightness.dark))),
-            const SizedBox(height: 4), Text(pack['name'] ?? '', style: const TextStyle(fontSize: 10), maxLines: 1),
-          ]),
-        );
-      },
+    bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final common = CommonTexts.of(context);
+    
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.local_fire_department, size: 48, color: Colors.orange.shade400),
+        const SizedBox(height: 12),
+        Text(common.featureUnderDevelopment, style: TextStyle(color: isDarkMode ? DarkColors.textSecondary : Colors.grey)),
+        const SizedBox(height: 20),
+        ElevatedButton(
+          onPressed: onShowStore,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: isDarkMode ? DarkColors.primary : AppColors.primary,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          ),
+          child: Text(common.stickerStoreTitle),
+        )
+      ],
     );
   }
 }

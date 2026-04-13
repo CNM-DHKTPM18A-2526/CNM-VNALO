@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
@@ -53,7 +53,7 @@ class ForwardProvider extends ChangeNotifier {
     return _chatProvider.conversations.where((c) {
       if (query.isEmpty) return true;
       final displayName = c.getDisplayName(currentUserId).toLowerCase();
-      return displayName.contains(query); 
+      return displayName.contains(query);
     }).toList();
   }
 
@@ -62,7 +62,7 @@ class ForwardProvider extends ChangeNotifier {
 
     final selectedIds = _selectedConversationIds.toList();
     final sourceMsgs = List<Message>.from(_sourceMessages);
-    
+
     _isSending = true;
     notifyListeners();
 

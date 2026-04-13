@@ -16,23 +16,30 @@ class OtpInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return TextField(
       maxLength: length,
       keyboardType: TextInputType.number,
       textAlign: TextAlign.center,
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      style: TextStyle(
+        fontSize: 18,
+        letterSpacing: 4,
+        fontWeight: FontWeight.bold,
+        color: isDarkMode ? Colors.white : Colors.black,
+      ),
       decoration: InputDecoration(
-        hintText: 'Nhập mã OTP',
+        hintText: 'Nháº­p mÃ£ OTP',
         counterText: '',
         filled: true,
-        fillColor: LightColors.surfaceLight,
+        fillColor: isDarkMode ? DarkColors.surface : LightColors.surfaceLight,
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: LightColors.divider),
+          borderSide: BorderSide(color: isDarkMode ? DarkColors.divider : LightColors.divider),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.primary),
+          borderSide: BorderSide(color: isDarkMode ? DarkColors.primary : AppColors.primary, width: 2),
         ),
       ),
       onChanged: (value) {

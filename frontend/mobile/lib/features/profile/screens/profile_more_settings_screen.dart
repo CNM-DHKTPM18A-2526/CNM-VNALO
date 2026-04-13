@@ -23,14 +23,14 @@ class ProfileMoreSettingsScreen extends StatelessWidget {
         onTap: onTap ??
             () {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('$title đang dùng fallback tạm thời.')),
+                SnackBar(content: Text('$title is currently using a temporary fallback.')),
               );
             },
       );
     }
 
     return Scaffold(
-      backgroundColor: AppColors.sectionBackground,
+      backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
       appBar: AppBar(
         backgroundColor: appBarBg,
         foregroundColor: Colors.white,
@@ -49,15 +49,15 @@ class ProfileMoreSettingsScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                item('Thông tin'),
+                item('Information'),
                 Divider(height: 1, indent: 16, color: dividerColor),
-                item('Đổi ảnh đại diện'),
+                item('Change profile photo'),
                 Divider(height: 1, indent: 16, color: dividerColor),
-                item('Đổi ảnh bìa'),
+                item('Change cover photo'),
                 Divider(height: 1, indent: 16, color: dividerColor),
-                item('Cập nhật giới thiệu bản thân'),
+                item('Update bio'),
                 Divider(height: 1, indent: 16, color: dividerColor),
-                item('Ví của tôi'),
+                item('My wallet'),
               ],
             ),
           ),
@@ -69,14 +69,14 @@ class ProfileMoreSettingsScreen extends StatelessWidget {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-                  child: Text('Cài đặt', style: TextStyle(color: sectionLabel, fontWeight: FontWeight.w600)),
+                  child: Text('Settings', style: TextStyle(color: sectionLabel, fontWeight: FontWeight.w600)),
                 ),
-                item('Mã QR của tôi'),
+                item('My QR code'),
                 Divider(height: 1, indent: 16, color: dividerColor),
-                item('Quyền riêng tư'),
+                item('Privacy'),
                 Divider(height: 1, indent: 16, color: dividerColor),
                 item(
-                  'Quản lý tài khoản',
+                  'Account management',
                   onTap: () {
                     Navigator.of(context, rootNavigator: true).push(
                       MaterialPageRoute(builder: (_) => const AccountSecurityScreen()),
@@ -84,7 +84,7 @@ class ProfileMoreSettingsScreen extends StatelessWidget {
                   },
                 ),
                 Divider(height: 1, indent: 16, color: dividerColor),
-                item('Cài đặt chung'),
+                item('General settings'),
               ],
             ),
           ),

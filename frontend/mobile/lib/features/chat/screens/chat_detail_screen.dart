@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
@@ -46,7 +47,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       chatProvider.setCurrentUserId(currentUserId);
       chatProvider.openConversation(widget.conversation.id);
 
-      // Tự động chuyển subtext cho chat nhóm sau 3 giây
+      // Auto-switch to group member subtitle after a short delay.
       if (widget.conversation.type == ConversationType.GROUP) {
         _subtextTimer = Timer(const Duration(seconds: 3), () {
           if (mounted) {
@@ -61,16 +62,16 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   void _onScroll() {
     if (_isLoadingMore) return;
-    
+
     // In reverse mode, scroll position increases as we scroll UP
     if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
       final chatProvider = context.read<ChatProvider>();
       final messages = chatProvider.getMessagesForConversation(widget.conversation.id);
-      
+
       if (messages.isNotEmpty) {
         setState(() => _isLoadingMore = true);
         final oldestId = messages.last.id;
-        
+
         chatProvider.loadMessages(widget.conversation.id, before: oldestId).then((_) {
           if (mounted) setState(() => _isLoadingMore = false);
         }).catchError((_) {
@@ -143,6 +144,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   Widget build(BuildContext context) {
     final currentUserId = context.read<AuthProvider>().user?.id ?? '';
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final common = CommonTexts.of(context);
 
     return Consumer<ChatProvider>(
       builder: (context, chat, child) {
@@ -158,8 +160,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         final wallpaperUrl = conv.personalWallpaperUrl ?? conv.wallpaperUrl;
 
         return Scaffold(
-          backgroundColor: wallpaperUrl != null 
-              ? (isDarkMode ? Colors.black : LightColors.scaffold) 
+          backgroundColor: wallpaperUrl != null
+              ? (isDarkMode ? Colors.black : LightColors.scaffold)
               : (isDarkMode ? Colors.black : const Color(0xFFEBEDF0)),
           appBar: AppBar(
             titleSpacing: 0,
@@ -209,7 +211,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 icon: const Icon(Icons.call_outlined, color: Colors.white),
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Tính năng đang được phát triển')),
+                    SnackBar(content: Text(common.featureUnderDevelopment)),
                   );
                 },
               ),
@@ -217,7 +219,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 icon: const Icon(Icons.videocam_outlined, color: Colors.white),
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Tính năng đang được phát triển')),
+                    SnackBar(content: Text(common.featureUnderDevelopment)),
                   );
                 },
               ),
@@ -260,7 +262,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                             if (items.isNotEmpty && items.last is List<Message>) {
                                final group = items.last as List<Message>;
                                final newestInGroup = group.first;
-                               if (newestInGroup.senderId == msg.senderId && 
+                               if (newestInGroup.senderId == msg.senderId &&
                                    newestInGroup.createdAt.difference(msg.createdAt).inMinutes.abs() < 2) {
                                    group.add(msg);
                                    continue;
@@ -271,7 +273,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                             items.add(msg);
                          }
                       }
-                      
+
                       for (int i = 0; i < items.length; i++) {
                          if (items[i] is List<Message> && (items[i] as List<Message>).length == 1) {
                              items[i] = (items[i] as List<Message>).first;
@@ -353,9 +355,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   }
 
   Widget _buildSubtext(bool isDirect) {
+    final common = CommonTexts.of(context);
     if (isDirect) {
       return Text(
-        'Vừa truy cập',
+        common.recentlyActive,
         style: TextStyle(
           fontSize: 12,
           color: Colors.white.withValues(alpha: 0.8),
@@ -366,8 +369,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
     return Text(
       _showGroupMembers
-          ? '${widget.conversation.activeMemberCount} thành viên'
-          : 'Bấm để xem thông tin',
+          ? common.membersCountAtChat(widget.conversation.activeMemberCount)
+          : common.clickForInfo,
       style: TextStyle(
         fontSize: 12,
         color: Colors.white.withValues(alpha: 0.8),
@@ -381,6 +384,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     String? avatarUrl,
     String? coverUrl,
   ) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final common = CommonTexts.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 16, top: 8),
       child: Column(
@@ -392,7 +397,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             margin: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              color: AppColors.primary.withValues(alpha: 0.1),
+              color: isDarkMode ? DarkColors.primary.withValues(alpha: 0.1) : AppColors.primary.withValues(alpha: 0.1),
               image: coverUrl != null
                   ? DecorationImage(
                       image: NetworkImage(coverUrl),
@@ -400,8 +405,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     )
                   : null,
               gradient: coverUrl == null
-                  ? const LinearGradient(
-                      colors: [Color(0xFF0068FF), Color(0xFF00A2ED)],
+                  ? LinearGradient(
+                      colors: isDarkMode
+                          ? [DarkColors.primary, DarkColors.primary.withValues(alpha: 0.8)]
+                          : [const Color(0xFF0068FF), const Color(0xFF00A2ED)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     )
@@ -434,7 +441,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Bắt đầu chia sẻ những câu chuyện thú vị\ncùng nhau',
+                  common.startConversationNote,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.grey.shade500,
@@ -445,11 +452,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _buildActionChip('👋', 'Xin chào!'),
+                    _buildActionChip('ðŸ‘‹', common.helloAction),
                     const SizedBox(width: 8),
-                    _buildActionChip('😊', 'Rất vui!'),
+                    _buildActionChip('ðŸ˜Š', common.niceToMeetAction),
                     const SizedBox(width: 8),
-                    _buildActionChip('🎉', 'Chào bạn!'),
+                    _buildActionChip('ðŸŽ‰', common.hiAction),
                   ],
                 ),
               ],
@@ -461,6 +468,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   }
 
   Widget _buildActionChip(String emoji, String label) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: () {
         context.read<ChatProvider>().sendMessage(
@@ -471,13 +479,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFFF0F4FF),
+          color: isDarkMode ? DarkColors.surfaceLight : const Color(0xFFF0F4FF),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+          border: Border.all(color: (isDarkMode ? DarkColors.primary : AppColors.primary).withValues(alpha: 0.3)),
         ),
         child: Text(
           '$emoji $label',
-          style: const TextStyle(fontSize: 13, color: AppColors.primary),
+          style: TextStyle(
+            fontSize: 13,
+            color: isDarkMode ? DarkColors.primary : AppColors.primary,
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ),
     );

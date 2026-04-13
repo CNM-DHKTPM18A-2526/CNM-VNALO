@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:vnalo_mobile/core/localization/common_texts.dart';
+import 'package:vnalo_mobile/core/localization/language_provider.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
 import 'package:vnalo_mobile/features/contacts/screens/send_request_screen.dart';
@@ -32,21 +34,22 @@ class UnifiedSearchScreen extends StatefulWidget {
 class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
     with SingleTickerProviderStateMixin {
   bool get isDarkMode => Theme.of(context).brightness == Brightness.dark;
+  Color get _primaryColor => isDarkMode ? DarkColors.primary : AppColors.primary;
   final TextEditingController _queryController = TextEditingController();
   late final TabController _tabController;
   int _searchRequestId = 0;
 
-  // States for search history and current query
   List<User> _recentFriends = <User>[];
   bool _loadingRecent = true;
 
-  // New states for hybrid search
   User? _strangerFoundByPhone;
   List<LocalContact> _localContactResults = [];
   List<LocalMessageSearchResult> _localMessageResults = [];
   bool _isSearching = false;
   bool _isCancelling = false;
-  String _selectedFilter = 'Tất cả'; // 'Tất cả', 'Link', 'File'
+  
+  // These filter values will be localized in build/logic
+  String _selectedFilterKey = 'all'; // 'all', 'link', 'file'
 
   int get _mineCount =>
       _localContactResults.length +
@@ -103,17 +106,13 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
     final db = context.read<LocalDatabase>();
     final userService = context.read<UserService>();
 
-    // 1. Local Search (Contacts & Messages)
     final contactsTask = db.searchContacts(q);
     final messagesTask = db.searchMessages(q);
 
-    // 2. Global Phone Search (flexible: 9-15 digits, opt leading '+')
     final phoneRegex = RegExp(r'^\+?[0-9]{9,15}$');
     Future<User?> phoneTask = Future.value(null);
     if (phoneRegex.hasMatch(q)) {
-      phoneTask = userService.getUserByPhone(q).catchError((e) {
-        return null;
-      });
+      phoneTask = userService.getUserByPhone(q).catchError((e) => null);
     }
 
     final results = await Future.wait([contactsTask, messagesTask, phoneTask]);
@@ -127,8 +126,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
       _isSearching = false;
     });
 
-    // Fast check for friendship status if stranger found
-    if (_strangerFoundByPhone != null && 
+    if (_strangerFoundByPhone != null &&
         _strangerFoundByPhone!.friendshipStatus?.toUpperCase() != 'PENDING_SENT') {
       _verifyStrangerStatus(_strangerFoundByPhone!.id, requestId);
     }
@@ -147,13 +145,13 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
     }
   }
 
-  // UI Helper for Highlighting
   TextSpan _highlightText(
     String text,
     String query, {
     required TextStyle baseStyle,
-    Color highlightColor = const Color(0xFF0091FF),
+    Color? highlightColor,
   }) {
+    final effectiveHighlightColor = highlightColor ?? _primaryColor;
     if (query.isEmpty) return TextSpan(text: text, style: baseStyle);
 
     final String lowerText = text.toLowerCase();
@@ -174,7 +172,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
         TextSpan(
           text: text.substring(indexOfMatch, indexOfMatch + query.length),
           style: TextStyle(
-            color: highlightColor,
+            color: effectiveHighlightColor,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -190,6 +188,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
   }
 
   Future<void> _handleLocalContactTap(LocalContact contact) async {
+    final common = CommonTexts.of(context, listen: false);
     try {
       final chatService = context.read<ChatService>();
       final conversation = await chatService.getOrCreateDirect(contact.id);
@@ -202,27 +201,22 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Không mở được cuộc trò chuyện.')),
+        SnackBar(content: Text(common.language == AppLanguage.vi ? 'Không mở được cuộc trò chuyện.' : 'Could not open conversation.')),
       );
     }
   }
 
   Future<void> _handleLocalMessageTap(LocalMessage msg) async {
+    final common = CommonTexts.of(context, listen: false);
     try {
       final db = context.read<LocalDatabase>();
       final chatService = context.read<ChatService>();
 
-      // 1. Local Lookup First
-      LocalConversation? localConv = await db.getLocalConversationById(
-        msg.conversationId,
-      );
-
+      LocalConversation? localConv = await db.getLocalConversationById(msg.conversationId);
       Conversation? conv;
       if (localConv != null) {
-        // Map local model to UI model
         conv = Conversation.fromLocal(localConv);
       } else {
-        // 2. Fallback to API
         conv = await chatService.getConversationById(msg.conversationId);
         if (conv == null) {
           final inbox = await chatService.getInbox();
@@ -234,7 +228,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
           }
         }
         if (conv == null) {
-          throw StateError('Conversation not found: ${msg.conversationId}');
+          throw StateError('Conversation not found');
         }
       }
 
@@ -247,12 +241,13 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Không thể mở cuộc trò chuyện này.')),
+        SnackBar(content: Text(common.language == AppLanguage.vi ? 'Không thể mở cuộc trò chuyện này.' : 'Cannot open this conversation.')),
       );
     }
   }
 
   Future<void> _handleStrangerCancel(User user) async {
+    final isVi = CommonTexts.of(context, listen: false).language == AppLanguage.vi;
     setState(() => _isCancelling = true);
     try {
       await context.read<FriendService>().cancelRequestByUserId(user.id);
@@ -263,12 +258,12 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
         );
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Đã hủy lời mời đến ${user.displayName}')),
+        SnackBar(content: Text(isVi ? 'Đã hủy lời mời đến ${user.displayName}' : 'Cancelled request to ${user.displayName}')),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Không thể hủy lời mời: $e')),
+        SnackBar(content: Text(isVi ? 'Không thể hủy lời mời: $e' : 'Failed to cancel request: $e')),
       );
     } finally {
       if (mounted) setState(() => _isCancelling = false);
@@ -278,8 +273,8 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
   @override
   Widget build(BuildContext context) {
     final query = _queryController.text.trim();
+    final common = CommonTexts.of(context);
     final scaffoldBg = isDarkMode ? DarkColors.scaffold : LightColors.scaffold;
-    final isSearching = query.isNotEmpty;
 
     return Scaffold(
       backgroundColor: scaffoldBg,
@@ -287,6 +282,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
         automaticallyImplyLeading: false,
         elevation: 0,
         backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
+        forceMaterialTransparency: !isDarkMode,
         flexibleSpace: isDarkMode
             ? null
             : Container(
@@ -307,28 +303,21 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                 child: Container(
                   height: 38,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
+                    color: isDarkMode ? Colors.white.withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   child: Row(
                     children: [
-                      const Icon(
-                        Icons.search,
-                        color: Colors.white,
-                        size: 20,
-                      ),
+                      const Icon(Icons.search, color: Colors.white, size: 20),
                       const SizedBox(width: 8),
                       Expanded(
                         child: TextField(
                           controller: _queryController,
                           autofocus: true,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            color: Colors.white,
-                          ),
+                          style: const TextStyle(fontSize: 15, color: Colors.white),
                           decoration: InputDecoration(
-                            hintText: 'Tìm kiếm',
+                            hintText: common.searchHint,
                             hintStyle: TextStyle(
                               color: Colors.white.withValues(alpha: 0.7),
                             ),
@@ -347,11 +336,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                             _queryController.clear();
                             _performHybridSearch('');
                           },
-                          child: const Icon(
-                            Icons.close,
-                            color: Colors.white,
-                            size: 20,
-                          ),
+                          child: const Icon(Icons.close, color: Colors.white, size: 20),
                         ),
                     ],
                   ),
@@ -373,23 +358,78 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
     );
   }
 
+  Widget _buildDefaultView() {
+    final isVi = CommonTexts.of(context).language == AppLanguage.vi;
+    return Column(
+      children: [
+        Container(
+          color: isDarkMode ? DarkColors.surface : LightColors.surface,
+          child: TabBar(
+            controller: _tabController,
+            dividerColor: isDarkMode ? DarkColors.divider : AppColors.sectionDivider,
+            labelColor: _primaryColor,
+            unselectedLabelColor: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary,
+            indicatorColor: _primaryColor,
+            indicatorWeight: 3,
+            labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+            tabs: [
+              Tab(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(isVi ? 'Của tôi' : 'Mine'),
+                    if (_mineCount > 0) ...[
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: _primaryColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '$_mineCount',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: _primaryColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Tab(text: isVi ? 'Khám phá' : 'Discover'),
+            ],
+          ),
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildMineTab(),
+              _buildDiscoverTab(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildMineTab() {
+    final common = CommonTexts.of(context);
+    final isVi = common.language == AppLanguage.vi;
     return ListView(
       children: [
-        _sectionHeader('Liên hệ vừa tìm'),
+        _sectionHeader(isVi ? 'Liên hệ vừa tìm' : 'Recent contacts'),
         if (_loadingRecent)
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.all(20),
-              child: CircularProgressIndicator(),
-            ),
-          )
+          const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
         else if (_recentFriends.isEmpty)
-          const Padding(
-            padding: EdgeInsets.all(16),
+          Padding(
+            padding: const EdgeInsets.all(16),
             child: Text(
-              'Chưa có lịch sử tìm kiếm',
-              style: TextStyle(color: Colors.grey),
+              isVi ? 'Chưa có lịch sử tìm kiếm' : 'No search history',
+              style: const TextStyle(color: Colors.grey),
             ),
           )
         else
@@ -405,11 +445,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Column(
                     children: [
-                      AvatarWidget(
-                        imageUrl: friend.avatarUrl,
-                        name: friend.displayName,
-                        size: 52,
-                      ),
+                      AvatarWidget(imageUrl: friend.avatarUrl, name: friend.displayName, size: 52),
                       const SizedBox(height: 4),
                       SizedBox(
                         width: 60,
@@ -435,7 +471,13 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
   }
 
   Widget _buildDiscoverTab() {
-    return const Center(child: Text('Khám phá các tính năng mới trên Vnalo'));
+    final isVi = CommonTexts.of(context).language == AppLanguage.vi;
+    return Center(
+      child: Text(
+        isVi ? 'Khám phá các tính năng mới trên Vnalo' : 'Discover new features on Vnalo',
+        style: TextStyle(color: isDarkMode ? DarkColors.textSecondary : Colors.grey)
+      )
+    );
   }
 
   Widget _buildResultList(String query) {
@@ -443,13 +485,9 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
         _localContactResults.isEmpty &&
         _localMessageResults.isEmpty) {
       if (_isSearching) {
-        return const Center(
-          child: Padding(
-            padding: EdgeInsets.all(32),
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        );
+        return const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator(strokeWidth: 2)));
       }
+      final isVi = CommonTexts.of(context).language == AppLanguage.vi;
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(40),
@@ -458,10 +496,12 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
             children: [
               Icon(Icons.search_off, size: 64, color: Colors.grey.shade300),
               const SizedBox(height: 16),
-              const Text(
-                'Không tìm thấy liên hệ, tin nhắn\ncó chứa nội dung bạn đang tìm kiếm',
+              Text(
+                isVi 
+                  ? 'Không tìm thấy liên hệ, tin nhắn\ncó chứa nội dung bạn đang tìm kiếm'
+                  : 'No contacts or messages found matching your search',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Color(0xFF757575), fontSize: 14),
+                style: const TextStyle(color: Color(0xFF757575), fontSize: 14),
               ),
             ],
           ),
@@ -469,39 +509,33 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
       );
     }
 
-    return Container(
-      color: Colors.transparent, // Đã có scaffoldBg bao bọc
-      child: ListView(
-        children: [
-          if (_strangerFoundByPhone != null) _buildStrangerSection(),
-          if (_localContactResults.isNotEmpty) _buildContactSection(query),
-          if (_localMessageResults.isNotEmpty) _buildMessageSection(query),
-        ],
-      ),
+    return ListView(
+      children: [
+        if (_strangerFoundByPhone != null) _buildStrangerSection(),
+        if (_localContactResults.isNotEmpty) _buildContactSection(query),
+        if (_localMessageResults.isNotEmpty) _buildMessageSection(query),
+      ],
     );
   }
 
   Widget _buildStrangerSection() {
     final user = _strangerFoundByPhone!;
     final surfaceColor = isDarkMode ? DarkColors.surface : LightColors.surface;
+    final isVi = CommonTexts.of(context).language == AppLanguage.vi;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionHeader('Tìm bạn qua số điện thoại (1)', showEdit: false),
+        _sectionHeader(isVi ? 'Tìm bạn qua số điện thoại (1)' : 'Search by phone (1)', showEdit: false),
         Container(
           color: surfaceColor,
           child: ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            leading: AvatarWidget(
-              imageUrl: user.avatarUrl,
-              name: user.displayName,
-              size: 52,
-            ),
+            leading: AvatarWidget(imageUrl: user.avatarUrl, name: user.displayName, size: 52),
             title: Text(
               user.displayName,
               style: TextStyle(
-                fontWeight: FontWeight.w600, 
+                fontWeight: FontWeight.w600,
                 fontSize: 16,
                 color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
               ),
@@ -512,22 +546,18 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                 text: TextSpan(
                   style: const TextStyle(color: Color(0xFF757575), fontSize: 14),
                   children: [
-                    const TextSpan(text: 'Số điện thoại: '),
+                    TextSpan(text: isVi ? 'Số điện thoại: ' : 'Phone: '),
                     _highlightText(
                       user.phone ?? '',
                       _queryController.text,
-                      baseStyle: const TextStyle(color: Color(0xFF0091FF)),
+                      baseStyle: TextStyle(color: _primaryColor),
                     ),
                   ],
                 ),
               ),
             ),
             trailing: _isCancelling
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0091FF)),
-                  )
+                ? SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: _primaryColor))
                 : OutlinedButton(
                     onPressed: () async {
                       if (user.friendshipStatus == 'PENDING_SENT') {
@@ -551,22 +581,20 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                     },
                     style: OutlinedButton.styleFrom(
                       backgroundColor: user.friendshipStatus == 'PENDING_SENT'
-                          ? Colors.grey.shade100
-                          : const Color(0xFFE3F2FD),
+                          ? (isDarkMode ? DarkColors.surfaceLight : Colors.grey.shade100)
+                          : (isDarkMode ? DarkColors.primary.withValues(alpha: 0.1) : const Color(0xFFE3F2FD)),
                       side: BorderSide.none,
                       foregroundColor: user.friendshipStatus == 'PENDING_SENT'
                           ? Colors.grey
-                          : const Color(0xFF0091FF),
+                          : _primaryColor,
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                     ),
                     child: Text(
-                      (_strangerFoundByPhone?.friendshipStatus?.toUpperCase() == 'PENDING_SENT' || 
-                       _strangerFoundByPhone?.friendshipStatus?.toUpperCase() == 'PENDING') 
-                          ? 'Đã gửi' 
-                          : 'Kết bạn',
+                      (_strangerFoundByPhone?.friendshipStatus?.toUpperCase() == 'PENDING_SENT' ||
+                       _strangerFoundByPhone?.friendshipStatus?.toUpperCase() == 'PENDING')
+                          ? (isVi ? 'Đã gửi' : 'Sent')
+                          : (isVi ? 'Kết bạn' : 'Add friend'),
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -580,11 +608,12 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
   Widget _buildContactSection(String query) {
     final surfaceColor = isDarkMode ? DarkColors.surface : LightColors.surface;
     final dividerColor = isDarkMode ? DarkColors.divider : AppColors.itemDivider;
+    final isVi = CommonTexts.of(context).language == AppLanguage.vi;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionHeader('Liên hệ (${_localContactResults.length})', showEdit: false),
+        _sectionHeader(isVi ? 'Liên hệ (${_localContactResults.length})' : 'Contacts (${_localContactResults.length})', showEdit: false),
         Container(
           color: surfaceColor,
           child: Column(
@@ -593,11 +622,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
               return Column(
                 children: [
                   ListTile(
-                    leading: AvatarWidget(
-                      imageUrl: contact.avatarUrl,
-                      name: contact.displayName,
-                      size: 52,
-                    ),
+                    leading: AvatarWidget(imageUrl: contact.avatarUrl, name: contact.displayName, size: 52),
                     title: RichText(
                       text: _highlightText(
                         contact.displayName,
@@ -609,9 +634,9 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                         ),
                       ),
                     ),
-                    trailing: const Icon(
+                    trailing: Icon(
                       Icons.phone_outlined,
-                      color: Color(0xFF0091FF),
+                      color: _primaryColor,
                       size: 24,
                     ),
                     onTap: () => _handleLocalContactTap(contact),
@@ -628,26 +653,102 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
     );
   }
 
+  Widget _buildMessageSection(String query) {
+    final surfaceColor = isDarkMode ? DarkColors.surface : LightColors.surface;
+    final isVi = CommonTexts.of(context).language == AppLanguage.vi;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionHeader(isVi ? 'Tin nhắn (${_localMessageResults.length})' : 'Messages (${_localMessageResults.length})', showEdit: false),
+        _buildFilterChips(),
+        Container(
+          color: surfaceColor,
+          child: Column(
+            children: List.generate(_localMessageResults.length, (index) {
+              final result = _localMessageResults[index];
+              return _buildMessageTile(result, query, index == _localMessageResults.length - 1);
+            }),
+          ),
+        ),
+        const Divider(height: 8, thickness: 8, color: Colors.transparent),
+      ],
+    );
+  }
+
+  Widget _buildMessageTile(LocalMessageSearchResult result, String query, bool isLast) {
+    final dividerColor = isDarkMode ? DarkColors.divider : AppColors.itemDivider;
+    final common = CommonTexts.of(context);
+    
+    return Column(
+      children: [
+        ListTile(
+          leading: AvatarWidget(imageUrl: result.conversationAvatar, name: result.conversationName ?? 'G', size: 52),
+          title: Text(
+            result.conversationName ?? (common.language == AppLanguage.vi ? 'Cuộc hội thoại' : 'Conversation'),
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
+              color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
+            ),
+          ),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: RichText(
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              text: _highlightText(
+                result.message.content,
+                query,
+                baseStyle: TextStyle(
+                  color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ),
+          trailing: Text(
+            DateFormat('dd/MM/yy').format(result.message.createdAt),
+            style: TextStyle(
+              fontSize: 11,
+              color: isDarkMode ? DarkColors.textHint : LightColors.textHint,
+            ),
+          ),
+          onTap: () => _handleLocalMessageTap(result.message),
+        ),
+        if (!isLast)
+          Divider(height: 1, thickness: 0.5, indent: 84, color: dividerColor),
+      ],
+    );
+  }
+
   Widget _buildFilterChips() {
+    final isVi = CommonTexts.of(context).language == AppLanguage.vi;
+    final filters = [
+      {'key': 'all', 'label': isVi ? 'Tất cả' : 'All'},
+      {'key': 'link', 'label': 'Link'},
+      {'key': 'file', 'label': 'File'},
+    ];
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
-        children: ['Tất cả', 'Link', 'File'].map((filter) {
-          final isSelected = _selectedFilter == filter;
+        children: filters.map((f) {
+          final isSelected = _selectedFilterKey == f['key'];
           return Padding(
             padding: const EdgeInsets.only(right: 8),
             child: ChoiceChip(
-              label: Text(filter),
+              label: Text(f['label']!),
               selected: isSelected,
               onSelected: (val) {
-                if (val) setState(() => _selectedFilter = filter);
+                if (val) setState(() => _selectedFilterKey = f['key']!);
               },
               selectedColor: isDarkMode ? const Color(0xFF003D80) : const Color(0xFFE3F2FD),
               backgroundColor: isDarkMode ? DarkColors.surfaceLight : Colors.white,
               labelStyle: TextStyle(
-                color: isSelected 
-                    ? (isDarkMode ? Colors.lightBlueAccent : const Color(0xFF0091FF))
+                color: isSelected
+                    ? _primaryColor
                     : (isDarkMode ? DarkColors.textSecondary : Colors.grey),
                 fontSize: 13,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
@@ -656,8 +757,8 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
                 side: BorderSide(
-                  color: isSelected 
-                      ? (isDarkMode ? Colors.lightBlueAccent : const Color(0xFF0091FF))
+                  color: isSelected
+                      ? _primaryColor
                       : (isDarkMode ? DarkColors.divider : Colors.grey.shade300),
                 ),
               ),
@@ -668,73 +769,8 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
     );
   }
 
-  Widget _buildMessageSection(String query) {
-    final surfaceColor = isDarkMode ? DarkColors.surface : LightColors.surface;
-    final dividerColor = isDarkMode ? DarkColors.divider : AppColors.itemDivider;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _sectionHeader('Tin nhắn (${_localMessageResults.length})', showEdit: false),
-        _buildFilterChips(),
-        Container(
-          color: surfaceColor,
-          child: Column(
-            children: List.generate(_localMessageResults.length, (index) {
-              final result = _localMessageResults[index];
-              return Column(
-                children: [
-                  ListTile(
-                    leading: AvatarWidget(
-                      imageUrl: result.conversationAvatar,
-                      name: result.conversationName ?? 'Group',
-                      size: 52,
-                    ),
-                    title: Text(
-                      result.conversationName ?? 'Cuộc hội thoại',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
-                        color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
-                      ),
-                    ),
-                    subtitle: Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: RichText(
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        text: _highlightText(
-                          result.message.content ?? '',
-                          query,
-                          baseStyle: TextStyle(
-                            color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ),
-                    trailing: Text(
-                      DateFormat('dd/MM/yy').format(result.message.createdAt),
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: isDarkMode ? DarkColors.textHint : LightColors.textHint,
-                      ),
-                    ),
-                    onTap: () => _handleLocalMessageTap(result.message),
-                  ),
-                  if (index < _localMessageResults.length - 1)
-                    Divider(height: 1, thickness: 0.5, indent: 84, color: dividerColor),
-                ],
-              );
-            }),
-          ),
-        ),
-        const Divider(height: 8, thickness: 8, color: Colors.transparent),
-      ],
-    );
-  }
-
   Widget _sectionHeader(String title, {bool showEdit = true}) {
+    final isVi = CommonTexts.of(context).language == AppLanguage.vi;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Row(
@@ -751,11 +787,11 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
           const Spacer(),
           if (showEdit)
             GestureDetector(
-              onTap: () {}, // TODO: Implement edit
-              child: const Text(
-                'SỬA',
-                style: TextStyle(
-                  color: Color(0xFF0091FF),
+              onTap: () {},
+              child: Text(
+                isVi ? 'SỬA' : 'EDIT',
+                style: const TextStyle(
+                  color: AppColors.primary,
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -763,60 +799,6 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
             ),
         ],
       ),
-    );
-  }
-
-  Widget _buildDefaultView() {
-    return Column(
-      children: [
-        Container(
-          color: isDarkMode ? DarkColors.surface : LightColors.surface,
-          child: TabBar(
-            controller: _tabController,
-            dividerColor: isDarkMode ? DarkColors.divider : AppColors.sectionDivider,
-            labelColor: const Color(0xFF0091FF),
-            unselectedLabelColor: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary,
-            indicatorColor: const Color(0xFF0091FF),
-            indicatorWeight: 3,
-            labelStyle: const TextStyle(fontWeight: FontWeight.bold),
-            tabs: [
-              Tab(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('Của tôi'),
-                    if (_mineCount > 0) ...[
-                      const SizedBox(width: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0091FF).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          '$_mineCount',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF0091FF),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              Tab(text: 'Khám phá'),
-            ],
-          ),
-        ),
-        Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: [_buildMineTab(), _buildDiscoverTab()],
-          ),
-        ),
-      ],
     );
   }
 }

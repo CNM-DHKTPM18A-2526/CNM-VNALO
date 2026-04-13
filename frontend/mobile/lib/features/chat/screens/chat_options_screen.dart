@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
+import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
@@ -40,24 +41,20 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
   }
 
   void _showComingSoon(String feature) {
+    final common = CommonTexts.of(context, listen: false);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Tính năng $feature đang được phát triển, vui lòng quay lại sau'),
+        content: Text(common.featureUnderDev(feature)),
         duration: const Duration(seconds: 2),
       ),
     );
   }
 
   void _openWallpaperSelection() {
-    Navigator.of(context).push(
-      PageRouteBuilder(
-        opaque: false,
-        barrierDismissible: true,
-        barrierColor: Colors.black.withValues(alpha: 0.1),
-        pageBuilder: (context, _, __) => WallpaperSelectionScreen(conversation: widget.conversation),
-        transitionsBuilder: (context, animation, secondAnimation, child) {
-          return FadeTransition(opacity: animation, child: child);
-        },
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => WallpaperSelectionScreen(conversation: widget.conversation),
       ),
     );
   }
@@ -65,29 +62,30 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
   Future<void> _editNickname() async {
     final currentUserId = context.read<AuthProvider>().user?.id ?? '';
     final otherMember = widget.conversation.members.firstWhere(
-      (m) => m.userId != currentUserId, 
+      (m) => m.userId != currentUserId,
       orElse: () => widget.conversation.members.first
     );
-    
+
     final controller = TextEditingController(text: otherMember.nickname ?? '');
-    
+    final common = CommonTexts.of(context, listen: false);
+
     final newNickname = await showCupertinoDialog<String>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
-        title: const Text('Đổi tên gợi nhớ'),
+        title: Text(common.editNicknameAction),
         content: Padding(
           padding: const EdgeInsets.only(top: 12),
           child: CupertinoTextField(
             controller: controller,
-            placeholder: 'Nhập tên gợi nhớ',
+            placeholder: common.nicknamePlaceholder,
             autofocus: true,
           ),
         ),
         actions: [
-          CupertinoDialogAction(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
+          CupertinoDialogAction(onPressed: () => Navigator.pop(context), child: Text(common.cancel)),
           CupertinoDialogAction(
             onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('Lưu'),
+            child: Text(common.save),
           ),
         ],
       ),
@@ -99,19 +97,20 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
   }
 
   Future<void> _showAutoDeletePicker() async {
+    final common = CommonTexts.of(context, listen: false);
     final durations = {
-      0: 'Không tự xóa',
-      60: '1 phút',
-      3600: '1 giờ',
-      86400: '24 giờ',
-      604800: '7 ngày',
+      0: common.off,
+      60: '1 ${common.minute}',
+      3600: '1 ${common.hour}',
+      86400: '24 ${common.hour}',
+      604800: '7 ${common.day}',
     };
 
     final result = await showCupertinoModalPopup<int>(
       context: context,
       builder: (context) => CupertinoActionSheet(
-        title: const Text('Tin nhắn tự xóa'),
-        message: const Text('Tin nhắn sẽ tự động biến mất sau khoảng thời gian được chọn.'),
+        title: Text(common.autoDeleteMessages),
+        message: Text(common.autoDeleteNote),
         actions: durations.entries.map<Widget>((e) => CupertinoActionSheetAction(
           onPressed: () => Navigator.pop(context, e.key),
           child: Text(e.value),
@@ -119,7 +118,7 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.pop(context),
           isDefaultAction: true,
-          child: const Text('Hủy'),
+          child: Text(common.cancel),
         ),
       ),
     );
@@ -133,17 +132,18 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
   }
 
   Future<void> _deleteHistory() async {
+    final common = CommonTexts.of(context, listen: false);
     final confirm = await showCupertinoDialog<bool>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
-        title: const Text('Xóa lịch sử trò chuyện?'),
-        content: const Text('Toàn bộ tin nhắn sẽ bị ẩn đi. Bạn không thể hoàn tác thao tác này.'),
+        title: Text(common.deleteHistoryTitleMsg),
+        content: Text(common.deleteHistoryWarning),
         actions: [
-          CupertinoDialogAction(onPressed: () => Navigator.pop(context, false), child: const Text('Hủy')),
+          CupertinoDialogAction(onPressed: () => Navigator.pop(context, false), child: Text(common.cancel)),
           CupertinoDialogAction(
             onPressed: () => Navigator.pop(context, true),
             isDestructiveAction: true,
-            child: const Text('Xóa'),
+            child: Text(common.delete),
           ),
         ],
       ),
@@ -162,23 +162,17 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
     final currentUserId = context.watch<AuthProvider>().user?.id ?? '';
     final displayName = currentConv.getDisplayName(currentUserId);
     final avatarUrl = currentConv.getDisplayAvatarUrl(currentUserId);
+    final common = CommonTexts.of(context);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F2F4),
       appBar: AppBar(
-        title: const Text('Tùy chọn', style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w600)),
-        backgroundColor: Colors.transparent,
+        title: Text(common.options, style: const TextStyle(fontSize: 18, color: Colors.white)),
+        backgroundColor: AppColors.primary,
         elevation: 0,
-        centerTitle: false,
-        titleSpacing: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
-        ),
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: AppColors.appBarGradient,
-          ),
         ),
       ),
       body: ListView(
@@ -205,33 +199,31 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
   Widget _buildHeader(String name, String? avatarUrl) {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 20),
+      padding: const EdgeInsets.symmetric(vertical: 24),
       child: Column(
         children: [
           AvatarWidget(imageUrl: avatarUrl, name: name, size: 80),
           const SizedBox(height: 12),
-          Text(
-            name,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.black),
-          ),
+          Text(name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
         ],
       ),
     );
   }
 
   Widget _buildQuickActions(Conversation conv) {
+    final common = CommonTexts.of(context);
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _buildQuickBtn(CupertinoIcons.search, 'Tìm\ntin nhắn', () => _showComingSoon('Tìm kiếm')),
-          _buildQuickBtn(CupertinoIcons.person, 'Trang\ncá nhân', () => _showComingSoon('Trang cá nhân')),
-          _buildQuickBtn(CupertinoIcons.paintbrush, 'Đổi\nhình nền', _openWallpaperSelection),
+          _buildQuickBtn(CupertinoIcons.search, common.searchMessagesAction, () => _showComingSoon('Tìm kiếm')),
+          _buildQuickBtn(CupertinoIcons.person, common.viewProfileQuickAction, () => _showComingSoon('Trang cá nhân')),
+          _buildQuickBtn(CupertinoIcons.paintbrush, common.changeWallpaperQuickAction, _openWallpaperSelection),
           _buildQuickBtn(
-            conv.isMuted ? CupertinoIcons.bell_slash : CupertinoIcons.bell, 
-            'Tắt\nthông báo', 
+            conv.isMuted ? CupertinoIcons.bell_slash : CupertinoIcons.bell,
+            common.muteNotifsQuickAction,
             () => context.read<ChatProvider>().updateConversationSettings(
               conversationId: conv.id,
               isMuted: !conv.isMuted,
@@ -243,95 +235,77 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
   }
 
   Widget _buildQuickBtn(IconData icon, String label, VoidCallback onTap) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
       child: Column(
         children: [
           Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade50,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: Icon(icon, color: Colors.black87, size: 22),
+            width: 44,
+            height: 44,
+            decoration: const BoxDecoration(color: Color(0xFFF4F5F7), shape: BoxShape.circle),
+            child: Icon(icon, color: isDarkMode ? DarkColors.textPrimary : Colors.black87, size: 22),
           ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 12, height: 1.2, color: Colors.black87),
-          ),
+          const SizedBox(height: 10),
+          Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, height: 1.2)),
         ],
       ),
     );
   }
 
   Widget _buildPrimarySettings(String name, Conversation conv) {
+    final common = CommonTexts.of(context);
     return Container(
       color: Colors.white,
       child: Column(
         children: [
-          _buildTile(CupertinoIcons.pencil, 'Đổi tên gợi nhớ', onTap: _editNickname),
+          _buildTile(CupertinoIcons.pencil, common.editNicknameAction, onTap: _editNickname),
           _buildDivider(),
-          _buildTile(CupertinoIcons.star, 'Đánh dấu bạn thân', 
+          _buildTile(CupertinoIcons.star, common.markAsFavoriteAction,
             trailing: CupertinoSwitch(
-              value: conv.isFavorite, 
+              value: conv.isFavorite,
               onChanged: (v) => context.read<ChatProvider>().updateConversationSettings(
                 conversationId: conv.id,
                 isFavorite: v,
               ),
-              activeColor: AppColors.primary,
+              activeTrackColor: AppColors.primary,
             ),
           ),
           _buildDivider(),
-          _buildTile(CupertinoIcons.clock, 'Nhật ký chung', onTap: () => _showComingSoon('Nhật ký chung')),
+          _buildTile(CupertinoIcons.clock, common.sharedTimelineAction, onTap: () => _showComingSoon('Nhật ký chung')),
         ],
       ),
     );
   }
 
   Widget _buildMediaSection() {
+    final common = CommonTexts.of(context);
     return Container(
       color: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildTile(CupertinoIcons.photo, 'Ảnh, file, link', onTap: () => _showComingSoon('Kho tư liệu')),
+          _buildTile(CupertinoIcons.photo, common.mediaDocsLinksAction, onTap: () => _showComingSoon('Kho tư liệu')),
           if (_isLoadingMedia)
-            const Padding(padding: EdgeInsets.only(left: 56, bottom: 16), child: CupertinoActivityIndicator())
+            const Padding(padding: EdgeInsets.symmetric(horizontal: 56), child: CupertinoActivityIndicator())
           else if (_recentMedia.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(left: 56, bottom: 16),
-              child: Text('Chưa có phương tiện nào được chia sẻ', style: TextStyle(color: Colors.grey, fontSize: 13))
-            )
+            Padding(padding: const EdgeInsets.only(left: 56, top: 4), child: Text(common.noSharedMediaNote, style: const TextStyle(color: Colors.grey, fontSize: 13)))
           else
-            Container(
+            SizedBox(
               height: 70,
-              margin: const EdgeInsets.only(bottom: 16, left: 16, right: 16),
               child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 56),
                 scrollDirection: Axis.horizontal,
-                itemCount: _recentMedia.length + 1,
+                itemCount: _recentMedia.length,
                 itemBuilder: (context, index) {
-                  if (index == _recentMedia.length) {
-                    return _buildMediaNextBtn();
-                  }
                   final m = _recentMedia[index];
                   return Container(
                     margin: const EdgeInsets.only(right: 8),
                     width: 70,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      color: Colors.grey.shade100,
-                    ),
+                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(4), color: Colors.grey.shade200),
                     clipBehavior: Clip.antiAlias,
-                    child: CachedNetworkImage(
-                      imageUrl: m.mediaUrl ?? '',
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => Container(color: Colors.grey.shade200),
-                      errorWidget: (context, url, error) => const Icon(Icons.error),
-                    ),
+                    child: CachedNetworkImage(imageUrl: m.mediaUrl ?? '', fit: BoxFit.cover),
                   );
                 },
               ),
@@ -341,133 +315,106 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
     );
   }
 
-  Widget _buildMediaNextBtn() {
-    return GestureDetector(
-      onTap: () => _showComingSoon('Kho tư liệu'),
-      child: Container(
-        width: 44,
-        height: 44,
-        margin: const EdgeInsets.symmetric(vertical: 13),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF0F4FF),
-          borderRadius: BorderRadius.circular(22),
-        ),
-        child: const Icon(Icons.arrow_forward, color: AppColors.primary, size: 20),
-      ),
-    );
-  }
-
   Widget _buildInteractionSettings(String name) {
+    final common = CommonTexts.of(context);
     return Container(
       color: Colors.white,
       child: Column(
         children: [
-          _buildTile(CupertinoIcons.group, 'Tạo nhóm với $name'),
+          _buildTile(CupertinoIcons.group, common.createGroupWithLabel(name)),
           _buildDivider(),
-          _buildTile(CupertinoIcons.person_add, 'Thêm $name vào nhóm'),
+          _buildTile(CupertinoIcons.person_add, common.addToGroupLabel(name)),
           _buildDivider(),
-          _buildTile(CupertinoIcons.person_3, 'Xem nhóm chung', trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-               const Text('24', style: TextStyle(color: Colors.grey)),
-               const SizedBox(width: 4),
-               const Icon(CupertinoIcons.chevron_right, size: 14, color: Colors.black26),
-            ],
-          )),
+          _buildTile(CupertinoIcons.person_3, common.viewSharedGroupsAction, trailing: const Text('24', style: TextStyle(color: Colors.grey))),
         ],
       ),
     );
   }
 
   Widget _buildConversationSettings(Conversation conv) {
+    final common = CommonTexts.of(context);
     return Container(
       color: Colors.white,
       child: Column(
         children: [
-          _buildTile(CupertinoIcons.pin, 'Ghim trò chuyện', 
+          _buildTile(CupertinoIcons.pin, common.pinConversationAction,
             trailing: CupertinoSwitch(
-              value: conv.isPinned, 
-              trackColor: Colors.grey.shade200,
+              value: conv.isPinned,
               onChanged: (v) => context.read<ChatProvider>().updateConversationSettings(conversationId: conv.id, isPinned: v),
-              activeColor: AppColors.primary,
+              activeTrackColor: AppColors.primary,
             )
           ),
           _buildDivider(),
-          _buildTile(CupertinoIcons.eye_slash, 'Ẩn trò chuyện', 
+          _buildTile(CupertinoIcons.eye_slash, common.hideConversationAction,
             trailing: CupertinoSwitch(
-              value: conv.isHidden, 
-              trackColor: Colors.grey.shade200,
+              value: conv.isHidden,
               onChanged: (v) => context.read<ChatProvider>().updateConversationSettings(conversationId: conv.id, isHidden: v),
-              activeColor: AppColors.primary,
+              activeTrackColor: AppColors.primary,
             )
           ),
           _buildDivider(),
-          _buildTile(CupertinoIcons.phone, 'Báo cuộc gọi đến', 
+          _buildTile(CupertinoIcons.phone, common.notifyCallsAction,
             trailing: CupertinoSwitch(
-              value: conv.notifyCall, 
-              trackColor: Colors.grey.shade200,
+              value: conv.notifyCall,
               onChanged: (v) => context.read<ChatProvider>().updateConversationSettings(conversationId: conv.id, notifyCall: v),
-              activeColor: AppColors.primary,
+              activeTrackColor: AppColors.primary,
             )
           ),
-          _buildDivider(),
-          _buildTile(CupertinoIcons.timer, 'Tin nhắn tự xóa', 
+          _buildZaloDivider(),
+          _buildTile(CupertinoIcons.timer, common.autoDeleteMessages,
             onTap: _showAutoDeletePicker,
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  _formatAutoDelete(conv.autoDeleteSeconds), 
-                  style: const TextStyle(color: Colors.grey, fontSize: 13)
-                ),
-                const SizedBox(width: 4),
-                const Icon(CupertinoIcons.chevron_right, size: 14, color: Colors.black26),
-              ],
+            trailing: Text(
+              _formatAutoDelete(context, conv.autoDeleteSeconds),
+              style: const TextStyle(color: Colors.grey, fontSize: 13)
             )
           ),
-          _buildDivider(),
-          _buildTile(CupertinoIcons.settings, 'Cài đặt cá nhân'),
+          _buildZaloDivider(),
+          _buildTile(CupertinoIcons.settings, common.personalSettingsAction),
         ],
       ),
     );
   }
 
   Widget _buildSecurityActions() {
+    final common = CommonTexts.of(context);
     return Container(
       color: Colors.white,
       child: Column(
         children: [
-          _buildTile(CupertinoIcons.exclamationmark_triangle, 'Báo xấu'),
+          _buildTile(CupertinoIcons.exclamationmark_triangle, common.reportUserAction),
           _buildDivider(),
-          _buildTile(CupertinoIcons.slash_circle, 'Quản lý chặn'),
+          _buildTile(CupertinoIcons.slash_circle, common.blockMgmtAction),
           _buildDivider(),
-          _buildTile(CupertinoIcons.chart_pie, 'Dung lượng trò chuyện'),
+          _buildTile(CupertinoIcons.chart_pie, common.chatStorageAction),
           _buildDivider(),
-          _buildTile(CupertinoIcons.trash, 'Xóa lịch sử trò chuyện', textColor: Colors.red, iconColor: Colors.red, onTap: _deleteHistory, showTrailing: false),
+          _buildTile(CupertinoIcons.trash, common.deleteHistoryAction, textColor: Colors.red, iconColor: Colors.red, onTap: _deleteHistory),
         ],
       ),
     );
   }
 
-  Widget _buildTile(IconData icon, String title, {Widget? trailing, VoidCallback? onTap, Color? textColor, Color? iconColor, bool showTrailing = true}) {
+  Widget _buildTile(IconData icon, String title, {Widget? trailing, VoidCallback? onTap, Color? textColor, Color? iconColor}) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return ListTile(
       onTap: onTap,
       dense: true,
-      leading: Icon(icon, color: iconColor ?? Colors.black54, size: 22),
-      title: Text(title, style: TextStyle(fontSize: 15, color: textColor ?? Colors.black87, fontWeight: FontWeight.w400)),
-      trailing: trailing ?? (showTrailing ? const Icon(CupertinoIcons.chevron_right, size: 14, color: Colors.black26) : null),
+      leading: Icon(icon, color: iconColor ?? (isDarkMode ? DarkColors.textSecondary : Colors.black54), size: 22),
+      title: Text(title, style: TextStyle(fontSize: 15, color: textColor ?? (isDarkMode ? DarkColors.textPrimary : Colors.black87))),
+      trailing: trailing ?? const Icon(CupertinoIcons.chevron_right, size: 14, color: Colors.black26),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16),
       minLeadingWidth: 24,
     );
   }
 
-  Widget _buildDivider() => const Divider(height: 1, thickness: 0.5, indent: 56, color: Color(0xFFEEEEEE));
+  Widget _buildDivider() => const Divider(height: 0.5, thickness: 0.5, indent: 56);
+  Widget _buildZaloDivider() => const Divider(height: 0.5, thickness: 0.5, indent: 56);
 
-  String _formatAutoDelete(int seconds) {
-    if (seconds == 0) return 'Không tự xóa';
-    if (seconds < 3600) return '${seconds ~/ 60} phút';
-    if (seconds < 86400) return '${seconds ~/ 3600} giờ';
-    if (seconds < 604800) return '${seconds ~/ 86400} ngày';
-    return '${seconds ~/ 604800} tuần';
+  String _formatAutoDelete(BuildContext context, int seconds) {
+    final common = CommonTexts.of(context, listen: false);
+    if (seconds == 0) return common.off;
+    if (seconds < 3600) return '${seconds ~/ 60} ${common.minute}';
+    if (seconds < 86400) return '${seconds ~/ 3600} ${common.hour}';
+    if (seconds < 604800) return '${seconds ~/ 86400} ${common.day}';
+    return '${seconds ~/ 604800} ${common.week}';
   }
 }

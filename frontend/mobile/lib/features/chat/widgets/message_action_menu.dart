@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
 
@@ -18,11 +19,12 @@ class MessageActionMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final backgroundColor = isDarkMode ? DarkColors.surface : Colors.white;
+    final common = CommonTexts.of(context);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // 1. Emoji Bar (Separated box as in Image 2)
+        // 1. Emoji Bar
         Container(
           height: 60,
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -31,7 +33,7 @@ class MessageActionMenu extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withValues(alpha: 0.1),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -50,7 +52,7 @@ class MessageActionMenu extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        // 2. Action Grid Box (Separated and highly rounded)
+        // 2. Action Grid Box
         Container(
           padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 8),
           decoration: BoxDecoration(
@@ -58,7 +60,7 @@ class MessageActionMenu extends StatelessWidget {
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withValues(alpha: 0.1),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -71,24 +73,24 @@ class MessageActionMenu extends StatelessWidget {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 crossAxisCount: 4,
-                mainAxisSpacing: 24,
                 crossAxisSpacing: 0,
+                mainAxisSpacing: 24,
                 childAspectRatio: 0.9,
                 children: [
-                  _buildActionItem(context, 'reply', 'Trả lời', Icons.reply_outlined, const Color(0xFF9C27B0)),
-                  _buildActionItem(context, 'forward', 'Chuyển tiếp', Icons.forward_rounded, const Color(0xFF2196F3)),
-                  _buildActionItem(context, 'save', 'Lưu My Documents', Icons.snippet_folder_outlined, const Color(0xFF03A9F4)),
-                  if (isMine)
-                    _buildActionItem(context, 'recall', 'Thu hồi', Icons.undo_rounded, const Color(0xFFFF6B35)),
-                  _buildActionItem(context, 'copy', 'Sao chép', Icons.copy_all_outlined, const Color(0xFF1E88E5)),
-                  _buildActionItem(context, 'pin', 'Ghim', Icons.push_pin_outlined, const Color(0xFFFF9800)),
-                  if (!isMine)
-                    _buildActionItem(context, 'multi', 'Chọn nhiều', Icons.check_circle_outline_rounded, const Color(0xFF1976D2)),
-                  if (isMine)
-                    _buildActionItem(context, 'multi', 'Chọn nhiều', Icons.check_circle_outline_rounded, const Color(0xFF1976D2)),
-                  _buildActionItem(context, 'quick', 'Tạo tin nhắn nhanh', Icons.bolt_rounded, const Color(0xFF1976D2)),
-                  _buildActionItem(context, 'info', 'Chi tiết', Icons.info_outline_rounded, Colors.blueGrey),
-                  _buildActionItem(context, 'delete', 'Xóa', Icons.delete_outline_rounded, Colors.redAccent),
+                  _buildActionItem(context, 'reply', common.replyAction, Icons.reply_outlined, const Color(0xFF9C27B0)),
+                  _buildActionItem(context, 'forward', common.forwardAction, Icons.forward_rounded, const Color(0xFF2196F3)),
+                  _buildActionItem(context, 'save', common.saveToDocsAction, Icons.snippet_folder_outlined, const Color(0xFF03A9F4)),
+                  _buildActionItem(context, 'copy', common.copyAction, Icons.copy_all_outlined, const Color(0xFF1E88E5)),
+                  
+                  _buildActionItem(context, 'pin', common.pinActionTag, Icons.push_pin_outlined, const Color(0xFFFF9800)),
+                  _buildActionItem(context, 'reminder', common.reminderAction, Icons.access_time_rounded, const Color(0xFFE65100)),
+                  _buildActionItem(context, 'multi', common.selectMultiAction, Icons.check_circle_outline_rounded, const Color(0xFF1976D2)),
+                  _buildActionItem(context, 'quick', common.quickReplyAction, Icons.bolt_rounded, const Color(0xFF1976D2)),
+                  
+                  _buildActionItem(context, 'translate', common.translateAction, Icons.translate_rounded, const Color(0xFF4CAF50), labelExtra: common.newTagLabel),
+                  _buildActionItem(context, 'tts', common.speakAction, Icons.volume_up_outlined, const Color(0xFF9C27B0), labelExtra: common.newTagLabel),
+                  _buildActionItem(context, 'info', common.detailsAction, Icons.info_outline_rounded, Colors.blueGrey),
+                  _buildActionItem(context, 'delete', common.delete, Icons.delete_outline_rounded, Colors.redAccent),
                 ],
               ),
             ],

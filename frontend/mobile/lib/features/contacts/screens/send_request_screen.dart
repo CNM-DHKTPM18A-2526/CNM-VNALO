@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
@@ -26,8 +27,10 @@ class _SendRequestScreenState extends State<SendRequestScreen> {
     super.initState();
     final auth = context.read<AuthProvider>();
     final myName = auth.user?.displayName ?? 'VNALO User';
+    final common = CommonTexts.of(context, listen: false);
+    
     _messageController = TextEditingController(
-      text: 'Xin chào, mình là $myName. Kết bạn với mình nhé!',
+      text: common.helloIam(myName),
     );
     final status = widget.targetUser.friendshipStatus?.toUpperCase();
     _isAlreadySent = status == 'PENDING_SENT' || status == 'PENDING';
@@ -47,17 +50,18 @@ class _SendRequestScreenState extends State<SendRequestScreen> {
 
   Future<void> _handleCancel() async {
     setState(() => _isSending = true);
+    final common = CommonTexts.of(context, listen: false);
     try {
       await context.read<FriendService>().cancelRequestByUserId(widget.targetUser.id);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Đã hủy lời mời đến ${widget.targetUser.displayName}')),
+        SnackBar(content: Text(common.requestCancelledTo(widget.targetUser.displayName))),
       );
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Không thể hủy lời mời: $e')),
+        SnackBar(content: Text('${common.cannotCancelRequest}: $e')),
       );
     } finally {
       if (mounted) setState(() => _isSending = false);
@@ -72,6 +76,7 @@ class _SendRequestScreenState extends State<SendRequestScreen> {
 
   Future<void> _handleSend() async {
     setState(() => _isSending = true);
+    final common = CommonTexts.of(context, listen: false);
     try {
       await context.read<FriendService>().sendFriendRequest(
             widget.targetUser.id,
@@ -80,18 +85,18 @@ class _SendRequestScreenState extends State<SendRequestScreen> {
       if (!mounted) return;
       
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Đã gửi lời mời đến ${widget.targetUser.displayName}')),
+        SnackBar(content: Text(common.requestSentTo(widget.targetUser.displayName))),
       );
       Navigator.pop(context, true);
     } on ApiException catch (e) {
       if (!mounted) return;
       final msg = switch (e.code) {
-        'SOCIAL_003' => 'Bạn đã gửi lời mời kết bạn cho người này rồi.',
-        'SOCIAL_002' => 'Hai bạn đã là bạn bè rồi.',
-        'SOCIAL_001' => 'Không thể tự kết bạn với chính mình.',
-        'SOCIAL_007' => 'Bạn đã chặn người dùng này.',
-        'SOCIAL_008' => 'Người dùng này đã chặn bạn.',
-        _ => 'Không thể gửi lời mời: ${e.message}',
+        'SOCIAL_003' => common.requestAlreadySent,
+        'SOCIAL_002' => common.alreadyFriends,
+        'SOCIAL_001' => common.cannotAddSelf,
+        'SOCIAL_007' => common.userBlocked,
+        'SOCIAL_008' => common.userBlockedYou,
+        _ => '${common.errorOccurred}: ${e.message}',
       };
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       if (e.code == 'SOCIAL_003' || e.code == 'SOCIAL_002') {
@@ -100,7 +105,7 @@ class _SendRequestScreenState extends State<SendRequestScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Đã xảy ra lỗi: $e')),
+        SnackBar(content: Text('${common.errorOccurred}: $e')),
       );
     } finally {
       if (mounted) setState(() => _isSending = false);
@@ -110,11 +115,12 @@ class _SendRequestScreenState extends State<SendRequestScreen> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final common = CommonTexts.of(context);
 
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.black : const Color(0xFFF4F5F7),
       appBar: AppBar(
-        title: const Text('Kết bạn', style: TextStyle(fontWeight: FontWeight.w700)),
+        title: Text(common.addFriendTitle, style: const TextStyle(fontWeight: FontWeight.w700)),
         backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.white,
         surfaceTintColor: isDarkMode ? DarkColors.appBarBg : Colors.white,
         foregroundColor: isDarkMode ? Colors.white : Colors.black,
@@ -124,7 +130,7 @@ class _SendRequestScreenState extends State<SendRequestScreen> {
             TextButton(
               onPressed: _isAlreadySent ? _handleCancel : _handleSend,
               child: Text(
-                _isAlreadySent ? 'HỦY' : 'GỬI',
+                _isAlreadySent ? common.cancelAction.toUpperCase() : common.sendAction,
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
             )
@@ -175,9 +181,9 @@ class _SendRequestScreenState extends State<SendRequestScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                   const Text(
-                    'Lời nhắn',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.grey),
+                   Text(
+                    common.messageLabel,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.grey),
                   ),
                   const SizedBox(height: 8),
                   TextField(
@@ -185,7 +191,7 @@ class _SendRequestScreenState extends State<SendRequestScreen> {
                     maxLines: 4,
                     maxLength: 150,
                     decoration: InputDecoration(
-                      hintText: 'Nhập lời nhắn...',
+                      hintText: common.enterMessageHint,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide(color: Colors.grey.shade300),
@@ -198,6 +204,7 @@ class _SendRequestScreenState extends State<SendRequestScreen> {
                       fillColor: isDarkMode ? Colors.black26 : const Color(0xFFF9FAFB),
                       counterText: '',
                     ),
+                    onChanged: (v) => setState(() {}),
                     style: const TextStyle(fontSize: 16),
                     readOnly: _isAlreadySent,
                   ),
@@ -216,15 +223,15 @@ class _SendRequestScreenState extends State<SendRequestScreen> {
                 width: double.infinity,
                 height: 50,
                 child: FilledButton(
-                  onPressed: _isSending ? null : _handleSend,
+                  onPressed: _isSending ? null : (_isAlreadySent ? _handleCancel : _handleSend),
                   style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primary,
+                    backgroundColor: _isAlreadySent ? Colors.redAccent : AppColors.primary,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
                   ),
                   child: _isSending 
                     ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
                     : Text(
-                        _isAlreadySent ? 'Hủy lời mời' : 'Gửi lời mời',
+                        _isAlreadySent ? common.cancelRequestAction : common.sendRequestAction,
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                 ),
