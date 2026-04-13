@@ -9,6 +9,17 @@ import { useLanguage } from '../../../shared/i18n/LanguageContext'
 import type { UserLookupResult } from '../../friends/friends.types'
 import type { ConversationSummary } from '../chat.types'
 import { ChatItem } from './ChatItem'
+import {
+  searchConversationsLocal,
+  searchMessagesLocal,
+  searchUsersByPhoneLocal,
+  searchUsersLocal,
+} from '../searchIndex'
+
+type SearchUserEntry = {
+  user: UserLookupResult
+  conversation: ConversationSummary
+}
 
 type ChatListProps = {
   conversations: ConversationSummary[]
@@ -49,31 +60,136 @@ export function ChatList({
     onSearchFriends(debouncedKeyword)
   }, [debouncedKeyword, onSearchFriends])
 
-  const filteredConversations = useMemo(() => {
-    const normalizedKeyword = debouncedKeyword.toLowerCase()
+  const normalizedKeyword = debouncedKeyword.trim()
+  const normalizedPhone = normalizedKeyword.replace(/\D/g, '')
+  const isPhoneQuery = normalizedPhone.length >= 2 && normalizedPhone.length >= Math.max(2, normalizedKeyword.length - 2)
 
+  const localConversationMatches = useMemo(() => {
     if (!normalizedKeyword) {
       return conversations
     }
 
-    return conversations.filter((conversation) =>
-      conversation.name.toLowerCase().includes(normalizedKeyword),
-    )
-  }, [conversations, debouncedKeyword])
+    const conversationNameMatches = searchConversationsLocal(normalizedKeyword)
+    const messageMatches = searchMessagesLocal(normalizedKeyword)
+    const messageConversationIds = new Set(messageMatches.map((message) => message.conversationId))
+    const matchedConversationIds = new Set<string>()
+    const results: ConversationSummary[] = []
 
-  const friendResultItems = useMemo<ConversationSummary[]>(() => {
-    return friendResults.map((friend) => ({
-      id: friend.id,
-      name: friend.displayName?.trim() || friend.phone || friend.email || t('contacts.common.unknownUser'),
-      lastMessage: friend.statusMessage?.trim() || friend.phone || friend.email || '',
-      unreadCount: 0,
-      online: false,
-      lastMessageSeq: 0,
-    }))
+    const addConversation = (conversation: ConversationSummary, preview?: string) => {
+      if (matchedConversationIds.has(conversation.id)) {
+        return
+      }
+
+      matchedConversationIds.add(conversation.id)
+      results.push(
+        preview
+          ? {
+              ...conversation,
+              lastMessage: preview,
+            }
+          : conversation,
+      )
+    }
+
+    for (const conversation of conversationNameMatches) {
+      addConversation(conversation)
+    }
+
+    for (const conversation of conversations) {
+      if (messageConversationIds.has(conversation.id)) {
+        const matchedMessage = messageMatches.find((message) => message.conversationId === conversation.id)
+        addConversation(
+          conversation,
+          matchedMessage?.content?.trim() || matchedMessage?.messageType || t('chat.searchMessagesSection'),
+        )
+      }
+    }
+
+    return results
+  }, [conversations, normalizedKeyword, t])
+
+  const localUserLookupItems = useMemo<SearchUserEntry[]>(() => {
+    if (!normalizedKeyword) {
+      return []
+    }
+
+    const candidates = isPhoneQuery ? searchUsersByPhoneLocal(normalizedPhone) : searchUsersLocal(normalizedKeyword)
+
+    return candidates.map((user) => {
+      const displayName = user.displayName?.trim() || user.phone || user.email || t('contacts.common.unknownUser')
+      return {
+        user: {
+          id: user.id,
+          phone: user.phone ?? null,
+          email: user.email ?? null,
+          displayName: user.displayName ?? null,
+          avatarUrl: user.avatarUrl ?? null,
+          coverUrl: null,
+          bio: user.bio ?? null,
+          statusMessage: user.bio ?? null,
+        },
+        conversation: {
+          id: user.id,
+          name: displayName,
+          lastMessage: user.bio?.trim() || user.phone || user.email || '',
+          unreadCount: 0,
+          online: false,
+          lastMessageSeq: 0,
+        },
+      }
+    })
+  }, [isPhoneQuery, normalizedKeyword, normalizedPhone, t])
+
+  const backendUserLookupItems = useMemo<SearchUserEntry[]>(() => {
+    const seenIds = new Set<string>()
+    const results: SearchUserEntry[] = []
+
+    for (const friend of friendResults) {
+      if (seenIds.has(friend.id)) {
+        continue
+      }
+
+      seenIds.add(friend.id)
+      const displayName = friend.displayName?.trim() || friend.phone || friend.email || t('contacts.common.unknownUser')
+      results.push({
+        user: friend,
+        conversation: {
+          id: friend.id,
+          name: displayName,
+          lastMessage: friend.statusMessage?.trim() || friend.phone || friend.email || '',
+          unreadCount: 0,
+          online: false,
+          lastMessageSeq: 0,
+        },
+      })
+    }
+
+    return results
   }, [friendResults, t])
 
+  const friendLookupItems = useMemo(() => {
+    const seenIds = new Set<string>()
+    const merged: SearchUserEntry[] = []
+
+    for (const item of localUserLookupItems) {
+      if (!seenIds.has(item.user.id)) {
+        seenIds.add(item.user.id)
+        merged.push(item)
+      }
+    }
+
+    for (const item of backendUserLookupItems) {
+      if (!seenIds.has(item.user.id)) {
+        seenIds.add(item.user.id)
+        merged.push(item)
+      }
+    }
+
+    return merged
+  }, [backendUserLookupItems, localUserLookupItems])
+
   const hasKeyword = debouncedKeyword.length > 0
-  const hasResults = filteredConversations.length > 0 || friendResultItems.length > 0
+  const hasResults = localConversationMatches.length > 0 || friendLookupItems.length > 0
 
   const openFriendSearch = () => {
     setIsAddFriendOpen(true)
@@ -116,8 +232,8 @@ export function ChatList({
         </div>
       </div>
       <div className='chat-list'>
-        {/* {filteredConversations.length > 0 ? <p>{t('chat.searchConversationsSection')}</p> : null} */}
-        {filteredConversations.map((conversation, index) => (
+        {localConversationMatches.length > 0 ? <p>{t('chat.searchConversationsSection')}</p> : null}
+        {localConversationMatches.map((conversation, index) => (
           <ChatItem
             key={conversation.id}
             conversation={conversation}
@@ -127,18 +243,15 @@ export function ChatList({
           />
         ))}
 
-        {friendResultItems.length > 0 ? <p>{t('chat.searchFriendsSection')}</p> : null}
-        {friendResultItems.map((friend, index) => (
+        {friendLookupItems.length > 0 ? <p>{t('chat.searchFriendsSection')}</p> : null}
+        {friendLookupItems.map((entry, index) => (
           <ChatItem
-            key={`friend-${friend.id}`}
-            conversation={friend}
+            key={`friend-${entry.user.id}`}
+            conversation={entry.conversation}
             active={false}
-            index={filteredConversations.length + index}
+            index={localConversationMatches.length + index}
             onSelect={() => {
-              const selectedFriend = friendResults[index]
-              if (selectedFriend) {
-                void onOpenFriendChat(selectedFriend)
-              }
+              void onOpenFriendChat(entry.user)
             }}
           />
         ))}

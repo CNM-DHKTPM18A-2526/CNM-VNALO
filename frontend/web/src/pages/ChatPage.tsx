@@ -5,10 +5,12 @@ import { getSyncPolicy } from '../features/auth/auth.api'
 import { ChatList } from '../features/chat/components/ChatList'
 import { ConversationInfo } from '../features/chat/components/ConversationInfo'
 import { SearchMessagesPanel } from '../features/chat/components/SearchMessagesPanel'
+import { SearchGlobalPanel } from '../features/chat/components/SearchGlobalPanel'
 import { ChatWindow } from '../features/chat/components/ChatWindow'
 import type { MessageContextMenuAction } from '../features/chat/components/MessageContextMenu'
 import {
   addMessageReaction,
+  deleteMessageForMe,
   fetchMessageReactions,
   fetchInbox,
   fetchMessages,
@@ -35,11 +37,20 @@ import type {
   MessageDeliveryState,
 } from '../features/chat/chat.types'
 import { getFriends, getUserById, searchUsers } from '../features/friends/friends.api'
+import { getUserByPhone } from '../features/friends/friends.api'
 import type { UserLookupResult } from '../features/friends/friends.types'
 import { useAuth } from '../features/auth/useAuth'
 import { Skeleton } from '../shared/components/ui/Skeleton'
 import { Card } from '../shared/components/ui/Card'
 import { useLanguage } from '../shared/i18n/LanguageContext'
+import {
+  initializeSearchIndex,
+  updateSearchIndexConversations,
+  addMessagesToSearchIndex,
+  updateSearchIndexUsers,
+  type CachedMessage,
+  type CachedUser,
+} from '../features/chat/searchIndex'
 
 function sortMessages(messages: ChatMessage[]): ChatMessage[] {
   return [...messages].sort((left, right) => {
@@ -372,7 +383,7 @@ export function ChatPage() {
   const [friendResults, setFriendResults] = useState<UserLookupResult[]>([])
   const [userProfileCache, setUserProfileCache] = useState<Record<string, CachedUserProfile>>({})
   const [isSocketConnected, setIsSocketConnected] = useState(false)
-  const [rightSidebarContent, setRightSidebarContent] = useState<'info' | 'search' | null>('info')
+  const [rightSidebarContent, setRightSidebarContent] = useState<'info' | 'search' | 'global-search' | null>('info')
   const [jumpToMessageId, setJumpToMessageId] = useState<string | null>(null)
   const [pinnedMessageIds, setPinnedMessageIds] = useState<Record<string, true>>({})
   const [starredMessageIds, setStarredMessageIds] = useState<Record<string, true>>({})
@@ -437,6 +448,55 @@ export function ChatPage() {
 
     persistDeletedMessageIds(user.id, deletedMessageIds)
   }, [deletedMessageIds, user?.id])
+
+  // Initialize search index on mount
+  useEffect(() => {
+    initializeSearchIndex()
+  }, [])
+
+  // Update search index when conversations are loaded
+  useEffect(() => {
+    if (conversations.length > 0) {
+      updateSearchIndexConversations(conversations)
+    }
+  }, [conversations])
+
+  // Update search index when messages are loaded
+  useEffect(() => {
+    const allMessages: CachedMessage[] = []
+    Object.entries(messagesByConversation).forEach(([conversationId, messages]) => {
+      const conversation = conversations.find((c) => c.id === conversationId)
+      messages.forEach((msg) => {
+        allMessages.push({
+          id: msg.id,
+          conversationId: msg.conversationId,
+          senderId: msg.senderId,
+          content: msg.text,
+          createdAt: msg.createdAt ?? undefined,
+          messageType: msg.type,
+          conversationName: conversation?.name,
+        })
+      })
+    })
+    if (allMessages.length > 0) {
+      addMessagesToSearchIndex(allMessages)
+    }
+  }, [messagesByConversation, conversations])
+
+  // Update search index when friends are loaded
+  useEffect(() => {
+    if (friendResults.length > 0) {
+      const cachedUsers: CachedUser[] = friendResults.map((u) => ({
+        id: u.id,
+        phone: u.phone ?? undefined,
+        email: u.email ?? undefined,
+        displayName: u.displayName ?? undefined,
+        avatarUrl: u.avatarUrl ?? undefined,
+        bio: u.bio ?? undefined,
+      }))
+      updateSearchIndexUsers(cachedUsers)
+    }
+  }, [friendResults])
 
   const toReactionState = useCallback(
     (rows: Array<{ userId: string; emoji: string }>): MessageReactionState => {
@@ -582,16 +642,21 @@ export function ChatPage() {
 
   const handleDeleteForMe = useCallback(
     async (messageId: string) => {
-      if (!messageId) {
+      if (!accessToken || !messageId) {
         return
       }
 
-      setDeletedMessageIds((prev) => ({
-        ...prev,
-        [messageId]: true,
-      }))
+      try {
+        await deleteMessageForMe(accessToken, messageId)
+        setDeletedMessageIds((prev) => ({
+          ...prev,
+          [messageId]: true,
+        }))
+      } catch (error) {
+        console.error('[ChatPage.handleDeleteForMe] Failed to delete message for me', { messageId, error })
+      }
     },
-    [],
+    [accessToken],
   )
 
   const handleRecallMessage = useCallback(
@@ -1001,7 +1066,15 @@ export function ChatPage() {
         return
       }
 
+      const normalizedPhone = normalizedKeyword.replace(/\D/g, '')
+
       try {
+        if (normalizedPhone.length >= 2 && normalizedPhone.length >= Math.max(2, normalizedKeyword.length - 2)) {
+          const user = await getUserByPhone(accessToken, normalizedKeyword)
+          setFriendResults(user ? [user] : [])
+          return
+        }
+
         const users = await searchUsers(accessToken, normalizedKeyword)
         setFriendResults(users)
       } catch (error) {
@@ -1020,7 +1093,44 @@ export function ChatPage() {
     [navigate],
   )
 
+  // Handlers for global search panel
+  const handleGlobalSearchSelectMessage = useCallback(
+    (messageId: string, conversationId: string) => {
+      setSelectedConversationId(conversationId)
+      navigate(`/chat/${conversationId}`)
+      setJumpToMessageId(messageId)
+      setRightSidebarContent(null)
+    },
+    [navigate],
+  )
+
+  const handleGlobalSearchSelectConversation = useCallback(
+    (conversationId: string) => {
+      setSelectedConversationId(conversationId)
+      navigate(`/chat/${conversationId}`)
+      setRightSidebarContent(null)
+    },
+    [navigate],
+  )
+
+  const handleGlobalSearchSelectUser = useCallback(
+    async (userId: string) => {
+      if (!accessToken || !user) {
+        return
+      }
+
+      try {
+        const conversationId = await getOrCreateDirectConversation(accessToken, userId)
+        handleGlobalSearchSelectConversation(conversationId)
+      } catch (error) {
+        console.error('[ChatPage] Failed to create direct conversation:', error)
+      }
+    },
+    [accessToken, user, handleGlobalSearchSelectConversation],
+  )
+
   const activeConversationId = routedConversationId || selectedConversationId
+
 
   useEffect(() => {
     if (!accessToken || !activeConversationId || !user) {
@@ -1841,6 +1951,36 @@ export function ChatPage() {
       }
 
       const normalizedKeyword = keyword.trim().toLowerCase()
+      const localConversationMessages = messagesByConversation[conversationId] ?? []
+
+      const localMessages = localConversationMessages.filter((message) => {
+        if (message.type === 'file') {
+          return false
+        }
+
+        if (!normalizedKeyword) {
+          return true
+        }
+
+        return (
+          message.text.toLowerCase().includes(normalizedKeyword) ||
+          getFileNameFromUrl(message.mediaUrl ?? message.attachments?.[0]?.url).includes(normalizedKeyword)
+        )
+      })
+
+      const localFiles = localConversationMessages.filter((message) => {
+        if (message.type !== 'file') {
+          return false
+        }
+
+        if (!normalizedKeyword) {
+          return true
+        }
+
+        const messageText = message.text.toLowerCase()
+        const fileName = getFileNameFromUrl(message.mediaUrl ?? message.attachments?.[0]?.url)
+        return messageText.includes(normalizedKeyword) || fileName.includes(normalizedKeyword)
+      })
 
       const [messageResult, fileResult] = await Promise.all([
         searchConversationMessages(accessToken, conversationId, {
@@ -1872,20 +2012,52 @@ export function ChatPage() {
           return messageText.includes(normalizedKeyword) || fileName.includes(normalizedKeyword)
         })
 
+      const mergedMessages = [...localMessages, ...mappedMessages]
+      const mergedFiles = [...localFiles, ...mappedFiles]
+      const dedupeById = (items: ChatMessage[]) => {
+        const seen = new Set<string>()
+        return items.filter((item) => {
+          if (seen.has(item.id)) {
+            return false
+          }
+          seen.add(item.id)
+          return true
+        })
+      }
+
       return {
-        messages: mappedMessages,
-        files: mappedFiles,
+        messages: dedupeById(mergedMessages),
+        files: dedupeById(mergedFiles),
       }
     },
-    [accessToken, user],
+    [accessToken, messagesByConversation, user],
   )
 
   const handleToggleSearchSidebar = useCallback(() => {
-    setRightSidebarContent((prev) => (prev === 'search' ? null : 'search'))
+    // If there's a selected conversation, toggle in-conversation search
+    // Otherwise, toggle global search
+    if (selectedConversationIdRef.current) {
+      setRightSidebarContent((prev) => (prev === 'search' ? null : 'search'))
+    } else {
+      setRightSidebarContent((prev) => (prev === 'global-search' ? null : 'global-search'))
+    }
   }, [])
 
   const handleToggleInfoSidebar = useCallback(() => {
     setRightSidebarContent((prev) => (prev === 'info' ? null : 'info'))
+  }, [])
+
+  // Add keyboard shortcut Cmd/Ctrl+K for global search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        setRightSidebarContent((prev) => (prev === 'global-search' ? null : 'global-search'))
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
   if (isBootstrapping || isLoadingConversations) {
@@ -1981,6 +2153,16 @@ export function ChatPage() {
 
           {rightSidebarContent === 'search' && !selectedConversation ? (
             <p>{t('pages.chat.sideInfoFallback')}</p>
+          ) : null}
+
+          {rightSidebarContent === 'global-search' ? (
+            <SearchGlobalPanel
+              accessToken={accessToken ?? undefined}
+              onSelectMessage={handleGlobalSearchSelectMessage}
+              onSelectConversation={handleGlobalSearchSelectConversation}
+              onSelectUser={handleGlobalSearchSelectUser}
+              onClose={() => setRightSidebarContent(null)}
+            />
           ) : null}
 
           {rightSidebarContent === 'info' ? (

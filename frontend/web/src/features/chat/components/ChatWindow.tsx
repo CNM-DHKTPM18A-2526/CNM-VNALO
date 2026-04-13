@@ -21,7 +21,7 @@ type ChatWindowProps = {
   onToggleSearchSidebar: () => void
   onToggleInfoSidebar: () => void
   onSyncHistory?: () => void
-  rightSidebarContent: 'info' | 'search' | null
+  rightSidebarContent: 'info' | 'search' | 'global-search' | null
   jumpToMessageId?: string | null
   onJumpToMessageHandled?: () => void
   isRestrictedMode?: boolean
@@ -209,10 +209,10 @@ export function ChatWindow({
             <Icon name='video' />
           </button>
           <button
-            className={rightSidebarContent === 'search' ? 'chat-header-action-btn chat-header-action-btn-active' : 'chat-header-action-btn'}
+            className={rightSidebarContent === 'search' || rightSidebarContent === 'global-search' ? 'chat-header-action-btn chat-header-action-btn-active' : 'chat-header-action-btn'}
             type='button'
             onClick={onToggleSearchSidebar}
-            aria-pressed={rightSidebarContent === 'search'}
+            aria-pressed={rightSidebarContent === 'search' || rightSidebarContent === 'global-search'}
           >
             <Icon name='search' />
           </button>

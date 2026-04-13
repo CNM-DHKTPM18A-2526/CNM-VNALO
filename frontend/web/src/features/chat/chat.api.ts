@@ -82,6 +82,31 @@ export type SearchConversationMessagesResult = {
   offset: number
 }
 
+export type GlobalSearchResult = {
+  type: 'message' | 'conversation' | 'user'
+  id: string
+  conversationId?: string
+  conversationName?: string
+  senderId?: string
+  senderName?: string
+  content?: string
+  createdAt?: string
+  phone?: string
+  displayName?: string
+  email?: string
+  avatarUrl?: string
+  bio?: string
+  displayText?: string
+}
+
+export type GlobalSearchResults = {
+  query: string
+  queryType: 'keyword' | 'phone'
+  results: GlobalSearchResult[]
+  hasLocalResults: boolean
+  totalCount: number
+}
+
 export type SendMessageRequest = {
   conversationId: string
   clientMessageId?: string
@@ -529,6 +554,40 @@ export async function unpinMessage(token: string, conversationId: string, messag
 
 export async function fetchPinnedMessages(token: string, conversationId: string): Promise<RawPinnedMessage[]> {
   return authorizedFetch<RawPinnedMessage[]>(token, `/conversations/${conversationId}/pins`)
+}
+
+/**
+ * Search globally across all conversations, messages, and support users/phone lookup
+ * This backend endpoint searches across all user's conversations and messages
+ */
+export async function searchGlobalMessages(
+  token: string,
+  keyword: string,
+  limit = 50,
+  offset = 0,
+): Promise<SearchConversationMessagesResult> {
+  const searchParams = new URLSearchParams()
+  searchParams.set('keyword', keyword)
+  searchParams.set('limit', String(limit))
+  searchParams.set('offset', String(offset))
+
+  const query = searchParams.toString()
+  const endpoint = `/messages/search${query ? `?${query}` : ''}`
+
+  try {
+    const data = await authorizedFetch<SearchConversationMessagesResult>(token, endpoint)
+    return data
+  } catch (error) {
+    // Fallback: if global search endpoint doesn't exist, return empty results
+    // Frontend will use local index instead
+    console.warn('[chat.api.searchGlobalMessages] Global search failed, using local index:', error)
+    return {
+      items: [],
+      total: 0,
+      limit,
+      offset,
+    }
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
