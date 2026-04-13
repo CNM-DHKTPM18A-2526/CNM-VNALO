@@ -217,26 +217,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final t = AuthTexts.of(context);
     final scaffoldBg = isDarkMode ? DarkColors.scaffold : Colors.white;
+    final appBarFg = isDarkMode ? Colors.white : const Color(0xFF171717);
 
     return Scaffold(
       backgroundColor: scaffoldBg,
       appBar: AppBar(
-        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
-        flexibleSpace: isDarkMode
-            ? null
-            : Container(
-                decoration: const BoxDecoration(
-                  gradient: AppColors.appBarGradient,
-                ),
-              ),
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(Icons.arrow_back, color: appBarFg),
           onPressed: _onBack,
         ),
         title: Text(
           t.forgotPasswordTitle,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: appBarFg,
             fontSize: 18,
             fontWeight: FontWeight.w700,
           ),
@@ -418,7 +413,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               text: TextSpan(
                 style: TextStyle(fontSize: 15, color: isDarkMode ? DarkColors.textSecondary : const Color(0xFF6B7280), height: 1.4),
                 children: [
-                  TextSpan(text: t.otpSentToLabel + '\n'),
+                  TextSpan(text: '${t.otpSentToLabel}\n'),
                   TextSpan(
                     text: email,
                     style: TextStyle(

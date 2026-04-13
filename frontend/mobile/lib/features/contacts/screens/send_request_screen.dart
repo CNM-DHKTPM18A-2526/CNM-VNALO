@@ -118,7 +118,7 @@ class _SendRequestScreenState extends State<SendRequestScreen> {
     final common = CommonTexts.of(context);
 
     return Scaffold(
-      backgroundColor: isDarkMode ? Colors.black : const Color(0xFFF4F5F7),
+      backgroundColor: isDarkMode ? Colors.black : LightColors.scaffold,
       appBar: AppBar(
         title: Text(common.addFriendTitle, style: const TextStyle(fontWeight: FontWeight.w700)),
         backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.white,

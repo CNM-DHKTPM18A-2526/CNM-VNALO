@@ -203,45 +203,43 @@ class ProfileDetailScreen extends StatelessWidget {
   // ——— Pick & update avatar ———
   Future<void> _pickAndUpdateAvatar(BuildContext context) async {
     final picker = ImagePicker();
+    final t = ProfileTexts.of(context, listen: false);
+    final auth = context.read<AuthProvider>();
     final picked = await picker.pickImage(
       source: ImageSource.gallery, maxWidth: 512, maxHeight: 512, imageQuality: 85,
     );
     if (picked == null) return;
 
-    final auth = context.read<AuthProvider>();
     final success = await auth.updateAvatar(File(picked.path));
-    final t = ProfileTexts.of(context, listen: false);
+    if (!context.mounted) return;
 
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(success ? t.updateSuccess : auth.error ?? t.updateFailed),
-          backgroundColor: success ? Colors.green : Colors.red,
-        ),
-      );
-    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(success ? t.updateSuccess : auth.error ?? t.updateFailed),
+        backgroundColor: success ? Colors.green : Colors.red,
+      ),
+    );
   }
 
   // ——— Pick & update cover ———
   Future<void> _pickAndUpdateCover(BuildContext context) async {
     final picker = ImagePicker();
+    final t = ProfileTexts.of(context, listen: false);
+    final auth = context.read<AuthProvider>();
     final picked = await picker.pickImage(
       source: ImageSource.gallery, maxWidth: 1920, maxHeight: 1080, imageQuality: 85,
     );
     if (picked == null) return;
 
-    final auth = context.read<AuthProvider>();
     final success = await auth.updateCover(File(picked.path));
-    final t = ProfileTexts.of(context, listen: false);
+    if (!context.mounted) return;
 
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(success ? t.updateSuccess : auth.error ?? t.updateFailed),
-          backgroundColor: success ? Colors.green : Colors.red,
-        ),
-      );
-    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(success ? t.updateSuccess : auth.error ?? t.updateFailed),
+        backgroundColor: success ? Colors.green : Colors.red,
+      ),
+    );
   }
 
   void _showComingSoon(BuildContext context, String feature) {

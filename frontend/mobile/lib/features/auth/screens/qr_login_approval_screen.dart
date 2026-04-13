@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/localization/common_texts.dart';
+import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 
 class QrLoginApprovalScreen extends StatefulWidget {
@@ -217,9 +218,16 @@ class _QrLoginApprovalScreenState extends State<QrLoginApprovalScreen> {
   Widget build(BuildContext context) {
     final common = CommonTexts.of(context);
     final preview = _preview;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final scaffoldBg = isDarkMode ? DarkColors.scaffold : Colors.white;
+    final appBarFg = isDarkMode ? Colors.white : const Color(0xFF171717);
 
     return Scaffold(
+      backgroundColor: scaffoldBg,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        foregroundColor: appBarFg,
         title: Text(common.qrLoginHeader),
       ),
       body: Column(

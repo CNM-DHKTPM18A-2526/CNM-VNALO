@@ -12,8 +12,6 @@ import 'package:vnalo_mobile/services/chat_service.dart';
 import 'package:vnalo_mobile/services/friend_service.dart';
 import 'package:vnalo_mobile/features/search/screens/unified_search_screen.dart';
 import 'package:vnalo_mobile/core/localization/common_texts.dart';
-import 'package:vnalo_mobile/features/profile/providers/avatar_cache_provider.dart';
-import 'package:vnalo_mobile/services/user_service.dart';
 
 class ContactsScreen extends StatefulWidget {
   const ContactsScreen({super.key});
@@ -73,31 +71,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
         );
       }
     }
-  }
-
-  Future<void> _refreshFriendAvatar(User user) async {
-    final fresh = await context.read<UserService>().getUserById(user.id);
-    if (!mounted) return;
-
-    if (fresh == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Không thể tải thông tin mới, vui lòng thử lại')),
-      );
-      return;
-    }
-
-    final idx = _friends.indexWhere((u) => u.id == user.id);
-    if (idx >= 0) {
-      _friends[idx] = fresh;
-      setState(() {});
-    }
-
-    context.read<AvatarCacheProvider>().bumpUserAvatarVersion(user.id);
-    context.read<ChatProvider>().updateUserProfileInConversations(fresh);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đã làm mới ảnh đại diện')),
-    );
   }
 
   @override
@@ -198,7 +171,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
     final sortedKeys = grouped.keys.toList()..sort();
 
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDarkMode ? DarkColors.scaffold : const Color(0xFFF4F5F7);
+    final bgColor = isDarkMode ? DarkColors.scaffold : LightColors.scaffold;
     final sectionColor = isDarkMode ? DarkColors.surface : Colors.white;
 
     return Container(
@@ -288,12 +261,12 @@ class _ContactsScreenState extends State<ContactsScreen> {
                         child: Text(letter, style: const TextStyle(fontWeight: FontWeight.bold)),
                       ),
                       ...grouped[letter]!.map((user) => ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                             leading: AvatarWidget(
                               imageUrl: user.avatarUrl,
                               name: user.displayName,
                               size: 44,
                               showOnline: user.isOnline,
-                              cacheVersion: context.watch<AvatarCacheProvider>().versionForUser(user.id),
                             ),
                             title: Text(user.displayName),
                             trailing: Row(
@@ -301,10 +274,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
                               children: [
                                 IconButton(icon: const Icon(Icons.call_outlined), onPressed: () {}),
                                 IconButton(icon: const Icon(Icons.videocam_outlined), onPressed: () {}),
-                                IconButton(
-                                  icon: const Icon(Icons.refresh_outlined),
-                                  onPressed: () => _refreshFriendAvatar(user),
-                                ),
                               ],
                             ),
                             onTap: () => _openChat(user),
@@ -342,7 +311,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
   Widget _buildGroupsTab(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final sectionColor = isDarkMode ? DarkColors.surface : Colors.white;
-    final bgColor = isDarkMode ? DarkColors.scaffold : const Color(0xFFF4F5F7);
+    final bgColor = isDarkMode ? DarkColors.scaffold : LightColors.scaffold;
 
     final chatProvider = context.watch<ChatProvider>();
     final groups = chatProvider.conversations.where((c) => c.type == ConversationType.GROUP).toList();
@@ -428,7 +397,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
   Widget _buildOATab(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final sectionColor = isDarkMode ? DarkColors.surface : Colors.white;
-    final bgColor = isDarkMode ? DarkColors.scaffold : const Color(0xFFF4F5F7);
+    final bgColor = isDarkMode ? DarkColors.scaffold : LightColors.scaffold;
     return Container(
       color: bgColor,
       child: ListView(

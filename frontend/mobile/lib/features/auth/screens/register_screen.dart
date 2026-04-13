@@ -586,7 +586,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     final scaffoldBg = isDarkMode ? DarkColors.scaffold : Colors.white;
-    final appBarBg = isDarkMode ? DarkColors.appBarBg : Colors.white;
     final showAppBarTitle = _currentStep == 0;
     final t = AuthTexts.of(context);
 
@@ -594,8 +593,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       backgroundColor: scaffoldBg,
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        backgroundColor: appBarBg,
-        surfaceTintColor: appBarBg,
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: BackButton(
           onPressed: _backStep,
@@ -812,7 +811,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // â”â”â”â”â”â”â”â”â”â”â”â”â”â”â” Step 0: Phone + Checkboxes â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+  // Step 0: Phone + Checkboxes
 
   Widget _buildPhoneStep() {
     final t = AuthTexts.of(context);
@@ -921,7 +920,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // â”â”â”â”â”â”â”â”â”â”â”â”â”â”â” Step 1: Name Input (Zalo-style header) â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+  // Step 1: Name Input (Zalo-style header)
 
   Widget _buildNameStep() {
     final t = AuthTexts.of(context);
@@ -935,7 +934,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             const SizedBox(height: 24),
-            // Centered header (NOT in AppBar) â€” like Zalo
+            // Centered header (NOT in AppBar) like Zalo
             Text(
               t.enterNameTitle,
               textAlign: TextAlign.center,
@@ -986,18 +985,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            // Rules â€” bolder text, matching Zalo
+            // Rules, bolder text, matching Zalo
             Align(
               alignment: Alignment.centerLeft,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _ruleItem('â€¢  ${t.nameHelpLength}'),
+                  _ruleItem('- ${t.nameHelpLength}'),
                   const SizedBox(height: 8),
-                  _ruleItem('â€¢  ${t.nameHelpNoNumbers}'),
+                  _ruleItem('- ${t.nameHelpNoNumbers}'),
                   const SizedBox(height: 8),
                   _ruleItem(
-                    'â€¢  ${t.nameHelpRules}',
+                    '- ${t.nameHelpRules}',
                     isLink: true,
                   ),
                 ],
@@ -1041,7 +1040,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // â”â”â”â”â”â”â”â”â”â”â”â”â”â”â” Step 2: Personal Info (Zalo-style) â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+  // Step 2: Personal Info (Zalo-style)
 
   Widget _buildPersonalInfoStep() {
     final t = AuthTexts.of(context);
@@ -1063,7 +1062,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
           const SizedBox(height: 28),
-          // Birthday â€” tap to open date picker bottom sheet
+          // Birthday: tap to open date picker bottom sheet
           GestureDetector(
             onTap: _pickBirthday,
             child: Container(
@@ -1098,7 +1097,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          // Gender â€” tap to open bottom sheet (like language picker)
+          // Gender: tap to open bottom sheet (like language picker)
           GestureDetector(
             onTap: _showGenderPicker,
             child: Container(
@@ -1367,7 +1366,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // â”â”â”â”â”â”â”â”â”â”â”â”â”â”â” Step 3: Password â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+  // Step 3: Password
 
   Widget _buildPasswordStep() {
     final t = AuthTexts.of(context);
@@ -1523,7 +1522,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // â”â”â”â”â”â”â”â”â”â”â”â”â”â”â” Step 4: Avatar â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+  // Step 4: Avatar
 
   Widget _buildAvatarStep() {
     final t = AuthTexts.of(context);

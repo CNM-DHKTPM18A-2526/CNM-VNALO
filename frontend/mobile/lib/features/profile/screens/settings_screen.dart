@@ -123,7 +123,8 @@ class SettingsScreen extends StatelessWidget {
     ];
   }
 
-  bool _isVi(BuildContext context) => ProfileTexts.of(context).language == AppLanguage.vi;
+  bool _isVi(BuildContext context) =>
+      ProfileTexts.of(context, listen: false).language == AppLanguage.vi;
 
   List<Widget> _buildAllSections(BuildContext context) {
     final sections = _getSettingsSections(context);
@@ -225,8 +226,9 @@ class SettingsScreen extends StatelessWidget {
 
   Future<void> _confirmLogout(BuildContext context) async {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final t = ProfileTexts.of(context);
-    final common = CommonTexts.of(context);
+    final t = ProfileTexts.of(context, listen: false);
+    final common = CommonTexts.of(context, listen: false);
+    final isVi = t.language == AppLanguage.vi;
 
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
@@ -262,7 +264,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    _isVi(context) 
+                    isVi
                       ? 'Nếu đổi máy mới, hãy sao lưu để tránh mất tin nhắn và ảnh gần đây'
                       : 'If switching to a new device, please backup to avoid losing recent messages and photos',
                     textAlign: TextAlign.center,

@@ -11,6 +11,7 @@ import 'package:vnalo_mobile/models/user_model.dart';
 import 'package:vnalo_mobile/services/chat_service.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 import 'package:vnalo_mobile/services/media_service.dart';
+import 'package:vnalo_mobile/services/notification_service.dart';
 import 'package:vnalo_mobile/core/database/local_database.dart';
 import 'dart:io';
 
@@ -18,6 +19,7 @@ class ChatProvider extends ChangeNotifier {
   final ChatService _chatService;
   final SocketService _socketService;
   final MediaService _mediaService;
+  final NotificationService _notificationService;
   final LocalDatabase _db;
 
   final Map<String, List<Message>> _messages = {};
@@ -57,15 +59,18 @@ class ChatProvider extends ChangeNotifier {
     required ChatService chatService,
     required SocketService socketService,
     required MediaService mediaService,
+    required NotificationService notificationService,
     required LocalDatabase db,
   })  : _chatService = chatService,
         _socketService = socketService,
         _mediaService = mediaService,
+      _notificationService = notificationService,
         _db = db,
         _messageSub = socketService.onMessage.listen((_) {}),
         _readSub = socketService.onRead.listen((_) {}),
         _deliveredSub = socketService.onDelivered.listen((_) {}),
         _recalledSub = socketService.onRecalled.listen((_) {}) {
+    _notificationService.ensureInitialized();
     _messageSub.onData(_handleIncomingMessage);
     _readSub.onData(_handleReadEvent);
     _deliveredSub.onData(_handleDeliveredEvent);
@@ -591,6 +596,7 @@ class ChatProvider extends ChangeNotifier {
     final index = _conversations.indexWhere((c) => c.id == conversationId);
     final isActiveConversation = conversationId == _activeConversationId;
     final isMine = message.senderId == _currentUserId;
+    Conversation? resolvedConversation;
     if (index >= 0) {
       final conversation = _conversations[index];
       final updatedConversation = conversation.copyWith(
@@ -600,6 +606,7 @@ class ChatProvider extends ChangeNotifier {
             : conversation.unreadCount + 1,
       );
       _conversations[index] = updatedConversation;
+      resolvedConversation = updatedConversation;
       _sortConversations();
     } else {
       // If the conversation is not in the current inbox, reload the inbox to show the new conversation
@@ -609,6 +616,15 @@ class ChatProvider extends ChangeNotifier {
     // Emit delivered indicator if it's not our message
     if (!isMine) {
       _socketService.markDelivered(message.id, conversationId);
+
+      final isMuted = resolvedConversation?.isMuted ?? false;
+      if (!isMuted) {
+        _playIncomingMessageSound();
+      }
+
+      if (!isActiveConversation && !isMuted && !message.isSystemMessage) {
+        _notifyIncomingMessage(resolvedMessage, resolvedConversation);
+      }
     }
 
     // Auto-read messages in active conversation and persist local read state.
@@ -624,6 +640,51 @@ class ChatProvider extends ChangeNotifier {
     _db.saveMessage(_toLocal(resolvedMessage));
 
     notifyListeners();
+  }
+
+  void _playIncomingMessageSound() {
+    try {
+      SystemSound.play(SystemSoundType.alert);
+    } catch (_) {
+      // Best effort only.
+    }
+  }
+
+  void _notifyIncomingMessage(Message message, Conversation? conversation) {
+    final currentUserId = _currentUserId;
+    if (currentUserId == null) return;
+
+    final title = conversation?.getDisplayName(currentUserId) ??
+        message.senderName ??
+        'Tin nhắn mới';
+    final body = _buildNotificationBody(message);
+
+    _notificationService.showChatNotification(
+      conversationId: message.conversationId,
+      title: title,
+      body: body,
+      senderId: message.senderId,
+    );
+  }
+
+  String _buildNotificationBody(Message message) {
+    switch (message.messageType) {
+      case MessageType.TEXT:
+        final text = (message.content ?? '').trim();
+        return text.isEmpty ? 'Tin nhắn mới' : text;
+      case MessageType.IMAGE:
+        return 'Đã gửi hình ảnh';
+      case MessageType.VIDEO:
+        return 'Đã gửi video';
+      case MessageType.AUDIO:
+        return 'Đã gửi tin nhắn thoại';
+      case MessageType.FILE:
+        return 'Đã gửi tệp tin';
+      case MessageType.STICKER:
+        return 'Đã gửi sticker';
+      default:
+        return 'Tin nhắn mới';
+    }
   }
 
   void _handleReadEvent(Map<String, dynamic> data) {

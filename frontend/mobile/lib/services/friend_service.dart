@@ -86,6 +86,27 @@ class FriendService {
     await cancelRequest(id.toString());
   }
 
+  Future<void> unfriend(String friendId) async {
+    await _apiService.delete(_base, '/friends/$friendId');
+  }
+
+  Future<String?> getFriendshipStatus(String userId) async {
+    try {
+      final response = await _apiService.get(_base, '/friends/$userId/status');
+      final data = response['data'];
+      if (data is Map<String, dynamic>) {
+        final status = data['status'] ?? data['friendshipStatus'] ?? data['friendship_status'];
+        return status?.toString();
+      }
+      if (data is String) {
+        return data;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<bool> checkSentRequest(String userId) async {
     try {
       final sent = await getSentRequests();

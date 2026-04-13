@@ -29,7 +29,7 @@ class OtpInput extends StatelessWidget {
         color: isDarkMode ? Colors.white : Colors.black,
       ),
       decoration: InputDecoration(
-        hintText: 'Nháº­p mÃ£ OTP',
+        hintText: 'Nhập mã OTP',
         counterText: '',
         filled: true,
         fillColor: isDarkMode ? DarkColors.surface : LightColors.surfaceLight,

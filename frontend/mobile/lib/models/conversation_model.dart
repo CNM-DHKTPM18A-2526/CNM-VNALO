@@ -136,14 +136,14 @@ class Conversation {
   // Method to get display name for the conversation based on its type and members
   String getDisplayName(String currentUserId, {int maxWidth = 0}) {
     if (type == ConversationType.DIRECT) {
-      if (members.isEmpty) return title ?? 'Chat';
+      if (members.isEmpty) return title ?? 'Người dùng';
       final other = members.firstWhere(
         (m) => m.userId != currentUserId,
         orElse: () => members.first,
       );
 
       // For direct conversations, use the other user's nickname or display name
-      return other.nickname ?? other.user?.displayName ?? 'User';
+      return other.nickname ?? other.user?.displayName ?? title ?? 'Người dùng';
     }
 
     // For group conversations, use the conversation title if available
@@ -181,8 +181,8 @@ class Conversation {
       orElse: () => members.first,
     );
 
-    // If the other user has an avatar, return it; otherwise, return null
-    return other.user?.avatarUrl;
+    // Fallback to conversation avatar when peer profile is not hydrated yet.
+    return other.user?.avatarUrl ?? avatarUrl;
   }
 
   // Method to get the count of active members (those who haven't left)

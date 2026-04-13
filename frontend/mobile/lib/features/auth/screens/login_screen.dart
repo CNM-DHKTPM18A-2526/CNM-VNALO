@@ -64,13 +64,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final scaffoldBg = isDarkMode ? DarkColors.scaffold : Colors.white;
-    final appBarBg = isDarkMode ? DarkColors.appBarBg : Colors.white;
 
     return Scaffold(
       backgroundColor: scaffoldBg,
       appBar: AppBar(
-        backgroundColor: appBarBg,
-        surfaceTintColor: appBarBg,
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
         title: Text(
           t.enterPhoneTitle,

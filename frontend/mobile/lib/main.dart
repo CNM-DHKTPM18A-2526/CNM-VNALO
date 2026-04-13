@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/config/app_config.dart';
@@ -23,6 +24,7 @@ import 'package:vnalo_mobile/services/media_cache_service.dart';
 import 'package:vnalo_mobile/features/timeline/providers/post_provider.dart';
 import 'package:vnalo_mobile/features/chat/providers/forward_provider.dart';
 import 'package:vnalo_mobile/features/profile/providers/avatar_cache_provider.dart';
+import 'package:vnalo_mobile/services/notification_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -70,6 +72,9 @@ void main() {
       );
     }
   }
+
+  unawaited(NotificationService().ensureInitialized());
+
   runApp(const VnaloApp());
 }
 
@@ -115,6 +120,7 @@ class VnaloApp extends StatelessWidget {
         Provider<MediaCacheService>(
           create: (context) => MediaCacheService(context.read<LocalDatabase>()),
         ),
+        Provider<NotificationService>(create: (_) => NotificationService()),
         ChangeNotifierProvider<ThemeProvider>(
           create: (_) => ThemeProvider()..initialize(),
         ),
@@ -140,6 +146,7 @@ class VnaloApp extends StatelessWidget {
                 socketService: context.read<SocketService>(),
                 mediaService: context.read<MediaService>(),
                 db: context.read<LocalDatabase>(),
+                notificationService: context.read<NotificationService>(),
               ),
         ),
         ChangeNotifierProvider<PostProvider>(

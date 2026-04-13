@@ -310,6 +310,24 @@ class CommonTexts {
   String get detailsAction => _isVi ? 'Chi tiết' : 'Info';
   String get newTagLabel => _isVi ? 'MỚI' : 'NEW';
 
+    // Message Bubble Status / Dialog
+    String get msgSending => _isVi ? 'Đang gửi...' : 'Sending...';
+    String get msgSendFailed => _isVi ? 'Gửi thất bại' : 'Send failed';
+    String get msgSent => _isVi ? 'Đã gửi' : 'Sent';
+    String get msgDelivered => _isVi ? 'Đã nhận' : 'Delivered';
+    String get msgSeen => _isVi ? 'Đã xem' : 'Seen';
+    String get msgRecalled => _isVi ? 'Tin nhắn đã thu hồi' : 'Message recalled';
+    String get msgCopiedToast => _isVi ? 'Đã sao chép tin nhắn' : 'Message copied';
+    String get recallMessageTitle => _isVi ? 'Thu hồi tin nhắn' : 'Recall message';
+    String get recallMessagePrompt => _isVi
+      ? 'Tin nhắn này sẽ bị thu hồi với mọi người. Tiếp tục?'
+      : 'This message will be removed for everyone. Continue?';
+    String get recallAction => _isVi ? 'Thu hồi' : 'Recall';
+    String get deleteMessageTitle => _isVi ? 'Xóa tin nhắn' : 'Delete message';
+    String get deleteMessagePrompt => _isVi
+      ? 'Tin nhắn này chỉ bị xóa ở phía bạn.'
+      : 'This removes the message only for you.';
+
   // Durations
   String get minute => _isVi ? 'phút' : 'min';
   String get hour => _isVi ? 'giờ' : 'hour';

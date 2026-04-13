@@ -53,7 +53,7 @@ class ProfileTexts {
 
   // Settings
   String get settings => _isVi ? 'Cài đặt' : 'Settings';
-  String get appearance => _isVi ? 'Giao diện' : 'Appearance';
+  String get appearance => _isVi ? 'Giao diện và ngôn ngữ' : 'Appearance';
   String get notifications => _isVi ? 'Thông báo' : 'Notifications';
   String get logout => _isVi ? 'Đăng xuất' : 'Log out';
   String get logoutConfirm => _isVi ? 'Bạn có chắc chắn muốn đăng xuất?' : 'Are you sure you want to log out?';

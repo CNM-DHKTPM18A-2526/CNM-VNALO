@@ -169,93 +169,85 @@ class _ChatListScreenState extends State<ChatListScreen> {
             color: AppColors.primary,
             child: ListView(
               children: [
-                // My Documents Section
                 Container(
                   color: isDarkMode ? DarkColors.surface : Colors.white,
-                  child: Column(
-                    children: [
-                      ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-                        leading: Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color: isDarkMode ? DarkColors.primary : Colors.blue,
-                            shape: BoxShape.circle,
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: chatProvider.conversations.length + 1,
+                    separatorBuilder: (context, index) => Divider(
+                      height: 1,
+                      thickness: 0.5,
+                      indent: 80,
+                      color: dividerColor,
+                    ),
+                    itemBuilder: (context, index) {
+                      if (index == 0) {
+                        return ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
                           ),
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              Icon(Icons.folder, color: Colors.white, size: 32),
-                              Icon(Icons.cloud, color: isDarkMode ? DarkColors.primary : Colors.blue, size: 16),
-                              Positioned(
-                                bottom: 0,
-                                right: 0,
-                                child: Container(
-                                  decoration: const BoxDecoration(
-                                    color: Colors.orange,
-                                    shape: BoxShape.circle,
+                          leading: Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              color: isDarkMode ? DarkColors.primary : Colors.blue,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                const Icon(Icons.folder, color: Colors.white, size: 32),
+                                Icon(Icons.cloud, color: isDarkMode ? DarkColors.primary : Colors.blue, size: 16),
+                                Positioned(
+                                  bottom: 0,
+                                  right: 0,
+                                  child: Container(
+                                    decoration: const BoxDecoration(
+                                      color: Colors.orange,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.check, color: Colors.white, size: 12),
                                   ),
-                                  child: const Icon(Icons.check, color: Colors.white, size: 12),
-                                ),
-                              )
-                            ],
+                                )
+                              ],
+                            ),
                           ),
-                        ),
-                        title: Text(
-                          common.myDocumentsHeader,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
-                            color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
+                          title: Text(
+                            common.myDocumentsHeader,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                              color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
+                            ),
                           ),
-                        ),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const MyDocumentsScreen()),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                // Inbox Section
-                if (chatProvider.conversations.isNotEmpty)
-                  Container(
-                    color: isDarkMode ? DarkColors.surface : Colors.white,
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: chatProvider.conversations.length,
-                      separatorBuilder: (context, index) => Divider(
-                        height: 1,
-                        thickness: 0.5,
-                        indent: 80,
-                        color: dividerColor,
-                      ),
-                      itemBuilder: (context, index) {
-                        final conversation = chatProvider.conversations[index];
-                        return ChatListItem(
-                          key: ValueKey(conversation.id),
-                          conversation: conversation,
                           onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => ChatDetailScreen(
-                                  conversation: conversation,
-                                ),
-                              ),
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const MyDocumentsScreen()),
                             );
                           },
                         );
-                      },
-                    ),
+                      }
+
+                      final conversation = chatProvider.conversations[index - 1];
+                      return ChatListItem(
+                        key: ValueKey(conversation.id),
+                        conversation: conversation,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => ChatDetailScreen(
+                                conversation: conversation,
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
                   ),
+                ),
               ],
             ),
           );

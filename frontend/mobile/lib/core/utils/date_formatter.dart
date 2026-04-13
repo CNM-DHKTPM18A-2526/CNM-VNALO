@@ -15,7 +15,7 @@ class DateFormatter {
     final local = dateTime.toLocal();
     final diff = now.difference(local);
 
-    if (diff.inSeconds < 60) return 'Vua xong';
+    if (diff.inSeconds < 60) return 'Vừa xong';
     if (diff.inMinutes < 60) return '${diff.inMinutes}p';
     if (diff.inHours < 24) return '${diff.inHours}h';
     if (diff.inDays < 7) return '${diff.inDays}ng';

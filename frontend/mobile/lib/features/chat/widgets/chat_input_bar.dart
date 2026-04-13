@@ -90,7 +90,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
       children: [
         _buildReplyPreview(context),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
           decoration: BoxDecoration(
             color: bgColor,
             border: Border(
@@ -99,8 +99,9 @@ class _ChatInputBarState extends State<ChatInputBar> {
           ),
           child: SafeArea(
             bottom: !_showStickers,
+            minimum: const EdgeInsets.symmetric(vertical: 2),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 IconButton(
                   icon: Icon(
@@ -135,7 +136,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                           fontSize: 16,
                         ),
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                         border: InputBorder.none,
                       ),
                     ),

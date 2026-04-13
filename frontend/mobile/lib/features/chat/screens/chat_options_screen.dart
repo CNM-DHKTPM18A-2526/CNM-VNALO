@@ -243,7 +243,10 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
           Container(
             width: 44,
             height: 44,
-            decoration: const BoxDecoration(color: Color(0xFFF4F5F7), shape: BoxShape.circle),
+            decoration: BoxDecoration(
+              color: isDarkMode ? DarkColors.surfaceLight : LightColors.scaffold,
+              shape: BoxShape.circle,
+            ),
             child: Icon(icon, color: isDarkMode ? DarkColors.textPrimary : Colors.black87, size: 22),
           ),
           const SizedBox(height: 10),

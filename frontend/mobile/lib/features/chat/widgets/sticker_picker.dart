@@ -411,7 +411,12 @@ class _StickerPickerState extends State<StickerPicker> {
                       style: TextStyle(color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary)
                     ),
                     trailing: isInstalled ? const Icon(Icons.check_circle, color: Colors.green) : ElevatedButton(
-                      onPressed: () async { await mediaService.installPack(id.toString()); _loadMyPacks(); Navigator.pop(context); },
+                      onPressed: () async {
+                        await mediaService.installPack(id.toString());
+                        _loadMyPacks();
+                        if (!context.mounted) return;
+                        Navigator.pop(context);
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: isDarkMode ? DarkColors.primary : AppColors.primary,
                         foregroundColor: Colors.white,
