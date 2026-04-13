@@ -465,10 +465,27 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                                 }).toList();
                           }
 
+                          final senderMember = conv.members.firstWhere(
+                            (m) => m.userId == message.senderId,
+                            orElse:
+                                () => ConversationMember(
+                                  conversationId: conv.id,
+                                  userId: message.senderId,
+                                  joinedAt: DateTime.now(),
+                                ),
+                          );
+
                           return MessageBubble(
                             message: message,
                             isMine: isMine,
                             showTime: showTime,
+                            showAvatar: !isMine && showTime,
+                            senderAvatarUrl:
+                                message.senderAvatarUrl ??
+                                senderMember.user?.avatarUrl,
+                            senderDisplayName:
+                                message.senderName ??
+                                senderMember.user?.displayName,
                             showStatus: showStatus,
                             milestoneText: milestoneText,
                             groupedMessages: groupedMessages,

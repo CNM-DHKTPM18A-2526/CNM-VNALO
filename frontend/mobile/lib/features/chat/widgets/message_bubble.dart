@@ -17,6 +17,10 @@ import 'package:vnalo_mobile/features/chat/providers/forward_provider.dart';
 import 'package:vnalo_mobile/features/chat/screens/forward_screen.dart';
 import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/features/call/models/call_log_message.dart';
+import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
+import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
+import 'package:vnalo_mobile/features/call/screens/video_call_screen.dart';
+import 'package:vnalo_mobile/features/call/screens/voice_call_screen.dart';
 
 class MessageBubble extends StatelessWidget {
   final Message message;
@@ -28,6 +32,9 @@ class MessageBubble extends StatelessWidget {
   final String? milestoneText;
   final List<Message>? groupedMessages;
   final Function(String)? onReplyTap;
+  final bool showAvatar;
+  final String? senderAvatarUrl;
+  final String? senderDisplayName;
 
   const MessageBubble({
     super.key,
@@ -40,6 +47,9 @@ class MessageBubble extends StatelessWidget {
     this.milestoneText,
     this.groupedMessages,
     this.onReplyTap,
+    this.showAvatar = false,
+    this.senderAvatarUrl,
+    this.senderDisplayName,
   });
 
   @override
@@ -80,6 +90,25 @@ class MessageBubble extends StatelessWidget {
                     isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
+                  if (!isMine)
+                    SizedBox(
+                      width: 30,
+                      child: Align(
+                        alignment: Alignment.bottomLeft,
+                        child:
+                            showAvatar
+                                ? AvatarWidget(
+                                  imageUrl: senderAvatarUrl,
+                                  name:
+                                      senderDisplayName ??
+                                      message.senderName ??
+                                      'User',
+                                  size: 24,
+                                )
+                                : const SizedBox(width: 24, height: 24),
+                      ),
+                    ),
+                  if (!isMine) const SizedBox(width: 6),
                   Flexible(child: _buildBubbleWrapper(context, isDarkMode)),
                 ],
               ),
@@ -366,10 +395,11 @@ class MessageBubble extends StatelessWidget {
   ) {
     final incoming = !isMine;
     final isVideo = callLog.mediaType == CallMediaType.video;
+    final canCallAgain = _resolveCallAgainTarget(context, callLog) != null;
     final cardColor =
         isMine
-            ? const Color(0xFF3D4A60)
-            : (isDarkMode ? const Color(0xFF2A2B2F) : const Color(0xFFE8EDF7));
+            ? const Color(0xFF3F4E66)
+            : (isDarkMode ? const Color(0xFF2C2D31) : const Color(0xFFDBE2EE));
 
     final titleColor = _callLogTitleColor(callLog.outcome, isDarkMode);
     final title = _callLogTitle(callLog, incoming, isVideo);
@@ -383,10 +413,10 @@ class MessageBubble extends StatelessWidget {
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.only(
-          topLeft: const Radius.circular(14),
-          topRight: const Radius.circular(14),
-          bottomLeft: Radius.circular(isMine ? 14 : 4),
-          bottomRight: Radius.circular(isMine ? 4 : 14),
+          topLeft: const Radius.circular(16),
+          topRight: const Radius.circular(16),
+          bottomLeft: Radius.circular(isMine ? 16 : 6),
+          bottomRight: Radius.circular(isMine ? 6 : 16),
         ),
       ),
       child: Column(
@@ -394,7 +424,7 @@ class MessageBubble extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+            padding: const EdgeInsets.fromLTRB(14, 11, 14, 9),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -403,21 +433,21 @@ class MessageBubble extends StatelessWidget {
                   style: TextStyle(
                     color: titleColor,
                     fontWeight: FontWeight.w700,
-                    fontSize: 18,
+                    fontSize: 14,
                     height: 1.15,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(subtitleIcon, size: 18, color: Colors.white60),
-                    const SizedBox(width: 6),
+                    Icon(subtitleIcon, size: 15, color: Colors.white60),
+                    const SizedBox(width: 5),
                     Flexible(
                       child: Text(
                         subtitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: Colors.white60,
-                          fontSize: 16,
+                          fontSize: 12,
                           height: 1.1,
                         ),
                       ),
@@ -431,13 +461,20 @@ class MessageBubble extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: TextButton(
-              onPressed: () {},
+              onPressed:
+                  canCallAgain
+                      ? () => _handleCallAgain(context, callLog)
+                      : null,
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+              ),
               child: Text(
                 common.callAgainAction,
-                style: const TextStyle(
-                  color: Color(0xFF1890FF),
+                style: TextStyle(
+                  color:
+                      canCallAgain ? const Color(0xFF1890FF) : Colors.white30,
                   fontWeight: FontWeight.w700,
-                  fontSize: 18,
+                  fontSize: 13,
                 ),
               ),
             ),
@@ -475,13 +512,62 @@ class MessageBubble extends StatelessWidget {
     return isVideo ? 'Cuộc gọi video' : 'Cuộc gọi thoại';
   }
 
+  String? _resolveCallAgainTarget(
+    BuildContext context,
+    CallLogMessage callLog,
+  ) {
+    final currentUserId = context.read<AuthProvider>().user?.id;
+    if (currentUserId == null || currentUserId.isEmpty) return null;
+
+    if (callLog.callerId == currentUserId) return callLog.calleeId;
+    if (callLog.calleeId == currentUserId) return callLog.callerId;
+
+    return message.senderId == currentUserId
+        ? callLog.calleeId
+        : callLog.callerId;
+  }
+
+  void _handleCallAgain(BuildContext context, CallLogMessage callLog) {
+    final currentUserId = context.read<AuthProvider>().user?.id;
+    final targetUserId = _resolveCallAgainTarget(context, callLog);
+    if (currentUserId == null || targetUserId == null || targetUserId.isEmpty) {
+      return;
+    }
+
+    final targetDisplayName =
+        senderDisplayName ?? message.senderName ?? 'Người dùng';
+    final targetAvatar = senderAvatarUrl ?? message.senderAvatarUrl;
+    final route = MaterialPageRoute(
+      builder: (_) {
+        if (callLog.mediaType == CallMediaType.video) {
+          return VideoCallScreen(
+            conversationId: message.conversationId,
+            currentUserId: currentUserId,
+            targetUserId: targetUserId,
+            targetDisplayName: targetDisplayName,
+            targetAvatarUrl: targetAvatar,
+          );
+        }
+
+        return VoiceCallScreen(
+          conversationId: message.conversationId,
+          currentUserId: currentUserId,
+          targetUserId: targetUserId,
+          targetDisplayName: targetDisplayName,
+          targetAvatarUrl: targetAvatar,
+        );
+      },
+    );
+    Navigator.push(context, route);
+  }
+
   IconData _callLogSubtitleIcon(
     CallLogMessage callLog,
     bool isVideo,
     bool incoming,
   ) {
     if (isVideo) {
-      return incoming ? Icons.call_received : Icons.call_made;
+      return Icons.videocam_outlined;
     }
 
     if (callLog.outcome == CallOutcome.missed) {
@@ -503,7 +589,7 @@ class MessageBubble extends StatelessWidget {
       case CallOutcome.failed:
         return const Color(0xFFFF6B6B);
       default:
-        return isDarkMode ? Colors.white : const Color(0xFFF5F7FA);
+        return isDarkMode ? Colors.white : const Color(0xFFF4F8FF);
     }
   }
 

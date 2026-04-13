@@ -144,75 +144,130 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: const Color(0xFF086CFF),
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            const SizedBox(height: 24),
-            Text(
-              'Voice Call',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.9),
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
+            const Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: Alignment(0, -0.25),
+                    radius: 1.0,
+                    colors: [
+                      Color(0xFF4EB4FF),
+                      Color(0xFF0B6DFF),
+                      Color(0xFF0058D6),
+                    ],
+                  ),
+                ),
               ),
             ),
-            const SizedBox(height: 28),
-            AvatarWidget(
-              imageUrl: widget.targetAvatarUrl,
-              name: widget.targetDisplayName,
-              size: 120,
-            ),
-            const SizedBox(height: 18),
-            Text(
-              widget.targetDisplayName,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 28,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              _buildStatusText(),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.8),
-                fontSize: 14,
-              ),
-            ),
-            const Spacer(),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Positioned.fill(
+              child: Column(
                 children: [
-                  _CallControlButton(
-                    icon:
-                        _callService.isMicrophoneEnabled
-                            ? Icons.mic
-                            : Icons.mic_off,
-                    backgroundColor:
-                        _callService.isMicrophoneEnabled
-                            ? Colors.white.withValues(alpha: 0.18)
-                            : const Color(0xFFEF4444),
-                    onTap: () => unawaited(_callService.toggleMicrophone()),
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _TopCircleIconButton(
+                          icon: Icons.arrow_back,
+                          onTap: _endCallAndClose,
+                        ),
+                        _TopCircleIconButton(
+                          icon: Icons.videocam_outlined,
+                          onTap: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Dùng nút video ở chat để bắt đầu video call',
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                  _CallControlButton(
-                    icon:
-                        _callService.isSpeakerOn
-                            ? Icons.volume_up
-                            : Icons.hearing_disabled,
-                    backgroundColor:
-                        _callService.isSpeakerOn
-                            ? Colors.white.withValues(alpha: 0.18)
-                            : const Color(0xFF334155),
-                    onTap: () => unawaited(_callService.toggleSpeaker()),
+                  const Spacer(),
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      _RingLayer(size: 280, alpha: 0.12),
+                      _RingLayer(size: 224, alpha: 0.14),
+                      _RingLayer(size: 172, alpha: 0.18),
+                      Container(
+                        width: 130,
+                        height: 130,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.28),
+                            width: 2,
+                          ),
+                        ),
+                        child: AvatarWidget(
+                          imageUrl: widget.targetAvatarUrl,
+                          name: widget.targetDisplayName,
+                          size: 126,
+                        ),
+                      ),
+                    ],
                   ),
-                  _CallControlButton(
-                    icon: Icons.call_end,
-                    backgroundColor: const Color(0xFFEF4444),
-                    onTap: _endCallAndClose,
+                  const SizedBox(height: 20),
+                  Text(
+                    widget.targetDisplayName,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 31,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    _buildStatusText(),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.88),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const Spacer(),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 26),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _BottomControl(
+                          icon:
+                              _callService.isSpeakerOn
+                                  ? Icons.volume_up
+                                  : Icons.hearing_disabled,
+                          label: 'Loa',
+                          onTap: () => unawaited(_callService.toggleSpeaker()),
+                          destructive: !_callService.isSpeakerOn,
+                        ),
+                        _BottomControl(
+                          icon: Icons.call_end,
+                          label: 'Kết thúc',
+                          onTap: _endCallAndClose,
+                          destructive: true,
+                        ),
+                        _BottomControl(
+                          icon:
+                              _callService.isMicrophoneEnabled
+                                  ? Icons.mic
+                                  : Icons.mic_off,
+                          label: 'Mic',
+                          onTap:
+                              () => unawaited(_callService.toggleMicrophone()),
+                          destructive: !_callService.isMicrophoneEnabled,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -224,31 +279,96 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
   }
 }
 
-class _CallControlButton extends StatelessWidget {
+class _TopCircleIconButton extends StatelessWidget {
   final IconData icon;
-  final Color backgroundColor;
   final VoidCallback onTap;
 
-  const _CallControlButton({
-    required this.icon,
-    required this.backgroundColor,
-    required this.onTap,
-  });
+  const _TopCircleIconButton({required this.icon, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(34),
+      borderRadius: BorderRadius.circular(24),
       child: Ink(
-        width: 68,
-        height: 68,
+        width: 40,
+        height: 40,
         decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(34),
+          color: Colors.black.withValues(alpha: 0.25),
+          shape: BoxShape.circle,
         ),
-        child: Icon(icon, color: Colors.white, size: 30),
+        child: Icon(icon, color: Colors.white, size: 22),
       ),
+    );
+  }
+}
+
+class _RingLayer extends StatelessWidget {
+  final double size;
+  final double alpha;
+
+  const _RingLayer({required this.size, required this.alpha});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: Colors.white.withValues(alpha: alpha),
+          width: 1.2,
+        ),
+      ),
+    );
+  }
+}
+
+class _BottomControl extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool destructive;
+
+  const _BottomControl({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.destructive = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(36),
+          child: Ink(
+            width: 70,
+            height: 70,
+            decoration: BoxDecoration(
+              color:
+                  destructive
+                      ? const Color(0xFFEF4444)
+                      : Colors.white.withValues(alpha: 0.25),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: Colors.white, size: 32),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.9),
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
     );
   }
 }

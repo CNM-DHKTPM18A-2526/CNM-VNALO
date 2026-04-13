@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
@@ -32,9 +33,9 @@ class VideoCallScreen extends StatefulWidget {
 
 class _VideoCallScreenState extends State<VideoCallScreen> {
   late final WebRtcCallService _callService;
-  late final RTCVideoRenderer _localRenderer;
   late final RTCVideoRenderer _remoteRenderer;
   late final Timer _ticker;
+
   bool _logSent = false;
   String? _initError;
 
@@ -44,7 +45,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   @override
   void initState() {
     super.initState();
-    _localRenderer = RTCVideoRenderer();
     _remoteRenderer = RTCVideoRenderer();
 
     _callService = WebRtcCallService(
@@ -65,7 +65,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   Future<void> _initRenderersAndCall() async {
     try {
-      await _localRenderer.initialize();
       await _remoteRenderer.initialize();
       await _callService.initialize();
       _syncRenderers();
@@ -78,7 +77,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   }
 
   void _syncRenderers() {
-    _localRenderer.srcObject = _callService.localStream;
     _remoteRenderer.srcObject = _callService.remoteStream;
   }
 
@@ -165,7 +163,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     _sendCallLogIfNeeded();
     _callService.removeListener(_onCallStateChanged);
     _callService.dispose();
-    _localRenderer.dispose();
     _remoteRenderer.dispose();
     super.dispose();
   }
@@ -205,7 +202,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     }
 
     final remoteStream = _callService.remoteStream;
-    final localStream = _callService.localStream;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -226,89 +222,131 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                     ),
           ),
           Positioned(
-            top: MediaQuery.of(context).padding.top + 16,
-            right: 16,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                width: 110,
-                height: 168,
-                color: Colors.black45,
-                child:
-                    localStream == null
-                        ? const Center(child: CircularProgressIndicator())
-                        : RTCVideoView(
-                          _localRenderer,
-                          mirror: _callService.isUsingFrontCamera,
-                          objectFit:
-                              RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-                        ),
+            top: MediaQuery.of(context).padding.top + 12,
+            left: 12,
+            right: 12,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _TopVideoButton(
+                  icon: Icons.arrow_back,
+                  onTap: _endCallAndClose,
+                ),
+                _TopVideoButton(
+                  icon: Icons.flip_camera_ios,
+                  onTap: () => unawaited(_callService.switchCamera()),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 66,
+            left: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.28),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.targetDisplayName,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _buildStatusText(),
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.85),
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
           Positioned(
-            top: MediaQuery.of(context).padding.top + 24,
-            left: 16,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.targetDisplayName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: ClipRect(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                child: Container(
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    12,
+                    16,
+                    MediaQuery.of(context).padding.bottom + 14,
+                  ),
+                  color: Colors.black.withValues(alpha: 0.28),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _VideoActionButton(
+                        icon:
+                            _callService.isCameraEnabled
+                                ? Icons.videocam
+                                : Icons.videocam_off,
+                        onTap: () => unawaited(_callService.toggleCamera()),
+                        active: _callService.isCameraEnabled,
+                      ),
+                      _VideoActionButton(
+                        icon:
+                            _callService.isMicrophoneEnabled
+                                ? Icons.mic
+                                : Icons.mic_off,
+                        onTap: () => unawaited(_callService.toggleMicrophone()),
+                        active: _callService.isMicrophoneEnabled,
+                      ),
+                      _VideoActionButton(
+                        icon: Icons.call_end,
+                        onTap: _endCallAndClose,
+                        active: false,
+                        destructive: true,
+                      ),
+                      _VideoActionButton(
+                        icon: Icons.more_horiz,
+                        onTap: () => unawaited(_callService.switchCamera()),
+                        active: true,
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  _buildStatusText(),
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.85),
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: MediaQuery.of(context).padding.bottom + 20,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _VideoActionButton(
-                  icon:
-                      _callService.isMicrophoneEnabled
-                          ? Icons.mic
-                          : Icons.mic_off,
-                  onTap: () => unawaited(_callService.toggleMicrophone()),
-                  active: _callService.isMicrophoneEnabled,
-                ),
-                _VideoActionButton(
-                  icon:
-                      _callService.isCameraEnabled
-                          ? Icons.videocam
-                          : Icons.videocam_off,
-                  onTap: () => unawaited(_callService.toggleCamera()),
-                  active: _callService.isCameraEnabled,
-                ),
-                _VideoActionButton(
-                  icon: Icons.flip_camera_ios,
-                  onTap: () => unawaited(_callService.switchCamera()),
-                  active: true,
-                ),
-                _VideoActionButton(
-                  icon: Icons.call_end,
-                  onTap: _endCallAndClose,
-                  active: false,
-                  destructive: true,
-                ),
-              ],
+              ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TopVideoButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _TopVideoButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(22),
+      child: Ink(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.32),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: Colors.white, size: 22),
       ),
     );
   }
