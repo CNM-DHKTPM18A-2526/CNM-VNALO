@@ -13,6 +13,8 @@ import 'package:vnalo_mobile/models/conversation_member_model.dart';
 import 'package:vnalo_mobile/models/user_model.dart';
 import 'package:vnalo_mobile/core/utils/date_formatter.dart';
 import 'package:vnalo_mobile/features/chat/screens/chat_options_screen.dart';
+import 'package:vnalo_mobile/features/call/screens/video_call_screen.dart';
+import 'package:vnalo_mobile/features/call/screens/voice_call_screen.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:async';
@@ -73,19 +75,25 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     if (_isLoadingMore) return;
 
     // In reverse mode, scroll position increases as we scroll UP
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
       final chatProvider = context.read<ChatProvider>();
-      final messages = chatProvider.getMessagesForConversation(widget.conversation.id);
+      final messages = chatProvider.getMessagesForConversation(
+        widget.conversation.id,
+      );
 
       if (messages.isNotEmpty) {
         setState(() => _isLoadingMore = true);
         final oldestId = messages.last.id;
 
-        chatProvider.loadMessages(widget.conversation.id, before: oldestId).then((_) {
-          if (mounted) setState(() => _isLoadingMore = false);
-        }).catchError((_) {
-          if (mounted) setState(() => _isLoadingMore = false);
-        });
+        chatProvider
+            .loadMessages(widget.conversation.id, before: oldestId)
+            .then((_) {
+              if (mounted) setState(() => _isLoadingMore = false);
+            })
+            .catchError((_) {
+              if (mounted) setState(() => _isLoadingMore = false);
+            });
       }
     }
   }
@@ -108,20 +116,23 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     });
 
     if (index != -1) {
-      _scrollController.animateTo(
-        index * 80.0,
-        duration: const Duration(milliseconds: 600),
-        curve: Curves.easeInOut,
-      ).then((_) {
-        if (mounted) {
-           context.read<ChatProvider>().highlightMessage(messageId);
-        }
-      });
+      _scrollController
+          .animateTo(
+            index * 80.0,
+            duration: const Duration(milliseconds: 600),
+            curve: Curves.easeInOut,
+          )
+          .then((_) {
+            if (mounted) {
+              context.read<ChatProvider>().highlightMessage(messageId);
+            }
+          });
     }
   }
 
   String _getDisplayName(String currentUserId, Conversation conversation) {
-    if (conversation.type == ConversationType.DIRECT && conversation.members.isNotEmpty) {
+    if (conversation.type == ConversationType.DIRECT &&
+        conversation.members.isNotEmpty) {
       return conversation.getDisplayName(currentUserId);
     }
     if (_friendSnapshot != null) {
@@ -131,7 +142,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   }
 
   String? _getAvatarUrl(String currentUserId, Conversation conversation) {
-    if (conversation.type == ConversationType.DIRECT && conversation.members.isNotEmpty) {
+    if (conversation.type == ConversationType.DIRECT &&
+        conversation.members.isNotEmpty) {
       return conversation.getDisplayAvatarUrl(currentUserId);
     }
     if (_friendSnapshot != null) {
@@ -155,6 +167,23 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     return null;
   }
 
+  String? _resolvePeerUserId(String currentUserId, Conversation conversation) {
+    if (_friendSnapshot != null && _friendSnapshot!.id.isNotEmpty) {
+      return _friendSnapshot!.id;
+    }
+
+    if (conversation.type == ConversationType.DIRECT &&
+        conversation.members.isNotEmpty) {
+      final other = conversation.members.firstWhere(
+        (m) => m.userId != currentUserId,
+        orElse: () => conversation.members.first,
+      );
+      return other.userId;
+    }
+
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUserId = context.read<AuthProvider>().user?.id ?? '';
@@ -171,27 +200,31 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         final displayName = _getDisplayName(currentUserId, conv);
         final avatarUrl = _getAvatarUrl(currentUserId, conv);
         final coverUrl = _getCoverUrl(currentUserId, conv);
-        final isDirect = conv.type == ConversationType.DIRECT || widget.friendUser != null;
+        final isDirect =
+            conv.type == ConversationType.DIRECT || widget.friendUser != null;
         final wallpaperUrl = conv.personalWallpaperUrl ?? conv.wallpaperUrl;
 
         return Scaffold(
-          backgroundColor: wallpaperUrl != null
-              ? (isDarkMode ? Colors.black : LightColors.scaffold)
-              : (isDarkMode ? Colors.black : LightColors.scaffold),
+          backgroundColor:
+              wallpaperUrl != null
+                  ? (isDarkMode ? Colors.black : LightColors.scaffold)
+                  : (isDarkMode ? Colors.black : LightColors.scaffold),
           appBar: AppBar(
             titleSpacing: 0,
-            backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
+            backgroundColor:
+                isDarkMode ? DarkColors.appBarBg : Colors.transparent,
             elevation: 0,
             forceMaterialTransparency: true,
             foregroundColor: Colors.white,
             iconTheme: const IconThemeData(color: Colors.white),
-            flexibleSpace: isDarkMode
-                ? null
-                : Container(
-                    decoration: const BoxDecoration(
-                      gradient: AppColors.appBarGradient,
+            flexibleSpace:
+                isDarkMode
+                    ? null
+                    : Container(
+                      decoration: const BoxDecoration(
+                        gradient: AppColors.appBarGradient,
+                      ),
                     ),
-                  ),
             title: Row(
               children: [
                 Expanded(
@@ -217,16 +250,66 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               IconButton(
                 icon: const Icon(Icons.call_outlined, color: Colors.white),
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(common.featureUnderDevelopment)),
+                  if (!isDirect) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(common.callFlowPlaceholder)),
+                    );
+                    return;
+                  }
+
+                  final peerUserId = _resolvePeerUserId(currentUserId, conv);
+                  if (peerUserId == null || peerUserId.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(common.cannotOpenChat)),
+                    );
+                    return;
+                  }
+
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder:
+                          (_) => VoiceCallScreen(
+                            conversationId: conv.id,
+                            currentUserId: currentUserId,
+                            targetUserId: peerUserId,
+                            targetDisplayName: displayName,
+                            targetAvatarUrl: avatarUrl,
+                          ),
+                    ),
                   );
                 },
               ),
               IconButton(
                 icon: const Icon(Icons.videocam_outlined, color: Colors.white),
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(common.featureUnderDevelopment)),
+                  if (!isDirect) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(common.callFlowPlaceholder)),
+                    );
+                    return;
+                  }
+
+                  final peerUserId = _resolvePeerUserId(currentUserId, conv);
+                  if (peerUserId == null || peerUserId.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(common.cannotOpenChat)),
+                    );
+                    return;
+                  }
+
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder:
+                          (_) => VideoCallScreen(
+                            conversationId: conv.id,
+                            currentUserId: currentUserId,
+                            targetUserId: peerUserId,
+                            targetDisplayName: displayName,
+                            targetAvatarUrl: avatarUrl,
+                          ),
+                    ),
                   );
                 },
               ),
@@ -236,7 +319,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => ChatOptionsScreen(conversation: conv),
+                      builder:
+                          (context) => ChatOptionsScreen(conversation: conv),
                     ),
                   );
                 },
@@ -244,18 +328,21 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             ],
           ),
           body: Container(
-            decoration: wallpaperUrl != null
-                ? BoxDecoration(
-                    image: DecorationImage(
-                      image: CachedNetworkImageProvider(wallpaperUrl),
-                      fit: BoxFit.cover,
-                      colorFilter: ColorFilter.mode(
-                        Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
-                        BlendMode.darken,
+            decoration:
+                wallpaperUrl != null
+                    ? BoxDecoration(
+                      image: DecorationImage(
+                        image: CachedNetworkImageProvider(wallpaperUrl),
+                        fit: BoxFit.cover,
+                        colorFilter: ColorFilter.mode(
+                          Colors.black.withValues(
+                            alpha: isDarkMode ? 0.3 : 0.1,
+                          ),
+                          BlendMode.darken,
+                        ),
                       ),
-                    ),
-                  )
-                : null,
+                    )
+                    : null,
             child: Column(
               children: [
                 Expanded(
@@ -264,73 +351,115 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       final rawItems = chat.getMessagesForConversation(conv.id);
                       final List<dynamic> items = [];
                       for (int i = 0; i < rawItems.length; i++) {
-                         final msg = rawItems[i];
-                         if (msg.messageType == MessageType.IMAGE) {
-                            if (items.isNotEmpty && items.last is List<Message>) {
-                               final group = items.last as List<Message>;
-                               final newestInGroup = group.first;
-                               if (newestInGroup.senderId == msg.senderId &&
-                                   newestInGroup.createdAt.difference(msg.createdAt).inMinutes.abs() < 2) {
-                                   group.add(msg);
-                                   continue;
-                               }
+                        final msg = rawItems[i];
+                        if (msg.messageType == MessageType.IMAGE) {
+                          if (items.isNotEmpty && items.last is List<Message>) {
+                            final group = items.last as List<Message>;
+                            final newestInGroup = group.first;
+                            if (newestInGroup.senderId == msg.senderId &&
+                                newestInGroup.createdAt
+                                        .difference(msg.createdAt)
+                                        .inMinutes
+                                        .abs() <
+                                    2) {
+                              group.add(msg);
+                              continue;
                             }
-                            items.add([msg]);
-                         } else {
-                            items.add(msg);
-                         }
+                          }
+                          items.add([msg]);
+                        } else {
+                          items.add(msg);
+                        }
                       }
 
                       for (int i = 0; i < items.length; i++) {
-                         if (items[i] is List<Message> && (items[i] as List<Message>).length == 1) {
-                             items[i] = (items[i] as List<Message>).first;
-                         }
+                        if (items[i] is List<Message> &&
+                            (items[i] as List<Message>).length == 1) {
+                          items[i] = (items[i] as List<Message>).first;
+                        }
                       }
 
                       return ListView.builder(
                         controller: _scrollController,
                         reverse: true,
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 8,
+                        ),
                         itemCount: items.length + (isDirect ? 1 : 0),
                         itemBuilder: (context, index) {
                           if (isDirect && index == items.length) {
-                            return _buildFriendProfileCard(displayName, avatarUrl, coverUrl);
+                            return _buildFriendProfileCard(
+                              displayName,
+                              avatarUrl,
+                              coverUrl,
+                            );
                           }
 
                           final item = items[index];
-                          final message = item is List<Message> ? item.first : item as Message;
-                          final groupedMessages = item is List<Message> ? item : null;
+                          final message =
+                              item is List<Message>
+                                  ? item.first
+                                  : item as Message;
+                          final groupedMessages =
+                              item is List<Message> ? item : null;
                           final isMine = message.isMine(currentUserId);
 
                           bool showTime = true;
                           if (index > 0) {
                             final nextRecentItem = items[index - 1];
-                            final nextRecentMsg = nextRecentItem is List<Message> ? nextRecentItem.last : nextRecentItem as Message;
-                            final sameSender = nextRecentMsg.senderId == message.senderId;
-                            final timeGap = nextRecentMsg.createdAt.difference(message.createdAt).inMinutes.abs();
+                            final nextRecentMsg =
+                                nextRecentItem is List<Message>
+                                    ? nextRecentItem.last
+                                    : nextRecentItem as Message;
+                            final sameSender =
+                                nextRecentMsg.senderId == message.senderId;
+                            final timeGap =
+                                nextRecentMsg.createdAt
+                                    .difference(message.createdAt)
+                                    .inMinutes
+                                    .abs();
                             if (sameSender && timeGap < 5) showTime = false;
                           }
 
-                          final rawMyLatestIndex = rawItems.indexWhere((m) => m.senderId == currentUserId);
-                          bool showStatus = (isMine && rawMyLatestIndex != -1 && rawItems[rawMyLatestIndex].id == message.id);
+                          final rawMyLatestIndex = rawItems.indexWhere(
+                            (m) => m.senderId == currentUserId,
+                          );
+                          bool showStatus =
+                              (isMine &&
+                                  rawMyLatestIndex != -1 &&
+                                  rawItems[rawMyLatestIndex].id == message.id);
 
                           String? milestoneText;
                           if (index == items.length - 1) {
-                            milestoneText = DateFormatter.formatTimelineDate(message.createdAt);
+                            milestoneText = DateFormatter.formatTimelineDate(
+                              message.createdAt,
+                            );
                           } else {
                             final olderItem = items[index + 1];
-                            final olderMsg = olderItem is List<Message> ? olderItem.first : olderItem as Message;
-                            final gap = message.createdAt.difference(olderMsg.createdAt).inMinutes.abs();
+                            final olderMsg =
+                                olderItem is List<Message>
+                                    ? olderItem.first
+                                    : olderItem as Message;
+                            final gap =
+                                message.createdAt
+                                    .difference(olderMsg.createdAt)
+                                    .inMinutes
+                                    .abs();
                             if (gap > 20) {
-                              milestoneText = DateFormatter.formatTimelineDate(message.createdAt);
+                              milestoneText = DateFormatter.formatTimelineDate(
+                                message.createdAt,
+                              );
                             }
                           }
 
                           List<ConversationMember>? readByMembers;
                           if (isMine && message.serverSeq != null) {
-                            readByMembers = conv.members.where((m) {
-                              return m.userId != currentUserId && m.lastReadSeq >= message.serverSeq!;
-                            }).toList();
+                            readByMembers =
+                                conv.members.where((m) {
+                                  return m.userId != currentUserId &&
+                                      m.lastReadSeq >= message.serverSeq!;
+                                }).toList();
                           }
 
                           return MessageBubble(
@@ -342,7 +471,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                             groupedMessages: groupedMessages,
                             readByMembers: readByMembers,
                             onReplyTap: (msgId) => _jumpToMessage(msgId, items),
-                            onRetry: message.status == MessageStatus.FAILED ? () => chat.retryMessage(message) : null,
+                            onRetry:
+                                message.status == MessageStatus.FAILED
+                                    ? () => chat.retryMessage(message)
+                                    : null,
                           );
                         },
                       );
@@ -351,7 +483,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 ),
                 ChatInputBar(
                   conversationId: conv.id,
-                  onSend: (text) => chat.sendMessage(conversationId: conv.id, content: text),
+                  onSend:
+                      (text) => chat.sendMessage(
+                        conversationId: conv.id,
+                        content: text,
+                      ),
                 ),
               ],
             ),
@@ -396,23 +532,37 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             width: double.infinity,
             margin: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              color: isDarkMode ? DarkColors.primary.withValues(alpha: 0.1) : AppColors.primary.withValues(alpha: 0.1),
-              image: coverUrl != null
-                  ? DecorationImage(
-                      image: NetworkImage(coverUrl),
-                      fit: BoxFit.cover,
-                    )
-                  : null,
-              gradient: coverUrl == null
-                  ? LinearGradient(
-                      colors: isDarkMode
-                          ? [DarkColors.primary, DarkColors.primary.withValues(alpha: 0.8)]
-                          : [const Color(0xFF0068FF), const Color(0xFF00A2ED)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    )
-                  : null,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
+              color:
+                  isDarkMode
+                      ? DarkColors.primary.withValues(alpha: 0.1)
+                      : AppColors.primary.withValues(alpha: 0.1),
+              image:
+                  coverUrl != null
+                      ? DecorationImage(
+                        image: NetworkImage(coverUrl),
+                        fit: BoxFit.cover,
+                      )
+                      : null,
+              gradient:
+                  coverUrl == null
+                      ? LinearGradient(
+                        colors:
+                            isDarkMode
+                                ? [
+                                  DarkColors.primary,
+                                  DarkColors.primary.withValues(alpha: 0.8),
+                                ]
+                                : [
+                                  const Color(0xFF0068FF),
+                                  const Color(0xFF00A2ED),
+                                ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                      : null,
             ),
           ),
           // Avatar + Name
@@ -443,10 +593,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 Text(
                   common.startConversationNote,
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.grey.shade500,
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -481,7 +628,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         decoration: BoxDecoration(
           color: isDarkMode ? DarkColors.surfaceLight : const Color(0xFFF0F4FF),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: (isDarkMode ? DarkColors.primary : AppColors.primary).withValues(alpha: 0.3)),
+          border: Border.all(
+            color: (isDarkMode ? DarkColors.primary : AppColors.primary)
+                .withValues(alpha: 0.3),
+          ),
         ),
         child: Text(
           '$emoji $label',
