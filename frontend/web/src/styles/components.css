@@ -836,6 +836,34 @@
   display: block;
 }
 
+.profile-crop-modal {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  background: #0f172a;
+}
+
+.profile-crop-stage {
+  position: relative;
+  width: 100%;
+  height: min(62vh, 520px);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #0b1220;
+}
+
+.profile-crop-zoom {
+  display: grid;
+  gap: 8px;
+  color: #dbe6ff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.profile-crop-zoom input[type='range'] {
+  width: 100%;
+}
+
 .modal-footer {
   padding: 14px 20px 20px;
   display: flex;
@@ -1418,6 +1446,395 @@
 .contacts-request-meta {
   font-size: 12px;
   color: var(--muted);
+}
+
+.add-friend-zalo {
+  display: grid;
+  gap: 14px;
+  animation: add-friend-zalo-enter 180ms ease-out;
+}
+
+@keyframes add-friend-zalo-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.add-friend-zalo-search {
+  display: grid;
+  grid-template-columns: 132px 1fr;
+  gap: 14px;
+  align-items: center;
+}
+
+.add-friend-zalo-prefix {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #334155;
+  font-weight: 600;
+  border-bottom: 1px solid #dbe3ef;
+  padding-bottom: 8px;
+  min-height: 38px;
+}
+
+.add-friend-zalo-flag {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.add-friend-zalo-caret {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.add-friend-zalo-input {
+  width: 100%;
+  border: 0;
+  border-bottom: 2px solid #2f68f7;
+  background: transparent;
+  min-height: 38px;
+  font-size: 22px;
+  color: #1e293b;
+  outline: none;
+}
+
+.add-friend-zalo-input::placeholder {
+  color: #8a9ab3;
+}
+
+.add-friend-zalo-section {
+  display: grid;
+  gap: 8px;
+}
+
+.add-friend-zalo-section h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.add-friend-zalo-list {
+  display: grid;
+  gap: 6px;
+}
+
+.add-friend-zalo-recent-item,
+.add-friend-zalo-suggest-item {
+  border: 0;
+  background: transparent;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 10px;
+  align-items: center;
+  text-align: left;
+  border-radius: 10px;
+  padding: 6px 4px;
+}
+
+.add-friend-zalo-recent-item {
+  cursor: pointer;
+}
+
+.add-friend-zalo-recent-item:hover,
+.add-friend-zalo-suggest-item:hover {
+  background: #f8fbff;
+}
+
+.add-friend-zalo-suggest-item {
+  grid-template-columns: 44px 1fr auto;
+}
+
+.add-friend-zalo-item-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.add-friend-zalo-item-copy strong {
+  font-size: 15px;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.add-friend-zalo-item-copy small {
+  font-size: 12px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.add-friend-zalo-add-btn {
+  min-width: 84px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #2f68f7;
+  background: #fff;
+  color: #2f68f7;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.add-friend-zalo-add-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.add-friend-zalo-more {
+  border: 0;
+  background: transparent;
+  width: fit-content;
+  padding: 2px 0;
+  color: #2f68f7;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.add-friend-zalo-footer {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.add-friend-zalo-btn {
+  min-width: 120px;
+  height: 44px;
+  border-radius: 8px;
+  border: 0;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.add-friend-zalo-btn-cancel {
+  background: #edf1f6;
+  color: #5f6f86;
+}
+
+.add-friend-zalo-btn-search {
+  background: #007aff;
+  color: #fff;
+}
+
+.add-friend-zalo-btn-cancel:hover:not(:disabled) {
+  background: #e3e9f1;
+  color: #4c5d74;
+  transform: translateY(-1px);
+}
+
+.add-friend-zalo-btn-search:hover:not(:disabled) {
+  background: #006de3;
+  box-shadow: 0 8px 18px rgba(0, 122, 255, 0.28);
+  transform: translateY(-1px);
+}
+
+.add-friend-zalo-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.add-friend-zalo-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.add-friend-zalo-inline-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.add-friend-profile {
+  display: grid;
+  gap: 10px;
+}
+
+.add-friend-profile-back {
+  width: fit-content;
+  border: 0;
+  background: transparent;
+  color: #2f68f7;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 2px 0;
+  cursor: pointer;
+}
+
+.add-friend-profile-card {
+  border: 1px solid #d7e2f0;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.add-friend-profile-cover {
+  height: 124px;
+  background:
+    radial-gradient(circle at 14% 28%, rgba(126, 182, 255, 0.5), transparent 42%),
+    radial-gradient(circle at 84% 16%, rgba(67, 144, 255, 0.34), transparent 40%),
+    linear-gradient(135deg, #1c4b93 0%, #2364c5 56%, #3b91de 100%);
+}
+
+.add-friend-profile-cover-image {
+  background-size: cover;
+  background-position: center;
+}
+
+.add-friend-profile-head {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 0 16px;
+  margin-top: -26px;
+}
+
+.add-friend-profile-avatar {
+  border-radius: 999px;
+  border: 3px solid #fff;
+  background: #fff;
+  width: fit-content;
+  box-shadow: 0 8px 18px rgba(17, 36, 72, 0.15);
+}
+
+.add-friend-profile-copy {
+  min-width: 0;
+  padding-top: 24px;
+}
+
+.add-friend-profile-copy h4 {
+  margin: 0;
+  font-size: 20px;
+  color: #1e293b;
+}
+
+.add-friend-profile-copy p {
+  margin: 3px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.add-friend-profile-info {
+  padding: 12px 16px 6px;
+  display: grid;
+  gap: 4px;
+}
+
+.add-friend-profile-info-row {
+  display: grid;
+  gap: 2px;
+  padding: 8px 0;
+  border-bottom: 1px solid #ebf0f7;
+}
+
+.add-friend-profile-info-row:last-child {
+  border-bottom: 0;
+}
+
+.add-friend-profile-info-row span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.add-friend-profile-info-row strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  word-break: break-word;
+}
+
+.add-friend-profile-actions {
+  padding: 8px 16px 16px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.add-friend-request-box {
+  margin: 0 16px 16px;
+  border: 1px solid #d7e2f0;
+  background: #f8fbff;
+  border-radius: 12px;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.add-friend-request-box label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.add-friend-request-box textarea {
+  border: 1px solid #d4deec;
+  border-radius: 10px;
+  padding: 10px;
+  outline: none;
+  resize: vertical;
+  min-height: 84px;
+  font: inherit;
+}
+
+.add-friend-request-box textarea:focus {
+  border-color: #2f68f7;
+  box-shadow: 0 0 0 3px rgba(47, 104, 247, 0.12);
+}
+
+.add-friend-request-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 640px) {
+  .add-friend-zalo-search {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .add-friend-zalo-suggest-item {
+    grid-template-columns: 44px 1fr;
+  }
+
+  .add-friend-zalo-add-btn {
+    grid-column: 2;
+    justify-self: start;
+    margin-top: 4px;
+  }
+
+  .add-friend-zalo-footer {
+    justify-content: stretch;
+  }
+
+  .add-friend-zalo-btn {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .add-friend-profile-head {
+    grid-template-columns: 1fr;
+    margin-top: -22px;
+  }
+
+  .add-friend-profile-copy {
+    padding-top: 0;
+  }
 }
 
 @media (max-width: 980px) {
