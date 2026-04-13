@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../../auth/useAuth'
+import { getOrCreateDirectConversation } from '../../chat/chat.api'
 import {
   checkFriendshipStatus,
   getIncomingFriendRequests,
@@ -36,6 +38,7 @@ type AddFriendModalProps = {
 }
 
 type RelationState = 'none' | 'already-friend' | 'incoming' | 'sent' | 'self'
+const RECENT_RESULT_STORAGE_KEY = 'vnalo:add-friend:recent'
 
 function isEmail(value: string) {
   return /^\S+@\S+\.\S+$/.test(value)
@@ -107,15 +110,6 @@ function maskEmail(email: string): string {
   return `${local.slice(0, 2)}***@${domain}`
 }
 
-function maskPhone(phone: string): string {
-  const cleaned = phone.replace(/\s+/g, '')
-  if (cleaned.length <= 5) {
-    return cleaned
-  }
-
-  return `${cleaned.slice(0, 3)}***${cleaned.slice(-2)}`
-}
-
 function toLookupFromTarget(target: AddFriendTarget): UserLookupResult | null {
   if (!target.userId) {
     return null
@@ -133,9 +127,36 @@ function toLookupFromTarget(target: AddFriendTarget): UserLookupResult | null {
   }
 }
 
+function loadRecentResultsFromStorage(): UserLookupResult[] {
+  try {
+    const raw = window.localStorage.getItem(RECENT_RESULT_STORAGE_KEY)
+    if (!raw) {
+      return []
+    }
+
+    const parsed = JSON.parse(raw) as UserLookupResult[]
+    if (!Array.isArray(parsed)) {
+      return []
+    }
+
+    return parsed.filter((item) => typeof item?.id === 'string').slice(0, 4)
+  } catch {
+    return []
+  }
+}
+
+function persistRecentResultsToStorage(results: UserLookupResult[]): void {
+  try {
+    window.localStorage.setItem(RECENT_RESULT_STORAGE_KEY, JSON.stringify(results.slice(0, 4)))
+  } catch {
+    // Ignore local storage failures.
+  }
+}
+
 export function AddFriendModal({ isOpen, onClose, initialTarget = null, onCompleted }: AddFriendModalProps) {
   const { accessToken, user } = useAuth()
   const { t } = useLanguage()
+  const navigate = useNavigate()
 
   const [identifier, setIdentifier] = useState('')
   const [requestMessage, setRequestMessage] = useState(() => t('contacts.modals.defaultMessage'))
@@ -149,16 +170,11 @@ export function AddFriendModal({ isOpen, onClose, initialTarget = null, onComple
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isPreparingTarget, setIsPreparingTarget] = useState(false)
   const [isAutoSearching, setIsAutoSearching] = useState(false)
-
-  const isInConfirmStep = Boolean(selectedUser)
-
-  const submitLabel = useMemo(() => {
-    if (isSubmitting) {
-      return t('contacts.common.processing')
-    }
-
-    return t('contacts.modals.sendRequestAction')
-  }, [isSubmitting, t])
+  const [isOpeningConversation, setIsOpeningConversation] = useState(false)
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
+  const [isComposingFriendRequest, setIsComposingFriendRequest] = useState(false)
+  const [recentResults, setRecentResults] = useState<UserLookupResult[]>([])
+  const [suggestedResults, setSuggestedResults] = useState<UserLookupResult[]>([])
 
   const resetModalState = () => {
     setIdentifier('')
@@ -171,6 +187,9 @@ export function AddFriendModal({ isOpen, onClose, initialTarget = null, onComple
     setIsSubmitting(false)
     setIsPreparingTarget(false)
     setIsAutoSearching(false)
+    setIsOpeningConversation(false)
+    setIsLoadingSuggestions(false)
+    setIsComposingFriendRequest(false)
   }
 
   const handleClose = () => {
@@ -178,14 +197,13 @@ export function AddFriendModal({ isOpen, onClose, initialTarget = null, onComple
     onClose()
   }
 
-  const resolveRelationship = useCallback(async (targetUserId: string) => {
+  const getRelationForUser = useCallback(async (targetUserId: string): Promise<RelationState> => {
     if (!accessToken) {
-      return
+      return 'none'
     }
 
     if (user?.id === targetUserId) {
-      setRelation('self')
-      return
+      return 'self'
     }
 
     const [friendshipStatus, incomingRequests, sentRequests] = await Promise.all([
@@ -195,24 +213,34 @@ export function AddFriendModal({ isOpen, onClose, initialTarget = null, onComple
     ])
 
     if (friendshipStatus.areFriends) {
-      setRelation('already-friend')
-      return
+      return 'already-friend'
     }
 
     const incoming = incomingRequests.find((item) => item.fromUserId === targetUserId && item.status === 'PENDING')
     if (incoming) {
-      setRelation('incoming')
-      return
+      return 'incoming'
     }
 
     const sent = sentRequests.find((item) => item.toUserId === targetUserId && item.status === 'PENDING')
     if (sent) {
-      setRelation('sent')
-      return
+      return 'sent'
     }
 
-    setRelation('none')
+    return 'none'
   }, [accessToken, user?.id])
+
+  const resolveRelationship = useCallback(async (targetUserId: string) => {
+    const relationState = await getRelationForUser(targetUserId)
+    setRelation(relationState)
+  }, [accessToken, user?.id])
+
+  const pushRecentResult = useCallback((target: UserLookupResult) => {
+    setRecentResults((prev) => {
+      const next = [target, ...prev.filter((item) => item.id !== target.id)].slice(0, 4)
+      persistRecentResultsToStorage(next)
+      return next
+    })
+  }, [])
 
   const findUserByIdentifier = useCallback(async (query: string): Promise<UserLookupResult | null> => {
     if (!accessToken) {
@@ -237,8 +265,9 @@ export function AddFriendModal({ isOpen, onClose, initialTarget = null, onComple
     return pickBestSearchResult(fallbackResults, query)
   }, [accessToken])
 
-  const openConfirmForUser = useCallback(async (matchedUser: UserLookupResult) => {
+  const openProfileForUser = useCallback(async (matchedUser: UserLookupResult) => {
     setSelectedUser(matchedUser)
+    setIsComposingFriendRequest(false)
     setErrorMessage(null)
     setSuccessMessage(null)
     await resolveRelationship(matchedUser.id)
@@ -271,7 +300,8 @@ export function AddFriendModal({ isOpen, onClose, initialTarget = null, onComple
         return
       }
 
-      await openConfirmForUser(matchedUser)
+      await openProfileForUser(matchedUser)
+      pushRecentResult(matchedUser)
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : t('contacts.feedback.genericError'))
       setSelectedUser(null)
@@ -287,7 +317,53 @@ export function AddFriendModal({ isOpen, onClose, initialTarget = null, onComple
     }
 
     setRequestMessage(t('contacts.modals.defaultMessage'))
+    setRecentResults(loadRecentResultsFromStorage())
   }, [isOpen, t])
+
+  useEffect(() => {
+    if (!isOpen || !accessToken) {
+      return
+    }
+
+    const query = identifier.trim()
+    if (!query) {
+      setSuggestedResults(recentResults)
+      return
+    }
+
+    let cancelled = false
+    setIsLoadingSuggestions(true)
+
+    const timerId = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const results = await searchUsers(accessToken, query)
+          if (cancelled) {
+            return
+          }
+
+          const normalized = results
+            .filter((item) => item.id !== user?.id)
+            .slice(0, 8)
+
+          setSuggestedResults(normalized)
+        } catch {
+          if (!cancelled) {
+            setSuggestedResults([])
+          }
+        } finally {
+          if (!cancelled) {
+            setIsLoadingSuggestions(false)
+          }
+        }
+      })()
+    }, 250)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timerId)
+    }
+  }, [accessToken, identifier, isOpen, recentResults, user?.id])
 
   useEffect(() => {
     if (!isOpen || !accessToken) {
@@ -319,7 +395,7 @@ export function AddFriendModal({ isOpen, onClose, initialTarget = null, onComple
             return
           }
 
-          await openConfirmForUser(resolved)
+          await openProfileForUser(resolved)
         } catch (error) {
           if (!active) {
             return
@@ -354,7 +430,7 @@ export function AddFriendModal({ isOpen, onClose, initialTarget = null, onComple
           return
         }
 
-        await openConfirmForUser(resolved)
+        await openProfileForUser(resolved)
       } catch (error) {
         if (!active) {
           return
@@ -372,7 +448,7 @@ export function AddFriendModal({ isOpen, onClose, initialTarget = null, onComple
     return () => {
       active = false
     }
-  }, [accessToken, findUserByIdentifier, initialTarget, isOpen, openConfirmForUser, t])
+  }, [accessToken, findUserByIdentifier, initialTarget, isOpen, openProfileForUser, t])
 
   const runPostActionRefresh = async () => {
     if (onCompleted) {
@@ -380,7 +456,7 @@ export function AddFriendModal({ isOpen, onClose, initialTarget = null, onComple
     }
   }
 
-  const handlePrimaryAction = async () => {
+  const handleSendFriendRequest = async () => {
     if (!accessToken || !selectedUser) {
       return
     }
@@ -401,12 +477,65 @@ export function AddFriendModal({ isOpen, onClose, initialTarget = null, onComple
       })
 
       await runPostActionRefresh()
+      pushRecentResult(selectedUser)
       setSuccessMessage(t('contacts.feedback.requestSentSuccess'))
+      setIsComposingFriendRequest(false)
       setRelation('sent')
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : t('contacts.feedback.genericError'))
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleOpenComposer = () => {
+    if (relation !== 'none') {
+      return
+    }
+
+    setIsComposingFriendRequest(true)
+    setErrorMessage(null)
+    setSuccessMessage(null)
+  }
+
+  const handleCallUser = () => {
+    if (!selectedUser?.phone) {
+      return
+    }
+
+    const dialNumber = selectedUser.phone.replace(/[^\d+]/g, '')
+    if (!dialNumber) {
+      return
+    }
+
+    window.location.href = `tel:${dialNumber}`
+  }
+
+  const handleBackToResults = () => {
+    setSelectedUser(null)
+    setIsComposingFriendRequest(false)
+    setRelation('none')
+    setErrorMessage(null)
+    setSuccessMessage(null)
+  }
+
+  const handleOpenConversation = async () => {
+    if (!accessToken || !selectedUser) {
+      return
+    }
+
+    setErrorMessage(null)
+    setSuccessMessage(null)
+    setIsOpeningConversation(true)
+
+    try {
+      const conversationId = await getOrCreateDirectConversation(accessToken, selectedUser.id)
+      handleClose()
+      navigate(`/chat/${conversationId}`)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : t('contacts.feedback.genericError'))
+    } finally {
+      setIsOpeningConversation(false)
     }
   }
 
@@ -421,113 +550,274 @@ export function AddFriendModal({ isOpen, onClose, initialTarget = null, onComple
             ? t('contacts.feedback.cannotAddSelf')
             : null
 
-  const profileName =
-    selectedUser?.displayName?.trim() || selectedUser?.email || selectedUser?.phone || t('contacts.modals.accountTitle')
+  const visibleRecentResults = useMemo(() => {
+    if (!selectedUser) {
+      return recentResults
+    }
 
-  const profileContact = selectedUser?.phone
-    ? maskPhone(selectedUser.phone)
-    : selectedUser?.email
-      ? maskEmail(selectedUser.email)
-      : null
+    return [selectedUser, ...recentResults.filter((item) => item.id !== selectedUser.id)].slice(0, 4)
+  }, [recentResults, selectedUser])
 
-  const profileSubline =
-    selectedUser?.statusMessage?.trim() || profileContact
+  const visibleSuggestedResults = useMemo(() => {
+    return suggestedResults
+      .filter((item) => !visibleRecentResults.some((recent) => recent.id === item.id))
+      .slice(0, 4)
+  }, [suggestedResults, visibleRecentResults])
+
+  const formatLookupLabel = (item: UserLookupResult): string => {
+    if (item.phone) {
+      return `(+84) ${item.phone.replace(/^\+?84/, '').replace(/^0/, '')}`
+    }
+
+    if (item.email) {
+      return maskEmail(item.email)
+    }
+
+    return t('contacts.common.unknownUser')
+  }
+
+  const renderDisplayName = (item: UserLookupResult): string => {
+    return item.displayName?.trim() || item.phone || item.email || t('contacts.common.unknownUser')
+  }
+
+  const renderProfileContent = () => {
+    if (!selectedUser) {
+      return null
+    }
+
+    const displayName = renderDisplayName(selectedUser)
+    const phoneDisplay = selectedUser.phone ? `(+84) ${selectedUser.phone.replace(/^\+?84/, '').replace(/^0/, '')}` : 'Chưa cập nhật'
+    const emailDisplay = selectedUser.email ?? 'Chưa cập nhật'
+    const bioDisplay = selectedUser.bio ?? selectedUser.statusMessage ?? 'Chưa có mô tả'
+    const canCall = relation === 'already-friend' && Boolean(selectedUser.phone)
+
+    return (
+      <section className='add-friend-profile'>
+        <button className='add-friend-profile-back' onClick={handleBackToResults} type='button'>
+          Quay lại kết quả
+        </button>
+
+        <div className='add-friend-profile-card'>
+          <div
+            className={`add-friend-profile-cover${selectedUser.coverUrl ? ' add-friend-profile-cover-image' : ''}`}
+            style={selectedUser.coverUrl ? { backgroundImage: `url(${selectedUser.coverUrl})` } : undefined}
+          />
+          <div className='add-friend-profile-head'>
+            <div className='add-friend-profile-avatar'>
+              <UserAvatar imageUrl={selectedUser.avatarUrl} name={displayName} size='lg' />
+            </div>
+            <div className='add-friend-profile-copy'>
+              <h4>{displayName}</h4>
+              <p>{selectedUser.statusMessage ?? 'Đang hoạt động trên VNALO'}</p>
+            </div>
+          </div>
+
+          <div className='add-friend-profile-info'>
+            <div className='add-friend-profile-info-row'>
+              <span>Số điện thoại</span>
+              <strong>{phoneDisplay}</strong>
+            </div>
+            <div className='add-friend-profile-info-row'>
+              <span>Email</span>
+              <strong>{emailDisplay}</strong>
+            </div>
+            <div className='add-friend-profile-info-row'>
+              <span>Giới thiệu</span>
+              <strong>{bioDisplay}</strong>
+            </div>
+          </div>
+
+          <div className='add-friend-profile-actions'>
+            {relation === 'already-friend' ? (
+              <>
+                <Button
+                  disabled={isOpeningConversation}
+                  onClick={() => {
+                    void handleOpenConversation()
+                  }}
+                  variant='primary'
+                >
+                  {isOpeningConversation ? 'Đang mở hội thoại...' : 'Nhắn tin'}
+                </Button>
+                <Button disabled={!canCall} onClick={handleCallUser} variant='subtle'>
+                  Gọi điện
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  disabled={isOpeningConversation}
+                  onClick={() => {
+                    void handleOpenConversation()
+                  }}
+                  variant='subtle'
+                >
+                  {isOpeningConversation ? 'Đang mở hội thoại...' : 'Nhắn tin'}
+                </Button>
+                <Button
+                  disabled={relation !== 'none' || isSubmitting}
+                  onClick={handleOpenComposer}
+                  variant='primary'
+                >
+                  Kết bạn
+                </Button>
+              </>
+            )}
+          </div>
+
+          {isComposingFriendRequest && relation === 'none' ? (
+            <div className='add-friend-request-box'>
+              <label htmlFor='add-friend-request-message'>Tin nhắn kết bạn</label>
+              <textarea
+                id='add-friend-request-message'
+                maxLength={240}
+                onChange={(event) => {
+                  setRequestMessage(event.target.value)
+                }}
+                placeholder='Xin chào, mình muốn kết bạn với bạn.'
+                rows={3}
+                value={requestMessage}
+              />
+              <div className='add-friend-request-actions'>
+                <Button
+                  disabled={isSubmitting}
+                  onClick={() => {
+                    setIsComposingFriendRequest(false)
+                  }}
+                  variant='subtle'
+                >
+                  Hủy
+                </Button>
+                <Button disabled={isSubmitting} onClick={handleSendFriendRequest} variant='primary'>
+                  {isSubmitting ? t('contacts.common.processing') : 'Kết bạn'}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </section>
+    )
+  }
 
   return (
     <Modal
-      description={isInConfirmStep ? t('contacts.modals.confirmDescription') : t('contacts.modals.searchDescription')}
+      description=''
       footer={
-        <>
-          <Button variant='ghost' onClick={handleClose}>
-            {t('contacts.common.cancel')}
-          </Button>
-          <Button
-            disabled={
-              isSubmitting ||
-              isSearching ||
-              isPreparingTarget ||
-              isAutoSearching ||
-              !selectedUser ||
-              relation !== 'none'
-            }
-            onClick={handlePrimaryAction}
-            variant='primary'
-          >
-            {submitLabel}
-          </Button>
-        </>
+        selectedUser ? undefined : (
+          <div className='add-friend-zalo-footer'>
+            <button className='add-friend-zalo-btn add-friend-zalo-btn-cancel' onClick={handleClose} type='button'>
+              Hủy
+            </button>
+            <button
+              className='add-friend-zalo-btn add-friend-zalo-btn-search'
+              disabled={isSearching || isSubmitting || isPreparingTarget || isAutoSearching}
+              onClick={() => {
+                void handleSearchUser()
+              }}
+              type='button'
+            >
+              {isSearching || isAutoSearching ? 'Đang tìm...' : 'Tìm kiếm'}
+            </button>
+          </div>
+        )
       }
       isOpen={isOpen}
       onClose={handleClose}
-      title={isInConfirmStep ? t('contacts.modals.confirmTitle') : t('contacts.modals.searchTitle')}
+      title='Thêm bạn'
     >
-      {!isInConfirmStep ? (
-        <label className='modal-field'>
-          <span>{t('contacts.modals.identifierLabel')}</span>
-          <div className='contacts-add-friend-search-row'>
-            <input
-              placeholder={t('contacts.modals.identifierPlaceholder')}
-              value={identifier}
-              onChange={(event) => {
-                setIdentifier(event.target.value)
-                setSelectedUser(null)
-                setRelation('none')
-                setErrorMessage(null)
-                setSuccessMessage(null)
-              }}
-            />
-            <Button disabled={isSearching || isSubmitting || isAutoSearching} onClick={handleSearchUser} variant='subtle'>
-              {isSearching || isAutoSearching ? t('contacts.modals.searching') : t('contacts.modals.searchAction')}
-            </Button>
+      <div className='add-friend-zalo'>
+        {/* Search row with VN country code and underline input like Zalo */}
+        <div className='add-friend-zalo-search'>
+          <div className='add-friend-zalo-prefix'>
+            <span className='add-friend-zalo-flag' aria-hidden='true'>
+              🇻🇳
+            </span>
+            <span>(+84)</span>
+            <span className='add-friend-zalo-caret'>▼</span>
           </div>
-        </label>
-      ) : null}
-
-      {isInConfirmStep && selectedUser ? (
-        <div className='friend-request-confirm'>
-          <div className='friend-request-profile'>
-            {selectedUser.coverUrl ? (
-              <img alt={profileName} className='friend-request-cover-image' src={selectedUser.coverUrl} />
-            ) : (
-              <div className='friend-request-cover-fallback' />
-            )}
-            <div className='friend-request-avatar-wrap'>
-              <UserAvatar imageUrl={selectedUser.avatarUrl} name={profileName} size='lg' />
-            </div>
-            <div className='friend-request-profile-copy'>
-              <h4>{profileName}</h4>
-              {profileSubline ? <p>{profileSubline}</p> : null}
-              {selectedUser.bio?.trim() ? <p className='friend-request-bio'>{selectedUser.bio}</p> : null}
-            </div>
-          </div>
-
-          <label className='modal-field'>
-            <span>{t('contacts.modals.messageLabel')}</span>
-            <textarea
-              placeholder={t('contacts.modals.messagePlaceholder')}
-              rows={3}
-              value={requestMessage}
-              onChange={(event) => setRequestMessage(event.target.value)}
-            />
-          </label>
-
-          <div className='friend-request-confirm-meta'>
-            {relationMessage ? <p className='contacts-request-meta'>{relationMessage}</p> : null}
-            <Button
-              disabled={isSubmitting || isSearching || isPreparingTarget}
-              onClick={() => {
-                setSelectedUser(null)
-                setRelation('none')
-                setErrorMessage(null)
-                setSuccessMessage(null)
-              }}
-              variant='ghost'
-            >
-              {t('contacts.modals.changeTargetAction')}
-            </Button>
-          </div>
+          <input
+            className='add-friend-zalo-input'
+            placeholder='Số điện thoại'
+            value={identifier}
+            onChange={(event) => {
+              setIdentifier(event.target.value)
+              setErrorMessage(null)
+              setSuccessMessage(null)
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                void handleSearchUser()
+              }
+            }}
+          />
         </div>
-      ) : null}
+
+        {selectedUser ? (
+          renderProfileContent()
+        ) : (
+          <>
+            <section className='add-friend-zalo-section'>
+              <h4>Kết quả gần nhất</h4>
+              <div className='add-friend-zalo-list'>
+                {visibleRecentResults.slice(0, 4).map((item) => (
+                  <button
+                    className='add-friend-zalo-recent-item'
+                    key={`recent-${item.id}`}
+                    type='button'
+                    onClick={() => {
+                      void openProfileForUser(item)
+                    }}
+                  >
+                    <UserAvatar imageUrl={item.avatarUrl} name={renderDisplayName(item)} size='md' />
+                    <span className='add-friend-zalo-item-copy'>
+                      <strong>{renderDisplayName(item)}</strong>
+                      <small>{formatLookupLabel(item)}</small>
+                    </span>
+                  </button>
+                ))}
+                {visibleRecentResults.length === 0 ? <p className='contacts-request-meta'>Chưa có kết quả gần nhất</p> : null}
+              </div>
+            </section>
+
+            <section className='add-friend-zalo-section'>
+              <h4>Có thể bạn quen</h4>
+              <div className='add-friend-zalo-list'>
+                {visibleSuggestedResults.map((item, index) => (
+                  <button
+                    className='add-friend-zalo-recent-item'
+                    key={`suggest-${item.id}`}
+                    type='button'
+                    onClick={() => {
+                      void openProfileForUser(item)
+                    }}
+                  >
+                    <UserAvatar imageUrl={item.avatarUrl} name={renderDisplayName(item)} size='md' />
+                    <span className='add-friend-zalo-item-copy'>
+                      <strong>{renderDisplayName(item)}</strong>
+                      <small>{index % 2 === 0 ? 'Từ số điện thoại' : 'Từ gợi ý kết bạn'}</small>
+                    </span>
+                  </button>
+                ))}
+                {!isLoadingSuggestions && visibleSuggestedResults.length === 0 ? (
+                  <p className='contacts-request-meta'>Không có gợi ý phù hợp</p>
+                ) : null}
+              </div>
+              <button
+                className='add-friend-zalo-more'
+                onClick={() => {
+                  void handleSearchUser()
+                }}
+                type='button'
+              >
+                Xem thêm
+              </button>
+            </section>
+          </>
+        )}
+
+        {!selectedUser && relationMessage ? <p className='contacts-request-meta'>{relationMessage}</p> : null}
+      </div>
 
       {successMessage ? <p className='contacts-feedback contacts-feedback-success'>{successMessage}</p> : null}
       {errorMessage ? <p className='contacts-feedback contacts-feedback-error'>{errorMessage}</p> : null}

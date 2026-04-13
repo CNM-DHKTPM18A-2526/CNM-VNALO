@@ -12,6 +12,8 @@ export function MainLayout() {
   const { user, logout } = useAuth()
   const { t } = useLanguage()
   const isChatWorkspace = location.pathname === '/' || location.pathname.startsWith('/chat')
+  const isContactsPage = location.pathname.startsWith('/contacts')
+  const shouldShowTopbar = !isChatWorkspace && !isContactsPage
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
 
   const title = useMemo(() => {
@@ -49,7 +51,7 @@ export function MainLayout() {
     <div className='app-shell'>
       <Sidebar onOpenSettingsModal={handleOpenSettings} />
       <section className='workspace'>
-        {isChatWorkspace ? null : (
+        {shouldShowTopbar ? (
           <Topbar
             title={title}
             userAvatarUrl={user?.avatarUrl}
@@ -57,7 +59,7 @@ export function MainLayout() {
             onLogout={logout}
             onOpenSettingsModal={handleOpenSettings}
           />
-        )}
+        ) : null}
         <main className={isChatWorkspace ? 'workspace-main workspace-main-chat page-enter' : 'workspace-main page-enter'} key={location.pathname}>
           <Outlet />
         </main>
