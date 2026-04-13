@@ -3,6 +3,13 @@ import { useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../features/auth/useAuth'
 import { getOrCreateDirectConversation } from '../features/chat/chat.api'
+import {
+  initializeSearchIndex,
+  searchUsersByPhoneLocal,
+  searchUsersLocal,
+  updateSearchIndexUsers,
+  type CachedUser,
+} from '../features/chat/searchIndex'
 import { FriendRequestList } from '../features/contacts/components/FriendRequestList'
 import { SentRequestList } from '../features/contacts/components/SentRequestList'
 import { AddFriendModal, type AddFriendTarget } from '../features/friends/components/AddFriendModal'
@@ -15,6 +22,8 @@ import {
   getIncomingFriendRequests,
   getSentFriendRequests,
   getUserById,
+  getUserByPhone,
+  searchUsers,
   unfriend,
 } from '../features/friends/friends.api'
 import type { Friend, FriendRequest, FriendStats, UserLookupResult } from '../features/friends/friends.types'
@@ -81,6 +90,28 @@ function sortByName(items: Friend[], fallback: string, mode: SortMode): Friend[]
   return mode === 'az' ? next : next.reverse()
 }
 
+function toCachedUserFromFriend(friend: Friend, fallback: string): CachedUser {
+  return {
+    id: friend.friendId,
+    phone: undefined,
+    email: undefined,
+    displayName: getFriendLabel(friend, fallback),
+    avatarUrl: friend.avatarUrl ?? undefined,
+    bio: friend.statusMessage?.trim() || undefined,
+  }
+}
+
+function toCachedUserFromLookup(user: UserLookupResult): CachedUser {
+  return {
+    id: user.id,
+    phone: user.phone ?? undefined,
+    email: user.email ?? undefined,
+    displayName: user.displayName ?? undefined,
+    avatarUrl: user.avatarUrl ?? undefined,
+    bio: user.bio ?? undefined,
+  }
+}
+
 export function ContactsPage() {
   const { accessToken } = useAuth()
   const { t } = useLanguage()
@@ -98,6 +129,8 @@ export function ContactsPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [activeFriendMenuId, setActiveFriendMenuId] = useState<string | null>(null)
   const [isOpeningConversationId, setIsOpeningConversationId] = useState<string | null>(null)
+  const [searchUserResults, setSearchUserResults] = useState<UserLookupResult[]>([])
+  const [isSearchingUsers, setIsSearchingUsers] = useState(false)
 
   const [friends, setFriends] = useState<Friend[]>([])
   const [incomingRequests, setIncomingRequests] = useState<FriendRequest[]>([])
@@ -127,7 +160,13 @@ export function ContactsPage() {
 
   const menuRef = useRef<HTMLDivElement | null>(null)
   const normalizedKeyword = keyword.trim().toLowerCase()
+  const normalizedPhoneKeyword = keyword.trim().replace(/\D/g, '')
+  const isPhoneQuery = normalizedPhoneKeyword.length >= 2 && normalizedPhoneKeyword.length >= Math.max(2, keyword.trim().length - 2)
   const unknownUserLabel = t('contacts.common.unknownUser')
+
+  useEffect(() => {
+    initializeSearchIndex()
+  }, [])
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -223,6 +262,14 @@ export function ContactsPage() {
   }, [accessToken, t])
 
   useEffect(() => {
+    if (friends.length === 0) {
+      return
+    }
+
+    updateSearchIndexUsers(friends.map((friend) => toCachedUserFromFriend(friend, unknownUserLabel)))
+  }, [friends, unknownUserLabel])
+
+  useEffect(() => {
     if (!accessToken) {
       return
     }
@@ -264,6 +311,78 @@ export function ContactsPage() {
       document.removeEventListener('visibilitychange', handleVisibility)
     }
   }, [accessToken])
+
+  useEffect(() => {
+    const query = keyword.trim()
+
+    if (!query) {
+      setSearchUserResults([])
+      setIsSearchingUsers(false)
+      return
+    }
+
+    let active = true
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        setIsSearchingUsers(true)
+
+        try {
+          const localResults = isPhoneQuery ? searchUsersByPhoneLocal(normalizedPhoneKeyword) : searchUsersLocal(query)
+          const localLookups = localResults.map((user) => ({
+            id: user.id,
+            phone: user.phone ?? null,
+            email: user.email ?? null,
+            displayName: user.displayName ?? null,
+            avatarUrl: user.avatarUrl ?? null,
+            coverUrl: null,
+            bio: user.bio ?? null,
+            statusMessage: user.bio ?? null,
+          }))
+
+          let remoteLookups: UserLookupResult[] = []
+          if (accessToken) {
+            try {
+              if (isPhoneQuery) {
+                const maybeUser = await getUserByPhone(accessToken, query)
+                remoteLookups = maybeUser ? [maybeUser] : []
+              } else {
+                remoteLookups = await searchUsers(accessToken, query)
+              }
+            } catch {
+              remoteLookups = []
+            }
+          }
+
+          const merged = new Map<string, UserLookupResult>()
+          for (const user of [...localLookups, ...remoteLookups]) {
+            if (!merged.has(user.id)) {
+              merged.set(user.id, user)
+            }
+          }
+
+          if (!active) {
+            return
+          }
+
+          const nextResults = [...merged.values()]
+          setSearchUserResults(nextResults)
+
+          if (nextResults.length > 0) {
+            updateSearchIndexUsers(nextResults.map(toCachedUserFromLookup))
+          }
+        } finally {
+          if (active) {
+            setIsSearchingUsers(false)
+          }
+        }
+      })()
+    }, 250)
+
+    return () => {
+      active = false
+      window.clearTimeout(timer)
+    }
+  }, [accessToken, isPhoneQuery, keyword, normalizedPhoneKeyword])
 
   const filteredFriends = useMemo(() => {
     return friends.filter((friend) => {
@@ -392,6 +511,27 @@ export function ContactsPage() {
     }
   }
 
+  const handleOpenLookupProfile = async (user: UserLookupResult) => {
+    if (!accessToken) return
+
+    setProfileError(null)
+    setIsProfileLoading(true)
+    setIsProfileModalOpen(true)
+    setProfileTargetUserId(user.id)
+    setProfilePreview(user)
+
+    try {
+      const profile = await getUserById(accessToken, user.id)
+      if (profile) {
+        setProfilePreview(profile)
+      }
+    } catch (error) {
+      setProfileError(error instanceof Error ? error.message : t('contacts.feedback.genericError'))
+    } finally {
+      setIsProfileLoading(false)
+    }
+  }
+
   const handleSendMessageFromProfile = async () => {
     if (!accessToken) return
 
@@ -415,6 +555,30 @@ export function ContactsPage() {
     }
   }
 
+  const handleOpenConversationByUserId = async (targetUserId: string, loadingKey: string) => {
+    if (!accessToken) return
+
+    if (!targetUserId) {
+      setFeedback({ type: 'error', message: t('contacts.feedback.genericError') })
+      return
+    }
+
+    setFeedback(null)
+    setIsOpeningConversationId(loadingKey)
+
+    try {
+      const conversationId = await getOrCreateDirectConversation(accessToken, targetUserId)
+      navigate(`/chat/${conversationId}`)
+    } catch (error) {
+      setFeedback({
+        type: 'error',
+        message: error instanceof Error ? error.message : t('contacts.feedback.genericError'),
+      })
+    } finally {
+      setIsOpeningConversationId(null)
+    }
+  }
+
   const handleCallFromProfile = () => {
     const phone = profilePreview?.phone?.trim()
     if (!phone) {
@@ -429,29 +593,8 @@ export function ContactsPage() {
   }
 
   const handleOpenConversation = async (friend: Friend) => {
-    if (!accessToken) return
-
-    const targetUserId = friend.friendId
-    if (!targetUserId) {
-      setFeedback({ type: 'error', message: t('contacts.feedback.genericError') })
-      return
-    }
-
-    setFeedback(null)
-    setIsOpeningConversationId(friend.friendshipId)
     setActiveFriendMenuId(null)
-
-    try {
-      const conversationId = await getOrCreateDirectConversation(accessToken, targetUserId)
-      navigate(`/chat/${conversationId}`)
-    } catch (error) {
-      setFeedback({
-        type: 'error',
-        message: error instanceof Error ? error.message : t('contacts.feedback.genericError'),
-      })
-    } finally {
-      setIsOpeningConversationId(null)
-    }
+    await handleOpenConversationByUserId(friend.friendId, friend.friendshipId)
   }
 
   const handleAcceptRequest = async (requestId: string) => {
@@ -666,13 +809,13 @@ export function ContactsPage() {
                 <div className='contacts-loading-wrap'>
                   <LoadingState label={t('contacts.loading.friends')} />
                 </div>
-              ) : sortedFriends.length === 0 ? (
+              ) : sortedFriends.length === 0 && searchUserResults.length === 0 ? (
                 <div className='contacts-empty-center'>
                   <div className='contacts-empty-icon-wrap'>
                     <Icon name='search' className='contacts-empty-icon' />
                   </div>
                   <div className='contacts-empty-title'>
-                    {normalizedKeyword ? 'Không tìm thấy bạn bè phù hợp' : 'Chưa có bạn bè nào'}
+                    {normalizedKeyword ? 'Không tìm thấy kết quả phù hợp' : 'Chưa có bạn bè nào'}
                   </div>
                   <p className='contacts-empty-description'>
                     {normalizedKeyword
@@ -682,89 +825,164 @@ export function ContactsPage() {
                 </div>
               ) : (
                 <div className='contacts-friends-groups'>
-                  {groupedFriends.map(([letter, items]) => (
-                    <section key={letter}>
+                  {normalizedKeyword ? (
+                    <section>
                       <div className='contacts-group-head'>
-                        <div className='contacts-group-letter'>{letter}</div>
+                        <div className='contacts-group-letter'>Kết quả tìm kiếm</div>
                       </div>
-
                       <div className='contacts-friends-list'>
-                        {items.map((friend) => {
-                          const displayName = getFriendLabel(friend, unknownUserLabel)
-                          const statusText = friend.statusMessage?.trim()
-                          const isOpen = activeFriendMenuId === friend.friendshipId
-                          const isOpening = isOpeningConversationId === friend.friendshipId
+                        {isSearchingUsers ? (
+                          <div className='contacts-friend-row'>
+                            <div className='contacts-friend-copy'>
+                              <p className='contacts-friend-name'>Đang tìm kiếm...</p>
+                            </div>
+                          </div>
+                        ) : null}
+                        {searchUserResults.map((user) => {
+                          const displayName = user.displayName?.trim() || user.phone || user.email || unknownUserLabel
+                          const isFriend = friends.some((friend) => friend.friendId === user.id)
+                          const friendMatch = friends.find((friend) => friend.friendId === user.id) ?? null
+                          const subtitle = user.phone?.trim() || user.email?.trim() || user.bio?.trim() || 'Người dùng'
 
                           return (
-                            <div
-                              key={friend.friendshipId}
-                              className='contacts-friend-row'
-                            >
+                            <div key={user.id} className='contacts-friend-row'>
                               <button
                                 type='button'
                                 className='contacts-friend-main-btn'
                                 onClick={() => {
-                                  void handleOpenConversation(friend)
+                                  void handleOpenLookupProfile(user)
                                 }}
                               >
-                                <UserAvatar imageUrl={friend.avatarUrl} name={displayName} size='md' />
+                                <UserAvatar imageUrl={user.avatarUrl} name={displayName} size='md' />
                                 <div className='contacts-friend-copy'>
                                   <p className='contacts-friend-name'>{displayName}</p>
-                                  {statusText ? <p className='contacts-friend-status'>{statusText}</p> : null}
+                                  <p className='contacts-friend-status'>{subtitle}</p>
                                 </div>
                               </button>
 
-                              <div ref={isOpen ? menuRef : undefined} className='contacts-friend-menu-wrap'>
-                                <button
-                                  type='button'
-                                  className='contacts-more-btn'
-                                  onClick={() => {
-                                    if (isOpen) {
-                                      closeFriendMenu()
-                                    } else {
-                                      openFriendMenu(friend)
-                                    }
-                                  }}
-                                >
-                                  <Icon name='more' />
-                                </button>
-
-                                {isOpen ? (
-                                  <div className='contacts-friend-menu'>
-                                    <div className='contacts-friend-menu-head'>{displayName}</div>
-                                    <div className='contacts-friend-menu-divider' />
-                                    <div className='contacts-friend-menu-items'>
-                                      {friendMenuItems.map((item) => (
-                                        <button
-                                          key={item.key}
-                                          type='button'
-                                          className={`contacts-friend-menu-item ${item.danger ? 'contacts-friend-menu-item-danger' : ''}`}
-                                          onClick={() => {
-                                            if (item.key === 'info') {
-                                              void handleOpenProfileModal(friend)
-                                            }
-                                            if (item.key === 'unfriend') {
-                                              setConfirmAction({ kind: 'unfriend', friendId: friend.friendId, displayName })
-                                            }
-                                            closeFriendMenu()
-                                          }}
-                                        >
-                                          <span>{item.label}</span>
-                                          {item.key === 'classify' ? <Icon name='chevronDown' className='contacts-chevron-right' /> : null}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
-                                ) : null}
+                              <div className='contacts-user-search-actions'>
+                                {isFriend && friendMatch ? (
+                                  <Button
+                                    variant='ghost'
+                                    onClick={() => {
+                                      void handleOpenConversation(friendMatch)
+                                    }}
+                                  >
+                                    Nhắn tin
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant='ghost'
+                                    onClick={() => {
+                                      openAddFriendModal({
+                                        userId: user.id,
+                                        displayName,
+                                        avatarUrl: user.avatarUrl ?? null,
+                                        phone: user.phone ?? null,
+                                        email: user.email ?? null,
+                                        bio: user.bio ?? null,
+                                        statusMessage: user.statusMessage ?? null,
+                                      })
+                                    }}
+                                  >
+                                    Kết bạn
+                                  </Button>
+                                )}
                               </div>
 
-                              {isOpening ? <div className='contacts-open-conversation-overlay' /> : null}
+                              {isOpeningConversationId === user.id ? <div className='contacts-open-conversation-overlay' /> : null}
                             </div>
                           )
                         })}
                       </div>
                     </section>
-                  ))}
+                  ) : null}
+
+                  {sortedFriends.length > 0 ? (
+                    groupedFriends.map(([letter, items]) => (
+                      <section key={letter}>
+                        <div className='contacts-group-head'>
+                          <div className='contacts-group-letter'>{letter}</div>
+                        </div>
+
+                        <div className='contacts-friends-list'>
+                          {items.map((friend) => {
+                            const displayName = getFriendLabel(friend, unknownUserLabel)
+                            const statusText = friend.statusMessage?.trim()
+                            const isOpen = activeFriendMenuId === friend.friendshipId
+                            const isOpening = isOpeningConversationId === friend.friendshipId
+
+                            return (
+                              <div
+                                key={friend.friendshipId}
+                                className='contacts-friend-row'
+                              >
+                                <button
+                                  type='button'
+                                  className='contacts-friend-main-btn'
+                                  onClick={() => {
+                                    void handleOpenConversation(friend)
+                                  }}
+                                >
+                                  <UserAvatar imageUrl={friend.avatarUrl} name={displayName} size='md' />
+                                  <div className='contacts-friend-copy'>
+                                    <p className='contacts-friend-name'>{displayName}</p>
+                                    {statusText ? <p className='contacts-friend-status'>{statusText}</p> : null}
+                                  </div>
+                                </button>
+
+                                <div ref={isOpen ? menuRef : undefined} className='contacts-friend-menu-wrap'>
+                                  <button
+                                    type='button'
+                                    className='contacts-more-btn'
+                                    onClick={() => {
+                                      if (isOpen) {
+                                        closeFriendMenu()
+                                      } else {
+                                        openFriendMenu(friend)
+                                      }
+                                    }}
+                                  >
+                                    <Icon name='more' />
+                                  </button>
+
+                                  {isOpen ? (
+                                    <div className='contacts-friend-menu'>
+                                      <div className='contacts-friend-menu-head'>{displayName}</div>
+                                      <div className='contacts-friend-menu-divider' />
+                                      <div className='contacts-friend-menu-items'>
+                                        {friendMenuItems.map((item) => (
+                                          <button
+                                            key={item.key}
+                                            type='button'
+                                            className={`contacts-friend-menu-item ${item.danger ? 'contacts-friend-menu-item-danger' : ''}`}
+                                            onClick={() => {
+                                              if (item.key === 'info') {
+                                                void handleOpenProfileModal(friend)
+                                              }
+                                              if (item.key === 'unfriend') {
+                                                setConfirmAction({ kind: 'unfriend', friendId: friend.friendId, displayName })
+                                              }
+                                              closeFriendMenu()
+                                            }}
+                                          >
+                                            <span>{item.label}</span>
+                                            {item.key === 'classify' ? <Icon name='chevronDown' className='contacts-chevron-right' /> : null}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ) : null}
+                                </div>
+
+                                {isOpening ? <div className='contacts-open-conversation-overlay' /> : null}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </section>
+                    ))
+                  ) : null}
                 </div>
               )
             ) : null}
