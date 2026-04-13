@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:vnalo_mobile/core/localization/common_texts.dart';
+import 'package:vnalo_mobile/core/localization/language_provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/auth/screens/welcome_screen.dart';
+import 'package:vnalo_mobile/features/profile/localization/profile_texts.dart';
 import 'package:vnalo_mobile/features/profile/screens/account_security_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/appearance_settings_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/personal_info_screen.dart';
@@ -15,19 +18,19 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
-    final searchHint = isDarkMode ? DarkColors.textHint : Colors.white.withValues(alpha: 0.8);
+    final t = ProfileTexts.of(context);
 
     return Scaffold(
       backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
       appBar: AppBar(
-        title: const Text(
-          'Cài đặt',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+        title: Text(
+          t.settings,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
         backgroundColor: isDarkMode ? appBarBg : Colors.transparent,
         foregroundColor: Colors.white,
         elevation: 0,
-        forceMaterialTransparency: true,
+        forceMaterialTransparency: !isDarkMode,
         iconTheme: const IconThemeData(color: Colors.white),
         flexibleSpace: isDarkMode
             ? null
@@ -40,7 +43,7 @@ class SettingsScreen extends StatelessWidget {
             onPressed: () {
               showSearch(
                 context: context,
-                delegate: _SettingsSearchDelegate(),
+                delegate: _SettingsSearchDelegate(t: t),
               );
             },
           ),
@@ -57,39 +60,41 @@ class SettingsScreen extends StatelessWidget {
   }
 
   List<MenuSection> _getSettingsSections(BuildContext context) {
+    final t = ProfileTexts.of(context);
+    final common = CommonTexts.of(context);
     return [
       MenuSection(
         items: [
           MenuItem(
             key: 'account',
             icon: Icons.shield_outlined,
-            title: 'Tài khoản và bảo mật',
+            title: t.accountAndSecurity,
             onTap: () {
               Navigator.of(context, rootNavigator: true).push(
                 MaterialPageRoute(builder: (_) => const AccountSecurityScreen()),
               );
             },
           ),
-          const MenuItem(key: 'privacy', icon: Icons.lock_outline, title: 'Quyền riêng tư'),
-        ],
-      ),
-      const MenuSection(
-        items: [
-          MenuItem(key: 'storage', icon: Icons.pie_chart_outline, title: 'Dữ liệu trên máy'),
-          MenuItem(key: 'backup', icon: Icons.cloud_sync_outlined, title: 'Sao lưu và khôi phục'),
+          MenuItem(key: 'privacy', icon: Icons.lock_outline, title: t.privacy),
         ],
       ),
       MenuSection(
         items: [
-          const MenuItem(key: 'notif', icon: Icons.notifications_outlined, title: 'Thông báo'),
-          const MenuItem(key: 'message', icon: Icons.chat_outlined, title: 'Tin nhắn'),
-          const MenuItem(key: 'call', icon: Icons.call_outlined, title: 'Cuộc gọi'),
-          const MenuItem(key: 'timeline', icon: Icons.access_time, title: 'Nhật ký'),
-          const MenuItem(key: 'contacts', icon: Icons.contacts_outlined, title: 'Danh bạ'),
+          MenuItem(key: 'storage', icon: Icons.pie_chart_outline, title: t.deviceData),
+          MenuItem(key: 'backup', icon: Icons.cloud_sync_outlined, title: _isVi(context) ? 'Sao lưu và khôi phục' : 'Backup & Restore'),
+        ],
+      ),
+      MenuSection(
+        items: [
+          MenuItem(key: 'notif', icon: Icons.notifications_outlined, title: t.notifications),
+          MenuItem(key: 'message', icon: Icons.chat_outlined, title: common.messages),
+          MenuItem(key: 'call', icon: Icons.call_outlined, title: _isVi(context) ? 'Cuộc gọi' : 'Calls'),
+          MenuItem(key: 'timeline', icon: Icons.access_time, title: common.timeline),
+          MenuItem(key: 'contacts', icon: Icons.contacts_outlined, title: common.contacts),
           MenuItem(
             key: 'appearance',
             icon: Icons.color_lens_outlined,
-            title: 'Giao diện và ngôn ngữ',
+            title: t.appearance,
             onTap: () {
               Navigator.of(context, rootNavigator: true).push(
                 MaterialPageRoute(builder: (_) => const AppearanceSettingsScreen()),
@@ -103,19 +108,21 @@ class SettingsScreen extends StatelessWidget {
           MenuItem(
             key: 'about',
             icon: Icons.info_outline,
-            title: 'Thông tin về VNALO',
+            title: _isVi(context) ? 'Thông tin về VNALO' : 'About VNALO',
             onTap: () {
               Navigator.of(context, rootNavigator: true).push(
                 MaterialPageRoute(builder: (_) => const PersonalInfoScreen()),
               );
             },
           ),
-          const MenuItem(key: 'help', icon: Icons.help_outline, title: 'Liên hệ hỗ trợ'),
-          const MenuItem(key: 'switch_account', icon: Icons.swap_horiz, title: 'Chuyển tài khoản'),
+          MenuItem(key: 'help', icon: Icons.help_outline, title: _isVi(context) ? 'Liên hệ hỗ trợ' : 'Help & Support'),
+          MenuItem(key: 'switch_account', icon: Icons.swap_horiz, title: _isVi(context) ? 'Chuyển tài khoản' : 'Switch account'),
         ],
       ),
     ];
   }
+
+  bool _isVi(BuildContext context) => ProfileTexts.of(context).language == AppLanguage.vi;
 
   List<Widget> _buildAllSections(BuildContext context) {
     final sections = _getSettingsSections(context);
@@ -161,7 +168,8 @@ class SettingsScreen extends StatelessWidget {
   Widget _buildLogoutButton(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final itemBgColor = isDarkMode ? DarkColors.divider : AppColors.itemDivider;
-    
+    final t = ProfileTexts.of(context);
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       width: double.infinity,
@@ -178,12 +186,12 @@ class SettingsScreen extends StatelessWidget {
         onPressed: () {
           _confirmLogout(context);
         },
-        child: const Row(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.logout, size: 20),
-            SizedBox(width: 8),
-            Text('Đăng xuất', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+            const Icon(Icons.logout, size: 20),
+            const SizedBox(width: 8),
+            Text(t.logout, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
           ],
         ),
       ),
@@ -199,7 +207,7 @@ class SettingsScreen extends StatelessWidget {
         splashColor: AppColors.itemPressBackground.withValues(alpha: 0.7),
         onTap: onTap,
         child: ListTile(
-          leading: Icon(icon, color: AppColors.primary),
+          leading: Icon(icon, color: isDarkMode ? DarkColors.primary : AppColors.primary),
           title: Text(
             title,
             style: TextStyle(
@@ -216,6 +224,9 @@ class SettingsScreen extends StatelessWidget {
 
   Future<void> _confirmLogout(BuildContext context) async {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final t = ProfileTexts.of(context);
+    final common = CommonTexts.of(context);
+
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -242,19 +253,20 @@ class SettingsScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  const Icon(Icons.info, color: AppColors.primary, size: 30),
+                  Icon(Icons.info, color: isDarkMode ? DarkColors.primary : AppColors.primary, size: 30),
                   const SizedBox(height: 12),
                   Text(
-                    'Đăng xuất khỏi tài khoản này?',
+                    t.logoutConfirm,
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Nếu đổi máy mới, hãy sao lưu để tránh mất tin nhắn và ảnh gần đây',
+                    _isVi(context) 
+                      ? 'Nếu đổi máy mới, hãy sao lưu để tránh mất tin nhắn và ảnh gần đây'
+                      : 'If switching to a new device, please backup to avoid losing recent messages and photos',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 15, color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary, height: 1.35),
                   ),
-                  const SizedBox(height: 16),
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
@@ -271,7 +283,7 @@ class SettingsScreen extends StatelessWidget {
                           side: BorderSide(color: isDarkMode ? Colors.red.withValues(alpha: 0.3) : Colors.red.shade100),
                         ),
                       ),
-                      child: const Text('Đăng xuất', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                      child: Text(t.logout, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -281,12 +293,12 @@ class SettingsScreen extends StatelessWidget {
                     child: ElevatedButton(
                       onPressed: () => Navigator.pop(sheetContext, false),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: isDarkMode ? Colors.white10 : Colors.grey.shade100,
-                        foregroundColor: isDarkMode ? Colors.white : Colors.black87,
+                        backgroundColor: isDarkMode ? DarkColors.divider : Colors.grey.shade100,
+                        foregroundColor: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
                         elevation: 0,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      child: const Text('Hủy', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                      child: Text(common.cancel, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                     ),
                   ),
                 ],
@@ -332,19 +344,23 @@ class _SectionDivider extends StatelessWidget {
 }
 
 class _SettingsSearchDelegate extends SearchDelegate<String> {
-  final List<String> _settingsKeys = [
-    'Tài khoản và bảo mật',
-    'Quyền riêng tư',
-    'Dữ liệu trên máy',
+  final ProfileTexts t;
+
+  _SettingsSearchDelegate({required this.t});
+
+  List<String> get _settingsKeys => [
+    t.accountAndSecurity,
+    t.privacy,
+    t.deviceData,
     'Sao lưu và khôi phục',
-    'Thông báo',
+    t.notifications,
     'Tin nhắn',
     'Danh bạ',
-    'Giao diện và ngôn ngữ',
+    t.appearance,
   ];
 
   @override
-  String get searchFieldLabel => 'Tìm cài đặt...';
+  String get searchFieldLabel => t.language == AppLanguage.vi ? 'Tìm cài đặt...' : 'Search settings...';
 
   @override
   List<Widget>? buildActions(BuildContext context) {
@@ -371,15 +387,15 @@ class _SettingsSearchDelegate extends SearchDelegate<String> {
 
   @override
   Widget buildResults(BuildContext context) {
-    return _buildSuggestionsList();
+    return _buildSuggestionsList(context);
   }
 
   @override
   Widget buildSuggestions(BuildContext context) {
-    return _buildSuggestionsList();
+    return _buildSuggestionsList(context);
   }
 
-  Widget _buildSuggestionsList() {
+  Widget _buildSuggestionsList(BuildContext context) {
     final suggestions = _settingsKeys
         .where((key) => key.toLowerCase().contains(query.toLowerCase()))
         .toList();
@@ -393,7 +409,7 @@ class _SettingsSearchDelegate extends SearchDelegate<String> {
           onTap: () {
             close(context, suggestions[index]);
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Đang phát triển thiết lập: ${suggestions[index]}')),
+              SnackBar(content: Text('${ProfileTexts.of(context).language == AppLanguage.vi ? 'Đang phát triển thiết lập' : 'Setting under development'}: ${suggestions[index]}')),
             );
           },
         );

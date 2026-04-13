@@ -1,5 +1,4 @@
 import 'package:drift/drift.dart';
-import 'package:flutter/foundation.dart';
 import 'connection/connection_stub.dart'
     if (dart.library.io) 'connection/native_connection.dart'
     if (dart.library.html) 'connection/web_connection.dart'
@@ -12,7 +11,7 @@ class LocalDatabase extends _$LocalDatabase {
   LocalDatabase() : super(conn.openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -32,50 +31,21 @@ class LocalDatabase extends _$LocalDatabase {
         await customStatement('DROP TRIGGER IF EXISTS contacts_ai');
         await customStatement('DROP TRIGGER IF EXISTS contacts_ad');
 
-        // 2. Create base tables if missing (for users upgrading from v1)
-        await m.createTable(messages);
-        await m.createTable(contacts);
-        await m.createTable(conversations);
-
-        // 3. Re-create FTS tables (Independent FTS5 schema)
+        // 2. Re-create FTS tables (Independent FTS5 schema)
         await customStatement('DROP TABLE IF EXISTS messages_fts');
         await customStatement('DROP TABLE IF EXISTS contacts_fts');
 
-        // 4. Re-create FTS tables and rebuild indexes from source tables
+        // 3. Re-create FTS tables and rebuild indexes from source tables
         await _createFtsTables();
-        
-        // Use try-catch for data migration to avoid blocking startup if tables are empty/corrupt
-        try {
-          await customStatement(
-            'INSERT INTO messages_fts(content, external_id) SELECT content, id FROM messages',
-          );
-          await customStatement(
-            'INSERT INTO contacts_fts(display_name, external_id) SELECT display_name, id FROM contacts',
-          );
-        } catch (e) {
-          debugPrint('FTS indexing failed during migration: $e');
-        }
+        await customStatement(
+          'INSERT INTO messages_fts(content, external_id) SELECT content, id FROM messages',
+        );
+        await customStatement(
+          'INSERT INTO contacts_fts(display_name, external_id) SELECT display_name, id FROM contacts',
+        );
 
-        // 5. Re-create triggers after rebuild to avoid side effects during migration
+        // 4. Re-create triggers after rebuild to avoid side effects during migration
         await _createFtsTriggers();
-      }
-
-      if (from < 3) {
-        // WIPE poisoned data (ISO strings in INTEGER created_at column)
-        await customStatement('DELETE FROM messages');
-        await customStatement('DELETE FROM messages_fts');
-        debugPrint('[Migration] Database v3: Purged legacy messages to fix formatting errors.');
-      }
-
-      if (from < 4) {
-        // Add media columns to messages (non-destructive ALTER TABLE)
-        await customStatement("ALTER TABLE messages ADD COLUMN message_type TEXT NOT NULL DEFAULT 'TEXT'");
-        await customStatement('ALTER TABLE messages ADD COLUMN media_url TEXT');
-        await customStatement('ALTER TABLE messages ADD COLUMN thumb_url TEXT');
-        await customStatement('ALTER TABLE messages ADD COLUMN local_path TEXT');
-        await customStatement('ALTER TABLE messages ADD COLUMN media_mime_type TEXT');
-        await customStatement('ALTER TABLE messages ADD COLUMN media_size_bytes INTEGER');
-        debugPrint('[Migration] Database v4: Added media columns to messages table.');
       }
     },
   );
@@ -116,58 +86,58 @@ class LocalDatabase extends _$LocalDatabase {
   // --- SEARCH QUERIES ---
 
   Future<List<LocalMessageSearchResult>> searchMessages(String query) async {
-    final results = await customSelect(
-      'SELECT m.*, c.name as conv_name, c.avatar_url as conv_avatar FROM messages m '
-      'LEFT JOIN conversations c ON m.conversation_id = c.id '
-      'WHERE m.id IN ( '
-      '  SELECT external_id FROM messages_fts WHERE content MATCH ? '
-      ') OR m.content LIKE ? '
-      'ORDER BY m.created_at DESC',
-      variables: [
-        Variable.withString('$query*'),
-        Variable.withString('%$query%'),
-      ],
-    ).get();
+    final results =
+        await customSelect(
+          'SELECT m.*, c.name as conv_name, c.avatar_url as conv_avatar FROM messages m '
+          'JOIN messages_fts f ON m.id = f.external_id '
+          'JOIN conversations c ON m.conversation_id = c.id '
+          'WHERE f.content MATCH ? '
+          'ORDER BY m.created_at DESC',
+          variables: [Variable.withString('$query*')],
+        ).get();
 
-    return results.map((row) {
-      return LocalMessageSearchResult(
-        message: LocalMessage(
-          id: row.read<String>('id'),
-          content: row.read<String>('content'),
-          conversationId: row.read<String>('conversation_id'),
-          createdAt: row.read<DateTime>('created_at'),
-          senderId: row.read<String>('sender_id'),
-          messageType: (row.readNullable<String>('message_type')) ?? 'TEXT',
-          mediaUrl: row.readNullable<String>('media_url'),
-          thumbUrl: row.readNullable<String>('thumb_url'),
-          localPath: row.readNullable<String>('local_path'),
-          mediaMimeType: row.readNullable<String>('media_mime_type'),
-          mediaSizeBytes: row.readNullable<int>('media_size_bytes'),
-        ),
-        conversationName: row.readNullable<String>('conv_name'),
-        conversationAvatar: row.readNullable<String>('conv_avatar'),
-      );
-    }).toList();
+    return results
+        .map(
+          (row) => LocalMessageSearchResult(
+            message: LocalMessage(
+              id: row.read<String>('id'),
+              content: row.read<String>('content'),
+              conversationId: row.read<String>('conversation_id'),
+              createdAt: row.read<DateTime>('created_at'),
+              senderId: row.read<String>('sender_id'),
+              messageType: row.readNullable<String>('message_type') ?? 'TEXT',
+              mediaUrl: row.readNullable<String>('media_url'),
+              thumbUrl: row.readNullable<String>('thumb_url'),
+              localPath: row.readNullable<String>('local_path'),
+              mediaMimeType: row.readNullable<String>('media_mime_type'),
+              mediaSizeBytes: row.readNullable<int>('media_size_bytes'),
+            ),
+            conversationName: row.readNullable<String>('conv_name'),
+            conversationAvatar: row.readNullable<String>('conv_avatar'),
+          ),
+        )
+        .toList();
   }
 
   Future<List<LocalContact>> searchContacts(String query) async {
-    final results = await customSelect(
-      'SELECT * FROM contacts WHERE id IN ('
-      '  SELECT external_id FROM contacts_fts WHERE display_name MATCH ?'
-      ') OR phone LIKE ?',
-      variables: [
-        Variable.withString('$query*'),
-        Variable.withString('%$query%'),
-      ],
-    ).get();
+    final results =
+        await customSelect(
+          'SELECT c.* FROM contacts c '
+          'JOIN contacts_fts f ON c.id = f.external_id '
+          'WHERE f.display_name MATCH ? OR c.phone LIKE ?',
+          variables: [
+            Variable.withString('$query*'),
+            Variable.withString('%$query%'),
+          ],
+        ).get();
 
     return results
         .map(
           (row) => LocalContact(
             id: row.read<String>('id'),
             displayName: row.read<String>('display_name'),
-            phone: row.readNullable<String>('phone'),
-            avatarUrl: row.readNullable<String>('avatar_url'),
+            phone: row.read<String>('phone'),
+            avatarUrl: row.read<String>('avatar_url'),
           ),
         )
         .toList();
@@ -185,47 +155,41 @@ class LocalDatabase extends _$LocalDatabase {
     final row = results.first;
     return LocalConversation(
       id: row.read<String>('id'),
-      name: row.readNullable<String>('name'),
+      name: row.read<String>('name'),
       type: row.read<String>('type'),
-      avatarUrl: row.readNullable<String>('avatar_url'),
-      lastMessage: row.readNullable<String>('last_message'),
+      avatarUrl: row.read<String>('avatar_url'),
+      lastMessage: row.read<String>('last_message'),
       updatedAt: row.read<DateTime>('updated_at'),
     );
   }
 
-  Future<void> saveMessage(LocalMessage message) async {
-    await into(messages).insert(message, mode: InsertMode.insertOrReplace);
+  // --- PERSISTENCE METHODS ---
+
+  Future<void> saveMessage(LocalMessage message) {
+    return into(messages).insert(message, mode: InsertMode.insertOrReplace);
   }
 
-  Future<void> saveMessagesBatch(List<LocalMessage> messageList) async {
-    await batch((batch) {
-      batch.insertAll(messages, messageList, mode: InsertMode.insertOrReplace);
+  Future<void> saveMessagesBatch(List<LocalMessage> msgs) async {
+    await batch((b) {
+      b.insertAll(messages, msgs, mode: InsertMode.insertOrReplace);
     });
   }
 
-  /// Update the local_path for a downloaded file/image.
-  Future<void> updateLocalPath(String messageId, String localPath) async {
-    await customStatement(
-      'UPDATE messages SET local_path = ? WHERE id = ?',
-      [localPath, messageId],
-    );
-  }
-
-  /// Clear local_path entries for messages whose files have been deleted.
-  Future<void> clearStalePaths(List<String> messageIds) async {
-    if (messageIds.isEmpty) return;
-    final placeholders = List.filled(messageIds.length, '?').join(',');
-    await customStatement(
-      'UPDATE messages SET local_path = NULL WHERE id IN ($placeholders)',
-      messageIds,
-    );
-  }
-
   Future<List<LocalMessage>> getMessagesByConversation(String conversationId) async {
-    return (select(messages)
-          ..where((t) => t.conversationId.equals(conversationId))
-          ..orderBy([(t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc)]))
-        .get();
+    final query = select(messages)
+      ..where((t) => t.conversationId.equals(conversationId))
+      ..orderBy([(t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc)]);
+    return query.get();
+  }
+
+  Future<void> updateLocalPath(String messageId, String localPath) {
+    return (update(messages)..where((t) => t.id.equals(messageId)))
+        .write(MessagesCompanion(localPath: Value(localPath)));
+  }
+
+  Future<void> clearStalePaths(List<String> ids) {
+    return (update(messages)..where((t) => t.id.isIn(ids)))
+        .write(const MessagesCompanion(localPath: Value(null)));
   }
 }
 

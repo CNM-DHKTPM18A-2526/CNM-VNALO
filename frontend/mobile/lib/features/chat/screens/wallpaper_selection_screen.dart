@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:vnalo_mobile/core/localization/common_texts.dart';
+import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
 
@@ -40,6 +42,7 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
   Future<void> _pickFromGallery() async {
     final picker = ImagePicker();
     final image = await picker.pickImage(source: ImageSource.gallery);
+    final common = CommonTexts.of(context, listen: false);
     if (image != null && mounted) {
       setState(() => _isSaving = true);
       try {
@@ -51,7 +54,7 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
         if (mounted) Navigator.pop(context);
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${common.errorOccurred}: $e')));
           setState(() => _isSaving = false);
         }
       }
@@ -61,6 +64,7 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
   Future<void> _save() async {
     if (_selectedUrl == null) return;
     setState(() => _isSaving = true);
+    final common = CommonTexts.of(context, listen: false);
     try {
       await context.read<ChatProvider>().updateWallpaperUrl(
         widget.conversation.id,
@@ -70,7 +74,7 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${common.errorOccurred}: $e')));
         setState(() => _isSaving = false);
       }
     }
@@ -78,6 +82,9 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final common = CommonTexts.of(context);
+
     return Scaffold(
       backgroundColor: Colors.black.withValues(alpha: 0.5),
       appBar: AppBar(
@@ -87,12 +94,12 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
           icon: const Icon(Icons.close, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Đổi hình nền', style: TextStyle(color: Colors.white, fontSize: 18)),
+        title: Text(common.changeWallpaperAction, style: const TextStyle(color: Colors.white, fontSize: 18)),
         actions: [
           TextButton(
             onPressed: (_selectedUrl != null && !_isSaving) ? _save : null,
             child: Text(
-              'XONG',
+              common.doneAction,
               style: TextStyle(
                 color: (_selectedUrl != null && !_isSaving) ? Colors.white : Colors.white38,
                 fontWeight: FontWeight.bold,
@@ -103,24 +110,17 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
       ),
       body: Stack(
         children: [
-          // Semi-transparent background to show chat preview if needed
-          // For now just focus on the modal-like UI from Pic 3
           Center(
             child: Container(
               width: MediaQuery.of(context).size.width * 0.9,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDarkMode ? DarkColors.surface : Colors.white,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Wallpaper Grid
-                  SliverGrid.count(
-                    crossAxisCount: 3,
-                    children: [],
-                  ), // Wait, can't use SliverGrid in a Column like this easily
                   GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
@@ -136,10 +136,10 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
                           onTap: _pickFromGallery,
                           child: Container(
                             decoration: BoxDecoration(
-                              color: Colors.blue.shade100,
+                              color: isDarkMode ? DarkColors.primary.withValues(alpha: 0.1) : Colors.blue.shade100,
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: const Icon(Icons.camera_alt, color: Colors.blue),
+                            child: Icon(Icons.camera_alt, color: isDarkMode ? DarkColors.primary : Colors.blue),
                           ),
                         );
                       }
@@ -151,15 +151,14 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(4),
                             image: DecorationImage(image: NetworkImage(url), fit: BoxFit.cover),
-                            border: isSelected ? Border.all(color: Colors.blue, width: 3) : null,
+                            border: isSelected ? Border.all(color: isDarkMode ? DarkColors.primary : Colors.blue, width: 3) : null,
                           ),
-                          child: isSelected ? const Center(child: Icon(Icons.check_circle, color: Colors.blue)) : null,
+                          child: isSelected ? Center(child: Icon(Icons.check_circle, color: isDarkMode ? DarkColors.primary : Colors.blue)) : null,
                         ),
                       );
                     },
                   ),
                   const SizedBox(height: 16),
-                  // Checkbox
                   Row(
                     children: [
                       SizedBox(
@@ -172,7 +171,12 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      const Text('Đổi hình nền cho cả hai bên', style: TextStyle(fontSize: 14, color: Colors.black87)),
+                      Expanded(
+                        child: Text(
+                          common.applyToBothSides, 
+                          style: TextStyle(fontSize: 14, color: isDarkMode ? DarkColors.textPrimary : Colors.black87)
+                        ),
+                      ),
                     ],
                   ),
                 ],

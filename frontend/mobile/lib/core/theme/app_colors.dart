@@ -8,7 +8,7 @@ class AppColors {
   static const Color primaryLight = Color(0xFF00A2ED);
   static const Color primaryDark = Color(0xFF0050CC);
 
-  // ─── Semantic ───
+  // â”€â”€â”€ Semantic â”€â”€â”€
   static const Color success = Color(0xFF22C55E);
   static const Color error = Color(0xFFEF4444);
   static const Color warning = Color(0xFFF59E0B);
@@ -43,6 +43,10 @@ class DarkColors {
   static const Color chatBubbleSent = Color(0xFF374151); // Slate 700
   static const Color chatBubbleReceived = Color(0xFF1F2937); // Slate 800
   static const Color appBarBg = Color(0xFF222222); // AppBar is lighter than Item
+
+  // Muted primary colors for Dark Mode (Slate Blue style)
+  static const Color primary = Color(0xFF4A90E2);
+  static const Color primaryLight = Color(0xFF6AB0FF);
 }
 
 class LightColors {

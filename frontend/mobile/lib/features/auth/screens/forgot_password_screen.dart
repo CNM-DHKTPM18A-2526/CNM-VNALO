@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
+import 'package:vnalo_mobile/features/auth/localization/auth_texts.dart';
 import 'package:vnalo_mobile/core/utils/validators.dart';
 import 'package:vnalo_mobile/features/auth/widgets/otp_input.dart';
 import 'package:vnalo_mobile/services/api_service.dart';
@@ -9,9 +10,9 @@ import 'package:vnalo_mobile/services/auth_service.dart';
 import 'package:vnalo_mobile/core/utils/api_error_mapper.dart';
 
 /// Forgot-password flow with 3 steps:
-///   1. Enter email → check exists & send OTP
-///   2. Enter OTP → verify
-///   3. Enter new password → reset
+///   1. Enter email -> check exists & send OTP
+///   2. Enter OTP -> verify
+///   3. Enter new password -> reset
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
 
@@ -80,12 +81,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     }
 
     setState(() => _isSending = true);
+    final t = AuthTexts.of(context, listen: false);
     try {
       await context.read<AuthService>().requestPasswordReset(email: email);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đã gửi mã OTP về email. Vui lòng kiểm tra hộp thư.'),
+        SnackBar(
+          content: Text(t.otpSentToEmailSuccess),
           backgroundColor: AppColors.success,
         ),
       );
@@ -94,7 +96,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     } on ApiException catch (e) {
       _showError(ApiErrorMapper.map(e));
     } catch (_) {
-      _showError('Không thể gửi OTP, vui lòng thử lại');
+      _showError(t.cannotSendOtp);
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
@@ -103,8 +105,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   // ─── Step 2: Verify OTP ───
   void _verifyOtp() {
     FocusScope.of(context).unfocus();
+    final t = AuthTexts.of(context, listen: false);
     if (!RegExp(r'^\d{6}$').hasMatch(_otpCode)) {
-      _showError('Mã OTP phải gồm 6 chữ số');
+      _showError(t.otpMustBeDigits);
       return;
     }
     _goToStep(2);
@@ -114,14 +117,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   Future<void> _resendOtp() async {
     if (_isSending) return;
     setState(() => _isSending = true);
+    final t = AuthTexts.of(context, listen: false);
     try {
       await context.read<AuthService>().requestPasswordReset(
             email: _emailController.text.trim(),
           );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đã gửi lại mã OTP'),
+        SnackBar(
+          content: Text(t.otpResentSuccess),
           backgroundColor: AppColors.success,
         ),
       );
@@ -129,7 +133,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     } on ApiException catch (e) {
       _showError(ApiErrorMapper.map(e));
     } catch (_) {
-      _showError('Gửi lại OTP thất bại');
+      _showError(t.resendOtpFailed);
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
@@ -138,27 +142,28 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   // ─── Step 3: Reset Password ───
   Future<void> _resetPassword() async {
     FocusScope.of(context).unfocus();
+    final t = AuthTexts.of(context, listen: false);
     final password = _passwordController.text;
     final confirm = _confirmController.text;
 
     if (password.length < 8) {
-      _showError('Mật khẩu phải có ít nhất 8 ký tự');
+      _showError(t.passwordAtLeast8);
       return;
     }
     if (!RegExp(r'[A-Z]').hasMatch(password)) {
-      _showError('Mật khẩu phải có ít nhất 1 chữ hoa');
+      _showError(t.passwordMustHaveUpper);
       return;
     }
     if (!RegExp(r'[a-z]').hasMatch(password)) {
-      _showError('Mật khẩu phải có ít nhất 1 chữ thường');
+      _showError(t.passwordMustHaveLower);
       return;
     }
     if (!RegExp(r'[0-9]').hasMatch(password)) {
-      _showError('Mật khẩu phải có ít nhất 1 chữ số');
+      _showError(t.passwordMustHaveNumber);
       return;
     }
     if (password != confirm) {
-      _showError('Mật khẩu xác nhận không khớp');
+      _showError(t.passwordMismatch);
       return;
     }
 
@@ -171,22 +176,22 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đặt lại mật khẩu thành công! Hãy đăng nhập bằng mật khẩu mới.'),
+        SnackBar(
+          content: Text(t.resetPasswordSuccess),
           backgroundColor: AppColors.success,
         ),
       );
       Navigator.pop(context); // Back to login
     } on ApiException catch (e) {
       if (e.code == 'AUTH_009' || e.code == 'AUTH_010' || e.code == 'AUTH_011') {
-        // OTP error → go back to OTP step
+        // OTP error -> go back to OTP step
         _showError(ApiErrorMapper.map(e));
         _goToStep(1);
       } else {
         _showError(ApiErrorMapper.map(e));
       }
     } catch (e) {
-      _showError('Đặt lại mật khẩu thất bại: $e');
+      _showError('${t.resetPasswordFailed}: $e');
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -210,6 +215,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final t = AuthTexts.of(context);
     final scaffoldBg = isDarkMode ? DarkColors.scaffold : Colors.white;
 
     return Scaffold(
@@ -227,12 +233,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: _onBack,
         ),
-        title: const Text(
-          'Quên mật khẩu',
-          style: TextStyle(
+        title: Text(
+          t.forgotPasswordTitle,
+          style: const TextStyle(
             color: Colors.white,
             fontSize: 18,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),
@@ -248,11 +254,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  // ═══════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════════════════
   // STEP 1: Email Input
-  // ═══════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════════════════
   Widget _buildEmailStep() {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final t = AuthTexts.of(context);
     final email = _emailController.text.trim();
     final isValid = Validators.email(email) == null;
 
@@ -270,15 +277,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 color: isDarkMode ? DarkColors.divider : const Color(0xFFEBF5FF),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.email_outlined,
                 size: 48,
-                color: AppColors.primary,
+                color: isDarkMode ? DarkColors.primary : AppColors.primary,
               ),
             ),
             const SizedBox(height: 24),
             Text(
-              'Nhập email đăng ký',
+              t.enterEmailToRegister,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 24,
@@ -287,10 +294,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               ),
             ),
             const SizedBox(height: 10),
-            const Text(
-              'Chúng tôi sẽ gửi mã xác nhận OTP đến email của bạn để đặt lại mật khẩu.',
+            Text(
+              t.otpSentNotice,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 15,
                 color: Color(0xFF6B7280),
                 height: 1.4,
@@ -318,7 +325,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                  borderSide: BorderSide(color: isDarkMode ? DarkColors.primary : AppColors.primary, width: 1.5),
                 ),
                 errorText: email.isNotEmpty && !isValid
                     ? Validators.email(email)
@@ -345,7 +352,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
                     : Text(
-                        'Gửi mã OTP',
+                        t.resendOtp,
                         style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w600,
@@ -360,11 +367,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  // ═══════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════════════════
   // STEP 2: OTP Verification
-  // ═══════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════════════════
   Widget _buildOtpStep() {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final t = AuthTexts.of(context);
     final email = _emailController.text.trim();
 
     return GestureDetector(
@@ -378,37 +386,44 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFFEBF5FF),
+                color: isDarkMode ? DarkColors.divider : const Color(0xFFEBF5FF),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.lock_outline,
                 size: 48,
-                color: Color(0xFF0068FF),
+                color: isDarkMode ? DarkColors.primary : const Color(0xFF0068FF),
               ),
             ),
             const SizedBox(height: 24),
             Text(
-              'Nhập mã xác nhận',
+              t.enterOtpTitleShort,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w700,
+                fontSize: 26,
+                fontWeight: FontWeight.w900,
                 color: isDarkMode ? Colors.white : const Color(0xFF141414),
+                letterSpacing: 1.0,
+                shadows: isDarkMode ? [
+                  Shadow(
+                    color: DarkColors.primary.withValues(alpha: 0.5),
+                    blurRadius: 10,
+                  )
+                ] : null,
               ),
             ),
             const SizedBox(height: 10),
             RichText(
               textAlign: TextAlign.center,
               text: TextSpan(
-                style: const TextStyle(fontSize: 15, color: Color(0xFF6B7280), height: 1.4),
+                style: TextStyle(fontSize: 15, color: isDarkMode ? DarkColors.textSecondary : const Color(0xFF6B7280), height: 1.4),
                 children: [
-                  const TextSpan(text: 'Mã OTP đã được gửi đến\n'),
+                  TextSpan(text: t.otpSentToLabel + '\n'),
                   TextSpan(
                     text: email,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF0068FF),
+                      color: isDarkMode ? DarkColors.primary : const Color(0xFF0068FF),
                     ),
                   ),
                 ],
@@ -424,14 +439,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               onPressed: _isSending || _resendCooldown > 0 ? null : _resendOtp,
               child: Text(
                 _isSending
-                    ? 'Đang gửi...'
+                    ? t.sending
                     : (_resendCooldown > 0
-                        ? 'Gửi lại mã (${_resendCooldown}s)'
-                        : 'Gửi lại mã OTP'),
+                        ? '${t.resendIn} (${_resendCooldown}s)'
+                        : t.resendOtp),
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: _resendCooldown > 0 ? Colors.grey : const Color(0xFF0068FF),
+                  color: _resendCooldown > 0 ? Colors.grey : (isDarkMode ? DarkColors.primary : const Color(0xFF0068FF)),
                 ),
               ),
             ),
@@ -443,15 +458,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 onPressed: _otpCode.length == 6 ? _verifyOtp : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _otpCode.length == 6
-                      ? const Color(0xFF0068FF)
-                      : const Color(0xFFE5E7EB),
+                      ? (isDarkMode ? DarkColors.primary : const Color(0xFF0068FF))
+                      : (isDarkMode ? DarkColors.divider : const Color(0xFFE5E7EB)),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(999),
                   ),
                   elevation: 0,
                 ),
                 child: Text(
-                  'Xác nhận',
+                  t.confirm,
                   style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w600,
@@ -466,11 +481,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  // ═══════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════════════════
   // STEP 3: New Password
-  // ═══════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════════════════
   Widget _buildNewPasswordStep() {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final t = AuthTexts.of(context);
     final password = _passwordController.text;
     final confirm = _confirmController.text;
     final isPasswordValid = password.length >= 8 &&
@@ -490,7 +506,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             const SizedBox(height: 8),
             Center(
               child: Text(
-                'Đặt mật khẩu mới',
+                t.setNewPassword,
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
@@ -499,11 +515,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               ),
             ),
             const SizedBox(height: 10),
-            const Center(
+            Center(
               child: Text(
-                'Mật khẩu phải gồm chữ hoa, chữ thường và số,\nít nhất 8 ký tự.',
+                t.resetPasswordNote,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 14,
                   color: Color(0xFF6B7280),
                   height: 1.5,
@@ -512,7 +528,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             ),
             const SizedBox(height: 28),
             Text(
-              'Mật khẩu mới',
+              t.newPassword,
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
@@ -526,7 +542,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               onChanged: (_) => setState(() {}),
               style: TextStyle(fontSize: 16, color: isDarkMode ? Colors.white : Colors.black),
               decoration: InputDecoration(
-                hintText: 'Nhập mật khẩu mới',
+                hintText: t.hintNewPassword,
                 filled: true,
                 fillColor: isDarkMode ? DarkColors.surface : const Color(0xFFF9FAFB),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -548,14 +564,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             ),
             if (password.isNotEmpty) ...[
               const SizedBox(height: 8),
-              _buildPasswordCheck('Ít nhất 8 ký tự', password.length >= 8),
-              _buildPasswordCheck('Có chữ hoa', RegExp(r'[A-Z]').hasMatch(password)),
-              _buildPasswordCheck('Có chữ thường', RegExp(r'[a-z]').hasMatch(password)),
-              _buildPasswordCheck('Có chữ số', RegExp(r'[0-9]').hasMatch(password)),
+              _buildPasswordCheck(t.passwordAtLeast8, password.length >= 8),
+              _buildPasswordCheck(t.passwordMustHaveUpper, RegExp(r'[A-Z]').hasMatch(password)),
+              _buildPasswordCheck(t.passwordMustHaveLower, RegExp(r'[a-z]').hasMatch(password)),
+              _buildPasswordCheck(t.passwordMustHaveNumber, RegExp(r'[0-9]').hasMatch(password)),
             ],
             const SizedBox(height: 20),
             Text(
-              'Xác nhận mật khẩu',
+              t.confirmNewPassword,
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
@@ -569,12 +585,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               onChanged: (_) => setState(() {}),
               style: TextStyle(fontSize: 16, color: isDarkMode ? Colors.white : Colors.black),
               decoration: InputDecoration(
-                hintText: 'Nhập lại mật khẩu mới',
+                hintText: t.hintConfirmPassword,
                 filled: true,
                 fillColor: isDarkMode ? DarkColors.surface : const Color(0xFFF9FAFB),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 errorText: confirm.isNotEmpty && !isMatch
-                    ? 'Mật khẩu xác nhận không khớp'
+                    ? t.passwordMismatch
                     : null,
                 suffixIcon: IconButton(
                   icon: Icon(
@@ -600,7 +616,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 onPressed: canSubmit ? _resetPassword : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: canSubmit
-                      ? AppColors.primary
+                      ? (isDarkMode ? DarkColors.primary : AppColors.primary)
                       : (isDarkMode ? DarkColors.divider : const Color(0xFFBFDBFE)),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(999),
@@ -613,9 +629,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         height: 20,
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
-                    : const Text(
-                        'XÁC NHẬN',
-                        style: TextStyle(
+                    : Text(
+                        t.confirmAction,
+                        style: const TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w700,
                           color: Colors.white,

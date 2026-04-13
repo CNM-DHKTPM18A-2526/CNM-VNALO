@@ -45,6 +45,9 @@ class AuthTexts {
   String get resendOtp => _isVi ? 'Gửi lại mã OTP' : 'Resend OTP';
   String get otpResent => _isVi ? 'Đã gửi lại OTP' : 'OTP resent';
   String get otpInvalid => _isVi ? 'Mã OTP phải gồm 6 chữ số' : 'OTP must be 6 digits';
+  String get emailOtpNote => _isVi ? 'Email sẽ được dùng để xác thực OTP đăng ký.' : 'Email will be used for OTP verification.';
+  String get registrationCompleting => _isVi ? 'Đang hoàn tất đăng ký, vui lòng đợi thêm một chút...' : 'Completing registration, please wait a moment...';
+  String get registrationSuccessWithAvatarError => _isVi ? 'Đăng ký đã hoàn tất, nhưng có lỗi khi cập nhật ảnh đại diện. Bạn có thể cập nhật lại trong Hồ sơ.' : 'Registration completed, but there was an error updating your profile picture. You can update it later in Profile.';
 
   String get alreadyHasAccount =>
       _isVi ? 'Bạn đã có tài khoản? ' : 'Already have an account? ';
@@ -63,10 +66,48 @@ class AuthTexts {
 
   String get loginFailed => _isVi ? 'Đăng nhập thất bại' : 'Login failed';
   String get registerFailed => _isVi ? 'Đăng ký thất bại' : 'Register failed';
+  String get forgotPassword => _isVi ? 'Quên mật khẩu?' : 'Forgot password?';
+  String get forgotPasswordTitle => _isVi ? 'Quên mật khẩu' : 'Forgot Password';
+  String get otpSentToEmailSuccess => _isVi ? 'Đã gửi mã OTP về email. Vui lòng kiểm tra hộp thư.' : 'OTP has been sent to your email. Please check your inbox.';
+  String get cannotSendOtp => _isVi ? 'Không thể gửi OTP, vui lòng thử lại' : 'Could not send OTP, please try again';
+  String get otpMustBeDigits => _isVi ? 'Mã OTP phải gồm 6 chữ số' : 'OTP must be 6 digits';
+  String get otpResentSuccess => _isVi ? 'Đã gửi lại mã OTP' : 'OTP resent successfully';
+  String get resendOtpFailed => _isVi ? 'Gửi lại OTP thất bại' : 'Failed to resend OTP';
+  String get resetPasswordSuccess => _isVi ? 'Đặt lại mật khẩu thành công! Hãy đăng nhập bằng mật khẩu mới.' : 'Password reset successful! Please log in with your new password.';
+  String get resetPasswordFailed => _isVi ? 'Đặt lại mật khẩu thất bại' : 'Failed to reset password';
+  String get passwordMismatch => _isVi ? 'Mật khẩu xác nhận không khớp' : 'Password confirmation does not match';
+  String get passwordAtLeast8 => _isVi ? 'Ít nhất 8 ký tự' : 'At least 8 characters';
+  String get passwordMustHaveUpper => _isVi ? 'Có chữ hoa' : 'At least 1 uppercase letter';
+  String get passwordMustHaveLower => _isVi ? 'Có chữ thường' : 'At least 1 lowercase letter';
+  String get passwordMustHaveNumber => _isVi ? 'Có chữ số' : 'At least 1 number';
+  String get enterEmailToRegister => _isVi ? 'Nhập email đăng ký' : 'Enter registered email';
+  String get otpSentNotice => _isVi ? 'Chúng tôi sẽ gửi mã xác nhận OTP đến email của bạn để đặt lại mật khẩu.' : 'We will send an OTP verification code to your email to reset your password.';
+  String get enterOtpTitleShort => _isVi ? 'Nhập mã xác nhận' : 'Enter verification code';
+  String get otpSentToLabel => _isVi ? 'Mã OTP đã được gửi đến' : 'OTP code has been sent to';
+  String get sending => _isVi ? 'Đang gửi...' : 'Sending...';
+  String get resendIn => _isVi ? 'Gửi lại mã' : 'Resend in';
+  String get confirm => _isVi ? 'Xác nhận' : 'Confirm';
+  String get setNewPassword => _isVi ? 'Đặt mật khẩu mới' : 'Set new password';
+  String get newPassword => _isVi ? 'Mật khẩu mới' : 'New password';
+  String get hintNewPassword => _isVi ? 'Nhập mật khẩu mới' : 'Enter new password';
+  String get confirmNewPassword => _isVi ? 'Xác nhận mật khẩu' : 'Confirm password';
+  String get hintConfirmPassword => _isVi ? 'Nhập lại mật khẩu mới' : 'Re-enter new password';
+  String get confirmAction => _isVi ? 'XÁC NHẬN' : 'CONFIRM';
+  String get resetPasswordNote => _isVi ? 'Mật khẩu phải gồm chữ hoa, chữ thường và số, ít nhất 8 ký tự.' : 'Password must include uppercase, lowercase letters and numbers, at least 8 characters.';
   String otpFailed(Object error) =>
       _isVi ? 'Gửi OTP thất bại: $error' : 'Failed to send OTP: $error';
   String accountLabel(String phone) =>
       _isVi ? 'Tài khoản: $phone' : 'Account: $phone';
+
+  String get updatePasswordTitle => _isVi ? 'Cập nhật mật khẩu' : 'Update password';
+  String get currentPasswordLabel => _isVi ? 'Mật khẩu hiện tại' : 'Current password';
+  String get hintCurrentPassword => _isVi ? 'Nhập mật khẩu hiện tại' : 'Enter current password';
+  String get updatePasswordSuccess => _isVi ? 'Đã cập nhật mật khẩu thành công' : 'Password updated successfully';
+  String get currentPasswordIncorrect => _isVi ? 'Mật khẩu hiện tại không đúng' : 'Current password incorrect';
+  String get newPasswordRequirementFail => _isVi ? 'Mật khẩu mới không đáp ứng yêu cầu' : 'New password does not meet requirements';
+  String get updatePasswordFailed => _isVi ? 'Cập nhật mật khẩu thất bại' : 'Failed to update password';
+  String get updatePasswordAction => _isVi ? 'CẬP NHẬT MẬT KHẨU' : 'UPDATE PASSWORD';
+  String get passwordRequirementShortNote => _isVi ? 'Mật khẩu phải có ít nhất 8 ký tự, gồm chữ hoa, chữ thường và số.' : 'Password must be at least 8 characters, including uppercase, lowercase letters and numbers.';
 
   String get languageTitle => _isVi ? 'Chọn ngôn ngữ' : 'Choose language';
   String get vietnamese => 'Tiếng Việt';
@@ -133,6 +174,20 @@ class AuthTexts {
       : 'Skipping profile photo might limit some features in the app.';
   String get cancel => _isVi ? 'Hủy' : 'Cancel';
   String get accept => _isVi ? 'Chấp nhận' : 'Accept';
+
+  // --- Permissions & Settings ---
+  String get canChangePrivacySettingsLater => _isVi ? 'Bạn luôn có thể thay đổi lựa chọn này trong Cài đặt quyền riêng tư.' : 'You can always change this in Privacy Settings.';
+  String get contactsPermissionDenied => _isVi ? 'Bạn đã tắt quyền Danh bạ. Có thể bật lại trong Cài đặt hệ thống.' : 'Contacts permission is disabled. You can enable it in System Settings.';
+  String get cameraPermissionTitle => _isVi ? 'Quyền máy ảnh' : 'Camera Permission';
+  String get cameraPermissionMessage => _isVi ? 'Vui lòng cấp quyền máy ảnh trong cài đặt để chụp ảnh.' : 'Please grant camera permission in settings to take photos.';
+  String get galleryPermissionTitle => _isVi ? 'Quyền thư viện ảnh' : 'Gallery Permission';
+  String get galleryPermissionMessage => _isVi ? 'Vui lòng cấp quyền truy cập ảnh trong cài đặt để chọn ảnh.' : 'Please grant gallery access in settings to choose photos.';
+  String pickImageError(Object e) => _isVi ? 'Lỗi chọn ảnh: $e' : 'Pick image error: $e';
+  String get openSettings => _isVi ? 'Mở Cài đặt' : 'Open Settings';
+
+  // --- Password Help ---
+  String get passwordRequirementNote => _isVi ? 'Mật khẩu phải có ít nhất 8 ký tự, gồm chữ hoa, chữ thường và số.' : 'Password must be at least 8 characters, including uppercase, lowercase letters and numbers.';
+  String get confirmPasswordRequirementNote => _isVi ? 'Xác nhận mật khẩu phải trùng khớp hoàn toàn với mật khẩu đã nhập.' : 'Confirmation password must exactly match the entered password.';
 
   // ─── Contacts Sync Prompt ───
   String get syncContactsTitle =>

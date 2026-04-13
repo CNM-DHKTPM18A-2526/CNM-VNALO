@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
+import 'package:vnalo_mobile/features/profile/localization/profile_texts.dart';
 
 class EditPersonalInfoScreen extends StatefulWidget {
   const EditPersonalInfoScreen({super.key});
@@ -38,17 +39,18 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final t = ProfileTexts.of(context);
     final sectionBg = isDarkMode ? DarkColors.surface : LightColors.surface;
     final dividerColor = isDarkMode ? DarkColors.divider : AppColors.itemDivider;
     final user = context.watch<AuthProvider?>()?.user;
-    final displayName = user?.displayName ?? 'Người dùng';
+    final displayName = user?.displayName ?? t.notUpdated;
 
     return Scaffold(
-      backgroundColor: isDarkMode ? DarkColors.scaffold : const Color(0xFFF3F4F6),
+      backgroundColor: isDarkMode ? DarkColors.scaffold : LightColors.scaffold,
       appBar: AppBar(
-        title: const Text(
-          'Chỉnh sửa thông tin',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+        title: Text(
+          t.editInfoTitle,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
         backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
         elevation: 0,
@@ -104,6 +106,7 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
                           _buildSimpleDateField(
                             controller: _dobController,
                             isDarkMode: isDarkMode,
+                            placeholder: t.selectBirthday,
                           ),
                         ],
                       ),
@@ -117,9 +120,9 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
                 Row(
                   children: [
                     const SizedBox(width: 4),
-                    _buildRadioOption('Nam', 'MALE'),
+                    _buildRadioOption(t.male, 'MALE'),
                     const SizedBox(width: 32),
-                    _buildRadioOption('Nữ', 'FEMALE'),
+                    _buildRadioOption(t.female, 'FEMALE'),
                   ],
                 ),
               ],
@@ -131,11 +134,11 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
             child: Container(
               height: 48,
               decoration: BoxDecoration(
-                gradient: AppColors.appBarGradient,
+                color: isDarkMode ? DarkColors.primary : AppColors.primary,
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.3),
+                    color: (isDarkMode ? DarkColors.primary : AppColors.primary).withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),
@@ -146,14 +149,14 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
                 child: InkWell(
                   onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Đã cập nhật thông tin thành công!')),
+                      SnackBar(content: Text(t.updateSuccess)),
                     );
                     Navigator.pop(context);
                   },
                   borderRadius: BorderRadius.circular(24),
-                  child: const Center(
+                  child: Center(
                     child: Text(
-                      'LƯU',
+                      t.saveAction,
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 15,
@@ -196,6 +199,7 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
   Widget _buildSimpleDateField({
     required TextEditingController controller,
     required bool isDarkMode,
+    required String placeholder,
   }) {
     return InkWell(
       onTap: () async {
@@ -217,7 +221,7 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Text(
-                controller.text.isEmpty ? 'Chọn ngày sinh' : controller.text,
+                controller.text.isEmpty ? placeholder : controller.text,
                 style: TextStyle(fontSize: 16, color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary),
               ),
             ),
@@ -229,6 +233,7 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
   }
 
   Widget _buildRadioOption(String label, String value) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final isSelected = _gender == value;
     return GestureDetector(
       onTap: () => setState(() => _gender = value),
@@ -239,7 +244,7 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: isSelected ? AppColors.primary : Colors.grey.shade400,
+                color: isSelected ? (isDarkMode ? DarkColors.primary : AppColors.primary) : Colors.grey.shade400,
                 width: 2,
               ),
             ),
@@ -248,7 +253,7 @@ class _EditPersonalInfoScreenState extends State<EditPersonalInfoScreen> {
               height: 14,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: isSelected ? AppColors.primary : Colors.transparent,
+                color: isSelected ? (isDarkMode ? DarkColors.primary : AppColors.primary) : Colors.transparent,
               ),
               child: isSelected ? const Icon(Icons.check, size: 10, color: Colors.white) : null,
             ),

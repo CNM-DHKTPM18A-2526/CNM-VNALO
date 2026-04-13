@@ -1,29 +1,44 @@
 import 'package:flutter/material.dart';
+import 'package:vnalo_mobile/core/localization/common_texts.dart';
 
 class DirectChatOptionsScreen extends StatelessWidget {
   const DirectChatOptionsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final common = CommonTexts.of(context);
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Tuy chon tro chuyen')),
+      appBar: AppBar(title: Text(common.chatOptionsHeader)),
       body: ListView(
-        children: const [
+        children: [
           ListTile(
-            leading: Icon(Icons.person_outline),
-            title: Text('Xem trang ca nhan'),
+            leading: const Icon(Icons.person_outline),
+            title: Text(common.viewProfileAction),
+            onTap: () {
+              // TODO: Implement view profile
+            },
           ),
           ListTile(
-            leading: Icon(Icons.notifications_off_outlined),
-            title: Text('Tat thong bao'),
+            leading: const Icon(Icons.notifications_off_outlined),
+            title: Text(common.muteNotificationsAction),
+            onTap: () {
+              // TODO: Implement mute notifications
+            },
           ),
           ListTile(
-            leading: Icon(Icons.block_outlined),
-            title: Text('Chan nguoi dung'),
+            leading: const Icon(Icons.block_outlined),
+            title: Text(common.blockUserAction),
+            onTap: () {
+              // TODO: Implement block user
+            },
           ),
           ListTile(
-            leading: Icon(Icons.delete_outline),
-            title: Text('Xoa cuoc tro chuyen'),
+            leading: const Icon(Icons.delete_outline),
+            title: Text(common.deleteChatAction),
+            onTap: () {
+              // TODO: Implement delete conversation
+            },
           ),
         ],
       ),

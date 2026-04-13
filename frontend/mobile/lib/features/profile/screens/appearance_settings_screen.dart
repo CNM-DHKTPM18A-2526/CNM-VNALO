@@ -1,28 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/localization/language_provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/theme/theme_provider.dart';
-import 'package:vnalo_mobile/features/auth/localization/auth_texts.dart';
 
 class AppearanceSettingsScreen extends StatelessWidget {
   const AppearanceSettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final common = CommonTexts.of(context);
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final searchHint = isDarkMode ? DarkColors.textHint : Colors.white.withValues(alpha: 0.8);
     final cardBorder = isDarkMode ? DarkColors.divider : AppColors.sectionDivider;
-    final sectionLabel = isDarkMode ? AppColors.primaryLight : AppColors.primary;
+    final sectionLabel = isDarkMode ? DarkColors.primary : AppColors.primary;
     final pageBg = isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground;
     final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
 
     return Scaffold(
       backgroundColor: pageBg,
       appBar: AppBar(
-        title: const Text(
-          'Giao diện và ngôn ngữ',
-          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
+        title: Text(
+          common.appearanceAndLanguageHeader,
+          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
         ),
         backgroundColor: appBarBg,
         surfaceTintColor: appBarBg,
@@ -37,11 +37,10 @@ class AppearanceSettingsScreen extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             children: [
-              // ─── Giao diện ───
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Text(
-                  'Giao diện',
+                  common.appearanceHeader,
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
@@ -49,11 +48,10 @@ class AppearanceSettingsScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              // Theme preview cards
               Row(
                 children: [
                   _ThemeCard(
-                    label: 'Sáng',
+                    label: common.lightThemeLabel,
                     selected: themeProvider.themeMode == ThemeMode.light,
                     isDark: false,
                     borderColor: cardBorder,
@@ -61,7 +59,7 @@ class AppearanceSettingsScreen extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   _ThemeCard(
-                    label: 'Tối',
+                    label: common.darkThemeLabel,
                     selected: themeProvider.themeMode == ThemeMode.dark,
                     isDark: true,
                     borderColor: cardBorder,
@@ -69,7 +67,7 @@ class AppearanceSettingsScreen extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   _ThemeCard(
-                    label: 'Hệ thống',
+                    label: common.systemThemeLabel,
                     selected: themeProvider.themeMode == ThemeMode.system,
                     isDark: null,
                     borderColor: cardBorder,
@@ -78,24 +76,22 @@ class AppearanceSettingsScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 20),
-              // Font options
               Column(
                 children: [
                    _SettingsRow(
-                    title: 'Đổi phông chữ',
-                    trailing: 'Phông chữ Vnalo',
+                    title: common.changeFontAction,
+                    trailing: common.vnaloFontLabel,
                     isDarkMode: isDarkMode,
                   ),
                   Divider(height: 1, color: isDarkMode ? DarkColors.divider : AppColors.sectionDivider),
-                   _SettingsRow(title: 'Đổi cỡ chữ', isDarkMode: isDarkMode),
+                   _SettingsRow(title: common.changeFontSizeAction, isDarkMode: isDarkMode),
                 ],
               ),
               const SizedBox(height: 18),
-              // ─── Ngôn ngữ ───
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Text(
-                  'Ngôn ngữ',
+                  common.languageHeader,
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
@@ -107,7 +103,7 @@ class AppearanceSettingsScreen extends StatelessWidget {
                 builder: (_, langProvider, __) {
                   final isVi = langProvider.language == AppLanguage.vi;
                   return _SettingsRow(
-                    title: 'Đổi ngôn ngữ',
+                    title: common.changeLanguageAction,
                     trailing: isVi ? '🇻🇳 Tiếng Việt' : '🇺🇸 English',
                     onTap: () => _showLanguagePicker(context, langProvider),
                     isDarkMode: isDarkMode,
@@ -123,6 +119,8 @@ class AppearanceSettingsScreen extends StatelessWidget {
 
   void _showLanguagePicker(BuildContext context, LanguageProvider provider) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final common = CommonTexts.of(context, listen: false);
+
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -143,13 +141,13 @@ class AppearanceSettingsScreen extends StatelessWidget {
                     width: 56,
                     height: 6,
                     decoration: BoxDecoration(
-                      color: isDarkMode ? Colors.white10 : Colors.grey.shade300,
+                      color: isDarkMode ? DarkColors.divider : Colors.grey.shade300,
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    AuthTexts.of(context, listen: false).languageTitle,
+                    common.changeLanguageAction,
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w600,
@@ -162,8 +160,8 @@ class AppearanceSettingsScreen extends StatelessWidget {
                     title: Text('Tiếng Việt',
                         style: TextStyle(fontSize: 17, color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary)),
                     trailing: provider.language == AppLanguage.vi
-                        ? const Icon(Icons.check,
-                            color: AppColors.primary, size: 24)
+                        ? Icon(Icons.check,
+                            color: isDarkMode ? DarkColors.primary : AppColors.primary, size: 24)
                         : null,
                     onTap: () {
                       provider.setLanguage(AppLanguage.vi);
@@ -171,12 +169,11 @@ class AppearanceSettingsScreen extends StatelessWidget {
                     },
                   ),
                   ListTile(
-                    leading: const Text('🇻🇳', style: TextStyle(fontSize: 28)),
-                    title:
-                         Text('English', style: TextStyle(fontSize: 17, color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary)),
+                    leading: const Text('🇺🇸', style: TextStyle(fontSize: 28)),
+                    title: Text('English', style: TextStyle(fontSize: 17, color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary)),
                     trailing: provider.language == AppLanguage.en
-                        ? const Icon(Icons.check,
-                            color: AppColors.primary, size: 24)
+                        ? Icon(Icons.check,
+                            color: isDarkMode ? DarkColors.primary : AppColors.primary, size: 24)
                         : null,
                     onTap: () {
                       provider.setLanguage(AppLanguage.en);
@@ -193,12 +190,10 @@ class AppearanceSettingsScreen extends StatelessWidget {
   }
 }
 
-// ─── Theme preview card widget ───
-
 class _ThemeCard extends StatelessWidget {
   final String label;
   final bool selected;
-  final bool? isDark; // null = system/mixed
+  final bool? isDark;
   final Color borderColor;
   final VoidCallback onTap;
 
@@ -217,11 +212,7 @@ class _ThemeCard extends StatelessWidget {
         : isDark == false
             ? const Color(0xFFE8F0FE)
             : (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF33334D) : const Color(0xFF4A4A6A));
-    final innerBar = isDark == true
-        ? AppColors.primary
-        : isDark == false
-            ? AppColors.primary
-            : AppColors.primary;
+    final innerBar = AppColors.primary;
     final innerBg = isDark == true
         ? const Color(0xFF333333)
         : isDark == false
@@ -239,7 +230,7 @@ class _ThemeCard extends StatelessWidget {
                 color: bgColor,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: selected ? AppColors.primary : borderColor,
+                  color: selected ? (Theme.of(context).brightness == Brightness.dark ? DarkColors.primary : AppColors.primary) : borderColor,
                   width: selected ? 2.5 : 1,
                 ),
               ),
@@ -299,7 +290,7 @@ class _ThemeCard extends StatelessWidget {
                       ? Icons.radio_button_checked
                       : Icons.radio_button_unchecked,
                   size: 20,
-                  color: selected ? AppColors.primary : Colors.grey.shade400,
+                  color: selected ? (Theme.of(context).brightness == Brightness.dark ? DarkColors.primary : AppColors.primary) : Colors.grey.shade400,
                 ),
                 const SizedBox(width: 4),
                 Text(
@@ -308,7 +299,7 @@ class _ThemeCard extends StatelessWidget {
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                     color: selected
-                        ? AppColors.primary
+                        ? (Theme.of(context).brightness == Brightness.dark ? DarkColors.primary : AppColors.primary)
                         : (Theme.of(context).brightness == Brightness.dark ? DarkColors.textSecondary : LightColors.textSecondary),
                   ),
                 ),

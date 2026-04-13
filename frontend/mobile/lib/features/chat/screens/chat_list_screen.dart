@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/models/quick_action_item.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
@@ -36,12 +37,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   void _openQuickActions() {
+    final common = CommonTexts.of(context, listen: false);
     showQuickActionsSheet(
       context,
       items: [
         QuickActionItem(
           icon: Icons.person_add_alt_1_outlined,
-          title: 'Thêm bạn',
+          title: common.addFriendAction,
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const AddFriendScreen()),
@@ -50,16 +52,16 @@ class _ChatListScreenState extends State<ChatListScreen> {
         ),
         QuickActionItem(
           icon: Icons.group_add_outlined,
-          title: 'Tạo nhóm',
+          title: common.createGroupAction,
           onTap: () {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Luồng tạo nhóm sẽ được nối ở bước message/group tiếp theo.')),
+              SnackBar(content: Text(common.groupFlowPlaceholder)),
             );
           },
         ),
         QuickActionItem(
           icon: Icons.folder_copy_outlined,
-          title: 'My Documents',
+          title: common.myDocumentsSubtitle,
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const MyDocumentsScreen()),
@@ -68,25 +70,16 @@ class _ChatListScreenState extends State<ChatListScreen> {
         ),
         QuickActionItem(
           icon: Icons.calendar_month_outlined,
-          title: 'Lịch Vnalo',
+          title: common.vnaloCalendar,
           onTap: () {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Lịch Vnalo sẽ được tích hợp ở bước lịch/message tiếp theo.')),
-            );
-          },
-        ),
-        QuickActionItem(
-          icon: Icons.video_call_outlined,
-          title: 'Tạo cuộc gọi nhóm',
-          onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Tạo cuộc gọi nhóm sẽ được triển khai ở module call.')),
+              SnackBar(content: Text(common.calendarFlowPlaceholder)),
             );
           },
         ),
         QuickActionItem(
           icon: Icons.devices_outlined,
-          title: 'Thiết bị đăng nhập',
+          title: common.loggedInDevices,
           onTap: () {
             Navigator.of(context, rootNavigator: true).push(
               MaterialPageRoute(builder: (_) => const AccountSecurityScreen()),
@@ -100,9 +93,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final common = CommonTexts.of(context);
     final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
     final searchHint = isDarkMode
-        ? DarkColors.textHint
+        ? DarkColors.textSecondary
         : Colors.white.withValues(alpha: 0.8);
     final dividerColor = isDarkMode
       ? DarkColors.divider
@@ -113,7 +107,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
       appBar: AppBar(
         backgroundColor: isDarkMode ? appBarBg : Colors.transparent,
         elevation: 0,
-        forceMaterialTransparency: true,
+        forceMaterialTransparency: !isDarkMode, // Only transparent in light mode to show gradient
         flexibleSpace: isDarkMode
             ? null
             : Container(
@@ -139,7 +133,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   Icon(Icons.search, size: 24, color: isDarkMode ? searchHint : Colors.white),
                   const SizedBox(width: 8),
                   Text(
-                    'Tìm kiếm',
+                    common.search,
                     style: TextStyle(
                       color: searchHint,
                       fontSize: 16,
@@ -153,11 +147,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
+            icon: Icon(Icons.qr_code_scanner, color: isDarkMode ? DarkColors.textPrimary : Colors.white),
             onPressed: _openQrScanner,
           ),
           IconButton(
-            icon: const Icon(Icons.add, color: Colors.white),
+            icon: Icon(Icons.add, color: isDarkMode ? DarkColors.textPrimary : Colors.white),
             onPressed: _openQuickActions,
           ),
         ],
@@ -188,15 +182,15 @@ class _ChatListScreenState extends State<ChatListScreen> {
                         leading: Container(
                           width: 52,
                           height: 52,
-                          decoration: const BoxDecoration(
-                            color: Colors.blue,
+                          decoration: BoxDecoration(
+                            color: isDarkMode ? DarkColors.primary : Colors.blue,
                             shape: BoxShape.circle,
                           ),
                           child: Stack(
                             alignment: Alignment.center,
                             children: [
-                              const Icon(Icons.folder, color: Colors.white, size: 32),
-                              const Icon(Icons.cloud, color: Colors.blue, size: 16),
+                              Icon(Icons.folder, color: Colors.white, size: 32),
+                              Icon(Icons.cloud, color: isDarkMode ? DarkColors.primary : Colors.blue, size: 16),
                               Positioned(
                                 bottom: 0,
                                 right: 0,
@@ -211,9 +205,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
                             ],
                           ),
                         ),
-                        title: const Text(
-                          'My Documents',
-                          style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
+                        title: Text(
+                          common.myDocumentsHeader,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
+                          ),
                         ),
                         onTap: () {
                           Navigator.push(

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:vnalo_mobile/core/localization/common_texts.dart';
+import 'package:vnalo_mobile/core/localization/language_provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
@@ -35,15 +37,16 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
     final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
     final auth = context.watch<AuthProvider>();
     final postProvider = context.watch<PostProvider>();
-    final displayName = auth.user?.displayName ?? 'Người dùng';
+    final common = CommonTexts.of(context);
+    final displayName = auth.user?.displayName ?? common.unknownUser;
     final searchHint = isDarkMode ? DarkColors.textHint : Colors.white.withValues(alpha: 0.8);
 
     return Scaffold(
-      backgroundColor: isDarkMode ? Colors.black : const Color(0xFFF3F4F6),
+      backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
       appBar: AppBar(
         backgroundColor: isDarkMode ? appBarBg : Colors.transparent,
         elevation: 0,
-        forceMaterialTransparency: true,
+        forceMaterialTransparency: !isDarkMode,
         titleSpacing: 0,
         flexibleSpace: isDarkMode
             ? null
@@ -70,18 +73,21 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
               dividerColor: Colors.transparent,
               labelColor: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
               unselectedLabelColor: isDarkMode ? DarkColors.textSecondary : Colors.grey.shade400,
-              indicatorColor: AppColors.primary,
+              indicatorColor: isDarkMode ? DarkColors.primary : AppColors.primary,
               indicatorWeight: 3,
               labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-              tabs: const [
-                Tab(text: 'Nhật ký'),
+              tabs: [
+                Tab(text: common.diaryTab),
                 Tab(
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('Vnalo Video'),
-                      SizedBox(width: 4),
-                      Badge(label: Text('Mới'), backgroundColor: Colors.orange),
+                      const Text('Vnalo Video'),
+                      const SizedBox(width: 4),
+                      Badge(
+                        label: Text(common.language == AppLanguage.vi ? 'Mới' : 'New'),
+                         backgroundColor: Colors.orange
+                      ),
                     ],
                   ),
                 ),
@@ -106,6 +112,7 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
   }
 
   Widget _buildSearchHeader(BuildContext context, bool isDarkMode, Color searchHint) {
+    final common = CommonTexts.of(context);
     return Padding(
       padding: const EdgeInsets.only(left: 16),
       child: GestureDetector(
@@ -116,7 +123,7 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
           children: [
             Icon(Icons.search, size: 24, color: isDarkMode ? searchHint : Colors.white),
             const SizedBox(width: 8),
-            Text('Tìm kiếm', style: TextStyle(color: searchHint, fontSize: 16, fontWeight: FontWeight.normal)),
+            Text(common.searchHintTimeline, style: TextStyle(color: searchHint, fontSize: 16, fontWeight: FontWeight.normal)),
           ],
         ),
       ),
@@ -125,6 +132,8 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
 
   Widget _buildNhatKyView(BuildContext context, bool isDarkMode, AuthProvider auth, PostProvider postProvider, String displayName) {
     final containerColor = isDarkMode ? DarkColors.surface : Colors.white;
+    final common = CommonTexts.of(context);
+    final isVi = common.language == AppLanguage.vi;
 
     return ListView(
       children: [
@@ -138,10 +147,13 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
                 children: [
                   AvatarWidget(imageUrl: auth.user?.avatarUrl, name: displayName, size: 45),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Hôm nay bạn thế nào?',
-                      style: TextStyle(color: Colors.grey, fontSize: 16),
+                      common.postInputPlaceholder,
+                      style: TextStyle(
+                        color: isDarkMode ? DarkColors.textHint : Colors.grey,
+                        fontSize: 16
+                      ),
                     ),
                   ),
                 ],
@@ -150,10 +162,10 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildQuickAction(Icons.image_outlined, 'Ảnh', Colors.green),
-                  _buildQuickAction(Icons.videocam_outlined, 'Video', Colors.pink),
-                  _buildQuickAction(Icons.collections_outlined, 'Album', Colors.blue),
-                  _buildQuickAction(Icons.text_fields, 'Nền chữ', Colors.blueAccent),
+                  _buildQuickAction(Icons.image_outlined, common.photoAction, Colors.green),
+                  _buildQuickAction(Icons.videocam_outlined, common.videoAction, Colors.pink),
+                  _buildQuickAction(Icons.collections_outlined, common.albumAction, Colors.blue),
+                  _buildQuickAction(Icons.text_fields, isVi ? 'Nền chữ' : 'Text background', Colors.blueAccent),
                 ],
               ),
             ],
@@ -172,10 +184,10 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
             itemCount: postProvider.stories.length + 1,
             itemBuilder: (context, index) {
               if (index == 0) {
-                return _buildStoryItem(auth.user?.avatarUrl, 'Tạo mới', isMe: true);
+                return _buildStoryItem(isDarkMode, auth.user?.avatarUrl, common.createNewStory, isMe: true);
               }
               final story = postProvider.stories[index - 1];
-              return _buildStoryItem(story.author.avatarUrl, story.author.displayName);
+              return _buildStoryItem(isDarkMode, story.author.avatarUrl, story.author.displayName);
             },
           ),
         ),
@@ -192,7 +204,7 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
                 Icon(Icons.feed_outlined, size: 80, color: isDarkMode ? Colors.white12 : Colors.grey.shade200),
                 const SizedBox(height: 16),
                 Text(
-                  'Chưa có kỷ niệm nào được chia sẻ.',
+                  isVi ? 'Chưa có kỷ niệm nào được chia sẻ.' : 'No memories shared yet.',
                   style: TextStyle(
                     color: isDarkMode ? DarkColors.textHint : Colors.grey.shade400,
                     fontSize: 16,
@@ -221,7 +233,7 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildStoryItem(String? url, String name, {bool isMe = false}) {
+  Widget _buildStoryItem(bool isDarkMode, String? url, String name, {bool isMe = false}) {
     return Padding(
       padding: const EdgeInsets.only(right: 16),
       child: Column(
@@ -232,7 +244,10 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
                 padding: const EdgeInsets.all(2),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.primary, width: 2),
+                  border: Border.all(
+                    color: isDarkMode ? DarkColors.primary : AppColors.primary,
+                    width: 2,
+                  ),
                 ),
                 child: AvatarWidget(imageUrl: url, name: name, size: 60),
               ),
@@ -242,7 +257,10 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
                   bottom: 0,
                   child: Container(
                     padding: const EdgeInsets.all(2),
-                    decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? DarkColors.primary : AppColors.primary,
+                      shape: BoxShape.circle,
+                    ),
                     child: const Icon(Icons.videocam, color: Colors.white, size: 16),
                   ),
                 ),
@@ -282,7 +300,12 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
             ],
           ),
           const SizedBox(height: 12),
-          Text(post.content, style: const TextStyle(fontSize: 15)),
+          Text(post.content,
+            style: TextStyle(
+              fontSize: 15,
+              color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
+            ),
+          ),
           if (post.mediaUrls.isNotEmpty) ...[
             const SizedBox(height: 12),
             ClipRRect(

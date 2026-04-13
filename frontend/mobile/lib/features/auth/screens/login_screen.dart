@@ -100,7 +100,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     minimumSize: const Size.fromHeight(56),
-                    backgroundColor: _hasPhone ? AppColors.primary : (isDarkMode ? DarkColors.surface : const Color(0xFFE5E7EB)),
+                    backgroundColor: _hasPhone ? (isDarkMode ? DarkColors.primary : AppColors.primary) : (isDarkMode ? DarkColors.surface : const Color(0xFFE5E7EB)),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(999),
                     ),
@@ -126,10 +126,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       );
                     },
-                    child: const Text(
-                      'Quên mật khẩu?',
+                    child: Text(
+                      t.forgotPassword,
                       style: TextStyle(
-                        color: AppColors.primary,
+                        color: isDarkMode ? DarkColors.primary : AppColors.primary,
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
@@ -157,8 +157,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         children: [
                           TextSpan(
                             text: t.createAccountShort,
-                            style: const TextStyle(
-                              color: AppColors.primary,
+                            style: TextStyle(
+                              color: isDarkMode ? DarkColors.primary : AppColors.primary,
                               fontWeight: FontWeight.bold,
                             ),
                           ),

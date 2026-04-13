@@ -7,59 +7,71 @@ class AppTheme {
 
   // Dark theme
   static ThemeData get darkTheme => ThemeData(
-    useMaterial3: true, // Enable Material 3 design
-    brightness: Brightness.dark, // Set the brightness to dark
+    useMaterial3: true,
+    brightness: Brightness.dark,
     scaffoldBackgroundColor: DarkColors.scaffold,
-    primaryColor: AppColors.primary,
+    primaryColor: DarkColors.primary,
 
-    // Define the color scheme for the dark theme
     colorScheme: const ColorScheme.dark(
-      primary: AppColors.primary,
-      secondary: AppColors.primaryLight,
+      primary: DarkColors.primary,
+      secondary: DarkColors.primaryLight,
       surface: DarkColors.surface,
       error: AppColors.error,
     ),
 
-    // Define the app bar theme for the dark theme
     appBarTheme: AppBarTheme(
-      backgroundColor: DarkColors.scaffold,
+      backgroundColor: DarkColors.appBarBg,
       elevation: 0,
+      centerTitle: false,
+      scrolledUnderElevation: 0,
       toolbarHeight: 52,
-      titleTextStyle: AppTypography.titleLarge,
-      iconTheme: const IconThemeData(color: DarkColors.textPrimary),
+      titleTextStyle: AppTypography.titleLarge.copyWith(color: Colors.white),
+      iconTheme: const IconThemeData(color: Colors.white),
     ),
 
-    // Define the bottom navigation bar theme for the dark theme
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(
       backgroundColor: DarkColors.surface,
-      selectedItemColor: AppColors.primary,
+      selectedItemColor: DarkColors.primary,
       unselectedItemColor: DarkColors.textHint,
       type: BottomNavigationBarType.fixed,
+      elevation: 8,
     ),
 
-    // Define the input decoration theme for the dark theme
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: DarkColors.surface,
       hintStyle: AppTypography.bodyMedium.copyWith(color: DarkColors.textHint),
-      border: OutlineInputBorder(
+      border: const OutlineInputBorder(
         borderRadius: BorderRadius.all(Radius.circular(12)),
         borderSide: BorderSide.none,
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     ),
 
-    // Define the elevated button theme for the dark theme
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primary,
+        backgroundColor: DarkColors.primary,
         foregroundColor: Colors.white,
         minimumSize: const Size(double.infinity, 48),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     ),
 
-    // Define the text theme for the dark theme
+    // Modal Themes
+    bottomSheetTheme: const BottomSheetThemeData(
+      backgroundColor: DarkColors.surface,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: DarkColors.surface,
+      surfaceTintColor: Colors.transparent,
+      titleTextStyle: AppTypography.titleLarge.copyWith(color: DarkColors.textPrimary),
+      contentTextStyle: AppTypography.bodyLarge.copyWith(color: DarkColors.textSecondary),
+    ),
+
     dividerColor: DarkColors.divider,
     splashColor: AppColors.itemPressBackground.withValues(alpha: 0.22),
     highlightColor: AppColors.itemPressBackground.withValues(alpha: 0.16),

@@ -34,7 +34,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
         return Container(
           decoration: BoxDecoration(
-            color: isDarkMode ? DarkColors.surface : Colors.white,
+            color: isDarkMode ? DarkColors.surface : LightColors.surface,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: SafeArea(
@@ -48,7 +48,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     width: 56,
                     height: 6,
                     decoration: BoxDecoration(
-                      color: isDarkMode ? DarkColors.divider : const Color(0xFFE5E7EB),
+                      color: isDarkMode ? DarkColors.divider : LightColors.divider,
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
@@ -58,7 +58,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     style: TextStyle(
                       fontSize: 30,
                       fontWeight: FontWeight.w600,
-                      color: isDarkMode ? Colors.white : const Color(0xFF141414),
+                      color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -109,7 +109,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         statusBarBrightness: isDarkMode ? Brightness.dark : Brightness.light,
       ),
       child: Scaffold(
-        backgroundColor: backgroundColor,
+        backgroundColor: isDarkMode ? DarkColors.scaffold : LightColors.scaffold,
         body: Column(
           children: [
             SizedBox(height: topInset + 4),
@@ -127,12 +127,12 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         minimumSize: const Size(0, 40),
                         side: BorderSide(
-                          color: isDarkMode ? DarkColors.divider : const Color(0xFFD5D7DB),
+                          color: isDarkMode ? DarkColors.divider : LightColors.divider,
                         ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(24),
                         ),
-                        foregroundColor: isDarkMode ? Colors.white70 : const Color(0xFF2A2A2A),
+                        foregroundColor: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
                       child: Row(
@@ -163,13 +163,13 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             // App logo and name
             Text(
               t.appName,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.w700,
-                color: AppColors.primary,
+                color: isDarkMode ? DarkColors.primary : AppColors.primary,
               ),
             ),
-            // Carousel area — uses Expanded to take all remaining vertical space
+            // Carousel area â€” uses Expanded to take all remaining vertical space
             Expanded(
               child: Column(
                 children: [
@@ -206,7 +206,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w700,
-                                  color: isDarkMode ? Colors.white : const Color(0xFF1B1B1B),
+                                  color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
                                   height: 1.3,
                                 ),
                               ),
@@ -221,7 +221,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                   fontSize: 14,
                                   fontWeight: FontWeight.w400,
                                   height: 1.4,
-                                  color: isDarkMode ? Colors.white70 : const Color(0xFF6B7280),
+                                  color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary,
                                 ),
                               ),
                               const SizedBox(height: 8),
@@ -245,8 +245,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                           width: 10,
                           decoration: BoxDecoration(
                             color: _currentPage == index
-                                ? AppColors.primary
-                                : const Color(0xFFD1D5DB),
+                                ? (isDarkMode ? DarkColors.primary : AppColors.primary)
+                                : (isDarkMode ? DarkColors.divider : LightColors.divider),
                             borderRadius: BorderRadius.circular(99),
                           ),
                         ),
@@ -271,7 +271,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                             },
                             style: ElevatedButton.styleFrom(
                               minimumSize: const Size.fromHeight(56),
-                              backgroundColor: AppColors.primary,
+                              backgroundColor: isDarkMode ? DarkColors.primary : AppColors.primary,
                               elevation: 0,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(999),
@@ -302,8 +302,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                             },
                             style: ElevatedButton.styleFrom(
                               minimumSize: const Size.fromHeight(56),
-                              backgroundColor: isDarkMode ? DarkColors.surface : const Color(0xFFE5E7EB),
-                              foregroundColor: isDarkMode ? Colors.white : const Color(0xFF111827),
+                              backgroundColor: isDarkMode ? DarkColors.surface : LightColors.surfaceLight,
+                              foregroundColor: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
                               elevation: 0,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(999),
@@ -355,12 +355,12 @@ class _LanguageOptionTile extends StatelessWidget {
         label,
         style: TextStyle(
           fontSize: 18,
-          color: isDarkMode ? Colors.white : const Color(0xFF1F2937),
+          color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
         ),
       ),
       trailing:
           selected
-              ? const Icon(Icons.check, color: AppColors.primary, size: 24)
+              ? Icon(Icons.check, color: isDarkMode ? DarkColors.primary : AppColors.primary, size: 24)
               : null,
     );
   }

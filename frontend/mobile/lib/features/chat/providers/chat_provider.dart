@@ -51,10 +51,18 @@ class ChatProvider extends ChangeNotifier {
   List<Message> getMessagesForConversation(String conversationId) =>
       _messages[conversationId] ?? [];
 
-  ChatProvider(this._chatService, this._socketService, this._mediaService, this._db)
-    : _messageSub = _socketService.onMessage.listen((_) {}),
-      _readSub = _socketService.onRead.listen((_) {}),
-      _deliveredSub = _socketService.onDelivered.listen((_) {}) {
+  ChatProvider({
+    required ChatService chatService,
+    required SocketService socketService,
+    required MediaService mediaService,
+    required LocalDatabase db,
+  })  : _chatService = chatService,
+        _socketService = socketService,
+        _mediaService = mediaService,
+        _db = db,
+        _messageSub = socketService.onMessage.listen((_) {}),
+        _readSub = socketService.onRead.listen((_) {}),
+        _deliveredSub = socketService.onDelivered.listen((_) {}) {
     _messageSub.onData(_handleIncomingMessage);
     _readSub.onData(_handleReadEvent);
     _deliveredSub.onData(_handleDeliveredEvent);
@@ -94,7 +102,7 @@ class ChatProvider extends ChangeNotifier {
         conversationId,
         before: before,
       );
-      
+
       if (before == null) {
         _messages[conversationId] = response;
         // Sync API messages to local DB in background
@@ -199,7 +207,7 @@ class ChatProvider extends ChangeNotifier {
     _highlightedMessageId = messageId;
     _highlightTimer?.cancel();
     notifyListeners();
-    
+
     // Auto clear highlight after 2 seconds
     _highlightTimer = Timer(const Duration(seconds: 2), () {
       _highlightedMessageId = null;
@@ -216,10 +224,10 @@ class ChatProvider extends ChangeNotifier {
     if (content.trim().isEmpty) return;
 
     final clientMessageId = _generateUuidV4();
-    
+
     // Auto-resolve reply ID if not provided but we are in reply mode
     final actualReplyId = replyToMessageId ?? _replyingTo?.id;
-    
+
     // If it's a reply, populate the replyTo fields for optimistic UI
     String? replySenderId;
     String? replySenderName;
@@ -247,10 +255,10 @@ class ChatProvider extends ChangeNotifier {
 
     _messages[conversationId] = [optimistic, ...(getMessagesForConversation(conversationId))];
     _replyingTo = null; // Clear reply state after sending
-    
+
     // Persist optimistic message locally
     _db.saveMessage(_toLocal(optimistic));
-    
+
     notifyListeners();
     _sendWithRetry(optimistic);
   }
@@ -264,7 +272,7 @@ class ChatProvider extends ChangeNotifier {
     final clientMessageId = _generateUuidV4();
     final fileName = file?.path.split('/').last ?? 'media';
     final fileSize = file?.lengthSync() ?? 0;
-    
+
     final optimistic = Message(
       id: 'local-$clientMessageId',
       conversationId: conversationId,
@@ -276,7 +284,7 @@ class ChatProvider extends ChangeNotifier {
       status: MessageStatus.SENDING,
       createdAt: DateTime.now(),
       // Temp local path for preview or remote URL
-      mediaUrl: file?.path ?? mediaUrl, 
+      mediaUrl: file?.path ?? mediaUrl,
     );
 
     _messages[conversationId] = [optimistic, ...(getMessagesForConversation(conversationId))];
@@ -291,7 +299,7 @@ class ChatProvider extends ChangeNotifier {
       final category = _mapMessageTypeToCategory(type);
       final mediaId = await _mediaService.uploadFile(file!, category);
       final publicUrl = _mediaService.getPublicUrl(mediaId);
-      
+
       final updated = optimistic.copyWith(
         mediaUrl: publicUrl,
         content: fileName,
@@ -330,6 +338,50 @@ class ChatProvider extends ChangeNotifier {
     _messages[conversationId] = [message, ...(getMessagesForConversation(conversationId))];
     notifyListeners();
     _sendWithRetry(message);
+  }
+
+  void sendGif({
+    required String conversationId,
+    required String gifUrl,
+  }) {
+    sendMediaMessage(
+      conversationId: conversationId,
+      mediaUrl: gifUrl,
+      type: MessageType.IMAGE,
+    );
+  }
+
+  void sendImage({required String conversationId, required String imagePath}) {
+    sendMediaMessage(
+      conversationId: conversationId,
+      file: File(imagePath),
+      type: MessageType.IMAGE,
+    );
+  }
+
+  void sendVideo({required String conversationId, required String videoPath}) {
+    sendMediaMessage(
+      conversationId: conversationId,
+      file: File(videoPath),
+      type: MessageType.VIDEO,
+    );
+  }
+
+  void sendFile({required String conversationId, required String filePath}) {
+    sendMediaMessage(
+      conversationId: conversationId,
+      file: File(filePath),
+      type: MessageType.FILE,
+    );
+  }
+
+  void deleteMessage(String messageId) {
+    if (_activeConversationId == null) return;
+    final cid = _activeConversationId!;
+    final list = _messages[cid] ?? [];
+    final updated = list.where((m) => m.id != messageId).toList();
+    _messages[cid] = updated;
+    notifyListeners();
   }
 
   MediaCategory _mapMessageTypeToCategory(MessageType type) {
@@ -393,7 +445,7 @@ class ChatProvider extends ChangeNotifier {
       if (optimisticIndex >= 0) {
         final updated = List<Message>.from(existing);
         final oldMessage = updated[optimisticIndex];
-        
+
         // MERGE metadata: Keep reply info if already present in optimistic but missing in resolved
         Message merged = resolvedMessage;
         if (oldMessage.replyToMessageId != null && merged.replyToMessageId == null) {
@@ -476,9 +528,9 @@ class ChatProvider extends ChangeNotifier {
     if (msgs != null && msgs.isNotEmpty) {
       bool changed = false;
       final updatedMsgs = msgs.map((m) {
-        if (m.senderId == _currentUserId && 
-            m.status != MessageStatus.READ && 
-            m.serverSeq != null && 
+        if (m.senderId == _currentUserId &&
+            m.status != MessageStatus.READ &&
+            m.serverSeq != null &&
             m.serverSeq! <= lastReadSeq) {
           changed = true;
           return m.copyWith(status: MessageStatus.READ);
@@ -653,7 +705,7 @@ class ChatProvider extends ChangeNotifier {
     super.dispose();
   }
 
-  // ─── Settings & Management ────────────────────────────────
+  // â”€â”€â”€ Settings & Management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Future<void> updateConversationSettings({
     required String conversationId,
@@ -698,7 +750,7 @@ class ChatProvider extends ChangeNotifier {
     try {
       await _chatService.deleteChatHistory(conversationId);
       _messages[conversationId] = [];
-      
+
       final index = _conversations.indexWhere((c) => c.id == conversationId);
       if (index >= 0) {
         _conversations[index] = _conversations[index].copyWith(
@@ -716,7 +768,7 @@ class ChatProvider extends ChangeNotifier {
   Future<void> updateMemberNickname(String conversationId, String userId, String nickname) async {
     try {
       await _chatService.updateMemberNickname(conversationId, userId, nickname);
-      
+
       final index = _conversations.indexWhere((c) => c.id == conversationId);
       if (index >= 0) {
         final conv = _conversations[index];
@@ -739,9 +791,9 @@ class ChatProvider extends ChangeNotifier {
     try {
       final mediaId = await _mediaService.uploadFile(file, MediaCategory.CHAT_IMAGE);
       final wallpaperUrl = _mediaService.getPublicUrl(mediaId);
-      
+
       await _chatService.updateWallpaper(conversationId, wallpaperUrl, isGlobal: isGlobal);
-      
+
       final index = _conversations.indexWhere((c) => c.id == conversationId);
       if (index >= 0) {
         if (isGlobal) {
@@ -760,7 +812,7 @@ class ChatProvider extends ChangeNotifier {
   Future<void> updateWallpaperUrl(String conversationId, String wallpaperUrl, {bool isGlobal = true}) async {
     try {
       await _chatService.updateWallpaper(conversationId, wallpaperUrl, isGlobal: isGlobal);
-      
+
       final index = _conversations.indexWhere((c) => c.id == conversationId);
       if (index >= 0) {
         if (isGlobal) {
@@ -792,9 +844,9 @@ class ChatProvider extends ChangeNotifier {
       final memberIndex = conv.members.indexWhere((m) => m.userId == senderId);
       if (memberIndex >= 0) {
         final member = conv.members[memberIndex];
-        return member.nickname ?? member.user?.displayName ?? 'Người dùng';
+        return member.nickname ?? member.user?.displayName ?? 'NgÆ°á»i dÃ¹ng';
       }
     }
-    return 'Người dùng';
+    return 'NgÆ°á»i dÃ¹ng';
   }
 }

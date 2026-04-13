@@ -1,9 +1,9 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/constants/api_endpoints.dart';
+import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_login_approval_screen.dart';
 import 'package:vnalo_mobile/features/auth/localization/auth_texts.dart';
 import 'package:vnalo_mobile/services/api_service.dart';
@@ -113,8 +113,9 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       if (!mounted) {
         return;
       }
+      final common = CommonTexts.of(context, listen: false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mã QR chưa được hỗ trợ trong luồng này.')),
+        SnackBar(content: Text(common.qrNotSupported)),
       );
       return;
     }
@@ -156,6 +157,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       return;
     }
 
+    final common = CommonTexts.of(context, listen: false);
     try {
       final result = await context.read<FriendService>().scanFriendQr(
         userId: payload.userId!,
@@ -167,14 +169,14 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         return;
       }
 
-      final message = result['message']?.toString() ?? 'Da xu ly QR ket ban.';
+      final message = result['message']?.toString() ?? common.processedFriendQr;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     } catch (e) {
       if (!mounted) {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Khong the xu ly QR ket ban: $e')),
+        SnackBar(content: Text('${common.cannotProcessFriendQr}: $e')),
       );
     }
   }
@@ -184,6 +186,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       return;
     }
 
+    final common = CommonTexts.of(context, listen: false);
     try {
       final response = await context.read<ApiService>().post(
         ApiEndpoints.messageBaseUrl,
@@ -198,14 +201,14 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
               ? (response['data']['status']?.toString() ?? 'REQUESTED')
               : 'REQUESTED');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Nhom: $status')),
+        SnackBar(content: Text(common.groupJoinStatus(status))),
       );
     } catch (e) {
       if (!mounted) {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Khong the tham gia nhom: $e')),
+        SnackBar(content: Text('${common.cannotJoinGroup}: $e')),
       );
     }
   }
@@ -213,6 +216,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   @override
   Widget build(BuildContext context) {
     final t = AuthTexts.of(context);
+    final common = CommonTexts.of(context);
     final textColor = Colors.white.withValues(alpha: 0.92);
 
     return Scaffold(
@@ -246,7 +250,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                     children: [
                       Icon(Icons.person_outline, color: textColor, size: 18),
                       const SizedBox(width: 8),
-                      Text('Mã QR của tôi', style: TextStyle(color: textColor, fontSize: 17)),
+                      Text(common.myQrCode, style: TextStyle(color: textColor, fontSize: 17)),
                     ],
                   ),
                 ),
@@ -282,7 +286,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Quét mọi mã QR',
+                    common.scanAnyQr,
                     style: TextStyle(color: textColor, fontSize: 36, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 10),
@@ -331,12 +335,17 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
             bottom: 24,
             left: 0,
             right: 0,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: const [
-                _BottomQuickAction(icon: Icons.photo, label: 'Ảnh có sẵn'),
-                _BottomQuickAction(icon: Icons.qr_code_2, label: 'QR chuyển khoản'),
-                _BottomQuickAction(icon: Icons.history, label: 'Gần đây'),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _BottomQuickAction(icon: Icons.photo, label: common.availablePhotos),
+                    _BottomQuickAction(icon: Icons.qr_code_2, label: common.transferQr),
+                    _BottomQuickAction(icon: Icons.history, label: common.recent),
+                  ],
+                ),
               ],
             ),
           ),

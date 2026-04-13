@@ -2,9 +2,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
+import 'package:vnalo_mobile/features/profile/localization/profile_texts.dart';
 import 'package:vnalo_mobile/features/profile/screens/account_security_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/profile_detail_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/settings_screen.dart';
@@ -46,12 +48,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final ok = await auth.updateAvatar(File(picked.path));
     if (!mounted) return;
 
+    final common = CommonTexts.of(context, listen: false);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           ok
-              ? 'Cập nhật ảnh đại diện thành công'
-              : (auth.error ?? 'Cập nhật ảnh đại diện thất bại'),
+              ? common.updateAvatarSuccess
+              : (auth.error ?? common.updateAvatarFail),
         ),
       ),
     );
@@ -60,21 +63,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
     final searchHint = isDarkMode
         ? DarkColors.textHint
         : Colors.white.withValues(alpha: 0.8);
     final pageBg = isDarkMode ? Colors.black : AppColors.sectionBackground;
     final sectionBg = isDarkMode ? DarkColors.surface : Colors.white;
     final auth = context.watch<AuthProvider>();
-    final displayName = auth.user?.displayName ?? 'Người dùng';
+    final common = CommonTexts.of(context);
+    final t = ProfileTexts.of(context);
+    final displayName = auth.user?.displayName ?? t.notUpdated;
 
     return Scaffold(
       backgroundColor: pageBg,
       appBar: AppBar(
-        backgroundColor: isDarkMode ? appBarBg : Colors.transparent,
+        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
         elevation: 0,
-        forceMaterialTransparency: true,
+        forceMaterialTransparency: !isDarkMode,
         flexibleSpace: isDarkMode
             ? null
             : Container(
@@ -98,7 +102,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Icon(Icons.search, size: 24, color: isDarkMode ? searchHint : Colors.white),
                   const SizedBox(width: 8),
                   Text(
-                    'Tìm kiếm',
+                    common.search,
                     style: TextStyle(
                       color: searchHint,
                       fontSize: 16,
@@ -157,7 +161,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               width: 22,
                               height: 22,
                               decoration: BoxDecoration(
-                                color: AppColors.primary,
+                                color: isDarkMode ? DarkColors.primary : AppColors.primary,
                                 shape: BoxShape.circle,
                                 border: Border.all(
                                     color: Colors.white, width: 1.5),
@@ -176,9 +180,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Expanded(
                       child: Text(
                         displayName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w700,
+                          color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
                         ),
                       ),
                     ),
@@ -197,28 +202,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   List<MenuSection> _getMenuSections(BuildContext context) {
+    final t = ProfileTexts.of(context);
     return [
       MenuSection(
         items: [
           MenuItem(
             key: 'vnCloud',
             icon: Icons.cloud_outlined,
-            title: 'vnCloud',
-            subtitle: 'Không gian lưu trữ dữ liệu trên đám mây',
+            title: t.vnCloud,
+            subtitle: t.vnCloudSubtitle,
             onTap: () {},
           ),
           MenuItem(
             key: 'vnStyle',
             icon: Icons.auto_fix_high_outlined,
-            title: 'vnStyle - Nổi bật trên Vnalo',
-            subtitle: 'Hình nền và nhạc cho cuộc gọi Vnalo',
+            title: t.vnStyle,
+            subtitle: t.vnStyleSubtitle,
             onTap: () {},
           ),
           MenuItem(
             key: 'myDocuments',
             icon: Icons.folder_outlined,
-            title: 'My Documents',
-            subtitle: 'Lưu trữ các tin nhắn quan trọng',
+            title: t.myDocuments,
+            subtitle: t.myDocumentsSubtitle,
             onTap: () {
               Navigator.push(
                 context,
@@ -233,22 +239,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
           MenuItem(
             key: 'deviceData',
             icon: Icons.pie_chart_outline,
-            title: 'Dữ liệu trên máy',
-            subtitle: 'Quản lý dữ liệu VNALO của bạn',
+            title: t.deviceData,
+            subtitle: t.deviceDataSubtitle,
             onTap: () {},
           ),
           MenuItem(
             key: 'qrWallet',
             icon: Icons.qr_code_rounded,
-            title: 'Ví QR',
-            subtitle: 'Lưu trữ và xuất trình các mã QR quan trọng',
+            title: t.qrWallet,
+            subtitle: t.qrWalletSubtitle,
             onTap: () {},
           ),
           MenuItem(
             key: 'vnPay',
             icon: Icons.account_balance_wallet_outlined,
-            title: 'Vnalo Pay (Sắp ra mắt)',
-            subtitle: 'Thanh toán tiện lợi, bảo mật',
+            title: ProfileTexts.of(context).vnaloPayTitle,
+            subtitle: ProfileTexts.of(context).vnaloPaySubtitle,
             onTap: () {},
           ),
         ],
@@ -258,7 +264,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           MenuItem(
             key: 'security',
             icon: Icons.shield_outlined,
-            title: 'Tài khoản và bảo mật',
+            title: t.accountAndSecurity,
             onTap: () {
               Navigator.of(context, rootNavigator: true).push(
                 MaterialPageRoute(
@@ -270,7 +276,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           MenuItem(
             key: 'privacy',
             icon: Icons.lock_outline,
-            title: 'Quyền riêng tư',
+            title: t.privacy,
             onTap: () {},
           ),
         ],
@@ -282,7 +288,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final sections = _getMenuSections(context);
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final sectionBg = isDarkMode ? DarkColors.surface : Colors.white;
-    final dividerColor = isDarkMode ? DarkColors.divider : AppColors.sectionDivider;
 
     return sections.expand((section) {
       return [
@@ -298,13 +303,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     itemKey: item.key,
                     normalBg: sectionBg,
                     icon: item.icon,
-                    iconColor: item.iconColor ?? AppColors.primary,
+                    iconColor: item.iconColor ?? (isDarkMode ? DarkColors.primary : AppColors.primary),
                     title: item.title,
                     subtitle: item.subtitle,
                     onTap: item.onTap,
                   ),
                   if (index < section.items.length - 1)
-                    Divider(height: 1, indent: 70, color: dividerColor),
+                    Divider(
+                      height: 1,
+                      indent: 70,
+                      color: isDarkMode ? DarkColors.divider : const Color(0xFFF3F4F6),
+                    ),
                 ],
               );
             }),

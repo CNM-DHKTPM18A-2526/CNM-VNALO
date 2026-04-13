@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
@@ -67,7 +68,7 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Không tải được mã QR của bạn.')),
+        SnackBar(content: Text(CommonTexts.of(context, listen: false).cannotLoadQr)),
       );
     } finally {
       if (mounted) {
@@ -103,15 +104,17 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
       );
     } on ApiException catch (e) {
       if (!mounted) return;
+      final common = CommonTexts.of(context, listen: false);
       final msg = switch (e.code) {
-        'USER_001' => 'Không tìm thấy người dùng với số điện thoại này.',
-        _ => 'Không tìm thấy người dùng hoặc bị giới hạn quyền riêng tư.',
+        'USER_001' => common.userNotFound,
+        _ => common.userSearchError,
       };
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } catch (e) {
       if (!mounted) return;
+      final common = CommonTexts.of(context, listen: false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Đã xảy ra lỗi: $e')),
+        SnackBar(content: Text('${common.errorOccurred}: $e')),
       );
     } finally {
       if (mounted) {
@@ -129,6 +132,7 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
     final displayName = auth.user?.displayName ?? 'VNALO';
     final scaffoldBg = isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground;
     final sectionBg = isDarkMode ? DarkColors.surface : Colors.white;
+    final common = CommonTexts.of(context);
 
     return Scaffold(
       backgroundColor: scaffoldBg,
@@ -137,7 +141,7 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
         surfaceTintColor: isDarkMode ? DarkColors.appBarBg : Colors.white,
         foregroundColor: isDarkMode ? Colors.white : Colors.black,
         elevation: 0,
-        title: const Text('Thêm bạn', style: TextStyle(fontWeight: FontWeight.w700)),
+        title: Text(common.addFriendHeader, style: const TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: ListView(
         children: [
@@ -164,29 +168,29 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
                   ),
                   child:
                       _isLoadingQr
-                          ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
-                          : (_qrPayload == null || _qrPayload!.isEmpty)
-                          ? const Icon(Icons.qr_code_2_rounded, size: 146, color: Colors.black87)
-                          : Padding(
-                            padding: const EdgeInsets.all(10),
-                            child: QrImageView(
-                              data: _qrPayload!,
-                              version: QrVersions.auto,
-                              eyeStyle: const QrEyeStyle(
-                                eyeShape: QrEyeShape.square,
-                                color: Colors.black,
-                              ),
-                              dataModuleStyle: const QrDataModuleStyle(
-                                dataModuleShape: QrDataModuleShape.square,
-                                color: Colors.black,
-                              ),
-                            ),
-                          ),
+                           ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+                           : (_qrPayload == null || _qrPayload!.isEmpty)
+                           ? Icon(Icons.qr_code_2_rounded, size: 146, color: Colors.grey.shade300)
+                           : Padding(
+                             padding: const EdgeInsets.all(10),
+                             child: QrImageView(
+                               data: _qrPayload!,
+                               version: QrVersions.auto,
+                               eyeStyle: const QrEyeStyle(
+                                 eyeShape: QrEyeShape.square,
+                                 color: Colors.black,
+                               ),
+                               dataModuleStyle: const QrDataModuleStyle(
+                                 dataModuleShape: QrDataModuleShape.square,
+                                 color: Colors.black,
+                               ),
+                             ),
+                           ),
                 ),
                 const SizedBox(height: 10),
-                const Text(
-                  'Quét mã để thêm bạn Vnalo với tôi',
-                  style: TextStyle(color: Color(0xFFD7E4F7), fontSize: 14, fontWeight: FontWeight.w500),
+                Text(
+                  common.scanMyQrToAdd,
+                  style: const TextStyle(color: Color(0xFFD7E4F7), fontSize: 14, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
@@ -201,7 +205,7 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
                     controller: _phoneController,
                     selectedCountryCode: _countryCode,
                     onCountryCodeChanged: (val) => setState(() => _countryCode = val),
-                    hintText: 'Nhập số điện thoại',
+                    hintText: common.phoneNumberHint,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -209,25 +213,25 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
                   padding: const EdgeInsets.only(top: 4),
                   child: CircleAvatar(
                     radius: 26,
-                    backgroundColor: 
+                    backgroundColor:
                         _isSearching
                         ? Colors.transparent
-                        : (_isValid 
-                            ? AppColors.primary 
-                            : (isDarkMode ? DarkColors.surface : const Color(0xFFE3E7ED))),
+                        : (_isValid
+                             ? (isDarkMode ? DarkColors.primary : AppColors.primary)
+                             : (isDarkMode ? DarkColors.surface : const Color(0xFFE3E7ED))),
                     child: IconButton(
                       onPressed: (_isValid && !_isSearching) ? _searchByPhone : null,
                       icon: _isSearching
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
-                            )
-                          : Icon(
-                              Icons.arrow_forward,
-                              color: _isValid ? Colors.white : (isDarkMode ? Colors.white24 : LightColors.textHint),
-                              size: 26,
-                            ),
+                           ? const SizedBox(
+                               width: 20,
+                               height: 20,
+                               child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                             )
+                           : Icon(
+                               Icons.arrow_forward,
+                               color: _isValid ? Colors.white : (isDarkMode ? Colors.white24 : LightColors.textHint),
+                               size: 26,
+                             ),
                     ),
                   ),
                 ),
@@ -239,8 +243,8 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(Icons.qr_code_scanner, color: AppColors.primary),
-                  title: const Text('Quét mã QR', style: TextStyle(fontSize: 18)),
+                  leading: Icon(Icons.qr_code_scanner, color: isDarkMode ? DarkColors.primary : AppColors.primary),
+                  title: Text(common.scanQR, style: const TextStyle(fontSize: 18)),
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const QrScannerScreen()),
@@ -249,11 +253,11 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
                 ),
                 const Divider(height: 1, indent: 64, color: AppColors.itemDivider),
                 ListTile(
-                  leading: const Icon(Icons.contact_page_outlined, color: AppColors.primary),
-                  title: const Text('Bạn bè có thể quen', style: TextStyle(fontSize: 18)),
+                  leading: Icon(Icons.contact_page_outlined, color: isDarkMode ? DarkColors.primary : AppColors.primary),
+                  title: Text(common.peopleNearby, style: const TextStyle(fontSize: 18)),
                   onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Sẽ triển khai ở bước đề xuất bạn bè tiếp theo.')),
+                      SnackBar(content: Text(common.featureUnderDevelopment)),
                     );
                   },
                 ),
@@ -267,14 +271,15 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
               child: OutlinedButton.icon(
                 onPressed: _loadMyQr,
                 icon: const Icon(Icons.refresh),
-                label: const Text('Tải lại mã QR'),
+                label: Text(common.reloadQr),
               ),
             ),
           const SizedBox(height: 12),
-          const Center(
+          Center(
             child: Text(
-              'Xem lời mời kết bạn đã gửi tại trang Danh bạ Vnalo',
-              style: TextStyle(color: LightColors.textSecondary, fontSize: 14),
+              common.viewSentRequestsNote,
+              style: const TextStyle(color: LightColors.textSecondary, fontSize: 13),
+              textAlign: TextAlign.center,
             ),
           ),
         ],

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
 import 'package:vnalo_mobile/features/search/screens/unified_search_screen.dart';
@@ -16,20 +17,21 @@ class DiscoverScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final appBarBg =
-        isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
+    final common = CommonTexts.of(context);
     final searchHint = isDarkMode ? DarkColors.textHint : Colors.white.withValues(alpha: 0.8);
 
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.black : const Color(0xFFF4F5F7),
       appBar: AppBar(
-        backgroundColor: isDarkMode ? appBarBg : Colors.transparent,
+        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
         elevation: 0,
-        forceMaterialTransparency: true,
+        forceMaterialTransparency: !isDarkMode,
         flexibleSpace: isDarkMode
             ? null
             : Container(
-                decoration: const BoxDecoration(gradient: AppColors.appBarGradient),
+                decoration: const BoxDecoration(
+                  gradient: AppColors.appBarGradient,
+                ),
               ),
         title: GestureDetector(
           behavior: HitTestBehavior.opaque,
@@ -52,9 +54,9 @@ class DiscoverScreen extends StatelessWidget {
                   Icon(Icons.search, size: 24, color: isDarkMode ? searchHint : Colors.white),
                   const SizedBox(width: 8),
                   Text(
-                    'Tìm kiếm',
+                    common.search,
                     style: TextStyle(
-                      color: searchHint,
+                      color: isDarkMode ? searchHint : Colors.white.withValues(alpha: 0.8),
                       fontSize: 16,
                       fontWeight: FontWeight.w400,
                     ),
@@ -80,30 +82,31 @@ class DiscoverScreen extends StatelessWidget {
   }
 
   List<MenuItem> _getDiscoverServices(BuildContext context) {
+    final common = CommonTexts.of(context);
     return [
-      const MenuItem(
+      MenuItem(
         key: 'vnShop',
         icon: Icons.storefront,
         title: 'VNALO Shop',
-        subtitle: 'Mua sắm trực tuyến',
+        subtitle: common.shoppingService,
       ),
-      const MenuItem(
+      MenuItem(
         key: 'games',
         icon: Icons.games,
-        title: 'Trò chơi',
-        subtitle: 'Chơi cùng bạn bè',
+        title: common.gamesService,
+        subtitle: common.gamesSubtitle,
       ),
-      const MenuItem(
+      MenuItem(
         key: 'news',
         icon: Icons.newspaper,
-        title: 'Tin tức',
-        subtitle: 'Cập nhật mới nhất',
+        title: common.newsService,
+        subtitle: common.newsSubtitle,
       ),
       MenuItem(
         key: 'qrScanner',
         icon: Icons.qr_code_scanner,
-        title: 'Quét QR',
-        subtitle: 'Đăng nhập web, thanh toán, kết bạn',
+        title: common.qrScannerTitle,
+        subtitle: common.qrScannerSubtitle,
         onTap: () => _openQrScanner(context),
       ),
     ];
@@ -163,10 +166,10 @@ class _DiscoverItem extends StatelessWidget {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.1),
+          color: (isDarkMode ? DarkColors.primary : AppColors.primary).withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(icon, color: AppColors.primary),
+        child: Icon(icon, color: isDarkMode ? DarkColors.primary : AppColors.primary),
       ),
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 16)),
       subtitle: Text(subtitle),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/contacts/screens/friend_options_screen.dart';
@@ -54,6 +55,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
 
   Future<void> _accept(Map<String, dynamic> request) async {
     final id = request['id']?.toString() ?? '';
+    final common = CommonTexts.of(context, listen: false);
     if (id.isEmpty) return;
     try {
       await context.read<FriendService>().acceptRequest(id);
@@ -79,7 +81,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => FriendOptionsScreen(
-            friendName: request['fromUserDisplayName'] ?? 'Bạn',
+            friendName: request['fromUserDisplayName'] ?? common.friends,
             friendAvatarUrl: request['fromUserAvatarUrl'],
             friendUserId: friendUserId,
             conversation: conversation,
@@ -89,25 +91,26 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi: ${e.message}')),
+        SnackBar(content: Text('${common.errorOccurred}: ${e.message}')),
       );
     }
   }
 
   Future<void> _reject(Map<String, dynamic> request) async {
     final id = request['id']?.toString() ?? '';
+    final common = CommonTexts.of(context, listen: false);
     if (id.isEmpty) return;
     try {
       await context.read<FriendService>().rejectRequest(id);
       if (!mounted) return;
       setState(() => _incoming.removeWhere((r) => r['id']?.toString() == id));
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã từ chối lời mời kết bạn.')),
+        SnackBar(content: Text(common.requestRejected)),
       );
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi: ${e.message}')),
+        SnackBar(content: Text('${common.errorOccurred}: ${e.message}')),
       );
     }
   }
@@ -115,26 +118,27 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final common = CommonTexts.of(context);
 
     return DefaultTabController(
       length: 2,
       child: Scaffold(
         appBar: AppBar(
           backgroundColor: isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg,
-          title: const Text('Lời mời kết bạn', style: TextStyle(fontWeight: FontWeight.w700)),
+          title: Text(common.friendRequests, style: const TextStyle(fontWeight: FontWeight.w700)),
           actions: [
             IconButton(icon: const Icon(Icons.settings_outlined), onPressed: () {}),
           ],
           bottom: TabBar(
             dividerColor: Colors.transparent,
-            labelColor: isDarkMode ? Colors.white : Colors.white,
+            labelColor: Colors.white,
             unselectedLabelColor: Colors.white60,
             indicatorColor: Colors.white,
             indicatorWeight: 3,
             labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
             tabs: [
-              Tab(text: 'Đã nhận  ${_incoming.length}'),
-              const Tab(text: 'Đã gửi'),
+              Tab(text: '${common.receivedTab}  ${_incoming.length}'),
+              Tab(text: common.sentTab),
             ],
           ),
         ),
@@ -149,6 +153,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
   }
 
   Widget _buildIncomingTab(bool isDarkMode) {
+    final common = CommonTexts.of(context);
     if (_loadingIncoming) return const Center(child: CircularProgressIndicator());
     if (_incoming.isEmpty) {
       return Center(
@@ -157,7 +162,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
           children: [
             Icon(Icons.person_outline, size: 64, color: Colors.grey.shade400),
             const SizedBox(height: 12),
-            const Text('Không có lời mời kết bạn', style: TextStyle(color: Colors.grey, fontSize: 16)),
+            Text(common.noFriendRequests, style: const TextStyle(color: Colors.grey, fontSize: 16)),
           ],
         ),
       );
@@ -169,7 +174,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: Text('Cũ hơn', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+            child: Text(common.olderHeader, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
           ),
           ..._incoming.map((req) => _buildIncomingItem(req, isDarkMode)),
         ],
@@ -178,9 +183,10 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
   }
 
   Widget _buildIncomingItem(Map<String, dynamic> req, bool isDarkMode) {
-    final name = req['fromUserDisplayName'] ?? 'Người dùng';
+    final common = CommonTexts.of(context);
+    final name = req['fromUserDisplayName'] ?? common.unknownUser;
     final avatar = req['fromUserAvatarUrl'] as String?;
-    final message = req['message'] as String? ?? 'Muốn kết bạn';
+    final message = req['message'] as String? ?? common.friendRequestSubtitle;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -214,7 +220,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                           padding: const EdgeInsets.symmetric(vertical: 8),
                         ),
-                        child: const Text('TỪ CHỐI', style: TextStyle(fontWeight: FontWeight.w600)),
+                        child: Text(common.rejectAction, style: const TextStyle(fontWeight: FontWeight.w600)),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -222,12 +228,12 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
                       child: OutlinedButton(
                         onPressed: () => _accept(req),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.primary,
-                          side: const BorderSide(color: AppColors.primary),
+                          foregroundColor: isDarkMode ? DarkColors.primary : AppColors.primary,
+                          side: BorderSide(color: isDarkMode ? DarkColors.primary : AppColors.primary),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                           padding: const EdgeInsets.symmetric(vertical: 8),
                         ),
-                        child: const Text('ĐỒNG Ý', style: TextStyle(fontWeight: FontWeight.w600)),
+                        child: Text(common.acceptAction, style: const TextStyle(fontWeight: FontWeight.w600)),
                       ),
                     ),
                   ],
@@ -241,6 +247,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
   }
 
   Widget _buildSentTab(bool isDarkMode) {
+    final common = CommonTexts.of(context);
     if (_loadingSent) return const Center(child: CircularProgressIndicator());
     if (_sent.isEmpty) {
       return Center(
@@ -249,7 +256,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
           children: [
             Icon(Icons.send_outlined, size: 64, color: Colors.grey.shade400),
             const SizedBox(height: 12),
-            const Text('Chưa gửi lời mời nào', style: TextStyle(color: Colors.grey, fontSize: 16)),
+            Text(common.noSentRequests, style: const TextStyle(color: Colors.grey, fontSize: 16)),
           ],
         ),
       );
@@ -261,14 +268,14 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
         itemCount: _sent.length,
         itemBuilder: (context, index) {
           final req = _sent[index];
-          final name = req['toUserDisplayName'] ?? 'Người dùng';
+          final name = req['toUserDisplayName'] ?? common.unknownUser;
           final avatar = req['toUserAvatarUrl'] as String?;
 
           return ListTile(
             leading: AvatarWidget(imageUrl: avatar, name: name, size: 48),
             title: Text(name, style: const TextStyle(fontWeight: FontWeight.w500)),
             subtitle: Text(
-              'Đang chờ phản hồi',
+              common.waitingResponse,
               style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
             ),
             trailing: TextButton(
@@ -280,16 +287,16 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
                   if (!mounted) return;
                   setState(() => _sent.removeWhere((r) => r['id']?.toString() == id));
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Đã thu hồi lời mời.')),
+                    SnackBar(content: Text(common.requestCancelled)),
                   );
                 } catch (e) {
                   if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Lỗi: $e')),
+                    SnackBar(content: Text('${common.errorOccurred}: $e')),
                   );
                 }
               },
-              child: const Text('Thu hồi', style: TextStyle(color: Colors.redAccent)),
+              child: Text(common.cancelAction, style: const TextStyle(color: Colors.redAccent)),
             ),
           );
         },

@@ -47,7 +47,7 @@ class _LoginPasswordScreenState extends State<LoginPasswordScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(auth.error ?? 'Đăng nhập thất bại'),
+        content: Text(auth.error ?? 'ÄÄƒng nháº­p tháº¥t báº¡i'),
         backgroundColor: AppColors.error,
       ),
     );
@@ -55,21 +55,16 @@ class _LoginPasswordScreenState extends State<LoginPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final t = AuthTexts.of(context);
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final scaffoldBg = isDarkMode ? DarkColors.scaffold : Colors.white;
-    final appBarBg = isDarkMode ? DarkColors.appBarBg : Colors.white;
-    final textColor = isDarkMode ? Colors.white : const Color(0xFF171717);
+    final t = AuthTexts.of(context);
+    final textColor = isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary;
 
     return Scaffold(
-      backgroundColor: scaffoldBg,
       appBar: AppBar(
-        backgroundColor: appBarBg,
-        surfaceTintColor: appBarBg,
-        elevation: 0,
+        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.white,
         title: Text(
           t.enterPasswordTitle,
-          style: TextStyle(color: textColor),
+          style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
         ),
       ),
       body: SafeArea(
@@ -95,14 +90,14 @@ class _LoginPasswordScreenState extends State<LoginPasswordScreen> {
                   style: TextStyle(color: textColor),
                   validator: (value) {
                     if ((value ?? '').trim().isEmpty) {
-                      return 'Vui lòng nhập mật khẩu';
+                      return 'Vui lÃ²ng nháº­p máº­t kháº©u';
                     }
                     return null;
                   },
                   decoration: InputDecoration(
                     hintText: t.passwordHint,
                     hintStyle: TextStyle(
-                      color: isDarkMode ? Colors.white38 : const Color(0xFF999999),
+                      color: isDarkMode ? DarkColors.textHint : LightColors.textHint,
                     ),
                     suffixIcon: IconButton(
                       icon: Icon(
@@ -127,7 +122,13 @@ class _LoginPasswordScreenState extends State<LoginPasswordScreen> {
                         ),
                       );
                     },
-                    child: const Text('Quên mật khẩu?'),
+                    child: Text(
+                      'QuÃªn máº­t kháº©u?',
+                      style: TextStyle(
+                        color: isDarkMode ? DarkColors.primary : AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ),
                 const Spacer(),
@@ -136,7 +137,7 @@ class _LoginPasswordScreenState extends State<LoginPasswordScreen> {
                       (_, auth, __) => ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           minimumSize: const Size.fromHeight(56),
-                          backgroundColor: AppColors.primary,
+                          backgroundColor: isDarkMode ? DarkColors.primary : AppColors.primary,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(999),
                           ),

@@ -131,10 +131,10 @@ class VnaloApp extends StatelessWidget {
         ChangeNotifierProvider<ChatProvider>(
           create:
               (context) => ChatProvider(
-                context.read<ChatService>(),
-                context.read<SocketService>(),
-                context.read<MediaService>(),
-                context.read<LocalDatabase>(),
+                chatService: context.read<ChatService>(),
+                socketService: context.read<SocketService>(),
+                mediaService: context.read<MediaService>(),
+                db: context.read<LocalDatabase>(),
               ),
         ),
         ChangeNotifierProvider<PostProvider>(

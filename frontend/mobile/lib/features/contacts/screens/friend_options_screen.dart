@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
@@ -36,22 +37,23 @@ class _FriendOptionsScreenState extends State<FriendOptionsScreen> {
   }
 
   void _editNickname() {
+    final common = CommonTexts.of(context, listen: false);
     final controller = TextEditingController(text: _displayName);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Đổi gợi nhớ'),
+        title: Text(common.editNicknameAction),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(
-            hintText: 'Nhập tên gọi nhớ',
+          decoration: InputDecoration(
+            hintText: common.nicknamePlaceholder,
           ),
           autofocus: true,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('HỦY'),
+            child: Text(common.cancelActionLabel),
           ),
           TextButton(
             onPressed: () {
@@ -60,10 +62,10 @@ class _FriendOptionsScreenState extends State<FriendOptionsScreen> {
               }
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Đã cập nhật tên gợi nhớ (Local)')),
+                SnackBar(content: Text(common.nicknameUpdatedLocal)),
               );
             },
-            child: const Text('LƯU'),
+            child: Text(common.saveActionLabel),
           ),
         ],
       ),
@@ -71,11 +73,8 @@ class _FriendOptionsScreenState extends State<FriendOptionsScreen> {
   }
 
   Future<void> _onDone() async {
-    // Try to open chat with the new friend
     if (widget.conversation != null) {
-      // Refresh inbox so the new conversation shows up
       context.read<ChatProvider>().loadInbox();
-      // Navigate to chat
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
           builder: (_) => ChatDetailScreen(conversation: widget.conversation!),
@@ -83,7 +82,6 @@ class _FriendOptionsScreenState extends State<FriendOptionsScreen> {
         (route) => route.isFirst,
       );
     } else if (widget.friendUserId != null && widget.friendUserId!.isNotEmpty) {
-      // Try to create conversation on the fly
       try {
         final conversation = await context.read<ChatService>().getOrCreateDirect(widget.friendUserId!);
         if (!mounted) return;
@@ -96,7 +94,6 @@ class _FriendOptionsScreenState extends State<FriendOptionsScreen> {
         );
       } catch (_) {
         if (!mounted) return;
-        // Fallback: just go back to main screen
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } else {
@@ -107,11 +104,12 @@ class _FriendOptionsScreenState extends State<FriendOptionsScreen> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final common = CommonTexts.of(context);
 
     return Scaffold(
       appBar: AppBar(
         backgroundColor: isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg,
-        title: const Text('Tùy chọn bạn bè', style: TextStyle(fontWeight: FontWeight.w700)),
+        title: Text(common.friendOptionsHeader, style: const TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: Column(
         children: [
@@ -146,7 +144,7 @@ class _FriendOptionsScreenState extends State<FriendOptionsScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Vừa kết bạn',
+                        common.recentlyFriended,
                         style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
                       ),
                     ],
@@ -159,12 +157,12 @@ class _FriendOptionsScreenState extends State<FriendOptionsScreen> {
           Container(
             color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
             child: SwitchListTile(
-              title: const Text('Chặn người này xem hoạt động của tôi'),
+              title: Text(common.blockActivityFromMe),
               value: _blockActivity,
               onChanged: (val) {
                 setState(() => _blockActivity = val);
               },
-              activeColor: AppColors.primary,
+              activeThumbColor: AppColors.primary,
             ),
           ),
           const SizedBox(height: 24),
@@ -181,7 +179,7 @@ class _FriendOptionsScreenState extends State<FriendOptionsScreen> {
                   elevation: 0,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                 ),
-                child: const Text('XONG', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                child: Text(common.doneLabel, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
               ),
             ),
           ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
+import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/features/chat/screens/chat_list_screen.dart';
 import 'package:vnalo_mobile/features/contacts/screens/contacts_screen.dart';
@@ -38,6 +39,8 @@ class _MainShellState extends State<MainShell> {
             unreadCount += c.unreadCount;
           }
 
+          final common = CommonTexts.of(context);
+
           return BottomNavigationBar(
             currentIndex: _currentIndex,
             onTap: (index) => setState(() => _currentIndex = index),
@@ -55,23 +58,23 @@ class _MainShellState extends State<MainShell> {
                       child: const Icon(Icons.chat_bubble_rounded),
                     )
                   : const Icon(Icons.chat_bubble_rounded),
-                label: 'Tin nhắn',
+                label: common.messagesTab,
               ),
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.contacts_outlined),
-                label: 'Danh bạ',
+              BottomNavigationBarItem(
+                icon: const Icon(Icons.contacts_outlined),
+                label: common.contactsTab,
               ),
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.grid_view_rounded),
-                label: 'Khám phá',
+              BottomNavigationBarItem(
+                icon: const Icon(Icons.grid_view_rounded),
+                label: common.discoverTab,
               ),
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.feed_outlined),
-                label: 'Tường nhà',
+              BottomNavigationBarItem(
+                icon: const Icon(Icons.feed_outlined),
+                label: common.wallTab,
               ),
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.person_outline),
-                label: 'Cá nhân',
+              BottomNavigationBarItem(
+                icon: const Icon(Icons.person_outline),
+                label: common.profileTab,
               ),
             ],
           );

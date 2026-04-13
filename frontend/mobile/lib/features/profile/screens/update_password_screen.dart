@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vnalo_mobile/features/auth/localization/auth_texts.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/services/api_service.dart';
@@ -25,10 +26,9 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
   String? _confirmPasswordError;
 
   bool get _canSubmit {
-    final current = _currentController.text;
     final next = _newController.text;
     final confirm = _confirmController.text;
-    if (current.isEmpty || next.isEmpty || confirm.isEmpty) return false;
+    if (_currentController.text.isEmpty || next.isEmpty || confirm.isEmpty) return false;
     if (next.length < 8) return false;
     if (!RegExp(r'[A-Z]').hasMatch(next)) return false;
     if (!RegExp(r'[a-z]').hasMatch(next)) return false;
@@ -38,24 +38,24 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
   }
 
   void _validateNewPassword(String value) {
+    final t = AuthTexts.of(context, listen: false);
     String? error;
     if (value.isNotEmpty) {
       if (value.length < 8) {
-        error = 'Mật khẩu phải có ít nhất 8 ký tự';
+        error = t.passwordAtLeast8;
       } else if (!RegExp(r'[A-Z]').hasMatch(value)) {
-        error = 'Mật khẩu phải có ít nhất 1 chữ hoa';
+        error = t.passwordMustHaveUpper;
       } else if (!RegExp(r'[a-z]').hasMatch(value)) {
-        error = 'Mật khẩu phải có ít nhất 1 chữ thường';
+        error = t.passwordMustHaveLower;
       } else if (!RegExp(r'[0-9]').hasMatch(value)) {
-        error = 'Mật khẩu phải có ít nhất 1 chữ số';
+        error = t.passwordMustHaveNumber;
       }
     }
     setState(() {
       _newPasswordError = error;
-      // Re-validate confirm if already filled
       if (_confirmController.text.isNotEmpty &&
           _confirmController.text != value) {
-        _confirmPasswordError = 'Mật khẩu xác nhận không khớp';
+        _confirmPasswordError = t.passwordMismatch;
       } else {
         _confirmPasswordError = null;
       }
@@ -63,9 +63,10 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
   }
 
   void _validateConfirmPassword(String value) {
+    final t = AuthTexts.of(context, listen: false);
     setState(() {
       if (value.isNotEmpty && value != _newController.text) {
-        _confirmPasswordError = 'Mật khẩu xác nhận không khớp';
+        _confirmPasswordError = t.passwordMismatch;
       } else {
         _confirmPasswordError = null;
       }
@@ -82,6 +83,7 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
 
   Future<void> _submit() async {
     if (!_canSubmit) return;
+    final t = AuthTexts.of(context, listen: false);
     setState(() => _isSubmitting = true);
 
     try {
@@ -91,8 +93,8 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
           );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đã cập nhật mật khẩu thành công'),
+        SnackBar(
+          content: Text(t.updatePasswordSuccess),
           backgroundColor: AppColors.success,
         ),
       );
@@ -102,15 +104,15 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
       String message;
       switch (e.code) {
         case 'AUTH_015':
-          message = 'Mật khẩu hiện tại không đúng';
+          message = t.currentPasswordIncorrect;
           break;
         case 'AUTH_016':
-          message = 'Mật khẩu mới không đáp ứng yêu cầu';
+          message = t.newPasswordRequirementFail;
           break;
         default:
           message = e.message.isNotEmpty && e.message != 'Unknown error'
               ? e.message
-              : 'Cập nhật mật khẩu thất bại (${e.statusCode})';
+              : '${t.updatePasswordFailed} (${e.statusCode})';
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message), backgroundColor: AppColors.error),
@@ -119,7 +121,7 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Lỗi: $e'),
+          content: Text('${t.cancel}: $e'),
           backgroundColor: AppColors.error,
         ),
       );
@@ -131,13 +133,14 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final t = AuthTexts.of(context);
     final scaffoldBg = isDarkMode ? DarkColors.scaffold : LightColors.scaffold;
     final surfaceColor = isDarkMode ? DarkColors.surface : LightColors.surface;
 
     return Scaffold(
       backgroundColor: scaffoldBg,
       appBar: AppBar(
-        title: const Text('Cập nhật mật khẩu'),
+        title: Text(t.updatePasswordTitle),
         backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
         foregroundColor: Colors.white,
         iconTheme: const IconThemeData(color: Colors.white),
@@ -162,11 +165,11 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.info_outline, color: AppColors.primary, size: 24),
+                Icon(Icons.info_outline, color: isDarkMode ? DarkColors.primary : AppColors.primary, size: 24),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Mật khẩu phải có ít nhất 8 ký tự, gồm chữ hoa, chữ thường và số.',
+                    t.passwordRequirementShortNote,
                     style: TextStyle(
                       fontSize: 14,
                       color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary,
@@ -179,9 +182,9 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
           ),
           const SizedBox(height: 28),
           _buildInputField(
-            label: 'Mật khẩu hiện tại',
+            label: t.currentPasswordLabel,
             controller: _currentController,
-            hint: 'Nhập mật khẩu hiện tại',
+            hint: t.hintCurrentPassword,
             obscure: !_showCurrent,
             onToggle: () => setState(() => _showCurrent = !_showCurrent),
             isDarkMode: isDarkMode,
@@ -189,9 +192,9 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
           ),
           const SizedBox(height: 20),
           _buildInputField(
-            label: 'Mật khẩu mới',
+            label: t.newPassword,
             controller: _newController,
-            hint: 'Nhập mật khẩu mới',
+            hint: t.hintNewPassword,
             obscure: !_showNew,
             onToggle: () => setState(() => _showNew = !_showNew),
             errorText: _newPasswordError,
@@ -201,9 +204,9 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
           ),
           const SizedBox(height: 20),
           _buildInputField(
-            label: 'Nhập lại mật khẩu mới',
+            label: t.confirmNewPassword,
             controller: _confirmController,
-            hint: 'Nhập lại mật khẩu mới',
+            hint: t.hintConfirmPassword,
             obscure: !_showConfirm,
             onToggle: () => setState(() => _showConfirm = !_showConfirm),
             errorText: _confirmPasswordError,
@@ -216,7 +219,7 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
             onPressed: _isSubmitting || !_canSubmit ? null : _submit,
             style: ElevatedButton.styleFrom(
               minimumSize: const Size.fromHeight(56),
-              backgroundColor: _canSubmit ? AppColors.primary : (isDarkMode ? DarkColors.divider : AppColors.primary.withValues(alpha: 0.3)),
+              backgroundColor: _canSubmit ? (isDarkMode ? DarkColors.primary : AppColors.primary) : (isDarkMode ? DarkColors.divider : AppColors.primary.withValues(alpha: 0.3)),
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               elevation: 0,
@@ -227,7 +230,7 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                   )
-                : const Text('CẬP NHẬT MẬT KHẨU', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+                : Text(t.updatePasswordAction, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
           ),
         ],
       ),
@@ -283,11 +286,15 @@ class _UpdatePasswordScreenState extends State<UpdatePasswordScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+              borderSide: BorderSide(color: isDarkMode ? DarkColors.primary : AppColors.primary, width: 1.5),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: AppColors.error),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.error, width: 1.5),
             ),
           ),
         ),
