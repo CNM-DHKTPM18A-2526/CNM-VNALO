@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/localization/language_provider.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
+import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
 import 'package:vnalo_mobile/features/contacts/screens/send_request_screen.dart';
 import 'package:vnalo_mobile/features/chat/screens/chat_detail_screen.dart';
+import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
 import 'package:vnalo_mobile/models/user_model.dart';
 import 'package:vnalo_mobile/services/chat_service.dart';
@@ -65,6 +67,13 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
       initialIndex: widget.initialTab == SearchInitialTab.mine ? 0 : 1,
     );
     _loadRecentFriends();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final chatProvider = context.read<ChatProvider>();
+      if (chatProvider.conversations.isEmpty) {
+        chatProvider.loadInbox();
+      }
+    });
   }
 
   Future<void> _loadRecentFriends() async {
@@ -609,6 +618,9 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
     final surfaceColor = isDarkMode ? DarkColors.surface : LightColors.surface;
     final dividerColor = isDarkMode ? DarkColors.divider : AppColors.itemDivider;
     final isVi = CommonTexts.of(context).language == AppLanguage.vi;
+    final friendMap = <String, User>{
+      for (final f in _recentFriends) f.id: f,
+    };
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -619,13 +631,16 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
           child: Column(
             children: List.generate(_localContactResults.length, (index) {
               final contact = _localContactResults[index];
+              final profile = friendMap[contact.id];
+              final displayName = profile?.displayName ?? contact.displayName;
+              final avatarUrl = profile?.avatarUrl ?? contact.avatarUrl;
               return Column(
                 children: [
                   ListTile(
-                    leading: AvatarWidget(imageUrl: contact.avatarUrl, name: contact.displayName, size: 52),
+                    leading: AvatarWidget(imageUrl: avatarUrl, name: displayName, size: 52),
                     title: RichText(
                       text: _highlightText(
-                        contact.displayName,
+                        displayName,
                         query,
                         baseStyle: TextStyle(
                           color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
@@ -667,7 +682,11 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
           child: Column(
             children: List.generate(_localMessageResults.length, (index) {
               final result = _localMessageResults[index];
-              return _buildMessageTile(result, query, index == _localMessageResults.length - 1);
+              return _buildMessageTile(
+                result,
+                query,
+                index == _localMessageResults.length - 1,
+              );
             }),
           ),
         ),
@@ -679,13 +698,19 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
   Widget _buildMessageTile(LocalMessageSearchResult result, String query, bool isLast) {
     final dividerColor = isDarkMode ? DarkColors.divider : AppColors.itemDivider;
     final common = CommonTexts.of(context);
+    final currentUserId = context.read<AuthProvider>().user?.id ?? '';
+    final hydrated = _findConversation(result.message.conversationId);
+    final displayName = hydrated?.getDisplayName(currentUserId) ??
+      result.conversationName ??
+      (common.language == AppLanguage.vi ? 'Cuộc hội thoại' : 'Conversation');
+    final avatarUrl = hydrated?.getDisplayAvatarUrl(currentUserId) ?? result.conversationAvatar;
     
     return Column(
       children: [
         ListTile(
-          leading: AvatarWidget(imageUrl: result.conversationAvatar, name: result.conversationName ?? 'G', size: 52),
+          leading: AvatarWidget(imageUrl: avatarUrl, name: displayName, size: 52),
           title: Text(
-            result.conversationName ?? (common.language == AppLanguage.vi ? 'Cuộc hội thoại' : 'Conversation'),
+            displayName,
             style: TextStyle(
               fontWeight: FontWeight.w600,
               fontSize: 16,
@@ -720,6 +745,14 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
           Divider(height: 1, thickness: 0.5, indent: 84, color: dividerColor),
       ],
     );
+  }
+
+  Conversation? _findConversation(String conversationId) {
+    final conversations = context.read<ChatProvider>().conversations;
+    for (final conv in conversations) {
+      if (conv.id == conversationId) return conv;
+    }
+    return null;
   }
 
   Widget _buildFilterChips() {
