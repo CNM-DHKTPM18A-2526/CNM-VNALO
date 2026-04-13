@@ -27,7 +27,13 @@ class AvatarWidget extends StatefulWidget {
 }
 
 class _AvatarWidgetState extends State<AvatarWidget> {
-  static final RegExp _publicMediaPattern = RegExp(r'^(.*/media/)public/([^/?]+)(\?.*)?$');
+  static final RegExp _publicMediaPattern = RegExp(
+    r'^(.*/media/)public/([^/?]+)(\?.*)?$',
+  );
+  static final RegExp _saveMediaPattern = RegExp(
+    r'^(.*/media/)([^/?]+)/save/?(\?.*)?$',
+  );
+
   List<String> _candidates = const [];
   int _index = 0;
 
@@ -55,16 +61,24 @@ class _AvatarWidgetState extends State<AvatarWidget> {
       return;
     }
 
-    final fallbacks = <String>{withVersion};
-    final match = _publicMediaPattern.firstMatch(withVersion);
-    if (match != null) {
-      final prefix = match.group(1)!;
-      final mediaId = match.group(2)!;
-      final query = match.group(3) ?? '';
-      fallbacks.add('$prefix$mediaId/save$query');
+    final candidates = <String>[withVersion];
+    final publicMatch = _publicMediaPattern.firstMatch(withVersion);
+    if (publicMatch != null) {
+      final prefix = publicMatch.group(1)!;
+      final mediaId = publicMatch.group(2)!;
+      final query = publicMatch.group(3) ?? '';
+      candidates.add('$prefix$mediaId/save$query');
+    } else {
+      final saveMatch = _saveMediaPattern.firstMatch(withVersion);
+      if (saveMatch != null) {
+        final prefix = saveMatch.group(1)!;
+        final mediaId = saveMatch.group(2)!;
+        final query = saveMatch.group(3) ?? '';
+        candidates.add('${prefix}public/$mediaId$query');
+      }
     }
 
-    _candidates = fallbacks.toList();
+    _candidates = candidates.toSet().toList();
     _index = 0;
   }
 

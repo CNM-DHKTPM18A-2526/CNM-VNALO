@@ -9,7 +9,9 @@ import 'package:vnalo_mobile/config/app_config.dart';
 class AvatarResolver {
   AvatarResolver._();
 
-  static final RegExp _saveUrlPattern = RegExp(r'^(.*/media/)([^/]+)/save/?$');
+  static final RegExp _saveUrlPattern = RegExp(
+    r'^(.*/media/)([^/?]+)/save/?(?:\?([^#]*))?$',
+  );
 
   /// Resolve [raw] to an absolute URL.
   ///
@@ -51,6 +53,10 @@ class AvatarResolver {
     if (match == null) return input;
     final prefix = match.group(1)!;
     final mediaId = match.group(2)!;
-    return '${prefix}public/$mediaId';
+    final query = match.group(3);
+    if (query == null || query.isEmpty) {
+      return '${prefix}public/$mediaId';
+    }
+    return '${prefix}public/$mediaId?$query';
   }
 }
