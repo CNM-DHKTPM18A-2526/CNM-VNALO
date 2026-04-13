@@ -327,7 +327,6 @@ class CommonTexts {
     String get recallMessagePrompt => _isVi
       ? 'Tin nhắn này sẽ bị thu hồi với mọi người. Tiếp tục?'
       : 'This message will be removed for everyone. Continue?';
-    String get recallAction => _isVi ? 'Thu hồi' : 'Recall';
     String get deleteMessageTitle => _isVi ? 'Xóa tin nhắn' : 'Delete message';
     String get deleteMessagePrompt => _isVi
       ? 'Tin nhắn này chỉ bị xóa ở phía bạn.'

@@ -145,7 +145,7 @@ class _AvatarWidgetState extends State<AvatarWidget> {
               decoration: BoxDecoration(
                 color: AppColors.online,
                 shape: BoxShape.circle,
-                border: Border.all(color: scheme.surface, width: borderWidth ?? 2),
+                border: Border.all(color: scheme.surface, width: widget.borderWidth ?? 2),
               ),
             ),
           ),

@@ -184,7 +184,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
           return RefreshIndicator(
             onRefresh: () => chatProvider.loadInbox(),
             color: AppColors.primary,
-<<<<<<< HEAD
+            child: Container(
               color: isDarkMode ? DarkColors.surface : Colors.white,
               child: ListView.separated(
                 itemCount: chatProvider.conversations.length + 1,
@@ -271,7 +271,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   );
                 },
               ),
-
+            ),
           );
         },
       ),
