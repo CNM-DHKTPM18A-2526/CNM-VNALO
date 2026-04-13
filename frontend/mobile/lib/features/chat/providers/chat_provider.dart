@@ -80,6 +80,7 @@ class ChatProvider extends ChangeNotifier {
 
     try {
       _conversations = await _chatService.getInbox();
+      await _applyLocalReadStateOverrides();
       _sortConversations();
     } catch (e) {
       debugPrint('loadInbox error: $e');
@@ -165,6 +166,10 @@ class ChatProvider extends ChangeNotifier {
         // Mark as read on server
         if (conv.lastMessage != null && conv.lastMessage!.serverSeq != null) {
           _socketService.markRead(conversationId, conv.lastMessage!.serverSeq!);
+          _db.upsertConversationReadState(
+            conversationId: conversationId,
+            lastReadSeq: conv.lastMessage!.serverSeq!,
+          );
         }
         notifyListeners();
       }
@@ -178,6 +183,19 @@ class ChatProvider extends ChangeNotifier {
     }
 
     await loadMessages(conversationId);
+
+    // Ensure read state is synced after fresh messages are loaded.
+    final latestSeq = _messages[conversationId]
+        ?.map((m) => m.serverSeq ?? 0)
+        .fold<int>(0, (max, seq) => seq > max ? seq : max) ??
+        0;
+    if (latestSeq > 0) {
+      _socketService.markRead(conversationId, latestSeq);
+      _db.upsertConversationReadState(
+        conversationId: conversationId,
+        lastReadSeq: latestSeq,
+      );
+    }
   }
 
   void setCurrentUserId(String userId) {
@@ -570,11 +588,13 @@ class ChatProvider extends ChangeNotifier {
     }
 
     final index = _conversations.indexWhere((c) => c.id == conversationId);
+    final isActiveConversation = conversationId == _activeConversationId;
+    final isMine = message.senderId == _currentUserId;
     if (index >= 0) {
       final conversation = _conversations[index];
       final updatedConversation = conversation.copyWith(
         lastMessage: message,
-        unreadCount: (conversation.id == _activeConversationId || message.senderId == _currentUserId)
+        unreadCount: (isActiveConversation || isMine)
             ? 0
             : conversation.unreadCount + 1,
       );
@@ -586,8 +606,17 @@ class ChatProvider extends ChangeNotifier {
     }
 
     // Emit delivered indicator if it's not our message
-    if (message.senderId != _currentUserId) {
+    if (!isMine) {
       _socketService.markDelivered(message.id, conversationId);
+    }
+
+    // Auto-read messages in active conversation and persist local read state.
+    if (isActiveConversation && !isMine && message.serverSeq != null) {
+      _socketService.markRead(conversationId, message.serverSeq!);
+      _db.upsertConversationReadState(
+        conversationId: conversationId,
+        lastReadSeq: message.serverSeq!,
+      );
     }
 
     // Persist newly received message to local DB
@@ -600,6 +629,11 @@ class ChatProvider extends ChangeNotifier {
     final String conversationId = data['conversationId'];
     final String userId = data['userId'];
     final int lastReadSeq = data['lastReadSeq'];
+
+    _db.upsertConversationReadState(
+      conversationId: conversationId,
+      lastReadSeq: lastReadSeq,
+    );
 
     // Update member's lastReadSeq in the conversation object
     final convIndex = _conversations.indexWhere((c) => c.id == conversationId);
@@ -638,6 +672,31 @@ class ChatProvider extends ChangeNotifier {
     }
 
     notifyListeners();
+  }
+
+  Future<void> _applyLocalReadStateOverrides() async {
+    if (_conversations.isEmpty) return;
+
+    final ids = _conversations.map((c) => c.id).toList();
+    final localReadState = await _db.getConversationReadStateMap(ids);
+    if (localReadState.isEmpty) return;
+
+    bool changed = false;
+    final updated = <Conversation>[];
+    for (final conv in _conversations) {
+      final lastReadSeq = localReadState[conv.id] ?? 0;
+      final lastMessageSeq = conv.lastMessage?.serverSeq ?? 0;
+      if (conv.unreadCount > 0 && lastReadSeq > 0 && lastMessageSeq > 0 && lastReadSeq >= lastMessageSeq) {
+        updated.add(conv.copyWith(unreadCount: 0));
+        changed = true;
+      } else {
+        updated.add(conv);
+      }
+    }
+
+    if (changed) {
+      _conversations = updated;
+    }
   }
 
   void _handleDeliveredEvent(Map<String, dynamic> data) {
