@@ -20,6 +20,7 @@ class LocalDatabase extends _$LocalDatabase {
       // Fresh Install v2: Manually create FTS and Triggers
       await _createFtsTables();
       await _createFtsTriggers();
+      await _deduplicateFtsRows();
     },
     onUpgrade: (m, from, to) async {
       if (from < 2) {
@@ -46,6 +47,7 @@ class LocalDatabase extends _$LocalDatabase {
 
         // 4. Re-create triggers after rebuild to avoid side effects during migration
         await _createFtsTriggers();
+        await _deduplicateFtsRows();
       }
     },
   );
@@ -83,15 +85,29 @@ class LocalDatabase extends _$LocalDatabase {
     ''');
   }
 
+  Future<void> _deduplicateFtsRows() async {
+    await customStatement(
+      'DELETE FROM messages_fts WHERE rowid NOT IN ('
+      '  SELECT MIN(rowid) FROM messages_fts GROUP BY external_id'
+      ')',
+    );
+    await customStatement(
+      'DELETE FROM contacts_fts WHERE rowid NOT IN ('
+      '  SELECT MIN(rowid) FROM contacts_fts GROUP BY external_id'
+      ')',
+    );
+  }
+
   // --- SEARCH QUERIES ---
 
   Future<List<LocalMessageSearchResult>> searchMessages(String query) async {
     final results =
         await customSelect(
           'SELECT m.*, c.name as conv_name, c.avatar_url as conv_avatar FROM messages m '
-          'JOIN messages_fts f ON m.id = f.external_id '
           'JOIN conversations c ON m.conversation_id = c.id '
-          'WHERE f.content MATCH ? '
+          'WHERE m.id IN ( '
+          '  SELECT DISTINCT f.external_id FROM messages_fts f WHERE f.content MATCH ? '
+          ') '
           'ORDER BY m.created_at DESC',
           variables: [Variable.withString('$query*')],
         ).get();
@@ -123,8 +139,12 @@ class LocalDatabase extends _$LocalDatabase {
     final results =
         await customSelect(
           'SELECT c.* FROM contacts c '
-          'JOIN contacts_fts f ON c.id = f.external_id '
-          'WHERE f.display_name MATCH ? OR c.phone LIKE ?',
+          'WHERE c.id IN ( '
+          '  SELECT f.external_id FROM contacts_fts f WHERE f.display_name MATCH ? '
+          '  UNION '
+          '  SELECT c2.id FROM contacts c2 WHERE c2.phone LIKE ? '
+          ') '
+          'ORDER BY c.display_name COLLATE NOCASE',
           variables: [
             Variable.withString('$query*'),
             Variable.withString('%$query%'),
