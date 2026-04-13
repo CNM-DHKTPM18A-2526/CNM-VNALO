@@ -1,9 +1,11 @@
 import type { ChangeEvent, KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
+import Cropper, { type Area } from 'react-easy-crop'
 
 import { useAuth } from '../features/auth/useAuth'
 import { updateAvatarForUser } from '../features/profile/avatar.service'
 import { uploadCover } from '../features/profile/cover.service'
+import { getCroppedImageFile } from '../features/profile/image-crop.util'
 import { validateAvatarFile } from '../features/profile/avatar.util'
 import { Skeleton } from '../shared/components/ui/Skeleton'
 import { UserAvatar } from '../shared/components/UserAvatar'
@@ -19,6 +21,13 @@ type GenderValue = (typeof GENDER_VALUES)[number]
 
 type GenderDraft = GenderValue | ''
 type PreviewImageKind = 'avatar' | 'cover'
+type CropTarget = 'avatar' | 'cover'
+type PendingCrop = {
+  kind: CropTarget
+  sourceUrl: string
+  originalFileName: string
+  mimeType: string
+}
 
 function isGenderValue(value: string): value is GenderValue {
   return (GENDER_VALUES as readonly string[]).includes(value)
@@ -45,6 +54,8 @@ function getLocalTodayIsoDate() {
 }
 
 const PROFILE_BIO_MAX_LENGTH = 160
+const AVATAR_ASPECT = 1
+const COVER_ASPECT = 16 / 6
 
 export function ProfilePage() {
   const { accessToken, isBootstrapping, user, updateUser } = useAuth()
@@ -56,10 +67,13 @@ export function ProfilePage() {
   const [coverUrl, setCoverUrl] = useState<string | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [selectedCoverFile, setSelectedCoverFile] = useState<File | null>(null)
   const [isSavingAvatar, setIsSavingAvatar] = useState(false)
   const [isSavingCover, setIsSavingCover] = useState(false)
+  const [isApplyingCrop, setIsApplyingCrop] = useState(false)
+  const [pendingCrop, setPendingCrop] = useState<PendingCrop | null>(null)
+  const [cropPosition, setCropPosition] = useState({ x: 0, y: 0 })
+  const [cropZoom, setCropZoom] = useState(1)
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null)
   const [avatarErrorMessage, setAvatarErrorMessage] = useState<string | null>(null)
   const [avatarSuccessMessage, setAvatarSuccessMessage] = useState<string | null>(null)
   const [coverErrorMessage, setCoverErrorMessage] = useState<string | null>(null)
@@ -102,8 +116,12 @@ export function ProfilePage() {
       if (coverPreviewUrl) {
         URL.revokeObjectURL(coverPreviewUrl)
       }
+
+      if (pendingCrop?.sourceUrl) {
+        URL.revokeObjectURL(pendingCrop.sourceUrl)
+      }
     }
-  }, [coverPreviewUrl, previewUrl])
+  }, [coverPreviewUrl, pendingCrop?.sourceUrl, previewUrl])
 
   const openFilePicker = () => {
     fileInputRef.current?.click()
@@ -164,7 +182,6 @@ export function ProfilePage() {
     }
 
     setPreviewUrl(null)
-    setSelectedFile(null)
 
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
@@ -177,11 +194,45 @@ export function ProfilePage() {
     }
 
     setCoverPreviewUrl(null)
-    setSelectedCoverFile(null)
 
     if (coverInputRef.current) {
       coverInputRef.current.value = ''
     }
+  }
+
+  const closeCropModal = () => {
+    if (pendingCrop?.sourceUrl) {
+      URL.revokeObjectURL(pendingCrop.sourceUrl)
+    }
+
+    setPendingCrop(null)
+    setCropPosition({ x: 0, y: 0 })
+    setCropZoom(1)
+    setCroppedAreaPixels(null)
+    setIsApplyingCrop(false)
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+    if (coverInputRef.current) {
+      coverInputRef.current.value = ''
+    }
+  }
+
+  const startCropping = (kind: CropTarget, file: File) => {
+    if (pendingCrop?.sourceUrl) {
+      URL.revokeObjectURL(pendingCrop.sourceUrl)
+    }
+
+    setPendingCrop({
+      kind,
+      sourceUrl: URL.createObjectURL(file),
+      originalFileName: file.name,
+      mimeType: file.type,
+    })
+    setCropPosition({ x: 0, y: 0 })
+    setCropZoom(1)
+    setCroppedAreaPixels(null)
   }
 
   const onFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -201,12 +252,7 @@ export function ProfilePage() {
       return
     }
 
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl)
-    }
-
-    setSelectedFile(file)
-    setPreviewUrl(URL.createObjectURL(file))
+    startCropping('avatar', file)
   }
 
   const onCoverFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -226,16 +272,11 @@ export function ProfilePage() {
       return
     }
 
-    if (coverPreviewUrl) {
-      URL.revokeObjectURL(coverPreviewUrl)
-    }
-
-    setSelectedCoverFile(file)
-    setCoverPreviewUrl(URL.createObjectURL(file))
+    startCropping('cover', file)
   }
 
-  const saveAvatar = async () => {
-    if (!selectedFile || !accessToken) {
+  const saveAvatar = async (file: File) => {
+    if (!accessToken) {
       return
     }
 
@@ -244,11 +285,10 @@ export function ProfilePage() {
     setAvatarSuccessMessage(null)
 
     try {
-      const updatedUser = await updateAvatarForUser(accessToken, selectedFile)
+      const updatedUser = await updateAvatarForUser(accessToken, file)
       setAvatarUrl(updatedUser.avatarUrl ?? null)
       updateUser(updatedUser)
       setAvatarSuccessMessage(t('profile.avatar.messages.saveSuccess'))
-      resetSelection()
     } catch {
       setAvatarErrorMessage(t('profile.avatar.messages.saveError'))
     } finally {
@@ -308,8 +348,8 @@ export function ProfilePage() {
     }
   }
 
-  const saveCover = async () => {
-    if (!selectedCoverFile || !accessToken) {
+  const saveCover = async (file: File) => {
+    if (!accessToken) {
       return
     }
 
@@ -318,7 +358,7 @@ export function ProfilePage() {
     setCoverSuccessMessage(null)
 
     try {
-      const uploadedCoverUrl = await uploadCover(selectedCoverFile, accessToken)
+      const uploadedCoverUrl = await uploadCover(file, accessToken)
       const updatedUser = await updateProfile(accessToken, {
         coverUrl: uploadedCoverUrl,
       })
@@ -326,11 +366,52 @@ export function ProfilePage() {
       setCoverUrl(updatedUser.coverUrl ?? uploadedCoverUrl)
       updateUser(updatedUser)
       setCoverSuccessMessage(t('profile.cover.messages.saveSuccess'))
-      resetCoverSelection()
     } catch {
       setCoverErrorMessage(t('profile.cover.messages.saveError'))
     } finally {
       setIsSavingCover(false)
+    }
+  }
+
+  const handleConfirmCrop = async () => {
+    if (!pendingCrop || !croppedAreaPixels) {
+      return
+    }
+
+    setIsApplyingCrop(true)
+
+    try {
+      const croppedFile = await getCroppedImageFile(
+        pendingCrop.sourceUrl,
+        croppedAreaPixels,
+        pendingCrop.originalFileName,
+        pendingCrop.mimeType,
+      )
+
+      if (pendingCrop.kind === 'avatar') {
+        if (previewUrl) {
+          URL.revokeObjectURL(previewUrl)
+        }
+        setPreviewUrl(URL.createObjectURL(croppedFile))
+        await saveAvatar(croppedFile)
+        resetSelection()
+      } else {
+        if (coverPreviewUrl) {
+          URL.revokeObjectURL(coverPreviewUrl)
+        }
+        setCoverPreviewUrl(URL.createObjectURL(croppedFile))
+        await saveCover(croppedFile)
+        resetCoverSelection()
+      }
+
+      closeCropModal()
+    } catch {
+      if (pendingCrop.kind === 'avatar') {
+        setAvatarErrorMessage(t('profile.avatar.messages.saveError'))
+      } else {
+        setCoverErrorMessage(t('profile.cover.messages.saveError'))
+      }
+      setIsApplyingCrop(false)
     }
   }
 
@@ -381,18 +462,8 @@ export function ProfilePage() {
         >
           <div className='profile-cover-actions' onClick={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()}>
             <button className='btn btn-ghost profile-cover-change-btn' type='button' onClick={openCoverPicker} disabled={isSavingCover}>
-              {t('profile.cover.changeButton')}
+              {isSavingCover ? t('profile.cover.savingButton') : t('profile.cover.changeButton')}
             </button>
-            {selectedCoverFile ? (
-              <>
-                <button className='btn btn-primary profile-cover-save-btn' type='button' onClick={saveCover} disabled={isSavingCover}>
-                  {isSavingCover ? t('profile.cover.savingButton') : t('profile.cover.saveButton')}
-                </button>
-                <button className='btn btn-ghost profile-cover-cancel-btn' type='button' onClick={resetCoverSelection} disabled={isSavingCover}>
-                  {t('profile.cover.cancelButton')}
-                </button>
-              </>
-            ) : null}
           </div>
         </div>
 
@@ -455,6 +526,60 @@ export function ProfilePage() {
 
         <Modal
           closeAriaLabel={t('profile.preview.closeAriaLabel')}
+          footer={
+            <>
+              <button className='btn btn-ghost' type='button' onClick={closeCropModal} disabled={isApplyingCrop}>
+                {t('profile.crop.cancelButton')}
+              </button>
+              <button
+                className='btn btn-primary'
+                type='button'
+                onClick={() => {
+                  void handleConfirmCrop()
+                }}
+                disabled={isApplyingCrop}
+              >
+                {isApplyingCrop ? t('profile.crop.processing') : t('profile.crop.confirmButton')}
+              </button>
+            </>
+          }
+          isOpen={Boolean(pendingCrop)}
+          onClose={closeCropModal}
+          title={pendingCrop?.kind === 'cover' ? t('profile.crop.coverTitle') : t('profile.crop.avatarTitle')}
+          variant='image'
+        >
+          {pendingCrop ? (
+            <div className='profile-crop-modal'>
+              <div className='profile-crop-stage'>
+                <Cropper
+                  image={pendingCrop.sourceUrl}
+                  crop={cropPosition}
+                  zoom={cropZoom}
+                  aspect={pendingCrop.kind === 'avatar' ? AVATAR_ASPECT : COVER_ASPECT}
+                  cropShape={pendingCrop.kind === 'avatar' ? 'round' : 'rect'}
+                  showGrid={pendingCrop.kind === 'cover'}
+                  onCropChange={setCropPosition}
+                  onZoomChange={setCropZoom}
+                  onCropComplete={(_, areaPixels) => setCroppedAreaPixels(areaPixels)}
+                />
+              </div>
+              <label className='profile-crop-zoom'>
+                <span>{t('profile.crop.zoomLabel')}</span>
+                <input
+                  type='range'
+                  min={1}
+                  max={3}
+                  step={0.01}
+                  value={cropZoom}
+                  onChange={(event) => setCropZoom(Number(event.target.value))}
+                />
+              </label>
+            </div>
+          ) : null}
+        </Modal>
+
+        <Modal
+          closeAriaLabel={t('profile.preview.closeAriaLabel')}
           isOpen={Boolean(activePreview)}
           onClose={closeImagePreview}
           title={activePreview?.kind === 'cover' ? t('profile.preview.coverTitle') : t('profile.preview.avatarTitle')}
@@ -479,26 +604,8 @@ export function ProfilePage() {
             <p className='profile-avatar-feedback profile-avatar-feedback-success'>{coverSuccessMessage}</p>
           ) : null}
 
-          {selectedFile || avatarErrorMessage || avatarSuccessMessage ? (
+          {avatarErrorMessage || avatarSuccessMessage ? (
             <div className='profile-avatar-panel'>
-              <div className='profile-avatar-actions'>
-                {selectedFile ? (
-                  <>
-                    <button className='btn btn-primary' type='button' onClick={saveAvatar} disabled={isSavingAvatar}>
-                      {isSavingAvatar ? t('profile.avatar.savingButton') : t('profile.avatar.saveButton')}
-                    </button>
-                    <button
-                      className='btn btn-ghost'
-                      type='button'
-                      onClick={resetSelection}
-                      disabled={isSavingAvatar}
-                    >
-                      {t('profile.avatar.cancelButton')}
-                    </button>
-                  </>
-                ) : null}
-              </div>
-
               <p className='profile-avatar-hint'>{t('profile.avatar.hint')}</p>
               {avatarErrorMessage ? (
                 <p className='profile-avatar-feedback profile-avatar-feedback-error'>{avatarErrorMessage}</p>
