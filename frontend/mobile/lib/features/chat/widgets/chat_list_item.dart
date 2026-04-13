@@ -6,6 +6,7 @@ import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/utils/date_formatter.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
+import 'package:vnalo_mobile/features/profile/providers/avatar_cache_provider.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
 
@@ -24,6 +25,8 @@ class ChatListItem extends StatelessWidget {
     final currentUserId = context.read<AuthProvider>().user?.id ?? '';
     final displayName = conversation.getDisplayName(currentUserId);
     final displayAvatar = conversation.getDisplayAvatarUrl(currentUserId);
+    final avatarOwnerId = _avatarOwnerId(currentUserId);
+    final avatarVersion = context.watch<AvatarCacheProvider>().versionForUser(avatarOwnerId);
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final common = CommonTexts.of(context);
 
@@ -71,6 +74,7 @@ class ChatListItem extends StatelessWidget {
                 name: displayName,
                 size: 48,
                 showOnline: conversation.type == ConversationType.DIRECT,
+                cacheVersion: avatarVersion,
               ),
               title: Row(
                 children: [
@@ -137,6 +141,16 @@ class ChatListItem extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  String _avatarOwnerId(String currentUserId) {
+    if (conversation.type != ConversationType.DIRECT) return '';
+    if (conversation.members.isEmpty) return '';
+    final other = conversation.members.firstWhere(
+      (m) => m.userId != currentUserId,
+      orElse: () => conversation.members.first,
+    );
+    return other.userId;
   }
 
   String? _buildLastMessagePreview(String currentUserId) {

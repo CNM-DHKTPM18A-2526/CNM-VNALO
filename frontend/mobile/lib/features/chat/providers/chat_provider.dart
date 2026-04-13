@@ -7,6 +7,7 @@ import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
 import 'package:vnalo_mobile/models/conversation_member_model.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
+import 'package:vnalo_mobile/models/user_model.dart';
 import 'package:vnalo_mobile/services/chat_service.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 import 'package:vnalo_mobile/services/media_service.dart';
@@ -1022,5 +1023,32 @@ class ChatProvider extends ChangeNotifier {
       }
     }
     return 'User';
+  }
+
+  void updateUserProfileInConversations(User updatedUser) {
+    bool changed = false;
+    final updatedConversations = _conversations.map((conv) {
+      if (conv.members.isEmpty) return conv;
+
+      final newMembers = conv.members.map((member) {
+        if (member.userId != updatedUser.id) return member;
+        changed = true;
+        final mergedUser = member.user?.copyWith(
+              displayName: updatedUser.displayName,
+              avatarUrl: updatedUser.avatarUrl,
+              coverUrl: updatedUser.coverUrl,
+              isOnline: updatedUser.isOnline,
+            ) ??
+            updatedUser;
+        return member.copyWith(user: mergedUser);
+      }).toList();
+
+      return conv.copyWith(members: newMembers);
+    }).toList();
+
+    if (changed) {
+      _conversations = updatedConversations;
+      notifyListeners();
+    }
   }
 }

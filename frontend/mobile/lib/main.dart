@@ -22,6 +22,7 @@ import 'package:vnalo_mobile/core/database/local_database.dart';
 import 'package:vnalo_mobile/services/media_cache_service.dart';
 import 'package:vnalo_mobile/features/timeline/providers/post_provider.dart';
 import 'package:vnalo_mobile/features/chat/providers/forward_provider.dart';
+import 'package:vnalo_mobile/features/profile/providers/avatar_cache_provider.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -116,6 +117,9 @@ class VnaloApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<ThemeProvider>(
           create: (_) => ThemeProvider()..initialize(),
+        ),
+        ChangeNotifierProvider<AvatarCacheProvider>(
+          create: (_) => AvatarCacheProvider(),
         ),
         ChangeNotifierProvider<LanguageProvider>(
           create: (_) => LanguageProvider()..initialize(),

@@ -16,6 +16,8 @@ import 'package:vnalo_mobile/features/chat/screens/chat_options_screen.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:async';
+import 'package:vnalo_mobile/features/profile/providers/avatar_cache_provider.dart';
+import 'package:vnalo_mobile/services/user_service.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final Conversation conversation;
@@ -36,10 +38,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   bool _showGroupMembers = false;
   final ScrollController _scrollController = ScrollController();
   bool _isLoadingMore = false;
+  User? _friendSnapshot;
 
   @override
   void initState() {
     super.initState();
+    _friendSnapshot = widget.friendUser;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final currentUserId = context.read<AuthProvider>().user?.id ?? '';
@@ -112,22 +116,28 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   }
 
   String _getDisplayName(String currentUserId, Conversation conversation) {
-    if (widget.friendUser != null) {
-      return widget.friendUser!.displayName;
+    if (conversation.type == ConversationType.DIRECT && conversation.members.isNotEmpty) {
+      return conversation.getDisplayName(currentUserId);
+    }
+    if (_friendSnapshot != null) {
+      return _friendSnapshot!.displayName;
     }
     return conversation.getDisplayName(currentUserId);
   }
 
   String? _getAvatarUrl(String currentUserId, Conversation conversation) {
-    if (widget.friendUser != null) {
-      return widget.friendUser!.avatarUrl;
+    if (conversation.type == ConversationType.DIRECT && conversation.members.isNotEmpty) {
+      return conversation.getDisplayAvatarUrl(currentUserId);
+    }
+    if (_friendSnapshot != null) {
+      return _friendSnapshot!.avatarUrl;
     }
     return conversation.getDisplayAvatarUrl(currentUserId);
   }
 
   String? _getCoverUrl(String currentUserId, Conversation conversation) {
-    if (widget.friendUser != null) {
-      return widget.friendUser!.coverUrl;
+    if (_friendSnapshot != null) {
+      return _friendSnapshot!.coverUrl;
     }
     final isDirect = conversation.type == ConversationType.DIRECT;
     if (isDirect && conversation.members.isNotEmpty) {
@@ -138,6 +148,44 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       return other.user?.coverUrl;
     }
     return null;
+  }
+
+  String? _resolveDirectPeerId(String currentUserId, Conversation conversation) {
+    if (conversation.type == ConversationType.DIRECT && conversation.members.isNotEmpty) {
+      final other = conversation.members.firstWhere(
+        (m) => m.userId != currentUserId,
+        orElse: () => conversation.members.first,
+      );
+      if (other.userId.isNotEmpty) return other.userId;
+    }
+    if (_friendSnapshot != null && _friendSnapshot!.id.isNotEmpty) {
+      return _friendSnapshot!.id;
+    }
+    return null;
+  }
+
+  Future<void> _refreshPeerAvatar(Conversation conversation, String currentUserId) async {
+    final userId = _resolveDirectPeerId(currentUserId, conversation);
+    if (userId == null) return;
+
+    final fresh = await context.read<UserService>().getUserById(userId);
+    if (!mounted) return;
+
+    if (fresh == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không thể làm mới ảnh đại diện')),
+      );
+      return;
+    }
+
+    _friendSnapshot = fresh;
+    context.read<AvatarCacheProvider>().bumpUserAvatarVersion(userId);
+    context.read<ChatProvider>().updateUserProfileInConversations(fresh);
+    setState(() {});
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Đã làm mới ảnh đại diện')),
+    );
   }
 
   @override
@@ -157,6 +205,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         final avatarUrl = _getAvatarUrl(currentUserId, conv);
         final coverUrl = _getCoverUrl(currentUserId, conv);
         final isDirect = conv.type == ConversationType.DIRECT || widget.friendUser != null;
+        final peerId = _resolveDirectPeerId(currentUserId, conv);
+        final avatarVersion = peerId == null
+          ? 0
+          : context.watch<AvatarCacheProvider>().versionForUser(peerId);
         final wallpaperUrl = conv.personalWallpaperUrl ?? conv.wallpaperUrl;
 
         return Scaffold(
@@ -184,7 +236,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 1),
                   ),
-                  child: AvatarWidget(name: displayName, imageUrl: avatarUrl, size: 36),
+                  child: AvatarWidget(
+                    name: displayName,
+                    imageUrl: avatarUrl,
+                    size: 36,
+                    cacheVersion: avatarVersion,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -223,6 +280,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   );
                 },
               ),
+              if (isDirect)
+                IconButton(
+                  icon: const Icon(Icons.refresh, color: Colors.white),
+                  onPressed: () => _refreshPeerAvatar(conv, currentUserId),
+                ),
               IconButton(
                 icon: const Icon(Icons.menu, color: Colors.white),
                 onPressed: () {
