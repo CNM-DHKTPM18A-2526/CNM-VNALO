@@ -10,6 +10,7 @@ type InboxItem = {
   unreadCount?: number
   lastMessagePreview?: string
   lastMessageSeq?: number
+  lastMessageSenderId?: string | null
   lastMessageAt?: string | null
   updatedAt?: string | null
   conversation?: {
@@ -315,15 +316,18 @@ export async function fetchInbox(token: string, currentUserId?: string): Promise
     const partnerUserId = String(peerMember?.userId ?? '').trim() || null
     const peerNickname = peerMember?.nickname?.trim()
     const peerFallback = partnerUserId ? `Người dùng ${partnerUserId.slice(0, 8)}` : null
+    const normalizedPreview = normalizeInboxPreview(item.lastMessagePreview)
 
     return {
       id,
       userId: partnerUserId,
       name: title && title.length > 0 ? title : peerNickname || peerFallback || `Trò chuyện ${id.slice(0, 8)}`,
-      lastMessage: normalizeInboxPreview(item.lastMessagePreview),
+      lastMessage: normalizedPreview,
+      lastMessagePreview: normalizedPreview,
       unreadCount: item.unreadCount ?? 0,
       online: false,
       lastMessageSeq: item.lastMessageSeq,
+      lastMessageSenderId: item.lastMessageSenderId ?? null,
       participantUserIds: members
         .map((member) => String(member.userId ?? '').trim())
         .filter((memberId): memberId is string => Boolean(memberId) && memberId !== myId),
@@ -621,6 +625,67 @@ export async function getOrCreateDirectConversation(token: string, targetUserId:
 
   if (!conversationId) {
     throw new Error('Invalid direct conversation response payload.')
+  }
+
+  return conversationId
+}
+
+export type CreateGroupConversationPayload = {
+  title: string
+  memberUserIds: string[]
+  avatarUrl?: string | null
+}
+
+export type CreateGroupConversationResponse = {
+  id: string
+  title: string
+  type: string
+  members?: Array<{
+    userId: string
+    nickname?: string | null
+  }>
+}
+
+/**
+ * Create a new group conversation
+ * @param token - Authorization token
+ * @param payload - Group creation payload with title, member IDs, and optional avatar URL
+ * @returns Conversation ID of the newly created group
+ */
+export async function createGroupConversation(
+  token: string,
+  payload: CreateGroupConversationPayload,
+): Promise<string> {
+  const response = await fetch(`${MESSAGE_API_URL}/conversations/group`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      title: payload.title.trim(),
+      memberUserIds: payload.memberUserIds,
+      ...(payload.avatarUrl ? { avatarUrl: payload.avatarUrl } : {}),
+    }),
+  })
+
+  const json = await response.json().catch(() => null)
+
+  if (!response.ok) {
+    const message = isRecord(json) && typeof json.message === 'string' ? json.message : null
+    throw new Error(message ?? 'Cannot create group conversation.')
+  }
+
+  const responsePayload = isRecord(json) && isRecord(json.data) ? json.data : json
+  const conversationId =
+    isRecord(responsePayload) && typeof responsePayload.id === 'string'
+      ? responsePayload.id
+      : isRecord(responsePayload) && typeof responsePayload.conversationId === 'string'
+        ? responsePayload.conversationId
+        : null
+
+  if (!conversationId) {
+    throw new Error('Invalid group creation response payload.')
   }
 
   return conversationId

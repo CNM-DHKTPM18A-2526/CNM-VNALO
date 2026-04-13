@@ -6,10 +6,12 @@ import { ChatList } from '../features/chat/components/ChatList'
 import { ConversationInfo } from '../features/chat/components/ConversationInfo'
 import { SearchMessagesPanel } from '../features/chat/components/SearchMessagesPanel'
 import { SearchGlobalPanel } from '../features/chat/components/SearchGlobalPanel'
+import { MessageShareModal } from '../features/chat/components/MessageShareModal'
 import { ChatWindow } from '../features/chat/components/ChatWindow'
 import type { MessageContextMenuAction } from '../features/chat/components/MessageContextMenu'
 import {
   addMessageReaction,
+  createGroupConversation,           // ← NEW
   deleteMessageForMe,
   fetchMessageReactions,
   fetchInbox,
@@ -25,7 +27,7 @@ import {
   sendMessage as sendMessageViaRest,
   unpinMessage,
   uploadChatMedia,
-} from '../features/chat/chat.api'
+} from '../features/chat/chat.api';
 import type { RawMessage } from '../features/chat/chat.api'
 import { REACTION_OPTIONS, type MessageReactionState, type ReactionKey } from '../features/chat/components/MessageReaction'
 import { useChatSocket } from '../features/chat/useChatSocket'
@@ -38,7 +40,7 @@ import type {
 } from '../features/chat/chat.types'
 import { getFriends, getUserById, searchUsers } from '../features/friends/friends.api'
 import { getUserByPhone } from '../features/friends/friends.api'
-import type { UserLookupResult } from '../features/friends/friends.types'
+import type { Friend, UserLookupResult } from '../features/friends/friends.types'
 import { useAuth } from '../features/auth/useAuth'
 import { Skeleton } from '../shared/components/ui/Skeleton'
 import { Card } from '../shared/components/ui/Card'
@@ -51,6 +53,7 @@ import {
   type CachedMessage,
   type CachedUser,
 } from '../features/chat/searchIndex'
+import { CreateGroupModal } from '../features/chat/components/CreateGroupModal'
 
 function sortMessages(messages: ChatMessage[]): ChatMessage[] {
   return [...messages].sort((left, right) => {
@@ -189,6 +192,41 @@ function getConversationPreview(message: ChatMessage): string {
     default:
       return message.text.trim()
   }
+}
+
+function formatPreviewSenderName(displayName?: string | null): string {
+  const normalized = String(displayName ?? '').trim().replace(/\s+/g, ' ')
+  if (!normalized) {
+    return ''
+  }
+
+  const parts = normalized.split(' ')
+  if (parts.length <= 2) {
+    return normalized
+  }
+
+  return parts.slice(-2).join(' ')
+}
+
+function formatConversationPreview(senderName: string | null | undefined, message: ChatMessage | string): string {
+  const rawMessage = typeof message === 'string' ? message : getConversationPreview(message)
+  const content = String(rawMessage ?? '').trim()
+
+  if (!content) {
+    return ''
+  }
+
+  const previewSender = formatPreviewSenderName(senderName)
+  if (!previewSender) {
+    return content
+  }
+
+  const prefix = `${previewSender}:`
+  if (content.startsWith(prefix)) {
+    return content
+  }
+
+  return `${previewSender}: ${content}`
 }
 
 function getDraftMessageType(payload: ChatComposePayload): ChatMessageType {
@@ -381,6 +419,7 @@ export function ChatPage() {
   const [peerLastReadByConversation, setPeerLastReadByConversation] = useState<Record<string, number>>({})
   const [reactionStatesByMessage, setReactionStatesByMessage] = useState<Record<string, MessageReactionState>>({})
   const [friendResults, setFriendResults] = useState<UserLookupResult[]>([])
+  const [friendsDirectory, setFriendsDirectory] = useState<Friend[]>([])
   const [userProfileCache, setUserProfileCache] = useState<Record<string, CachedUserProfile>>({})
   const [isSocketConnected, setIsSocketConnected] = useState(false)
   const [rightSidebarContent, setRightSidebarContent] = useState<'info' | 'search' | 'global-search' | null>('info')
@@ -392,6 +431,8 @@ export function ChatPage() {
   const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([])
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false)
   const [isTokenRestrictedMode, setIsTokenRestrictedMode] = useState(false)
+  const [shareModalMessage, setShareModalMessage] = useState<ChatMessage | null>(null)
+  const [isShareSubmitting, setIsShareSubmitting] = useState(false)
 
   const selectedConversationIdRef = useRef('')
   const selectedMessagesRef = useRef<ChatMessage[]>([])
@@ -401,6 +442,9 @@ export function ChatPage() {
   const pendingProfileLookupRef = useRef<Set<string>>(new Set())
   const lastLoadedMessagesKeyRef = useRef('')
   const messageLoadRequestSeqRef = useRef(0)
+
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
+  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
 
   useEffect(() => {
     selectedConversationIdRef.current = routedConversationId || selectedConversationId
@@ -666,7 +710,13 @@ export function ChatPage() {
       }
 
       try {
-        await recallMessage(accessToken, messageId)
+        await joinConversation(conversationId)
+
+        const ack = await emitRecallMessage({ messageId, conversationId })
+        if (ack?.event !== 'message.recalled') {
+          await recallMessage(accessToken, messageId)
+        }
+
         setRecalledMessageIds((prev) => ({
           ...prev,
           [messageId]: true,
@@ -757,11 +807,105 @@ export function ChatPage() {
           void handleDeleteForMe(messageId)
           setSelectedMessageIds((prev) => prev.filter((item) => item !== messageId))
           return
+        case 'share':
+          setShareModalMessage(message)
+          return
         default:
           return
       }
     },
     [handleDeleteForMe, handleRecallMessage, handleTogglePinMessage, toggleMessageIdInList],
+  )
+
+  const handleShareMessage = useCallback(
+    async (targetUserIds: string[], note: string) => {
+      if (!accessToken || !shareModalMessage || targetUserIds.length === 0) {
+        return
+      }
+
+      const trimmedNote = note.trim()
+      const mediaUrl = shareModalMessage.mediaUrl ?? shareModalMessage.attachments?.[0]?.url ?? null
+      const mediaThumbnailUrl = shareModalMessage.mediaThumbnailUrl ?? shareModalMessage.attachments?.[0]?.thumbnailUrl ?? null
+      const mediaMimeType = shareModalMessage.mediaMimeType ?? shareModalMessage.attachments?.[0]?.mimeType ?? null
+      const mediaSizeBytes = shareModalMessage.mediaSizeBytes ?? shareModalMessage.attachments?.[0]?.sizeBytes ?? null
+      const messageType =
+        shareModalMessage.type === 'image'
+          ? 'IMAGE'
+          : shareModalMessage.type === 'file'
+            ? 'FILE'
+            : shareModalMessage.type === 'sticker'
+              ? 'STICKER'
+              : 'TEXT'
+
+      const payloadContent =
+        (shareModalMessage.text ?? '').trim().length > 0
+          ? shareModalMessage.text
+          : shareModalMessage.type === 'image'
+            ? mediaUrl ?? '[image]'
+            : shareModalMessage.type === 'file'
+              ? shareModalMessage.attachments?.[0]?.name ?? mediaUrl ?? '[file]'
+              : shareModalMessage.type === 'sticker'
+                ? '[sticker]'
+                : ''
+
+      setIsShareSubmitting(true)
+
+      try {
+        for (const userId of targetUserIds) {
+          const conversationId = await getOrCreateDirectConversation(accessToken, userId)
+          await joinConversation(conversationId)
+
+          if (trimmedNote) {
+            const noteAck = await emitSendMessage({
+              conversationId,
+              content: trimmedNote,
+              messageType: 'TEXT',
+            })
+
+            if (noteAck?.event !== 'message.sent') {
+              await sendMessageViaRest(accessToken, {
+                conversationId,
+                content: trimmedNote,
+                messageType: 'TEXT',
+              })
+            }
+          }
+
+          const shareAck = await emitSendMessage({
+            conversationId,
+            content: payloadContent,
+            messageType: toSocketMessageType(shareModalMessage.type),
+            mediaUrl,
+            mediaThumbnailUrl,
+            mediaMimeType,
+            mediaSizeBytes,
+          })
+
+          if (shareAck?.event !== 'message.sent') {
+            await sendMessageViaRest(accessToken, {
+              conversationId,
+              content: payloadContent || undefined,
+            messageType,
+            mediaUrl,
+            mediaThumbnailUrl,
+            mediaMimeType,
+            mediaSizeBytes,
+            })
+          }
+        }
+
+        setShareModalMessage(null)
+      } catch (error) {
+        console.error('[ChatPage.handleShareMessage] Failed to share message', {
+          error,
+          messageId: shareModalMessage.id,
+          targetUserIds,
+        })
+      } finally {
+        setIsShareSubmitting(false)
+      }
+    },
+    [accessToken, shareModalMessage],
   )
 
   const getCachedProfileFromStore = useCallback(
@@ -852,6 +996,46 @@ export function ChatPage() {
     [getCachedProfileFromStore],
   )
 
+const handleCreateGroup = useCallback(
+  async (groupName: string, avatarUrl: string | null, memberIds: string[]) => {
+    if (!accessToken || !user) {
+      toast.error("Vui lòng đăng nhập lại");
+      return;
+    }
+
+    console.log("🚀 [CREATE GROUP] Bắt đầu tạo nhóm:", {
+      groupName,
+      memberCount: memberIds.length,
+      memberIds,
+      avatarUrl,
+    });
+
+    setIsCreatingGroup(true);
+
+    try {
+      const groupId = await createGroupConversation(accessToken, {
+        title: groupName,
+        memberUserIds: memberIds,
+        avatarUrl: avatarUrl,
+      });
+
+      console.log("✅ [CREATE GROUP] Thành công! Group ID:", groupId);
+
+      toast.success(`✅ Đã tạo nhóm "${groupName}" thành công!`);
+
+      // Chuyển hướng vào nhóm vừa tạo
+      navigate(`/chat/${groupId}`);
+      setIsCreateGroupOpen(false);
+    } catch (error: any) {
+      console.error("❌ [CREATE GROUP] Lỗi:", error);
+      toast.error(error.message || "Không thể tạo nhóm. Vui lòng thử lại.");
+    } finally {
+      setIsCreatingGroup(false);
+    }
+  },
+  [accessToken, user, navigate]
+);
+
   const loadInbox = useCallback(
     async (token: string, preferredConversationId?: string) => {
       setIsLoadingConversations(true)
@@ -870,12 +1054,23 @@ export function ChatPage() {
             .filter((friend) => Boolean(friend.friendId))
             .map((friend) => [friend.friendId, friend.nickname?.trim() || friend.displayName?.trim() || null]),
         )
+        const friendAvatarById = new Map(
+          friends
+            .filter((friend) => Boolean(friend.friendId))
+            .map((friend) => [friend.friendId, friend.avatarUrl ?? null]),
+        )
         const friendIdSet = new Set(
           friends
             .map((friend) => String(friend.friendId ?? '').trim())
             .filter((friendId): friendId is string => Boolean(friendId)),
         )
         friendIdSetRef.current = friendIdSet
+        setFriendsDirectory(friends)
+
+        const previewNameById = new Map(friendNameById)
+        if (user?.id) {
+          previewNameById.set(user.id, user.name?.trim() || fallbackUserDisplayName(user.id))
+        }
 
         setUserProfileCache((prev) => {
           const next = { ...prev }
@@ -915,6 +1110,9 @@ export function ChatPage() {
           if (fallback.name) {
             friendNameById.set(fallback.peerId, fallback.name)
           }
+          if (fallback.avatarUrl) {
+            friendAvatarById.set(fallback.peerId, fallback.avatarUrl)
+          }
         }
 
         setUserProfileCache((prev) => {
@@ -932,15 +1130,27 @@ export function ChatPage() {
         const mappedItems = items.map((item) => {
           const peerId = (item.participantUserIds ?? []).find((participantId) => participantId !== user?.id)
           const resolvedPeerName = peerId ? friendNameById.get(peerId) : null
+          const resolvedPeerAvatar = peerId ? (friendAvatarById.get(peerId) ?? null) : null
+          const resolvedLastMessageSenderName = item.lastMessageSenderId
+            ? (previewNameById.get(item.lastMessageSenderId) ?? null)
+            : null
+          const formattedLastMessage = formatConversationPreview(
+            resolvedLastMessageSenderName,
+            item.lastMessagePreview ?? item.lastMessage ?? '',
+          )
           const isStranger = peerId ? !friendIdSet.has(peerId) : false
           const withName = resolvedPeerName
             ? {
                 ...item,
                 name: resolvedPeerName,
+                avatarUrl: resolvedPeerAvatar,
+                lastMessage: formattedLastMessage,
                 isStranger,
               }
             : {
                 ...item,
+                lastMessage: formattedLastMessage,
+                avatarUrl: resolvedPeerAvatar,
                 isStranger,
               }
 
@@ -991,11 +1201,17 @@ export function ChatPage() {
         setIsLoadingConversations(false)
       }
     },
-    [routedConversationId, user?.id],
+    [routedConversationId, user?.id, user?.name],
   )
 
   const updateConversationAfterMessage = useCallback(
     (conversationId: string, message: ChatMessage, markAsReadNow: boolean) => {
+      const senderName =
+        message.senderId === user?.id
+          ? user?.name?.trim() || fallbackUserDisplayName(message.senderId)
+          : userProfileCacheRef.current[message.senderId]?.displayName || fallbackUserDisplayName(message.senderId)
+      const formattedPreview = formatConversationPreview(senderName, message)
+
       setConversations((prev) => {
         const index = prev.findIndex((conversation) => conversation.id === conversationId)
         if (index === -1) {
@@ -1006,7 +1222,7 @@ export function ChatPage() {
         const current = next[index]
         next[index] = {
           ...current,
-          lastMessage: getConversationPreview(message),
+          lastMessage: formattedPreview,
           lastMessageSeq: message.serverSeq ?? current.lastMessageSeq,
           unreadCount: markAsReadNow ? 0 : current.unreadCount + (message.sender === 'me' ? 0 : 1),
         }
@@ -1014,15 +1230,17 @@ export function ChatPage() {
         return next
       })
     },
-    [],
+    [user?.id, user?.name],
   )
 
   useEffect(() => {
-    if (!accessToken) {
+    if (!accessToken || !user) {
       setConversations([])
       setMessagesByConversation({})
       setSelectedConversationId('')
       setFriendResults([])
+      setFriendsDirectory([])
+      setShareModalMessage(null)
       setIsTokenRestrictedMode(false)
       lastLoadedMessagesKeyRef.current = ''
       return
@@ -1043,7 +1261,7 @@ export function ChatPage() {
     setIsRestrictedMode(false)
 
     void loadInbox(accessToken)
-  }, [accessToken, loadInbox])
+  }, [accessToken, loadInbox, user?.id, user?.name])
 
   useEffect(() => {
     if (!routedConversationId) {
@@ -1187,7 +1405,7 @@ export function ChatPage() {
     })()
   }, [accessToken, activeConversationId, deletedMessageIds, isRestrictedMode, syncConversationReactions, syncPinnedMessages, user])
 
-  const { emitSendMessage, joinConversation, markAsRead, getSocket } = useChatSocket({
+  const { emitSendMessage, emitRecallMessage, joinConversation, markAsRead, getSocket } = useChatSocket({
     token: accessToken,
     onConnected: async () => {
       setIsSocketConnected(true)
@@ -1236,8 +1454,9 @@ export function ChatPage() {
               {
                 id: mapped.conversationId,
                 name: profile.displayName,
+                avatarUrl: profile.avatarUrl,
                 isStranger: senderId ? !friendIdSetRef.current.has(senderId) : false,
-                lastMessage: getConversationPreview(mapped),
+                  lastMessage: formatConversationPreview(profile.displayName, mapped),
                 unreadCount: mapped.sender === 'me' ? 0 : 1,
                 online: false,
                 lastMessageSeq: mapped.serverSeq,
@@ -1256,6 +1475,8 @@ export function ChatPage() {
           next[existingIndex] = {
             ...current,
             name: shouldReplaceName ? profile.displayName : current.name,
+            avatarUrl: current.avatarUrl ?? profile.avatarUrl,
+            lastMessage: formatConversationPreview(profile.displayName, mapped),
             isStranger:
               senderId && friendIdSetRef.current.has(senderId)
                 ? false
@@ -1500,6 +1721,7 @@ export function ChatPage() {
             {
               id: conversationId,
               name: friendName,
+              avatarUrl: friend.avatarUrl ?? null,
               isStranger: false,
               lastMessage: '',
               unreadCount: 0,
@@ -2135,11 +2357,19 @@ export function ChatPage() {
         starredMessageIds={starredMessageIds}
         recalledMessageIds={recalledMessageIds}
         deletedMessageIds={deletedMessageIds}
+        userProfilesById={userProfileCache}
         selectedMessageIds={selectedMessageIds}
         isMultiSelectMode={isMultiSelectMode}
         onToggleMessageSelection={toggleMessageIdInList}
         onClearMultiSelectMode={handleClearMultiSelectMode}
         onMessageContextMenuAction={handleMessageContextMenuAction}
+      />
+      <CreateGroupModal
+        isOpen={isCreateGroupOpen}
+        friends={friendsDirectory}           // Danh sách bạn bè đã load
+        isSubmitting={isCreatingGroup}
+        onClose={() => setIsCreateGroupOpen(false)}
+        onCreate={handleCreateGroup}
       />
       {rightSidebarContent ? (
         <aside className='chat-side-panel'>
@@ -2176,6 +2406,19 @@ export function ChatPage() {
           ) : null}
         </aside>
       ) : null}
+
+      <MessageShareModal
+        isOpen={Boolean(shareModalMessage)}
+        message={shareModalMessage}
+        friends={friendsDirectory}
+        isSubmitting={isShareSubmitting}
+        onClose={() => {
+          if (!isShareSubmitting) {
+            setShareModalMessage(null)
+          }
+        }}
+        onShare={handleShareMessage}
+      />
     </div>
   )
 }

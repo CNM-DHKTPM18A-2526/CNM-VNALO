@@ -90,6 +90,7 @@ export function ConversationInfo({ conversation, messages }: ConversationInfoPro
         <div className="flex justify-center">
           <UserAvatar
             name={conversation.name}
+            imageUrl={conversation.avatarUrl ?? null}
             size="lg"
             className="h-20 w-20 shadow-lg ring-2 ring-white"
           />

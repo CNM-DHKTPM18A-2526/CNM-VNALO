@@ -2,12 +2,15 @@ export type ConversationSummary = {
   id: string
   userId?: string | null
   name: string
+  avatarUrl?: string | null
   isStranger?: boolean
   lastMessage: string
   unreadCount: number
   online: boolean
   isOnline?: boolean
   lastMessageSeq?: number
+  lastMessagePreview?: string | null
+  lastMessageSenderId?: string | null
   participantUserIds?: string[]
   lastMessageAt?: string | null
   updatedAt?: string | null
