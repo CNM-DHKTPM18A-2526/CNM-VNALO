@@ -168,20 +168,15 @@ function toSocketMessageType(type: ChatMessageType): Uppercase<ChatMessageType> 
 }
 
 function getConversationPreview(message: ChatMessage): string {
-  const text = message.text.trim()
-  if (text) {
-    return text
-  }
-
   switch (message.type) {
     case 'image':
       return 'Ảnh'
     case 'file':
-      return 'Tệp đính kèm'
+      return 'File'
     case 'sticker':
       return 'Sticker'
     default:
-      return ''
+      return message.text.trim()
   }
 }
 
@@ -198,21 +193,7 @@ function getDraftMessageType(payload: ChatComposePayload): ChatMessageType {
 }
 
 function getDraftContent(payload: ChatComposePayload): string {
-  const text = payload.text.trim()
-
-  if (text) {
-    return text
-  }
-
-  if (payload.file) {
-    return payload.file.name
-  }
-
-  if (payload.sticker) {
-    return payload.sticker.name
-  }
-
-  return ''
+  return payload.text.trim()
 }
 
 function getFileNameFromUrl(url?: string | null): string {
@@ -404,6 +385,7 @@ export function ChatPage() {
   const selectedConversationIdRef = useRef('')
   const selectedMessagesRef = useRef<ChatMessage[]>([])
   const conversationsRef = useRef<ConversationSummary[]>([])
+  const friendIdSetRef = useRef<Set<string>>(new Set())
   const userProfileCacheRef = useRef<Record<string, CachedUserProfile>>({})
   const pendingProfileLookupRef = useRef<Set<string>>(new Set())
   const lastLoadedMessagesKeyRef = useRef('')
@@ -823,6 +805,12 @@ export function ChatPage() {
             .filter((friend) => Boolean(friend.friendId))
             .map((friend) => [friend.friendId, friend.nickname?.trim() || friend.displayName?.trim() || null]),
         )
+        const friendIdSet = new Set(
+          friends
+            .map((friend) => String(friend.friendId ?? '').trim())
+            .filter((friendId): friendId is string => Boolean(friendId)),
+        )
+        friendIdSetRef.current = friendIdSet
 
         setUserProfileCache((prev) => {
           const next = { ...prev }
@@ -879,12 +867,17 @@ export function ChatPage() {
         const mappedItems = items.map((item) => {
           const peerId = (item.participantUserIds ?? []).find((participantId) => participantId !== user?.id)
           const resolvedPeerName = peerId ? friendNameById.get(peerId) : null
+          const isStranger = peerId ? !friendIdSet.has(peerId) : false
           const withName = resolvedPeerName
             ? {
                 ...item,
                 name: resolvedPeerName,
+                isStranger,
               }
-            : item
+            : {
+                ...item,
+                isStranger,
+              }
 
           return applyRestrictedConversationPreview(withName, false)
         })
@@ -1133,6 +1126,7 @@ export function ChatPage() {
               {
                 id: mapped.conversationId,
                 name: profile.displayName,
+                isStranger: senderId ? !friendIdSetRef.current.has(senderId) : false,
                 lastMessage: getConversationPreview(mapped),
                 unreadCount: mapped.sender === 'me' ? 0 : 1,
                 online: false,
@@ -1152,6 +1146,10 @@ export function ChatPage() {
           next[existingIndex] = {
             ...current,
             name: shouldReplaceName ? profile.displayName : current.name,
+            isStranger:
+              senderId && friendIdSetRef.current.has(senderId)
+                ? false
+                : current.isStranger ?? Boolean(senderId),
             participantUserIds:
               current.participantUserIds && senderId
                 ? Array.from(new Set([...current.participantUserIds, senderId]))
@@ -1392,6 +1390,7 @@ export function ChatPage() {
             {
               id: conversationId,
               name: friendName,
+              isStranger: false,
               lastMessage: '',
               unreadCount: 0,
               online: false,

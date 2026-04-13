@@ -49,11 +49,6 @@ export function ChatList({
     onSearchFriends(debouncedKeyword)
   }, [debouncedKeyword, onSearchFriends])
 
-  const selectedConversation = useMemo(
-    () => conversations.find((conversation) => conversation.id === selectedConversationId),
-    [conversations, selectedConversationId],
-  )
-
   const filteredConversations = useMemo(() => {
     const normalizedKeyword = debouncedKeyword.toLowerCase()
 
@@ -85,11 +80,11 @@ export function ChatList({
   }
 
   const addFriendInitialTarget = useMemo(
-    () => ({
-      displayName: selectedConversation?.name ?? undefined,
-      seedQuery: keyword.trim() || selectedConversation?.name || undefined,
-    }),
-    [keyword, selectedConversation],
+    () => {
+      const seedQuery = keyword.trim()
+      return seedQuery ? { seedQuery } : null
+    },
+    [keyword],
   )
 
   return (
@@ -121,7 +116,7 @@ export function ChatList({
         </div>
       </div>
       <div className='chat-list'>
-        {filteredConversations.length > 0 ? <p>{t('chat.searchConversationsSection')}</p> : null}
+        {/* {filteredConversations.length > 0 ? <p>{t('chat.searchConversationsSection')}</p> : null} */}
         {filteredConversations.map((conversation, index) => (
           <ChatItem
             key={conversation.id}

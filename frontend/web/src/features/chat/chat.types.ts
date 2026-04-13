@@ -2,6 +2,7 @@ export type ConversationSummary = {
   id: string
   userId?: string | null
   name: string
+  isStranger?: boolean
   lastMessage: string
   unreadCount: number
   online: boolean

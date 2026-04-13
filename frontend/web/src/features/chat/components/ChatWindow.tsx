@@ -20,6 +20,7 @@ type ChatWindowProps = {
   onSend: (message: ChatComposePayload) => void
   onToggleSearchSidebar: () => void
   onToggleInfoSidebar: () => void
+  onSyncHistory?: () => void
   rightSidebarContent: 'info' | 'search' | null
   jumpToMessageId?: string | null
   onJumpToMessageHandled?: () => void
@@ -46,6 +47,7 @@ export function ChatWindow({
   onSend,
   onToggleSearchSidebar,
   onToggleInfoSidebar,
+  onSyncHistory,
   rightSidebarContent,
   jumpToMessageId = null,
   onJumpToMessageHandled,
@@ -162,6 +164,7 @@ export function ChatWindow({
   const isOnline = conversation.online
   const lastSeenTime = conversation.lastSeenTime ?? conversation.updatedAt ?? conversation.lastMessageAt ?? null
   const statusText = isOnline ? 'Đang hoạt động' : formatPresence(false, lastSeenTime)
+  const isStranger = Boolean(conversation.isStranger)
 
   console.log('[ChatWindow.mode]', {
     conversationId: conversation.id,
@@ -192,7 +195,10 @@ export function ChatWindow({
           </div>
           <div className='chat-window-header-copy'>
             <h2>{conversation.name}</h2>
-            <p>{statusText}</p>
+            <div className='chat-window-header-meta'>
+              {isStranger ? <span className='chat-stranger-badge'>Người lạ</span> : null}
+              <p>{statusText}</p>
+            </div>
           </div>
         </div>
         <div className='chat-window-header-actions'>
@@ -272,7 +278,7 @@ export function ChatWindow({
             <Icon name='info' />
             <span>Đồng bộ tin nhắn đang tắt. Web chỉ hiển thị dữ liệu mới.</span>
           </div>
-          <button className='sync-button' type='button' onClick={onSyncHistory}>
+          <button className='sync-button' type='button' onClick={() => onSyncHistory?.()}>
             Đồng bộ ngay
           </button>
         </div>

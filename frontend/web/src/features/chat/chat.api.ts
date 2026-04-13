@@ -169,6 +169,41 @@ function isHttpUrl(value?: string | null): boolean {
   }
 }
 
+function normalizeInboxPreview(rawPreview?: string | null): string {
+  const preview = String(rawPreview ?? '').trim()
+  if (!preview) {
+    return ''
+  }
+
+  const lowered = preview.toLowerCase()
+
+  if (lowered === '[sticker]' || lowered.startsWith('sticker://') || lowered.includes('sticker')) {
+    return 'Sticker'
+  }
+
+  if (lowered === '[image]' || lowered === '[ảnh]') {
+    return 'Ảnh'
+  }
+
+  if (lowered === '[file]' || lowered === '[tệp]') {
+    return 'File'
+  }
+
+  if (isHttpUrl(preview)) {
+    return isImageUrl(preview) ? 'Ảnh' : 'File'
+  }
+
+  if (/\.(png|jpe?g|gif|webp|bmp|svg|avif|heic)$/i.test(preview)) {
+    return 'Ảnh'
+  }
+
+  if (/\.[a-z0-9]{2,8}$/i.test(preview) && !preview.includes(' ')) {
+    return 'File'
+  }
+
+  return preview
+}
+
 function normalizeMessageType(raw: RawMessageLike): ChatMessageType {
   const declaredType = String(raw.messageType ?? '').trim().toLowerCase()
   const content = String(raw.content ?? '').trim()
@@ -260,7 +295,7 @@ export async function fetchInbox(token: string, currentUserId?: string): Promise
       id,
       userId: partnerUserId,
       name: title && title.length > 0 ? title : peerNickname || peerFallback || `Trò chuyện ${id.slice(0, 8)}`,
-      lastMessage: item.lastMessagePreview ?? '',
+      lastMessage: normalizeInboxPreview(item.lastMessagePreview),
       unreadCount: item.unreadCount ?? 0,
       online: false,
       lastMessageSeq: item.lastMessageSeq,
