@@ -47,7 +47,7 @@ class _LoginPasswordScreenState extends State<LoginPasswordScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(auth.error ?? 'ÄÄƒng nháº­p tháº¥t báº¡i'),
+        content: Text(auth.error ?? 'Đăng nhập thất bại'),
         backgroundColor: AppColors.error,
       ),
     );
@@ -57,11 +57,14 @@ class _LoginPasswordScreenState extends State<LoginPasswordScreen> {
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final t = AuthTexts.of(context);
+    final scaffoldBg = isDarkMode ? DarkColors.scaffold : Colors.white;
     final textColor = isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary;
 
     return Scaffold(
+      backgroundColor: scaffoldBg,
       appBar: AppBar(
-        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.white,
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
         title: Text(
           t.enterPasswordTitle,
           style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
@@ -90,7 +93,7 @@ class _LoginPasswordScreenState extends State<LoginPasswordScreen> {
                   style: TextStyle(color: textColor),
                   validator: (value) {
                     if ((value ?? '').trim().isEmpty) {
-                      return 'Vui lÃ²ng nháº­p máº­t kháº©u';
+                      return 'Vui lòng nhập mật khẩu';
                     }
                     return null;
                   },
@@ -123,7 +126,7 @@ class _LoginPasswordScreenState extends State<LoginPasswordScreen> {
                       );
                     },
                     child: Text(
-                      'QuÃªn máº­t kháº©u?',
+                      'Quên mật khẩu?',
                       style: TextStyle(
                         color: isDarkMode ? DarkColors.primary : AppColors.primary,
                         fontWeight: FontWeight.w600,

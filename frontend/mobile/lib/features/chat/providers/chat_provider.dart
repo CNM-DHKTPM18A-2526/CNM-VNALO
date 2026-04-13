@@ -656,7 +656,7 @@ class ChatProvider extends ChangeNotifier {
 
     final title = conversation?.getDisplayName(currentUserId) ??
         message.senderName ??
-        'Tin nhan moi';
+        'Tin nhắn mới';
     final body = _buildNotificationBody(message);
 
     _notificationService.showChatNotification(
@@ -671,19 +671,19 @@ class ChatProvider extends ChangeNotifier {
     switch (message.messageType) {
       case MessageType.TEXT:
         final text = (message.content ?? '').trim();
-        return text.isEmpty ? 'Tin nhan moi' : text;
+        return text.isEmpty ? 'Tin nhắn mới' : text;
       case MessageType.IMAGE:
-        return 'Da gui hinh anh';
+        return 'Đã gửi hình ảnh';
       case MessageType.VIDEO:
-        return 'Da gui video';
+        return 'Đã gửi video';
       case MessageType.AUDIO:
-        return 'Da gui tin nhan thoai';
+        return 'Đã gửi tin nhắn thoại';
       case MessageType.FILE:
-        return 'Da gui tep tin';
+        return 'Đã gửi tệp tin';
       case MessageType.STICKER:
-        return 'Da gui sticker';
+        return 'Đã gửi sticker';
       default:
-        return 'Tin nhan moi';
+        return 'Tin nhắn mới';
     }
   }
 

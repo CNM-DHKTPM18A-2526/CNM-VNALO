@@ -143,7 +143,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
-    final bgColor = isDarkMode ? Colors.black : const Color(0xFFEBEDF0);
+    final bgColor = isDarkMode ? Colors.black : LightColors.scaffold;
     final cardColor = isDarkMode ? const Color(0xFF1E1E1E) : Colors.white;
 
     return Scaffold(

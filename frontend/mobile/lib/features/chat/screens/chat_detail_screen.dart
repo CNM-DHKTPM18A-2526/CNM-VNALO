@@ -177,7 +177,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         return Scaffold(
           backgroundColor: wallpaperUrl != null
               ? (isDarkMode ? Colors.black : LightColors.scaffold)
-              : (isDarkMode ? Colors.black : const Color(0xFFEBEDF0)),
+              : (isDarkMode ? Colors.black : LightColors.scaffold),
           appBar: AppBar(
             titleSpacing: 0,
             backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,

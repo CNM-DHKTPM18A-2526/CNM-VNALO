@@ -21,7 +21,7 @@ class DiscoverScreen extends StatelessWidget {
     final searchHint = isDarkMode ? DarkColors.textHint : Colors.white.withValues(alpha: 0.8);
 
     return Scaffold(
-      backgroundColor: isDarkMode ? Colors.black : const Color(0xFFF4F5F7),
+      backgroundColor: isDarkMode ? Colors.black : LightColors.scaffold,
       appBar: AppBar(
         backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
         elevation: 0,

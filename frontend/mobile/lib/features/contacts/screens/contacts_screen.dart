@@ -171,7 +171,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
     final sortedKeys = grouped.keys.toList()..sort();
 
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDarkMode ? DarkColors.scaffold : const Color(0xFFF4F5F7);
+    final bgColor = isDarkMode ? DarkColors.scaffold : LightColors.scaffold;
     final sectionColor = isDarkMode ? DarkColors.surface : Colors.white;
 
     return Container(
@@ -311,7 +311,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
   Widget _buildGroupsTab(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final sectionColor = isDarkMode ? DarkColors.surface : Colors.white;
-    final bgColor = isDarkMode ? DarkColors.scaffold : const Color(0xFFF4F5F7);
+    final bgColor = isDarkMode ? DarkColors.scaffold : LightColors.scaffold;
 
     final chatProvider = context.watch<ChatProvider>();
     final groups = chatProvider.conversations.where((c) => c.type == ConversationType.GROUP).toList();
@@ -397,7 +397,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
   Widget _buildOATab(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final sectionColor = isDarkMode ? DarkColors.surface : Colors.white;
-    final bgColor = isDarkMode ? DarkColors.scaffold : const Color(0xFFF4F5F7);
+    final bgColor = isDarkMode ? DarkColors.scaffold : LightColors.scaffold;
     return Container(
       color: bgColor,
       child: ListView(

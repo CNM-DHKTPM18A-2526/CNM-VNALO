@@ -167,7 +167,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 color: isDarkMode ? DarkColors.primary : AppColors.primary,
               ),
             ),
-            // Carousel area â€” uses Expanded to take all remaining vertical space
+            // Carousel area uses Expanded to take all remaining vertical space
             Expanded(
               child: Column(
                 children: [

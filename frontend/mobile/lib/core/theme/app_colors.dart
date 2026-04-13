@@ -51,7 +51,7 @@ class DarkColors {
 
 class LightColors {
   LightColors._();
-  static const Color scaffold = Color(0xFFEBEDF0); // Vnalo light gray background
+  static const Color scaffold = Color(0xFFFFFFFF); // Vnalo light background (white)
   static const Color surface = Color(0xFFFFFFFF);
   static const Color surfaceLight = Color(0xFFF6F7F8);
   static const Color textPrimary = Color(0xFF1A1A1A);
