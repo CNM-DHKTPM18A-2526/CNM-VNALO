@@ -15,6 +15,7 @@ import 'package:vnalo_mobile/features/chat/widgets/audio_player_widget.dart';
 import 'package:flutter/services.dart';
 import 'package:vnalo_mobile/features/chat/providers/forward_provider.dart';
 import 'package:vnalo_mobile/features/chat/screens/forward_screen.dart';
+import 'package:vnalo_mobile/core/localization/common_texts.dart';
 
 class MessageBubble extends StatelessWidget {
   final Message message;
@@ -43,6 +44,7 @@ class MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final common = CommonTexts.of(context, listen: false);
 
     return Column(
       children: [
@@ -79,7 +81,7 @@ class MessageBubble extends StatelessWidget {
               ),
               if (isMine || showTime || (readByMembers != null && readByMembers!.isNotEmpty)) ...[
                 const SizedBox(height: 4),
-                _buildStatusLabel(isDarkMode),
+                _buildStatusLabel(context, isDarkMode, common),
               ],
             ],
           ),
@@ -89,6 +91,8 @@ class MessageBubble extends StatelessWidget {
   }
 
   Widget _buildBubbleContent(BuildContext context, bool isDarkMode) {
+    final common = CommonTexts.of(context, listen: false);
+
     if (groupedMessages != null && groupedMessages!.isNotEmpty) {
       return _buildImageGrid(context, isDarkMode);
     }
@@ -132,7 +136,7 @@ class MessageBubble extends StatelessWidget {
         children: [
           // Render a dedicated style for recalled messages.
           if (message.isRecalled)
-            _buildRecalledContent(isMine, isDarkMode)
+            _buildRecalledContent(isMine, isDarkMode, common)
           else ...[
             if (message.replyToMessageId != null) _buildReplyQuote(context, isDarkMode),
             _renderTypeSpecificContent(context, isDarkMode),
@@ -185,6 +189,7 @@ class MessageBubble extends StatelessWidget {
     final position = renderBox.localToGlobal(Offset.zero);
     final size = renderBox.size;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final common = CommonTexts.of(context, listen: false);
 
     // Skip action menu for recalled messages.
     if (message.isRecalled) return;
@@ -204,7 +209,7 @@ class MessageBubble extends StatelessWidget {
              Clipboard.setData(ClipboardData(text: message.content ?? ''));
              if (context.mounted) {
                ScaffoldMessenger.of(context).showSnackBar(
-                 const SnackBar(content: Text('Message copied')),
+                 SnackBar(content: Text(common.msgCopiedToast)),
                );
              }
            }
@@ -213,17 +218,17 @@ class MessageBubble extends StatelessWidget {
             final confirmed = await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
-                title: const Text('Recall message'),
-                content: const Text('This message will be removed for everyone. Continue?'),
+                title: Text(common.recallMessageTitle),
+                content: Text(common.recallMessagePrompt),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text('Cancel'),
+                    child: Text(common.cancel),
                   ),
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, true),
                     style: TextButton.styleFrom(foregroundColor: Colors.orange),
-                    child: const Text('Recall'),
+                    child: Text(common.recallAction),
                   ),
                 ],
               ),
@@ -237,17 +242,17 @@ class MessageBubble extends StatelessWidget {
             final confirmed = await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
-                title: const Text('Delete message'),
-                content: const Text('This removes the message only for you.'),
+                title: Text(common.deleteMessageTitle),
+                content: Text(common.deleteMessagePrompt),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text('Cancel'),
+                    child: Text(common.cancel),
                   ),
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, true),
                     style: TextButton.styleFrom(foregroundColor: Colors.red),
-                    child: const Text('Delete'),
+                    child: Text(common.delete),
                   ),
                 ],
               ),
@@ -272,7 +277,7 @@ class MessageBubble extends StatelessWidget {
   }
 
   /// Bubble content for a recalled message.
-  Widget _buildRecalledContent(bool isMine, bool isDarkMode) {
+  Widget _buildRecalledContent(bool isMine, bool isDarkMode, CommonTexts common) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -283,7 +288,7 @@ class MessageBubble extends StatelessWidget {
         ),
         const SizedBox(width: 4),
         Text(
-          'Message recalled',
+          common.msgRecalled,
           style: TextStyle(
             fontSize: 14,
             fontStyle: FontStyle.italic,
@@ -478,7 +483,7 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusLabel(bool isDarkMode) {
+  Widget _buildStatusLabel(BuildContext context, bool isDarkMode, CommonTexts common) {
     if (!showStatus && !showTime && readByMembers?.isEmpty == true) {
       return const SizedBox.shrink();
     }
@@ -508,9 +513,9 @@ class MessageBubble extends StatelessWidget {
         ],
         if (showStatus) ...[
           if (message.status == MessageStatus.SENDING)
-             Text('Sending...', style: TextStyle(fontSize: 10, color: Colors.grey))
+             Text(common.msgSending, style: TextStyle(fontSize: 10, color: Colors.grey))
           else if (message.status == MessageStatus.FAILED)
-             const Text('Send failed', style: TextStyle(fontSize: 10, color: Colors.red))
+             Text(common.msgSendFailed, style: const TextStyle(fontSize: 10, color: Colors.red))
           else
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -529,7 +534,7 @@ class MessageBubble extends StatelessWidget {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    _getStatusText(message.status),
+                    _getStatusText(message.status, common),
                     style: TextStyle(
                       fontSize: 10,
                       color: message.status == MessageStatus.READ ? Colors.blue : (isDarkMode ? Colors.white70 : Colors.black54),
@@ -589,14 +594,14 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
-  String _getStatusText(MessageStatus status) {
+  String _getStatusText(MessageStatus status, CommonTexts common) {
     switch (status) {
       case MessageStatus.SENT:
-        return 'Sent';
+        return common.msgSent;
       case MessageStatus.DELIVERED:
-        return 'Delivered';
+        return common.msgDelivered;
       case MessageStatus.READ:
-        return 'Read';
+        return common.msgSeen;
       default:
         return '';
     }
