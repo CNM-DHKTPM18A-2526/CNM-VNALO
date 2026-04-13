@@ -93,74 +93,8 @@ class ChatService {
       conversations.add(Conversation.fromJson(json));
     }
 
-    // Batch fetch user profiles for all member IDs
     if (allMemberIds.isNotEmpty) {
-      final userProfiles = <String, Map<String, dynamic>>{};
-      await Future.wait(
-        allMemberIds.map((uid) async {
-          try {
-            final res = await _apiService.get(_coreBase, '/users/$uid');
-            final data = res['data'];
-            if (data is Map<String, dynamic>) {
-              userProfiles[uid] = data;
-            } else if (res.containsKey('displayName')) {
-              userProfiles[uid] = res;
-            }
-          } catch (_) {
-            // User not found or error, skip
-          }
-        }),
-      );
-
-      // Enrich conversation members with user profile data
-      for (int i = 0; i < conversations.length; i++) {
-        final conv = conversations[i];
-        if (conv.members.isEmpty) continue;
-        final enrichedMembers =
-            conv.members.map((member) {
-              final profile = userProfiles[member.userId];
-              if (profile != null && member.user == null) {
-                return ConversationMember.fromJson({
-                  'conversationId': member.conversationId,
-                  'userId': member.userId,
-                  'role': member.role.name,
-                  'nickname': member.nickname,
-                  'joinedAt': member.joinedAt.toIso8601String(),
-                  'user': profile,
-                });
-              }
-              return member;
-            }).toList();
-
-        // Rebuild conversation with enriched members
-        conversations[i] = Conversation(
-          id: conv.id,
-          type: conv.type,
-          title: conv.title,
-          avatarUrl: conv.avatarUrl,
-          description: conv.description,
-          createdBy: conv.createdBy,
-          status: conv.status,
-          joinMode: conv.joinMode,
-          memberLimit: conv.memberLimit,
-          isEncrypted: conv.isEncrypted,
-          allowMemberInvite: conv.allowMemberInvite,
-          allowMemberPin: conv.allowMemberPin,
-          allowMemberEditInfo: conv.allowMemberEditInfo,
-          createdAt: conv.createdAt,
-          updatedAt: conv.updatedAt,
-          members: enrichedMembers,
-          lastMessage: conv.lastMessage,
-          unreadCount: conv.unreadCount,
-          isPinned: conv.isPinned,
-          isMuted: conv.isMuted,
-          isHidden: conv.isHidden,
-          isFavorite: conv.isFavorite,
-          autoDeleteSeconds: conv.autoDeleteSeconds,
-          notifyCall: conv.notifyCall,
-          personalWallpaperUrl: conv.personalWallpaperUrl,
-        );
-      }
+      await _enrichConversationMembers(conversations, allMemberIds);
     }
 
     // Some inbox entries may come with incomplete conversation payload
@@ -205,7 +139,63 @@ class ChatService {
       }
     }
 
+    // Run one more hydration pass because detail conversations can add members
+    // that were not present in the initial inbox payload.
+    final allIdsAfterMerge = <String>{};
+    for (final conv in conversations) {
+      for (final member in conv.members) {
+        allIdsAfterMerge.add(member.userId);
+      }
+    }
+    if (allIdsAfterMerge.isNotEmpty) {
+      await _enrichConversationMembers(conversations, allIdsAfterMerge);
+    }
+
     return conversations;
+  }
+
+  Future<void> _enrichConversationMembers(
+    List<Conversation> conversations,
+    Iterable<String> userIds,
+  ) async {
+    final userProfiles = <String, Map<String, dynamic>>{};
+    await Future.wait(
+      userIds.map((uid) async {
+        try {
+          final res = await _apiService.get(_coreBase, '/users/$uid');
+          final data = res['data'];
+          if (data is Map<String, dynamic>) {
+            userProfiles[uid] = data;
+          } else if (res.containsKey('displayName')) {
+            userProfiles[uid] = res;
+          }
+        } catch (_) {
+          // User not found or transient error; keep existing fallback name/avatar.
+        }
+      }),
+    );
+
+    for (int i = 0; i < conversations.length; i++) {
+      final conv = conversations[i];
+      if (conv.members.isEmpty) continue;
+
+      final enrichedMembers = conv.members.map((member) {
+        final profile = userProfiles[member.userId];
+        if (profile != null && member.user == null) {
+          return ConversationMember.fromJson({
+            'conversationId': member.conversationId,
+            'userId': member.userId,
+            'role': member.role.name,
+            'nickname': member.nickname,
+            'joinedAt': member.joinedAt.toIso8601String(),
+            'user': profile,
+          });
+        }
+        return member;
+      }).toList();
+
+      conversations[i] = conv.copyWith(members: enrichedMembers);
+    }
   }
 
   Future<Conversation?> getConversationById(String conversationId) async {
