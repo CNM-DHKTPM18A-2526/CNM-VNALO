@@ -565,7 +565,10 @@ export class MessageService {
     
     // Use raw query for efficiently appending to the array without fetching it
     await this.dataSource.query(
-      `UPDATE message SET hidden_by_users = array_append(hidden_by_users, $1::uuid) WHERE id = $2::uuid AND NOT ($1::uuid = ANY(hidden_by_users))`,
+      `UPDATE message
+       SET hidden_by_users = array_append(COALESCE(hidden_by_users, ARRAY[]::uuid[]), $1::uuid)
+       WHERE message_id = $2::uuid
+         AND NOT ($1::uuid = ANY(COALESCE(hidden_by_users, ARRAY[]::uuid[])))`,
       [userId, messageId]
     );
 
