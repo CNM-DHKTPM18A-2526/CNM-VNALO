@@ -12,7 +12,6 @@ import 'package:vnalo_mobile/models/conversation_model.dart';
 import 'package:vnalo_mobile/models/user_model.dart';
 import 'package:vnalo_mobile/services/chat_service.dart';
 import 'package:vnalo_mobile/services/friend_service.dart';
-import 'package:vnalo_mobile/services/user_service.dart';
 import 'package:vnalo_mobile/core/database/local_database.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:intl/intl.dart';
@@ -45,6 +44,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
   bool _loadingRecent = true;
 
   User? _strangerFoundByPhone;
+  List<User> _friendResults = [];
   List<LocalContact> _localContactResults = [];
   List<LocalMessageSearchResult> _localMessageResults = [];
   bool _isSearching = false;
@@ -90,6 +90,92 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
     }
   }
 
+  String _digitsOnly(String? value) {
+    if (value == null) return '';
+    return value.replaceAll(RegExp(r'[^0-9]'), '');
+  }
+
+  String _normalizePhoneForLookup(String? value) {
+    final digits = _digitsOnly(value);
+    if (digits.isEmpty) return '';
+
+    if (digits.startsWith('84') && digits.length >= 11) {
+      return '0${digits.substring(2)}';
+    }
+    if (digits.startsWith('0')) {
+      return digits;
+    }
+    if (digits.length == 9) {
+      return '0$digits';
+    }
+    return digits;
+  }
+
+  bool _isPhoneLikeQuery(String query) {
+    final digits = _digitsOnly(query);
+    if (digits.length < 9 || digits.length > 15) return false;
+    final nonPhoneChars = query.replaceAll(RegExp(r'[0-9\s\+\-\(\)\.]'), '');
+    return nonPhoneChars.isEmpty;
+  }
+
+  User? _findFriendByPhoneQuery(String query) {
+    final q = _normalizePhoneForLookup(query);
+    if (q.isEmpty) return null;
+
+    for (final friend in _recentFriends) {
+      final friendPhone = _normalizePhoneForLookup(friend.phone);
+      if (friendPhone.isEmpty) continue;
+      if (friendPhone.contains(q) || q.contains(friendPhone)) {
+        return friend.copyWith(friendshipStatus: 'FRIEND');
+      }
+    }
+    return null;
+  }
+
+  List<User> _findFriendsByQuery(String query) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return const [];
+
+    final qPhone = _normalizePhoneForLookup(query);
+    final results = <User>[];
+    for (final friend in _recentFriends) {
+      final nameHit = friend.displayName.toLowerCase().contains(q);
+      final friendPhone = _normalizePhoneForLookup(friend.phone);
+      final phoneHit = qPhone.isNotEmpty && friendPhone.isNotEmpty && (friendPhone.contains(qPhone) || qPhone.contains(friendPhone));
+      if (nameHit || phoneHit) {
+        results.add(friend.copyWith(friendshipStatus: 'FRIEND'));
+      }
+    }
+    return results;
+  }
+
+  Future<User?> _searchUserByPhoneWithFallback(String query, User? localFriendMatch) async {
+    User? remote;
+    try {
+      remote = await context.read<FriendService>().searchUserByPhone(query);
+    } catch (_) {
+      remote = null;
+    }
+
+    if (remote != null) {
+      final isFriend = _recentFriends.any((f) => f.id == remote!.id);
+      if (isFriend) {
+        return remote.copyWith(friendshipStatus: 'FRIEND');
+      }
+      return remote;
+    }
+    return localFriendMatch;
+  }
+
+  String _effectiveFriendshipStatus(User user) {
+    final status = user.friendshipStatus?.toUpperCase();
+    if (status != null && status.isNotEmpty) {
+      return status;
+    }
+    final isFriend = _recentFriends.any((f) => f.id == user.id);
+    return isFriend ? 'FRIEND' : 'NONE';
+  }
+
   @override
   void dispose() {
     _queryController.dispose();
@@ -104,6 +190,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
       setState(() {
         _isSearching = false;
         _strangerFoundByPhone = null;
+        _friendResults = [];
         _localContactResults = [];
         _localMessageResults = [];
       });
@@ -113,25 +200,29 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
     setState(() => _isSearching = true);
 
     final db = context.read<LocalDatabase>();
-    final userService = context.read<UserService>();
-
     final contactsTask = db.searchContacts(q);
     final messagesTask = db.searchMessages(q);
 
-    final phoneRegex = RegExp(r'^\+?[0-9]{9,15}$');
+    final localFriendMatch = _findFriendByPhoneQuery(q);
+
     Future<User?> phoneTask = Future.value(null);
-    if (phoneRegex.hasMatch(q)) {
-      phoneTask = userService.getUserByPhone(q).catchError((e) => null);
+    if (_isPhoneLikeQuery(q)) {
+      phoneTask = _searchUserByPhoneWithFallback(q, localFriendMatch);
     }
 
     final results = await Future.wait([contactsTask, messagesTask, phoneTask]);
 
     if (!mounted || requestId != _searchRequestId) return;
 
+    final phoneUser = results[2] as User?;
+    final friendResults = _findFriendsByQuery(q)
+      ..removeWhere((u) => u.id == phoneUser?.id);
+
     setState(() {
       _localContactResults = results[0] as List<LocalContact>;
       _localMessageResults = results[1] as List<LocalMessageSearchResult>;
-      _strangerFoundByPhone = results[2] as User?;
+      _strangerFoundByPhone = phoneUser;
+      _friendResults = friendResults;
       _isSearching = false;
     });
 
@@ -142,7 +233,30 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
   }
 
   Future<void> _verifyStrangerStatus(String userId, int requestId) async {
-    final isSent = await context.read<FriendService>().checkSentRequest(userId);
+    final friendService = context.read<FriendService>();
+
+    if (_recentFriends.any((f) => f.id == userId)) {
+      if (mounted && requestId == _searchRequestId) {
+        setState(() {
+          if (_strangerFoundByPhone?.id == userId) {
+            _strangerFoundByPhone = _strangerFoundByPhone?.copyWith(friendshipStatus: 'FRIEND');
+          }
+        });
+      }
+      return;
+    }
+
+    final status = await friendService.getFriendshipStatus(userId);
+    if (status != null && mounted && requestId == _searchRequestId) {
+      setState(() {
+        if (_strangerFoundByPhone?.id == userId) {
+          _strangerFoundByPhone = _strangerFoundByPhone?.copyWith(friendshipStatus: status.toUpperCase());
+        }
+      });
+      return;
+    }
+
+    final isSent = await friendService.checkSentRequest(userId);
     if (isSent && mounted && requestId == _searchRequestId) {
       setState(() {
         if (_strangerFoundByPhone?.id == userId) {
@@ -273,6 +387,53 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(isVi ? 'Không thể hủy lời mời: $e' : 'Failed to cancel request: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isCancelling = false);
+    }
+  }
+
+  Future<void> _openChat(User user) async {
+    final common = CommonTexts.of(context, listen: false);
+    try {
+      final conversation = await context.read<ChatService>().getOrCreateDirect(user.id);
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ChatDetailScreen(
+            conversation: conversation,
+            friendUser: user,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(common.language == AppLanguage.vi ? 'Không mở được cuộc trò chuyện.' : 'Could not open conversation.')),
+      );
+    }
+  }
+
+  Future<void> _handleUnfriend(User user) async {
+    final isVi = CommonTexts.of(context, listen: false).language == AppLanguage.vi;
+    setState(() => _isCancelling = true);
+    try {
+      await context.read<FriendService>().unfriend(user.id);
+      if (!mounted) return;
+
+      setState(() {
+        _strangerFoundByPhone = _strangerFoundByPhone?.copyWith(friendshipStatus: 'NONE');
+        _recentFriends = _recentFriends.where((f) => f.id != user.id).toList();
+        _friendResults = _friendResults.where((f) => f.id != user.id).toList();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(isVi ? 'Đã hủy kết bạn với ${user.displayName}' : 'Unfriended ${user.displayName}')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(isVi ? 'Không thể hủy kết bạn: $e' : 'Failed to unfriend: $e')),
       );
     } finally {
       if (mounted) setState(() => _isCancelling = false);
@@ -490,9 +651,13 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
   }
 
   Widget _buildResultList(String query) {
+    final conversationMatches = _findConversationsByName(query);
+
     if (_strangerFoundByPhone == null &&
+      _friendResults.isEmpty &&
         _localContactResults.isEmpty &&
-        _localMessageResults.isEmpty) {
+        _localMessageResults.isEmpty &&
+        conversationMatches.isEmpty) {
       if (_isSearching) {
         return const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator(strokeWidth: 2)));
       }
@@ -521,8 +686,163 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
     return ListView(
       children: [
         if (_strangerFoundByPhone != null) _buildStrangerSection(),
+        if (_friendResults.isNotEmpty) _buildFriendSection(query),
+        if (conversationMatches.isNotEmpty) _buildConversationSection(query, conversationMatches),
         if (_localContactResults.isNotEmpty) _buildContactSection(query),
         if (_localMessageResults.isNotEmpty) _buildMessageSection(query),
+      ],
+    );
+  }
+
+  Widget _buildFriendSection(String query) {
+    final surfaceColor = isDarkMode ? DarkColors.surface : LightColors.surface;
+    final dividerColor = isDarkMode ? DarkColors.divider : AppColors.itemDivider;
+    final isVi = CommonTexts.of(context).language == AppLanguage.vi;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionHeader(isVi ? 'Bạn bè (${_friendResults.length})' : 'Friends (${_friendResults.length})', showEdit: false),
+        Container(
+          color: surfaceColor,
+          child: Column(
+            children: List.generate(_friendResults.length, (index) {
+              final user = _friendResults[index];
+              return Column(
+                children: [
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    leading: AvatarWidget(imageUrl: user.avatarUrl, name: user.displayName, size: 52),
+                    title: RichText(
+                      text: _highlightText(
+                        user.displayName,
+                        query,
+                        baseStyle: TextStyle(
+                          color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    subtitle: Text(
+                      user.phone ?? '',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
+                    trailing: OutlinedButton(
+                      onPressed: _isCancelling ? null : () => _handleUnfriend(user),
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: isDarkMode ? DarkColors.surfaceLight : Colors.grey.shade100,
+                        side: BorderSide.none,
+                        foregroundColor: Colors.grey,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      ),
+                      child: Text(
+                        isVi ? 'Bạn bè' : 'Friends',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    onTap: () => _openChat(user),
+                  ),
+                  if (index < _friendResults.length - 1)
+                    Divider(height: 1, thickness: 0.5, indent: 84, color: dividerColor),
+                ],
+              );
+            }),
+          ),
+        ),
+        const Divider(height: 8, thickness: 8, color: Colors.transparent),
+      ],
+    );
+  }
+
+  List<Conversation> _findConversationsByName(String query) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return const [];
+
+    final currentUserId = context.read<AuthProvider>().user?.id ?? '';
+    final conversations = context.read<ChatProvider>().conversations;
+
+    final results = <Conversation>[];
+    for (final conv in conversations) {
+      final displayName = conv.getDisplayName(currentUserId).toLowerCase();
+      if (displayName.contains(q)) {
+        results.add(conv);
+      }
+    }
+    return results;
+  }
+
+  Widget _buildConversationSection(String query, List<Conversation> conversations) {
+    final surfaceColor = isDarkMode ? DarkColors.surface : LightColors.surface;
+    final dividerColor = isDarkMode ? DarkColors.divider : AppColors.itemDivider;
+    final isVi = CommonTexts.of(context).language == AppLanguage.vi;
+    final currentUserId = context.read<AuthProvider>().user?.id ?? '';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionHeader(
+          isVi ? 'Doan chat (${conversations.length})' : 'Conversations (${conversations.length})',
+          showEdit: false,
+        ),
+        Container(
+          color: surfaceColor,
+          child: Column(
+            children: List.generate(conversations.length, (index) {
+              final conv = conversations[index];
+              final displayName = conv.getDisplayName(currentUserId);
+              final avatarUrl = conv.getDisplayAvatarUrl(currentUserId);
+              final preview = conv.lastMessage?.content?.trim();
+              final subtitle = (preview == null || preview.isEmpty)
+                  ? (isVi ? 'Mo cuoc tro chuyen' : 'Open conversation')
+                  : preview;
+
+              return Column(
+                children: [
+                  ListTile(
+                    leading: AvatarWidget(imageUrl: avatarUrl, name: displayName, size: 52),
+                    title: RichText(
+                      text: _highlightText(
+                        displayName,
+                        query,
+                        baseStyle: TextStyle(
+                          color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    subtitle: Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ChatDetailScreen(conversation: conv),
+                        ),
+                      );
+                    },
+                  ),
+                  if (index < conversations.length - 1)
+                    Divider(height: 1, thickness: 0.5, indent: 84, color: dividerColor),
+                ],
+              );
+            }),
+          ),
+        ),
+        const Divider(height: 8, thickness: 8, color: Colors.transparent),
       ],
     );
   }
@@ -531,6 +851,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
     final user = _strangerFoundByPhone!;
     final surfaceColor = isDarkMode ? DarkColors.surface : LightColors.surface;
     final isVi = CommonTexts.of(context).language == AppLanguage.vi;
+    final status = _effectiveFriendshipStatus(user);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -569,7 +890,9 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                 ? SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: _primaryColor))
                 : OutlinedButton(
                     onPressed: () async {
-                      if (user.friendshipStatus == 'PENDING_SENT') {
+                      if (status == 'FRIEND') {
+                        _handleUnfriend(user);
+                      } else if (status == 'PENDING_SENT' || status == 'PENDING') {
                         _handleStrangerCancel(user);
                       } else {
                         final result = await Navigator.push(
@@ -589,21 +912,22 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                       }
                     },
                     style: OutlinedButton.styleFrom(
-                      backgroundColor: user.friendshipStatus == 'PENDING_SENT'
+                      backgroundColor: (status == 'PENDING_SENT' || status == 'PENDING' || status == 'FRIEND')
                           ? (isDarkMode ? DarkColors.surfaceLight : Colors.grey.shade100)
                           : (isDarkMode ? DarkColors.primary.withValues(alpha: 0.1) : const Color(0xFFE3F2FD)),
                       side: BorderSide.none,
-                      foregroundColor: user.friendshipStatus == 'PENDING_SENT'
+                      foregroundColor: (status == 'PENDING_SENT' || status == 'PENDING' || status == 'FRIEND')
                           ? Colors.grey
                           : _primaryColor,
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                     ),
                     child: Text(
-                      (_strangerFoundByPhone?.friendshipStatus?.toUpperCase() == 'PENDING_SENT' ||
-                       _strangerFoundByPhone?.friendshipStatus?.toUpperCase() == 'PENDING')
-                          ? (isVi ? 'Đã gửi' : 'Sent')
-                          : (isVi ? 'Kết bạn' : 'Add friend'),
+                      status == 'FRIEND'
+                          ? (isVi ? 'Bạn bè' : 'Friends')
+                          : ((status == 'PENDING_SENT' || status == 'PENDING')
+                              ? (isVi ? 'Đã gửi' : 'Sent')
+                              : (isVi ? 'Kết bạn' : 'Add friend')),
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -763,11 +1087,17 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
       {'key': 'file', 'label': 'File'},
     ];
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: filters.map((f) {
+    return SizedBox(
+      width: double.infinity,
+      child: ColoredBox(
+        color: isDarkMode ? DarkColors.surface : Colors.white,
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: filters.map((f) {
           final isSelected = _selectedFilterKey == f['key'];
           return Padding(
             padding: const EdgeInsets.only(right: 8),
@@ -778,7 +1108,9 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                 if (val) setState(() => _selectedFilterKey = f['key']!);
               },
               selectedColor: isDarkMode ? const Color(0xFF003D80) : const Color(0xFFE3F2FD),
-              backgroundColor: isDarkMode ? DarkColors.surfaceLight : Colors.white,
+                backgroundColor: isDarkMode
+                  ? DarkColors.surfaceLight.withValues(alpha: 0.72)
+                  : const Color(0xFFF1F5F9),
               labelStyle: TextStyle(
                 color: isSelected
                     ? _primaryColor
@@ -797,7 +1129,10 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
               ),
             ),
           );
-        }).toList(),
+              }).toList(),
+            ),
+          ),
+        ),
       ),
     );
   }
