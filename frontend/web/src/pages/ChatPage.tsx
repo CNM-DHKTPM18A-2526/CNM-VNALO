@@ -27,6 +27,7 @@ import {
   sendMessage as sendMessageViaRest,
   unpinMessage,
   uploadChatMedia,
+  fetchConversation,
 } from '../features/chat/chat.api';
 import type { RawMessage } from '../features/chat/chat.api'
 import { REACTION_OPTIONS, type MessageReactionState, type ReactionKey } from '../features/chat/components/MessageReaction'
@@ -54,6 +55,12 @@ import {
   type CachedUser,
 } from '../features/chat/searchIndex'
 import { CreateGroupModal } from '../features/chat/components/CreateGroupModal'
+
+// Fallback toast object to prevent crashes if toast library is missing
+const toast = {
+  success: (msg: string) => alert(msg),
+  error: (msg: string) => alert(msg),
+};
 
 function sortMessages(messages: ChatMessage[]): ChatMessage[] {
   return [...messages].sort((left, right) => {
@@ -885,11 +892,11 @@ export function ChatPage() {
             await sendMessageViaRest(accessToken, {
               conversationId,
               content: payloadContent || undefined,
-            messageType,
-            mediaUrl,
-            mediaThumbnailUrl,
-            mediaMimeType,
-            mediaSizeBytes,
+              messageType,
+              mediaUrl,
+              mediaThumbnailUrl,
+              mediaMimeType,
+              mediaSizeBytes,
             })
           }
         }
@@ -996,56 +1003,114 @@ export function ChatPage() {
     [getCachedProfileFromStore],
   )
 
-const handleCreateGroup = useCallback(
-  async (groupName: string, avatarUrl: string | null, memberIds: string[]) => {
-    if (!accessToken || !user) {
-      toast.error("Vui lòng đăng nhập lại");
-      return;
-    }
-
-    console.log("🚀 [CREATE GROUP] Bắt đầu tạo nhóm:", {
-      groupName,
-      memberCount: memberIds.length,
-      memberIds,
-      avatarUrl,
-    });
-
-    setIsCreatingGroup(true);
-
-    try {
-      const groupId = await createGroupConversation(accessToken, {
-        title: groupName,
-        memberUserIds: memberIds,
-        avatarUrl: avatarUrl,
-      });
-
-      console.log("✅ [CREATE GROUP] Thành công! Group ID:", groupId);
-
-      toast.success(`✅ Đã tạo nhóm "${groupName}" thành công!`);
-
-      // Chuyển hướng vào nhóm vừa tạo
-      navigate(`/chat/${groupId}`);
-      setIsCreateGroupOpen(false);
-    } catch (error: any) {
-      console.error("❌ [CREATE GROUP] Lỗi:", error);
-      toast.error(error.message || "Không thể tạo nhóm. Vui lòng thử lại.");
-    } finally {
-      setIsCreatingGroup(false);
-    }
-  },
-  [accessToken, user, navigate]
-);
 
   const loadInbox = useCallback(
     async (token: string, preferredConversationId?: string) => {
       setIsLoadingConversations(true)
 
       try {
-        const [items, policy, friends] = await Promise.all([
+        let [items, policy, friends] = await Promise.all([
           fetchInbox(token, user?.id),
           getSyncPolicy(token).catch(() => null),
           getFriends(token).catch(() => []),
         ])
+
+        // Identify existing self-chat or Inject virtual "My Documents"
+        const myDocsId = `vnalo_cloud_${user?.id}`;
+        let hasSelfChat = false;
+        items = items.map(it => {
+          // A self-chat is a non-group chat with no other participants (only self, who is filtered out)
+          const isSelf = !it.isGroup && it.participantUserIds?.length === 0;
+          if (isSelf) {
+            hasSelfChat = true;
+            return {
+              ...it,
+              name: 'My Documents',
+              isCloud: true,
+              avatarUrl: 'cloud_icon',
+            };
+          }
+          return it;
+        });
+
+        if (!hasSelfChat) {
+          const myDocsEntry: ConversationSummary = {
+            id: myDocsId,
+            name: 'My Documents',
+            isGroup: false,
+            isCloud: true,
+            avatarUrl: 'cloud_icon',
+            lastMessage: 'Lưu và đồng bộ dữ liệu giữa các thiết bị',
+            unreadCount: 0,
+            participantUserIds: [user?.id ?? ''],
+            lastMessageAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          items = [myDocsEntry, ...items];
+        }
+
+        const targetId = preferredConversationId || routedConversationId;
+        
+        // Collect IDs to proactively fetch
+        const proactiveIds = new Set<string>();
+        if (targetId) proactiveIds.add(targetId);
+        
+        try {
+          const storedPending = localStorage.getItem(`vnalo_pending_groups_${user?.id}`);
+          const pendingIds: string[] = storedPending ? JSON.parse(storedPending) : [];
+          pendingIds.forEach(id => proactiveIds.add(id));
+        } catch (e) {
+          console.warn("Failed to load pending group IDs:", e);
+        }
+
+        const missingIds = Array.from(proactiveIds).filter(id => !items.some(it => it.id === id));
+        
+        if (missingIds.length > 0) {
+          console.log("🔍 [ChatPage] Proactively fetching missing conversations:", missingIds);
+          const fetchedResults = await Promise.all(
+            missingIds.map(id => fetchConversation(token, id).catch(() => null))
+          );
+          
+          const myId = String(user?.id ?? '').trim();
+          fetchedResults.forEach(rawConvo => {
+            if (rawConvo) {
+              const members = rawConvo.conversation?.members || rawConvo.members || [];
+              const participantIds = members
+                .map((m: any) => String(m.userId ?? '').trim())
+                .filter((id: string) => id && id !== myId);
+
+              const freshConvo: ConversationSummary = {
+                id: rawConvo.id || (rawConvo.conversation?.id as string),
+                isGroup: (rawConvo.type || rawConvo.conversation?.type) === 'GROUP',
+                name: rawConvo.title || rawConvo.conversation?.title || "Nhóm mới",
+                avatarUrl: rawConvo.avatarUrl || rawConvo.conversation?.avatarUrl || null,
+                lastMessage: "Nhóm mới được tạo",
+                unreadCount: 0,
+                participantUserIds: participantIds,
+                memberCount: members.length,
+                lastMessageAt: rawConvo.updatedAt || new Date().toISOString(),
+                updatedAt: rawConvo.updatedAt || new Date().toISOString(),
+              };
+              
+              // Only add if not already present (double check for safety)
+              if (!items.some(it => it.id === freshConvo.id)) {
+                items = [freshConvo, ...items];
+              }
+            }
+          });
+
+          // Cleanup: if an ID is now in items, it's either fetched or already in inbox
+          try {
+            const storedPending = localStorage.getItem(`vnalo_pending_groups_${user?.id}`);
+            let pendingIds: string[] = storedPending ? JSON.parse(storedPending) : [];
+            const stillMissing = pendingIds.filter(id => !items.some(it => it.id === id));
+            // Actually, if we just fetched it and it's in items, we can keep it in pending 
+            // until it naturally appears in /inbox (which usually means it has messages).
+            // But for now, if it's in items, we've fulfilled the requirement of showing it.
+            // Let's only remove if it's naturally in the API response (items BEFORE we added fresh ones)
+          } catch (e) {}
+        }
+
         const restrictedByToken = isRestrictedWebToken(token)
         const restrictedByPolicy = Boolean(policy?.webRestrictedMode) || policy?.syncEnabled === false
         const restrictionSignalsPresent = restrictedByToken || restrictedByPolicy
@@ -1090,8 +1155,8 @@ const handleCreateGroup = useCallback(
         const unresolvedPeerIds = [
           ...new Set(
             items
-              .map((item) => (item.participantUserIds ?? []).find((participantId) => participantId !== user?.id))
-              .filter((peerId): peerId is string => typeof peerId === 'string' && !friendNameById.has(peerId)),
+              .flatMap((item) => item.participantUserIds ?? [])
+              .filter((peerId): peerId is string => typeof peerId === 'string' && peerId !== user?.id && !friendNameById.has(peerId)),
           ),
         ]
 
@@ -1129,8 +1194,9 @@ const handleCreateGroup = useCallback(
 
         const mappedItems = items.map((item) => {
           const peerId = (item.participantUserIds ?? []).find((participantId) => participantId !== user?.id)
-          const resolvedPeerName = peerId ? friendNameById.get(peerId) : null
-          const resolvedPeerAvatar = peerId ? (friendAvatarById.get(peerId) ?? null) : null
+          const isGroup = item.isGroup;
+          const resolvedPeerName = !isGroup && peerId ? friendNameById.get(peerId) : null
+          const resolvedPeerAvatar = !isGroup && peerId ? (friendAvatarById.get(peerId) ?? null) : null
           const resolvedLastMessageSenderName = item.lastMessageSenderId
             ? (previewNameById.get(item.lastMessageSenderId) ?? null)
             : null
@@ -1138,21 +1204,21 @@ const handleCreateGroup = useCallback(
             resolvedLastMessageSenderName,
             item.lastMessagePreview ?? item.lastMessage ?? '',
           )
-          const isStranger = peerId ? !friendIdSet.has(peerId) : false
-          const withName = resolvedPeerName
+          const isStranger = !isGroup && peerId ? !friendIdSet.has(peerId) : false
+
+          const withName = (!isGroup && resolvedPeerName)
             ? {
-                ...item,
-                name: resolvedPeerName,
-                avatarUrl: resolvedPeerAvatar,
-                lastMessage: formattedLastMessage,
-                isStranger,
-              }
+              ...item,
+              name: resolvedPeerName,
+              avatarUrl: resolvedPeerAvatar,
+              lastMessage: formattedLastMessage,
+              isStranger,
+            }
             : {
-                ...item,
-                lastMessage: formattedLastMessage,
-                avatarUrl: resolvedPeerAvatar,
-                isStranger,
-              }
+              ...item,
+              lastMessage: formattedLastMessage,
+              isStranger,
+            }
 
           return applyRestrictedConversationPreview(withName, false)
         })
@@ -1165,16 +1231,18 @@ const handleCreateGroup = useCallback(
           })
         }
         setIsRestrictedMode(false)
+        console.log('🚀 [DEBUG] Inbox items from API:', mappedItems);
+
         setConversations((prev) => {
-          if (!preferredConversationId) {
+          if (!targetId) {
             return mappedItems
           }
 
-          if (mappedItems.some((item) => item.id === preferredConversationId)) {
+          if (mappedItems.some((item) => item.id === targetId)) {
             return mappedItems
           }
 
-          const preserved = prev.find((item) => item.id === preferredConversationId)
+          const preserved = prev.find((item) => item.id === targetId)
           if (!preserved) {
             return mappedItems
           }
@@ -1201,8 +1269,81 @@ const handleCreateGroup = useCallback(
         setIsLoadingConversations(false)
       }
     },
-    [routedConversationId, user?.id, user?.name],
+    [routedConversationId, user?.id, user?.name, accessToken],
   )
+
+  const handleCreateGroup = useCallback(
+    async (groupName: string, avatarUrl: string | null, memberIds: string[]) => {
+      if (!accessToken || !user) {
+        toast.error("Vui lòng đăng nhập lại");
+        return;
+      }
+
+      setIsCreatingGroup(true);
+      try {
+        let finalAvatarUrl = avatarUrl;
+        if (avatarUrl && avatarUrl.startsWith('blob:')) {
+          try {
+            const blob = await fetch(avatarUrl).then(r => r.blob());
+            const file = new File([blob], 'avatar.png', { type: blob.type });
+            const uploadRes = await uploadChatMedia(accessToken, file);
+            finalAvatarUrl = uploadRes.url;
+          } catch (e) {
+            console.warn("Failed to upload avatar:", e);
+          }
+        }
+        const groupId = await createGroupConversation(accessToken, {
+          title: groupName,
+          memberUserIds: memberIds,
+          avatarUrl: finalAvatarUrl,
+        });
+
+        console.log("🚀 [DEBUG] Created Group ID:", groupId);
+
+        // Manually construct and append the new group to local state for immediate UI update
+        const newGroupEntry: ConversationSummary = {
+          id: groupId,
+          name: groupName,
+          isGroup: true,
+          avatarUrl: finalAvatarUrl,
+          lastMessage: "Bạn đã tạo nhóm",
+          unreadCount: 0,
+          participantUserIds: memberIds,
+          memberCount: memberIds.length + 1,
+          lastMessageAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+        setConversations(prev => [newGroupEntry, ...prev.filter(c => c.id !== groupId)]);
+        setSelectedConversationId(groupId);
+
+        // Remember this group ID locally to ensure it shows up even if it has no messages
+        try {
+          const storedPending = localStorage.getItem(`vnalo_pending_groups_${user?.id}`);
+          let pendingIds: string[] = storedPending ? JSON.parse(storedPending) : [];
+          if (!pendingIds.includes(groupId)) {
+            pendingIds.push(groupId);
+            localStorage.setItem(`vnalo_pending_groups_${user?.id}`, JSON.stringify(pendingIds));
+          }
+        } catch (e) {
+          console.warn("Failed to save pending group ID:", e);
+        }
+
+        // Refresh conversation list to sync with backend
+        await loadInbox(accessToken, groupId);
+
+        toast.success(`✅ Đã tạo nhóm "${groupName}" thành công!`);
+        navigate(`/chat/${groupId}`);
+        setIsCreateGroupOpen(false);
+      } catch (error: any) {
+        console.error("❌ [CREATE GROUP] Lỗi:", error);
+        toast.error(error.message || "Không thể tạo nhóm. Vui lòng thử lại.");
+      } finally {
+        setIsCreatingGroup(false);
+      }
+    },
+    [accessToken, user, navigate, loadInbox]
+  );
 
   const updateConversationAfterMessage = useCallback(
     (conversationId: string, message: ChatMessage, markAsReadNow: boolean) => {
@@ -1349,6 +1490,31 @@ const handleCreateGroup = useCallback(
 
   const activeConversationId = routedConversationId || selectedConversationId
 
+  // Auto-resolve virtual "My Documents" to real ID
+  useEffect(() => {
+    if (!accessToken || !user || !activeConversationId) return;
+    
+    if (activeConversationId === `vnalo_cloud_${user.id}`) {
+      void (async () => {
+        try {
+          console.log('[ChatPage] Resolving virtual Cloud chat to real ID...');
+          const realId = await getOrCreateDirectConversation(accessToken, user.id);
+          
+          // Map virtual entry to real one in state
+          setConversations(prev => prev.map(c => 
+            c.id === activeConversationId ? { ...c, id: realId } : c
+          ));
+          
+          // Switch to real ID
+          setSelectedConversationId(realId);
+          navigate(`/chat/${realId}`);
+        } catch (err) {
+          console.error('[ChatPage] Failed to resolve cloud chat:', err);
+        }
+      })();
+    }
+  }, [accessToken, activeConversationId, navigate, user]);
+
 
   useEffect(() => {
     if (!accessToken || !activeConversationId || !user) {
@@ -1366,7 +1532,8 @@ const handleCreateGroup = useCallback(
 
     void (async () => {
       try {
-        const rawMessages = await fetchMessages(accessToken, activeConversationId)
+        const isVirtualCloud = activeConversationId === `vnalo_cloud_${user.id}`;
+        const rawMessages = isVirtualCloud ? [] : await fetchMessages(accessToken, activeConversationId)
         console.log('Dữ liệu tin nhắn nhận được:', rawMessages)
         const mapped = sortMessages(
           rawMessages
@@ -1387,9 +1554,9 @@ const handleCreateGroup = useCallback(
             prev.map((conversation) =>
               conversation.id === activeConversationId
                 ? {
-                    ...conversation,
-                    unreadCount: 0,
-                  }
+                  ...conversation,
+                  unreadCount: 0,
+                }
                 : conversation,
             ),
           )
@@ -1456,7 +1623,7 @@ const handleCreateGroup = useCallback(
                 name: profile.displayName,
                 avatarUrl: profile.avatarUrl,
                 isStranger: senderId ? !friendIdSetRef.current.has(senderId) : false,
-                  lastMessage: formatConversationPreview(profile.displayName, mapped),
+                lastMessage: formatConversationPreview(profile.displayName, mapped),
                 unreadCount: mapped.sender === 'me' ? 0 : 1,
                 online: false,
                 lastMessageSeq: mapped.serverSeq,
@@ -1533,13 +1700,13 @@ const handleCreateGroup = useCallback(
           [payload.conversationId]: current.map((message) =>
             message.id === payload.messageId
               ? {
-                  ...message,
-                  text: '',
-                  mediaUrl: null,
-                  mediaThumbnailUrl: null,
-                  mediaMimeType: null,
-                  mediaSizeBytes: null,
-                }
+                ...message,
+                text: '',
+                mediaUrl: null,
+                mediaThumbnailUrl: null,
+                mediaMimeType: null,
+                mediaSizeBytes: null,
+              }
               : message,
           ),
         }
@@ -1818,6 +1985,21 @@ const handleCreateGroup = useCallback(
       const content = getDraftContent(draft)
       const messageType = getDraftMessageType(draft)
 
+      // Fallback resolve virtual "My Documents" to real conversation if needed
+      let targetConversationId = conversationId;
+      if (conversationId === `vnalo_cloud_${user.id}`) {
+        try {
+          const realId = await getOrCreateDirectConversation(accessToken, user.id);
+          targetConversationId = realId;
+          // Sync state
+          setConversations(prev => prev.map(c => c.id === conversationId ? { ...c, id: realId } : c));
+          setSelectedConversationId(realId);
+        } catch (err) {
+          console.error('[ChatPage.send] Final attempt to resolve cloud chat failed', err);
+          return; // Cannot send to virtual ID
+        }
+      }
+
       const clientMessageId =
         typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
           ? crypto.randomUUID()
@@ -1858,14 +2040,14 @@ const handleCreateGroup = useCallback(
         console.log('[OPTIMISTIC MESSAGE]', optimisticPreviewMessage)
 
         setMessagesByConversation((prev) => {
-          const current = prev[conversationId] ?? []
+          const current = prev[targetConversationId] ?? []
           return {
             ...prev,
-            [conversationId]: upsertMessage(current, optimisticPreviewMessage),
+            [targetConversationId]: upsertMessage(current, optimisticPreviewMessage),
           }
         })
 
-        updateConversationAfterMessage(conversationId, optimisticPreviewMessage, true)
+        updateConversationAfterMessage(targetConversationId, optimisticPreviewMessage, true)
       }
 
       if (draft.file) {
@@ -1886,10 +2068,10 @@ const handleCreateGroup = useCallback(
             const uploadedImageUrl = mediaUrl
             let previousBlobUrl: string | null = null
             setMessagesByConversation((prev) => {
-              const current = prev[conversationId] ?? []
+              const current = prev[targetConversationId] ?? []
               return {
                 ...prev,
-                [conversationId]: current.map((message) => {
+                [targetConversationId]: current.map((message) => {
                   if (message.clientMessageId !== clientMessageId) {
                     return message
                   }
@@ -1929,10 +2111,10 @@ const handleCreateGroup = useCallback(
 
           if (messageType === 'image') {
             setMessagesByConversation((prev) => {
-              const current = prev[conversationId] ?? []
+              const current = prev[targetConversationId] ?? []
               return {
                 ...prev,
-                [conversationId]: markLocalMessageFailed(current, clientMessageId),
+                [targetConversationId]: markLocalMessageFailed(current, clientMessageId),
               }
             })
           }
@@ -1950,7 +2132,7 @@ const handleCreateGroup = useCallback(
 
       console.log('[ChatPage.send] Start:', {
         clientMessageId,
-        conversationId,
+        conversationId: targetConversationId,
         contentLength: content.length,
         messageType,
       })
@@ -1958,7 +2140,7 @@ const handleCreateGroup = useCallback(
       const optimisticMessage: ChatMessage = {
         id: clientMessageId,
         clientMessageId,
-        conversationId,
+        conversationId: targetConversationId,
         sender: 'me',
         senderId: user.id,
         type: messageType,
@@ -1970,14 +2152,14 @@ const handleCreateGroup = useCallback(
         mediaSizeBytes,
         attachments: mediaUrl
           ? [
-              {
-                url: mediaUrl,
-                name: draft.file?.name ?? undefined,
-                thumbnailUrl: mediaThumbnailUrl,
-                mimeType: mediaMimeType,
-                sizeBytes: mediaSizeBytes,
-              },
-            ]
+            {
+              url: mediaUrl,
+              name: draft.file?.name ?? undefined,
+              thumbnailUrl: mediaThumbnailUrl,
+              mimeType: mediaMimeType,
+              sizeBytes: mediaSizeBytes,
+            },
+          ]
           : undefined,
         timestamp: formatMessageTimestamp(),
         deliveryState: 'sending',
@@ -1997,7 +2179,7 @@ const handleCreateGroup = useCallback(
                 : content
 
       const payload = {
-        conversationId,
+        conversationId: targetConversationId,
         content: payloadContent,
         clientMessageId,
         messageType: toSocketMessageType(messageType),
@@ -2011,14 +2193,14 @@ const handleCreateGroup = useCallback(
 
       if (messageType !== 'image') {
         setMessagesByConversation((prev) => {
-          const current = prev[conversationId] ?? []
+          const current = prev[targetConversationId] ?? []
           return {
             ...prev,
-            [conversationId]: upsertMessage(current, optimisticMessage),
+            [targetConversationId]: upsertMessage(current, optimisticMessage),
           }
         })
 
-        updateConversationAfterMessage(conversationId, optimisticMessage, true)
+        updateConversationAfterMessage(targetConversationId, optimisticMessage, true)
       }
 
       console.log('[ChatPage.send] Emitting message...')
@@ -2041,33 +2223,33 @@ const handleCreateGroup = useCallback(
           mediaSizeBytes: mappedServerMessage.mediaSizeBytes ?? mediaSizeBytes,
           attachments: resolvedMediaUrl
             ? [
-                {
-                  url: resolvedMediaUrl,
-                  name: draft.file?.name ?? mappedServerMessage.attachments?.[0]?.name ?? undefined,
-                  thumbnailUrl: mappedServerMessage.mediaThumbnailUrl ?? mediaThumbnailUrl,
-                  mimeType: mappedServerMessage.mediaMimeType ?? mediaMimeType,
-                  sizeBytes: mappedServerMessage.mediaSizeBytes ?? mediaSizeBytes,
-                },
-              ]
+              {
+                url: resolvedMediaUrl,
+                name: draft.file?.name ?? mappedServerMessage.attachments?.[0]?.name ?? undefined,
+                thumbnailUrl: mappedServerMessage.mediaThumbnailUrl ?? mediaThumbnailUrl,
+                mimeType: mappedServerMessage.mediaMimeType ?? mediaMimeType,
+                sizeBytes: mappedServerMessage.mediaSizeBytes ?? mediaSizeBytes,
+              },
+            ]
             : mappedServerMessage.attachments,
           deliveryState: 'sent' as const,
         }
         setMessagesByConversation((prev) => {
-          const current = prev[conversationId] ?? []
+          const current = prev[targetConversationId] ?? []
           return {
             ...prev,
-            [conversationId]: upsertMessage(current, serverMessage),
+            [targetConversationId]: upsertMessage(current, serverMessage),
           }
         })
 
-        updateConversationAfterMessage(conversationId, serverMessage, true)
+        updateConversationAfterMessage(targetConversationId, serverMessage, true)
         return
       }
 
       console.warn('[ChatPage.send] No valid ACK, trying REST fallback /messages before marking failed')
       try {
         const restMessage = await sendMessageViaRest(accessToken, {
-          conversationId,
+          conversationId: targetConversationId,
           content: payloadContent,
           clientMessageId,
           messageType: payload.messageType,
@@ -2086,14 +2268,14 @@ const handleCreateGroup = useCallback(
           }
 
           setMessagesByConversation((prev) => {
-            const current = prev[conversationId] ?? []
+            const current = prev[targetConversationId] ?? []
             return {
               ...prev,
-              [conversationId]: upsertMessage(current, mappedRestMessage),
+              [targetConversationId]: upsertMessage(current, mappedRestMessage),
             }
           })
 
-          updateConversationAfterMessage(conversationId, mappedRestMessage, true)
+          updateConversationAfterMessage(targetConversationId, mappedRestMessage, true)
           return
         }
       } catch (restFallbackError) {
@@ -2102,10 +2284,10 @@ const handleCreateGroup = useCallback(
         const message = restFallbackError instanceof Error ? restFallbackError.message : String(restFallbackError)
         if (message.toLowerCase().includes('restricted web session cannot send messages')) {
           setMessagesByConversation((prev) => {
-            const current = prev[conversationId] ?? []
+            const current = prev[targetConversationId] ?? []
             return {
               ...prev,
-              [conversationId]: markLocalMessageFailed(current, clientMessageId),
+              [targetConversationId]: markLocalMessageFailed(current, clientMessageId),
             }
           })
           console.warn('[ChatPage.send] Send blocked by restricted web policy; message marked failed immediately')
@@ -2335,6 +2517,8 @@ const handleCreateGroup = useCallback(
         onSearchFriends={handleSearchFriends}
         onOpenFriendChat={handleOpenFriendChat}
         onSelectConversation={handleSelectConversation}
+        onCreateGroupClick={() => setIsCreateGroupOpen(true)}
+
       />
       <ChatWindow
         conversation={selectedConversation}
@@ -2398,7 +2582,11 @@ const handleCreateGroup = useCallback(
           {rightSidebarContent === 'info' ? (
             <>
               {selectedConversation ? (
-                <ConversationInfo conversation={selectedConversation} messages={selectedMessages} />
+                <ConversationInfo
+                  conversation={selectedConversation}
+                  messages={selectedMessages}
+                  userProfilesById={userProfileCache}
+                />
               ) : (
                 <p>{t('pages.chat.sideInfoFallback')}</p>
               )}

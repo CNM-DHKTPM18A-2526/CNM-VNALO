@@ -17,9 +17,13 @@ type InboxItem = {
     id?: string
     title?: string | null
     type?: string
+    avatarUrl?: string | null
+    avatar_url?: string | null
     members?: Array<{
       userId?: string
       nickname?: string | null
+      avatarUrl?: string | null
+      avatar_url?: string | null
     }>
   } | null
 }
@@ -318,24 +322,33 @@ export async function fetchInbox(token: string, currentUserId?: string): Promise
     const peerFallback = partnerUserId ? `Người dùng ${partnerUserId.slice(0, 8)}` : null
     const normalizedPreview = normalizeInboxPreview(item.lastMessagePreview)
 
-    return {
-      id,
-      userId: partnerUserId,
-      name: title && title.length > 0 ? title : peerNickname || peerFallback || `Trò chuyện ${id.slice(0, 8)}`,
-      lastMessage: normalizedPreview,
-      lastMessagePreview: normalizedPreview,
-      unreadCount: item.unreadCount ?? 0,
-      online: false,
-      lastMessageSeq: item.lastMessageSeq,
-      lastMessageSenderId: item.lastMessageSenderId ?? null,
-      participantUserIds: members
-        .map((member) => String(member.userId ?? '').trim())
-        .filter((memberId): memberId is string => Boolean(memberId) && memberId !== myId),
-      lastMessageAt: item.lastMessageAt ?? null,
-      updatedAt: item.updatedAt ?? null,
-      lastSeenTime: item.lastMessageAt ?? null,
-    }
-  })
+    const isGroup = (item.conversation?.type ?? (item.conversation as any)?.type) === 'GROUP'
+    const name = isGroup ? (title || (item.conversation as any)?.name || 'Nhóm không tên') : (title || peerNickname || peerFallback || `Trò chuyện ${id.slice(0, 8)}`)
+    const avatarUrl = isGroup 
+      ? (item.conversation?.avatarUrl || (item.conversation as any)?.avatar_url || null) 
+      : (peerMember?.avatarUrl || (peerMember as any)?.avatar_url || null)
+
+      return {
+        id,
+        userId: partnerUserId,
+        isGroup,
+        name,
+        avatarUrl,
+        memberCount: members.length,
+        lastMessage: normalizedPreview,
+        lastMessagePreview: normalizedPreview,
+        unreadCount: item.unreadCount ?? 0,
+        online: false,
+        lastMessageSeq: item.lastMessageSeq,
+        lastMessageSenderId: item.lastMessageSenderId ?? null,
+        participantUserIds: members
+          .map((member) => String(member.userId ?? '').trim())
+          .filter((memberId): memberId is string => Boolean(memberId) && memberId !== myId),
+        lastMessageAt: item.lastMessageAt ?? null,
+        updatedAt: item.updatedAt ?? null,
+        lastSeenTime: item.lastMessageAt ?? null,
+      }
+    })
 }
 
 export function mapRawMessage(raw: RawMessageLike, currentUserId: string): ChatMessage {
@@ -664,7 +677,7 @@ export async function createGroupConversation(
     },
     body: JSON.stringify({
       title: payload.title.trim(),
-      memberUserIds: payload.memberUserIds,
+      memberIds: payload.memberUserIds,
       ...(payload.avatarUrl ? { avatarUrl: payload.avatarUrl } : {}),
     }),
   })
@@ -689,4 +702,34 @@ export async function createGroupConversation(
   }
 
   return conversationId
+}
+
+export async function fetchConversation(token: string, conversationId: string): Promise<any> {
+  const response = await fetch(`${MESSAGE_API_URL}/conversations/${conversationId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  })
+
+  if (!response.ok) return null;
+  const json = await response.json().catch(() => null);
+  const data = (json && typeof json === 'object' && !Array.isArray(json) && json.data) ? json.data : json;
+  
+  if (data) {
+    const isGroup = (data.type ?? (data as any)?.type) === 'GROUP';
+    const title = data.title?.trim();
+    const members = data.members ?? [];
+    return {
+      ...data,
+      isGroup,
+      name: isGroup ? (title || (data as any)?.name || 'Nhóm không tên') : (title || 'Cuộc trò chuyện'),
+      avatarUrl: isGroup 
+        ? (data.avatarUrl || (data as any)?.avatar_url || null) 
+        : (data.avatarUrl || (data as any)?.avatar_url || null),
+      memberCount: members.length,
+      participantUserIds: members.map((m: any) => String(m.userId || '').trim())
+    };
+  }
+  return data;
 }

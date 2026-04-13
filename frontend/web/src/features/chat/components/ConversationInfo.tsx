@@ -22,11 +22,12 @@ import { UserAvatar } from '../../../shared/components/UserAvatar';
 type ConversationInfoProps = {
   conversation: ConversationSummary;
   messages: ChatMessage[];
+  userProfilesById?: Record<string, { displayName: string; avatarUrl: string | null }>;
 };
 
 type SectionKey = 'media' | 'files' | 'links' | 'security';
 
-export function ConversationInfo({ conversation, messages }: ConversationInfoProps) {
+export function ConversationInfo({ conversation, messages, userProfilesById = {} }: ConversationInfoProps) {
   const [expanded, setExpanded] = useState<Record<SectionKey, boolean>>({
     media: true,
     files: true,
@@ -74,9 +75,11 @@ export function ConversationInfo({ conversation, messages }: ConversationInfoPro
     return links.slice(0, 8);
   }, [messages]);
 
-  const toggleSection = (section: SectionKey) => {
+  const toggleSection = (section: SectionKey | 'members') => {
     setExpanded((prev) => ({ ...prev, [section]: !prev[section] }));
   };
+
+  const [membersExpanded, setMembersExpanded] = useState(true);
 
   return (
     <div className="h-full overflow-y-auto bg-[#F1F1F4] pb-20">
@@ -93,6 +96,8 @@ export function ConversationInfo({ conversation, messages }: ConversationInfoPro
             imageUrl={conversation.avatarUrl ?? null}
             size="lg"
             className="h-20 w-20 shadow-lg ring-2 ring-white"
+            isGroup={conversation.isGroup}
+            isCloud={conversation.isCloud}
           />
         </div>
 
@@ -103,18 +108,57 @@ export function ConversationInfo({ conversation, messages }: ConversationInfoPro
           </button>
         </div>
 
-        {/* Action Buttons */}
-        <div className="mt-6 grid grid-cols-3 gap-3">
-          <ActionButton icon={BellOff} label="Tắt thông báo" />
-          <ActionButton icon={Pin} label="Ghim hội thoại" />
-          <ActionButton icon={UserPlus} label="Tạo nhóm trò chuyện" />
-        </div>
+        {conversation.isCloud ? (
+          <div className="mt-4 px-6 text-center">
+            <p className="text-[14px] text-gray-500 leading-relaxed">
+              Lưu trữ và truy cập nhanh những nội dung quan trọng của bạn ngay trên VNALO
+            </p>
+            {/* Mock storage UI similar to Zalo */}
+            <div className="mt-6 text-left">
+               <div className="flex justify-between text-[13px] mb-2 font-medium">
+                  <span className="text-gray-600">Dung lượng</span>
+                  <span className="text-gray-400">291 MB / 500 MB</span>
+               </div>
+               <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden flex">
+                  <div className="h-full bg-orange-400" style={{ width: '40%' }}></div>
+                  <div className="h-full bg-green-400" style={{ width: '15%' }}></div>
+               </div>
+               <div className="mt-2 flex gap-3 text-[11px] text-gray-400">
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-400"></span>Ảnh</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400"></span>Video</span>
+               </div>
+               <button className="w-full mt-4 py-2 border border-gray-200 rounded-lg text-[14px] font-medium hover:bg-gray-50">
+                  Xem và dọn dẹp My Documents
+               </button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-6 grid grid-cols-3 gap-3">
+            <ActionButton icon={BellOff} label="Tắt thông báo" />
+            <ActionButton icon={Pin} label="Ghim hội thoại" />
+            <ActionButton icon={UserPlus} label="Tạo nhóm trò chuyện" />
+          </div>
+        )}
       </section>
 
       {/* Common Info */}
       <section className="mt-3 bg-white px-5 py-2">
         <InfoRow icon={AlarmClock} text="Danh sách nhắc hẹn" />
-        <InfoRow icon={Users} text="5 nhóm chung" />
+        {conversation.isGroup && (
+          <Section title={`Thành viên nhóm (${(conversation.participantUserIds?.length ?? 0) + 1})`} expanded={membersExpanded} onToggle={() => setMembersExpanded(!membersExpanded)}>
+             <div className="space-y-3">
+               {(conversation.participantUserIds ?? []).map(userId => {
+                 const profile = userProfilesById[userId];
+                 return (
+                   <div key={userId} className="flex items-center gap-3">
+                     <UserAvatar name={profile?.displayName || 'Thành viên'} imageUrl={profile?.avatarUrl} size="sm" />
+                     <span className="text-[15px] text-slate-700">{profile?.displayName || `Người dùng ${userId.slice(0,6)}`}</span>
+                   </div>
+                 );
+               })}
+             </div>
+          </Section>
+        )}
       </section>
 
       {/* Ảnh/Video */}

@@ -190,8 +190,14 @@ export function ChatWindow({
       <header className='chat-window-header'>
         <div className='chat-window-header-main'>
           <div className='relative'>
-            <UserAvatar name={conversation.name} imageUrl={conversation.avatarUrl ?? null} size='md' />
-            {isOnline && (
+            <UserAvatar
+              name={conversation.name}
+              imageUrl={conversation.avatarUrl ?? null}
+              size='md'
+              isGroup={conversation.isGroup}
+              isCloud={conversation.isCloud}
+            />
+            {isOnline && !conversation.isCloud && (
               <span className='absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full' />
             )}
           </div>
@@ -199,7 +205,13 @@ export function ChatWindow({
             <h2>{conversation.name}</h2>
             <div className='chat-window-header-meta'>
               {isStranger ? <span className='chat-stranger-badge'>Người lạ</span> : null}
-              <p>{statusText}</p>
+              {conversation.isCloud ? (
+                <p>Lưu và đồng bộ dữ liệu giữa các thiết bị</p>
+              ) : conversation.isGroup ? (
+                <p>{conversation.memberCount || 0} thành viên</p>
+              ) : (
+                <p>{statusText}</p>
+              )}
             </div>
           </div>
         </div>
@@ -256,10 +268,10 @@ export function ChatWindow({
                 previous.sender !== message.sender ||
                 previous.senderId !== message.senderId
               const resolvedSenderName = isIncoming
-                ? profile?.displayName || conversation.name
+                ? profile?.displayName || (conversation.isGroup ? 'Thành viên' : conversation.name)
                 : 'Bạn'
               const resolvedSenderAvatar = isIncoming
-                ? (profile?.avatarUrl ?? conversation.avatarUrl ?? null)
+                ? (profile?.avatarUrl ?? (conversation.isGroup ? null : conversation.avatarUrl) ?? null)
                 : null
 
               return (
@@ -269,7 +281,7 @@ export function ChatWindow({
                   senderName={resolvedSenderName}
                   senderAvatarUrl={resolvedSenderAvatar}
                   showAvatar={isIncoming ? isFirstInCluster : false}
-                  showSenderName={isIncoming ? isFirstInCluster : false}
+                  showSenderName={isIncoming && conversation.isGroup ? isFirstInCluster : false}
                   reactions={reactionStatesByMessage[message.id]?.reactions ?? {}}
                   quickReaction={reactionStatesByMessage[message.id]?.lastUsedReaction}
                   onAddReaction={(reactionKey) => onAddReaction?.(message.id, reactionKey)}
