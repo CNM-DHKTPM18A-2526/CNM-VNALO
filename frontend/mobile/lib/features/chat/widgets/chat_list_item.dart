@@ -11,11 +11,13 @@ import 'package:vnalo_mobile/models/conversation_model.dart';
 class ChatListItem extends StatelessWidget {
   final Conversation conversation;
   final VoidCallback onTap;
+  final bool isVirtualCloud;
 
   const ChatListItem({
     super.key,
     required this.conversation,
     required this.onTap,
+    this.isVirtualCloud = false,
   });
 
   @override
@@ -71,12 +73,39 @@ class ChatListItem extends StatelessWidget {
                 horizontal: 16,
                 vertical: 10,
               ),
-              leading: AvatarWidget(
-                imageUrl: displayAvatar,
-                name: displayName,
-                size: 48,
-                showOnline: conversation.type == ConversationType.DIRECT,
-              ),
+              leading: isVirtualCloud
+                  ? Container(
+                      width: 48,
+                      height: 48,
+                      decoration: const BoxDecoration(
+                        color: Colors.blue,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          const Icon(Icons.folder, color: Colors.white, size: 28),
+                          const Icon(Icons.cloud, color: Colors.blue, size: 14),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              decoration: const BoxDecoration(
+                                color: Colors.orange,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.check, color: Colors.white, size: 10),
+                            ),
+                          )
+                        ],
+                      ),
+                    )
+                  : AvatarWidget(
+                      imageUrl: displayAvatar,
+                      name: displayName,
+                      size: 48,
+                      showOnline: conversation.type == ConversationType.DIRECT,
+                    ),
               title: Row(
                 children: [
                   Expanded(
@@ -101,9 +130,11 @@ class ChatListItem extends StatelessWidget {
                   Expanded(
                     child: Text(
                       conversation.lastMessage?.content ??
-                          (conversation.type == ConversationType.DIRECT
-                              ? 'Gửi lời chào $displayName'
-                              : ''),
+                          (isVirtualCloud
+                              ? 'Lưu trữ các tin nhắn quan trọng'
+                              : (conversation.type == ConversationType.DIRECT
+                                  ? 'Gửi lời chào $displayName'
+                                  : '')),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(

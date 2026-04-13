@@ -704,7 +704,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         text: _highlightText(
-                          result.message.content,
+                          result.message.content ?? '',
                           query,
                           baseStyle: TextStyle(
                             color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary,

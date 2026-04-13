@@ -128,19 +128,24 @@ class MessageBubble extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (message.replyToMessageId != null) _buildReplyQuote(context, isDarkMode),
-          _renderTypeSpecificContent(context, isDarkMode),
-          if (showTime && message.messageType != MessageType.IMAGE)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                DateFormatter.time(message.createdAt),
-                style: TextStyle(
-                  fontSize: 10,
-                  color: isDarkMode ? DarkColors.textHint : Colors.grey.shade500,
+          // Hiển thị đặc biệt khi tin nhắn đã bị thu hồi
+          if (message.isRecalled)
+            _buildRecalledContent(isMine, isDarkMode)
+          else ...[
+            if (message.replyToMessageId != null) _buildReplyQuote(context, isDarkMode),
+            _renderTypeSpecificContent(context, isDarkMode),
+            if (showTime && message.messageType != MessageType.IMAGE)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  DateFormatter.time(message.createdAt),
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: isDarkMode ? DarkColors.textHint : Colors.grey.shade500,
+                  ),
                 ),
               ),
-            ),
+          ],
         ],
       ),
     );
@@ -179,25 +184,101 @@ class MessageBubble extends StatelessWidget {
     final size = renderBox.size;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
+    // Không hiển thị menu nếu tin nhắn đã bị thu hồi
+    if (message.isRecalled) return;
+
     FocusedMessageDialog.show(
       context,
       message: message,
       isMine: isMine,
       position: position,
       size: size,
-      child: _buildBubbleContent(context, isDarkMode), // Re-render bubble content for the dialog
-      onAction: (action) {
+      child: _buildBubbleContent(context, isDarkMode),
+      onAction: (action) async {
         if (action == 'reply') {
           chatProvider.setReplyTo(message);
         } else if (action == 'copy') {
            if (message.messageType == MessageType.TEXT) {
              Clipboard.setData(ClipboardData(text: message.content ?? ''));
-             ScaffoldMessenger.of(context).showSnackBar(
-               const SnackBar(content: Text('Đã sao chép tin nhắn')),
-             );
+             if (context.mounted) {
+               ScaffoldMessenger.of(context).showSnackBar(
+                 const SnackBar(content: Text('Đã sao chép tin nhắn')),
+               );
+             }
            }
+        } else if (action == 'recall') {
+          if (context.mounted) {
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Thu hồi tin nhắn'),
+                content: const Text('Tin nhắn sẽ được thu hồi với tất cả mọi người. Bạn có chắc không?'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Hủy'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    style: TextButton.styleFrom(foregroundColor: Colors.orange),
+                    child: const Text('Thu hồi'),
+                  ),
+                ],
+              ),
+            );
+            if (confirmed == true) {
+              chatProvider.recallMessage(message.id, message.conversationId);
+            }
+          }
+        } else if (action == 'delete') {
+          if (context.mounted) {
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Xóa tin nhắn'),
+                content: const Text('Tin nhắn sẽ bị xóa ở phía bạn. Người khác vẫn nhìn thấy tin nhắn này.'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Hủy'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    style: TextButton.styleFrom(foregroundColor: Colors.red),
+                    child: const Text('Xóa'),
+                  ),
+                ],
+              ),
+            );
+            if (confirmed == true && context.mounted) {
+              await chatProvider.deleteForMe(message.id, message.conversationId);
+            }
+          }
         }
       },
+    );
+  }
+
+  /// Widget hiển thị khi tin nhắn đã bị thu hồi
+  Widget _buildRecalledContent(bool isMine, bool isDarkMode) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.undo_rounded,
+          size: 14,
+          color: isDarkMode ? Colors.white38 : Colors.grey.shade400,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          'Tin nhắn đã được thu hồi',
+          style: TextStyle(
+            fontSize: 14,
+            fontStyle: FontStyle.italic,
+            color: isDarkMode ? Colors.white38 : Colors.grey.shade500,
+          ),
+        ),
+      ],
     );
   }
 

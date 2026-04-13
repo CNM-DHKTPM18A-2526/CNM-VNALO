@@ -12,7 +12,7 @@ class LocalDatabase extends _$LocalDatabase {
   LocalDatabase() : super(conn.openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -65,6 +65,39 @@ class LocalDatabase extends _$LocalDatabase {
         await customStatement('DELETE FROM messages');
         await customStatement('DELETE FROM messages_fts');
         debugPrint('[Migration] Database v3: Purged legacy messages to fix formatting errors.');
+      }
+
+      if (from < 4) {
+        // Add client_message_id column to messages table
+        try {
+          await m.addColumn(messages, messages.clientMessageId);
+        } catch (e) {
+          debugPrint('[Migration] Column client_message_id already exists, skipping.');
+        }
+      }
+
+      if (from < 5) {
+        // Use customStatement to avoid reliance on generated getters for migration
+        // Wrap each column addition in a try-catch for idempotency
+        final columns = [
+          "message_type TEXT NOT NULL DEFAULT 'TEXT'",
+          "media_url TEXT",
+          "media_thumbnail_url TEXT",
+          "media_mime_type TEXT",
+          "media_size_bytes INTEGER",
+          "reply_to_message_id TEXT",
+          "reply_to_sender_id TEXT",
+          "reply_to_content TEXT",
+          "status TEXT NOT NULL DEFAULT 'SENT'",
+        ];
+
+        for (var col in columns) {
+          try {
+            await customStatement("ALTER TABLE messages ADD COLUMN $col");
+          } catch (e) {
+            debugPrint('[Migration] Column addition failed (may already exist): $col');
+          }
+        }
       }
     },
   );
@@ -122,10 +155,20 @@ class LocalDatabase extends _$LocalDatabase {
       return LocalMessageSearchResult(
         message: LocalMessage(
           id: row.read<String>('id'),
-          content: row.read<String>('content'),
+          content: row.readNullable<String>('content'),
           conversationId: row.read<String>('conversation_id'),
           createdAt: row.read<DateTime>('created_at'),
           senderId: row.read<String>('sender_id'),
+          clientMessageId: row.readNullable<String>('client_message_id'),
+          messageType: row.readNullable<String>('message_type') ?? 'TEXT',
+          mediaUrl: row.readNullable<String>('media_url'),
+          mediaThumbnailUrl: row.readNullable<String>('media_thumbnail_url'),
+          mediaMimeType: row.readNullable<String>('media_mime_type'),
+          mediaSizeBytes: row.readNullable<int>('media_size_bytes'),
+          replyToMessageId: row.readNullable<String>('reply_to_message_id'),
+          replyToSenderId: row.readNullable<String>('reply_to_sender_id'),
+          replyToContent: row.readNullable<String>('reply_to_content'),
+          status: row.readNullable<String>('status') ?? 'SENT',
         ),
         conversationName: row.readNullable<String>('conv_name'),
         conversationAvatar: row.readNullable<String>('conv_avatar'),
@@ -187,10 +230,17 @@ class LocalDatabase extends _$LocalDatabase {
   }
 
   Future<List<LocalMessage>> getMessagesByConversation(String conversationId) async {
-    return (select(messages)
+    debugPrint('DEBUG: [LocalDatabase] getMessagesByConversation querying for ID: $conversationId');
+    final query = (select(messages)
           ..where((t) => t.conversationId.equals(conversationId))
-          ..orderBy([(t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc)]))
-        .get();
+          ..orderBy([(t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc)]));
+    final result = await query.get();
+    debugPrint('DEBUG: [LocalDatabase] getMessagesByConversation result: ${result.length} rows');
+    return result;
+  }
+
+  Future<void> deleteMessage(String messageId) async {
+    await (delete(messages)..where((t) => t.id.equals(messageId))).go();
   }
 }
 

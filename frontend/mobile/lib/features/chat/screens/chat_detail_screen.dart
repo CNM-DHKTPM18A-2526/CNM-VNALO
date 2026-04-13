@@ -34,6 +34,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   Timer? _subtextTimer;
   bool _showGroupMembers = false;
   final ScrollController _scrollController = ScrollController();
+  bool _isLoadingMore = false;
 
   @override
   void initState() {
@@ -53,7 +54,30 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           }
         });
       }
+
+      _scrollController.addListener(_onScroll);
     });
+  }
+
+  void _onScroll() {
+    if (_isLoadingMore) return;
+    
+    // In reverse mode, scroll position increases as we scroll UP
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      final chatProvider = context.read<ChatProvider>();
+      final messages = chatProvider.getMessagesForConversation(widget.conversation.id);
+      
+      if (messages.isNotEmpty) {
+        setState(() => _isLoadingMore = true);
+        final oldestId = messages.last.id;
+        
+        chatProvider.loadMessages(widget.conversation.id, before: oldestId).then((_) {
+          if (mounted) setState(() => _isLoadingMore = false);
+        }).catchError((_) {
+          if (mounted) setState(() => _isLoadingMore = false);
+        });
+      }
+    }
   }
 
   @override
@@ -86,29 +110,29 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
   }
 
-  String _getDisplayName(String currentUserId) {
+  String _getDisplayName(String currentUserId, Conversation conversation) {
     if (widget.friendUser != null) {
       return widget.friendUser!.displayName;
     }
-    return widget.conversation.getDisplayName(currentUserId);
+    return conversation.getDisplayName(currentUserId);
   }
 
-  String? _getAvatarUrl(String currentUserId) {
+  String? _getAvatarUrl(String currentUserId, Conversation conversation) {
     if (widget.friendUser != null) {
       return widget.friendUser!.avatarUrl;
     }
-    return widget.conversation.getDisplayAvatarUrl(currentUserId);
+    return conversation.getDisplayAvatarUrl(currentUserId);
   }
 
-  String? _getCoverUrl(String currentUserId) {
+  String? _getCoverUrl(String currentUserId, Conversation conversation) {
     if (widget.friendUser != null) {
       return widget.friendUser!.coverUrl;
     }
-    final isDirect = widget.conversation.type == ConversationType.DIRECT;
-    if (isDirect && widget.conversation.members.isNotEmpty) {
-      final other = widget.conversation.members.firstWhere(
+    final isDirect = conversation.type == ConversationType.DIRECT;
+    if (isDirect && conversation.members.isNotEmpty) {
+      final other = conversation.members.firstWhere(
         (m) => m.userId != currentUserId,
-        orElse: () => widget.conversation.members.first,
+        orElse: () => conversation.members.first,
       );
       return other.user?.coverUrl;
     }
@@ -127,9 +151,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           orElse: () => widget.conversation,
         );
 
-        final displayName = _getDisplayName(currentUserId);
-        final avatarUrl = _getAvatarUrl(currentUserId);
-        final coverUrl = _getCoverUrl(currentUserId);
+        final displayName = _getDisplayName(currentUserId, conv);
+        final avatarUrl = _getAvatarUrl(currentUserId, conv);
+        final coverUrl = _getCoverUrl(currentUserId, conv);
         final isDirect = conv.type == ConversationType.DIRECT || widget.friendUser != null;
         final wallpaperUrl = conv.personalWallpaperUrl ?? conv.wallpaperUrl;
 

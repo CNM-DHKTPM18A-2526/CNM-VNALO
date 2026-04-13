@@ -26,6 +26,12 @@ class MediaService {
   String getPublicUrl(String mediaId) {
     if (mediaId.isEmpty) return '';
     if (mediaId.startsWith('http')) return mediaId;
+    
+    if (mediaId.startsWith('/')) {
+      final baseUri = Uri.parse(_base);
+      return '${baseUri.scheme}://${baseUri.authority}$mediaId';
+    }
+    
     return '$_base/media/public/$mediaId';
   }
 

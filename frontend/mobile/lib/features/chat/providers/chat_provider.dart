@@ -25,6 +25,7 @@ class ChatProvider extends ChangeNotifier {
   final StreamSubscription<Message> _messageSub;
   final StreamSubscription<Map<String, dynamic>> _readSub;
   final StreamSubscription<Map<String, dynamic>> _deliveredSub;
+  final StreamSubscription<Map<String, dynamic>> _recalledSub;
   final Random _random = Random.secure();
 
   List<Conversation> _conversations = [];
@@ -54,10 +55,12 @@ class ChatProvider extends ChangeNotifier {
   ChatProvider(this._chatService, this._socketService, this._mediaService, this._db)
     : _messageSub = _socketService.onMessage.listen((_) {}),
       _readSub = _socketService.onRead.listen((_) {}),
-      _deliveredSub = _socketService.onDelivered.listen((_) {}) {
+      _deliveredSub = _socketService.onDelivered.listen((_) {}),
+      _recalledSub = _socketService.onRecalled.listen((_) {}) {
     _messageSub.onData(_handleIncomingMessage);
     _readSub.onData(_handleReadEvent);
     _deliveredSub.onData(_handleDeliveredEvent);
+    _recalledSub.onData(_handleRecalledMessage);
   }
 
   List<Message> getMessages(String conversationId) =>
@@ -90,25 +93,60 @@ class ChatProvider extends ChangeNotifier {
   Future<void> loadMessages(String conversationId, {String? before}) async {
     try {
       // 2. Fetch from API to update and sync
+      debugPrint('DEBUG: [ChatProvider] loadMessages ($conversationId): Fetching from server (before: $before)...');
       final response = await _chatService.getMessages(
         conversationId,
         before: before,
       );
+      debugPrint('DEBUG: [ChatProvider] loadMessages ($conversationId): Server returned ${response.length} messages');
       
       if (before == null) {
-        _messages[conversationId] = response;
-        // Sync API messages to local DB in background
+        // Merge strategy for initial load
+        final currentMessages = _messages[conversationId] ?? [];
+        final Map<String, Message> messageMap = {};
+        
+        // Use clientMessageId as a secondary key for merging optimistic UI
+        final Map<String, String> clientToId = {};
+
+        for (var m in currentMessages) {
+          messageMap[m.id] = m;
+          if (m.clientMessageId != null) {
+            clientToId[m.clientMessageId!] = m.id;
+          }
+        }
+
+        for (var serverMsg in response) {
+          // If this server message matches an optimistic one, remove the optimistic one
+          if (serverMsg.clientMessageId != null && clientToId.containsKey(serverMsg.clientMessageId)) {
+            messageMap.remove(clientToId[serverMsg.clientMessageId]);
+          }
+          messageMap[serverMsg.id] = serverMsg;
+        }
+
+        final mergedList = messageMap.values.toList();
+        // Sort by createdAt descending (newest first for reverse ListView)
+        mergedList.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        
+        _messages[conversationId] = mergedList;
         _db.saveMessagesBatch(response.map(_toLocal).toList());
       } else {
-        _messages[conversationId] = [
-          ...(_messages[conversationId] ?? []),
-          ...response,
-        ];
+        // Appending older messages
+        final current = _messages[conversationId] ?? [];
+        final Map<String, Message> messageMap = {
+          for (var m in current) m.id: m
+        };
+        for (var m in response) {
+          messageMap[m.id] = m;
+        }
+        final merged = messageMap.values.toList();
+        merged.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        _messages[conversationId] = merged;
+        _db.saveMessagesBatch(response.map(_toLocal).toList());
       }
       notifyListeners();
     } catch (e, stack) {
-      debugPrint('loadMessages error: $e');
-      debugPrint('Stack trace: $stack');
+      debugPrint('DEBUG: [ChatProvider] loadMessages error: $e');
+      debugPrint('DEBUG: [ChatProvider] Stack trace: $stack');
     }
   }
 
@@ -117,7 +155,17 @@ class ChatProvider extends ChangeNotifier {
       id: m.id,
       conversationId: m.conversationId,
       senderId: m.senderId,
-      content: m.content ?? '',
+      clientMessageId: m.clientMessageId,
+      messageType: m.messageType.name,
+      content: m.content,
+      mediaUrl: m.mediaUrl,
+      mediaThumbnailUrl: m.mediaThumbnailUrl,
+      mediaMimeType: m.mediaMimeType,
+      mediaSizeBytes: m.mediaSizeBytes,
+      replyToMessageId: m.replyToMessageId,
+      replyToSenderId: m.replyToSenderId,
+      replyToContent: m.replyToContent,
+      status: m.status.name,
       createdAt: m.createdAt,
     );
   }
@@ -127,9 +175,18 @@ class ChatProvider extends ChangeNotifier {
       id: lm.id,
       conversationId: lm.conversationId,
       senderId: lm.senderId,
+      clientMessageId: lm.clientMessageId,
+      messageType: enumFromString(MessageType.values, lm.messageType),
       content: lm.content,
+      mediaUrl: lm.mediaUrl,
+      mediaThumbnailUrl: lm.mediaThumbnailUrl,
+      mediaMimeType: lm.mediaMimeType,
+      mediaSizeBytes: lm.mediaSizeBytes,
+      replyToMessageId: lm.replyToMessageId,
+      replyToSenderId: lm.replyToSenderId,
+      replyToContent: lm.replyToContent,
+      status: enumFromString(MessageStatus.values, lm.status),
       createdAt: lm.createdAt,
-      status: MessageStatus.SENT,
     );
   }
 
@@ -153,11 +210,19 @@ class ChatProvider extends ChangeNotifier {
 
     // 1. Load from Local Cache FIRST (Optimistic UI)
     final localMsgs = await _db.getMessagesByConversation(conversationId);
+    debugPrint('DEBUG: [ChatProvider] openConversation ($conversationId): Found ${localMsgs.length} messages in DB');
+    
     if (_activeConversationId == conversationId) {
-      _messages[conversationId] = localMsgs.map(_fromLocal).toList();
+      try {
+        _messages[conversationId] = localMsgs.map(_fromLocal).toList();
+        debugPrint('DEBUG: [ChatProvider] openConversation ($conversationId): Successfully mapped ${localMsgs.length} messages');
+      } catch (e) {
+        debugPrint('DEBUG: [ChatProvider] openConversation mapping error: $e');
+      }
       notifyListeners();
     }
 
+    debugPrint('DEBUG: [ChatProvider] openConversation ($conversationId): Calling loadMessages (fetch from server)...');
     await loadMessages(conversationId);
   }
 
@@ -356,6 +421,49 @@ class ChatProvider extends ChangeNotifier {
     _sendWithRetry(message.copyWith(status: MessageStatus.SENDING));
   }
 
+  /// Thu hồi tin nhắn — emit socket event, backend sẽ broadcast lại
+  void recallMessage(String messageId, String conversationId) {
+    _socketService.recallMessage(messageId, conversationId);
+  }
+
+  /// Xóa tin nhắn phía mình — gọi HTTP, cập nhật state local ngay lập tức
+  Future<void> deleteForMe(String messageId, String conversationId) async {
+    // Optimistic update: xóa ngay khỏi UI
+    final msgs = _messages[conversationId];
+    if (msgs != null) {
+      _messages[conversationId] = msgs.where((m) => m.id != messageId).toList();
+      notifyListeners();
+    }
+    try {
+      await _chatService.deleteForMe(messageId);
+    } catch (e) {
+      debugPrint('deleteForMe error: $e');
+      // Nếu lỗi thì reload lại messages
+      loadMessages(conversationId);
+    }
+  }
+
+  /// Xử lý sự kiện message.recalled từ socket
+  void _handleRecalledMessage(Map<String, dynamic> data) {
+    final String messageId = data['messageId'] as String? ?? '';
+    final String conversationId = data['conversationId'] as String? ?? '';
+    if (messageId.isEmpty || conversationId.isEmpty) return;
+
+    final msgs = _messages[conversationId];
+    if (msgs != null) {
+      final index = msgs.indexWhere((m) => m.id == messageId);
+      if (index >= 0) {
+        final updated = List<Message>.from(msgs);
+        updated[index] = updated[index].copyWith(
+          status: MessageStatus.RECALLED,
+          content: 'Tin nhắn đã được thu hồi',
+        );
+        _messages[conversationId] = updated;
+        notifyListeners();
+      }
+    }
+  }
+
   void _handleIncomingMessage(Message message) {
     final conversationId = message.conversationId;
 
@@ -385,6 +493,9 @@ class ChatProvider extends ChangeNotifier {
       if (optimisticIndex >= 0) {
         final updated = List<Message>.from(existing);
         final oldMessage = updated[optimisticIndex];
+        
+        // Remove old optimistic message from local DB to prevent duplicates
+        _db.deleteMessage(oldMessage.id);
         
         // MERGE metadata: Keep reply info if already present in optimistic but missing in resolved
         Message merged = resolvedMessage;
@@ -638,6 +749,7 @@ class ChatProvider extends ChangeNotifier {
     _messageSub.cancel();
     _readSub.cancel();
     _deliveredSub.cancel();
+    _recalledSub.cancel();
     _highlightTimer?.cancel();
     for (final timer in _retryTimers.values) {
       timer.cancel();

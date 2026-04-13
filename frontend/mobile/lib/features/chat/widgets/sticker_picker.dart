@@ -81,10 +81,17 @@ class _StickerPickerState extends State<StickerPicker> {
       final mediaService = context.read<MediaService>();
       final stickers = await mediaService.getStickersInPack(packId);
       if (mounted) {
-        setState(() { _stickersCache[packId] = stickers; });
+        setState(() {
+          _stickersCache[packId] = stickers;
+        });
       }
     } catch (e) {
       debugPrint('Error loading stickers for pack $packId: $e');
+      if (mounted) {
+        setState(() {
+          _stickersCache[packId] = [];
+        });
+      }
     }
   }
 
@@ -147,8 +154,7 @@ class _StickerPickerState extends State<StickerPicker> {
                   _buildTabItem(Icons.sticky_note_2, true, isDarkMode, ""),
                   _buildTabItem(Icons.access_time_filled, false, isDarkMode, ""),
                   ..._myPacks.map((pack) {
-                    final url = pack['coverUrl'] ?? pack['thumbnailUrl'] ?? '';
-                    return _buildPackTabItem(url, isDarkMode);
+                    return _buildPackTabItem(pack, isDarkMode);
                   }),
                 ],
               ),
@@ -191,13 +197,21 @@ class _StickerPickerState extends State<StickerPicker> {
     );
   }
 
-  Widget _buildPackTabItem(String url, bool isDarkMode) {
+  Widget _buildPackTabItem(Map<String, dynamic> pack, bool isDarkMode) {
+    final url = pack['coverUrl'] ?? pack['thumbnailUrl'] ?? pack['coverMediaId'] ?? '';
     return Tab(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(4),
-          child: SizedBox(width: 30, height: 30, child: _buildSmartImage(url, isDarkMode)),
+          child: SizedBox(
+          width: 30,
+          height: 30,
+          child: _buildSmartImage(
+            (url ?? '').toString(),
+            isDarkMode,
+          ),
+        ),
         ),
       ),
     );
@@ -205,8 +219,11 @@ class _StickerPickerState extends State<StickerPicker> {
 
   Widget _buildSmartImage(String url, bool isDarkMode) {
     if (url.isEmpty) return Icon(Icons.style, size: 24, color: isDarkMode ? Colors.white54 : Colors.black38);
+    
+    final fullUrl = context.read<MediaService>().getPublicUrl(url);
+    
     return CachedNetworkImage(
-      imageUrl: url,
+      imageUrl: fullUrl,
       fit: BoxFit.cover,
       placeholder: (context, url) => Container(color: Colors.grey.withOpacity(0.1)),
       errorWidget: (context, error, stackTrace) => Icon(Icons.style, size: 24, color: isDarkMode ? Colors.white54 : Colors.black38),
@@ -324,15 +341,18 @@ class _StickerPickerState extends State<StickerPicker> {
 
   Widget _stickerItem(Map<String, dynamic> sticker) {
     final id = sticker['stickerId'] ?? sticker['id'];
-    final url = sticker['url'] ?? sticker['mediaUrl'] ?? '';
+    final url = sticker['url'] ?? sticker['mediaUrl'] ?? sticker['mediaId'] ?? '';
     return GestureDetector(
       onTap: () {
         context.read<MediaService>().recordStickerUsage(id.toString());
-        context.read<ChatProvider>().sendSticker(conversationId: widget.conversationId, stickerId: id.toString(), stickerUrl: url);
+        context.read<ChatProvider>().sendSticker(conversationId: widget.conversationId, stickerId: id.toString(), stickerUrl: (url ?? '').toString());
         widget.onSelected();
         _loadRecentStickers();
       },
-      child: _buildSmartImage(url, Theme.of(context).brightness == Brightness.dark),
+      child: _buildSmartImage(
+        (url ?? '').toString(),
+        Theme.of(context).brightness == Brightness.dark,
+      ),
     );
   }
 
@@ -355,11 +375,19 @@ class _StickerPickerState extends State<StickerPicker> {
                 itemCount: allPacks.length,
                 separatorBuilder: (context, index) => const Divider(indent: 70),
                 itemBuilder: (context, index) {
+                  final isDarkMode = Theme.of(context).brightness == Brightness.dark;
                   final pack = allPacks[index];
                   final id = pack['stickerPackId'] ?? pack['id'];
                   final isInstalled = _myPacks.any((p) => (p['stickerPackId'] ?? p['id']).toString() == id.toString());
                   return ListTile(
-                    leading: ClipRRect(borderRadius: BorderRadius.circular(8), child: CachedNetworkImage(imageUrl: pack['coverUrl'] ?? pack['thumbnailUrl'] ?? '', width: 50, height: 50, fit: BoxFit.cover)),
+                    leading: ClipRRect(
+                      borderRadius: BorderRadius.circular(8), 
+                      child: SizedBox(
+                        width: 50,
+                        height: 50,
+                        child: _buildSmartImage((pack['coverUrl'] ?? pack['thumbnailUrl'] ?? pack['coverMediaId'] ?? '').toString(), isDarkMode),
+                      )
+                    ),
                     title: Text(pack['name'] ?? ''),
                     trailing: isInstalled ? const Icon(Icons.check_circle, color: Colors.green) : ElevatedButton(
                       onPressed: () async { await mediaService.installPack(id.toString()); _loadMyPacks(); Navigator.pop(context); },
@@ -394,14 +422,24 @@ class _GifTabContentState extends State<_GifTabContent> {
 
   Future<void> _loadTrending() async {
     setState(() => _isLoading = true);
-    final gifs = await GifService(context.read<MediaService>()).getTrendingGifs();
-    if (mounted) setState(() { _gifs = gifs; _isLoading = false; });
+    try {
+      final gifs = await GifService(context.read<MediaService>()).getTrendingGifs();
+      if (mounted) setState(() { _gifs = gifs; _isLoading = false; });
+    } catch (e) {
+      debugPrint('Error loading GIFs: $e');
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _search(String query) async {
     setState(() => _isLoading = true);
-    final gifs = await GifService(context.read<MediaService>()).searchGifs(query);
-    if (mounted) setState(() { _gifs = gifs; _isLoading = false; });
+    try {
+      final gifs = await GifService(context.read<MediaService>()).searchGifs(query);
+      if (mounted) setState(() { _gifs = gifs; _isLoading = false; });
+    } catch (e) {
+      debugPrint('Error searching GIFs: $e');
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
