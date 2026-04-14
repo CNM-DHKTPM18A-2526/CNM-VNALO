@@ -308,7 +308,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 hintText: 'example@gmail.com',
                 prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF9CA3AF)),
                 filled: true,
-                fillColor: isDarkMode ? DarkColors.surface : const Color(0xFFF9FAFB),
+                fillColor: isDarkMode ? DarkColors.surface : Colors.white,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -539,7 +539,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               decoration: InputDecoration(
                 hintText: t.hintNewPassword,
                 filled: true,
-                fillColor: isDarkMode ? DarkColors.surface : const Color(0xFFF9FAFB),
+                fillColor: isDarkMode ? DarkColors.surface : Colors.white,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 suffixIcon: IconButton(
                   icon: Icon(
@@ -582,7 +582,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               decoration: InputDecoration(
                 hintText: t.hintConfirmPassword,
                 filled: true,
-                fillColor: isDarkMode ? DarkColors.surface : const Color(0xFFF9FAFB),
+                fillColor: isDarkMode ? DarkColors.surface : Colors.white,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 errorText: confirm.isNotEmpty && !isMatch
                     ? t.passwordMismatch
