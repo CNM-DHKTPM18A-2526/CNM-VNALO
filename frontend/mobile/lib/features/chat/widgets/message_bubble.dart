@@ -166,12 +166,15 @@ class MessageBubble extends StatelessWidget {
           bottomLeft: Radius.circular(isMine ? 16 : 4),
           bottomRight: Radius.circular(isMine ? 4 : 16),
         ),
+        border: isDarkMode
+            ? Border.all(color: Colors.white.withValues(alpha: 0.1), width: 0.5)
+            : null,
         boxShadow: [
           if (!isDarkMode && !isMine)
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 2,
-              offset: const Offset(0, 1),
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 3,
+              offset: const Offset(0, 1.5),
             ),
         ],
       ),
@@ -397,11 +400,25 @@ class MessageBubble extends StatelessWidget {
     final isVideo = callLog.mediaType == CallMediaType.video;
     final canCallAgain = _resolveCallAgainTarget(context, callLog) != null;
     final cardColor =
-        isMine
-            ? const Color(0xFF3F4E66)
-            : (isDarkMode ? const Color(0xFF2C2D31) : const Color(0xFFDBE2EE));
+        isDarkMode
+            ? (isMine ? DarkColors.callLogSent : DarkColors.callLogReceived)
+            : (isMine ? LightColors.callLogSent : LightColors.callLogReceived);
 
     final titleColor = _callLogTitleColor(callLog.outcome, isDarkMode);
+    final isMissed =
+        callLog.outcome == CallOutcome.missed ||
+        callLog.outcome == CallOutcome.failed;
+
+    // Contrast text colors for Light Mode
+    final labelColor =
+        isDarkMode
+            ? Colors.white60
+            : (isMine ? const Color(0xFF5D6470) : LightColors.textSecondary);
+    final dividerColor =
+        isDarkMode
+            ? Colors.white.withValues(alpha: 0.12)
+            : Colors.black.withValues(alpha: 0.08);
+
     final title = _callLogTitle(callLog, incoming, isVideo);
     final subtitle = _callLogSubtitle(callLog, isVideo);
     final subtitleIcon = _callLogSubtitleIcon(callLog, isVideo, incoming);
@@ -418,10 +435,14 @@ class MessageBubble extends StatelessWidget {
           bottomLeft: Radius.circular(isMine ? 16 : 6),
           bottomRight: Radius.circular(isMine ? 6 : 16),
         ),
+        border: isDarkMode
+            ? Border.all(color: Colors.white.withValues(alpha: 0.1), width: 0.5)
+            : null,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
+      child: IntrinsicWidth(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 11, 14, 9),
@@ -438,15 +459,20 @@ class MessageBubble extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
+                const SizedBox(width: 180), // Đảm bảo chiều rộng tối thiểu đẹp như Zalo
                 Row(
                   children: [
-                    Icon(subtitleIcon, size: 15, color: Colors.white60),
+                    Icon(
+                      subtitleIcon,
+                      size: 15,
+                      color: isMissed ? titleColor.withValues(alpha: 0.8) : labelColor,
+                    ),
                     const SizedBox(width: 5),
                     Flexible(
                       child: Text(
                         subtitle,
                         style: TextStyle(
-                          color: Colors.white60,
+                          color: labelColor,
                           fontSize: 12,
                           height: 1.1,
                         ),
@@ -457,7 +483,7 @@ class MessageBubble extends StatelessWidget {
               ],
             ),
           ),
-          Container(height: 1, color: Colors.white.withValues(alpha: 0.12)),
+          Container(height: 1, color: dividerColor),
           SizedBox(
             width: double.infinity,
             child: TextButton(
@@ -472,7 +498,7 @@ class MessageBubble extends StatelessWidget {
                 common.callAgainAction,
                 style: TextStyle(
                   color:
-                      canCallAgain ? const Color(0xFF1890FF) : Colors.white30,
+                      canCallAgain ? const Color(0xFF1890FF) : (isDarkMode ? Colors.white30 : Colors.black26),
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
                 ),
@@ -481,8 +507,9 @@ class MessageBubble extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   String _callLogTitle(CallLogMessage callLog, bool incoming, bool isVideo) {
     final base = isVideo ? 'Cuộc gọi video' : 'Cuộc gọi thoại';
@@ -589,7 +616,7 @@ class MessageBubble extends StatelessWidget {
       case CallOutcome.failed:
         return const Color(0xFFFF6B6B);
       default:
-        return isDarkMode ? Colors.white : const Color(0xFFF4F8FF);
+        return isDarkMode ? Colors.white : LightColors.textPrimary;
     }
   }
 

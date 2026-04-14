@@ -9,6 +9,7 @@ import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/profile/providers/avatar_cache_provider.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
+import 'package:vnalo_mobile/features/call/models/call_log_message.dart';
 
 class ChatListItem extends StatelessWidget {
   final Conversation conversation;
@@ -164,6 +165,14 @@ class ChatListItem extends StatelessWidget {
       return '${prefix}Tin nhắn đã thu hồi';
     }
 
+    final rawContent = message.content ?? '';
+    final log = CallLogMessage.tryParse(rawContent);
+    if (log != null) {
+      final isVoice = log.mediaType == CallMediaType.voice;
+      final typeStr = isVoice ? 'thoại' : 'video';
+      return '$prefix[Cuộc gọi $typeStr]';
+    }
+
     final content = (message.content ?? '').trim();
     final mediaUrl = (message.mediaUrl ?? '').trim();
     final typePreview = switch (message.messageType) {
@@ -173,7 +182,17 @@ class ChatListItem extends StatelessWidget {
       MessageType.FILE => _filePreview(content),
       MessageType.AUDIO => '[Âm thanh]',
       MessageType.STICKER => '[Sticker]',
-      MessageType.SYSTEM => content.isNotEmpty ? content : '[Hệ thống]',
+      MessageType.SYSTEM => (() {
+        if (content.startsWith('CALL_LOG::')) {
+          final log = CallLogMessage.tryParse(content);
+          if (log != null) {
+            final isVoice = log.mediaType == CallMediaType.voice;
+            final typeStr = isVoice ? 'thoại' : 'video';
+            return '[Cuộc gọi $typeStr]';
+          }
+        }
+        return content.isNotEmpty ? content : '[Hệ thống]';
+      })(),
       MessageType.REPLY => content.isNotEmpty ? '[Trả lời] $content' : '[Trả lời]',
       MessageType.FORWARD => content.isNotEmpty ? '[Chuyển tiếp] $content' : '[Chuyển tiếp]',
     };
@@ -182,7 +201,14 @@ class ChatListItem extends StatelessWidget {
       return '$prefix[Link] $mediaUrl';
     }
 
-    return '$prefix${typePreview ?? ''}'.trim();
+    final result = '$prefix${typePreview ?? ''}'.trim();
+    
+    // FINAL SAFEGUARD: Nếu vẫn còn lộ call_log thì ép về text sạch
+    if (result.contains('CALL_LOG::')) {
+      return '$prefix[Cuộc gọi]';
+    }
+    
+    return result;
   }
 
   String _filePreview(String content) {

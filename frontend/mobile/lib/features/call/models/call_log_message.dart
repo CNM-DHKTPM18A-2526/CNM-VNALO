@@ -43,10 +43,25 @@ class CallLogMessage {
   }
 
   static CallLogMessage? tryParse(String? content) {
-    if (content == null || !content.startsWith(_prefix)) return null;
+    if (content == null) return null;
+
+    final index = content.indexOf(_prefix);
+    if (index == -1) return null;
 
     try {
-      final jsonPart = content.substring(_prefix.length);
+      // Tìm phần nội dung sau tiền tố
+      String jsonPart = content.substring(index + _prefix.length).trim();
+      
+      // Tìm vị trí của dấu { đầu tiên và } cuối cùng để trích xuất JSON sạch
+      final start = jsonPart.indexOf('{');
+      final end = jsonPart.lastIndexOf('}');
+      if (start == -1 || end == -1 || start >= end) return null;
+      
+      jsonPart = jsonPart.substring(start, end + 1);
+      
+      // Unescape toàn diện (loại bỏ \" và các ký tự escape lồng nhau)
+      jsonPart = jsonPart.replaceAll('\\"', '"').replaceAll('\\\\', '\\');
+
       final decoded = jsonDecode(jsonPart);
       if (decoded is! Map) return null;
 
@@ -59,23 +74,20 @@ class CallLogMessage {
       final outcome = _enumOrDefault(
         CallOutcome.values,
         map['outcome']?.toString(),
-        CallOutcome.failed,
+        CallOutcome.answered,
       );
 
       return CallLogMessage(
-        callId: map['callId']?.toString() ?? '',
-        conversationId: map['conversationId']?.toString() ?? '',
-        callerId: map['callerId']?.toString() ?? '',
-        calleeId: map['calleeId']?.toString() ?? '',
+        callId: map['callId'] ?? '',
+        conversationId: map['conversationId'] ?? '',
+        callerId: map['callerId'] ?? '',
+        calleeId: map['calleeId'] ?? '',
         mediaType: mediaType,
         outcome: outcome,
-        durationSeconds:
-            int.tryParse(map['durationSeconds']?.toString() ?? '') ?? 0,
-        createdAt:
-            DateTime.tryParse(map['createdAt']?.toString() ?? '') ??
-            DateTime.now(),
+        durationSeconds: (map['durationSeconds'] as num?)?.toInt() ?? 0,
+        createdAt: DateTime.tryParse(map['createdAt'] ?? '') ?? DateTime.now(),
       );
-    } catch (_) {
+    } catch (e) {
       return null;
     }
   }
