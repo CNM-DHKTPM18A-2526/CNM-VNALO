@@ -37,7 +37,7 @@ class ChatListItem extends StatelessWidget {
     final secondaryTextColor = isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary;
     final hintColor = isDarkMode ? DarkColors.textHint : LightColors.textHint;
     final dividerColor = isDarkMode ? DarkColors.divider : const Color(0xFFE9EDF3);
-    final lastPreview = _buildLastMessagePreview(currentUserId);
+    final lastPreview = _buildLastMessagePreview(currentUserId, common);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -164,15 +164,15 @@ class ChatListItem extends StatelessWidget {
     return other.userId;
   }
 
-  String? _buildLastMessagePreview(String currentUserId) {
+  String? _buildLastMessagePreview(String currentUserId, CommonTexts common) {
     final message = conversation.lastMessage;
     if (message == null) return null;
 
     final isMine = message.senderId.isNotEmpty && message.senderId == currentUserId;
     final prefix = isMine ? 'Bạn: ' : '';
 
-    if (message.status == MessageStatus.RECALLED) {
-      return '${prefix}Tin nhắn đã thu hồi';
+    if (message.isRecalled) {
+      return '$prefix${common.msgRecalled}';
     }
 
     final rawContent = message.content ?? '';

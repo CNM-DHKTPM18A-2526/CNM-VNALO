@@ -288,8 +288,8 @@ class MessageBubble extends StatelessWidget {
             final confirmed = await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
-                title: Text(common.recallAction),
-                content: Text(common.confirmRecallMessage),
+                title: Text(common.recallMessageTitle),
+                content: Text(common.recallMessagePrompt),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, false),
@@ -298,7 +298,7 @@ class MessageBubble extends StatelessWidget {
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, true),
                     style: TextButton.styleFrom(foregroundColor: Colors.orange),
-                    child: Text(common.recallAction),
+                    child: Text(common.recallMessageTitle),
                   ),
                 ],
               ),
@@ -312,8 +312,8 @@ class MessageBubble extends StatelessWidget {
             final confirmed = await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
-                title: Text(common.deleteForMeAction),
-                content: Text(common.confirmDeleteForMe),
+                title: Text(common.deleteMessageTitle),
+                content: Text(common.deleteMessagePrompt),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, false),
@@ -322,7 +322,7 @@ class MessageBubble extends StatelessWidget {
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, true),
                     style: TextButton.styleFrom(foregroundColor: Colors.red),
-                    child: Text(common.delete),
+                    child: Text(common.deleteMessageTitle),
                   ),
                 ],
               ),
