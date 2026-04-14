@@ -700,6 +700,7 @@ class MessageBubble extends StatelessWidget {
                       (_) => FullScreenImageViewer(
                         imageUrl: resolvedUrl,
                         isLocal: isLocal,
+                        accessToken: token,
                       ),
                 ),
               );
