@@ -5,6 +5,11 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 
 class WebRtcCallService extends ChangeNotifier {
+  static const int _defaultRingTimeoutSeconds = int.fromEnvironment(
+    'CALL_RING_TIMEOUT_SECONDS',
+    defaultValue: 38,
+  );
+
   final SocketService _socketService;
   final String conversationId;
   final String callId;
@@ -12,12 +17,14 @@ class WebRtcCallService extends ChangeNotifier {
   final String peerUserId;
   final bool audioOnly;
   final bool isCaller;
+  final int ringTimeoutSeconds;
 
   RTCPeerConnection? _peerConnection;
   MediaStream? _localStream;
   MediaStream? _remoteStream;
   StreamSubscription<Map<String, dynamic>>? _signalSubscription;
   final List<RTCIceCandidate> _pendingCandidates = [];
+  Timer? _ringTimeoutTimer;
 
   bool _isInitializing = false;
   bool _isConnected = false;
@@ -39,7 +46,12 @@ class WebRtcCallService extends ChangeNotifier {
     required this.peerUserId,
     required this.audioOnly,
     required this.isCaller,
-  }) : _socketService = socketService;
+    int? ringTimeoutSeconds,
+  }) : ringTimeoutSeconds =
+           (ringTimeoutSeconds == null || ringTimeoutSeconds <= 0)
+               ? _defaultRingTimeoutSeconds
+               : ringTimeoutSeconds,
+       _socketService = socketService;
 
   MediaStream? get localStream => _localStream;
   MediaStream? get remoteStream => _remoteStream;
@@ -78,6 +90,7 @@ class WebRtcCallService extends ChangeNotifier {
 
       if (isCaller) {
         await _createAndSendOffer();
+        _startRingTimeoutCountdown();
       }
     } catch (e) {
       _errorMessage = _mapInitError(e);
@@ -123,6 +136,7 @@ class WebRtcCallService extends ChangeNotifier {
         if (!_isConnected) {
           _isConnected = true;
           _connectedAt = DateTime.now();
+          _ringTimeoutTimer?.cancel();
           notifyListeners();
         }
       }
@@ -174,6 +188,19 @@ class WebRtcCallService extends ChangeNotifier {
       senderUserId: currentUserId,
       sdp: {'type': offer.type, 'sdp': offer.sdp},
     );
+  }
+
+  void _startRingTimeoutCountdown() {
+    _ringTimeoutTimer?.cancel();
+    if (!isCaller || ringTimeoutSeconds <= 0) return;
+
+    _ringTimeoutTimer = Timer(Duration(seconds: ringTimeoutSeconds), () async {
+      if (_isEnded || _isConnected) return;
+      _errorMessage =
+          'Người nhận chưa bắt máy sau $ringTimeoutSeconds giây. Cuộc gọi đã tự động kết thúc.';
+      notifyListeners();
+      await endCall(reason: 'no-answer-timeout');
+    });
   }
 
   Future<void> _onSignalEvent(Map<String, dynamic> signal) async {
@@ -371,6 +398,8 @@ class WebRtcCallService extends ChangeNotifier {
     _isEnded = true;
     _isConnected = false;
     _lastEndReason = reason;
+    _ringTimeoutTimer?.cancel();
+    _ringTimeoutTimer = null;
 
     if (notifyPeer) {
       _socketService.endCall(
@@ -415,6 +444,7 @@ class WebRtcCallService extends ChangeNotifier {
 
   @override
   void dispose() {
+    _ringTimeoutTimer?.cancel();
     unawaited(endCall(notifyPeer: false));
     super.dispose();
   }
