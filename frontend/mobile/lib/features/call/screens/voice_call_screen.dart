@@ -33,7 +33,6 @@ class VoiceCallScreen extends StatefulWidget {
 class _VoiceCallScreenState extends State<VoiceCallScreen> {
   late final WebRtcCallService _callService;
   late final Timer _ticker;
-  Timer? _timeoutTimer;
   bool _logSent = false;
 
   String get _callId =>
@@ -55,14 +54,6 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
     unawaited(_callService.initialize());
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
-    });
-
-    // Tự động ngắt cuộc gọi sau 38 giây nếu không có người nghe
-    _timeoutTimer = Timer(const Duration(seconds: 38), () {
-      if (mounted && !_callService.isConnected) {
-        debugPrint('Call timeout: No answer after 38s');
-        _endCallAndClose();
-      }
     });
   }
 
@@ -146,7 +137,6 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
   @override
   void dispose() {
     _ticker.cancel();
-    _timeoutTimer?.cancel();
     _sendCallLogIfNeeded();
     _callService.removeListener(_onCallStateChanged);
     _callService.dispose();
@@ -160,13 +150,14 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (context) => VideoCallScreen(
-          conversationId: widget.conversationId,
-          currentUserId: widget.currentUserId,
-          targetUserId: widget.targetUserId,
-          targetDisplayName: widget.targetDisplayName,
-          targetAvatarUrl: widget.targetAvatarUrl,
-        ),
+        builder:
+            (context) => VideoCallScreen(
+              conversationId: widget.conversationId,
+              currentUserId: widget.currentUserId,
+              targetUserId: widget.targetUserId,
+              targetDisplayName: widget.targetDisplayName,
+              targetAvatarUrl: widget.targetAvatarUrl,
+            ),
       ),
     );
   }
@@ -175,7 +166,8 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     // Layering Law: Trong cuộc gọi, ta thường ưu tiên không gian tối chuyên sâu (Premium)
-    final backgroundColor = isDarkMode ? const Color(0xFF000000) : const Color(0xFF086CFF);
+    final backgroundColor =
+        isDarkMode ? const Color(0xFF000000) : const Color(0xFF086CFF);
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -185,152 +177,168 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
           Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
-                gradient: isDarkMode
-                    ? RadialGradient(
-                        center: const Alignment(0, -0.4),
-                        radius: 1.2,
-                        colors: [
-                          const Color(0xFF131313).withValues(alpha: 0.8),
-                          const Color(0xFF000000),
-                        ],
-                      )
-                    : const RadialGradient(
-                        center: Alignment(0, -0.4),
-                        radius: 1.0,
-                        colors: [
-                          Color(0xFF4EB4FF),
-                          Color(0xFF0B6DFF),
-                          Color(0xFF0058D6),
-                        ],
-                      ),
+                gradient:
+                    isDarkMode
+                        ? RadialGradient(
+                          center: const Alignment(0, -0.4),
+                          radius: 1.2,
+                          colors: [
+                            const Color(0xFF131313).withValues(alpha: 0.8),
+                            const Color(0xFF000000),
+                          ],
+                        )
+                        : const RadialGradient(
+                          center: Alignment(0, -0.4),
+                          radius: 1.0,
+                          colors: [
+                            Color(0xFF4EB4FF),
+                            Color(0xFF0B6DFF),
+                            Color(0xFF0058D6),
+                          ],
+                        ),
               ),
             ),
           ),
           SafeArea(
             child: Column(
-                children: [
-                  const SizedBox(height: 12),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _TopCircleIconButton(
-                          icon: Icons.keyboard_arrow_down,
-                          onTap: _endCallAndClose,
-                        ),
-                        const Text(
-                          'VNALO',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.8,
-                          ),
-                        ),
-                        _TopCircleIconButton(
-                          icon: Icons.videocam,
-                          onTap: _upgradeToVideoCall,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Spacer(flex: 1),
-                  // Avatar & Animated Ripples
-                  Stack(
-                    alignment: Alignment.center,
+              children: [
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      if (!_callService.isConnected) ...[
-                        const _AnimatedPulseRing(size: 280, delay: Duration(milliseconds: 0)),
-                        const _AnimatedPulseRing(size: 224, delay: Duration(milliseconds: 800)),
-                        const _AnimatedPulseRing(size: 172, delay: Duration(milliseconds: 1600)),
-                      ] else ...[
-                        _RingLayer(size: 280, alpha: 0.08),
-                        _RingLayer(size: 224, alpha: 0.1),
-                        _RingLayer(size: 172, alpha: 0.12),
-                      ],
-                      Container(
-                        width: 140,
-                        height: 140,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.35),
-                            width: 2.5,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.2),
-                              blurRadius: 20,
-                              spreadRadius: 5,
-                            ),
-                          ],
+                      _TopCircleIconButton(
+                        icon: Icons.keyboard_arrow_down,
+                        onTap: _endCallAndClose,
+                      ),
+                      const Text(
+                        'VNALO',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
                         ),
-                        child: ClipOval(
-                          child: AvatarWidget(
-                            imageUrl: widget.targetAvatarUrl,
-                            name: widget.targetDisplayName,
-                            size: 135,
-                          ),
-                        ),
+                      ),
+                      _TopCircleIconButton(
+                        icon: Icons.videocam,
+                        onTap: _upgradeToVideoCall,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 32),
-                  Text(
-                    widget.targetDisplayName,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    _buildStatusText(),
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.85),
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const Spacer(flex: 4),
-                  // Bottom Controls
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 48),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _BottomControl(
-                          icon: _callService.isSpeakerOn ? Icons.volume_up : Icons.volume_off,
-                          label: 'Loa',
-                          onTap: () => unawaited(_callService.toggleSpeaker()),
-                          active: _callService.isSpeakerOn,
+                ),
+                const Spacer(flex: 1),
+                // Avatar & Animated Ripples
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    if (!_callService.isConnected) ...[
+                      const _AnimatedPulseRing(
+                        size: 280,
+                        delay: Duration(milliseconds: 0),
+                      ),
+                      const _AnimatedPulseRing(
+                        size: 224,
+                        delay: Duration(milliseconds: 800),
+                      ),
+                      const _AnimatedPulseRing(
+                        size: 172,
+                        delay: Duration(milliseconds: 1600),
+                      ),
+                    ] else ...[
+                      _RingLayer(size: 280, alpha: 0.08),
+                      _RingLayer(size: 224, alpha: 0.1),
+                      _RingLayer(size: 172, alpha: 0.12),
+                    ],
+                    Container(
+                      width: 140,
+                      height: 140,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.35),
+                          width: 2.5,
                         ),
-                        _BottomControl(
-                          icon: Icons.call_end,
-                          label: 'Kết thúc',
-                          onTap: _endCallAndClose,
-                          destructive: true,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.2),
+                            blurRadius: 20,
+                            spreadRadius: 5,
+                          ),
+                        ],
+                      ),
+                      child: ClipOval(
+                        child: AvatarWidget(
+                          imageUrl: widget.targetAvatarUrl,
+                          name: widget.targetDisplayName,
+                          size: 135,
                         ),
-                        _BottomControl(
-                          icon: _callService.isMicrophoneEnabled ? Icons.mic : Icons.mic_off,
-                          label: 'Mic',
-                          onTap: () => unawaited(_callService.toggleMicrophone()),
-                          active: _callService.isMicrophoneEnabled,
-                        ),
-                      ],
+                      ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 32),
+                Text(
+                  widget.targetDisplayName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _buildStatusText(),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.85),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const Spacer(flex: 4),
+                // Bottom Controls
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 48),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _BottomControl(
+                        icon:
+                            _callService.isSpeakerOn
+                                ? Icons.volume_up
+                                : Icons.volume_off,
+                        label: 'Loa',
+                        onTap: () => unawaited(_callService.toggleSpeaker()),
+                        active: _callService.isSpeakerOn,
+                      ),
+                      _BottomControl(
+                        icon: Icons.call_end,
+                        label: 'Kết thúc',
+                        onTap: _endCallAndClose,
+                        destructive: true,
+                      ),
+                      _BottomControl(
+                        icon:
+                            _callService.isMicrophoneEnabled
+                                ? Icons.mic
+                                : Icons.mic_off,
+                        label: 'Mic',
+                        onTap: () => unawaited(_callService.toggleMicrophone()),
+                        active: _callService.isMicrophoneEnabled,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      );
-    }
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _TopCircleIconButton extends StatelessWidget {
@@ -350,9 +358,7 @@ class _TopCircleIconButton extends StatelessWidget {
           color: Colors.black.withValues(alpha: 0.5),
           shape: BoxShape.circle,
         ),
-        child: Center(
-          child: Icon(icon, color: Colors.white, size: 28),
-        ),
+        child: Center(child: Icon(icon, color: Colors.white, size: 28)),
       ),
     );
   }
@@ -390,7 +396,8 @@ class _AnimatedPulseRing extends StatefulWidget {
   State<_AnimatedPulseRing> createState() => _AnimatedPulseRingState();
 }
 
-class _AnimatedPulseRingState extends State<_AnimatedPulseRing> with SingleTickerProviderStateMixin {
+class _AnimatedPulseRingState extends State<_AnimatedPulseRing>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
@@ -403,9 +410,10 @@ class _AnimatedPulseRingState extends State<_AnimatedPulseRing> with SingleTicke
       duration: const Duration(milliseconds: 2400),
     );
 
-    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.2).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
+    _scaleAnimation = Tween<double>(
+      begin: 0.8,
+      end: 1.2,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
     _opacityAnimation = TweenSequence<double>([
       TweenSequenceItem(tween: Tween<double>(begin: 0.0, end: 0.2), weight: 30),
@@ -473,9 +481,12 @@ class _BottomControl extends StatelessWidget {
             width: 72,
             height: 72,
             decoration: BoxDecoration(
-              color: destructive
-                  ? const Color(0xFFFF3B30) // Solid Red like Zalo
-                  : Colors.black.withValues(alpha: 0.5), // Đồng bộ với Appbar
+              color:
+                  destructive
+                      ? const Color(0xFFFF3B30) // Solid Red like Zalo
+                      : Colors.black.withValues(
+                        alpha: 0.5,
+                      ), // Đồng bộ với Appbar
               shape: BoxShape.circle,
               boxShadow: [
                 if (destructive)
@@ -486,9 +497,7 @@ class _BottomControl extends StatelessWidget {
                   ),
               ],
             ),
-            child: Center(
-              child: Icon(icon, color: Colors.white, size: 36),
-            ),
+            child: Center(child: Icon(icon, color: Colors.white, size: 36)),
           ),
         ),
         const SizedBox(height: 10),

@@ -36,7 +36,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   late final RTCVideoRenderer _localRenderer;
   late final RTCVideoRenderer _remoteRenderer;
   late final Timer _ticker;
-  Timer? _timeoutTimer;
 
   bool _logSent = false;
   String? _initError;
@@ -63,14 +62,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     unawaited(_initRenderersAndCall());
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
-    });
-
-    // Tự động ngắt cuộc gọi sau 38 giây nếu không có người nghe
-    _timeoutTimer = Timer(const Duration(seconds: 38), () {
-      if (mounted && !_callService.isConnected) {
-        debugPrint('Video Call timeout: No answer after 38s');
-        _endCallAndClose();
-      }
     });
   }
 
@@ -174,7 +165,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   @override
   void dispose() {
     _ticker.cancel();
-    _timeoutTimer?.cancel();
     _sendCallLogIfNeeded();
     _callService.removeListener(_onCallStateChanged);
     _callService.dispose();
@@ -227,27 +217,27 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
             child:
                 _callService.isConnected && remoteStream != null
                     ? RTCVideoView(
-                        _remoteRenderer,
-                        objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-                      )
+                      _remoteRenderer,
+                      objectFit:
+                          RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                    )
                     : (_callService.localStream != null
                         ? RTCVideoView(
-                            _localRenderer,
-                            objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-                            mirror: true,
-                          )
+                          _localRenderer,
+                          objectFit:
+                              RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                          mirror: true,
+                        )
                         : _RemotePlaceholder(
-                            name: widget.targetDisplayName,
-                            avatarUrl: widget.targetAvatarUrl,
-                            status: _buildStatusText(),
-                          )),
+                          name: widget.targetDisplayName,
+                          avatarUrl: widget.targetAvatarUrl,
+                          status: _buildStatusText(),
+                        )),
           ),
           // Dark overlay to make UI more readable during ringing with local camera
           if (!_callService.isConnected)
             Positioned.fill(
-              child: Container(
-                color: Colors.black.withValues(alpha: 0.15),
-              ),
+              child: Container(color: Colors.black.withValues(alpha: 0.15)),
             ),
           // Backdrop for top controls shadow
           if (!_callService.isConnected)
@@ -305,7 +295,9 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         color: Colors.white,
                         fontSize: 26,
                         fontWeight: FontWeight.w700,
-                        shadows: [Shadow(color: Colors.black45, blurRadius: 15)],
+                        shadows: [
+                          Shadow(color: Colors.black45, blurRadius: 15),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -315,7 +307,9 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         color: Colors.white,
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
-                        shadows: [Shadow(color: Colors.black45, blurRadius: 10)],
+                        shadows: [
+                          Shadow(color: Colors.black45, blurRadius: 10),
+                        ],
                       ),
                     ),
                     const Spacer(),
@@ -348,13 +342,19 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       _VideoActionButton(
-                        icon: _callService.isCameraEnabled ? Icons.videocam : Icons.videocam_off,
+                        icon:
+                            _callService.isCameraEnabled
+                                ? Icons.videocam
+                                : Icons.videocam_off,
                         label: 'Camera',
                         onTap: () => unawaited(_callService.toggleCamera()),
                         active: _callService.isCameraEnabled,
                       ),
                       _VideoActionButton(
-                        icon: _callService.isMicrophoneEnabled ? Icons.mic : Icons.mic_off,
+                        icon:
+                            _callService.isMicrophoneEnabled
+                                ? Icons.mic
+                                : Icons.mic_off,
                         label: 'Mic',
                         onTap: () => unawaited(_callService.toggleMicrophone()),
                         active: _callService.isMicrophoneEnabled,
@@ -372,7 +372,9 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         onTap: () {
                           // Placeholder for future features (Filters, Screen Sharing, etc.)
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Tính năng đang phát triển')),
+                            const SnackBar(
+                              content: Text('Tính năng đang phát triển'),
+                            ),
                           );
                         },
                         active: true,
@@ -406,9 +408,7 @@ class _TopCircleIconButton extends StatelessWidget {
           color: Colors.black.withValues(alpha: 0.5),
           shape: BoxShape.circle,
         ),
-        child: Center(
-          child: Icon(icon, color: Colors.white, size: 28),
-        ),
+        child: Center(child: Icon(icon, color: Colors.white, size: 28)),
       ),
     );
   }
@@ -418,7 +418,10 @@ class _SmallParticipantView extends StatelessWidget {
   final String displayName;
   final String status;
 
-  const _SmallParticipantView({required this.displayName, required this.status});
+  const _SmallParticipantView({
+    required this.displayName,
+    required this.status,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -519,9 +522,10 @@ class _VideoActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = destructive
-        ? const Color(0xFFFF3B30) // Solid Red like Zalo
-        : Colors.black.withValues(alpha: 0.5); // Đồng bộ với Appbar
+    final backgroundColor =
+        destructive
+            ? const Color(0xFFFF3B30) // Solid Red like Zalo
+            : Colors.black.withValues(alpha: 0.5); // Đồng bộ với Appbar
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -543,9 +547,7 @@ class _VideoActionButton extends StatelessWidget {
                   ),
               ],
             ),
-            child: Center(
-              child: Icon(icon, color: Colors.white, size: 34),
-            ),
+            child: Center(child: Icon(icon, color: Colors.white, size: 34)),
           ),
         ),
         if (label != null) ...[
