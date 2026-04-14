@@ -25,6 +25,17 @@ export type SendMessageAck = {
   message?: string
 }
 
+export type RecallMessagePayload = {
+  messageId: string
+  conversationId: string
+}
+
+export type RecallMessageAck = {
+  event?: 'message.recalled' | string
+  data?: RawMessage
+  message?: string
+}
+
 const SEND_ACK_TIMEOUT_MS = 4000
 
 export type MessageReadPayload = {
@@ -230,6 +241,56 @@ export class ChatSocketService {
         window.clearTimeout(timeoutId)
         console.log('[SEND] ✅ Received ACK from backend:', ack)
         resolve((ack as SendMessageAck | null) ?? null)
+      })
+    })
+  }
+
+  async emitRecallMessage(payload: RecallMessagePayload): Promise<RecallMessageAck | null> {
+    if (!this.joinedConversations) {
+      this.joinedConversations = new Set<string>()
+    }
+
+    if (!this.socket?.connected) {
+      return {
+        event: 'message.error',
+        message: 'Socket is not connected',
+      }
+    }
+
+    if (!this.joinedConversations.has(payload.conversationId)) {
+      return {
+        event: 'message.error',
+        message: `Conversation ${payload.conversationId} not joined`,
+      }
+    }
+
+    return new Promise((resolve) => {
+      if (!this.socket) {
+        return resolve({
+          event: 'message.error',
+          message: 'Socket instance unavailable',
+        })
+      }
+
+      let settled = false
+      const timeoutId = window.setTimeout(() => {
+        if (settled) {
+          return
+        }
+        settled = true
+        resolve({
+          event: 'message.error',
+          message: 'ACK timeout from backend',
+        })
+      }, SEND_ACK_TIMEOUT_MS)
+
+      this.socket.emit('message.recall', payload, (ack: unknown) => {
+        if (settled) {
+          return
+        }
+        settled = true
+        window.clearTimeout(timeoutId)
+        resolve((ack as RecallMessageAck | null) ?? null)
       })
     })
   }

@@ -23,6 +23,10 @@ type IconName =
   | 'help'
   | 'close'
   | 'layoutSidebar'
+  | 'folder'
+  | 'checkSquare'
+  | 'cloud'
+  | 'briefcase'
 
 type IconProps = {
   name: IconName
@@ -259,6 +263,40 @@ export function Icon({ name, className }: IconProps) {
         <line x1='13.5' y1='9' x2='18' y2='9' />
         <line x1='13.5' y1='12' x2='18' y2='12' />
         <line x1='13.5' y1='15' x2='16.8' y2='15' />
+      </svg>
+    )
+  }
+
+  if (name === 'checkSquare') {
+    return (
+      <svg {...commonProps}>
+        <polyline points='9 11 12 14 22 4' />
+        <path d='M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11' />
+      </svg>
+    )
+  }
+
+  if (name === 'cloud') {
+    return (
+      <svg {...commonProps}>
+        <path d='M17.5 19c2.5 0 4.5-2 4.5-4.5 0-2.3-1.7-4.2-3.9-4.5-1.1-3.6-4.5-6-8.1-6-3.3 0-6.2 2-7.4 5-2.1.2-3.8 2-3.8 4.2C0 16.5 2 18.5 4.5 18.5h13' />
+      </svg>
+    )
+  }
+
+  if (name === 'briefcase') {
+    return (
+      <svg {...commonProps}>
+        <rect x='2' y='7' width='20' height='14' rx='2' />
+        <path d='M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16' />
+      </svg>
+    )
+  }
+
+  if (name === 'folder') {
+    return (
+      <svg {...commonProps}>
+        <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
       </svg>
     )
   }

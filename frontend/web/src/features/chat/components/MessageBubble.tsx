@@ -1,8 +1,9 @@
-import { MoreHorizontal, Pin, Star } from 'lucide-react'
+import { MoreHorizontal, Pin, Share2, Star } from 'lucide-react'
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 
 import type { ChatMessage } from '../chat.types'
 import { Icon } from '../../../shared/components/Icon'
+import { UserAvatar } from '../../../shared/components/UserAvatar'
 import { DEFAULT_CHAT_STICKERS } from '../chat.stickers'
 import { useImageViewer } from './ImageViewer'
 import { MessageReactionBar, MessageReactionSummary, REACTION_OPTIONS, type MessageReactionMap, type ReactionKey } from './MessageReaction'
@@ -39,6 +40,10 @@ function resolveStickerSrc(message: ChatMessage): string | null {
 
 type MessageBubbleProps = {
   message: ChatMessage
+  senderName?: string
+  senderAvatarUrl?: string | null
+  showAvatar?: boolean
+  showSenderName?: boolean
   quickReaction?: ReactionKey
   reactions: MessageReactionMap
   onAddReaction: (reactionKey: ReactionKey) => void
@@ -58,6 +63,10 @@ const HOVER_HIDE_DELAY_MS = 180
 
 export function MessageBubble({
   message,
+  senderName,
+  senderAvatarUrl = null,
+  showAvatar = true,
+  showSenderName = false,
   quickReaction,
   reactions,
   onAddReaction,
@@ -232,6 +241,14 @@ export function MessageBubble({
     onContextMenuAction?.(action, message)
   }
 
+  const handleShareClick = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    closeContextMenu()
+    closeReactionUi()
+    onContextMenuAction?.('share', message)
+  }
+
   useEffect(() => {
     const mediaQuery = window.matchMedia('(hover: hover) and (pointer: fine)')
 
@@ -321,6 +338,11 @@ export function MessageBubble({
 
   return (
     <div className={message.sender === 'me' ? 'message-row message-row-me' : 'message-row'} data-message-id={message.id}>
+      {!isMyMessage ? (
+        <div className={showAvatar ? 'message-row-avatar' : 'message-row-avatar message-row-avatar-spacer'}>
+          {showAvatar ? <UserAvatar name={senderName || 'Người dùng'} imageUrl={senderAvatarUrl} size='sm' /> : null}
+        </div>
+      ) : null}
       <div
         ref={stackRef}
         className='message-stack'
@@ -355,16 +377,27 @@ export function MessageBubble({
           </button>
         ) : null}
 
-          <button
-            ref={contextMenuTriggerRef}
-            type='button'
-            className={isMyMessage ? 'message-context-menu-trigger message-context-menu-trigger-me' : 'message-context-menu-trigger'}
-            onClick={handleContextMenuTriggerClick}
-            aria-label='Mở menu tin nhắn'
-            aria-expanded={isContextMenuOpen}
-          >
-            <MoreHorizontal />
-          </button>
+          <div className={isMyMessage ? 'message-action-toolbar message-action-toolbar-me' : 'message-action-toolbar'}>
+            <button
+              type='button'
+              className='message-share-trigger'
+              onClick={handleShareClick}
+              aria-label='Chia sẻ tin nhắn'
+            >
+              <Share2 />
+            </button>
+
+            <button
+              ref={contextMenuTriggerRef}
+              type='button'
+              className='message-context-menu-trigger'
+              onClick={handleContextMenuTriggerClick}
+              aria-label='Mở menu tin nhắn'
+              aria-expanded={isContextMenuOpen}
+            >
+              <MoreHorizontal />
+            </button>
+          </div>
 
           {isContextMenuOpen ? (
             <MessageContextMenu
@@ -385,6 +418,8 @@ export function MessageBubble({
           }
           onClick={handleMessageTap}
         >
+        {!isMyMessage && showSenderName ? <div className='message-sender-name'>{senderName || 'Người dùng'}</div> : null}
+
         {isPinned || isStarred ? (
           <div className='message-bubble-flag-row'>
             {isPinned ? (

@@ -12,6 +12,9 @@ export const translations = {
       brandSub: 'Web chat',
       workspace: 'Workspace',
       team: 'VNALO Team',
+      documents: 'Documents',
+      todo: 'To-do',
+      cloud: 'Cloud',
     },
     topbar: {
       subtitle: 'Fast, clean, and clear for daily team chat flows',
@@ -54,6 +57,20 @@ export const translations = {
       settings: {
         title: 'Settings',
         subtitle: 'Customize notifications, theme, and account security.',
+      },
+      documents: {
+        title: 'My Documents',
+        search_placeholder: 'Search for documents...',
+        tab_all: 'All',
+        tab_images: 'Images',
+        tab_videos: 'Videos',
+        tab_files: 'Files',
+        tab_links: 'Links',
+        col_name: 'Document name',
+        col_sender: 'Sender',
+        col_conversation: 'Conversation',
+        col_date: 'Date',
+        empty: 'No documents found',
       },
     },
     settings: {
@@ -430,6 +447,9 @@ export const translations = {
       brandSub: 'Web chat',
       workspace: 'Không gian làm việc',
       team: 'Đội VNALO',
+      documents: 'Tài liệu',
+      todo: 'To-do',
+      cloud: 'Cloud',
     },
     topbar: {
       subtitle: 'Nhanh, gọn, rõ ràng cho luồng chat đội nhóm hằng ngày',
@@ -472,6 +492,20 @@ export const translations = {
       settings: {
         title: 'Cài đặt',
         subtitle: 'Tùy chỉnh trải nghiệm thông báo, giao diện và bảo mật tài khoản.',
+      },
+      documents: {
+        title: 'Quản lý file',
+        search_placeholder: 'Tìm kiếm tài liệu...',
+        tab_all: 'Tất cả',
+        tab_images: 'Hình ảnh',
+        tab_videos: 'Video',
+        tab_files: 'Tài liệu',
+        tab_links: 'Liên kết',
+        col_name: 'Tên tài liệu',
+        col_sender: 'Người gửi',
+        col_conversation: 'Hội thoại',
+        col_date: 'Ngày gửi',
+        empty: 'Không tìm thấy tài liệu nào',
       },
     },
     settings: {

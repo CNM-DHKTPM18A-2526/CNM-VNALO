@@ -5,7 +5,7 @@ import type { CSSProperties } from 'react'
 
 import type { ChatMessage } from '../chat.types'
 
-export type MessageContextMenuAction = 'copy' | 'pin' | 'star' | 'multiSelect' | 'details' | 'more' | 'recall' | 'deleteSelf'
+export type MessageContextMenuAction = 'copy' | 'share' | 'pin' | 'star' | 'multiSelect' | 'details' | 'more' | 'recall' | 'deleteSelf'
 
 type MessageContextMenuPosition = {
   top: number

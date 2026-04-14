@@ -26,7 +26,13 @@ export function ChatItem({ conversation, active, index, onSelect }: ChatItemProp
       type='button'
     >
       <div className='chat-item-avatar-wrap'>
-        <UserAvatar name={conversation?.name ?? ''} size='md' />
+        <UserAvatar 
+          name={conversation?.name ?? ''} 
+          imageUrl={conversation?.avatarUrl ?? null} 
+          size='md' 
+          isGroup={conversation?.isGroup}
+          isCloud={conversation?.isCloud}
+        />
         {isOnline ? <span className='chat-item-online-dot' /> : null}
       </div>
       <div className='chat-item-content'>
