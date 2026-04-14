@@ -24,6 +24,7 @@ import 'package:vnalo_mobile/services/media_cache_service.dart';
 import 'package:vnalo_mobile/features/timeline/providers/post_provider.dart';
 import 'package:vnalo_mobile/features/chat/providers/forward_provider.dart';
 import 'package:vnalo_mobile/features/profile/providers/avatar_cache_provider.dart';
+import 'package:vnalo_mobile/features/call/widgets/incoming_call_coordinator.dart';
 import 'package:vnalo_mobile/services/notification_service.dart';
 
 void main() {
@@ -165,6 +166,15 @@ class VnaloApp extends StatelessWidget {
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: themeProvider.themeMode,
+            builder: (context, child) {
+              final content = child ?? const SizedBox.shrink();
+              return Stack(
+                children: [
+                  content,
+                  const IncomingCallCoordinator(),
+                ],
+              );
+            },
             locale:
                 languageProvider.language == AppLanguage.vi
                     ? const Locale('vi', 'VN')

@@ -16,6 +16,8 @@ class VoiceCallScreen extends StatefulWidget {
   final String targetUserId;
   final String targetDisplayName;
   final String? targetAvatarUrl;
+  final bool isCaller;
+  final String? callId;
 
   const VoiceCallScreen({
     super.key,
@@ -24,6 +26,8 @@ class VoiceCallScreen extends StatefulWidget {
     required this.targetUserId,
     required this.targetDisplayName,
     this.targetAvatarUrl,
+    this.isCaller = true,
+    this.callId,
   });
 
   @override
@@ -33,15 +37,16 @@ class VoiceCallScreen extends StatefulWidget {
 class _VoiceCallScreenState extends State<VoiceCallScreen> {
   late final WebRtcCallService _callService;
   late final Timer _ticker;
+  late final String _callId;
   bool _logSent = false;
   bool _didAutoClose = false;
-
-  String get _callId =>
-      'voice-${DateTime.now().millisecondsSinceEpoch}-${widget.currentUserId}';
 
   @override
   void initState() {
     super.initState();
+    _callId =
+        widget.callId ??
+        'voice-${DateTime.now().millisecondsSinceEpoch}-${widget.currentUserId}';
     _callService = WebRtcCallService(
       socketService: context.read<SocketService>(),
       conversationId: widget.conversationId,
@@ -49,7 +54,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
       currentUserId: widget.currentUserId,
       peerUserId: widget.targetUserId,
       audioOnly: true,
-      isCaller: true,
+      isCaller: widget.isCaller,
     )..addListener(_onCallStateChanged);
 
     unawaited(_callService.initialize());
@@ -113,8 +118,8 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
     final payload = CallLogMessage(
       callId: _callId,
       conversationId: widget.conversationId,
-      callerId: widget.currentUserId,
-      calleeId: widget.targetUserId,
+      callerId: widget.isCaller ? widget.currentUserId : widget.targetUserId,
+      calleeId: widget.isCaller ? widget.targetUserId : widget.currentUserId,
       mediaType: CallMediaType.voice,
       outcome: _deriveOutcome(),
       durationSeconds: durationSeconds,
@@ -142,7 +147,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
       return 'Đang khởi tạo cuộc gọi...';
     }
 
-    return 'Đang gọi...';
+    return widget.isCaller ? 'Đang gọi...' : 'Cuộc gọi đến...';
   }
 
   @override
@@ -155,6 +160,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
   }
 
   void _upgradeToVideoCall() {
+    if (!widget.isCaller) return;
     unawaited(_callService.endCall());
     _sendCallLogIfNeeded();
     if (!mounted) return;
@@ -168,6 +174,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
               targetUserId: widget.targetUserId,
               targetDisplayName: widget.targetDisplayName,
               targetAvatarUrl: widget.targetAvatarUrl,
+              isCaller: true,
             ),
       ),
     );

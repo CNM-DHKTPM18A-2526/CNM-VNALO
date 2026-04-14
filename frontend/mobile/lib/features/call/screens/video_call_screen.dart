@@ -17,6 +17,8 @@ class VideoCallScreen extends StatefulWidget {
   final String targetUserId;
   final String targetDisplayName;
   final String? targetAvatarUrl;
+  final bool isCaller;
+  final String? callId;
 
   const VideoCallScreen({
     super.key,
@@ -25,6 +27,8 @@ class VideoCallScreen extends StatefulWidget {
     required this.targetUserId,
     required this.targetDisplayName,
     this.targetAvatarUrl,
+    this.isCaller = true,
+    this.callId,
   });
 
   @override
@@ -36,17 +40,18 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   late final RTCVideoRenderer _localRenderer;
   late final RTCVideoRenderer _remoteRenderer;
   late final Timer _ticker;
+  late final String _callId;
 
   bool _logSent = false;
   bool _didAutoClose = false;
   String? _initError;
 
-  String get _callId =>
-      'video-${DateTime.now().millisecondsSinceEpoch}-${widget.currentUserId}';
-
   @override
   void initState() {
     super.initState();
+    _callId =
+      widget.callId ??
+      'video-${DateTime.now().millisecondsSinceEpoch}-${widget.currentUserId}';
     _localRenderer = RTCVideoRenderer();
     _remoteRenderer = RTCVideoRenderer();
 
@@ -57,7 +62,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       currentUserId: widget.currentUserId,
       peerUserId: widget.targetUserId,
       audioOnly: false,
-      isCaller: true,
+      isCaller: widget.isCaller,
     )..addListener(_onCallStateChanged);
 
     unawaited(_initRenderersAndCall());
@@ -141,8 +146,8 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     final payload = CallLogMessage(
       callId: _callId,
       conversationId: widget.conversationId,
-      callerId: widget.currentUserId,
-      calleeId: widget.targetUserId,
+      callerId: widget.isCaller ? widget.currentUserId : widget.targetUserId,
+      calleeId: widget.isCaller ? widget.targetUserId : widget.currentUserId,
       mediaType: CallMediaType.video,
       outcome: _deriveOutcome(),
       durationSeconds: durationSeconds,
@@ -170,7 +175,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       return 'Đang khởi tạo video...';
     }
 
-    return 'Đang gọi video...';
+    return widget.isCaller ? 'Đang gọi video...' : 'Cuộc gọi video đến...';
   }
 
   @override

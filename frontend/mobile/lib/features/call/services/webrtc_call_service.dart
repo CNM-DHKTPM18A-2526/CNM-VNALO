@@ -200,6 +200,7 @@ class WebRtcCallService extends ChangeNotifier {
       callId: callId,
       targetUserId: peerUserId,
       senderUserId: currentUserId,
+      audioOnly: audioOnly,
       sdp: {'type': offer.type, 'sdp': offer.sdp},
     );
   }

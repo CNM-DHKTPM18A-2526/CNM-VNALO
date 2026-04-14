@@ -216,6 +216,7 @@ class SocketService {
     required String callId,
     required String targetUserId,
     String? senderUserId,
+    required bool audioOnly,
     required Map<String, dynamic> sdp,
   }) {
     debugPrint(
@@ -226,6 +227,7 @@ class SocketService {
       'callId': callId,
       'targetUserId': targetUserId,
       if (senderUserId != null) 'senderUserId': senderUserId,
+      'audioOnly': audioOnly,
       'sdp': sdp,
     });
   }
