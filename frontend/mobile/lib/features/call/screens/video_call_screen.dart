@@ -38,6 +38,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   late final Timer _ticker;
 
   bool _logSent = false;
+  bool _didAutoClose = false;
   String? _initError;
 
   String get _callId =>
@@ -87,6 +88,16 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   void _onCallStateChanged() {
     _syncRenderers();
     if (!mounted) return;
+
+    if (_callService.isEnded && !_didAutoClose) {
+      _didAutoClose = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && Navigator.canPop(context)) {
+          Navigator.pop(context);
+        }
+      });
+    }
+
     setState(() {});
   }
 

@@ -34,6 +34,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
   late final WebRtcCallService _callService;
   late final Timer _ticker;
   bool _logSent = false;
+  bool _didAutoClose = false;
 
   String get _callId =>
       'voice-${DateTime.now().millisecondsSinceEpoch}-${widget.currentUserId}';
@@ -59,6 +60,16 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
 
   void _onCallStateChanged() {
     if (!mounted) return;
+
+    if (_callService.isEnded && !_didAutoClose) {
+      _didAutoClose = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && Navigator.canPop(context)) {
+          Navigator.pop(context);
+        }
+      });
+    }
+
     setState(() {});
   }
 
