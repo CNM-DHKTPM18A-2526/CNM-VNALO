@@ -12,6 +12,7 @@ class AvatarWidget extends StatefulWidget {
   final double size;
   final bool showOnline;
   final int cacheVersion;
+  final double? borderWidth;
 
   const AvatarWidget({
     super.key,
@@ -20,6 +21,7 @@ class AvatarWidget extends StatefulWidget {
     this.size = 48,
     this.showOnline = false,
     this.cacheVersion = 0,
+    this.borderWidth,
   });
 
   @override
@@ -93,9 +95,18 @@ class _AvatarWidgetState extends State<AvatarWidget> {
 
     return Stack(
       children: [
-        SizedBox(
+        Container(
           width: widget.size,
           height: widget.size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: widget.borderWidth != null && widget.borderWidth! > 0
+                ? Border.all(
+                    color: Colors.white,
+                    width: widget.borderWidth!,
+                  )
+                : null,
+          ),
           child: ClipOval(
             child: activeUrl == null
                 ? _initialsAvatar(initials, initialsBg)
@@ -134,7 +145,7 @@ class _AvatarWidgetState extends State<AvatarWidget> {
               decoration: BoxDecoration(
                 color: AppColors.online,
                 shape: BoxShape.circle,
-                border: Border.all(color: scheme.surface, width: 2),
+                border: Border.all(color: scheme.surface, width: widget.borderWidth ?? 2),
               ),
             ),
           ),

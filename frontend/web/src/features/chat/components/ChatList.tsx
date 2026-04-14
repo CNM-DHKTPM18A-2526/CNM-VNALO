@@ -28,6 +28,7 @@ type ChatListProps = {
   onSearchFriends: (keyword: string) => void
   onOpenFriendChat: (friend: UserLookupResult) => void | Promise<void>
   onSelectConversation: (conversationId: string) => void
+  onCreateGroupClick?: () => void
 }
 
 export function ChatList({
@@ -37,6 +38,7 @@ export function ChatList({
   onSearchFriends,
   onOpenFriendChat,
   onSelectConversation,
+  onCreateGroupClick,
 }: ChatListProps) {
   const { t } = useLanguage()
   const [keyword, setKeyword] = useState('')
@@ -84,9 +86,9 @@ export function ChatList({
       results.push(
         preview
           ? {
-              ...conversation,
-              lastMessage: preview,
-            }
+            ...conversation,
+            lastMessage: preview,
+          }
           : conversation,
       )
     }
@@ -221,7 +223,7 @@ export function ChatList({
             </button>
             <button
               className='chat-toolbar-btn'
-              onClick={() => setIsCreateGroupOpen(true)}
+              onClick={() => onCreateGroupClick ? onCreateGroupClick() : setIsCreateGroupOpen(true)}
               title={t('chat.createGroup')}
               type='button'
             >

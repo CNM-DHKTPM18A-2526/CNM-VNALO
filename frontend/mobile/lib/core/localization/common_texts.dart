@@ -31,6 +31,10 @@ class CommonTexts {
   String get back => _isVi ? 'Quay lại' : 'Back';
   String get update => _isVi ? 'Cập nhật' : 'Update';
   String get sort => _isVi ? 'Sắp xếp' : 'Sort';
+  String get recallAction => _isVi ? 'Thu hồi' : 'Recall';
+  String get deleteForMeAction => _isVi ? 'Xóa ở phía tôi' : 'Delete for me';
+  String get confirmRecallMessage => _isVi ? 'Tin nhắn này sẽ được thu hồi với tất cả mọi người.' : 'This message will be recalled for everyone.';
+  String get confirmDeleteForMe => _isVi ? 'Tin nhắn này sẽ bị xóa khỏi lịch sử trò chuyện của bạn.' : 'This message will be deleted from your chat history.';
   String get filterAll => _isVi ? 'Tất cả' : 'All';
   String get recentlyActive => _isVi ? 'Mới truy cập' : 'Recently active';
   String get today => _isVi ? 'Hôm nay' : 'Today';
@@ -84,6 +88,7 @@ class CommonTexts {
   String get anonymousUser => _isVi ? 'Người dùng' : 'User';
   String get addFriendAction => _isVi ? 'Thêm bạn' : 'Add friend';
   String get createGroupAction => _isVi ? 'Tạo nhóm' : 'Create group';
+  String get joinGroupAction => _isVi ? 'Tham gia nhóm' : 'Join group';
   String get groupFlowPlaceholder =>
       _isVi
           ? 'Luồng tạo nhóm sẽ được nối ở bước message/group tiếp theo.'
@@ -491,7 +496,6 @@ class CommonTexts {
       _isVi
           ? 'Tin nhắn này sẽ bị thu hồi với mọi người. Tiếp tục?'
           : 'This message will be removed for everyone. Continue?';
-  String get recallAction => _isVi ? 'Thu hồi' : 'Recall';
   String get deleteMessageTitle => _isVi ? 'Xóa tin nhắn' : 'Delete message';
   String get deleteMessagePrompt =>
       _isVi

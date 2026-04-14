@@ -21,6 +21,7 @@ import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/call/screens/video_call_screen.dart';
 import 'package:vnalo_mobile/features/call/screens/voice_call_screen.dart';
+import 'package:vnalo_mobile/core/utils/avatar_resolver.dart';
 
 class MessageBubble extends StatelessWidget {
   final Message message;
@@ -128,9 +129,34 @@ class MessageBubble extends StatelessWidget {
   Widget _buildBubbleContent(BuildContext context, bool isDarkMode) {
     final common = CommonTexts.of(context, listen: false);
     final callLog = CallLogMessage.tryParse(message.content);
-
     if (callLog != null) {
       return _buildCallLogCard(context, isDarkMode, callLog, common);
+    }
+
+    if (message.isRecalled) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isDarkMode ? DarkColors.surface : Colors.transparent,
+          border: Border.all(color: isDarkMode ? DarkColors.divider : Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.history_rounded, size: 16, color: isDarkMode ? Colors.white38 : Colors.grey.shade500),
+            const SizedBox(width: 8),
+            Text(
+              common.msgRecalled,
+              style: TextStyle(
+                fontSize: 14,
+                fontStyle: FontStyle.italic,
+                color: isDarkMode ? Colors.white38 : Colors.grey.shade500,
+              ),
+            ),
+          ],
+        ),
+      );
     }
 
     if (groupedMessages != null && groupedMessages!.isNotEmpty) {
@@ -141,23 +167,21 @@ class MessageBubble extends StatelessWidget {
       return _buildSticker();
     }
 
-    final bubbleColor =
-        isMine
-            ? (isDarkMode
-                ? DarkColors.chatBubbleSent
-                : LightColors.chatBubbleSent)
-            : (isDarkMode
-                ? DarkColors.chatBubbleReceived
-                : LightColors.chatBubbleReceived);
+    final isMediaOnly = message.messageType == MessageType.IMAGE || message.messageType == MessageType.VIDEO;
+    
+    final bubbleColor = isMediaOnly
+        ? Colors.transparent
+        : (isMine
+            ? (isDarkMode ? DarkColors.chatBubbleSent : LightColors.chatBubbleSent)
+            : (isDarkMode ? DarkColors.chatBubbleReceived : LightColors.chatBubbleReceived));
 
     return Container(
       constraints: BoxConstraints(
         maxWidth: MediaQuery.of(context).size.width * 0.75,
       ),
-      padding:
-          message.messageType == MessageType.IMAGE
-              ? EdgeInsets.zero
-              : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: isMediaOnly
+          ? EdgeInsets.zero
+          : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: bubbleColor,
         borderRadius: BorderRadius.only(
@@ -170,7 +194,7 @@ class MessageBubble extends StatelessWidget {
             ? Border.all(color: Colors.white.withValues(alpha: 0.1), width: 0.5)
             : null,
         boxShadow: [
-          if (!isDarkMode && !isMine)
+          if (!isDarkMode && !isMine && !isMediaOnly)
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 3,
@@ -183,26 +207,19 @@ class MessageBubble extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Render a dedicated style for recalled messages.
-          if (message.isRecalled)
-            _buildRecalledContent(isMine, isDarkMode, common)
-          else ...[
-            if (message.replyToMessageId != null)
-              _buildReplyQuote(context, isDarkMode),
-            _renderTypeSpecificContent(context, isDarkMode),
-            if (showTime && message.messageType != MessageType.IMAGE)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  DateFormatter.time(message.createdAt),
-                  style: TextStyle(
-                    fontSize: 10,
-                    color:
-                        isDarkMode ? DarkColors.textHint : Colors.grey.shade500,
-                  ),
+          if (message.replyToMessageId != null) _buildReplyQuote(context, isDarkMode),
+          _renderTypeSpecificContent(context, isDarkMode),
+          if (showTime && !isMediaOnly)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                DateFormatter.time(message.createdAt),
+                style: TextStyle(
+                  fontSize: 10,
+                  color: isDarkMode ? DarkColors.textHint : Colors.grey.shade500,
                 ),
               ),
-          ],
+            ),
         ],
       ),
     );
@@ -259,35 +276,32 @@ class MessageBubble extends StatelessWidget {
           chatProvider.setReplyTo(message);
         } else if (action == 'copy') {
           if (message.messageType == MessageType.TEXT) {
-            Clipboard.setData(ClipboardData(text: message.content ?? ''));
-            if (context.mounted) {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(SnackBar(content: Text(common.msgCopiedToast)));
-            }
-          }
+             Clipboard.setData(ClipboardData(text: message.content ?? ''));
+             if (context.mounted) {
+               ScaffoldMessenger.of(context).showSnackBar(
+                 SnackBar(content: Text(common.msgCopiedToast)),
+               );
+             }
+           }
         } else if (action == 'recall') {
           if (context.mounted) {
             final confirmed = await showDialog<bool>(
               context: context,
-              builder:
-                  (ctx) => AlertDialog(
-                    title: Text(common.recallMessageTitle),
-                    content: Text(common.recallMessagePrompt),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, false),
-                        child: Text(common.cancel),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, true),
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.orange,
-                        ),
-                        child: Text(common.recallAction),
-                      ),
-                    ],
+              builder: (ctx) => AlertDialog(
+                title: Text(common.recallAction),
+                content: Text(common.confirmRecallMessage),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: Text(common.cancel),
                   ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    style: TextButton.styleFrom(foregroundColor: Colors.orange),
+                    child: Text(common.recallAction),
+                  ),
+                ],
+              ),
             );
             if (confirmed == true) {
               chatProvider.recallMessage(message.id, message.conversationId);
@@ -297,24 +311,21 @@ class MessageBubble extends StatelessWidget {
           if (context.mounted) {
             final confirmed = await showDialog<bool>(
               context: context,
-              builder:
-                  (ctx) => AlertDialog(
-                    title: Text(common.deleteMessageTitle),
-                    content: Text(common.deleteMessagePrompt),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, false),
-                        child: Text(common.cancel),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, true),
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.red,
-                        ),
-                        child: Text(common.delete),
-                      ),
-                    ],
+              builder: (ctx) => AlertDialog(
+                title: Text(common.deleteForMeAction),
+                content: Text(common.confirmDeleteForMe),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: Text(common.cancel),
                   ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    style: TextButton.styleFrom(foregroundColor: Colors.red),
+                    child: Text(common.delete),
+                  ),
+                ],
+              ),
             );
             if (confirmed == true && context.mounted) {
               await chatProvider.deleteForMe(
@@ -338,32 +349,7 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
-  /// Bubble content for a recalled message.
-  Widget _buildRecalledContent(
-    bool isMine,
-    bool isDarkMode,
-    CommonTexts common,
-  ) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          Icons.undo_rounded,
-          size: 14,
-          color: isDarkMode ? Colors.white38 : Colors.grey.shade400,
-        ),
-        const SizedBox(width: 4),
-        Text(
-          common.msgRecalled,
-          style: TextStyle(
-            fontSize: 14,
-            fontStyle: FontStyle.italic,
-            color: isDarkMode ? Colors.white38 : Colors.grey.shade500,
-          ),
-        ),
-      ],
-    );
-  }
+
 
   Widget _renderTypeSpecificContent(BuildContext context, bool isDarkMode) {
     switch (message.messageType) {
@@ -373,6 +359,10 @@ class MessageBubble extends StatelessWidget {
         return _buildFileCard(context, isDarkMode);
       case MessageType.AUDIO:
         return _buildAudioPlayer(context);
+      case MessageType.STICKER:
+        return _buildSticker();
+      case MessageType.VIDEO:
+        return _buildVideoPlayer(context);
       default:
         return Text(
           message.content ?? '',
@@ -695,15 +685,14 @@ class MessageBubble extends StatelessWidget {
   }
 
   Widget _buildImage(BuildContext context) {
-    final url = message.mediaUrl ?? '';
-    if (url.isEmpty) return const SizedBox.shrink();
+    final rawUrl = message.mediaUrl ?? '';
+    if (rawUrl.isEmpty) return const SizedBox.shrink();
+
+    final isLocal = rawUrl.startsWith('/') || rawUrl.contains('Users') || rawUrl.contains('storage');
+    final url = isLocal ? rawUrl : (AvatarResolver.resolveUrl(rawUrl) ?? rawUrl);
 
     return GestureDetector(
       onTap: () {
-        final isLocal =
-            url.startsWith('/') ||
-            url.contains('Users') ||
-            url.contains('storage');
         Navigator.of(context).push(
           MaterialPageRoute(
             builder:
@@ -711,16 +700,17 @@ class MessageBubble extends StatelessWidget {
           ),
         );
       },
-      child:
-          url.startsWith('/') ||
-                  url.contains('Users') ||
-                  url.contains('storage') // Basic check for local path
-              ? Image.file(File(url), fit: BoxFit.cover)
-              : Image.network(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          maxHeight: 280,
+          minWidth: 150, // Minimum width so it doesn't look too skinny
+        ),
+        child: isLocal
+            ? Image.file(File(url), fit: BoxFit.cover)
+            : Image.network(
                 url,
                 headers: const {
-                  'User-Agent':
-                      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
                 },
                 fit: BoxFit.cover,
                 loadingBuilder: (context, child, loadingProgress) {
@@ -728,25 +718,24 @@ class MessageBubble extends StatelessWidget {
                   return Container(
                     height: 200,
                     color: Colors.grey.shade200,
-                    child: const Center(
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
+                    child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
                   );
                 },
-                errorBuilder:
-                    (context, error, stackTrace) => const Center(
-                      child: Icon(
-                        Icons.broken_image,
-                        size: 40,
-                        color: Colors.grey,
-                      ),
-                    ),
+                errorBuilder: (context, error, stackTrace) => Container(
+                  height: 200,
+                  color: Colors.grey.shade200,
+                  child: const Center(
+                    child: Icon(Icons.broken_image, size: 40, color: Colors.grey),
+                  ),
+                ),
               ),
+      ),
     );
   }
 
   Widget _buildSticker() {
-    final url = message.mediaUrl ?? '';
+    final rawUrl = message.mediaUrl ?? '';
+    final url = AvatarResolver.resolveUrl(rawUrl) ?? rawUrl;
     return Container(
       width: 120,
       height: 120,
@@ -809,11 +798,46 @@ class MessageBubble extends StatelessWidget {
     return AudioPlayerWidget(audioUrl: message.mediaUrl ?? '', isMine: isMine);
   }
 
-  Widget _buildStatusLabel(
-    BuildContext context,
-    bool isDarkMode,
-    CommonTexts common,
-  ) {
+
+  Widget _buildVideoPlayer(BuildContext context) {
+    final thumbnailUrl = message.mediaThumbnailUrl ?? '';
+    final url = AvatarResolver.resolveUrl(thumbnailUrl.isNotEmpty ? thumbnailUrl : (message.mediaUrl ?? '')) ?? '';
+    
+    return Container(
+      width: 200,
+      height: 150,
+      decoration: BoxDecoration(
+        color: Colors.black12,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          if (url.isNotEmpty)
+            Positioned.fill(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: CachedNetworkImage(
+                  imageUrl: url,
+                  fit: BoxFit.cover,
+                  errorWidget: (_, __, ___) => const Center(child: Icon(Icons.videocam, size: 40, color: Colors.grey)),
+                ),
+              ),
+            ),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: const BoxDecoration(
+              color: Colors.black54,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.play_arrow, color: Colors.white, size: 30),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusLabel(BuildContext context, bool isDarkMode, CommonTexts common) {
     if (!showStatus && !showTime && readByMembers?.isEmpty == true) {
       return const SizedBox.shrink();
     }
@@ -923,7 +947,7 @@ class MessageBubble extends StatelessWidget {
               padding: const EdgeInsets.only(left: 2),
               child: ClipOval(
                 child: Image.network(
-                  m.user?.avatarUrl ??
+                  AvatarResolver.resolveUrl(m.user?.avatarUrl) ??
                       'https://ui-avatars.com/api/?name=${m.user?.displayName ?? 'U'}',
                   width: 14,
                   height: 14,
@@ -974,6 +998,12 @@ class MessageBubble extends StatelessWidget {
   }
 
   Widget _buildReplyQuote(BuildContext context, bool isDarkMode) {
+    String replyName = message.replyToSenderName ?? 'User';
+    if (message.replyToSenderName == null && message.replyToSenderId != null) {
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+      replyName = chatProvider.getSenderName(message.conversationId, message.replyToSenderId!);
+    }
+
     return GestureDetector(
       onTap: () {
         if (message.replyToMessageId != null) {
@@ -1000,7 +1030,7 @@ class MessageBubble extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              message.replyToSenderName ?? 'User',
+              replyName,
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 12,

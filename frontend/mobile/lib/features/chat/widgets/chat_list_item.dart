@@ -5,6 +5,7 @@ import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/utils/date_formatter.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
+import 'package:vnalo_mobile/core/widgets/group_avatar.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/profile/providers/avatar_cache_provider.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
@@ -70,13 +71,22 @@ class ChatListItem extends StatelessWidget {
             child: ListTile(
               onTap: onTap,
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              leading: AvatarWidget(
-                imageUrl: displayAvatar,
-                name: displayName,
-                size: 48,
-                showOnline: conversation.type == ConversationType.DIRECT,
-                cacheVersion: avatarVersion,
-              ),
+              leading: (conversation.type == ConversationType.GROUP && (conversation.avatarUrl == null || conversation.avatarUrl!.isEmpty))
+                  ? GroupAvatar(
+                      members: conversation.members
+                          .where((m) => m.userId != currentUserId)
+                          .take(4)
+                          .map((m) => (imageUrl: m.user?.avatarUrl, name: m.user?.displayName ?? 'User'))
+                          .toList(),
+                      size: 48,
+                    )
+                  : AvatarWidget(
+                      imageUrl: displayAvatar,
+                      name: displayName,
+                      size: 48,
+                      showOnline: conversation.type == ConversationType.DIRECT,
+                      cacheVersion: avatarVersion,
+                    ),
               title: Row(
                 children: [
                   Expanded(

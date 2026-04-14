@@ -10,15 +10,20 @@ type InboxItem = {
   unreadCount?: number
   lastMessagePreview?: string
   lastMessageSeq?: number
+  lastMessageSenderId?: string | null
   lastMessageAt?: string | null
   updatedAt?: string | null
   conversation?: {
     id?: string
     title?: string | null
     type?: string
+    avatarUrl?: string | null
+    avatar_url?: string | null
     members?: Array<{
       userId?: string
       nickname?: string | null
+      avatarUrl?: string | null
+      avatar_url?: string | null
     }>
   } | null
 }
@@ -315,23 +320,35 @@ export async function fetchInbox(token: string, currentUserId?: string): Promise
     const partnerUserId = String(peerMember?.userId ?? '').trim() || null
     const peerNickname = peerMember?.nickname?.trim()
     const peerFallback = partnerUserId ? `Người dùng ${partnerUserId.slice(0, 8)}` : null
+    const normalizedPreview = normalizeInboxPreview(item.lastMessagePreview)
 
-    return {
-      id,
-      userId: partnerUserId,
-      name: title && title.length > 0 ? title : peerNickname || peerFallback || `Trò chuyện ${id.slice(0, 8)}`,
-      lastMessage: normalizeInboxPreview(item.lastMessagePreview),
-      unreadCount: item.unreadCount ?? 0,
-      online: false,
-      lastMessageSeq: item.lastMessageSeq,
-      participantUserIds: members
-        .map((member) => String(member.userId ?? '').trim())
-        .filter((memberId): memberId is string => Boolean(memberId) && memberId !== myId),
-      lastMessageAt: item.lastMessageAt ?? null,
-      updatedAt: item.updatedAt ?? null,
-      lastSeenTime: item.lastMessageAt ?? null,
-    }
-  })
+    const isGroup = (item.conversation?.type ?? (item.conversation as any)?.type) === 'GROUP'
+    const name = isGroup ? (title || (item.conversation as any)?.name || 'Nhóm không tên') : (title || peerNickname || peerFallback || `Trò chuyện ${id.slice(0, 8)}`)
+    const avatarUrl = isGroup 
+      ? (item.conversation?.avatarUrl || (item.conversation as any)?.avatar_url || null) 
+      : (peerMember?.avatarUrl || (peerMember as any)?.avatar_url || null)
+
+      return {
+        id,
+        userId: partnerUserId,
+        isGroup,
+        name,
+        avatarUrl,
+        memberCount: members.length,
+        lastMessage: normalizedPreview,
+        lastMessagePreview: normalizedPreview,
+        unreadCount: item.unreadCount ?? 0,
+        online: false,
+        lastMessageSeq: item.lastMessageSeq,
+        lastMessageSenderId: item.lastMessageSenderId ?? null,
+        participantUserIds: members
+          .map((member) => String(member.userId ?? '').trim())
+          .filter((memberId): memberId is string => Boolean(memberId) && memberId !== myId),
+        lastMessageAt: item.lastMessageAt ?? null,
+        updatedAt: item.updatedAt ?? null,
+        lastSeenTime: item.lastMessageAt ?? null,
+      }
+    })
 }
 
 export function mapRawMessage(raw: RawMessageLike, currentUserId: string): ChatMessage {
@@ -624,4 +641,95 @@ export async function getOrCreateDirectConversation(token: string, targetUserId:
   }
 
   return conversationId
+}
+
+export type CreateGroupConversationPayload = {
+  title: string
+  memberUserIds: string[]
+  avatarUrl?: string | null
+}
+
+export type CreateGroupConversationResponse = {
+  id: string
+  title: string
+  type: string
+  members?: Array<{
+    userId: string
+    nickname?: string | null
+  }>
+}
+
+/**
+ * Create a new group conversation
+ * @param token - Authorization token
+ * @param payload - Group creation payload with title, member IDs, and optional avatar URL
+ * @returns Conversation ID of the newly created group
+ */
+export async function createGroupConversation(
+  token: string,
+  payload: CreateGroupConversationPayload,
+): Promise<string> {
+  const response = await fetch(`${MESSAGE_API_URL}/conversations/group`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      title: payload.title.trim(),
+      memberIds: payload.memberUserIds,
+      ...(payload.avatarUrl ? { avatarUrl: payload.avatarUrl } : {}),
+    }),
+  })
+
+  const json = await response.json().catch(() => null)
+
+  if (!response.ok) {
+    const message = isRecord(json) && typeof json.message === 'string' ? json.message : null
+    throw new Error(message ?? 'Cannot create group conversation.')
+  }
+
+  const responsePayload = isRecord(json) && isRecord(json.data) ? json.data : json
+  const conversationId =
+    isRecord(responsePayload) && typeof responsePayload.id === 'string'
+      ? responsePayload.id
+      : isRecord(responsePayload) && typeof responsePayload.conversationId === 'string'
+        ? responsePayload.conversationId
+        : null
+
+  if (!conversationId) {
+    throw new Error('Invalid group creation response payload.')
+  }
+
+  return conversationId
+}
+
+export async function fetchConversation(token: string, conversationId: string): Promise<any> {
+  const response = await fetch(`${MESSAGE_API_URL}/conversations/${conversationId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  })
+
+  if (!response.ok) return null;
+  const json = await response.json().catch(() => null);
+  const data = (json && typeof json === 'object' && !Array.isArray(json) && json.data) ? json.data : json;
+  
+  if (data) {
+    const isGroup = (data.type ?? (data as any)?.type) === 'GROUP';
+    const title = data.title?.trim();
+    const members = data.members ?? [];
+    return {
+      ...data,
+      isGroup,
+      name: isGroup ? (title || (data as any)?.name || 'Nhóm không tên') : (title || 'Cuộc trò chuyện'),
+      avatarUrl: isGroup 
+        ? (data.avatarUrl || (data as any)?.avatar_url || null) 
+        : (data.avatarUrl || (data as any)?.avatar_url || null),
+      memberCount: members.length,
+      participantUserIds: members.map((m: any) => String(m.userId || '').trim())
+    };
+  }
+  return data;
 }

@@ -6,10 +6,12 @@ import { ChatList } from '../features/chat/components/ChatList'
 import { ConversationInfo } from '../features/chat/components/ConversationInfo'
 import { SearchMessagesPanel } from '../features/chat/components/SearchMessagesPanel'
 import { SearchGlobalPanel } from '../features/chat/components/SearchGlobalPanel'
+import { MessageShareModal } from '../features/chat/components/MessageShareModal'
 import { ChatWindow } from '../features/chat/components/ChatWindow'
 import type { MessageContextMenuAction } from '../features/chat/components/MessageContextMenu'
 import {
   addMessageReaction,
+  createGroupConversation,           // ← NEW
   deleteMessageForMe,
   fetchMessageReactions,
   fetchInbox,
@@ -25,7 +27,8 @@ import {
   sendMessage as sendMessageViaRest,
   unpinMessage,
   uploadChatMedia,
-} from '../features/chat/chat.api'
+  fetchConversation,
+} from '../features/chat/chat.api';
 import type { RawMessage } from '../features/chat/chat.api'
 import { REACTION_OPTIONS, type MessageReactionState, type ReactionKey } from '../features/chat/components/MessageReaction'
 import { useChatSocket } from '../features/chat/useChatSocket'
@@ -38,7 +41,7 @@ import type {
 } from '../features/chat/chat.types'
 import { getFriends, getUserById, searchUsers } from '../features/friends/friends.api'
 import { getUserByPhone } from '../features/friends/friends.api'
-import type { UserLookupResult } from '../features/friends/friends.types'
+import type { Friend, UserLookupResult } from '../features/friends/friends.types'
 import { useAuth } from '../features/auth/useAuth'
 import { Skeleton } from '../shared/components/ui/Skeleton'
 import { Card } from '../shared/components/ui/Card'
@@ -51,6 +54,13 @@ import {
   type CachedMessage,
   type CachedUser,
 } from '../features/chat/searchIndex'
+import { CreateGroupModal } from '../features/chat/components/CreateGroupModal'
+
+// Fallback toast object to prevent crashes if toast library is missing
+const toast = {
+  success: (msg: string) => alert(msg),
+  error: (msg: string) => alert(msg),
+};
 
 function sortMessages(messages: ChatMessage[]): ChatMessage[] {
   return [...messages].sort((left, right) => {
@@ -189,6 +199,41 @@ function getConversationPreview(message: ChatMessage): string {
     default:
       return message.text.trim()
   }
+}
+
+function formatPreviewSenderName(displayName?: string | null): string {
+  const normalized = String(displayName ?? '').trim().replace(/\s+/g, ' ')
+  if (!normalized) {
+    return ''
+  }
+
+  const parts = normalized.split(' ')
+  if (parts.length <= 2) {
+    return normalized
+  }
+
+  return parts.slice(-2).join(' ')
+}
+
+function formatConversationPreview(senderName: string | null | undefined, message: ChatMessage | string): string {
+  const rawMessage = typeof message === 'string' ? message : getConversationPreview(message)
+  const content = String(rawMessage ?? '').trim()
+
+  if (!content) {
+    return ''
+  }
+
+  const previewSender = formatPreviewSenderName(senderName)
+  if (!previewSender) {
+    return content
+  }
+
+  const prefix = `${previewSender}:`
+  if (content.startsWith(prefix)) {
+    return content
+  }
+
+  return `${previewSender}: ${content}`
 }
 
 function getDraftMessageType(payload: ChatComposePayload): ChatMessageType {
@@ -381,6 +426,7 @@ export function ChatPage() {
   const [peerLastReadByConversation, setPeerLastReadByConversation] = useState<Record<string, number>>({})
   const [reactionStatesByMessage, setReactionStatesByMessage] = useState<Record<string, MessageReactionState>>({})
   const [friendResults, setFriendResults] = useState<UserLookupResult[]>([])
+  const [friendsDirectory, setFriendsDirectory] = useState<Friend[]>([])
   const [userProfileCache, setUserProfileCache] = useState<Record<string, CachedUserProfile>>({})
   const [isSocketConnected, setIsSocketConnected] = useState(false)
   const [rightSidebarContent, setRightSidebarContent] = useState<'info' | 'search' | 'global-search' | null>('info')
@@ -392,6 +438,8 @@ export function ChatPage() {
   const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([])
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false)
   const [isTokenRestrictedMode, setIsTokenRestrictedMode] = useState(false)
+  const [shareModalMessage, setShareModalMessage] = useState<ChatMessage | null>(null)
+  const [isShareSubmitting, setIsShareSubmitting] = useState(false)
 
   const selectedConversationIdRef = useRef('')
   const selectedMessagesRef = useRef<ChatMessage[]>([])
@@ -401,6 +449,9 @@ export function ChatPage() {
   const pendingProfileLookupRef = useRef<Set<string>>(new Set())
   const lastLoadedMessagesKeyRef = useRef('')
   const messageLoadRequestSeqRef = useRef(0)
+
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
+  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
 
   useEffect(() => {
     selectedConversationIdRef.current = routedConversationId || selectedConversationId
@@ -666,7 +717,13 @@ export function ChatPage() {
       }
 
       try {
-        await recallMessage(accessToken, messageId)
+        await joinConversation(conversationId)
+
+        const ack = await emitRecallMessage({ messageId, conversationId })
+        if (ack?.event !== 'message.recalled') {
+          await recallMessage(accessToken, messageId)
+        }
+
         setRecalledMessageIds((prev) => ({
           ...prev,
           [messageId]: true,
@@ -757,11 +814,105 @@ export function ChatPage() {
           void handleDeleteForMe(messageId)
           setSelectedMessageIds((prev) => prev.filter((item) => item !== messageId))
           return
+        case 'share':
+          setShareModalMessage(message)
+          return
         default:
           return
       }
     },
     [handleDeleteForMe, handleRecallMessage, handleTogglePinMessage, toggleMessageIdInList],
+  )
+
+  const handleShareMessage = useCallback(
+    async (targetUserIds: string[], note: string) => {
+      if (!accessToken || !shareModalMessage || targetUserIds.length === 0) {
+        return
+      }
+
+      const trimmedNote = note.trim()
+      const mediaUrl = shareModalMessage.mediaUrl ?? shareModalMessage.attachments?.[0]?.url ?? null
+      const mediaThumbnailUrl = shareModalMessage.mediaThumbnailUrl ?? shareModalMessage.attachments?.[0]?.thumbnailUrl ?? null
+      const mediaMimeType = shareModalMessage.mediaMimeType ?? shareModalMessage.attachments?.[0]?.mimeType ?? null
+      const mediaSizeBytes = shareModalMessage.mediaSizeBytes ?? shareModalMessage.attachments?.[0]?.sizeBytes ?? null
+      const messageType =
+        shareModalMessage.type === 'image'
+          ? 'IMAGE'
+          : shareModalMessage.type === 'file'
+            ? 'FILE'
+            : shareModalMessage.type === 'sticker'
+              ? 'STICKER'
+              : 'TEXT'
+
+      const payloadContent =
+        (shareModalMessage.text ?? '').trim().length > 0
+          ? shareModalMessage.text
+          : shareModalMessage.type === 'image'
+            ? mediaUrl ?? '[image]'
+            : shareModalMessage.type === 'file'
+              ? shareModalMessage.attachments?.[0]?.name ?? mediaUrl ?? '[file]'
+              : shareModalMessage.type === 'sticker'
+                ? '[sticker]'
+                : ''
+
+      setIsShareSubmitting(true)
+
+      try {
+        for (const userId of targetUserIds) {
+          const conversationId = await getOrCreateDirectConversation(accessToken, userId)
+          await joinConversation(conversationId)
+
+          if (trimmedNote) {
+            const noteAck = await emitSendMessage({
+              conversationId,
+              content: trimmedNote,
+              messageType: 'TEXT',
+            })
+
+            if (noteAck?.event !== 'message.sent') {
+              await sendMessageViaRest(accessToken, {
+                conversationId,
+                content: trimmedNote,
+                messageType: 'TEXT',
+              })
+            }
+          }
+
+          const shareAck = await emitSendMessage({
+            conversationId,
+            content: payloadContent,
+            messageType: toSocketMessageType(shareModalMessage.type),
+            mediaUrl,
+            mediaThumbnailUrl,
+            mediaMimeType,
+            mediaSizeBytes,
+          })
+
+          if (shareAck?.event !== 'message.sent') {
+            await sendMessageViaRest(accessToken, {
+              conversationId,
+              content: payloadContent || undefined,
+              messageType,
+              mediaUrl,
+              mediaThumbnailUrl,
+              mediaMimeType,
+              mediaSizeBytes,
+            })
+          }
+        }
+
+        setShareModalMessage(null)
+      } catch (error) {
+        console.error('[ChatPage.handleShareMessage] Failed to share message', {
+          error,
+          messageId: shareModalMessage.id,
+          targetUserIds,
+        })
+      } finally {
+        setIsShareSubmitting(false)
+      }
+    },
+    [accessToken, shareModalMessage],
   )
 
   const getCachedProfileFromStore = useCallback(
@@ -852,16 +1003,114 @@ export function ChatPage() {
     [getCachedProfileFromStore],
   )
 
+
   const loadInbox = useCallback(
     async (token: string, preferredConversationId?: string) => {
       setIsLoadingConversations(true)
 
       try {
-        const [items, policy, friends] = await Promise.all([
+        let [items, policy, friends] = await Promise.all([
           fetchInbox(token, user?.id),
           getSyncPolicy(token).catch(() => null),
           getFriends(token).catch(() => []),
         ])
+
+        // Identify existing self-chat or Inject virtual "My Documents"
+        const myDocsId = `vnalo_cloud_${user?.id}`;
+        let hasSelfChat = false;
+        items = items.map(it => {
+          // A self-chat is a non-group chat with no other participants (only self, who is filtered out)
+          const isSelf = !it.isGroup && it.participantUserIds?.length === 0;
+          if (isSelf) {
+            hasSelfChat = true;
+            return {
+              ...it,
+              name: 'My Documents',
+              isCloud: true,
+              avatarUrl: 'cloud_icon',
+            };
+          }
+          return it;
+        });
+
+        if (!hasSelfChat) {
+          const myDocsEntry: ConversationSummary = {
+            id: myDocsId,
+            name: 'My Documents',
+            isGroup: false,
+            isCloud: true,
+            avatarUrl: 'cloud_icon',
+            lastMessage: 'Lưu và đồng bộ dữ liệu giữa các thiết bị',
+            unreadCount: 0,
+            participantUserIds: [user?.id ?? ''],
+            lastMessageAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          items = [myDocsEntry, ...items];
+        }
+
+        const targetId = preferredConversationId || routedConversationId;
+        
+        // Collect IDs to proactively fetch
+        const proactiveIds = new Set<string>();
+        if (targetId) proactiveIds.add(targetId);
+        
+        try {
+          const storedPending = localStorage.getItem(`vnalo_pending_groups_${user?.id}`);
+          const pendingIds: string[] = storedPending ? JSON.parse(storedPending) : [];
+          pendingIds.forEach(id => proactiveIds.add(id));
+        } catch (e) {
+          console.warn("Failed to load pending group IDs:", e);
+        }
+
+        const missingIds = Array.from(proactiveIds).filter(id => !items.some(it => it.id === id));
+        
+        if (missingIds.length > 0) {
+          console.log("🔍 [ChatPage] Proactively fetching missing conversations:", missingIds);
+          const fetchedResults = await Promise.all(
+            missingIds.map(id => fetchConversation(token, id).catch(() => null))
+          );
+          
+          const myId = String(user?.id ?? '').trim();
+          fetchedResults.forEach(rawConvo => {
+            if (rawConvo) {
+              const members = rawConvo.conversation?.members || rawConvo.members || [];
+              const participantIds = members
+                .map((m: any) => String(m.userId ?? '').trim())
+                .filter((id: string) => id && id !== myId);
+
+              const freshConvo: ConversationSummary = {
+                id: rawConvo.id || (rawConvo.conversation?.id as string),
+                isGroup: (rawConvo.type || rawConvo.conversation?.type) === 'GROUP',
+                name: rawConvo.title || rawConvo.conversation?.title || "Nhóm mới",
+                avatarUrl: rawConvo.avatarUrl || rawConvo.conversation?.avatarUrl || null,
+                lastMessage: "Nhóm mới được tạo",
+                unreadCount: 0,
+                participantUserIds: participantIds,
+                memberCount: members.length,
+                lastMessageAt: rawConvo.updatedAt || new Date().toISOString(),
+                updatedAt: rawConvo.updatedAt || new Date().toISOString(),
+              };
+              
+              // Only add if not already present (double check for safety)
+              if (!items.some(it => it.id === freshConvo.id)) {
+                items = [freshConvo, ...items];
+              }
+            }
+          });
+
+          // Cleanup: if an ID is now in items, it's either fetched or already in inbox
+          try {
+            const storedPending = localStorage.getItem(`vnalo_pending_groups_${user?.id}`);
+            let pendingIds: string[] = storedPending ? JSON.parse(storedPending) : [];
+            const stillMissing = pendingIds.filter(id => !items.some(it => it.id === id));
+            // Actually, if we just fetched it and it's in items, we can keep it in pending 
+            // until it naturally appears in /inbox (which usually means it has messages).
+            // But for now, if it's in items, we've fulfilled the requirement of showing it.
+            // Let's only remove if it's naturally in the API response (items BEFORE we added fresh ones)
+          } catch (e) {}
+        }
+
         const restrictedByToken = isRestrictedWebToken(token)
         const restrictedByPolicy = Boolean(policy?.webRestrictedMode) || policy?.syncEnabled === false
         const restrictionSignalsPresent = restrictedByToken || restrictedByPolicy
@@ -870,12 +1119,23 @@ export function ChatPage() {
             .filter((friend) => Boolean(friend.friendId))
             .map((friend) => [friend.friendId, friend.nickname?.trim() || friend.displayName?.trim() || null]),
         )
+        const friendAvatarById = new Map(
+          friends
+            .filter((friend) => Boolean(friend.friendId))
+            .map((friend) => [friend.friendId, friend.avatarUrl ?? null]),
+        )
         const friendIdSet = new Set(
           friends
             .map((friend) => String(friend.friendId ?? '').trim())
             .filter((friendId): friendId is string => Boolean(friendId)),
         )
         friendIdSetRef.current = friendIdSet
+        setFriendsDirectory(friends)
+
+        const previewNameById = new Map(friendNameById)
+        if (user?.id) {
+          previewNameById.set(user.id, user.name?.trim() || fallbackUserDisplayName(user.id))
+        }
 
         setUserProfileCache((prev) => {
           const next = { ...prev }
@@ -895,8 +1155,8 @@ export function ChatPage() {
         const unresolvedPeerIds = [
           ...new Set(
             items
-              .map((item) => (item.participantUserIds ?? []).find((participantId) => participantId !== user?.id))
-              .filter((peerId): peerId is string => typeof peerId === 'string' && !friendNameById.has(peerId)),
+              .flatMap((item) => item.participantUserIds ?? [])
+              .filter((peerId): peerId is string => typeof peerId === 'string' && peerId !== user?.id && !friendNameById.has(peerId)),
           ),
         ]
 
@@ -915,6 +1175,9 @@ export function ChatPage() {
           if (fallback.name) {
             friendNameById.set(fallback.peerId, fallback.name)
           }
+          if (fallback.avatarUrl) {
+            friendAvatarById.set(fallback.peerId, fallback.avatarUrl)
+          }
         }
 
         setUserProfileCache((prev) => {
@@ -931,18 +1194,31 @@ export function ChatPage() {
 
         const mappedItems = items.map((item) => {
           const peerId = (item.participantUserIds ?? []).find((participantId) => participantId !== user?.id)
-          const resolvedPeerName = peerId ? friendNameById.get(peerId) : null
-          const isStranger = peerId ? !friendIdSet.has(peerId) : false
-          const withName = resolvedPeerName
+          const isGroup = item.isGroup;
+          const resolvedPeerName = !isGroup && peerId ? friendNameById.get(peerId) : null
+          const resolvedPeerAvatar = !isGroup && peerId ? (friendAvatarById.get(peerId) ?? null) : null
+          const resolvedLastMessageSenderName = item.lastMessageSenderId
+            ? (previewNameById.get(item.lastMessageSenderId) ?? null)
+            : null
+          const formattedLastMessage = formatConversationPreview(
+            resolvedLastMessageSenderName,
+            item.lastMessagePreview ?? item.lastMessage ?? '',
+          )
+          const isStranger = !isGroup && peerId ? !friendIdSet.has(peerId) : false
+
+          const withName = (!isGroup && resolvedPeerName)
             ? {
-                ...item,
-                name: resolvedPeerName,
-                isStranger,
-              }
+              ...item,
+              name: resolvedPeerName,
+              avatarUrl: resolvedPeerAvatar,
+              lastMessage: formattedLastMessage,
+              isStranger,
+            }
             : {
-                ...item,
-                isStranger,
-              }
+              ...item,
+              lastMessage: formattedLastMessage,
+              isStranger,
+            }
 
           return applyRestrictedConversationPreview(withName, false)
         })
@@ -955,16 +1231,18 @@ export function ChatPage() {
           })
         }
         setIsRestrictedMode(false)
+        console.log('🚀 [DEBUG] Inbox items from API:', mappedItems);
+
         setConversations((prev) => {
-          if (!preferredConversationId) {
+          if (!targetId) {
             return mappedItems
           }
 
-          if (mappedItems.some((item) => item.id === preferredConversationId)) {
+          if (mappedItems.some((item) => item.id === targetId)) {
             return mappedItems
           }
 
-          const preserved = prev.find((item) => item.id === preferredConversationId)
+          const preserved = prev.find((item) => item.id === targetId)
           if (!preserved) {
             return mappedItems
           }
@@ -991,11 +1269,90 @@ export function ChatPage() {
         setIsLoadingConversations(false)
       }
     },
-    [routedConversationId, user?.id],
+    [routedConversationId, user?.id, user?.name, accessToken],
   )
+
+  const handleCreateGroup = useCallback(
+    async (groupName: string, avatarUrl: string | null, memberIds: string[]) => {
+      if (!accessToken || !user) {
+        toast.error("Vui lòng đăng nhập lại");
+        return;
+      }
+
+      setIsCreatingGroup(true);
+      try {
+        let finalAvatarUrl = avatarUrl;
+        if (avatarUrl && avatarUrl.startsWith('blob:')) {
+          try {
+            const blob = await fetch(avatarUrl).then(r => r.blob());
+            const file = new File([blob], 'avatar.png', { type: blob.type });
+            const uploadRes = await uploadChatMedia(accessToken, file);
+            finalAvatarUrl = uploadRes.url;
+          } catch (e) {
+            console.warn("Failed to upload avatar:", e);
+          }
+        }
+        const groupId = await createGroupConversation(accessToken, {
+          title: groupName,
+          memberUserIds: memberIds,
+          avatarUrl: finalAvatarUrl,
+        });
+
+        console.log("🚀 [DEBUG] Created Group ID:", groupId);
+
+        // Manually construct and append the new group to local state for immediate UI update
+        const newGroupEntry: ConversationSummary = {
+          id: groupId,
+          name: groupName,
+          isGroup: true,
+          avatarUrl: finalAvatarUrl,
+          lastMessage: "Bạn đã tạo nhóm",
+          unreadCount: 0,
+          participantUserIds: memberIds,
+          memberCount: memberIds.length + 1,
+          lastMessageAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+        setConversations(prev => [newGroupEntry, ...prev.filter(c => c.id !== groupId)]);
+        setSelectedConversationId(groupId);
+
+        // Remember this group ID locally to ensure it shows up even if it has no messages
+        try {
+          const storedPending = localStorage.getItem(`vnalo_pending_groups_${user?.id}`);
+          let pendingIds: string[] = storedPending ? JSON.parse(storedPending) : [];
+          if (!pendingIds.includes(groupId)) {
+            pendingIds.push(groupId);
+            localStorage.setItem(`vnalo_pending_groups_${user?.id}`, JSON.stringify(pendingIds));
+          }
+        } catch (e) {
+          console.warn("Failed to save pending group ID:", e);
+        }
+
+        // Refresh conversation list to sync with backend
+        await loadInbox(accessToken, groupId);
+
+        toast.success(`✅ Đã tạo nhóm "${groupName}" thành công!`);
+        navigate(`/chat/${groupId}`);
+        setIsCreateGroupOpen(false);
+      } catch (error: any) {
+        console.error("❌ [CREATE GROUP] Lỗi:", error);
+        toast.error(error.message || "Không thể tạo nhóm. Vui lòng thử lại.");
+      } finally {
+        setIsCreatingGroup(false);
+      }
+    },
+    [accessToken, user, navigate, loadInbox]
+  );
 
   const updateConversationAfterMessage = useCallback(
     (conversationId: string, message: ChatMessage, markAsReadNow: boolean) => {
+      const senderName =
+        message.senderId === user?.id
+          ? user?.name?.trim() || fallbackUserDisplayName(message.senderId)
+          : userProfileCacheRef.current[message.senderId]?.displayName || fallbackUserDisplayName(message.senderId)
+      const formattedPreview = formatConversationPreview(senderName, message)
+
       setConversations((prev) => {
         const index = prev.findIndex((conversation) => conversation.id === conversationId)
         if (index === -1) {
@@ -1006,7 +1363,7 @@ export function ChatPage() {
         const current = next[index]
         next[index] = {
           ...current,
-          lastMessage: getConversationPreview(message),
+          lastMessage: formattedPreview,
           lastMessageSeq: message.serverSeq ?? current.lastMessageSeq,
           unreadCount: markAsReadNow ? 0 : current.unreadCount + (message.sender === 'me' ? 0 : 1),
         }
@@ -1014,15 +1371,17 @@ export function ChatPage() {
         return next
       })
     },
-    [],
+    [user?.id, user?.name],
   )
 
   useEffect(() => {
-    if (!accessToken) {
+    if (!accessToken || !user) {
       setConversations([])
       setMessagesByConversation({})
       setSelectedConversationId('')
       setFriendResults([])
+      setFriendsDirectory([])
+      setShareModalMessage(null)
       setIsTokenRestrictedMode(false)
       lastLoadedMessagesKeyRef.current = ''
       return
@@ -1043,7 +1402,7 @@ export function ChatPage() {
     setIsRestrictedMode(false)
 
     void loadInbox(accessToken)
-  }, [accessToken, loadInbox])
+  }, [accessToken, loadInbox, user?.id, user?.name])
 
   useEffect(() => {
     if (!routedConversationId) {
@@ -1131,6 +1490,31 @@ export function ChatPage() {
 
   const activeConversationId = routedConversationId || selectedConversationId
 
+  // Auto-resolve virtual "My Documents" to real ID
+  useEffect(() => {
+    if (!accessToken || !user || !activeConversationId) return;
+    
+    if (activeConversationId === `vnalo_cloud_${user.id}`) {
+      void (async () => {
+        try {
+          console.log('[ChatPage] Resolving virtual Cloud chat to real ID...');
+          const realId = await getOrCreateDirectConversation(accessToken, user.id);
+          
+          // Map virtual entry to real one in state
+          setConversations(prev => prev.map(c => 
+            c.id === activeConversationId ? { ...c, id: realId } : c
+          ));
+          
+          // Switch to real ID
+          setSelectedConversationId(realId);
+          navigate(`/chat/${realId}`);
+        } catch (err) {
+          console.error('[ChatPage] Failed to resolve cloud chat:', err);
+        }
+      })();
+    }
+  }, [accessToken, activeConversationId, navigate, user]);
+
 
   useEffect(() => {
     if (!accessToken || !activeConversationId || !user) {
@@ -1148,7 +1532,8 @@ export function ChatPage() {
 
     void (async () => {
       try {
-        const rawMessages = await fetchMessages(accessToken, activeConversationId)
+        const isVirtualCloud = activeConversationId === `vnalo_cloud_${user.id}`;
+        const rawMessages = isVirtualCloud ? [] : await fetchMessages(accessToken, activeConversationId)
         console.log('Dữ liệu tin nhắn nhận được:', rawMessages)
         const mapped = sortMessages(
           rawMessages
@@ -1169,9 +1554,9 @@ export function ChatPage() {
             prev.map((conversation) =>
               conversation.id === activeConversationId
                 ? {
-                    ...conversation,
-                    unreadCount: 0,
-                  }
+                  ...conversation,
+                  unreadCount: 0,
+                }
                 : conversation,
             ),
           )
@@ -1187,7 +1572,7 @@ export function ChatPage() {
     })()
   }, [accessToken, activeConversationId, deletedMessageIds, isRestrictedMode, syncConversationReactions, syncPinnedMessages, user])
 
-  const { emitSendMessage, joinConversation, markAsRead, getSocket } = useChatSocket({
+  const { emitSendMessage, emitRecallMessage, joinConversation, markAsRead, getSocket } = useChatSocket({
     token: accessToken,
     onConnected: async () => {
       setIsSocketConnected(true)
@@ -1236,8 +1621,9 @@ export function ChatPage() {
               {
                 id: mapped.conversationId,
                 name: profile.displayName,
+                avatarUrl: profile.avatarUrl,
                 isStranger: senderId ? !friendIdSetRef.current.has(senderId) : false,
-                lastMessage: getConversationPreview(mapped),
+                lastMessage: formatConversationPreview(profile.displayName, mapped),
                 unreadCount: mapped.sender === 'me' ? 0 : 1,
                 online: false,
                 lastMessageSeq: mapped.serverSeq,
@@ -1256,6 +1642,8 @@ export function ChatPage() {
           next[existingIndex] = {
             ...current,
             name: shouldReplaceName ? profile.displayName : current.name,
+            avatarUrl: current.avatarUrl ?? profile.avatarUrl,
+            lastMessage: formatConversationPreview(profile.displayName, mapped),
             isStranger:
               senderId && friendIdSetRef.current.has(senderId)
                 ? false
@@ -1312,13 +1700,13 @@ export function ChatPage() {
           [payload.conversationId]: current.map((message) =>
             message.id === payload.messageId
               ? {
-                  ...message,
-                  text: '',
-                  mediaUrl: null,
-                  mediaThumbnailUrl: null,
-                  mediaMimeType: null,
-                  mediaSizeBytes: null,
-                }
+                ...message,
+                text: '',
+                mediaUrl: null,
+                mediaThumbnailUrl: null,
+                mediaMimeType: null,
+                mediaSizeBytes: null,
+              }
               : message,
           ),
         }
@@ -1500,6 +1888,7 @@ export function ChatPage() {
             {
               id: conversationId,
               name: friendName,
+              avatarUrl: friend.avatarUrl ?? null,
               isStranger: false,
               lastMessage: '',
               unreadCount: 0,
@@ -1596,6 +1985,21 @@ export function ChatPage() {
       const content = getDraftContent(draft)
       const messageType = getDraftMessageType(draft)
 
+      // Fallback resolve virtual "My Documents" to real conversation if needed
+      let targetConversationId = conversationId;
+      if (conversationId === `vnalo_cloud_${user.id}`) {
+        try {
+          const realId = await getOrCreateDirectConversation(accessToken, user.id);
+          targetConversationId = realId;
+          // Sync state
+          setConversations(prev => prev.map(c => c.id === conversationId ? { ...c, id: realId } : c));
+          setSelectedConversationId(realId);
+        } catch (err) {
+          console.error('[ChatPage.send] Final attempt to resolve cloud chat failed', err);
+          return; // Cannot send to virtual ID
+        }
+      }
+
       const clientMessageId =
         typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
           ? crypto.randomUUID()
@@ -1636,14 +2040,14 @@ export function ChatPage() {
         console.log('[OPTIMISTIC MESSAGE]', optimisticPreviewMessage)
 
         setMessagesByConversation((prev) => {
-          const current = prev[conversationId] ?? []
+          const current = prev[targetConversationId] ?? []
           return {
             ...prev,
-            [conversationId]: upsertMessage(current, optimisticPreviewMessage),
+            [targetConversationId]: upsertMessage(current, optimisticPreviewMessage),
           }
         })
 
-        updateConversationAfterMessage(conversationId, optimisticPreviewMessage, true)
+        updateConversationAfterMessage(targetConversationId, optimisticPreviewMessage, true)
       }
 
       if (draft.file) {
@@ -1664,10 +2068,10 @@ export function ChatPage() {
             const uploadedImageUrl = mediaUrl
             let previousBlobUrl: string | null = null
             setMessagesByConversation((prev) => {
-              const current = prev[conversationId] ?? []
+              const current = prev[targetConversationId] ?? []
               return {
                 ...prev,
-                [conversationId]: current.map((message) => {
+                [targetConversationId]: current.map((message) => {
                   if (message.clientMessageId !== clientMessageId) {
                     return message
                   }
@@ -1707,10 +2111,10 @@ export function ChatPage() {
 
           if (messageType === 'image') {
             setMessagesByConversation((prev) => {
-              const current = prev[conversationId] ?? []
+              const current = prev[targetConversationId] ?? []
               return {
                 ...prev,
-                [conversationId]: markLocalMessageFailed(current, clientMessageId),
+                [targetConversationId]: markLocalMessageFailed(current, clientMessageId),
               }
             })
           }
@@ -1728,7 +2132,7 @@ export function ChatPage() {
 
       console.log('[ChatPage.send] Start:', {
         clientMessageId,
-        conversationId,
+        conversationId: targetConversationId,
         contentLength: content.length,
         messageType,
       })
@@ -1736,7 +2140,7 @@ export function ChatPage() {
       const optimisticMessage: ChatMessage = {
         id: clientMessageId,
         clientMessageId,
-        conversationId,
+        conversationId: targetConversationId,
         sender: 'me',
         senderId: user.id,
         type: messageType,
@@ -1748,14 +2152,14 @@ export function ChatPage() {
         mediaSizeBytes,
         attachments: mediaUrl
           ? [
-              {
-                url: mediaUrl,
-                name: draft.file?.name ?? undefined,
-                thumbnailUrl: mediaThumbnailUrl,
-                mimeType: mediaMimeType,
-                sizeBytes: mediaSizeBytes,
-              },
-            ]
+            {
+              url: mediaUrl,
+              name: draft.file?.name ?? undefined,
+              thumbnailUrl: mediaThumbnailUrl,
+              mimeType: mediaMimeType,
+              sizeBytes: mediaSizeBytes,
+            },
+          ]
           : undefined,
         timestamp: formatMessageTimestamp(),
         deliveryState: 'sending',
@@ -1775,7 +2179,7 @@ export function ChatPage() {
                 : content
 
       const payload = {
-        conversationId,
+        conversationId: targetConversationId,
         content: payloadContent,
         clientMessageId,
         messageType: toSocketMessageType(messageType),
@@ -1789,14 +2193,14 @@ export function ChatPage() {
 
       if (messageType !== 'image') {
         setMessagesByConversation((prev) => {
-          const current = prev[conversationId] ?? []
+          const current = prev[targetConversationId] ?? []
           return {
             ...prev,
-            [conversationId]: upsertMessage(current, optimisticMessage),
+            [targetConversationId]: upsertMessage(current, optimisticMessage),
           }
         })
 
-        updateConversationAfterMessage(conversationId, optimisticMessage, true)
+        updateConversationAfterMessage(targetConversationId, optimisticMessage, true)
       }
 
       console.log('[ChatPage.send] Emitting message...')
@@ -1819,33 +2223,33 @@ export function ChatPage() {
           mediaSizeBytes: mappedServerMessage.mediaSizeBytes ?? mediaSizeBytes,
           attachments: resolvedMediaUrl
             ? [
-                {
-                  url: resolvedMediaUrl,
-                  name: draft.file?.name ?? mappedServerMessage.attachments?.[0]?.name ?? undefined,
-                  thumbnailUrl: mappedServerMessage.mediaThumbnailUrl ?? mediaThumbnailUrl,
-                  mimeType: mappedServerMessage.mediaMimeType ?? mediaMimeType,
-                  sizeBytes: mappedServerMessage.mediaSizeBytes ?? mediaSizeBytes,
-                },
-              ]
+              {
+                url: resolvedMediaUrl,
+                name: draft.file?.name ?? mappedServerMessage.attachments?.[0]?.name ?? undefined,
+                thumbnailUrl: mappedServerMessage.mediaThumbnailUrl ?? mediaThumbnailUrl,
+                mimeType: mappedServerMessage.mediaMimeType ?? mediaMimeType,
+                sizeBytes: mappedServerMessage.mediaSizeBytes ?? mediaSizeBytes,
+              },
+            ]
             : mappedServerMessage.attachments,
           deliveryState: 'sent' as const,
         }
         setMessagesByConversation((prev) => {
-          const current = prev[conversationId] ?? []
+          const current = prev[targetConversationId] ?? []
           return {
             ...prev,
-            [conversationId]: upsertMessage(current, serverMessage),
+            [targetConversationId]: upsertMessage(current, serverMessage),
           }
         })
 
-        updateConversationAfterMessage(conversationId, serverMessage, true)
+        updateConversationAfterMessage(targetConversationId, serverMessage, true)
         return
       }
 
       console.warn('[ChatPage.send] No valid ACK, trying REST fallback /messages before marking failed')
       try {
         const restMessage = await sendMessageViaRest(accessToken, {
-          conversationId,
+          conversationId: targetConversationId,
           content: payloadContent,
           clientMessageId,
           messageType: payload.messageType,
@@ -1864,14 +2268,14 @@ export function ChatPage() {
           }
 
           setMessagesByConversation((prev) => {
-            const current = prev[conversationId] ?? []
+            const current = prev[targetConversationId] ?? []
             return {
               ...prev,
-              [conversationId]: upsertMessage(current, mappedRestMessage),
+              [targetConversationId]: upsertMessage(current, mappedRestMessage),
             }
           })
 
-          updateConversationAfterMessage(conversationId, mappedRestMessage, true)
+          updateConversationAfterMessage(targetConversationId, mappedRestMessage, true)
           return
         }
       } catch (restFallbackError) {
@@ -1880,10 +2284,10 @@ export function ChatPage() {
         const message = restFallbackError instanceof Error ? restFallbackError.message : String(restFallbackError)
         if (message.toLowerCase().includes('restricted web session cannot send messages')) {
           setMessagesByConversation((prev) => {
-            const current = prev[conversationId] ?? []
+            const current = prev[targetConversationId] ?? []
             return {
               ...prev,
-              [conversationId]: markLocalMessageFailed(current, clientMessageId),
+              [targetConversationId]: markLocalMessageFailed(current, clientMessageId),
             }
           })
           console.warn('[ChatPage.send] Send blocked by restricted web policy; message marked failed immediately')
@@ -2113,6 +2517,8 @@ export function ChatPage() {
         onSearchFriends={handleSearchFriends}
         onOpenFriendChat={handleOpenFriendChat}
         onSelectConversation={handleSelectConversation}
+        onCreateGroupClick={() => setIsCreateGroupOpen(true)}
+
       />
       <ChatWindow
         conversation={selectedConversation}
@@ -2135,11 +2541,19 @@ export function ChatPage() {
         starredMessageIds={starredMessageIds}
         recalledMessageIds={recalledMessageIds}
         deletedMessageIds={deletedMessageIds}
+        userProfilesById={userProfileCache}
         selectedMessageIds={selectedMessageIds}
         isMultiSelectMode={isMultiSelectMode}
         onToggleMessageSelection={toggleMessageIdInList}
         onClearMultiSelectMode={handleClearMultiSelectMode}
         onMessageContextMenuAction={handleMessageContextMenuAction}
+      />
+      <CreateGroupModal
+        isOpen={isCreateGroupOpen}
+        friends={friendsDirectory}           // Danh sách bạn bè đã load
+        isSubmitting={isCreatingGroup}
+        onClose={() => setIsCreateGroupOpen(false)}
+        onCreate={handleCreateGroup}
       />
       {rightSidebarContent ? (
         <aside className='chat-side-panel'>
@@ -2168,7 +2582,11 @@ export function ChatPage() {
           {rightSidebarContent === 'info' ? (
             <>
               {selectedConversation ? (
-                <ConversationInfo conversation={selectedConversation} messages={selectedMessages} />
+                <ConversationInfo
+                  conversation={selectedConversation}
+                  messages={selectedMessages}
+                  userProfilesById={userProfileCache}
+                />
               ) : (
                 <p>{t('pages.chat.sideInfoFallback')}</p>
               )}
@@ -2176,6 +2594,19 @@ export function ChatPage() {
           ) : null}
         </aside>
       ) : null}
+
+      <MessageShareModal
+        isOpen={Boolean(shareModalMessage)}
+        message={shareModalMessage}
+        friends={friendsDirectory}
+        isSubmitting={isShareSubmitting}
+        onClose={() => {
+          if (!isShareSubmitting) {
+            setShareModalMessage(null)
+          }
+        }}
+        onShare={handleShareMessage}
+      />
     </div>
   )
 }

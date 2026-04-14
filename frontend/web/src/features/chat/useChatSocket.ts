@@ -205,6 +205,10 @@ export function useChatSocket({
     return getOrCreateChatService().emitSendMessage(payload) ?? null
   }, [])
 
+  const emitRecallMessage = useCallback(async (payload: { messageId: string; conversationId: string }) => {
+    return getOrCreateChatService().emitRecallMessage(payload) ?? null
+  }, [])
+
   const joinConversation = useCallback(async (conversationId: string): Promise<boolean> => {
     return getOrCreateChatService().joinConversation(conversationId) ?? false
   }, [])
@@ -225,6 +229,7 @@ export function useChatSocket({
     connect,
     disconnect,
     emitSendMessage,
+    emitRecallMessage,
     joinConversation,
     markAsRead,
     isConnected,

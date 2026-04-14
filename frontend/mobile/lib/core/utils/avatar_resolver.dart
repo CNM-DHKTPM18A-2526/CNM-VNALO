@@ -24,28 +24,72 @@ class AvatarResolver {
 
     final normalized = _normalizeSaveUrl(value);
 
-    final uri = Uri.tryParse(normalized);
-    if (uri != null && uri.hasScheme) {
+    // If already an absolute URL, return as-is
+    if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
       return normalized;
     }
 
-    // Build base from media-service URL, fallback to core-service URL.
+    // Build base from media-service URL
     if (!AppConfig.isInitialized) return normalized;
 
-    final mediaUri = Uri.parse(AppConfig.instance.mediaServiceUrl);
-    final coreUri = Uri.parse(AppConfig.instance.coreServiceUrl);
-    final host = mediaUri.host.isNotEmpty ? mediaUri.host : coreUri.host;
-    final scheme =
-        mediaUri.scheme.isNotEmpty ? mediaUri.scheme : coreUri.scheme;
-    if (host.isEmpty || scheme.isEmpty) return normalized;
+    final mediaUrl = AppConfig.instance.mediaServiceUrl;
+    final mediaUri = Uri.parse(mediaUrl);
 
-    final path = normalized.startsWith('/') ? normalized : '/$normalized';
-    return Uri(
-      scheme: scheme,
-      host: host,
-      port: mediaUri.hasPort ? mediaUri.port : null,
-      path: path,
-    ).toString();
+    // Extract the base path from mediaServiceUrl (e.g. "/api/v1")
+    String basePath = mediaUri.path.replaceAll(RegExp(r'/+$'), '');
+
+    // The normalized input could be something like:
+    //   /api/v1/media/public-file?key=stickers/pack/img.png
+    //   /media/public/abc-123
+    //   /stickers/packs
+    //   media/public/abc-123
+    //
+    // We need to:
+    // 1. Separate the path from query parameters
+    // 2. Prepend basePath if not already present
+    // 3. Reconstruct with scheme://host:port + path + query
+
+    // Parse the normalized value as a relative URI to extract path/query
+    // But Uri.parse needs a scheme, so we use a trick:
+    String fullInput = normalized;
+    if (!fullInput.startsWith('/')) {
+      fullInput = '/$fullInput';
+    }
+
+    // Split path and query manually since Uri constructor strips query from path
+    String pathPart = fullInput;
+    String? queryPart;
+    final qIndex = fullInput.indexOf('?');
+    if (qIndex >= 0) {
+      pathPart = fullInput.substring(0, qIndex);
+      queryPart = fullInput.substring(qIndex + 1);
+    }
+
+    // Avoid duplicating the base path
+    String finalPath = pathPart;
+    if (basePath.isNotEmpty && !pathPart.startsWith(basePath)) {
+      finalPath = '$basePath$pathPart';
+    }
+
+    // Clean up double slashes
+    finalPath = finalPath.replaceAll(RegExp(r'/+'), '/');
+
+    // Build the final URL
+    final buffer = StringBuffer();
+    buffer.write(mediaUri.scheme);
+    buffer.write('://');
+    buffer.write(mediaUri.host);
+    if (mediaUri.hasPort) {
+      buffer.write(':');
+      buffer.write(mediaUri.port);
+    }
+    buffer.write(finalPath);
+    if (queryPart != null && queryPart.isNotEmpty) {
+      buffer.write('?');
+      buffer.write(queryPart);
+    }
+
+    return buffer.toString();
   }
 
   static String _normalizeSaveUrl(String input) {

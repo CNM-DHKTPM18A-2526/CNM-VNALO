@@ -47,35 +47,71 @@ class _ChatInputBarState extends State<ChatInputBar> {
   }
 
   Future<void> _pickImage() async {
-    // Send picked image immediately through chat provider.
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-    if (image != null && mounted) {
-      context.read<ChatProvider>().sendImage(
-        conversationId: widget.conversationId,
-        imagePath: image.path,
-      );
+    final List<XFile> images = await _picker.pickMultiImage();
+    if (images.isNotEmpty && mounted) {
+      final provider = context.read<ChatProvider>();
+      for (final image in images) {
+        final length = await image.length();
+        if (length > 5 * 1024 * 1024) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Không hỗ trợ gửi file/ảnh lớn hơn 5MB')),
+            );
+          }
+          continue;
+        }
+        provider.sendImage(
+          conversationId: widget.conversationId,
+          imagePath: image.path,
+        );
+      }
     }
   }
 
   Future<void> _pickVideo() async {
-    // Send picked video immediately through chat provider.
-    final XFile? video = await _picker.pickVideo(source: ImageSource.gallery);
-    if (video != null && mounted) {
-      context.read<ChatProvider>().sendVideo(
-        conversationId: widget.conversationId,
-        videoPath: video.path,
-      );
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.video,
+      allowMultiple: true,
+    );
+    if (result != null && mounted) {
+      final provider = context.read<ChatProvider>();
+      for (final file in result.files) {
+        if (file.path == null) continue;
+        if (file.size > 5 * 1024 * 1024) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Không hỗ trợ gửi video lớn hơn 5MB')),
+            );
+          }
+          continue;
+        }
+        provider.sendVideo(
+          conversationId: widget.conversationId,
+          videoPath: file.path!,
+        );
+      }
     }
   }
 
   Future<void> _pickFile() async {
-    // Send selected file as a regular attachment message.
-    FilePickerResult? result = await FilePicker.platform.pickFiles();
+    FilePickerResult? result = await FilePicker.platform.pickFiles(allowMultiple: true);
     if (result != null && mounted) {
-      context.read<ChatProvider>().sendFile(
-        conversationId: widget.conversationId,
-        filePath: result.files.single.path!,
-      );
+      final provider = context.read<ChatProvider>();
+      for (final file in result.files) {
+        if (file.path == null) continue;
+        if (file.size > 5 * 1024 * 1024) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Không hỗ trợ gửi file lớn hơn 5MB')),
+            );
+          }
+          continue;
+        }
+        provider.sendFile(
+          conversationId: widget.conversationId,
+          filePath: file.path!,
+        );
+      }
     }
   }
 
@@ -277,7 +313,6 @@ class _ChatInputBarState extends State<ChatInputBar> {
 
   void _showAttachmentMenu(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final common = CommonTexts.of(context, listen: false);
     
     showModalBottomSheet(
       context: context,
@@ -286,44 +321,82 @@ class _ChatInputBarState extends State<ChatInputBar> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Center(
-              child: Container(
-                margin: const EdgeInsets.only(top: 10, bottom: 10),
-                width: 40, height: 4,
-                decoration: BoxDecoration(
-                  color: isDarkMode ? DarkColors.divider : Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 24),
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(
+                    color: isDarkMode ? DarkColors.divider : Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
+              Wrap(
+                spacing: 20,
+                runSpacing: 20,
+                alignment: WrapAlignment.start,
+                children: [
+                  _buildMenuButton(context, isDarkMode, Icons.location_on, const Color(0xFFE56353), 'Vị trí', () {
+                    Navigator.pop(context);
+                  }),
+                  _buildMenuButton(context, isDarkMode, Icons.attach_file, const Color(0xFF4A89DF), 'Tài liệu', () {
+                    Navigator.pop(context);
+                    _pickFile();
+                  }),
+                  _buildMenuButton(context, isDarkMode, Icons.videocam, const Color(0xFF34A853), 'Video', () {
+                    Navigator.pop(context);
+                    _pickVideo();
+                  }),
+                  _buildMenuButton(context, isDarkMode, Icons.alarm, const Color(0xFFE56353), 'Nhắc hẹn', () {
+                    Navigator.pop(context);
+                  }),
+                  _buildMenuButton(context, isDarkMode, Icons.chat, const Color(0xFF4A89DF), 'Tin nhắn nhanh', () {
+                    Navigator.pop(context);
+                  }),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMenuButton(BuildContext context, bool isDarkMode, IconData icon, Color color, String label, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: SizedBox(
+        width: 72,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: Colors.white, size: 28),
             ),
-            ListTile(
-              leading: Icon(Icons.image, color: isDarkMode ? DarkColors.textPrimary : Colors.black87),
-              title: Text(common.imageLabel, style: TextStyle(color: isDarkMode ? DarkColors.textPrimary : Colors.black87)),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage();
-              },
+            const SizedBox(height: 8),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.2,
+                color: isDarkMode ? Colors.white70 : Colors.black87,
+              ),
             ),
-            ListTile(
-              leading: Icon(Icons.videocam, color: isDarkMode ? DarkColors.textPrimary : Colors.black87),
-              title: Text(common.videoAction, style: TextStyle(color: isDarkMode ? DarkColors.textPrimary : Colors.black87)),
-              onTap: () {
-                Navigator.pop(context);
-                _pickVideo();
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.insert_drive_file, color: isDarkMode ? DarkColors.textPrimary : Colors.black87),
-              title: Text('${common.documentLabel} (${common.fileLimitNote})', style: TextStyle(color: isDarkMode ? DarkColors.textPrimary : Colors.black87)),
-              onTap: () {
-                Navigator.pop(context);
-                _pickFile();
-              },
-            ),
-            const SizedBox(height: 12),
           ],
         ),
       ),

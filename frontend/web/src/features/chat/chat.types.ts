@@ -1,17 +1,17 @@
-export type ConversationSummary = {
+export interface ConversationSummary {
   id: string
-  userId?: string | null
   name: string
-  isStranger?: boolean
-  lastMessage: string
-  unreadCount: number
-  online: boolean
-  isOnline?: boolean
-  lastMessageSeq?: number
-  participantUserIds?: string[]
+  avatarUrl?: string | null
+  lastMessage?: string | null
+  lastMessagePreview?: string | null
+  unreadCount?: number
   lastMessageAt?: string | null
   updatedAt?: string | null
+  participantUserIds?: string[]
+  memberCount?: number
   lastSeenTime?: string | null
+  isGroup?: boolean
+  isCloud?: boolean
 }
 
 export type ChatMessageType = 'text' | 'image' | 'file' | 'sticker'

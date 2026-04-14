@@ -6,12 +6,6 @@ import { Icon } from './Icon'
 import { UserAvatar } from './UserAvatar'
 import { SettingsMenu } from './SettingsMenu'
 
-const menuItems = [
-  { to: '/chat', labelKey: 'sidebar.chat', icon: 'chat' as const },
-  { to: '/contacts', labelKey: 'sidebar.contacts', icon: 'addressBook' as const },
-  { to: '/profile', labelKey: 'sidebar.profile', icon: 'user' as const },
-]
-
 type SidebarProps = {
   onOpenSettingsModal?: () => void
 }
@@ -19,6 +13,18 @@ type SidebarProps = {
 export function Sidebar({ onOpenSettingsModal }: SidebarProps) {
   const { t } = useLanguage()
   const { user } = useAuth()
+
+  const menuItems = [
+    { to: '/chat', labelKey: 'sidebar.chat', icon: 'chat' as const },
+    { to: '/contacts', labelKey: 'sidebar.contacts', icon: 'addressBook' as const },
+    { to: '/todo', labelKey: 'sidebar.todo', icon: 'checkSquare' as const },
+    { to: '/documents', labelKey: 'sidebar.documents', icon: 'folder' as const },
+    { 
+      to: user ? `/chat/vnalo_cloud_${user.id}` : '/chat', 
+      labelKey: 'sidebar.cloud', 
+      icon: 'cloud' as const 
+    },
+  ]
 
   const handleOpenSettings = () => {
     onOpenSettingsModal?.()
@@ -30,14 +36,11 @@ export function Sidebar({ onOpenSettingsModal }: SidebarProps) {
         <NavLink className='sidebar-profile-link' title={t('sidebar.profile')} to='/profile'>
           <UserAvatar imageUrl={user?.avatarUrl} name={user?.name ?? user?.email ?? 'VNALO User'} size='md' />
         </NavLink>
-        <span aria-hidden className='brand-logo'>
-          V
-        </span>
       </div>
       <nav className='sidebar-nav'>
         {menuItems.map((item) => (
           <NavLink
-            key={item.to}
+            key={item.labelKey}
             to={item.to}
             className={({ isActive }) =>
               isActive ? 'sidebar-link sidebar-link-active' : 'sidebar-link'
@@ -51,6 +54,11 @@ export function Sidebar({ onOpenSettingsModal }: SidebarProps) {
         ))}
       </nav>
       <div className='sidebar-footer'>
+        <NavLink className='sidebar-link' to='/tools' title="Công cụ">
+          <span aria-hidden className='sidebar-link-icon'>
+            <Icon name="briefcase" />
+          </span>
+        </NavLink>
         <SettingsMenu onOpenSettings={handleOpenSettings} />
       </div>
     </aside>

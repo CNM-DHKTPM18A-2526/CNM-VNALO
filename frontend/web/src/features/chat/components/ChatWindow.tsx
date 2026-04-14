@@ -33,6 +33,7 @@ type ChatWindowProps = {
   starredMessageIds?: Record<string, true>
   recalledMessageIds?: Record<string, true>
   deletedMessageIds?: Record<string, true>
+  userProfilesById?: Record<string, { displayName: string; avatarUrl: string | null }>
   selectedMessageIds?: string[]
   isMultiSelectMode?: boolean
   onToggleMessageSelection?: (messageId: string) => void
@@ -60,6 +61,7 @@ export function ChatWindow({
   starredMessageIds = {},
   recalledMessageIds = {},
   deletedMessageIds = {},
+  userProfilesById = {},
   selectedMessageIds = [],
   isMultiSelectMode = false,
   onToggleMessageSelection,
@@ -188,8 +190,14 @@ export function ChatWindow({
       <header className='chat-window-header'>
         <div className='chat-window-header-main'>
           <div className='relative'>
-            <UserAvatar name={conversation.name} size='md' />
-            {isOnline && (
+            <UserAvatar
+              name={conversation.name}
+              imageUrl={conversation.avatarUrl ?? null}
+              size='md'
+              isGroup={conversation.isGroup}
+              isCloud={conversation.isCloud}
+            />
+            {isOnline && !conversation.isCloud && (
               <span className='absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full' />
             )}
           </div>
@@ -197,7 +205,13 @@ export function ChatWindow({
             <h2>{conversation.name}</h2>
             <div className='chat-window-header-meta'>
               {isStranger ? <span className='chat-stranger-badge'>Người lạ</span> : null}
-              <p>{statusText}</p>
+              {conversation.isCloud ? (
+                <p>Lưu và đồng bộ dữ liệu giữa các thiết bị</p>
+              ) : conversation.isGroup ? (
+                <p>{conversation.memberCount || 0} thành viên</p>
+              ) : (
+                <p>{statusText}</p>
+              )}
             </div>
           </div>
         </div>
@@ -245,30 +259,50 @@ export function ChatWindow({
               description={t('chat.windowEmptyDesc')}
             />
           ) : (
-            conversationMessages.map((message) => (
-              <MessageBubble
-                key={message.id}
-                message={message}
-                reactions={reactionStatesByMessage[message.id]?.reactions ?? {}}
-                quickReaction={reactionStatesByMessage[message.id]?.lastUsedReaction}
-                onAddReaction={(reactionKey) => onAddReaction?.(message.id, reactionKey)}
-                onRemoveReaction={(reactionKey) => onRemoveReaction?.(message.id, reactionKey)}
-                onContextMenuAction={(action, currentMessage) => onMessageContextMenuAction?.(message.id, action, currentMessage)}
-                isHighlighted={highlightedMessageId === message.id}
-                isPinned={Boolean(pinnedMessageIds[message.id])}
-                isStarred={Boolean(starredMessageIds[message.id])}
-                isRecalled={Boolean(recalledMessageIds[message.id])}
-                isMultiSelectMode={isMultiSelectMode}
-                isSelected={selectedMessageIds.includes(message.id)}
-                onToggleSelection={() => onToggleMessageSelection?.(message.id)}
-                isReadByPeer={
-                  message.sender === 'me' &&
-                  message.serverSeq !== undefined &&
-                  peerLastReadSeq !== undefined &&
-                  message.serverSeq <= peerLastReadSeq
-                }
-              />
-            ))
+            conversationMessages.map((message, index) => {
+              const previous = index > 0 ? conversationMessages[index - 1] : null
+              const profile = userProfilesById[message.senderId]
+              const isIncoming = message.sender !== 'me'
+              const isFirstInCluster =
+                !previous ||
+                previous.sender !== message.sender ||
+                previous.senderId !== message.senderId
+              const resolvedSenderName = isIncoming
+                ? profile?.displayName || (conversation.isGroup ? 'Thành viên' : conversation.name)
+                : 'Bạn'
+              const resolvedSenderAvatar = isIncoming
+                ? (profile?.avatarUrl ?? (conversation.isGroup ? null : conversation.avatarUrl) ?? null)
+                : null
+
+              return (
+                <MessageBubble
+                  key={message.id}
+                  message={message}
+                  senderName={resolvedSenderName}
+                  senderAvatarUrl={resolvedSenderAvatar}
+                  showAvatar={isIncoming ? isFirstInCluster : false}
+                  showSenderName={isIncoming && conversation.isGroup ? isFirstInCluster : false}
+                  reactions={reactionStatesByMessage[message.id]?.reactions ?? {}}
+                  quickReaction={reactionStatesByMessage[message.id]?.lastUsedReaction}
+                  onAddReaction={(reactionKey) => onAddReaction?.(message.id, reactionKey)}
+                  onRemoveReaction={(reactionKey) => onRemoveReaction?.(message.id, reactionKey)}
+                  onContextMenuAction={(action, currentMessage) => onMessageContextMenuAction?.(message.id, action, currentMessage)}
+                  isHighlighted={highlightedMessageId === message.id}
+                  isPinned={Boolean(pinnedMessageIds[message.id])}
+                  isStarred={Boolean(starredMessageIds[message.id])}
+                  isRecalled={Boolean(recalledMessageIds[message.id])}
+                  isMultiSelectMode={isMultiSelectMode}
+                  isSelected={selectedMessageIds.includes(message.id)}
+                  onToggleSelection={() => onToggleMessageSelection?.(message.id)}
+                  isReadByPeer={
+                    message.sender === 'me' &&
+                    message.serverSeq !== undefined &&
+                    peerLastReadSeq !== undefined &&
+                    message.serverSeq <= peerLastReadSeq
+                  }
+                />
+              )
+            })
           )}
         </div>
       </ImageViewerProvider>
