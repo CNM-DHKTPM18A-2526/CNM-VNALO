@@ -870,6 +870,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
           Column(
             children: List.generate(displayList.length, (index) {
               final conv = displayList[index];
+              displayedIds.add(conv.id);
               final displayName = conv.getDisplayName(currentUserId);
               final avatarUrl = conv.getDisplayAvatarUrl(currentUserId);
 
