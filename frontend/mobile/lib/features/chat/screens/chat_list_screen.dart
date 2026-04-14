@@ -187,8 +187,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
           return RefreshIndicator(
             onRefresh: () => chatProvider.loadInbox(),
             color: AppColors.primary,
-            child: Container(
-              color: isDarkMode ? DarkColors.surface : Colors.white,
+            child: ColoredBox(
+              color: isDarkMode ? DarkColors.surface : AppColors.sectionBackground,
               child: ListView.separated(
                 itemCount: chatProvider.conversations.length + 1,
                 separatorBuilder: (context, index) {
@@ -226,11 +226,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
                       }
                     }
 
-                    return ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
-                      ),
+                    return ColoredBox(
+                      color: isDarkMode ? DarkColors.surface : Colors.white,
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
                       leading: Container(
                         width: 52,
                         height: 52,
@@ -293,7 +295,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           MaterialPageRoute(builder: (_) => const MyDocumentsScreen()),
                         );
                       },
-                    );
+                    ),
+                  );
                   }
 
                   // 2. Conversations
