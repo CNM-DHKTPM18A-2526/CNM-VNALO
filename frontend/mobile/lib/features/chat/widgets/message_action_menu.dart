@@ -21,21 +21,64 @@ class MessageActionMenu extends StatelessWidget {
     final backgroundColor = isDarkMode ? DarkColors.surface : Colors.white;
     final common = CommonTexts.of(context);
 
+    // Dynamic items based on isMine (Matching User Images)
+    final List<Widget> actionItems = [];
+
+    if (isMine) {
+      // Image 2 Order (Mine)
+      actionItems.addAll([
+        _buildActionItem(context, 'reply', common.replyAction, Icons.reply_rounded, const Color(0xFF9C27B0)),
+        _buildActionItem(context, 'forward', common.forwardAction, Icons.forward_rounded, const Color(0xFF2196F3)),
+        _buildActionItem(context, 'save', common.saveToDocsAction, Icons.folder_open_outlined, const Color(0xFF03A9F4)),
+        _buildActionItem(context, 'recall', common.recallAction, Icons.settings_backup_restore_rounded, Colors.orange),
+        
+        _buildActionItem(context, 'copy', common.copyAction, Icons.copy_rounded, const Color(0xFF1E88E5)),
+        _buildActionItem(context, 'pin', common.pinActionTag, Icons.push_pin_outlined, const Color(0xFFFF9800)),
+        _buildActionItem(context, 'reminder', common.reminderAction, Icons.access_time_rounded, const Color(0xFFE65100)),
+        _buildActionItem(context, 'multi', common.selectMultiAction, Icons.check_circle_outline_rounded, const Color(0xFF1976D2)),
+        
+        _buildActionItem(context, 'quick', common.quickReplyAction, Icons.bolt_rounded, const Color(0xFF1976D2)),
+        _buildActionItem(context, 'translate', common.translateAction, Icons.translate_rounded, const Color(0xFF4CAF50), labelExtra: common.newTagLabel),
+        _buildActionItem(context, 'tts', common.speakAction, Icons.volume_up_outlined, const Color(0xFF9C27B0), labelExtra: common.newTagLabel),
+        _buildActionItem(context, 'info', common.detailsAction, Icons.info_outline_rounded, Colors.blueGrey),
+        
+        _buildActionItem(context, 'delete', common.deleteForMeAction, Icons.delete_outline_rounded, Colors.redAccent),
+      ]);
+    } else {
+      // Image 1 Order (Other)
+      actionItems.addAll([
+        _buildActionItem(context, 'reply', common.replyAction, Icons.reply_rounded, const Color(0xFF9C27B0)),
+        _buildActionItem(context, 'forward', common.forwardAction, Icons.forward_rounded, const Color(0xFF2196F3)),
+        _buildActionItem(context, 'save', common.saveToDocsAction, Icons.folder_open_outlined, const Color(0xFF03A9F4)),
+        _buildActionItem(context, 'copy', common.copyAction, Icons.copy_rounded, const Color(0xFF1E88E5)),
+        
+        _buildActionItem(context, 'pin', common.pinActionTag, Icons.push_pin_outlined, const Color(0xFFFF9800)),
+        _buildActionItem(context, 'reminder', common.reminderAction, Icons.access_time_rounded, const Color(0xFFE65100)),
+        _buildActionItem(context, 'multi', common.selectMultiAction, Icons.check_circle_outline_rounded, const Color(0xFF1976D2)),
+        _buildActionItem(context, 'quick', common.quickReplyAction, Icons.bolt_rounded, const Color(0xFF1976D2)),
+        
+        _buildActionItem(context, 'translate', common.translateAction, Icons.translate_rounded, const Color(0xFF4CAF50), labelExtra: common.newTagLabel),
+        _buildActionItem(context, 'tts', common.speakAction, Icons.volume_up_outlined, const Color(0xFF9C27B0), labelExtra: common.newTagLabel),
+        _buildActionItem(context, 'info', common.detailsAction, Icons.info_outline_rounded, Colors.blueGrey),
+        _buildActionItem(context, 'delete', common.deleteForMeAction, Icons.delete_outline_rounded, Colors.redAccent),
+      ]);
+    }
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         // 1. Emoji Bar
         Container(
-          height: 60,
+          height: 56,
           padding: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: BorderRadius.circular(16),
+            color: backgroundColor.withValues(alpha: 0.95),
+            borderRadius: BorderRadius.circular(28),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+                blurRadius: 15,
+                offset: const Offset(0, 5),
               ),
             ],
           ),
@@ -54,15 +97,15 @@ class MessageActionMenu extends StatelessWidget {
         const SizedBox(height: 12),
         // 2. Action Grid Box
         Container(
-          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 8),
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
           decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: BorderRadius.circular(24),
+            color: backgroundColor.withValues(alpha: 0.95),
+            borderRadius: BorderRadius.circular(28),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+                blurRadius: 15,
+                offset: const Offset(0, 5),
               ),
             ],
           ),
@@ -74,24 +117,9 @@ class MessageActionMenu extends StatelessWidget {
                 physics: const NeverScrollableScrollPhysics(),
                 crossAxisCount: 4,
                 crossAxisSpacing: 0,
-                mainAxisSpacing: 24,
-                childAspectRatio: 0.9,
-                children: [
-                  _buildActionItem(context, 'reply', common.replyAction, Icons.reply_outlined, const Color(0xFF9C27B0)),
-                  _buildActionItem(context, 'forward', common.forwardAction, Icons.forward_rounded, const Color(0xFF2196F3)),
-                  _buildActionItem(context, 'save', common.saveToDocsAction, Icons.snippet_folder_outlined, const Color(0xFF03A9F4)),
-                  _buildActionItem(context, 'copy', common.copyAction, Icons.copy_all_outlined, const Color(0xFF1E88E5)),
-                  
-                  _buildActionItem(context, 'pin', common.pinActionTag, Icons.push_pin_outlined, const Color(0xFFFF9800)),
-                  _buildActionItem(context, 'reminder', common.reminderAction, Icons.access_time_rounded, const Color(0xFFE65100)),
-                  _buildActionItem(context, 'multi', common.selectMultiAction, Icons.check_circle_outline_rounded, const Color(0xFF1976D2)),
-                  _buildActionItem(context, 'quick', common.quickReplyAction, Icons.bolt_rounded, const Color(0xFF1976D2)),
-                  
-                  _buildActionItem(context, 'translate', common.translateAction, Icons.translate_rounded, const Color(0xFF4CAF50), labelExtra: common.newTagLabel),
-                  _buildActionItem(context, 'tts', common.speakAction, Icons.volume_up_outlined, const Color(0xFF9C27B0), labelExtra: common.newTagLabel),
-                  _buildActionItem(context, 'info', common.detailsAction, Icons.info_outline_rounded, Colors.blueGrey),
-                  _buildActionItem(context, 'delete', common.delete, Icons.delete_outline_rounded, Colors.redAccent),
-                ],
+                mainAxisSpacing: 16,
+                childAspectRatio: 0.85,
+                children: actionItems,
               ),
             ],
           ),
@@ -103,7 +131,10 @@ class MessageActionMenu extends StatelessWidget {
   Widget _buildEmoji(String emoji) {
     return GestureDetector(
       onTap: () => onAction('emoji_$emoji'),
-      child: Text(emoji, style: const TextStyle(fontSize: 28)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Text(emoji, style: const TextStyle(fontSize: 32)),
+      ),
     );
   }
 
@@ -128,11 +159,18 @@ class MessageActionMenu extends StatelessWidget {
           Stack(
             clipBehavior: Clip.none,
             children: [
-              Icon(icon, color: color, size: 28),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: (isDarkMode ? Colors.white : Colors.black).withValues(alpha: 0.05),
+                ),
+                child: Icon(icon, color: color, size: 24),
+              ),
               if (labelExtra != null)
                 Positioned(
-                  top: -6,
-                  right: -14,
+                  top: -2,
+                  right: -8,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                     decoration: BoxDecoration(
@@ -154,9 +192,10 @@ class MessageActionMenu extends StatelessWidget {
               label,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 10.5,
                 fontWeight: FontWeight.w400,
                 color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
+                height: 1.1,
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,

@@ -216,6 +216,10 @@ class LocalDatabase extends _$LocalDatabase {
     return query.get();
   }
 
+  Future<int> deleteMessage(String messageId) {
+    return (delete(messages)..where((t) => t.id.equals(messageId))).go();
+  }
+
   Future<void> updateLocalPath(String messageId, String localPath) {
     return (update(messages)..where((t) => t.id.equals(messageId)))
         .write(MessagesCompanion(localPath: Value(localPath)));

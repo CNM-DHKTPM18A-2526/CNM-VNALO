@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:vnalo_mobile/features/chat/widgets/message_action_menu.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
@@ -27,7 +28,7 @@ class FocusedMessageDialog extends StatelessWidget {
     
     // Estimated height for the menu (Emoji box + spacing + Action box)
     const double estimatedMenuHeight = 520.0;
-    const double spacing = 16.0;
+    const double spacing = 12.0;
     const double margin = 16.0;
 
     // Check if there is enough space below the bubble
@@ -49,25 +50,40 @@ class FocusedMessageDialog extends StatelessWidget {
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          // Dark background (interactive)
+          // 1. Dark blurred background
           GestureDetector(
             onTap: () => Navigator.pop(context),
-            child: Container(
-              color: Colors.black.withOpacity(0.7),
-              width: double.infinity,
-              height: double.infinity,
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0.0, end: 1.0),
+              duration: const Duration(milliseconds: 200),
+              builder: (context, value, child) {
+                return BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 5 * value, sigmaY: 5 * value),
+                  child: Container(
+                    color: Colors.black.withValues(alpha: 0.4 * value),
+                    width: double.infinity,
+                    height: double.infinity,
+                  ),
+                );
+              },
             ),
           ),
           
-          // The Bubble (Highlighted)
+          // 2. The Bubble (Highlighted)
           Positioned(
             top: bubbleTop,
             left: position.dx,
             width: size.width,
-            child: child,
+            child: Hero(
+              tag: 'msg_${message.id}',
+              child: Material(
+                color: Colors.transparent,
+                child: child,
+              ),
+            ),
           ),
           
-          // The Action Menu (Always Below)
+          // 3. The Action Menu (Always Below)
           Positioned(
             top: bubbleTop + size.height + spacing,
             left: 20,

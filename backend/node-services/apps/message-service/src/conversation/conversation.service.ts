@@ -423,7 +423,19 @@ export class ConversationService {
     }
 
     if (dto.nickname !== undefined) member.nickname = dto.nickname;
-    if (dto.role !== undefined && !isSelf) member.role = dto.role;
+    if (dto.role !== undefined && !isSelf) {
+      if (dto.role === MemberRole.OWNER) {
+        // Ownership transfer logic: demote current owner
+        const currentOwner = await this.memberRepo.findOne({
+          where: { conversationId, role: MemberRole.OWNER, leftAt: IsNull() },
+        });
+        if (currentOwner && currentOwner.userId !== targetUserId) {
+          currentOwner.role = MemberRole.MEMBER;
+          await this.memberRepo.save(currentOwner);
+        }
+      }
+      member.role = dto.role as MemberRole;
+    }
 
     return this.memberRepo.save(member);
   }

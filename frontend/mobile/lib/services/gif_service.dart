@@ -11,6 +11,7 @@ class GifService {
       final url = media['url'] ?? '';
       return {
         'id': media['id'],
+        'url': url,
         'media_formats': {
           'tinygif': {'url': url},
           'gif': {'url': url}

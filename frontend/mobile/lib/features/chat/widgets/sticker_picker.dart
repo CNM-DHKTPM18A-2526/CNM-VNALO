@@ -7,6 +7,7 @@ import 'package:vnalo_mobile/services/media_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vnalo_mobile/services/gif_service.dart';
+import 'package:vnalo_mobile/core/utils/avatar_resolver.dart';
 
 class StickerPicker extends StatefulWidget {
   final String conversationId;
@@ -214,13 +215,17 @@ class _StickerPickerState extends State<StickerPicker> {
   }
 
   Widget _buildSmartImage(String url, bool isDarkMode) {
-    // Reuse a resilient thumbnail loader with placeholder/error fallback.
     if (url.isEmpty) return Icon(Icons.style, size: 24, color: isDarkMode ? DarkColors.textHint : Colors.black38);
+    final resolvedUrl = AvatarResolver.resolveUrl(url) ?? url;
+    debugPrint('[StickerPicker] raw=$url => resolved=$resolvedUrl');
     return CachedNetworkImage(
-      imageUrl: url,
+      imageUrl: resolvedUrl,
       fit: BoxFit.cover,
       placeholder: (context, url) => Container(color: Colors.grey.withValues(alpha: 0.1)),
-      errorWidget: (context, error, stackTrace) => Icon(Icons.style, size: 24, color: isDarkMode ? DarkColors.textHint : Colors.black38),
+      errorWidget: (context, error, stackTrace) {
+        debugPrint('[StickerPicker] FAILED to load: $resolvedUrl, error: $error');
+        return Icon(Icons.style, size: 24, color: isDarkMode ? DarkColors.textHint : Colors.black38);
+      },
     );
   }
 
@@ -491,14 +496,24 @@ class _GifTabContentState extends State<_GifTabContent> {
             itemCount: _gifs.length,
             itemBuilder: (context, index) {
               final gif = _gifs[index];
+              final rawUrl = gif['url']?.toString() ?? '';
+              final resolvedUrl = AvatarResolver.resolveUrl(rawUrl) ?? rawUrl;
+
+              if (resolvedUrl.isEmpty) return const SizedBox.shrink();
+
               return GestureDetector(
                 onTap: () {
-                  context.read<ChatProvider>().sendGif(conversationId: widget.conversationId, gifUrl: gif['url']);
+                  context.read<ChatProvider>().sendGif(conversationId: widget.conversationId, gifUrl: resolvedUrl);
                   widget.onSelected();
                 },
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: CachedNetworkImage(imageUrl: gif['url'], fit: BoxFit.cover, placeholder: (context, url) => Container(color: Colors.grey.withValues(alpha: 0.1))),
+                  child: CachedNetworkImage(
+                    imageUrl: resolvedUrl, 
+                    fit: BoxFit.cover, 
+                    placeholder: (context, url) => Container(color: Colors.grey.withValues(alpha: 0.1)),
+                    errorWidget: (context, error, stackTrace) => const Center(child: Icon(Icons.error_outline)),
+                  ),
                 ),
               );
             },

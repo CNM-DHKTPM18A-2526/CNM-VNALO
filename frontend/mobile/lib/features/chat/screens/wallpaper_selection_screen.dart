@@ -46,7 +46,7 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
     if (image != null && mounted) {
       setState(() => _isSaving = true);
       try {
-        await context.read<ChatProvider>().updateWallpaper(
+        await context.read<ChatProvider>().updateWallpaperFile(
           widget.conversation.id,
           File(image.path),
           isGlobal: _applyToBoth,
@@ -65,47 +65,43 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black.withValues(alpha: 0.4),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0.5,
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.close, color: Colors.grey),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Đổi hình nền',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.black87),
+        ),
+        actions: [
+          TextButton(
+            onPressed: (_selectedUrl != null && !_isSaving) ? _save : null,
+            child: Text(
+              'XONG',
+              style: TextStyle(
+                color: (_selectedUrl != null && !_isSaving) ? AppColors.primary : Colors.grey.shade400,
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+              ),
+            ),
+          ),
+        ],
+      ),
       body: Stack(
         children: [
-          // Close on tap outside
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(color: Colors.transparent),
-          ),
-          Center(
-            child: Container(
-              width: MediaQuery.of(context).size.width * 0.9,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.2),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Modal Header
-                  _buildHeader(),
-                  const Divider(height: 1),
-                  // Wallpaper Grid
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        _buildGrid(),
-                        const SizedBox(height: 16),
-                        _buildApplyToBothCheckbox(),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                _buildGrid(),
+                const SizedBox(height: 20),
+                _buildApplyToBothCheckbox(),
+              ],
             ),
           ),
           if (_isSaving)
@@ -118,35 +114,8 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
     );
   }
 
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.close, color: Colors.grey),
-            onPressed: () => Navigator.pop(context),
-          ),
-          const Text(
-            'Change wallpaper',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.black87),
-          ),
-          TextButton(
-            onPressed: (_selectedUrl != null && !_isSaving) ? _save : null,
-            child: Text(
-              'XONG',
-              style: TextStyle(
-                color: (_selectedUrl != null && !_isSaving) ? AppColors.primary : Colors.grey,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+
+
 
   Widget _buildGrid() {
     return GridView.builder(
@@ -224,7 +193,7 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
             ),
             const SizedBox(width: 10),
             const Text(
-              'Apply wallpaper for both participants',
+              'Đổi hình nền cho cả 2 bên',
               style: TextStyle(fontSize: 14, color: Colors.black87),
             ),
           ],
