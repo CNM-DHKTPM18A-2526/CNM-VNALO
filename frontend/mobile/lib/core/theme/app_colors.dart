@@ -40,8 +40,10 @@ class DarkColors {
   static const Color textSecondary = Color(0xFFB0B0B0);
   static const Color textHint = Color(0xFF808080);
   static const Color divider = Color(0xFF333333);
-  static const Color chatBubbleSent = Color(0xFF374151); // Slate 700
-  static const Color chatBubbleReceived = Color(0xFF1F2937); // Slate 800
+  static const Color chatBubbleSent = Color(0xFF115684); // Navy blue for dark mode
+  static const Color chatBubbleReceived = Color(0xFF2A2B2F); // Dark slate
+  static const Color callLogSent = chatBubbleSent;
+  static const Color callLogReceived = chatBubbleReceived;
   static const Color appBarBg = Color(0xFF222222); // AppBar is lighter than Item
 
   // Muted primary colors for Dark Mode (Slate Blue style)
@@ -51,7 +53,7 @@ class DarkColors {
 
 class LightColors {
   LightColors._();
-  static const Color scaffold = Color(0xFFFFFFFF); // Vnalo light background (white)
+  static const Color scaffold = Color(0xFFF0F2F5); // Zalo light background (light grey)
   static const Color surface = Color(0xFFFFFFFF);
   static const Color surfaceLight = Color(0xFFF6F7F8);
   static const Color textPrimary = Color(0xFF1A1A1A);
@@ -60,5 +62,7 @@ class LightColors {
   static const Color divider = Color(0xFFE0E0E0);
   static const Color chatBubbleSent = Color(0xFFDDF2FF); // Vnalo light blue
   static const Color chatBubbleReceived = Color(0xFFFFFFFF); // Vnalo white
+  static const Color callLogSent = chatBubbleSent;
+  static const Color callLogReceived = chatBubbleReceived;
   static const Color appBarBg = Color(0xFF0068FF);
 }

@@ -153,7 +153,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                   child: Container(
                     decoration: BoxDecoration(
                       color: isDarkMode ? Colors.white10 : Colors.transparent,
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: TextField(
                       controller: _controller,
@@ -166,12 +166,13 @@ class _ChatInputBarState extends State<ChatInputBar> {
                         color: isDarkMode ? Colors.white : Colors.black87,
                       ),
                       decoration: InputDecoration(
-                        hintText: common.messageHint,
+                        hintText: 'Tin nhắn',
                         hintStyle: TextStyle(
                           color: isDarkMode ? DarkColors.textHint : const Color(0xFFA1A3A7),
                           fontSize: 16,
                         ),
                         isDense: true,
+                        filled: false, // Đảm bảo không bị fill màu xám mặc định
                         contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                         border: InputBorder.none,
                       ),

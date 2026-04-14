@@ -47,6 +47,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>VNALO cần quyền truy cập máy ảnh để giúp bạn chụp và cập nhật ảnh đại diện.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>VNALO cần quyền truy cập micro để thực hiện cuộc gọi thoại và video.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>VNALO cần quyền truy cập thư viện ảnh để bạn có thể chọn ảnh đại diện có sẵn.</string>
 	<key>NSContactsUsageDescription</key>

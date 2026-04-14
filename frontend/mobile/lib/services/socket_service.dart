@@ -16,9 +16,12 @@ class SocketService {
   final _presenceController =
       StreamController<Map<String, dynamic>>.broadcast();
   final _readController = StreamController<Map<String, dynamic>>.broadcast();
-  final _deliveredController = StreamController<Map<String, dynamic>>.broadcast();
-  final _recalledController = StreamController<Map<String, dynamic>>.broadcast();
-
+  final _deliveredController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final _recalledController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final _callSignalController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<Message> get onMessage =>
       _messageController.stream; // Stream for incoming messages
@@ -29,9 +32,23 @@ class SocketService {
   Stream<Map<String, dynamic>> get onRead => _readController.stream;
   Stream<Map<String, dynamic>> get onDelivered => _deliveredController.stream;
   Stream<Map<String, dynamic>> get onRecalled => _recalledController.stream;
+  Stream<Map<String, dynamic>> get onCallSignal => _callSignalController.stream;
 
+  void _emitCallSignal(String type, dynamic data) {
+    if (data is! Map) return;
+    final payload = Map<String, dynamic>.from(data);
+    _callSignalController.add({'type': type, ...payload});
+  }
 
   void connect(String token) {
+    if (_socket != null && _socket!.connected) {
+      return;
+    }
+
+    if (_socket != null) {
+      disconnect();
+    }
+
     _socket = io.io(
       '${AppConfig.instance.socketUrl}/chat',
       io.OptionBuilder()
@@ -85,6 +102,21 @@ class SocketService {
 
     _socket!.on('message.recalled', (data) {
       _recalledController.add(Map<String, dynamic>.from(data));
+    });
+
+    _socket!.on('call.offer', (data) => _emitCallSignal('offer', data));
+    _socket!.on('call.answer', (data) => _emitCallSignal('answer', data));
+    _socket!.on(
+      'call.ice-candidate',
+      (data) => _emitCallSignal('ice-candidate', data),
+    );
+    _socket!.on('call.end', (data) => _emitCallSignal('end', data));
+    _socket!.on('call.signal', (data) {
+      if (data is! Map) return;
+      final payload = Map<String, dynamic>.from(data);
+      final type = payload['type']?.toString();
+      if (type == null || type.isEmpty) return;
+      _callSignalController.add(payload);
     });
   }
 
@@ -176,6 +208,70 @@ class SocketService {
     });
   }
 
+  void sendCallOffer({
+    required String conversationId,
+    required String callId,
+    required String targetUserId,
+    String? senderUserId,
+    required Map<String, dynamic> sdp,
+  }) {
+    _socket?.emit('call.offer', {
+      'conversationId': conversationId,
+      'callId': callId,
+      'targetUserId': targetUserId,
+      if (senderUserId != null) 'senderUserId': senderUserId,
+      'sdp': sdp,
+    });
+  }
+
+  void sendCallAnswer({
+    required String conversationId,
+    required String callId,
+    required String targetUserId,
+    String? senderUserId,
+    required Map<String, dynamic> sdp,
+  }) {
+    _socket?.emit('call.answer', {
+      'conversationId': conversationId,
+      'callId': callId,
+      'targetUserId': targetUserId,
+      if (senderUserId != null) 'senderUserId': senderUserId,
+      'sdp': sdp,
+    });
+  }
+
+  void sendCallIceCandidate({
+    required String conversationId,
+    required String callId,
+    required String targetUserId,
+    String? senderUserId,
+    required Map<String, dynamic> candidate,
+  }) {
+    _socket?.emit('call.ice-candidate', {
+      'conversationId': conversationId,
+      'callId': callId,
+      'targetUserId': targetUserId,
+      if (senderUserId != null) 'senderUserId': senderUserId,
+      'candidate': candidate,
+    });
+  }
+
+  void endCall({
+    required String conversationId,
+    required String callId,
+    required String targetUserId,
+    String? senderUserId,
+    String? reason,
+  }) {
+    _socket?.emit('call.end', {
+      'conversationId': conversationId,
+      'callId': callId,
+      'targetUserId': targetUserId,
+      if (senderUserId != null) 'senderUserId': senderUserId,
+      if (reason != null && reason.isNotEmpty) 'reason': reason,
+    });
+  }
+
   void disconnect() {
     _socket?.disconnect(); // Disconnect from the socket server
     _socket?.dispose(); // Dispose the socket instance to free up resources
@@ -190,5 +286,6 @@ class SocketService {
     _readController.close();
     _deliveredController.close();
     _recalledController.close();
+    _callSignalController.close();
   }
 }
