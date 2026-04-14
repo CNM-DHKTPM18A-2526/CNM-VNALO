@@ -1,7 +1,5 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -12,20 +10,9 @@ import {
 } from 'react'
 import { ChevronLeft, ChevronRight, Download, X, ZoomIn, ZoomOut } from 'lucide-react'
 
-export type ViewerImageItem = {
-  messageId: string
-  url: string
-  senderName: string
-  timestamp: string
-}
+import type { ViewerImageItem } from '../chat.types'
 
-type ImageViewerContextValue = {
-  openImageViewerByMessageId: (messageId: string) => void
-  openImageViewerByUrl: (url: string) => void
-  closeImageViewer: () => void
-}
-
-const ImageViewerContext = createContext<ImageViewerContextValue | null>(null)
+import { ImageViewerContext, type ImageViewerContextValue } from '../context/ImageViewerContext'
 
 type ImageViewerProviderProps = {
   images: ViewerImageItem[]
@@ -332,12 +319,4 @@ export function ImageViewerProvider({ images, children }: ImageViewerProviderPro
   )
 }
 
-export function useImageViewer(): ImageViewerContextValue {
-  const context = useContext(ImageViewerContext)
 
-  if (!context) {
-    throw new Error('useImageViewer must be used inside ImageViewerProvider')
-  }
-
-  return context
-}

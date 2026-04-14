@@ -63,3 +63,32 @@ export type MessageReadEvent = {
   conversationId: string
   lastReadSeq: number
 }
+
+// -------------------- REACTION TYPES --------------------
+export type ReactionKey = 'like' | 'love' | 'haha' | 'wow' | 'sad' | 'angry'
+
+export type ReactionOption = {
+  key: ReactionKey
+  emoji: string
+  label: string
+}
+
+export type ReactionState = {
+  count: number
+  myCount: number
+}
+
+export type MessageReactionMap = Partial<Record<ReactionKey, ReactionState>>
+
+export type MessageReactionState = {
+  reactions: MessageReactionMap
+  lastUsedReaction?: ReactionKey
+}
+
+// -------------------- VIEWER TYPES --------------------
+export type ViewerImageItem = {
+  messageId: string
+  url: string
+  senderName: string
+  timestamp: string
+}

@@ -1,31 +1,8 @@
-export type ReactionKey = 'like' | 'love' | 'haha' | 'wow' | 'sad' | 'angry'
-
-export type ReactionOption = {
-  key: ReactionKey
-  emoji: string
-  label: string
-}
-
-export type ReactionState = {
-  count: number
-  myCount: number
-}
-
-export type MessageReactionMap = Partial<Record<ReactionKey, ReactionState>>
-
-export type MessageReactionState = {
-  reactions: MessageReactionMap
-  lastUsedReaction?: ReactionKey
-}
-
-export const REACTION_OPTIONS: ReactionOption[] = [
-  { key: 'like', emoji: '👍', label: 'Thích' },
-  { key: 'love', emoji: '❤️', label: 'Tim' },
-  { key: 'haha', emoji: '😂', label: 'Cười' },
-  { key: 'wow', emoji: '😮', label: 'Ngạc nhiên' },
-  { key: 'sad', emoji: '😢', label: 'Buồn' },
-  { key: 'angry', emoji: '😡', label: 'Giận' },
-]
+import { REACTION_OPTIONS } from '../chat.constants'
+import type {
+  MessageReactionMap,
+  ReactionKey,
+} from '../chat.types'
 
 type MessageReactionBarProps = {
   reactions: MessageReactionMap

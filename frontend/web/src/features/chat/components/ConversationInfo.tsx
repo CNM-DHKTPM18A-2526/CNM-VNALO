@@ -13,7 +13,6 @@ import {
   Trash2,
   TriangleAlert,
   UserPlus,
-  Users,
 } from 'lucide-react';
 
 import type { ChatMessage, ConversationSummary } from '../chat.types';

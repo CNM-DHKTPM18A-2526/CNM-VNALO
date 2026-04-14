@@ -44,7 +44,7 @@ export function formatPresence(isOnline?: boolean | null, lastSeenTime?: string 
       month: 'numeric',
       day: 'numeric',
     }).format(lastSeen)
-  } catch (error) {
+  } catch {
     console.warn('[formatPresence] Invalid date:', lastSeenTime)
     return 'Ngoại tuyến'
   }
