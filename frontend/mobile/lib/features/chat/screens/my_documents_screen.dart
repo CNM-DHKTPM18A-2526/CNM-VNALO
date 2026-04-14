@@ -5,6 +5,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vnalo_mobile/core/database/local_database.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
+import 'package:vnalo_mobile/features/chat/widgets/chat_input_bar.dart';
+import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
+import 'package:vnalo_mobile/models/message_model.dart';
+import 'package:image_picker/image_picker.dart';
 
 // A simple local message model for self-storage
 // Migrated from private _LocalMessage to global LocalMessage
@@ -115,8 +119,30 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
     await db.saveMessage(msg);
     if (!mounted) return;
     setState(() => _messages.insert(0, msg));
+    context.read<ChatProvider>().refreshCloudPreview();
     _inputController.clear();
     setState(() => _hasText = false);
+  }
+
+  Future<void> _saveMedia(String path, MessageType type) async {
+    final db = context.read<LocalDatabase>();
+    final auth = context.read<AuthProvider>();
+    final myId = auth.user?.id ?? 'ME';
+
+    final msg = LocalMessage(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      conversationId: _convId,
+      senderId: myId,
+      messageType: type.name,
+      content: path.split('/').last,
+      mediaUrl: path,
+      createdAt: DateTime.now(),
+    );
+
+    await db.saveMessage(msg);
+    if (!mounted) return;
+    setState(() => _messages.insert(0, msg));
+    context.read<ChatProvider>().refreshCloudPreview();
   }
 
   List<LocalMessage> get _filteredMessages {
@@ -236,85 +262,24 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: isDarkMode ? DarkColors.surface : LightColors.surface,
-          border: Border(
-            top: BorderSide(
-              color: isDarkMode ? DarkColors.divider : const Color(0xFFE5E7EB),
-              width: 0.5,
-            ),
-          ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                IconButton(
-                  icon: Icon(Icons.emoji_emotions_outlined,
-                    color: isDarkMode ? DarkColors.textHint : const Color(0xFF5D6470)),
-                  onPressed: () {},
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: _inputController,
-                    onChanged: (v) => setState(() => _hasText = v.trim().isNotEmpty),
-                    minLines: 1,
-                    maxLines: 5,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'Message',
-                      hintStyle: TextStyle(
-                        color: isDarkMode ? DarkColors.textHint : const Color(0xFFA1A3A7),
-                        fontSize: 16,
-                      ),
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 6),
-                      border: InputBorder.none,
-                    ),
-                  ),
-                ),
-                if (_hasText)
-                  IconButton(
-                    icon: const Icon(Icons.send, color: AppColors.primary),
-                    onPressed: () => _sendMessage(_inputController.text),
-                  )
-                else
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: Icon(Icons.more_horiz, color: isDarkMode ? DarkColors.textHint : const Color(0xFF5D6470)),
-                        onPressed: () {},
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        constraints: const BoxConstraints(),
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.mic_none_outlined, color: isDarkMode ? DarkColors.textHint : const Color(0xFF5D6470)),
-                        onPressed: () {},
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        constraints: const BoxConstraints(),
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.image_outlined, color: isDarkMode ? DarkColors.textHint : const Color(0xFF5D6470)),
-                        onPressed: () {},
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        constraints: const BoxConstraints(),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
-          ),
-        ),
+      bottomNavigationBar: ChatInputBar(
+        conversationId: _convId,
+        onSend: _sendMessage,
+        onSendImages: (images) async {
+          for (var img in images) {
+            await _saveMedia(img.path, MessageType.IMAGE);
+          }
+        },
+        onSendVideos: (paths) async {
+          for (var p in paths) {
+            await _saveMedia(p, MessageType.VIDEO);
+          }
+        },
+        onSendFiles: (paths) async {
+          for (var p in paths) {
+            await _saveMedia(p, MessageType.FILE);
+          }
+        },
       ),
     );
   }

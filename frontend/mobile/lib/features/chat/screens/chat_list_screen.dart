@@ -200,6 +200,25 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 itemBuilder: (context, index) {
                   if (index == 0) {
                     // 1. My Documents (First Item)
+                    final lastCloud = chatProvider.lastCloudMessage;
+                    String cloudSubtitle = common.myDocumentsSubtitle;
+                    String? cloudTime;
+                    
+                    if (lastCloud != null) {
+                      cloudTime = DateFormatter.relative(lastCloud.createdAt);
+                      if (lastCloud.messageType == MessageType.TEXT) {
+                        cloudSubtitle = lastCloud.content ?? '';
+                      } else {
+                        cloudSubtitle = switch (lastCloud.messageType) {
+                          MessageType.IMAGE => '[Hình ảnh]',
+                          MessageType.VIDEO => '[Video]',
+                          MessageType.FILE => '[Tệp tin]',
+                          MessageType.AUDIO => '[Âm thanh]',
+                          _ => 'Đã gửi một mục'
+                        };
+                      }
+                    }
+
                     return ListTile(
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -230,16 +249,32 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           ],
                         ),
                       ),
-                      title: Text(
-                        common.myDocumentsHeader,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                          color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
-                        ),
+                      title: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              common.myDocumentsHeader,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                                color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          if (cloudTime != null)
+                            Text(
+                              cloudTime,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDarkMode ? DarkColors.textSecondary : Colors.grey,
+                              ),
+                            ),
+                        ],
                       ),
                       subtitle: Text(
-                        common.myDocumentsSubtitle,
+                        cloudSubtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 13,
                           color: isDarkMode ? DarkColors.textSecondary : Colors.grey,

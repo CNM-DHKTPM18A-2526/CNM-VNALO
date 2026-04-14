@@ -38,8 +38,10 @@ class ChatProvider extends ChangeNotifier {
   Message? _replyingTo;
   String? _highlightedMessageId;
   Timer? _highlightTimer;
+  Message? _lastCloudMessage;
 
   List<Conversation> get conversations => _conversations;
+  Message? get lastCloudMessage => _lastCloudMessage;
   bool get isLoading => _isLoading;
   String? get activeConversationId => _activeConversationId;
   Message? get replyingTo => _replyingTo;
@@ -94,6 +96,13 @@ class ChatProvider extends ChangeNotifier {
 
     try {
       final raw = await _chatService.getInbox();
+      
+      // Load last cloud message
+      final cloudMsgs = await _db.getMessagesByConversation('MY_DOCUMENTS');
+      if (cloudMsgs.isNotEmpty) {
+        _lastCloudMessage = _fromLocal(cloudMsgs.first);
+      }
+      
       final backendIds = raw.map((c) => c.id).toSet();
       
       // Preserve locally created groups that are not yet in the backend inbox
@@ -117,6 +126,14 @@ class ChatProvider extends ChangeNotifier {
       debugPrint('loadInbox error: $e');
     } finally {
       _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  void refreshCloudPreview() async {
+    final cloudMsgs = await _db.getMessagesByConversation('MY_DOCUMENTS');
+    if (cloudMsgs.isNotEmpty) {
+      _lastCloudMessage = _fromLocal(cloudMsgs.first);
       notifyListeners();
     }
   }

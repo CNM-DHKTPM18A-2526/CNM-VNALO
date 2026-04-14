@@ -221,7 +221,9 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
 
     setState(() {
       _localContactResults = results[0] as List<LocalContact>;
-      _localMessageResults = results[1] as List<LocalMessageSearchResult>;
+      _localMessageResults = (results[1] as List<LocalMessageSearchResult>)
+          .where((m) => !m.message.content.startsWith('CALL_LOG::'))
+          .toList();
       _strangerFoundByPhone = phoneUser;
       _friendResults = friendResults;
       _isSearching = false;
@@ -474,7 +476,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                 child: Container(
                   height: 38,
                   decoration: BoxDecoration(
-                    color: isDarkMode ? Colors.white.withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.2),
+                    color: isDarkMode ? Colors.white.withValues(alpha: 0.1) : Colors.white,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   padding: const EdgeInsets.symmetric(horizontal: 10),
