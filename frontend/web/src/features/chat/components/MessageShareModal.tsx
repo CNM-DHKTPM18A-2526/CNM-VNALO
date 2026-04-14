@@ -36,9 +36,12 @@ export function MessageShareModal({
       return
     }
 
-    setSearchKeyword('')
-    setNote('')
-    setSelectedUserIds([])
+    // Use requestAnimationFrame to avoid synchronous setState in effect warning
+    requestAnimationFrame(() => {
+      setSearchKeyword('')
+      setNote('')
+      setSelectedUserIds([])
+    })
   }, [isOpen, message?.id])
 
   const filteredFriends = useMemo(() => {

@@ -9,6 +9,7 @@ import {
   updateSearchIndexUsers,
 } from '../searchIndex'
 import { searchUsers, getUserByPhone } from '../../friends/friends.api'
+import { formatMessageContent } from '../utils/messageUtils'
 
 function normalizeText(value?: string | null): string | undefined {
   return value ?? undefined
@@ -92,9 +93,9 @@ export function SearchGlobalPanel({
                 id: msg.id,
                 conversationId: msg.conversationId,
                 conversationName: msg.conversationName,
-                content: msg.content?.substring(0, 100),
+                content: formatMessageContent(msg.content?.substring(0, 100) || ''),
                 createdAt: msg.createdAt,
-                displayText: msg.content?.substring(0, 50) || '[Media]',
+                displayText: formatMessageContent(msg.content?.substring(0, 50) || '') || '[Media]',
               })
             }
           })
@@ -256,7 +257,7 @@ export function SearchGlobalPanel({
           break
       }
     },
-    [results, selectedIndex, onClose],
+    [results, selectedIndex, onClose, handleSelectResult],
   )
 
   const handleSelectResult = useCallback(
@@ -406,7 +407,7 @@ function SearchResultItem({ result, isSelected, onClick }: SearchResultItemProps
         {result.type === 'message' ? (
           <div className="text-xs">
             <div className="font-medium text-gray-600 dark:text-gray-300">{result.conversationName}</div>
-            <div className="text-gray-500 dark:text-gray-400 truncate">{result.displayText}</div>
+            <div className="text-gray-500 dark:text-gray-400 truncate">{formatMessageContent(result.displayText || '')}</div>
           </div>
         ) : result.type === 'user' && result.phone ? (
           <div>

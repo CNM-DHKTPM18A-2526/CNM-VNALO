@@ -1,13 +1,15 @@
 import { MoreHorizontal, Pin, Share2, Star } from 'lucide-react'
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 
-import type { ChatMessage } from '../chat.types'
+import type { ChatMessage, MessageReactionMap, ReactionKey } from '../chat.types'
+import { REACTION_OPTIONS } from '../chat.constants'
 import { Icon } from '../../../shared/components/Icon'
 import { UserAvatar } from '../../../shared/components/UserAvatar'
 import { DEFAULT_CHAT_STICKERS } from '../chat.stickers'
-import { useImageViewer } from './ImageViewer'
-import { MessageReactionBar, MessageReactionSummary, REACTION_OPTIONS, type MessageReactionMap, type ReactionKey } from './MessageReaction'
+import { useImageViewer } from '../context/ImageViewerContext'
+import { MessageReactionBar, MessageReactionSummary } from './MessageReaction'
 import { MessageContextMenu, type MessageContextMenuAction } from './MessageContextMenu'
+import { formatMessageContent } from '../utils/messageUtils'
 
 function getFileName(url?: string | null): string {
   if (!url) {
@@ -509,7 +511,7 @@ export function MessageBubble({
           </>
         ) : null}
 
-        {!isRecalled && message.type === 'text' ? <p>{message.text}</p> : null}
+        {!isRecalled && message.type === 'text' ? <p>{formatMessageContent(message.text)}</p> : null}
 
         <time>
           {message.timestamp}

@@ -322,13 +322,16 @@ export async function fetchInbox(token: string, currentUserId?: string): Promise
     const peerFallback = partnerUserId ? `Người dùng ${partnerUserId.slice(0, 8)}` : null
     const normalizedPreview = normalizeInboxPreview(item.lastMessagePreview)
 
-    const isGroup = (item.conversation?.type ?? (item.conversation as any)?.type) === 'GROUP'
-    const name = isGroup ? (title || (item.conversation as any)?.name || 'Nhóm không tên') : (title || peerNickname || peerFallback || `Trò chuyện ${id.slice(0, 8)}`)
-    const avatarUrl = isGroup 
-      ? (item.conversation?.avatarUrl || (item.conversation as any)?.avatar_url || null) 
-      : (peerMember?.avatarUrl || (peerMember as any)?.avatar_url || null)
+    const convo = item.conversation as (Record<string, unknown> | null | undefined)
+    const isGroup = (item.conversation?.type ?? convo?.type) === 'GROUP'
+    const name = isGroup
+      ? (title || (convo?.name as string | undefined) || 'Nhóm không tên')
+      : (title || peerNickname || peerFallback || `Trò chuyện ${id.slice(0, 8)}`)
+    const avatarUrl = isGroup
+      ? (item.conversation?.avatarUrl || (convo?.avatar_url as string | undefined) || null)
+      : (peerMember?.avatarUrl || (peerMember as (Record<string, unknown> | undefined))?.avatar_url as string | undefined || null)
 
-      return {
+    return {
         id,
         userId: partnerUserId,
         isGroup,
@@ -704,7 +707,7 @@ export async function createGroupConversation(
   return conversationId
 }
 
-export async function fetchConversation(token: string, conversationId: string): Promise<any> {
+export async function fetchConversation(token: string, conversationId: string): Promise<Record<string, unknown> | null> {
   const response = await fetch(`${MESSAGE_API_URL}/conversations/${conversationId}`, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -717,19 +720,20 @@ export async function fetchConversation(token: string, conversationId: string): 
   const data = (json && typeof json === 'object' && !Array.isArray(json) && json.data) ? json.data : json;
   
   if (data) {
-    const isGroup = (data.type ?? (data as any)?.type) === 'GROUP';
-    const title = data.title?.trim();
-    const members = data.members ?? [];
+    const raw = data as Record<string, unknown>
+    const isGroup = (raw.type ?? raw.type) === 'GROUP'
+    const title = (raw.title as string | undefined)?.trim()
+    const members = (raw.members as Array<Record<string, unknown>> | undefined) ?? []
     return {
-      ...data,
+      ...raw,
       isGroup,
-      name: isGroup ? (title || (data as any)?.name || 'Nhóm không tên') : (title || 'Cuộc trò chuyện'),
-      avatarUrl: isGroup 
-        ? (data.avatarUrl || (data as any)?.avatar_url || null) 
-        : (data.avatarUrl || (data as any)?.avatar_url || null),
+      name: isGroup ? (title || (raw.name as string | undefined) || 'Nhóm không tên') : (title || 'Cuộc trò chuyện'),
+      avatarUrl: isGroup
+        ? ((raw.avatarUrl as string | undefined) || (raw.avatar_url as string | undefined) || null)
+        : ((raw.avatarUrl as string | undefined) || (raw.avatar_url as string | undefined) || null),
       memberCount: members.length,
-      participantUserIds: members.map((m: any) => String(m.userId || '').trim())
-    };
+      participantUserIds: members.map((m) => String(m.userId || '').trim()),
+    }
   }
   return data;
 }

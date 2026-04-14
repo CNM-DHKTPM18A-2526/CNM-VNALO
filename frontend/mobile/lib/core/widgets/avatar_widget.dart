@@ -115,7 +115,7 @@ class _AvatarWidgetState extends State<AvatarWidget> {
                     fit: BoxFit.cover,
                     fadeInDuration: Duration.zero,
                     fadeOutDuration: Duration.zero,
-                    httpHeaders: token != null
+                    httpHeaders: (token != null && AvatarResolver.isInternalUrl(activeUrl))
                         ? {'Authorization': 'Bearer $token'}
                         : const {},
                     placeholder: (_, __) =>

@@ -13,6 +13,19 @@ class AvatarResolver {
     r'^(.*/media/)([^/?]+)/save/?(?:\?([^#]*))?$',
   );
 
+  /// Checks if [url] points to the internal media service.
+  static bool isInternalUrl(String? url) {
+    if (url == null || url.isEmpty) return false;
+    
+    // Relative paths are always internal
+    if (url.startsWith('/')) return true;
+
+    if (!AppConfig.isInitialized) return false;
+    
+    final mediaBase = AppConfig.instance.mediaServiceUrl;
+    return url.startsWith(mediaBase);
+  }
+
   /// Resolve [raw] to an absolute URL.
   ///
   /// * `null` / empty ➜ returns `null`

@@ -232,7 +232,7 @@ export function AddFriendModal({ isOpen, onClose, initialTarget = null, onComple
   const resolveRelationship = useCallback(async (targetUserId: string) => {
     const relationState = await getRelationForUser(targetUserId)
     setRelation(relationState)
-  }, [accessToken, user?.id])
+  }, [getRelationForUser])
 
   const pushRecentResult = useCallback((target: UserLookupResult) => {
     setRecentResults((prev) => {

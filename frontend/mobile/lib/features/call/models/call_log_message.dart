@@ -42,6 +42,30 @@ class CallLogMessage {
     return '$_prefix${jsonEncode(payload)}';
   }
 
+  String toLocalizedText({required bool isMine}) {
+    final incoming = !isMine;
+    final isVideo = mediaType == CallMediaType.video;
+    final base = isVideo ? 'Cuộc gọi video' : 'Cuộc gọi thoại';
+
+    switch (outcome) {
+      case CallOutcome.answered:
+        final minutes = durationSeconds ~/ 60;
+        final seconds = durationSeconds % 60;
+        final durationText = '($minutes:${seconds.toString().padLeft(2, '0')})';
+        return '${incoming ? '$base đến' : '$base đi'} $durationText';
+      case CallOutcome.declined:
+        return incoming ? 'Bạn đã từ chối' : 'Người nhận đã từ chối';
+      case CallOutcome.missed:
+        return incoming ? 'Bạn bị nhỡ' : 'Không trả lời';
+      case CallOutcome.busy:
+        return incoming ? 'Bạn bận' : 'Người nhận bận';
+      case CallOutcome.canceled:
+        return incoming ? 'Cuộc gọi đã hủy' : 'Bạn đã hủy cuộc gọi';
+      case CallOutcome.failed:
+        return 'Cuộc gọi thất bại';
+    }
+  }
+
   static CallLogMessage? tryParse(String? content) {
     if (content == null) return null;
 
