@@ -10,10 +10,10 @@ class AvatarResolver {
   AvatarResolver._();
 
   static final RegExp _saveUrlPattern = RegExp(
-    r'^(.*/media/)([^/?]+)/save/?(?:\?([^#]*))?$',
+    r'^(.*/media/)(.+)/save/?(?:\?([^#]*))?$',
   );
   static final RegExp _publicUrlPattern = RegExp(
-    r'^(.*/media/)public/([^/?]+)(?:\?([^#]*))?$',
+    r'^(.*/media/)public/(.+)(?:\?([^#]*))?$',
   );
 
   /// Checks if [url] points to the internal media service.

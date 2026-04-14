@@ -78,7 +78,7 @@ class CommonTexts {
   String get searchHintTimeline => _isVi ? 'Tìm kiếm' : 'Search';
   String get postInputPlaceholder =>
       _isVi ? 'Hôm nay bạn thế nào?' : 'How are you today?';
-  String get photoAction => _isVi ? 'Ảnh' : 'Photo';
+  String get photoAction => _isVi ? 'Hình ảnh' : 'Photo';
   String get videoAction => _isVi ? 'Video' : 'Video';
   String get albumAction => _isVi ? 'Album' : 'Album';
   String get audioAction => _isVi ? 'Âm thanh' : 'Audio';

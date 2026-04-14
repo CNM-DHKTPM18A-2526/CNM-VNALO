@@ -209,17 +209,20 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     
                     if (lastCloud != null) {
                       cloudTime = DateFormatter.relative(lastCloud.createdAt);
+                      final prefix = 'Bạn: ';
+                      
                       if (lastCloud.messageType == MessageType.TEXT) {
-                        cloudSubtitle = lastCloud.content ?? '';
+                        cloudSubtitle = '$prefix${lastCloud.content ?? ''}';
                       } else {
-                        cloudSubtitle = switch (lastCloud.messageType) {
+                        final label = switch (lastCloud.messageType) {
                           MessageType.IMAGE => '[${common.photoAction}]',
                           MessageType.VIDEO => '[${common.videoAction}]',
-                          MessageType.FILE => '[${common.documentLabel}]',
+                          MessageType.FILE => '[${common.documentLabel}] ${lastCloud.content ?? ''}'.trim(),
                           MessageType.AUDIO => '[${common.audioAction}]',
                           MessageType.STICKER => '[Sticker]',
                           _ => common.msgSent
                         };
+                        cloudSubtitle = '$prefix$label';
                       }
                     }
 
