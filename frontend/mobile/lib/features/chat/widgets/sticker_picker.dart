@@ -8,6 +8,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vnalo_mobile/services/gif_service.dart';
 import 'package:vnalo_mobile/core/utils/avatar_resolver.dart';
+import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 
 class StickerPicker extends StatefulWidget {
   final String conversationId;
@@ -218,9 +219,14 @@ class _StickerPickerState extends State<StickerPicker> {
     if (url.isEmpty) return Icon(Icons.style, size: 24, color: isDarkMode ? DarkColors.textHint : Colors.black38);
     final resolvedUrl = AvatarResolver.resolveUrl(url) ?? url;
     debugPrint('[StickerPicker] raw=$url => resolved=$resolvedUrl');
+    final token = context.read<AuthProvider>().accessToken;
+
     return CachedNetworkImage(
       imageUrl: resolvedUrl,
       fit: BoxFit.cover,
+      httpHeaders: (token != null && AvatarResolver.isInternalUrl(resolvedUrl))
+          ? {'Authorization': 'Bearer $token'}
+          : const {},
       placeholder: (context, url) => Container(color: Colors.grey.withValues(alpha: 0.1)),
       errorWidget: (context, error, stackTrace) {
         debugPrint('[StickerPicker] FAILED to load: $resolvedUrl, error: $error');
@@ -411,7 +417,24 @@ class _StickerPickerState extends State<StickerPicker> {
                   final id = pack['stickerPackId'] ?? pack['id'];
                   final isInstalled = _myPacks.any((p) => (p['stickerPackId'] ?? p['id']).toString() == id.toString());
                   return ListTile(
-                    leading: ClipRRect(borderRadius: BorderRadius.circular(8), child: CachedNetworkImage(imageUrl: pack['coverUrl'] ?? pack['thumbnailUrl'] ?? '', width: 50, height: 50, fit: BoxFit.cover)),
+                    leading: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Builder(
+                        builder: (context) {
+                          final token = context.read<AuthProvider>().accessToken;
+                          final url = pack['coverUrl'] ?? pack['thumbnailUrl'] ?? '';
+                          return CachedNetworkImage(
+                            imageUrl: url,
+                            width: 50,
+                            height: 50,
+                            fit: BoxFit.cover,
+                            httpHeaders: (token != null && AvatarResolver.isInternalUrl(url))
+                                ? {'Authorization': 'Bearer $token'}
+                                : const {},
+                          );
+                        }
+                      ),
+                    ),
                     title: Text(pack['name'] ?? '',
                       style: TextStyle(color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary)
                     ),
@@ -508,11 +531,19 @@ class _GifTabContentState extends State<_GifTabContent> {
                 },
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: CachedNetworkImage(
-                    imageUrl: resolvedUrl, 
-                    fit: BoxFit.cover, 
-                    placeholder: (context, url) => Container(color: Colors.grey.withValues(alpha: 0.1)),
-                    errorWidget: (context, error, stackTrace) => const Center(child: Icon(Icons.error_outline)),
+                  child: Builder(
+                    builder: (context) {
+                      final token = context.read<AuthProvider>().accessToken;
+                      return CachedNetworkImage(
+                        imageUrl: resolvedUrl, 
+                        fit: BoxFit.cover, 
+                        httpHeaders: (token != null && AvatarResolver.isInternalUrl(resolvedUrl))
+                            ? {'Authorization': 'Bearer $token'}
+                            : const {},
+                        placeholder: (context, url) => Container(color: Colors.grey.withValues(alpha: 0.1)),
+                        errorWidget: (context, error, stackTrace) => const Center(child: Icon(Icons.error_outline)),
+                      );
+                    }
                   ),
                 ),
               );

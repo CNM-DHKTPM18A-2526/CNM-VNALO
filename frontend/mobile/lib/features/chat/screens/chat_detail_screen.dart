@@ -19,6 +19,7 @@ import 'package:vnalo_mobile/features/call/screens/voice_call_screen.dart';
 import 'package:vnalo_mobile/features/chat/screens/group_chat_options_screen.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:vnalo_mobile/core/utils/avatar_resolver.dart';
 import 'dart:async';
 
 class ChatDetailScreen extends StatefulWidget {
@@ -588,7 +589,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               image:
                   coverUrl != null
                       ? DecorationImage(
-                        image: NetworkImage(coverUrl),
+                        image: CachedNetworkImageProvider(
+                          AvatarResolver.resolveUrl(coverUrl) ?? coverUrl,
+                          headers: (context.read<AuthProvider>().accessToken != null && AvatarResolver.isInternalUrl(AvatarResolver.resolveUrl(coverUrl) ?? coverUrl))
+                              ? {'Authorization': 'Bearer ${context.read<AuthProvider>().accessToken}'}
+                              : {},
+                        ),
                         fit: BoxFit.cover,
                       )
                       : null,

@@ -864,10 +864,18 @@ class MessageBubble extends StatelessWidget {
             Positioned.fill(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: CachedNetworkImage(
-                  imageUrl: url,
-                  fit: BoxFit.cover,
-                  errorWidget: (_, __, ___) => const Center(child: Icon(Icons.videocam, size: 40, color: Colors.grey)),
+                child: Builder(
+                  builder: (context) {
+                    final token = context.read<AuthProvider>().accessToken;
+                    return CachedNetworkImage(
+                      imageUrl: url,
+                      fit: BoxFit.cover,
+                      httpHeaders: (token != null && AvatarResolver.isInternalUrl(url))
+                          ? {'Authorization': 'Bearer $token'}
+                          : const {},
+                      errorWidget: (_, __, ___) => const Center(child: Icon(Icons.videocam, size: 40, color: Colors.grey)),
+                    );
+                  }
                 ),
               ),
             ),
@@ -993,24 +1001,32 @@ class MessageBubble extends StatelessWidget {
             (m) => Padding(
               padding: const EdgeInsets.only(left: 2),
               child: ClipOval(
-                child: Image.network(
-                  AvatarResolver.resolveUrl(m.user?.avatarUrl) ??
-                      'https://ui-avatars.com/api/?name=${m.user?.displayName ?? 'U'}',
-                  width: 14,
-                  height: 14,
-                  fit: BoxFit.cover,
-                  errorBuilder:
-                      (_, __, ___) => Container(
-                        width: 14,
-                        height: 14,
-                        color: Colors.grey,
-                        child: const Icon(
-                          Icons.person,
-                          size: 10,
-                          color: Colors.white,
-                        ),
+              child: Builder(
+                builder: (context) {
+                  final token = context.read<AuthProvider>().accessToken;
+                  final url = AvatarResolver.resolveUrl(m.user?.avatarUrl) ??
+                      'https://ui-avatars.com/api/?name=${m.user?.displayName ?? 'U'}';
+                  return CachedNetworkImage(
+                    imageUrl: url,
+                    width: 14,
+                    height: 14,
+                    fit: BoxFit.cover,
+                    httpHeaders: (token != null && AvatarResolver.isInternalUrl(url))
+                        ? {'Authorization': 'Bearer $token'}
+                        : const {},
+                    errorWidget: (_, __, ___) => Container(
+                      width: 14,
+                      height: 14,
+                      color: Colors.grey,
+                      child: const Icon(
+                        Icons.person,
+                        size: 10,
+                        color: Colors.white,
                       ),
-                ),
+                    ),
+                  );
+                }
+              ),
               ),
             ),
           ),

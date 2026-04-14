@@ -121,14 +121,9 @@ class AvatarResolver {
   }
 
   static String _normalizeSaveUrl(String input) {
-    final match = _saveUrlPattern.firstMatch(input);
-    if (match == null) return input;
-    final prefix = match.group(1)!;
-    final mediaId = match.group(2)!;
-    final query = match.group(3);
-    if (query == null || query.isEmpty) {
-      return '${prefix}public/$mediaId';
-    }
-    return '${prefix}public/$mediaId?$query';
+    // If we're already sending auth headers (implemented in widgets),
+    // we should NOT force a change to '/public' because the file
+    // might be private and require the current token.
+    return input;
   }
 }
