@@ -180,10 +180,112 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
     );
   }
 
+  Widget _buildControlButtons(WebRtcCallService callService) {
+    if (callService.isEnded) {
+      return const SizedBox(height: 80);
+    }
+
+    final isCaller = widget.isCaller;
+    final isAccepted = callService.isAccepted;
+
+    // IF RECEIVER AND NOT ACCEPTED YET -> SHOW ACCEPT/DECLINE
+    if (!isCaller && !isAccepted) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 60),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _buildAcceptDeclineButton(
+              onPressed: () => callService.endCall(reason: 'declined'),
+              icon: Icons.call_end,
+              color: Colors.redAccent,
+              label: 'Từ chối',
+            ),
+            _buildAcceptDeclineButton(
+              onPressed: () => callService.acceptCall(),
+              icon: Icons.call,
+              color: Colors.green,
+              label: 'Chấp nhận',
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 48),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _BottomControl(
+            icon:
+                _callService.isSpeakerOn ? Icons.volume_up : Icons.volume_off,
+            label: 'Loa',
+            onTap: () => unawaited(_callService.toggleSpeaker()),
+            active: _callService.isSpeakerOn,
+          ),
+          _BottomControl(
+            icon: Icons.call_end,
+            label: 'Kết thúc',
+            onTap: _endCallAndClose,
+            destructive: true,
+          ),
+          _BottomControl(
+            icon:
+                _callService.isMicrophoneEnabled ? Icons.mic : Icons.mic_off,
+            label: 'Mic',
+            onTap: () => unawaited(_callService.toggleMicrophone()),
+            active: _callService.isMicrophoneEnabled,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAcceptDeclineButton({
+    required VoidCallback onPressed,
+    required IconData icon,
+    required Color color,
+    required String label,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        GestureDetector(
+          onTap: onPressed,
+          child: Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.4),
+                  blurRadius: 15,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: Icon(icon, color: Colors.white, size: 32),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    // Layering Law: Trong cuộc gọi, ta thường ưu tiên không gian tối chuyên sâu (Premium)
     final backgroundColor =
         isDarkMode ? const Color(0xFF000000) : const Color(0xFF086CFF);
 
@@ -191,7 +293,6 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
       backgroundColor: backgroundColor,
       body: Stack(
         children: [
-          // Background covers the entire screen, including status bar
           Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
@@ -247,7 +348,6 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
                   ),
                 ),
                 const Spacer(flex: 1),
-                // Avatar & Animated Ripples
                 Stack(
                   alignment: Alignment.center,
                   children: [
@@ -317,34 +417,6 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
                   ),
                 ),
                 const Spacer(flex: 4),
-                // Bottom Controls
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 48),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _BottomControl(
-                        icon:
-                            _callService.isSpeakerOn
-                                ? Icons.volume_up
-                                : Icons.volume_off,
-                        label: 'Loa',
-                        onTap: () => unawaited(_callService.toggleSpeaker()),
-                        active: _callService.isSpeakerOn,
-                      ),
-                      _BottomControl(
-                        icon: Icons.call_end,
-                        label: 'Kết thúc',
-                        onTap: _endCallAndClose,
-                        destructive: true,
-                      ),
-                      _BottomControl(
-                        icon:
-                            _callService.isMicrophoneEnabled
-                                ? Icons.mic
-                                : Icons.mic_off,
-                        label: 'Mic',
-                        onTap: () => unawaited(_callService.toggleMicrophone()),
                         active: _callService.isMicrophoneEnabled,
                       ),
                     ],

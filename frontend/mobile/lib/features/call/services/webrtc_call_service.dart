@@ -37,6 +37,7 @@ class WebRtcCallService extends ChangeNotifier {
   DateTime? _connectedAt;
   bool _hasRemoteDescription = false;
   String? _lastEndReason;
+  bool _isAccepted = false;
 
   WebRtcCallService({
     required SocketService socketService,
@@ -65,6 +66,7 @@ class WebRtcCallService extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   DateTime? get connectedAt => _connectedAt;
   String? get lastEndReason => _lastEndReason;
+  bool get isAccepted => _isAccepted;
 
   String get _logPrefix =>
       '[WebRtcCallService][callId=$callId][conv=$conversationId][peer=$peerUserId]';
@@ -92,12 +94,16 @@ class WebRtcCallService extends ChangeNotifier {
       _peerConnection = await createPeerConnection(configuration);
       debugPrint('$_logPrefix peerConnection created');
       _registerPeerCallbacks();
-      await _openLocalMedia();
-      await Helper.setSpeakerphoneOn(_isSpeakerOn);
 
       if (isCaller) {
+        _isAccepted = true; // Caller is always "accepted"
+        await _openLocalMedia();
+        await Helper.setSpeakerphoneOn(_isSpeakerOn);
         await _createAndSendOffer();
         _startRingTimeoutCountdown();
+      } else {
+        // Callee: Wait for user to press "Accept"
+        await Helper.setSpeakerphoneOn(_isSpeakerOn);
       }
     } catch (e) {
       _errorMessage = _mapInitError(e);
@@ -182,6 +188,47 @@ class WebRtcCallService extends ChangeNotifier {
     for (final track in tracks) {
       await _peerConnection?.addTrack(track, _localStream!);
     }
+  }
+
+  Future<void> acceptCall() async {
+    if (_isAccepted || _isEnded) return;
+    debugPrint('$_logPrefix acceptCall()');
+
+    try {
+      _isAccepted = true;
+      notifyListeners();
+
+      await _openLocalMedia();
+      
+      // If we already have the offer, we can send the answer now
+      if (_hasRemoteDescription) {
+        await _createAndSendAnswer();
+      }
+    } catch (e) {
+      _errorMessage = 'Không thể chấp nhận cuộc gọi: $e';
+      debugPrint('$_logPrefix acceptCall() failed error=$_errorMessage');
+      notifyListeners();
+    }
+  }
+
+  Future<void> _createAndSendAnswer() async {
+    final pc = _peerConnection;
+    if (pc == null) return;
+
+    final answer = await pc.createAnswer({
+      'offerToReceiveAudio': 1,
+      'offerToReceiveVideo': audioOnly ? 0 : 1,
+    });
+    await pc.setLocalDescription(answer);
+    debugPrint('$_logPrefix local answer created and set');
+
+    _socketService.sendCallAnswer(
+      conversationId: conversationId,
+      callId: callId,
+      targetUserId: peerUserId,
+      senderUserId: currentUserId,
+      sdp: {'type': answer.type, 'sdp': answer.sdp},
+    );
   }
 
   Future<void> _createAndSendOffer() async {
@@ -305,20 +352,11 @@ class WebRtcCallService extends ChangeNotifier {
     _hasRemoteDescription = true;
     await _flushPendingCandidates();
 
-    final answer = await pc.createAnswer({
-      'offerToReceiveAudio': 1,
-      'offerToReceiveVideo': audioOnly ? 0 : 1,
-    });
-    await pc.setLocalDescription(answer);
-    debugPrint('$_logPrefix local answer created and set');
-
-    _socketService.sendCallAnswer(
-      conversationId: conversationId,
-      callId: callId,
-      targetUserId: peerUserId,
-      senderUserId: currentUserId,
-      sdp: {'type': answer.type, 'sdp': answer.sdp},
-    );
+    // If already accepted (User pressed Accept button), send answer immediately.
+    // If not yet accepted, wait for acceptCall() to trigger answer.
+    if (_isAccepted) {
+      await _createAndSendAnswer();
+    }
   }
 
   Future<void> _handleAnswer(Map<String, dynamic> signal) async {

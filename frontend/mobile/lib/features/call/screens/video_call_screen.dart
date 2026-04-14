@@ -237,7 +237,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                       objectFit:
                           RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
                     )
-                    : (_callService.localStream != null
+                    : ((_callService.localStream != null && _callService.isAccepted)
                         ? RTCVideoView(
                           _localRenderer,
                           objectFit:
@@ -354,55 +354,78 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                 child: Container(
                   padding: const EdgeInsets.fromLTRB(16, 24, 16, 48),
                   color: Colors.black.withValues(alpha: 0.25),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _VideoActionButton(
-                        icon:
-                            _callService.isCameraEnabled
-                                ? Icons.videocam
-                                : Icons.videocam_off,
-                        label: 'Camera',
-                        onTap: () => unawaited(_callService.toggleCamera()),
-                        active: _callService.isCameraEnabled,
-                      ),
-                      _VideoActionButton(
-                        icon:
-                            _callService.isMicrophoneEnabled
-                                ? Icons.mic
-                                : Icons.mic_off,
-                        label: 'Mic',
-                        onTap: () => unawaited(_callService.toggleMicrophone()),
-                        active: _callService.isMicrophoneEnabled,
-                      ),
-                      _VideoActionButton(
-                        icon: Icons.call_end,
-                        label: 'Kết thúc',
-                        onTap: _endCallAndClose,
-                        active: false,
-                        destructive: true,
-                      ),
-                      _VideoActionButton(
-                        icon: Icons.more_horiz,
-                        label: 'Thêm',
-                        onTap: () {
-                          // Placeholder for future features (Filters, Screen Sharing, etc.)
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Tính năng đang phát triển'),
-                            ),
-                          );
-                        },
-                        active: true,
-                      ),
-                    ],
-                  ),
+                  child: _buildCallControls(_callService),
                 ),
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+  Widget _buildCallControls(WebRtcCallService callService) {
+    if (callService.isEnded) {
+      return const SizedBox(height: 80);
+    }
+
+    final isCaller = widget.isCaller;
+    final isAccepted = callService.isAccepted;
+
+    if (!isCaller && !isAccepted) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _VideoActionButton(
+            icon: Icons.call_end,
+            label: 'Từ chối',
+            onTap: () => callService.endCall(reason: 'declined'),
+            active: false,
+            destructive: true,
+          ),
+          _VideoActionButton(
+            icon: Icons.videocam,
+            label: 'Chấp nhận',
+            onTap: () => callService.acceptCall(),
+            active: true,
+            color: Colors.green,
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        _VideoActionButton(
+          icon: callService.isCameraEnabled ? Icons.videocam : Icons.videocam_off,
+          label: 'Camera',
+          onTap: () => unawaited(callService.toggleCamera()),
+          active: callService.isCameraEnabled,
+        ),
+        _VideoActionButton(
+          icon: callService.isMicrophoneEnabled ? Icons.mic : Icons.mic_off,
+          label: 'Mic',
+          onTap: () => unawaited(callService.toggleMicrophone()),
+          active: callService.isMicrophoneEnabled,
+        ),
+        _VideoActionButton(
+          icon: Icons.call_end,
+          label: 'Kết thúc',
+          onTap: _endCallAndClose,
+          active: false,
+          destructive: true,
+        ),
+        _VideoActionButton(
+          icon: Icons.more_horiz,
+          label: 'Thêm',
+          onTap: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Tính năng đang phát triển')),
+            );
+          },
+          active: true,
+        ),
+      ],
     );
   }
 }
@@ -527,6 +550,7 @@ class _VideoActionButton extends StatelessWidget {
   final VoidCallback onTap;
   final bool active;
   final bool destructive;
+  final Color? color;
 
   const _VideoActionButton({
     required this.icon,
@@ -534,14 +558,16 @@ class _VideoActionButton extends StatelessWidget {
     required this.onTap,
     required this.active,
     this.destructive = false,
+    this.color,
   });
 
   @override
   Widget build(BuildContext context) {
     final backgroundColor =
-        destructive
-            ? const Color(0xFFFF3B30) // Solid Red like Zalo
-            : Colors.black.withValues(alpha: 0.5); // Đồng bộ với Appbar
+        color ??
+            (destructive
+                ? const Color(0xFFFF3B30) // Solid Red like Zalo
+                : Colors.black.withValues(alpha: 0.5)); // Đồng bộ với Appbar
 
     return Column(
       mainAxisSize: MainAxisSize.min,
