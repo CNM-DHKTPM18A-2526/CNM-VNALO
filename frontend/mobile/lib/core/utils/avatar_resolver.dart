@@ -22,8 +22,23 @@ class AvatarResolver {
 
     if (!AppConfig.isInitialized) return false;
     
-    final mediaBase = AppConfig.instance.mediaServiceUrl;
-    return url.startsWith(mediaBase);
+    final mediaBase = AppConfig.instance.mediaServiceUrl.replaceAll(RegExp(r'/+$'), '');
+    final normalizedUrl = url.replaceAll(RegExp(r'/+$'), '');
+
+    if (normalizedUrl.startsWith(mediaBase)) return true;
+
+    // Additional check for internal media service path patterns
+    // This handles cases where the host might change (IP vs domain) but it's clearly our service
+    if (normalizedUrl.contains('/api/v1/media/')) return true;
+
+    // Additional check for IP-based matching
+    final mediaUri = Uri.tryParse(mediaBase);
+    final inputUri = Uri.tryParse(url);
+    if (mediaUri != null && inputUri != null) {
+      if (mediaUri.host == inputUri.host && mediaUri.port == inputUri.port) return true;
+    }
+
+    return false;
   }
 
   /// Resolve [raw] to an absolute URL.

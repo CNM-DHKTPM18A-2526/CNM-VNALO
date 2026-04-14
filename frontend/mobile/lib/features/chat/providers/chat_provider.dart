@@ -97,10 +97,14 @@ class ChatProvider extends ChangeNotifier {
     try {
       final raw = await _chatService.getInbox();
       
-      // Load last cloud message
-      final cloudMsgs = await _db.getMessagesByConversation('MY_DOCUMENTS');
-      if (cloudMsgs.isNotEmpty) {
-        _lastCloudMessage = _fromLocal(cloudMsgs.first);
+      // Load last cloud message (Harden to prevent inbox blocking)
+      try {
+        final cloudMsgs = await _db.getMessagesByConversation('MY_DOCUMENTS');
+        if (cloudMsgs.isNotEmpty) {
+          _lastCloudMessage = _fromLocal(cloudMsgs.first);
+        }
+      } catch (e) {
+        debugPrint('Cloud preview loading failed: $e');
       }
       
       final backendIds = raw.map((c) => c.id).toSet();
@@ -131,10 +135,14 @@ class ChatProvider extends ChangeNotifier {
   }
 
   void refreshCloudPreview() async {
-    final cloudMsgs = await _db.getMessagesByConversation('MY_DOCUMENTS');
-    if (cloudMsgs.isNotEmpty) {
-      _lastCloudMessage = _fromLocal(cloudMsgs.first);
-      notifyListeners();
+    try {
+      final cloudMsgs = await _db.getMessagesByConversation('MY_DOCUMENTS');
+      if (cloudMsgs.isNotEmpty) {
+        _lastCloudMessage = _fromLocal(cloudMsgs.first);
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('refreshCloudPreview failure: $e');
     }
   }
 
@@ -265,6 +273,10 @@ class ChatProvider extends ChangeNotifier {
       mediaUrl: m.mediaUrl,
       mediaMimeType: m.mediaMimeType,
       mediaSizeBytes: m.mediaSizeBytes,
+      replyToId: m.replyToMessageId,
+      replyToSenderId: m.replyToSenderId,
+      replyToSenderName: m.replyToSenderName,
+      replyToContent: m.replyToContent,
     );
   }
 
@@ -279,6 +291,10 @@ class ChatProvider extends ChangeNotifier {
       mediaUrl: lm.mediaUrl,
       mediaMimeType: lm.mediaMimeType,
       mediaSizeBytes: lm.mediaSizeBytes,
+      replyToMessageId: lm.replyToId,
+      replyToSenderId: lm.replyToSenderId,
+      replyToSenderName: lm.replyToSenderName,
+      replyToContent: lm.replyToContent,
       status: MessageStatus.SENT,
     );
   }

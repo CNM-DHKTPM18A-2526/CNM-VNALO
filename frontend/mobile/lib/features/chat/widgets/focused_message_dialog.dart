@@ -9,6 +9,7 @@ class FocusedMessageDialog extends StatelessWidget {
   final Offset position;
   final Size size;
   final Widget child; // The bubble widget to show in focus
+  final bool isCloud;
   final Function(String action) onAction;
 
   const FocusedMessageDialog({
@@ -19,6 +20,7 @@ class FocusedMessageDialog extends StatelessWidget {
     required this.size,
     required this.child,
     required this.onAction,
+    this.isCloud = false,
   });
 
   @override
@@ -93,6 +95,7 @@ class FocusedMessageDialog extends StatelessWidget {
               child: MessageActionMenu(
                 message: message,
                 isMine: isMine,
+                isCloud: isCloud,
                 onAction: onAction,
               ),
             ),
@@ -110,6 +113,7 @@ class FocusedMessageDialog extends StatelessWidget {
     required Size size,
     required Widget child,
     required Function(String action) onAction,
+    bool isCloud = false,
   }) {
     Navigator.push(
       context,
@@ -119,6 +123,7 @@ class FocusedMessageDialog extends StatelessWidget {
         pageBuilder: (context, _, __) => FocusedMessageDialog(
           message: message,
           isMine: isMine,
+          isCloud: isCloud,
           position: position,
           size: size,
           onAction: onAction,

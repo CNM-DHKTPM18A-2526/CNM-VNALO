@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/models/quick_action_item.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
+import 'package:vnalo_mobile/core/utils/date_formatter.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
@@ -15,6 +16,8 @@ import 'package:vnalo_mobile/features/profile/screens/account_security_screen.da
 import 'package:vnalo_mobile/features/chat/screens/create_group_screen.dart';
 import 'package:vnalo_mobile/features/chat/screens/join_group_screen.dart';
 import 'package:vnalo_mobile/features/search/screens/unified_search_screen.dart';
+import 'package:vnalo_mobile/models/conversation_enums.dart';
+import 'package:vnalo_mobile/models/message_model.dart';
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
@@ -210,11 +213,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
                         cloudSubtitle = lastCloud.content ?? '';
                       } else {
                         cloudSubtitle = switch (lastCloud.messageType) {
-                          MessageType.IMAGE => '[Hình ảnh]',
-                          MessageType.VIDEO => '[Video]',
-                          MessageType.FILE => '[Tệp tin]',
-                          MessageType.AUDIO => '[Âm thanh]',
-                          _ => 'Đã gửi một mục'
+                          MessageType.IMAGE => '[${common.photoAction}]',
+                          MessageType.VIDEO => '[${common.videoAction}]',
+                          MessageType.FILE => '[${common.documentLabel}]',
+                          MessageType.AUDIO => '[${common.audioAction}]',
+                          MessageType.STICKER => '[Sticker]',
+                          _ => common.msgSent
                         };
                       }
                     }

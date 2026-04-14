@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:drift/drift.dart';
 import 'connection/connection_stub.dart'
     if (dart.library.io) 'connection/native_connection.dart'
@@ -11,7 +12,7 @@ class LocalDatabase extends _$LocalDatabase {
   LocalDatabase() : super(conn.openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -53,8 +54,25 @@ class LocalDatabase extends _$LocalDatabase {
       if (from < 3) {
         await _createReadStateTable();
       }
+      if (from < 4) {
+        // Safe addition: check for existence or catch duplicate name error
+        await _safeAddColumn(m, messages, messages.replyToId);
+        await _safeAddColumn(m, messages, messages.replyToSenderId);
+        await _safeAddColumn(m, messages, messages.replyToSenderName);
+        await _safeAddColumn(m, messages, messages.replyToContent);
+      }
     },
   );
+
+  Future<void> _safeAddColumn(Migrator m, TableInfo table, GeneratedColumn column) async {
+    final result = await customSelect('PRAGMA table_info(${table.actualTableName})').get();
+    final columns = result.map((row) => row.read<String>('name')).toList();
+    if (!columns.contains(column.name)) {
+      await m.addColumn(table, column);
+    } else {
+      debugPrint('Column ${column.name} in ${table.actualTableName} already exists, skipping.');
+    }
+  }
 
   Future<void> _createReadStateTable() async {
     await customStatement(
@@ -176,6 +194,7 @@ class LocalDatabase extends _$LocalDatabase {
         )
         .toList();
   }
+
 
   Future<LocalConversation?> getLocalConversationById(String id) async {
     final results =

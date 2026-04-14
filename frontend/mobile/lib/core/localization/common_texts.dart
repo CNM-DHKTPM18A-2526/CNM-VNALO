@@ -81,6 +81,7 @@ class CommonTexts {
   String get photoAction => _isVi ? 'Ảnh' : 'Photo';
   String get videoAction => _isVi ? 'Video' : 'Video';
   String get albumAction => _isVi ? 'Album' : 'Album';
+  String get audioAction => _isVi ? 'Âm thanh' : 'Audio';
   String get backgroundTextAction => _isVi ? 'Nền chữ' : 'Text BG';
   String get createNewStory => _isVi ? 'Tạo mới' : 'Create new';
   String get noPostsYet =>
@@ -348,7 +349,7 @@ class CommonTexts {
       _isVi
           ? '${dt.day} tháng ${dt.month}, ${dt.year}'
           : '${dt.month} ${dt.day}, ${dt.year}';
-  String get myDocumentsHeader => _isVi ? 'My Documents' : 'My Documents';
+  String get myDocumentsHeader => 'My Documents';
   String get noContentYet => _isVi ? 'Chưa có nội dung nào' : 'No content yet';
   String get saveContentNote =>
       _isVi
@@ -501,6 +502,9 @@ class CommonTexts {
       _isVi
           ? 'Tin nhắn này chỉ bị xóa ở phía bạn.'
           : 'This removes the message only for you.';
+
+  // My Documents
+  // Header and tabs are already declared at lines 344 and 352
 
   // Durations
   String get minute => _isVi ? 'phút' : 'min';

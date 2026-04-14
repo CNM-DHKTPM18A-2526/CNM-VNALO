@@ -220,9 +220,10 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
       ..removeWhere((u) => u.id == phoneUser?.id);
 
     setState(() {
-      _localContactResults = results[0] as List<LocalContact>;
       _localMessageResults = (results[1] as List<LocalMessageSearchResult>)
-          .where((m) => !m.message.content.startsWith('CALL_LOG::'))
+          .where((m) =>
+              m.message.messageType != 'SYSTEM' &&
+              !m.message.content.contains('CALL_LOG'))
           .toList();
       _strangerFoundByPhone = phoneUser;
       _friendResults = friendResults;
@@ -476,23 +477,34 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                 child: Container(
                   height: 38,
                   decoration: BoxDecoration(
-                    color: isDarkMode ? Colors.white.withValues(alpha: 0.1) : Colors.white,
-                    borderRadius: BorderRadius.circular(8),
+                    color: isDarkMode
+                        ? Colors.white.withValues(alpha: 0.1)
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   child: Row(
                     children: [
-                      const Icon(Icons.search, color: Colors.white, size: 20),
+                      Icon(
+                        Icons.search,
+                        color: isDarkMode ? Colors.white : Colors.black54,
+                        size: 20,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: TextField(
                           controller: _queryController,
                           autofocus: true,
-                          style: const TextStyle(fontSize: 15, color: Colors.white),
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: isDarkMode ? Colors.white : Colors.black87,
+                          ),
                           decoration: InputDecoration(
                             hintText: common.searchHint,
                             hintStyle: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.7),
+                              color: isDarkMode
+                                  ? Colors.white.withValues(alpha: 0.7)
+                                  : Colors.black54,
                             ),
                             filled: true,
                             fillColor: Colors.transparent,
@@ -509,7 +521,11 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                             _queryController.clear();
                             _performHybridSearch('');
                           },
-                          child: const Icon(Icons.close, color: Colors.white, size: 20),
+                          child: Icon(
+                            Icons.close,
+                            color: isDarkMode ? Colors.white : Colors.black54,
+                            size: 20,
+                          ),
                         ),
                     ],
                   ),

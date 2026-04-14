@@ -188,7 +188,6 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
     final isCaller = widget.isCaller;
     final isAccepted = callService.isAccepted;
 
-    // IF RECEIVER AND NOT ACCEPTED YET -> SHOW ACCEPT/DECLINE
     if (!isCaller && !isAccepted) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 60),
@@ -198,13 +197,13 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
             _buildAcceptDeclineButton(
               onPressed: () => callService.endCall(reason: 'declined'),
               icon: Icons.call_end,
-              color: Colors.redAccent,
+              color: const Color(0xFFFF3B30),
               label: 'Từ chối',
             ),
             _buildAcceptDeclineButton(
               onPressed: () => callService.acceptCall(),
               icon: Icons.call,
-              color: Colors.green,
+              color: const Color(0xFF4CD964),
               label: 'Chấp nhận',
             ),
           ],
@@ -218,8 +217,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           _BottomControl(
-            icon:
-                _callService.isSpeakerOn ? Icons.volume_up : Icons.volume_off,
+            icon: _callService.isSpeakerOn ? Icons.volume_up : Icons.volume_off,
             label: 'Loa',
             onTap: () => unawaited(_callService.toggleSpeaker()),
             active: _callService.isSpeakerOn,
@@ -231,8 +229,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
             destructive: true,
           ),
           _BottomControl(
-            icon:
-                _callService.isMicrophoneEnabled ? Icons.mic : Icons.mic_off,
+            icon: _callService.isMicrophoneEnabled ? Icons.mic : Icons.mic_off,
             label: 'Mic',
             onTap: () => unawaited(_callService.toggleMicrophone()),
             active: _callService.isMicrophoneEnabled,
@@ -417,11 +414,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
                   ),
                 ),
                 const Spacer(flex: 4),
-                        active: _callService.isMicrophoneEnabled,
-                      ),
-                    ],
-                  ),
-                ),
+                _buildControlButtons(_callService),
               ],
             ),
           ),

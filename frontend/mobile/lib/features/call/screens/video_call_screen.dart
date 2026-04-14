@@ -387,7 +387,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
             label: 'Chấp nhận',
             onTap: () => callService.acceptCall(),
             active: true,
-            color: Colors.green,
+            color: const Color(0xFF4CD964),
           ),
         ],
       );

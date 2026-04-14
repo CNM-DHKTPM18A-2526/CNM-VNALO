@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,8 +8,16 @@ import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/chat/widgets/chat_input_bar.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
+import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
+import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:vnalo_mobile/features/chat/providers/forward_provider.dart';
+import 'package:vnalo_mobile/features/chat/screens/forward_screen.dart';
+import 'package:vnalo_mobile/features/chat/widgets/message_bubble.dart';
+import 'package:vnalo_mobile/services/media_service.dart';
+import 'package:path/path.dart' as p;
+import 'dart:io';
 
 // A simple local message model for self-storage
 // Migrated from private _LocalMessage to global LocalMessage
@@ -20,11 +29,33 @@ class MyDocumentsScreen extends StatefulWidget {
   State<MyDocumentsScreen> createState() => _MyDocumentsScreenState();
 }
 
+extension LocalMessageExtension on LocalMessage {
+  Message toMessage(String currentUserId) {
+    return Message(
+      id: id,
+      conversationId: conversationId,
+      senderId: senderId,
+      content: content,
+      messageType: MessageType.values.firstWhere(
+        (e) => e.name == messageType,
+        orElse: () => MessageType.TEXT,
+      ),
+      mediaUrl: mediaUrl,
+      mediaMimeType: mediaMimeType,
+      mediaSizeBytes: mediaSizeBytes,
+      replyToMessageId: replyToId,
+      replyToSenderId: replyToSenderId,
+      replyToSenderName: replyToSenderName,
+      replyToContent: replyToContent,
+      createdAt: createdAt,
+      status: MessageStatus.SENT, // 1 tick "Đã gửi" per Zalo style
+    );
+  }
+}
+
 class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
-  // Dedicated local conversation key for self-saved messages.
   static const _storageKey = 'my_documents_messages';
   static const _convId = 'MY_DOCUMENTS';
-  static const List<String> _tabs = ['All', 'Text', 'Images', 'Files', 'Links'];
 
   int _selectedTabIndex = 0;
   final List<LocalMessage> _messages = [];
@@ -102,10 +133,13 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
   void _sendMessage(String content) async {
     if (content.trim().isEmpty) return;
 
-    // Persist immediately so this screen works offline by default.
     final db = context.read<LocalDatabase>();
     final auth = context.read<AuthProvider>();
     final myId = auth.user?.id ?? 'ME';
+    final myName = auth.user?.displayName ?? 'Tôi';
+
+    final chat = context.read<ChatProvider>();
+    final reply = chat.replyingTo;
 
     final msg = LocalMessage(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -114,39 +148,41 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
       messageType: 'TEXT',
       content: content.trim(),
       createdAt: DateTime.now(),
+      replyToId: reply?.id,
+      replyToSenderId: reply?.senderId,
+      replyToSenderName: reply != null ? (reply.senderName ?? 'Tôi') : null,
+      replyToContent: reply?.content,
     );
 
     await db.saveMessage(msg);
     if (!mounted) return;
-    setState(() => _messages.insert(0, msg));
+    setState(() {
+      _messages.insert(0, msg);
+    });
+    chat.setReplyTo(null);
     context.read<ChatProvider>().refreshCloudPreview();
     _inputController.clear();
     setState(() => _hasText = false);
   }
 
-  Future<void> _saveMedia(String path, MessageType type) async {
-    final db = context.read<LocalDatabase>();
-    final auth = context.read<AuthProvider>();
-    final myId = auth.user?.id ?? 'ME';
-
-    final msg = LocalMessage(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      conversationId: _convId,
-      senderId: myId,
-      messageType: type.name,
-      content: path.split('/').last,
-      mediaUrl: path,
-      createdAt: DateTime.now(),
-    );
-
-    await db.saveMessage(msg);
-    if (!mounted) return;
-    setState(() => _messages.insert(0, msg));
-    context.read<ChatProvider>().refreshCloudPreview();
-  }
-
   List<LocalMessage> get _filteredMessages {
-    return _messages; // SQLite query should handle filtering in the future
+    switch (_selectedTabIndex) {
+      case 0: // Tất cả
+        return _messages;
+      case 1: // Văn bản
+        return _messages.where((m) => m.messageType == 'TEXT').toList();
+      case 2: // Ảnh
+        return _messages.where((m) => m.messageType == 'IMAGE').toList();
+      case 3: // File
+        return _messages.where((m) => m.messageType == 'FILE' || m.messageType == 'VIDEO').toList();
+      case 4: // Link
+        return _messages.where((m) => 
+          m.messageType == 'LINK' || 
+          (m.messageType == 'TEXT' && m.content.contains('http'))
+        ).toList();
+      default:
+        return _messages;
+    }
   }
 
   String _formatTime(DateTime dt) {
@@ -155,22 +191,24 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
     return '$h:$m';
   }
 
-  String _formatDateGroup(DateTime dt) {
+  String _formatDateGroup(DateTime dt, CommonTexts texts) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final msgDay = DateTime(dt.year, dt.month, dt.day);
     final diff = today.difference(msgDay).inDays;
-    if (diff == 0) return 'Today';
-    if (diff == 1) return 'Yesterday';
+    if (diff == 0) return texts.today;
+    if (diff == 1) return texts.yesterday;
     return '${dt.day}/${dt.month}/${dt.year}';
   }
-
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
     final bgColor = isDarkMode ? Colors.black : LightColors.scaffold;
     final cardColor = isDarkMode ? const Color(0xFF1E1E1E) : Colors.white;
+
+    final texts = CommonTexts.of(context);
+    final tabs = texts.docTabs;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -191,20 +229,16 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
                   ),
                 ),
               ),
-        title: const Row(
+        title: Row(
           children: [
             Text(
-              'My Documents',
-              style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w600),
+              texts.myDocumentsHeader,
+              style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w600),
             ),
-            SizedBox(width: 6),
-            Icon(Icons.verified, color: Colors.orange, size: 18),
+            const SizedBox(width: 6),
+            const Icon(Icons.verified, color: Colors.orange, size: 18),
           ],
         ),
-        actions: [
-          IconButton(icon: const Icon(Icons.search, color: Colors.white), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.menu, color: Colors.white), onPressed: () {}),
-        ],
       ),
       body: Column(
         children: [
@@ -216,7 +250,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
-                children: List.generate(_tabs.length, (i) {
+                children: List.generate(tabs.length, (i) {
                   final isSelected = _selectedTabIndex == i;
                   return GestureDetector(
                     onTap: () => setState(() => _selectedTabIndex = i),
@@ -233,7 +267,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
                             : Border.all(color: Colors.grey.withValues(alpha: 0.4)),
                       ),
                       child: Text(
-                        _tabs[i],
+                        tabs[i],
                         style: TextStyle(
                           color: isSelected
                               ? (isDarkMode ? Colors.white : Colors.black87)
@@ -264,7 +298,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
       ),
       bottomNavigationBar: ChatInputBar(
         conversationId: _convId,
-        onSend: _sendMessage,
+        onSend: (text) => _sendMessage(text),
         onSendImages: (images) async {
           for (var img in images) {
             await _saveMedia(img.path, MessageType.IMAGE);
@@ -307,18 +341,49 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
 
   Widget _buildMessageList(bool isDarkMode) {
     final msgs = _filteredMessages;
+    final texts = CommonTexts.of(context);
 
-    // Group by date
+    // Group by date - msgs is newest first
     final Map<String, List<LocalMessage>> grouped = {};
+    final List<String> dateOrder = [];
     for (final m in msgs) {
-      final key = _formatDateGroup(m.createdAt);
-      grouped.putIfAbsent(key, () => []);
+      final key = _formatDateGroup(m.createdAt, texts);
+      if (!grouped.containsKey(key)) {
+        dateOrder.add(key);
+        grouped[key] = [];
+      }
       grouped[key]!.add(m);
     }
 
     final List<Widget> items = [];
-    grouped.forEach((date, messages) {
-      // Date header
+    // With reverse: true, we want items[0] to be at the bottom (newest)
+    // So we iterate dates from newest to oldest
+    for (final date in dateOrder) {
+      final messages = grouped[date]!;
+      
+      // Add messages in that date (already newest first)
+      for (int i = 0; i < messages.length; i++) {
+        final msg = messages[i];
+        
+        // i == 0 is newest in this date group
+        bool showTime = true;
+        if (i < messages.length - 1) {
+          final older = messages[i + 1];
+          final gap = msg.createdAt.difference(older.createdAt).inMinutes.abs();
+          if (gap < 5) {
+            showTime = false;
+          }
+        }
+        
+        bool showStatus = false;
+        if (msg.id == msgs.first.id) {
+          showStatus = true; // Sent status for overall newest
+        }
+
+        items.add(_buildBubble(msg, isDarkMode, showTime, showStatus));
+      }
+
+      // Add Date header AFTER messages of that date (it will appear ABOVE them in reverse: true)
       items.add(
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -337,30 +402,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
           ),
         ),
       );
-
-      for (int i = 0; i < messages.length; i++) {
-        final msg = messages[i];
-
-        // Grouping logic for MyDocuments (all messages are 'Mine')
-        // showTime: if it's the newest message (i == 0) OR gap with message above it (i-1) is > 5 mins
-        bool showTime = true;
-        if (i > 0) {
-          final nextRecent = messages[i - 1]; // nextRecent is "below" in UI (reverse: true)
-          final gap = nextRecent.createdAt.difference(msg.createdAt).inMinutes.abs();
-          if (gap < 5) {
-            showTime = false;
-          }
-        }
-
-        // showStatus: only for the absolute newest message in the newest date group
-        bool showStatus = false;
-        if (i == 0 && date == _formatDateGroup(msgs.first.createdAt)) {
-          showStatus = true;
-        }
-
-        items.add(_buildBubble(msg, isDarkMode, showTime, showStatus));
-      }
-    });
+    }
 
     return ListView(
       controller: _scrollController,
@@ -370,71 +412,109 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
     );
   }
 
-  Widget _buildBubble(LocalMessage msg, bool isDarkMode, bool showTime, bool showStatus) {
-    final bubbleColor = isDarkMode ? DarkColors.chatBubbleSent : LightColors.chatBubbleSent;
+  void _handleReply(Message msg) {
+    context.read<ChatProvider>().setReplyTo(msg);
+  }
 
-    return Align(
-      alignment: Alignment.centerRight,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Container(
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.75,
-            ),
-            margin: EdgeInsets.only(
-              top: showTime ? 8 : 2,
-              bottom: 2,
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: bubbleColor,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-                bottomLeft: Radius.circular(16),
-                bottomRight: Radius.circular(4),
-              ),
-            ),
-            child: Text(
-              msg.content,
-              style: TextStyle(
-                fontSize: 15,
-                color: isDarkMode ? Colors.white : const Color(0xFF1F2937),
-              ),
-            ),
-          ),
-          if (showTime || showStatus)
-            Padding(
-              padding: const EdgeInsets.only(right: 6, bottom: 8, top: 2),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (showTime)
-                    Text(
-                      _formatTime(msg.createdAt),
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: isDarkMode ? DarkColors.textHint : Colors.grey.shade500,
-                      ),
-                    ),
-                  if (showStatus) ...[
-                    if (showTime) const SizedBox(width: 6),
-                    const Icon(Icons.done_all, size: 14, color: Colors.blue),
-                    const SizedBox(width: 4),
-                    const Text(
-                      'Received',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-        ],
-      ),
+  void _deleteMessage(Message msg) async {
+    final db = context.read<LocalDatabase>();
+    await db.deleteMessage(msg.id!);
+    setState(() {
+      _messages.removeWhere((m) => m.id == msg.id);
+    });
+    context.read<ChatProvider>().refreshCloudPreview();
+  }
+
+  void _forwardMessage(Message msg) {
+    // Parity with regular chat: use ForwardProvider
+    context.read<ForwardProvider>().startForwarding([msg]);
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ForwardScreen()),
+    );
+  }
+
+  Future<void> _saveMedia(String path, MessageType type) async {
+    final db = context.read<LocalDatabase>();
+    final auth = context.read<AuthProvider>();
+    final media = context.read<MediaService>();
+    final chat = context.read<ChatProvider>();
+    final myId = auth.user?.id ?? 'ME';
+    final myName = auth.user?.displayName ?? 'Tôi';
+    final fileName = path.split(Platform.isWindows ? '\\' : '/').last;
+
+    // 0. Get reply state
+    final reply = chat.replyingTo;
+
+    // 1. Add optimistic message
+    final optimisticId = 'opt-${DateTime.now().millisecondsSinceEpoch}';
+    final optimistic = LocalMessage(
+      id: optimisticId,
+      conversationId: _convId,
+      senderId: myId,
+      messageType: type.name,
+      content: fileName,
+      mediaUrl: path, // Local path for preview
+      createdAt: DateTime.now(),
+      replyToId: reply?.id,
+      replyToSenderId: reply?.senderId,
+      replyToSenderName: reply != null ? (reply.senderName ?? 'Tôi') : null,
+      replyToContent: reply?.content,
+    );
+
+    setState(() {
+      _messages.insert(0, optimistic);
+    });
+
+    try {
+      // 2. Upload to server
+      final category = type == MessageType.IMAGE ? MediaCategory.CHAT_IMAGE : 
+                       (type == MessageType.VIDEO ? MediaCategory.CHAT_VIDEO : MediaCategory.CHAT_FILE);
+      final mediaId = await media.uploadFile(File(path), category);
+      final publicUrl = media.getPublicUrl(mediaId);
+
+      // 3. Finalize message
+      final finalized = optimistic.copyWith(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        mediaUrl: Value(publicUrl),
+        // status: 'SENT', // Remove status
+      );
+
+      // 4. Save to DB
+      await db.saveMessage(finalized);
+      
+      // 5. Update UI and clear reply
+      setState(() {
+        final idx = _messages.indexWhere((m) => m.id == optimisticId);
+        if (idx != -1) {
+          _messages[idx] = finalized;
+        }
+      });
+      chat.setReplyTo(null);
+
+      // 6. Sync chat list preview
+      chat.refreshCloudPreview();
+      
+    } catch (e) {
+      debugPrint('Media upload failed: $e');
+      // On failure, we keep the local version but maybe mark it for retry in UI later
+    }
+  }
+
+  Widget _buildBubble(LocalMessage msg, bool isDarkMode, bool showTime, bool showStatus) {
+    final currentUserId = context.read<AuthProvider>().user?.id ?? 'ME';
+    final message = msg.toMessage(currentUserId);
+
+    return MessageBubble(
+      message: message,
+      isMine: true,
+      showTime: showTime,
+      showStatus: showStatus,
+      onReplyAction: _handleReply,
+      onDeleteAction: _deleteMessage,
+      onForwardAction: _forwardMessage,
+      onReplyTap: (id) {
+        // Implement jump to message if needed
+      },
     );
   }
 }
