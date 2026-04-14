@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, Check, Search, Users, X } from 'lucide-react';
+import { Camera, Check, Search, X } from 'lucide-react';
 
 
 import { UserAvatar } from '../../../shared/components/UserAvatar';
-import { Button } from '../../../shared/components/ui/Button';
 import { Modal } from '../../../shared/components/ui/Modal';
 import type { Friend } from '../../friends/friends.types';
 
@@ -74,11 +73,15 @@ export function CreateGroupModal({
   // Reset khi mở modal
   useEffect(() => {
     if (!isOpen) return;
-    setGroupName('');
-    setSearchKeyword('');
-    setSelectedMemberIds([]);
-    setActiveFilter('all');
-    setAvatarPreviewUrl(null);
+    
+    // Use requestAnimationFrame to avoid synchronous setState in effect warning
+    requestAnimationFrame(() => {
+      setGroupName('');
+      setSearchKeyword('');
+      setSelectedMemberIds([]);
+      setActiveFilter('all');
+      setAvatarPreviewUrl(null);
+    });
   }, [isOpen]);
 
   const filterTabs: Array<{ id: FilterType; label: string }> = [

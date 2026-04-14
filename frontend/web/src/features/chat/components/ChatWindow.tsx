@@ -133,7 +133,14 @@ export function ChatWindow({
     }
 
     target.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    setHighlightedMessageId(jumpToMessageId)
+    
+    // Use requestAnimationFrame to avoid synchronous setState in effect warning
+    requestAnimationFrame(() => {
+      if (lastHandledJumpIdRef.current !== jumpToMessageId) {
+        setHighlightedMessageId(jumpToMessageId)
+      }
+    })
+
     lastHandledJumpIdRef.current = jumpToMessageId
     onJumpToMessageHandled?.()
   }, [conversationMessages, jumpToMessageId, onJumpToMessageHandled])

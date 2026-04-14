@@ -5,6 +5,7 @@ import 'package:vnalo_mobile/core/localization/language_provider.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
+import 'package:vnalo_mobile/features/call/models/call_log_message.dart';
 import 'package:vnalo_mobile/features/contacts/screens/send_request_screen.dart';
 import 'package:vnalo_mobile/features/chat/screens/chat_detail_screen.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
@@ -1047,7 +1048,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               text: _highlightText(
-                result.message.content,
+                CallLogMessage.tryParse(result.message.content)?.toLocalizedText(isMine: result.message.senderId == currentUserId) ?? result.message.content,
                 query,
                 baseStyle: TextStyle(
                   color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary,

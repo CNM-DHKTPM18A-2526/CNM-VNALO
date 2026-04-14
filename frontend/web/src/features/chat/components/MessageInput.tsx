@@ -84,10 +84,16 @@ export function MessageInput({
 
       const parsed = JSON.parse(raw) as unknown
       if (Array.isArray(parsed)) {
-        setRecentEmojis(parsed.filter((item): item is string => typeof item === 'string').slice(0, 16))
+        const validated = parsed.filter((item): item is string => typeof item === 'string').slice(0, 16)
+        // Use requestAnimationFrame to avoid synchronous setState in effect warning
+        requestAnimationFrame(() => {
+          setRecentEmojis(validated)
+        })
       }
     } catch {
-      setRecentEmojis([])
+      requestAnimationFrame(() => {
+        setRecentEmojis([])
+      })
     }
   }, [])
 

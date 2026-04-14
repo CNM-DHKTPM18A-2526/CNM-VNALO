@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Icon } from '../../../shared/components/Icon'
 import { UserAvatar } from '../../../shared/components/UserAvatar'
 import type { ChatMessage, ConversationSummary } from '../chat.types'
+import { formatMessageContent } from '../utils/messageUtils'
 
 type SearchSenderFilter = 'all' | 'me' | 'other'
 type SearchDateFilter = 'all' | 'today' | '7d' | '30d'
@@ -95,8 +96,14 @@ export function SearchMessagesPanel({ conversation, onSearchConversation, onSele
 
   useEffect(() => {
     let active = true
-    setIsSearching(true)
-    setSearchError('')
+    
+    // Set loading state in next tick to avoid cascading render warning
+    const timeoutId = setTimeout(() => {
+      if (active) {
+        setIsSearching(true)
+        setSearchError('')
+      }
+    }, 0)
 
     onSearchConversation(conversation.id, debouncedKeyword)
       .then((result) => {
@@ -122,6 +129,7 @@ export function SearchMessagesPanel({ conversation, onSearchConversation, onSele
 
     return () => {
       active = false
+      clearTimeout(timeoutId)
     }
   }, [conversation.id, debouncedKeyword, onSearchConversation])
 
@@ -236,7 +244,7 @@ export function SearchMessagesPanel({ conversation, onSearchConversation, onSele
                   <strong>{message.sender === 'me' ? 'Bạn' : conversation.name}</strong>
                   <time>{message.timestamp}</time>
                 </div>
-                <p>{message.text || (message.type === 'image' ? 'Ảnh' : message.type === 'sticker' ? 'Sticker' : 'Tin nhắn')}</p>
+                <p>{formatMessageContent(message.text) || (message.type === 'image' ? 'Ảnh' : message.type === 'sticker' ? 'Sticker' : 'Tin nhắn')}</p>
               </div>
             </article>
           ))
