@@ -33,7 +33,6 @@ class CommonTexts {
   String get sort => _isVi ? 'Sắp xếp' : 'Sort';
   String get recallAction => _isVi ? 'Thu hồi' : 'Recall';
   String get deleteForMeAction => _isVi ? 'Xóa ở phía tôi' : 'Delete for me';
-  String get confirmRecallMessage => _isVi ? 'Tin nhắn này sẽ được thu hồi với tất cả mọi người.' : 'This message will be recalled for everyone.';
   String get confirmDeleteForMe => _isVi ? 'Tin nhắn này sẽ bị xóa khỏi lịch sử trò chuyện của bạn.' : 'This message will be deleted from your chat history.';
   String get filterAll => _isVi ? 'Tất cả' : 'All';
   String get recentlyActive => _isVi ? 'Mới truy cập' : 'Recently active';
@@ -163,9 +162,14 @@ class CommonTexts {
   String get featureUnderDevelopment =>
       _isVi ? 'Tính năng đang được phát triển' : 'Feature under development';
   String get unknownUser => _isVi ? 'Người dùng ẩn danh' : 'Unknown user';
+  String get upcomingBirthday => _isVi ? 'Sinh nhật sắp tới' : 'Upcoming birthday';
+  String get you => _isVi ? 'Bạn' : 'You';
 
   // Chat List / Actions
   String get pinAction => _isVi ? 'Ghim' : 'Pin';
+  String get unpinAction => _isVi ? 'Bỏ ghim' : 'Unpin';
+  String get confirmUnpinTitle => _isVi ? 'Bỏ ghim tin nhắn?' : 'Unpin message?';
+  String get unpinSuccess => _isVi ? 'Bạn đã bỏ ghim thành công' : 'Unpinned successfully';
   String get muteAction => _isVi ? 'Tắt' : 'Mute';
   String sayHelloTo(String name) =>
       _isVi ? 'Gửi lời chào $name' : 'Say hello to $name';
@@ -341,15 +345,9 @@ class CommonTexts {
   String get memberLimitLabel => _isVi ? 'Giới hạn thành viên' : 'Member Limit';
 
   // My Documents
-  List<String> get docTabs =>
-      _isVi
-          ? ['Tất cả', 'Văn bản', 'Ảnh', 'File', 'Link']
-          : ['All', 'Text', 'Image', 'File', 'Link'];
-  String formatDocDate(DateTime dt) =>
-      _isVi
-          ? '${dt.day} tháng ${dt.month}, ${dt.year}'
-          : '${dt.month} ${dt.day}, ${dt.year}';
-  String get myDocumentsHeader => 'My Documents';
+  List<String> get docTabs => _isVi ? ['Tất cả', 'Văn bản', 'Ảnh', 'File', 'Link'] : ['All', 'Text', 'Image', 'File', 'Link'];
+  String formatDocDate(DateTime dt) => _isVi ? '${dt.day} tháng ${dt.month}, ${dt.year}' : '${dt.month} ${dt.day}, ${dt.year}';
+  String get myDocumentsHeader => _isVi ? 'Cloud của tôi' : 'My Documents';
   String get noContentYet => _isVi ? 'Chưa có nội dung nào' : 'No content yet';
   String get saveContentNote =>
       _isVi
@@ -384,6 +382,9 @@ class CommonTexts {
   String get imageLabel => _isVi ? 'Hình ảnh' : 'Image';
   String get documentLabel => _isVi ? 'Tài liệu' : 'Document';
   String get fileLimitNote => _isVi ? 'Dưới 5MB' : 'Under 5MB';
+  String get downloadedLabel => _isVi ? 'Đã tải xuống' : 'Downloaded';
+  String get openFileAction => _isVi ? 'Mở' : 'Open';
+  String get downloadAction => _isVi ? 'Tải xuống' : 'Download';
 
   // Appearance & Language
   String get appearanceAndLanguageHeader =>
@@ -480,6 +481,7 @@ class CommonTexts {
   String get translateAction => _isVi ? 'Dịch' : 'Translate';
   String get speakAction => _isVi ? 'Đọc văn bản' : 'Speak';
   String get detailsAction => _isVi ? 'Chi tiết' : 'Info';
+  String get confirmRecallMessage => _isVi ? 'Tin nhắn này sẽ bị gỡ bỏ với tất cả mọi người. Bạn có chắc chắn muốn thu hồi?' : 'This message will be removed for everyone. Are you sure you want to recall?';
   String get newTagLabel => _isVi ? 'MỚI' : 'NEW';
 
   // Message Bubble Status / Dialog

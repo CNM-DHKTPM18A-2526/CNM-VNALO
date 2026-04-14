@@ -20,6 +20,10 @@ class SocketService {
       StreamController<Map<String, dynamic>>.broadcast();
   final _recalledController =
       StreamController<Map<String, dynamic>>.broadcast();
+  final _pinnedController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final _unpinnedController =
+      StreamController<Map<String, dynamic>>.broadcast();
   final _callSignalController =
       StreamController<Map<String, dynamic>>.broadcast();
 
@@ -32,6 +36,8 @@ class SocketService {
   Stream<Map<String, dynamic>> get onRead => _readController.stream;
   Stream<Map<String, dynamic>> get onDelivered => _deliveredController.stream;
   Stream<Map<String, dynamic>> get onRecalled => _recalledController.stream;
+  Stream<Map<String, dynamic>> get onPinned => _pinnedController.stream;
+  Stream<Map<String, dynamic>> get onUnpinned => _unpinnedController.stream;
   Stream<Map<String, dynamic>> get onCallSignal => _callSignalController.stream;
 
   void _emitCallSignal(String type, dynamic data) {
@@ -105,6 +111,14 @@ class SocketService {
 
     _socket!.on('message.recalled', (data) {
       _recalledController.add(Map<String, dynamic>.from(data));
+    });
+
+    _socket!.on('message.pinned', (data) {
+      _pinnedController.add(Map<String, dynamic>.from(data));
+    });
+
+    _socket!.on('message.unpinned', (data) {
+      _unpinnedController.add(Map<String, dynamic>.from(data));
     });
 
     _socket!.on('call.offer', (data) => _emitCallSignal('offer', data));
@@ -211,6 +225,20 @@ class SocketService {
     });
   }
 
+  void pinMessage(String messageId, String conversationId) {
+    _socket?.emit('message.pin', {
+      'messageId': messageId,
+      'conversationId': conversationId,
+    });
+  }
+
+  void unpinMessage(String messageId, String conversationId) {
+    _socket?.emit('message.unpin', {
+      'messageId': messageId,
+      'conversationId': conversationId,
+    });
+  }
+
   void sendCallOffer({
     required String conversationId,
     required String callId,
@@ -303,6 +331,8 @@ class SocketService {
     _readController.close();
     _deliveredController.close();
     _recalledController.close();
+    _pinnedController.close();
+    _unpinnedController.close();
     _callSignalController.close();
   }
 }

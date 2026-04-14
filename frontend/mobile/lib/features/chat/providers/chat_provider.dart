@@ -25,10 +25,13 @@ class ChatProvider extends ChangeNotifier {
   final Map<String, List<Message>> _messages = {};
   final Map<String, Timer> _retryTimers = {};
   final Map<String, int> _retryCounts = {};
+  final Map<String, List<Message>> _pinnedMessages = {};
   final StreamSubscription<Message> _messageSub;
   final StreamSubscription<Map<String, dynamic>> _readSub;
   final StreamSubscription<Map<String, dynamic>> _deliveredSub;
   final StreamSubscription<Map<String, dynamic>> _recalledSub;
+  final StreamSubscription<Map<String, dynamic>> _pinnedSub;
+  final StreamSubscription<Map<String, dynamic>> _unpinnedSub;
   final Random _random = Random.secure();
 
   List<Conversation> _conversations = [];
@@ -57,6 +60,9 @@ class ChatProvider extends ChangeNotifier {
   List<Message> getMessagesForConversation(String conversationId) =>
       _messages[conversationId] ?? [];
 
+  List<Message> getPinnedMessagesForConversation(String conversationId) =>
+      _pinnedMessages[conversationId] ?? [];
+
   ChatProvider({
     required ChatService chatService,
     required SocketService socketService,
@@ -71,12 +77,16 @@ class ChatProvider extends ChangeNotifier {
         _messageSub = socketService.onMessage.listen((_) {}),
         _readSub = socketService.onRead.listen((_) {}),
         _deliveredSub = socketService.onDelivered.listen((_) {}),
-        _recalledSub = socketService.onRecalled.listen((_) {}) {
+        _recalledSub = socketService.onRecalled.listen((_) {}),
+        _pinnedSub = socketService.onPinned.listen((_) {}),
+        _unpinnedSub = socketService.onUnpinned.listen((_) {}) {
     _notificationService.ensureInitialized();
     _messageSub.onData(_handleIncomingMessage);
     _readSub.onData(_handleReadEvent);
     _deliveredSub.onData(_handleDeliveredEvent);
-      _recalledSub.onData(_handleRecalledEvent);
+    _recalledSub.onData(_handleRecalledEvent);
+    _pinnedSub.onData(_handlePinnedEvent);
+    _unpinnedSub.onData(_handleUnpinnedEvent);
   }
 
   List<Message> getMessages(String conversationId) =>
@@ -302,6 +312,7 @@ class ChatProvider extends ChangeNotifier {
   Future<void> openConversation(String conversationId) async {
     _activeConversationId = conversationId;
     _socketService.joinConversation(conversationId);
+    loadPinnedMessages(conversationId);
 
     // Clear unread count locally
     final index = _conversations.indexWhere((c) => c.id == conversationId);
@@ -613,6 +624,16 @@ class ChatProvider extends ChangeNotifier {
       messageId,
       list[index].copyWith(status: MessageStatus.RECALLED, content: ''),
     );
+  }
+
+  Future<void> downloadFile(Message message) async {
+    // Basic implementation: for now, we just open the URL if possible, 
+    // or provide a placeholder for actual background downloading in the future.
+    if (message.mediaUrl == null || message.mediaUrl!.isEmpty) return;
+    
+    // In a real app, this would involve a background download task.
+    // For now, satisfy the compiler and provide a hook.
+    debugPrint('Download requested for: ${message.mediaUrl}');
   }
 
   // Delete a message only for current user.
@@ -1082,6 +1103,8 @@ class ChatProvider extends ChangeNotifier {
     _readSub.cancel();
     _deliveredSub.cancel();
     _recalledSub.cancel();
+    _pinnedSub.cancel();
+    _unpinnedSub.cancel();
     _highlightTimer?.cancel();
     for (final timer in _retryTimers.values) {
       timer.cancel();
@@ -1477,12 +1500,70 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
-  Future<List<Message>> fetchPinnedMessages(String conversationId) async {
+  Future<void> loadPinnedMessages(String conversationId) async {
     try {
-      // This path depends on backend implementation
-      return await _chatService.getMessages(conversationId, limit: 10); // Placeholder
+      final pins = await _chatService.getPinnedMessages(conversationId);
+      final List<Message> messages = [];
+      for (final p in (pins as List)) {
+        if (p['message'] != null) {
+          messages.add(Message.fromJson(p['message']));
+        }
+      }
+      _pinnedMessages[conversationId] = messages;
+      notifyListeners();
     } catch (e) {
-      return [];
+      debugPrint('loadPinnedMessages error: $e');
+    }
+  }
+
+  void pinMessage(String messageId) {
+    if (_activeConversationId == null) return;
+    _socketService.pinMessage(messageId, _activeConversationId!);
+  }
+
+  void unpinMessage(String messageId) {
+    if (_activeConversationId == null) return;
+    _socketService.unpinMessage(messageId, _activeConversationId!);
+  }
+
+  bool isMessagePinned(String conversationId, String messageId) {
+    final pins = _pinnedMessages[conversationId];
+    if (pins == null) return false;
+    return pins.any((m) => m.id == messageId);
+  }
+
+  void _handlePinnedEvent(Map<String, dynamic> data) {
+    debugPrint('[ChatProvider] 📌 Received message.pinned event: $data');
+    final pin = data['pin'];
+    if (pin != null && pin['message'] != null) {
+      final conversationId = pin['conversationId'] ?? _activeConversationId;
+      if (conversationId == null) {
+        debugPrint('[ChatProvider] ⚠️ Skip pin: No conversationId found');
+        return;
+      }
+
+      final message = Message.fromJson(pin['message']);
+      final currentPins = _pinnedMessages[conversationId] ?? [];
+      
+      // Avoid duplicates
+      if (!currentPins.any((m) => m.id == message.id)) {
+        _pinnedMessages[conversationId] = [message, ...currentPins];
+        notifyListeners();
+      }
+    }
+  }
+
+  void _handleUnpinnedEvent(Map<String, dynamic> data) {
+    final messageId = data['messageId'];
+    final conversationId = data['conversationId'] ?? _activeConversationId;
+    if (messageId == null || conversationId == null) return;
+
+    final currentPins = _pinnedMessages[conversationId] ?? [];
+    final updatedPins = currentPins.where((m) => m.id != messageId).toList();
+    
+    if (updatedPins.length != currentPins.length) {
+      _pinnedMessages[conversationId] = updatedPins;
+      notifyListeners();
     }
   }
 }

@@ -20,6 +20,7 @@ import 'package:vnalo_mobile/features/chat/screens/group_chat_options_screen.dar
 import 'package:vnalo_mobile/models/message_model.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:vnalo_mobile/core/utils/avatar_resolver.dart';
+import 'package:vnalo_mobile/features/chat/widgets/pinned_message_bar.dart';
 import 'dart:async';
 
 class ChatDetailScreen extends StatefulWidget {
@@ -379,6 +380,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     : null,
             child: Column(
               children: [
+                PinnedMessageBar(
+                  conversationId: conv.id,
+                  onMessageTap: (msgId) {
+                    final rawItems = chat.getMessagesForConversation(conv.id);
+                    _jumpToMessage(msgId, rawItems);
+                  },
+                ),
                 Expanded(
                   child: Builder(
                     builder: (context) {

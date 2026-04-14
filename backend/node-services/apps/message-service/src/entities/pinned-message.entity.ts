@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index, Unique } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index, Unique, ManyToOne, JoinColumn } from 'typeorm';
+import { Message } from './message.entity';
 
 @Entity('pinned_message')
 @Unique('unique_pin', ['conversationId', 'messageId'])
@@ -12,6 +13,10 @@ export class PinnedMessage {
 
   @Column({ name: 'message_id', type: 'uuid' })
   messageId: string;
+
+  @ManyToOne(() => Message)
+  @JoinColumn({ name: 'message_id' })
+  message: Message;
 
   @Column({ name: 'server_seq', type: 'bigint' })
   serverSeq: number;

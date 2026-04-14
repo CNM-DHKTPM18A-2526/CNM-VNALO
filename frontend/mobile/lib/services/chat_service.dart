@@ -455,4 +455,9 @@ class ChatService {
     final response = await _apiService.post(_base, '/conversations/$conversationId/join', body: {});
     return response['data'] ?? response;
   }
+
+  Future<List<dynamic>> getPinnedMessages(String conversationId) async {
+    final response = await _apiService.get(_base, '/conversations/$conversationId/pins');
+    return response['data'] ?? response as List;
+  }
 }

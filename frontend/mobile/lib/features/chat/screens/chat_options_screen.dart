@@ -246,15 +246,17 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
 
   Widget _buildQuickActions(Conversation conv) {
     final common = CommonTexts.of(context);
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final iconColor = isDarkMode ? DarkColors.textPrimary : Colors.black87;
+
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.only(top: 4, bottom: 16),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           _buildQuickBtn(CupertinoIcons.search, common.searchMessagesAction, () => _showComingSoon('Tìm kiếm')),
           _buildQuickBtn(CupertinoIcons.person, common.viewProfileQuickAction, () => _showComingSoon('Trang cá nhân')),
-          _buildQuickBtn(CupertinoIcons.paintbrush, common.changeWallpaperQuickAction, _openWallpaperSelection),
           _buildQuickBtn(
             conv.isMuted ? CupertinoIcons.bell_slash_fill : CupertinoIcons.bell,
             common.muteNotifsQuickAction,

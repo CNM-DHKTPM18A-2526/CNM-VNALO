@@ -148,19 +148,27 @@ class _ChatListScreenState extends State<ChatListScreen> {
             tag: 'search_bar_chat',
             child: Material(
               color: Colors.transparent,
-              child: Row(
-                children: [
-                  Icon(Icons.search, size: 24, color: isDarkMode ? searchHint : Colors.white),
-                  const SizedBox(width: 8),
-                  Text(
-                    common.search,
-                    style: TextStyle(
-                      color: searchHint,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w400,
+              child: Container(
+                height: 40,
+                decoration: BoxDecoration(
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: [
+                    Icon(Icons.search, size: 20, color: isDarkMode ? searchHint : Colors.white),
+                    const SizedBox(width: 8),
+                    Text(
+                      common.search,
+                      style: TextStyle(
+                        color: isDarkMode ? searchHint : Colors.white.withValues(alpha: 0.9),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w400,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -233,6 +241,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           horizontal: 16,
                           vertical: 10,
                         ),
+
                       leading: Container(
                         width: 52,
                         height: 52,
@@ -248,16 +257,19 @@ class _ChatListScreenState extends State<ChatListScreen> {
                               bottom: 0,
                               right: 0,
                               child: Container(
+
                                 decoration: const BoxDecoration(
                                   color: Colors.orange,
                                   shape: BoxShape.circle,
                                 ),
                                 child: const Icon(Icons.check, color: Colors.white, size: 12),
+
                               ),
                             )
                           ],
                         ),
                       ),
+
                       title: Row(
                         children: [
                           Expanded(
