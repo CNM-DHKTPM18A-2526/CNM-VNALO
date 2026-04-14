@@ -391,3 +391,101 @@ If blocked > 30 minutes:
 	 - first failing stack trace.
 
 This significantly reduces debug turnaround time for the team.
+
+## Phân tích kỹ thuật mobile (hiệu năng, sẵn sàng, search, load dữ liệu, local DB)
+
+Phần này tổng hợp theo code hiện tại trong `frontend/mobile/lib` để liệt kê các kỹ thuật “premium” đã áp dụng thực tế.
+
+### Search (Hybrid Search: local + remote)
+
+Kỹ thuật đang dùng:
+
+- **Full-text search local bằng SQLite FTS5** cho `messages` và `contacts`, có trigger đồng bộ index theo insert/delete (`lib/core/database/local_database.dart`).
+- **Hybrid query song song** bằng `Future.wait`:
+  - local contacts (`db.searchContacts`)
+  - local messages (`db.searchMessages`)
+  - remote phone lookup khi query giống số điện thoại
+  (`lib/features/search/screens/unified_search_screen.dart`).
+- **Chống race-condition kết quả search** bằng `requestId` tăng dần (`_searchRequestId`) để bỏ qua response cũ khi người dùng gõ nhanh.
+
+Đánh giá:
+
+- Mạnh ở độ trễ thấp nhờ ưu tiên local FTS.
+- Ổn định UI tốt khi có nhiều request chồng nhau.
+- **Hiện chưa có debounce/throttle input** (`onChanged` gọi trực tiếp `_performHybridSearch`) nên có thể tạo nhiều request khi gõ rất nhanh; mục này nên theo dõi trong backlog tối ưu hiệu năng.
+
+### Load dữ liệu và đồng bộ realtime
+
+Kỹ thuật đang dùng:
+
+- **Local-first loading**: mở conversation sẽ đọc tin nhắn từ local DB trước, sau đó fetch API để refresh (`ChatProvider.openConversation`).
+- **Pagination theo `before + limit`** ở API lấy message (`ChatService.getMessages`) để tải từng lát dữ liệu.
+- **Batch enrich dữ liệu hội thoại**: gom member IDs và gọi profile song song qua `Future.wait` để giảm tuần tự hóa request (`ChatService`).
+- **Realtime socket với auto reconnect** (`SocketService`):
+  - websocket + polling fallback
+  - auto reconnect với delay 1s, tối đa 10 lần.
+
+Đánh giá:
+
+- Tối ưu perceived performance (mở màn hình chat nhanh vì có cache local).
+- Realtime có khả năng tự phục hồi kết nối tốt cho mobile network không ổn định.
+
+### Độ sẵn sàng và chịu lỗi (availability/reliability)
+
+Kỹ thuật đang dùng:
+
+- **HTTP timeout cứng**:
+  - 30s cho JSON API
+  - 90s cho multipart upload
+  (`ApiService`).
+- **Coalescing refresh token**: dùng `_refreshInFlight` để gộp nhiều luồng 401 concurrent, tránh đua refresh token.
+- **Fail-fast network error mapping**: phân biệt timeout, mất mạng, client exception để UI xử lý rõ ràng hơn.
+- **Socket ACK + retry backoff cho gửi tin nhắn**:
+  - optimistic message
+  - retry tối đa 3 lần, backoff tăng dần
+  - chuyển trạng thái FAILED khi quá ngưỡng
+  (`ChatProvider._sendWithRetry`, `_scheduleRetry`).
+
+Đánh giá:
+
+- Có đầy đủ lớp phòng thủ ở cả REST lẫn socket.
+- Phù hợp bài toán chat cần tính liên tục cao trên mạng di động thực tế.
+
+### Local DB, cache và tối ưu I/O
+
+Kỹ thuật đang dùng:
+
+- **Drift + SQLite** cho offline cache có schema migration (`schemaVersion = 3`).
+- **Native DB chạy background isolate** (`NativeDatabase.createInBackground`) giúp giảm blocking UI thread.
+- **LazyDatabase** để trì hoãn mở DB đến khi thực sự cần.
+- **Batch upsert** (`InsertMode.insertOrReplace`) cho sync contacts/messages.
+- **Read-state local (conversation_read_state)** với cập nhật đơn điệu (`ON CONFLICT ... CASE WHEN excluded > current`) để không ghi đè lùi trạng thái đã đọc.
+- **Media file cache on-demand**:
+  - tải file khi cần, lưu path local vào DB
+  - kiểm tra stale path và tự clear khi file vật lý đã mất
+  (`MediaCacheService`).
+
+Đánh giá:
+
+- Đây là nhóm kỹ thuật “premium” rõ rệt cho mobile chat:
+  - vừa tối ưu tốc độ hiển thị
+  - vừa giảm network round-trip
+  - vẫn giữ được tính nhất quán dữ liệu quan trọng (read-state, media path).
+
+### Tổng hợp kỹ thuật “premium” đã dùng trong mobile
+
+1. **SQLite FTS5 + trigger-based index maintenance** cho tìm kiếm nội bộ tốc độ cao.
+2. **Hybrid search pipeline** (local FTS + remote fallback) chạy song song.
+3. **Request race protection** bằng version/request ID.
+4. **Local-first rendering + remote reconciliation** cho màn hình chat.
+5. **Cursor-style pagination (`before`, `limit`)** cho message loading.
+6. **Realtime Socket.IO với auto-reconnect và fallback transport**.
+7. **ACK-driven optimistic messaging + bounded retry/backoff**.
+8. **HTTP timeout budgets khác nhau theo loại tải (JSON vs multipart)**.
+9. **Refresh-token coalescing** chống token-rotation race.
+10. **Drift migration + background DB executor + lazy initialization**.
+11. **Bulk sync/write bằng batch upsert**.
+12. **On-demand media local cache + stale-path self-healing**.
+13. **Monotonic local read-state upsert** để bảo toàn trạng thái đã đọc.
+
+> Ghi chú phạm vi: danh sách trên phản ánh **kỹ thuật đã có trong code hiện tại**; chưa bao gồm các kỹ thuật chưa được triển khai (ví dụ: debounce search input, adaptive prefetch theo network class, telemetry/perf tracing theo frame).
