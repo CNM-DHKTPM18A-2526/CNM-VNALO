@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/models/quick_action_item.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
+import 'package:vnalo_mobile/core/utils/date_formatter.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
@@ -15,6 +16,8 @@ import 'package:vnalo_mobile/features/profile/screens/account_security_screen.da
 import 'package:vnalo_mobile/features/chat/screens/create_group_screen.dart';
 import 'package:vnalo_mobile/features/chat/screens/join_group_screen.dart';
 import 'package:vnalo_mobile/features/search/screens/unified_search_screen.dart';
+import 'package:vnalo_mobile/models/conversation_enums.dart';
+import 'package:vnalo_mobile/models/message_model.dart';
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
@@ -184,8 +187,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
           return RefreshIndicator(
             onRefresh: () => chatProvider.loadInbox(),
             color: AppColors.primary,
-            child: Container(
-              color: isDarkMode ? DarkColors.surface : Colors.white,
+            child: ColoredBox(
+              color: isDarkMode ? DarkColors.surface : AppColors.sectionBackground,
               child: ListView.separated(
                 itemCount: chatProvider.conversations.length + 1,
                 separatorBuilder: (context, index) {
@@ -200,11 +203,36 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 itemBuilder: (context, index) {
                   if (index == 0) {
                     // 1. My Documents (First Item)
-                    return ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
-                      ),
+                    final lastCloud = chatProvider.lastCloudMessage;
+                    String cloudSubtitle = common.myDocumentsSubtitle;
+                    String? cloudTime;
+                    
+                    if (lastCloud != null) {
+                      cloudTime = DateFormatter.relative(lastCloud.createdAt);
+                      final prefix = 'Bạn: ';
+                      
+                      if (lastCloud.messageType == MessageType.TEXT) {
+                        cloudSubtitle = '$prefix${lastCloud.content ?? ''}';
+                      } else {
+                        final label = switch (lastCloud.messageType) {
+                          MessageType.IMAGE => '[${common.photoAction}]',
+                          MessageType.VIDEO => '[${common.videoAction}]',
+                          MessageType.FILE => '[${common.documentLabel}] ${lastCloud.content ?? ''}'.trim(),
+                          MessageType.AUDIO => '[${common.audioAction}]',
+                          MessageType.STICKER => '[Sticker]',
+                          _ => common.msgSent
+                        };
+                        cloudSubtitle = '$prefix$label';
+                      }
+                    }
+
+                    return ColoredBox(
+                      color: isDarkMode ? DarkColors.surface : Colors.white,
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
                       leading: Container(
                         width: 52,
                         height: 52,
@@ -230,16 +258,32 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           ],
                         ),
                       ),
-                      title: Text(
-                        common.myDocumentsHeader,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                          color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
-                        ),
+                      title: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              common.myDocumentsHeader,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                                color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          if (cloudTime != null)
+                            Text(
+                              cloudTime,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDarkMode ? DarkColors.textSecondary : Colors.grey,
+                              ),
+                            ),
+                        ],
                       ),
                       subtitle: Text(
-                        common.myDocumentsSubtitle,
+                        cloudSubtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 13,
                           color: isDarkMode ? DarkColors.textSecondary : Colors.grey,
@@ -251,7 +295,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           MaterialPageRoute(builder: (_) => const MyDocumentsScreen()),
                         );
                       },
-                    );
+                    ),
+                  );
                   }
 
                   // 2. Conversations

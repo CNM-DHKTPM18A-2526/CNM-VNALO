@@ -32,7 +32,7 @@ class OtpInput extends StatelessWidget {
         hintText: 'Nhập mã OTP',
         counterText: '',
         filled: true,
-        fillColor: isDarkMode ? DarkColors.surface : LightColors.surfaceLight,
+        fillColor: isDarkMode ? DarkColors.surface : Colors.white,
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: isDarkMode ? DarkColors.divider : LightColors.divider),

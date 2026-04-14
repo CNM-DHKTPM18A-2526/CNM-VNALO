@@ -37,6 +37,9 @@ class SocketService {
   void _emitCallSignal(String type, dynamic data) {
     if (data is! Map) return;
     final payload = Map<String, dynamic>.from(data);
+    debugPrint(
+      '[SocketService][CALL][RECV] type=$type callId=${payload['callId']} conversationId=${payload['conversationId']} sender=${payload['senderUserId'] ?? payload['senderId'] ?? payload['fromUserId']} target=${payload['targetUserId'] ?? payload['toUserId']}',
+    );
     _callSignalController.add({'type': type, ...payload});
   }
 
@@ -213,13 +216,18 @@ class SocketService {
     required String callId,
     required String targetUserId,
     String? senderUserId,
+    required bool audioOnly,
     required Map<String, dynamic> sdp,
   }) {
+    debugPrint(
+      '[SocketService][CALL][SEND] type=offer callId=$callId conversationId=$conversationId sender=$senderUserId target=$targetUserId',
+    );
     _socket?.emit('call.offer', {
       'conversationId': conversationId,
       'callId': callId,
       'targetUserId': targetUserId,
       if (senderUserId != null) 'senderUserId': senderUserId,
+      'audioOnly': audioOnly,
       'sdp': sdp,
     });
   }
@@ -231,6 +239,9 @@ class SocketService {
     String? senderUserId,
     required Map<String, dynamic> sdp,
   }) {
+    debugPrint(
+      '[SocketService][CALL][SEND] type=answer callId=$callId conversationId=$conversationId sender=$senderUserId target=$targetUserId',
+    );
     _socket?.emit('call.answer', {
       'conversationId': conversationId,
       'callId': callId,
@@ -247,6 +258,9 @@ class SocketService {
     String? senderUserId,
     required Map<String, dynamic> candidate,
   }) {
+    debugPrint(
+      '[SocketService][CALL][SEND] type=ice-candidate callId=$callId conversationId=$conversationId sender=$senderUserId target=$targetUserId',
+    );
     _socket?.emit('call.ice-candidate', {
       'conversationId': conversationId,
       'callId': callId,
@@ -263,6 +277,9 @@ class SocketService {
     String? senderUserId,
     String? reason,
   }) {
+    debugPrint(
+      '[SocketService][CALL][SEND] type=end callId=$callId conversationId=$conversationId sender=$senderUserId target=$targetUserId reason=$reason',
+    );
     _socket?.emit('call.end', {
       'conversationId': conversationId,
       'callId': callId,

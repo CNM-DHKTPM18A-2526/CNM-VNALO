@@ -7,9 +7,11 @@ import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
 import 'package:vnalo_mobile/features/call/models/call_log_message.dart';
 import 'package:vnalo_mobile/features/contacts/screens/send_request_screen.dart';
+import 'package:vnalo_mobile/features/call/screens/voice_call_screen.dart';
 import 'package:vnalo_mobile/features/chat/screens/chat_detail_screen.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
+import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/user_model.dart';
 import 'package:vnalo_mobile/services/chat_service.dart';
 import 'package:vnalo_mobile/services/friend_service.dart';
@@ -50,6 +52,12 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
   List<LocalMessageSearchResult> _localMessageResults = [];
   bool _isSearching = false;
   bool _isCancelling = false;
+  
+  // Results expansion states
+  bool _isFriendsExpanded = false;
+  bool _isContactsExpanded = false;
+  bool _isConversationsExpanded = false;
+  bool _isMessagesExpanded = false;
   
   // These filter values will be localized in build/logic
   String _selectedFilterKey = 'all'; // 'all', 'link', 'file'
@@ -220,8 +228,11 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
       ..removeWhere((u) => u.id == phoneUser?.id);
 
     setState(() {
-      _localContactResults = results[0] as List<LocalContact>;
-      _localMessageResults = results[1] as List<LocalMessageSearchResult>;
+      _localMessageResults = (results[1] as List<LocalMessageSearchResult>)
+          .where((m) =>
+              m.message.messageType != 'SYSTEM' &&
+              !m.message.content.contains('CALL_LOG'))
+          .toList();
       _strangerFoundByPhone = phoneUser;
       _friendResults = friendResults;
       _isSearching = false;
@@ -275,7 +286,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
     required TextStyle baseStyle,
     Color? highlightColor,
   }) {
-    final effectiveHighlightColor = highlightColor ?? _primaryColor;
+    final effectiveHighlightColor = highlightColor ?? AppColors.primary;
     if (query.isEmpty) return TextSpan(text: text, style: baseStyle);
 
     final String lowerText = text.toLowerCase();
@@ -445,10 +456,9 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
   Widget build(BuildContext context) {
     final query = _queryController.text.trim();
     final common = CommonTexts.of(context);
-    final scaffoldBg = isDarkMode ? DarkColors.scaffold : LightColors.scaffold;
 
     return Scaffold(
-      backgroundColor: scaffoldBg,
+      backgroundColor: isDarkMode ? DarkColors.scaffold : Colors.grey.shade100,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         elevation: 0,
@@ -474,23 +484,34 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                 child: Container(
                   height: 38,
                   decoration: BoxDecoration(
-                    color: isDarkMode ? Colors.white.withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(8),
+                    color: isDarkMode
+                        ? Colors.white.withValues(alpha: 0.1)
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   child: Row(
                     children: [
-                      const Icon(Icons.search, color: Colors.white, size: 20),
+                      Icon(
+                        Icons.search,
+                        color: isDarkMode ? Colors.white : Colors.black54,
+                        size: 20,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: TextField(
                           controller: _queryController,
                           autofocus: true,
-                          style: const TextStyle(fontSize: 15, color: Colors.white),
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: isDarkMode ? Colors.white : Colors.black87,
+                          ),
                           decoration: InputDecoration(
                             hintText: common.searchHint,
                             hintStyle: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.7),
+                              color: isDarkMode
+                                  ? Colors.white.withValues(alpha: 0.7)
+                                  : Colors.black54,
                             ),
                             filled: true,
                             fillColor: Colors.transparent,
@@ -507,7 +528,11 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                             _queryController.clear();
                             _performHybridSearch('');
                           },
-                          child: const Icon(Icons.close, color: Colors.white, size: 20),
+                          child: Icon(
+                            Icons.close,
+                            color: isDarkMode ? Colors.white : Colors.black54,
+                            size: 20,
+                          ),
                         ),
                     ],
                   ),
@@ -551,19 +576,12 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                     Text(isVi ? 'Của tôi' : 'Mine'),
                     if (_mineCount > 0) ...[
                       const SizedBox(width: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: _primaryColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          '$_mineCount',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: _primaryColor,
-                          ),
+                      Text(
+                        '(${_mineCount > 99 ? '99+' : _mineCount})',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: _primaryColor,
                         ),
                       ),
                     ],
@@ -684,31 +702,56 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
       );
     }
 
+    final displayedIds = <String>{};
+
     return ListView(
       children: [
-        if (_strangerFoundByPhone != null) _buildStrangerSection(),
-        if (_friendResults.isNotEmpty) _buildFriendSection(query),
-        if (conversationMatches.isNotEmpty) _buildConversationSection(query, conversationMatches),
-        if (_localContactResults.isNotEmpty) _buildContactSection(query),
-        if (_localMessageResults.isNotEmpty) _buildMessageSection(query),
+        if (_strangerFoundByPhone != null) ...[
+          _buildStrangerSection(displayedIds),
+          const SizedBox(height: 8),
+        ],
+        if (_friendResults.isNotEmpty) ...[
+          _buildFriendSection(query, displayedIds),
+          const SizedBox(height: 8),
+        ],
+        if (conversationMatches.isNotEmpty) ...[
+          _buildConversationSection(query, conversationMatches, displayedIds),
+          const SizedBox(height: 8),
+        ],
+        if (_localContactResults.isNotEmpty) ...[
+          _buildContactSection(query, displayedIds),
+          const SizedBox(height: 8),
+        ],
+        if (_localMessageResults.isNotEmpty) ...[
+          _buildMessageSection(query, displayedIds),
+          const SizedBox(height: 8),
+        ],
       ],
     );
   }
 
-  Widget _buildFriendSection(String query) {
+  Widget _buildFriendSection(String query, Set<String> displayedIds) {
     final surfaceColor = isDarkMode ? DarkColors.surface : LightColors.surface;
     final dividerColor = isDarkMode ? DarkColors.divider : AppColors.itemDivider;
     final isVi = CommonTexts.of(context).language == AppLanguage.vi;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _sectionHeader(isVi ? 'Bạn bè (${_friendResults.length})' : 'Friends (${_friendResults.length})', showEdit: false),
-        Container(
-          color: surfaceColor,
-          child: Column(
-            children: List.generate(_friendResults.length, (index) {
-              final user = _friendResults[index];
+    final results = _friendResults.where((r) => !displayedIds.contains(r.id)).toList();
+    if (results.isEmpty) return const SizedBox.shrink();
+
+    final threshold = 5;
+    final showAll = _isFriendsExpanded || results.length <= threshold;
+    final displayList = showAll ? results : results.take(threshold).toList();
+
+    return Container(
+      color: surfaceColor,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionHeader(isVi ? 'Bạn bè' : 'Friends', count: results.length.toString(), showEdit: false),
+          Column(
+            children: List.generate(displayList.length, (index) {
+              final user = displayList[index];
+              displayedIds.add(user.id);
               return Column(
                 children: [
                   ListTile(
@@ -734,31 +777,46 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                         fontSize: 13,
                       ),
                     ),
-                    trailing: OutlinedButton(
-                      onPressed: _isCancelling ? null : () => _handleUnfriend(user),
-                      style: OutlinedButton.styleFrom(
-                        backgroundColor: isDarkMode ? DarkColors.surfaceLight : Colors.grey.shade100,
-                        side: BorderSide.none,
-                        foregroundColor: Colors.grey,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      ),
-                      child: Text(
-                        isVi ? 'Bạn bè' : 'Friends',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.call, color: AppColors.primary, size: 20),
+                      onPressed: () => _handleCallAction(user),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      style: IconButton.styleFrom(
+                        backgroundColor: const Color(0xFFE3F2FD),
+                        shape: const CircleBorder(),
+                        fixedSize: const Size(32, 32),
                       ),
                     ),
                     onTap: () => _openChat(user),
                   ),
-                  if (index < _friendResults.length - 1)
+                  if (index < displayList.length - 1)
                     Divider(height: 1, thickness: 0.5, indent: 84, color: dividerColor),
                 ],
               );
             }),
           ),
-        ),
-        const Divider(height: 8, thickness: 8, color: Colors.transparent),
-      ],
+          if (results.length > threshold && !_isFriendsExpanded)
+            GestureDetector(
+              onTap: () => setState(() => _isFriendsExpanded = true),
+              child: Container(
+                width: double.infinity,
+                color: surfaceColor,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      isVi ? 'Xem thêm' : 'See more',
+                      style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13, color: Colors.black87),
+                    ),
+                    const Icon(Icons.expand_more, size: 18, color: Colors.black54),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -779,30 +837,42 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
     return results;
   }
 
-  Widget _buildConversationSection(String query, List<Conversation> conversations) {
+  Widget _buildConversationSection(String query, List<Conversation> conversations, Set<String> displayedIds) {
     final surfaceColor = isDarkMode ? DarkColors.surface : LightColors.surface;
     final dividerColor = isDarkMode ? DarkColors.divider : AppColors.itemDivider;
     final isVi = CommonTexts.of(context).language == AppLanguage.vi;
     final currentUserId = context.read<AuthProvider>().user?.id ?? '';
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _sectionHeader(
-          isVi ? 'Doan chat (${conversations.length})' : 'Conversations (${conversations.length})',
-          showEdit: false,
-        ),
-        Container(
-          color: surfaceColor,
-          child: Column(
-            children: List.generate(conversations.length, (index) {
-              final conv = conversations[index];
+    final results = conversations.where((c) {
+      if (c.type == ConversationType.DIRECT && c.members.isNotEmpty) {
+        final otherId = c.members.firstWhere((m) => m.userId != currentUserId, orElse: () => c.members.first).userId;
+        return !displayedIds.contains(otherId);
+      }
+      return !displayedIds.contains(c.id);
+    }).toList();
+    
+    if (results.isEmpty) return const SizedBox.shrink();
+
+    const threshold = 5;
+    final showAll = _isConversationsExpanded || results.length <= threshold;
+    final displayList = showAll ? results : results.take(threshold).toList();
+
+    return Container(
+      color: surfaceColor,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionHeader(
+            isVi ? 'Cuộc trò chuyện' : 'Conversations',
+            count: results.length.toString(),
+            showEdit: false,
+          ),
+          Column(
+            children: List.generate(displayList.length, (index) {
+              final conv = displayList[index];
+              displayedIds.add(conv.id);
               final displayName = conv.getDisplayName(currentUserId);
               final avatarUrl = conv.getDisplayAvatarUrl(currentUserId);
-              final preview = conv.lastMessage?.content?.trim();
-              final subtitle = (preview == null || preview.isEmpty)
-                  ? (isVi ? 'Mo cuoc tro chuyen' : 'Open conversation')
-                  : preview;
 
               return Column(
                 children: [
@@ -819,48 +889,129 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                         ),
                       ),
                     ),
-                    subtitle: Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary,
-                        fontSize: 13,
+                    trailing: IconButton(
+                      icon: const Icon(Icons.call, color: AppColors.primary, size: 20),
+                      onPressed: () => _handleCallAction(conv),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      style: IconButton.styleFrom(
+                        backgroundColor: const Color(0xFFE3F2FD),
+                        shape: const CircleBorder(),
+                        fixedSize: const Size(32, 32),
                       ),
                     ),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => ChatDetailScreen(conversation: conv),
-                        ),
-                      );
-                    },
+                    onTap: () => _openConversation(conv),
                   ),
-                  if (index < conversations.length - 1)
+                  if (index < displayList.length - 1)
                     Divider(height: 1, thickness: 0.5, indent: 84, color: dividerColor),
                 ],
               );
             }),
           ),
-        ),
-        const Divider(height: 8, thickness: 8, color: Colors.transparent),
-      ],
+          if (results.length > threshold && !_isConversationsExpanded)
+            GestureDetector(
+              onTap: () => setState(() => _isConversationsExpanded = true),
+              child: Container(
+                width: double.infinity,
+                color: surfaceColor,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      isVi ? 'Xem thêm' : 'See more',
+                      style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13, color: Colors.black87),
+                    ),
+                    const Icon(Icons.expand_more, size: 18, color: Colors.black54),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
-  Widget _buildStrangerSection() {
+  void _openConversation(Conversation conversation) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ChatDetailScreen(conversation: conversation),
+      ),
+    );
+  }
+
+  // Handle calling from search results
+  Future<void> _handleCallAction(dynamic target) async {
+    final currentUserId = context.read<AuthProvider>().user?.id ?? '';
+    final chatService = context.read<ChatService>();
+    
+    Conversation? resolvedConv;
+    String? peerUserId;
+    String? peerDisplayName;
+    String? peerAvatarUrl;
+
+    try {
+      if (target is Conversation) {
+        resolvedConv = target;
+        peerUserId = _resolvePeerUserId(currentUserId, target);
+        peerDisplayName = target.getDisplayName(currentUserId);
+        peerAvatarUrl = target.getDisplayAvatarUrl(currentUserId);
+      } else if (target is User) {
+        // Find existing or create new direct conversation
+        resolvedConv = await chatService.getOrCreateDirect(target.id);
+        peerUserId = target.id;
+        peerDisplayName = target.displayName;
+        peerAvatarUrl = target.avatarUrl;
+      }
+
+      if (resolvedConv == null || peerUserId == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Không thể khởi tạo cuộc gọi')),
+          );
+        }
+        return;
+      }
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => VoiceCallScreen(
+              conversationId: resolvedConv!.id,
+              currentUserId: currentUserId,
+              targetUserId: peerUserId!,
+              targetDisplayName: peerDisplayName ?? 'User',
+              targetAvatarUrl: peerAvatarUrl,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi: $e')),
+        );
+      }
+    }
+  }
+
+  Widget _buildStrangerSection(Set<String> displayedIds) {
+    if (_strangerFoundByPhone != null) {
+      displayedIds.add(_strangerFoundByPhone!.id);
+    }
     final user = _strangerFoundByPhone!;
     final surfaceColor = isDarkMode ? DarkColors.surface : LightColors.surface;
     final isVi = CommonTexts.of(context).language == AppLanguage.vi;
     final status = _effectiveFriendshipStatus(user);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _sectionHeader(isVi ? 'Tìm bạn qua số điện thoại (1)' : 'Search by phone (1)', showEdit: false),
-        Container(
-          color: surfaceColor,
-          child: ListTile(
+    return Container(
+      color: surfaceColor,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionHeader(isVi ? 'Tìm bạn qua số điện thoại' : 'Search by phone', count: '1', showEdit: false),
+          ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             leading: AvatarWidget(imageUrl: user.avatarUrl, name: user.displayName, size: 52),
             title: Text(
@@ -887,59 +1038,75 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                 ),
               ),
             ),
-            trailing: _isCancelling
-                ? SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: _primaryColor))
-                : OutlinedButton(
-                    onPressed: () async {
-                      if (status == 'FRIEND') {
-                        _handleUnfriend(user);
-                      } else if (status == 'PENDING_SENT' || status == 'PENDING') {
-                        _handleStrangerCancel(user);
-                      } else {
-                        final result = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => SendRequestScreen(targetUser: user),
-                          ),
-                        );
-                        if (result == true) {
-                          setState(() {
-                            final currentStatus = _strangerFoundByPhone?.friendshipStatus;
-                            _strangerFoundByPhone = _strangerFoundByPhone?.copyWith(
-                              friendshipStatus: currentStatus == 'PENDING_SENT' ? 'NONE' : 'PENDING_SENT',
-                            );
-                          });
-                        }
-                      }
-                    },
-                    style: OutlinedButton.styleFrom(
-                      backgroundColor: (status == 'PENDING_SENT' || status == 'PENDING' || status == 'FRIEND')
-                          ? (isDarkMode ? DarkColors.surfaceLight : Colors.grey.shade100)
-                          : (isDarkMode ? DarkColors.primary.withValues(alpha: 0.1) : const Color(0xFFE3F2FD)),
-                      side: BorderSide.none,
-                      foregroundColor: (status == 'PENDING_SENT' || status == 'PENDING' || status == 'FRIEND')
-                          ? Colors.grey
-                          : _primaryColor,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                    ),
-                    child: Text(
-                      status == 'FRIEND'
-                          ? (isVi ? 'Bạn bè' : 'Friends')
-                          : ((status == 'PENDING_SENT' || status == 'PENDING')
-                              ? (isVi ? 'Đã gửi' : 'Sent')
-                              : (isVi ? 'Kết bạn' : 'Add friend')),
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.call, color: AppColors.primary, size: 20),
+                  onPressed: () => _handleCallAction(user),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  style: IconButton.styleFrom(
+                    backgroundColor: const Color(0xFFE3F2FD),
+                    shape: const CircleBorder(),
+                    fixedSize: const Size(32, 32),
                   ),
+                ),
+                const SizedBox(width: 8),
+                _isCancelling
+                    ? SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: _primaryColor))
+                    : OutlinedButton(
+                        onPressed: () async {
+                          if (status == 'FRIEND') {
+                            _handleUnfriend(user);
+                          } else if (status == 'PENDING_SENT' || status == 'PENDING') {
+                            _handleStrangerCancel(user);
+                          } else {
+                            final result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => SendRequestScreen(targetUser: user),
+                              ),
+                            );
+                            if (result == true) {
+                              setState(() {
+                                final currentStatus = _strangerFoundByPhone?.friendshipStatus;
+                                _strangerFoundByPhone = _strangerFoundByPhone?.copyWith(
+                                  friendshipStatus: currentStatus == 'PENDING_SENT' ? 'NONE' : 'PENDING_SENT',
+                                );
+                              });
+                            }
+                          }
+                        },
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: (status == 'PENDING_SENT' || status == 'PENDING' || status == 'FRIEND')
+                              ? (isDarkMode ? DarkColors.surfaceLight : Colors.grey.shade100)
+                              : (isDarkMode ? DarkColors.primary.withValues(alpha: 0.1) : const Color(0xFFE3F2FD)),
+                          side: BorderSide.none,
+                          foregroundColor: (status == 'PENDING_SENT' || status == 'PENDING' || status == 'FRIEND')
+                              ? Colors.grey
+                              : _primaryColor,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        ),
+                        child: Text(
+                          status == 'FRIEND'
+                              ? (isVi ? 'Bạn bè' : 'Friends')
+                              : ((status == 'PENDING_SENT' || status == 'PENDING')
+                                  ? (isVi ? 'Đã gửi' : 'Sent')
+                                  : (isVi ? 'Kết bạn' : 'Add friend')),
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+              ],
+            ),
           ),
-        ),
-        const Divider(height: 8, thickness: 8, color: Colors.transparent),
-      ],
+        ],
+      ),
     );
   }
 
-  Widget _buildContactSection(String query) {
+  Widget _buildContactSection(String query, Set<String> displayedIds) {
     final surfaceColor = isDarkMode ? DarkColors.surface : LightColors.surface;
     final dividerColor = isDarkMode ? DarkColors.divider : AppColors.itemDivider;
     final isVi = CommonTexts.of(context).language == AppLanguage.vi;
@@ -947,15 +1114,23 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
       for (final f in _recentFriends) f.id: f,
     };
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _sectionHeader(isVi ? 'Liên hệ (${_localContactResults.length})' : 'Contacts (${_localContactResults.length})', showEdit: false),
-        Container(
-          color: surfaceColor,
-          child: Column(
-            children: List.generate(_localContactResults.length, (index) {
-              final contact = _localContactResults[index];
+    final results = _localContactResults.where((r) => !displayedIds.contains(r.id)).toList();
+    if (results.isEmpty) return const SizedBox.shrink();
+
+    const threshold = 5;
+    final showAll = _isContactsExpanded || results.length <= threshold;
+    final displayList = showAll ? results : results.take(threshold).toList();
+
+    return Container(
+      color: surfaceColor,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionHeader(isVi ? 'Liên hệ' : 'Contacts', count: results.length.toString(), showEdit: false),
+          Column(
+            children: List.generate(displayList.length, (index) {
+              final contact = displayList[index];
+              displayedIds.add(contact.id);
               final profile = friendMap[contact.id];
               final displayName = profile?.displayName ?? contact.displayName;
               final avatarUrl = profile?.avatarUrl ?? contact.avatarUrl;
@@ -974,49 +1149,105 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                         ),
                       ),
                     ),
-                    trailing: Icon(
-                      Icons.phone_outlined,
-                      color: _primaryColor,
-                      size: 24,
+                    trailing: IconButton(
+                      icon: const Icon(Icons.call, color: AppColors.primary, size: 20),
+                      onPressed: () => _handleCallAction(contact),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      style: IconButton.styleFrom(
+                        backgroundColor: const Color(0xFFE3F2FD),
+                        shape: const CircleBorder(),
+                        fixedSize: const Size(32, 32),
+                      ),
                     ),
                     onTap: () => _handleLocalContactTap(contact),
                   ),
-                  if (index < _localContactResults.length - 1)
+                  if (index < displayList.length - 1)
                     Divider(height: 1, thickness: 0.5, indent: 84, color: dividerColor),
                 ],
               );
             }),
           ),
-        ),
-        const Divider(height: 8, thickness: 8, color: Colors.transparent),
-      ],
+          if (results.length > threshold && !_isContactsExpanded)
+            GestureDetector(
+              onTap: () => setState(() => _isContactsExpanded = true),
+              child: Container(
+                width: double.infinity,
+                color: surfaceColor,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      isVi ? 'Xem thêm' : 'See more',
+                      style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13, color: Colors.black87),
+                    ),
+                    const Icon(Icons.expand_more, size: 18, color: Colors.black54),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
-  Widget _buildMessageSection(String query) {
+  Widget _buildMessageSection(String query, Set<String> displayedIds) {
     final surfaceColor = isDarkMode ? DarkColors.surface : LightColors.surface;
     final isVi = CommonTexts.of(context).language == AppLanguage.vi;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _sectionHeader(isVi ? 'Tin nhắn (${_localMessageResults.length})' : 'Messages (${_localMessageResults.length})', showEdit: false),
-        _buildFilterChips(),
-        Container(
-          color: surfaceColor,
-          child: Column(
-            children: List.generate(_localMessageResults.length, (index) {
-              final result = _localMessageResults[index];
+    // Grouping: Group all messages by conversationId, and show only the most recent one.
+    final groupedResultMap = <String, LocalMessageSearchResult>{};
+    for (final result in _localMessageResults) {
+      final cid = result.message.conversationId;
+      if (!groupedResultMap.containsKey(cid)) {
+        groupedResultMap[cid] = result;
+      }
+    }
+    final results = groupedResultMap.values.toList();
+
+    const threshold = 5;
+    final showAll = _isMessagesExpanded || results.length <= threshold;
+    final displayList = showAll ? results : results.take(threshold).toList();
+
+    return Container(
+      color: surfaceColor,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionHeader(isVi ? 'Tin nhắn' : 'Messages', count: results.length.toString(), showEdit: false),
+          _buildFilterChips(),
+          Column(
+            children: List.generate(displayList.length, (index) {
+              final result = displayList[index];
               return _buildMessageTile(
                 result,
                 query,
-                index == _localMessageResults.length - 1,
+                index == displayList.length - 1,
               );
             }),
           ),
-        ),
-        const Divider(height: 8, thickness: 8, color: Colors.transparent),
-      ],
+          if (results.length > threshold && !_isMessagesExpanded)
+            GestureDetector(
+              onTap: () => setState(() => _isMessagesExpanded = true),
+              child: Container(
+                width: double.infinity,
+                color: surfaceColor,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      isVi ? 'Xem thêm' : 'See more',
+                      style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13, color: Colors.black87),
+                    ),
+                    const Icon(Icons.expand_more, size: 18, color: Colors.black54),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -1025,10 +1256,29 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
     final common = CommonTexts.of(context);
     final currentUserId = context.read<AuthProvider>().user?.id ?? '';
     final hydrated = _findConversation(result.message.conversationId);
-    final displayName = hydrated?.getDisplayName(currentUserId) ??
-      result.conversationName ??
-      (common.language == AppLanguage.vi ? 'Cuộc hội thoại' : 'Conversation');
-    final avatarUrl = hydrated?.getDisplayAvatarUrl(currentUserId) ?? result.conversationAvatar;
+    
+    String displayName = hydrated?.getDisplayName(currentUserId) ?? result.conversationName ?? '';
+    String? avatarUrl = hydrated?.getDisplayAvatarUrl(currentUserId) ?? result.conversationAvatar;
+
+    final isVi = common.language == AppLanguage.vi;
+    
+    // Fix for Direct Chats with no name in the database
+    if (displayName.isEmpty || displayName == (isVi ? 'Cuộc hội thoại' : 'Conversation')) {
+      if (result.conversationType == 'DIRECT' && hydrated != null) {
+        try {
+          final otherMember = hydrated.members.firstWhere(
+            (m) => m.userId != currentUserId,
+            orElse: () => hydrated.members.first,
+          );
+          displayName = otherMember.nickname ?? otherMember.user?.displayName ?? displayName;
+          avatarUrl ??= otherMember.user?.avatarUrl;
+        } catch (_) {}
+      }
+      
+      if (displayName.isEmpty || displayName == 'Cuộc hội thoại') {
+        displayName = (isVi ? 'Cuộc hội thoại' : 'Conversation');
+      }
+    }
     
     return Column(
       children: [
@@ -1066,6 +1316,18 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
           ),
           onTap: () => _handleLocalMessageTap(result.message),
         ),
+        Padding(
+          padding: const EdgeInsets.only(left: 84, bottom: 8),
+          child: Row(
+            children: [
+              Text(
+                '1 ${isVi ? 'kết quả phù hợp' : 'match found'}',
+                style: const TextStyle(color: AppColors.primary, fontSize: 13),
+              ),
+              const Icon(Icons.chevron_right, color: AppColors.primary, size: 16),
+            ],
+          ),
+        ),
         if (!isLast)
           Divider(height: 1, thickness: 0.5, indent: 84, color: dividerColor),
       ],
@@ -1090,84 +1352,115 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
 
     return SizedBox(
       width: double.infinity,
-      child: ColoredBox(
-        color: isDarkMode ? DarkColors.surface : Colors.white,
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: filters.map((f) {
-          final isSelected = _selectedFilterKey == f['key'];
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ChoiceChip(
-              label: Text(f['label']!),
-              selected: isSelected,
-              onSelected: (val) {
-                if (val) setState(() => _selectedFilterKey = f['key']!);
-              },
-              selectedColor: isDarkMode ? const Color(0xFF003D80) : const Color(0xFFE3F2FD),
-                backgroundColor: isDarkMode
-                  ? DarkColors.surfaceLight.withValues(alpha: 0.72)
-                  : const Color(0xFFF1F5F9),
-              labelStyle: TextStyle(
-                color: isSelected
-                    ? _primaryColor
-                    : (isDarkMode ? DarkColors.textSecondary : Colors.grey),
-                fontSize: 13,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: BorderSide(
-                  color: isSelected
-                      ? _primaryColor
-                      : (isDarkMode ? DarkColors.divider : Colors.grey.shade300),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: filters.map((f) {
+              final isSelected = _selectedFilterKey == f['key'];
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  avatar: Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isSelected ? AppColors.primary : Colors.grey.shade400,
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
+                  label: Text(f['label']!),
+                  selected: isSelected,
+                  onSelected: (val) {
+                    if (val) setState(() => _selectedFilterKey = f['key']!);
+                  },
+                  selectedColor: isDarkMode ? const Color(0xFF003D80) : const Color(0xFFE3F2FD),
+                  backgroundColor: isDarkMode
+                      ? DarkColors.surfaceLight.withValues(alpha: 0.72)
+                      : const Color(0xFFF1F5F9),
+                  labelStyle: TextStyle(
+                    color: isSelected
+                        ? AppColors.primary
+                        : (isDarkMode ? DarkColors.textSecondary : Colors.black87),
+                    fontSize: 14,
+                    fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    side: BorderSide.none,
+                  ),
                 ),
-              ),
-            ),
-          );
-              }).toList(),
-            ),
+              );
+            }).toList(),
           ),
         ),
       ),
     );
   }
 
-  Widget _sectionHeader(String title, {bool showEdit = true}) {
+  Widget _sectionHeader(String title, {bool showEdit = true, String? count}) {
     final isVi = CommonTexts.of(context).language == AppLanguage.vi;
+    
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      width: double.infinity,
+      padding: const EdgeInsets.only(left: 16, top: 16, bottom: 8),
       child: Row(
         children: [
-          Text(
-            title.toUpperCase(),
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: isDarkMode ? DarkColors.textHint : LightColors.textSecondary,
-              letterSpacing: 0.5,
+          RichText(
+            text: TextSpan(
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: isDarkMode ? DarkColors.textSecondary : Colors.grey.shade600,
+                letterSpacing: 0.5,
+              ),
+              children: [
+                TextSpan(text: title.toUpperCase()),
+                if (count != null && count != '0') ...[
+                  const TextSpan(text: ' ('),
+                  TextSpan(text: count),
+                  const TextSpan(text: ')'),
+                ],
+              ],
             ),
           ),
           const Spacer(),
           if (showEdit)
-            GestureDetector(
-              onTap: () {},
+            TextButton(
+              onPressed: () {},
+              style: TextButton.styleFrom(
+                minimumSize: Size.zero,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              ),
               child: Text(
-                isVi ? 'SỬA' : 'EDIT',
-                style: const TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 13,
+                isVi ? 'Chỉnh sửa' : 'Edit',
+                style: TextStyle(
+                  color: _primaryColor,
                   fontWeight: FontWeight.w600,
+                  fontSize: 13,
                 ),
               ),
             ),
         ],
       ),
     );
+  }
+
+  String? _resolvePeerUserId(String currentUserId, Conversation conv) {
+    if (conv.type != ConversationType.DIRECT) return null;
+    try {
+      return conv.members
+          .firstWhere((m) => m.userId != currentUserId,
+              orElse: () => conv.members.first)
+          .userId;
+    } catch (_) {
+      return null;
+    }
   }
 }

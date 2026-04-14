@@ -115,26 +115,26 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const Spacer(),
-                Center(
-                  child: GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const ForgotPasswordScreen(),
-                        ),
-                      );
-                    },
-                    child: Text(
-                      t.forgotPassword,
-                      style: TextStyle(
-                        color: isDarkMode ? DarkColors.primary : AppColors.primary,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
+                // Center(
+                //   child: GestureDetector(
+                //     onTap: () {
+                //       Navigator.push(
+                //         context,
+                //         MaterialPageRoute(
+                //           builder: (_) => const ForgotPasswordScreen(),
+                //         ),
+                //       );
+                //     },
+                //     child: Text(
+                //       t.forgotPassword,
+                //       style: TextStyle(
+                //         color: isDarkMode ? DarkColors.primary : AppColors.primary,
+                //         fontSize: 16,
+                //         fontWeight: FontWeight.w600,
+                //       ),
+                //     ),
+                //   ),
+                // ),
                 const SizedBox(height: 16),
                 Center(
                   child: GestureDetector(

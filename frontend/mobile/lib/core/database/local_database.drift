@@ -11,7 +11,12 @@ CREATE TABLE messages (
     thumb_url TEXT,
     local_path TEXT,
     media_mime_type TEXT,
-    media_size_bytes INTEGER
+    media_size_bytes INTEGER,
+    -- Reply fields
+    reply_to_id TEXT,
+    reply_to_sender_id TEXT,
+    reply_to_sender_name TEXT,
+    reply_to_content TEXT
 ) AS LocalMessage;
 
 CREATE TABLE contacts (

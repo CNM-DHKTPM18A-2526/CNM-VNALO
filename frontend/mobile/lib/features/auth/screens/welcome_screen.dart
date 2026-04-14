@@ -107,7 +107,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         statusBarBrightness: isDarkMode ? Brightness.dark : Brightness.light,
       ),
       child: Scaffold(
-        backgroundColor: isDarkMode ? DarkColors.scaffold : LightColors.scaffold,
+        backgroundColor: isDarkMode ? DarkColors.scaffold : Colors.white,
         body: Column(
           children: [
             SizedBox(height: topInset + 4),
@@ -300,7 +300,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                             },
                             style: ElevatedButton.styleFrom(
                               minimumSize: const Size.fromHeight(56),
-                              backgroundColor: isDarkMode ? DarkColors.surface : LightColors.surfaceLight,
+                              backgroundColor: isDarkMode ? DarkColors.surface : Colors.white,
                               foregroundColor: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
                               elevation: 0,
                               shape: RoundedRectangleBorder(

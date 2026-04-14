@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:drift/drift.dart';
 import 'connection/connection_stub.dart'
     if (dart.library.io) 'connection/native_connection.dart'
@@ -11,7 +12,7 @@ class LocalDatabase extends _$LocalDatabase {
   LocalDatabase() : super(conn.openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -53,8 +54,25 @@ class LocalDatabase extends _$LocalDatabase {
       if (from < 3) {
         await _createReadStateTable();
       }
+      if (from < 4) {
+        // Safe addition: check for existence or catch duplicate name error
+        await _safeAddColumn(m, messages, messages.replyToId);
+        await _safeAddColumn(m, messages, messages.replyToSenderId);
+        await _safeAddColumn(m, messages, messages.replyToSenderName);
+        await _safeAddColumn(m, messages, messages.replyToContent);
+      }
     },
   );
+
+  Future<void> _safeAddColumn(Migrator m, TableInfo table, GeneratedColumn column) async {
+    final result = await customSelect('PRAGMA table_info(${table.actualTableName})').get();
+    final columns = result.map((row) => row.read<String>('name')).toList();
+    if (!columns.contains(column.name)) {
+      await m.addColumn(table, column);
+    } else {
+      debugPrint('Column ${column.name} in ${table.actualTableName} already exists, skipping.');
+    }
+  }
 
   Future<void> _createReadStateTable() async {
     await customStatement(
@@ -115,26 +133,25 @@ class LocalDatabase extends _$LocalDatabase {
   // --- SEARCH QUERIES ---
 
   Future<List<LocalMessageSearchResult>> searchMessages(String query) async {
-    final results =
-        await customSelect(
-          'SELECT m.*, c.name as conv_name, c.avatar_url as conv_avatar FROM messages m '
-          'JOIN conversations c ON m.conversation_id = c.id '
-          'WHERE m.id IN ( '
-          '  SELECT DISTINCT f.external_id FROM messages_fts f WHERE f.content MATCH ? '
-          ') '
-          'ORDER BY m.created_at DESC',
-          variables: [Variable.withString('$query*')],
-        ).get();
+    final results = await customSelect(
+      'SELECT DISTINCT m.*, c.name as conv_name, c.type as conv_type, c.avatar_url as conv_avatar FROM messages m '
+      'JOIN conversations c ON m.conversation_id = c.id '
+      'WHERE m.id IN ( '
+      '  SELECT DISTINCT f.external_id FROM messages_fts f WHERE f.content MATCH ? '
+      ') '
+      'ORDER BY m.created_at DESC',
+      variables: [Variable.withString('$query*')],
+    ).get();
 
     return results
         .map(
           (row) => LocalMessageSearchResult(
             message: LocalMessage(
-              id: row.read<String>('id'),
-              content: row.read<String>('content'),
-              conversationId: row.read<String>('conversation_id'),
-              createdAt: row.read<DateTime>('created_at'),
-              senderId: row.read<String>('sender_id'),
+              id: row.readNullable<String>('id') ?? '',
+              content: row.readNullable<String>('content') ?? '',
+              conversationId: row.readNullable<String>('conversation_id') ?? '',
+              createdAt: row.readNullable<DateTime>('created_at') ?? DateTime.now(),
+              senderId: row.readNullable<String>('sender_id') ?? '',
               messageType: row.readNullable<String>('message_type') ?? 'TEXT',
               mediaUrl: row.readNullable<String>('media_url'),
               thumbUrl: row.readNullable<String>('thumb_url'),
@@ -144,38 +161,39 @@ class LocalDatabase extends _$LocalDatabase {
             ),
             conversationName: row.readNullable<String>('conv_name'),
             conversationAvatar: row.readNullable<String>('conv_avatar'),
+            conversationType: row.readNullable<String>('conv_type'),
           ),
         )
         .toList();
   }
 
   Future<List<LocalContact>> searchContacts(String query) async {
-    final results =
-        await customSelect(
-          'SELECT c.* FROM contacts c '
-          'WHERE c.id IN ( '
-          '  SELECT f.external_id FROM contacts_fts f WHERE f.display_name MATCH ? '
-          '  UNION '
-          '  SELECT c2.id FROM contacts c2 WHERE c2.phone LIKE ? '
-          ') '
-          'ORDER BY c.display_name COLLATE NOCASE',
-          variables: [
-            Variable.withString('$query*'),
-            Variable.withString('%$query%'),
-          ],
-        ).get();
+    final results = await customSelect(
+      'SELECT DISTINCT c.* FROM contacts c '
+      'WHERE c.id IN ( '
+      '  SELECT f.external_id FROM contacts_fts f WHERE f.display_name MATCH ? '
+      '  UNION '
+      '  SELECT c2.id FROM contacts c2 WHERE c2.phone LIKE ? '
+      ') '
+      'ORDER BY c.display_name COLLATE NOCASE',
+      variables: [
+        Variable.withString('$query*'),
+        Variable.withString('%$query%'),
+      ],
+    ).get();
 
     return results
         .map(
           (row) => LocalContact(
-            id: row.read<String>('id'),
-            displayName: row.read<String>('display_name'),
-            phone: row.read<String>('phone'),
-            avatarUrl: row.read<String>('avatar_url'),
+            id: row.readNullable<String>('id') ?? '',
+            displayName: row.readNullable<String>('display_name') ?? '',
+            phone: row.readNullable<String>('phone') ?? '',
+            avatarUrl: row.readNullable<String>('avatar_url'),
           ),
         )
         .toList();
   }
+
 
   Future<LocalConversation?> getLocalConversationById(String id) async {
     final results =
@@ -271,10 +289,12 @@ class LocalMessageSearchResult {
   final LocalMessage message;
   final String? conversationName;
   final String? conversationAvatar;
+  final String? conversationType;
 
   LocalMessageSearchResult({
     required this.message,
     this.conversationName,
     this.conversationAvatar,
+    this.conversationType,
   });
 }

@@ -8,7 +8,9 @@ import 'package:vnalo_mobile/core/utils/date_formatter.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/conversation_member_model.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
+import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:vnalo_mobile/core/utils/avatar_resolver.dart';
 import 'package:open_file/open_file.dart';
 import 'package:vnalo_mobile/features/chat/widgets/full_screen_image_viewer.dart';
 import 'package:vnalo_mobile/features/chat/widgets/audio_player_widget.dart';
@@ -32,10 +34,13 @@ class MessageBubble extends StatelessWidget {
   final bool showStatus;
   final String? milestoneText;
   final List<Message>? groupedMessages;
-  final Function(String)? onReplyTap;
-  final bool showAvatar;
   final String? senderAvatarUrl;
   final String? senderDisplayName;
+  final Function(Message)? onReplyAction;
+  final Function(Message)? onDeleteAction;
+  final Function(Message)? onForwardAction;
+  final Function(String)? onReplyTap;
+  final bool showAvatar;
 
   const MessageBubble({
     super.key,
@@ -48,9 +53,12 @@ class MessageBubble extends StatelessWidget {
     this.milestoneText,
     this.groupedMessages,
     this.onReplyTap,
-    this.showAvatar = false,
     this.senderAvatarUrl,
     this.senderDisplayName,
+    this.onReplyAction,
+    this.onDeleteAction,
+    this.onForwardAction,
+    this.showAvatar = false,
   });
 
   @override
@@ -164,7 +172,7 @@ class MessageBubble extends StatelessWidget {
     }
 
     if (message.messageType == MessageType.STICKER) {
-      return _buildSticker();
+      return _buildSticker(context);
     }
 
     final isMediaOnly = message.messageType == MessageType.IMAGE || message.messageType == MessageType.VIDEO;
@@ -264,16 +272,23 @@ class MessageBubble extends StatelessWidget {
     // Skip action menu for recalled messages.
     if (message.isRecalled) return;
 
+    final isCloud = message.conversationId == 'MY_DOCUMENTS' || message.conversationId == 'my_documents_conversation';
+
     FocusedMessageDialog.show(
       context,
       message: message,
       isMine: isMine,
+      isCloud: isCloud,
       position: position,
       size: size,
       child: _buildBubbleContent(context, isDarkMode),
       onAction: (action) async {
         if (action == 'reply') {
-          chatProvider.setReplyTo(message);
+          if (onReplyAction != null) {
+            onReplyAction!(message);
+          } else {
+            chatProvider.setReplyTo(message);
+          }
         } else if (action == 'copy') {
           if (message.messageType == MessageType.TEXT) {
              Clipboard.setData(ClipboardData(text: message.content ?? ''));
@@ -308,6 +323,27 @@ class MessageBubble extends StatelessWidget {
             }
           }
         } else if (action == 'delete') {
+          if (onDeleteAction != null) {
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: Text(common.deleteMessageTitle),
+                content: Text(common.deleteMessagePrompt),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(common.cancel)),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    style: TextButton.styleFrom(foregroundColor: Colors.red),
+                    child: Text(common.deleteMessageTitle),
+                  ),
+                ],
+              ),
+            );
+            if (confirmed == true) {
+              onDeleteAction!(message);
+            }
+            return;
+          }
           if (context.mounted) {
             final confirmed = await showDialog<bool>(
               context: context,
@@ -335,6 +371,10 @@ class MessageBubble extends StatelessWidget {
             }
           }
         } else if (action == 'forward') {
+          if (onForwardAction != null) {
+            onForwardAction!(message);
+            return;
+          }
           final forwardProvider = context.read<ForwardProvider>();
           forwardProvider.startForwarding([message]);
 
@@ -360,7 +400,7 @@ class MessageBubble extends StatelessWidget {
       case MessageType.AUDIO:
         return _buildAudioPlayer(context);
       case MessageType.STICKER:
-        return _buildSticker();
+        return _buildSticker(context);
       case MessageType.VIDEO:
         return _buildVideoPlayer(context);
       default:
@@ -647,14 +687,20 @@ class MessageBubble extends StatelessWidget {
               url.startsWith('/') ||
               url.contains('Users') ||
               url.contains('storage');
+          
+          final resolvedUrl = isLocal ? url : (AvatarResolver.resolveUrl(url) ?? url);
+          final auth = context.read<AuthProvider>();
+          final token = auth.accessToken;
+
           return GestureDetector(
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder:
                       (_) => FullScreenImageViewer(
-                        imageUrl: url,
+                        imageUrl: resolvedUrl,
                         isLocal: isLocal,
+                        accessToken: token,
                       ),
                 ),
               );
@@ -662,21 +708,14 @@ class MessageBubble extends StatelessWidget {
             child:
                 isLocal
                     ? Image.file(File(url), fit: BoxFit.cover)
-                    : Image.network(
-                      url,
-                      headers: const {
-                        'User-Agent':
-                            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                      },
+                    : CachedNetworkImage(
+                      imageUrl: resolvedUrl,
                       fit: BoxFit.cover,
-                      loadingBuilder:
-                          (context, child, loadingProgress) =>
-                              loadingProgress == null
-                                  ? child
-                                  : Container(color: Colors.grey.shade200),
-                      errorBuilder:
-                          (context, error, stackTrace) =>
-                              const Icon(Icons.broken_image),
+                      httpHeaders: (token != null && AvatarResolver.isInternalUrl(resolvedUrl))
+                          ? {'Authorization': 'Bearer $token'}
+                          : const {},
+                      placeholder: (context, url) => Container(color: Colors.grey.shade200),
+                      errorWidget: (context, url, error) => const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
                     ),
           );
         },
@@ -707,35 +746,41 @@ class MessageBubble extends StatelessWidget {
         ),
         child: isLocal
             ? Image.file(File(url), fit: BoxFit.cover)
-            : Image.network(
-                url,
-                headers: const {
-                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                },
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Container(
-                    height: 200,
-                    color: Colors.grey.shade200,
-                    child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            : Builder(
+                builder: (context) {
+                  final token = context.watch<AuthProvider>().accessToken;
+                  return CachedNetworkImage(
+                    imageUrl: url,
+                    fit: BoxFit.cover,
+                    httpHeaders: (token != null && AvatarResolver.isInternalUrl(url))
+                        ? {'Authorization': 'Bearer $token'}
+                        : const {},
+                    placeholder: (context, url) => Container(
+                      height: 200,
+                      color: Colors.grey.shade200,
+                      child: const Center(
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      height: 200,
+                      color: Colors.grey.shade200,
+                      child: const Center(
+                        child: Icon(Icons.broken_image, size: 40, color: Colors.grey),
+                      ),
+                    ),
                   );
-                },
-                errorBuilder: (context, error, stackTrace) => Container(
-                  height: 200,
-                  color: Colors.grey.shade200,
-                  child: const Center(
-                    child: Icon(Icons.broken_image, size: 40, color: Colors.grey),
-                  ),
-                ),
+                }
               ),
       ),
     );
   }
 
-  Widget _buildSticker() {
+  Widget _buildSticker(BuildContext context) {
     final rawUrl = message.mediaUrl ?? '';
     final url = AvatarResolver.resolveUrl(rawUrl) ?? rawUrl;
+    final token = context.watch<AuthProvider>().accessToken;
+
     return Container(
       width: 120,
       height: 120,
@@ -743,6 +788,9 @@ class MessageBubble extends StatelessWidget {
       child: CachedNetworkImage(
         imageUrl: url,
         fit: BoxFit.contain,
+        httpHeaders: (token != null && AvatarResolver.isInternalUrl(url))
+            ? {'Authorization': 'Bearer $token'}
+            : const {},
         placeholder: (context, url) => const SizedBox.shrink(),
         errorWidget:
             (context, url, error) =>
@@ -817,10 +865,18 @@ class MessageBubble extends StatelessWidget {
             Positioned.fill(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: CachedNetworkImage(
-                  imageUrl: url,
-                  fit: BoxFit.cover,
-                  errorWidget: (_, __, ___) => const Center(child: Icon(Icons.videocam, size: 40, color: Colors.grey)),
+                child: Builder(
+                  builder: (context) {
+                    final token = context.watch<AuthProvider>().accessToken;
+                    return CachedNetworkImage(
+                      imageUrl: url,
+                      fit: BoxFit.cover,
+                      httpHeaders: (token != null && AvatarResolver.isInternalUrl(url))
+                          ? {'Authorization': 'Bearer $token'}
+                          : const {},
+                      errorWidget: (_, __, ___) => const Center(child: Icon(Icons.videocam, size: 40, color: Colors.grey)),
+                    );
+                  }
                 ),
               ),
             ),
@@ -946,24 +1002,32 @@ class MessageBubble extends StatelessWidget {
             (m) => Padding(
               padding: const EdgeInsets.only(left: 2),
               child: ClipOval(
-                child: Image.network(
-                  AvatarResolver.resolveUrl(m.user?.avatarUrl) ??
-                      'https://ui-avatars.com/api/?name=${m.user?.displayName ?? 'U'}',
-                  width: 14,
-                  height: 14,
-                  fit: BoxFit.cover,
-                  errorBuilder:
-                      (_, __, ___) => Container(
-                        width: 14,
-                        height: 14,
-                        color: Colors.grey,
-                        child: const Icon(
-                          Icons.person,
-                          size: 10,
-                          color: Colors.white,
-                        ),
+              child: Builder(
+                builder: (context) {
+                  final token = context.watch<AuthProvider>().accessToken;
+                  final url = AvatarResolver.resolveUrl(m.user?.avatarUrl) ??
+                      'https://ui-avatars.com/api/?name=${m.user?.displayName ?? 'U'}';
+                  return CachedNetworkImage(
+                    imageUrl: url,
+                    width: 14,
+                    height: 14,
+                    fit: BoxFit.cover,
+                    httpHeaders: (token != null && AvatarResolver.isInternalUrl(url))
+                        ? {'Authorization': 'Bearer $token'}
+                        : const {},
+                    errorWidget: (_, __, ___) => Container(
+                      width: 14,
+                      height: 14,
+                      color: Colors.grey,
+                      child: const Icon(
+                        Icons.person,
+                        size: 10,
+                        color: Colors.white,
                       ),
-                ),
+                    ),
+                  );
+                }
+              ),
               ),
             ),
           ),

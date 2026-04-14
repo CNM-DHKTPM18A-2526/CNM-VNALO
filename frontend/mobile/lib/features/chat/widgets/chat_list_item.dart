@@ -187,10 +187,10 @@ class ChatListItem extends StatelessWidget {
     final mediaUrl = (message.mediaUrl ?? '').trim();
     final typePreview = switch (message.messageType) {
       MessageType.TEXT => _textPreview(content),
-      MessageType.IMAGE => '[Hình ảnh]',
-      MessageType.VIDEO => '[Video]',
-      MessageType.FILE => _filePreview(content),
-      MessageType.AUDIO => '[Âm thanh]',
+      MessageType.IMAGE => '[${common.photoAction}]',
+      MessageType.VIDEO => '[${common.videoAction}]',
+      MessageType.FILE => _filePreview(content, common),
+      MessageType.AUDIO => '[${common.audioAction}]',
       MessageType.STICKER => '[Sticker]',
       MessageType.SYSTEM => (() {
         if (content.startsWith('CALL_LOG::')) {
@@ -221,9 +221,9 @@ class ChatListItem extends StatelessWidget {
     return result;
   }
 
-  String _filePreview(String content) {
-    if (content.isEmpty) return '[File]';
-    return '[File] $content';
+  String _filePreview(String content, CommonTexts common) {
+    if (content.isEmpty) return '[${common.documentLabel}]';
+    return '[${common.documentLabel}] $content';
   }
 
   String? _textPreview(String content) {

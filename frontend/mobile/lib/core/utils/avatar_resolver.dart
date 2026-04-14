@@ -10,7 +10,10 @@ class AvatarResolver {
   AvatarResolver._();
 
   static final RegExp _saveUrlPattern = RegExp(
-    r'^(.*/media/)([^/?]+)/save/?(?:\?([^#]*))?$',
+    r'^(.*/media/)(.+)/save/?(?:\?([^#]*))?$',
+  );
+  static final RegExp _publicUrlPattern = RegExp(
+    r'^(.*/media/)public/(.+)(?:\?([^#]*))?$',
   );
 
   /// Checks if [url] points to the internal media service.
@@ -22,8 +25,23 @@ class AvatarResolver {
 
     if (!AppConfig.isInitialized) return false;
     
-    final mediaBase = AppConfig.instance.mediaServiceUrl;
-    return url.startsWith(mediaBase);
+    final mediaBase = AppConfig.instance.mediaServiceUrl.replaceAll(RegExp(r'/+$'), '');
+    final normalizedUrl = url.replaceAll(RegExp(r'/+$'), '');
+
+    if (normalizedUrl.startsWith(mediaBase)) return true;
+
+    // Additional check for internal media service path patterns
+    // This handles cases where the host might change (IP vs domain) but it's clearly our service
+    if (normalizedUrl.contains('/api/v1/media/')) return true;
+
+    // Additional check for IP-based matching
+    final mediaUri = Uri.tryParse(mediaBase);
+    final inputUri = Uri.tryParse(url);
+    if (mediaUri != null && inputUri != null) {
+      if (mediaUri.host == inputUri.host && mediaUri.port == inputUri.port) return true;
+    }
+
+    return false;
   }
 
   /// Resolve [raw] to an absolute URL.
@@ -106,14 +124,16 @@ class AvatarResolver {
   }
 
   static String _normalizeSaveUrl(String input) {
-    final match = _saveUrlPattern.firstMatch(input);
-    if (match == null) return input;
-    final prefix = match.group(1)!;
-    final mediaId = match.group(2)!;
-    final query = match.group(3);
-    if (query == null || query.isEmpty) {
-      return '${prefix}public/$mediaId';
+    // Proactively convert /public/ to /save/ if it's an internal media request.
+    // This allows us to use authenticated endpoints which are more reliable
+    // than anonymous public endpoints on restricted servers.
+    final publicMatch = _publicUrlPattern.firstMatch(input);
+    if (publicMatch != null) {
+      final prefix = publicMatch.group(1)!;
+      final mediaId = publicMatch.group(2)!;
+      final query = publicMatch.group(3) != null ? '?${publicMatch.group(3)}' : '';
+      return '$prefix$mediaId/save$query';
     }
-    return '${prefix}public/$mediaId?$query';
+    return input;
   }
 }

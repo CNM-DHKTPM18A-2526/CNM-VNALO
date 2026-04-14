@@ -1,15 +1,18 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:vnalo_mobile/core/utils/avatar_resolver.dart';
 
 class FullScreenImageViewer extends StatelessWidget {
   final String imageUrl;
   final bool isLocal;
+  final String? accessToken;
 
   const FullScreenImageViewer({
     super.key,
     required this.imageUrl,
     required this.isLocal,
+    this.accessToken,
   });
 
   @override
@@ -34,8 +37,17 @@ class FullScreenImageViewer extends StatelessWidget {
               : CachedNetworkImage(
                   imageUrl: imageUrl,
                   fit: BoxFit.contain,
-                  placeholder: (context, url) => const CircularProgressIndicator(color: Colors.white),
-                  errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.white, size: 50),
+                  httpHeaders: (accessToken != null && AvatarResolver.isInternalUrl(imageUrl))
+                      ? {'Authorization': 'Bearer $accessToken'}
+                      : const {},
+                  placeholder: (context, url) => const Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  ),
+                  errorWidget: (context, url, error) => const Icon(
+                    Icons.error,
+                    color: Colors.white,
+                    size: 50,
+                  ),
                 ),
         ),
       ),

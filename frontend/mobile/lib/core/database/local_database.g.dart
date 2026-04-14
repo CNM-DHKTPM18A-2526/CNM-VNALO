@@ -128,6 +128,51 @@ class Messages extends Table with TableInfo<Messages, LocalMessage> {
     requiredDuringInsert: false,
     $customConstraints: '',
   );
+  static const VerificationMeta _replyToIdMeta = const VerificationMeta(
+    'replyToId',
+  );
+  late final GeneratedColumn<String> replyToId = GeneratedColumn<String>(
+    'reply_to_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: '',
+  );
+  static const VerificationMeta _replyToSenderIdMeta = const VerificationMeta(
+    'replyToSenderId',
+  );
+  late final GeneratedColumn<String> replyToSenderId = GeneratedColumn<String>(
+    'reply_to_sender_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: '',
+  );
+  static const VerificationMeta _replyToSenderNameMeta = const VerificationMeta(
+    'replyToSenderName',
+  );
+  late final GeneratedColumn<String> replyToSenderName =
+      GeneratedColumn<String>(
+        'reply_to_sender_name',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        $customConstraints: '',
+      );
+  static const VerificationMeta _replyToContentMeta = const VerificationMeta(
+    'replyToContent',
+  );
+  late final GeneratedColumn<String> replyToContent = GeneratedColumn<String>(
+    'reply_to_content',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: '',
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -141,6 +186,10 @@ class Messages extends Table with TableInfo<Messages, LocalMessage> {
     localPath,
     mediaMimeType,
     mediaSizeBytes,
+    replyToId,
+    replyToSenderId,
+    replyToSenderName,
+    replyToContent,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -239,6 +288,39 @@ class Messages extends Table with TableInfo<Messages, LocalMessage> {
         ),
       );
     }
+    if (data.containsKey('reply_to_id')) {
+      context.handle(
+        _replyToIdMeta,
+        replyToId.isAcceptableOrUnknown(data['reply_to_id']!, _replyToIdMeta),
+      );
+    }
+    if (data.containsKey('reply_to_sender_id')) {
+      context.handle(
+        _replyToSenderIdMeta,
+        replyToSenderId.isAcceptableOrUnknown(
+          data['reply_to_sender_id']!,
+          _replyToSenderIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('reply_to_sender_name')) {
+      context.handle(
+        _replyToSenderNameMeta,
+        replyToSenderName.isAcceptableOrUnknown(
+          data['reply_to_sender_name']!,
+          _replyToSenderNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('reply_to_content')) {
+      context.handle(
+        _replyToContentMeta,
+        replyToContent.isAcceptableOrUnknown(
+          data['reply_to_content']!,
+          _replyToContentMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -298,6 +380,22 @@ class Messages extends Table with TableInfo<Messages, LocalMessage> {
         DriftSqlType.int,
         data['${effectivePrefix}media_size_bytes'],
       ),
+      replyToId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reply_to_id'],
+      ),
+      replyToSenderId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reply_to_sender_id'],
+      ),
+      replyToSenderName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reply_to_sender_name'],
+      ),
+      replyToContent: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reply_to_content'],
+      ),
     );
   }
 
@@ -324,6 +422,12 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
   final String? localPath;
   final String? mediaMimeType;
   final int? mediaSizeBytes;
+
+  /// Reply fields
+  final String? replyToId;
+  final String? replyToSenderId;
+  final String? replyToSenderName;
+  final String? replyToContent;
   const LocalMessage({
     required this.id,
     required this.conversationId,
@@ -336,6 +440,10 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
     this.localPath,
     this.mediaMimeType,
     this.mediaSizeBytes,
+    this.replyToId,
+    this.replyToSenderId,
+    this.replyToSenderName,
+    this.replyToContent,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -360,6 +468,18 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
     }
     if (!nullToAbsent || mediaSizeBytes != null) {
       map['media_size_bytes'] = Variable<int>(mediaSizeBytes);
+    }
+    if (!nullToAbsent || replyToId != null) {
+      map['reply_to_id'] = Variable<String>(replyToId);
+    }
+    if (!nullToAbsent || replyToSenderId != null) {
+      map['reply_to_sender_id'] = Variable<String>(replyToSenderId);
+    }
+    if (!nullToAbsent || replyToSenderName != null) {
+      map['reply_to_sender_name'] = Variable<String>(replyToSenderName);
+    }
+    if (!nullToAbsent || replyToContent != null) {
+      map['reply_to_content'] = Variable<String>(replyToContent);
     }
     return map;
   }
@@ -392,6 +512,22 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
           mediaSizeBytes == null && nullToAbsent
               ? const Value.absent()
               : Value(mediaSizeBytes),
+      replyToId:
+          replyToId == null && nullToAbsent
+              ? const Value.absent()
+              : Value(replyToId),
+      replyToSenderId:
+          replyToSenderId == null && nullToAbsent
+              ? const Value.absent()
+              : Value(replyToSenderId),
+      replyToSenderName:
+          replyToSenderName == null && nullToAbsent
+              ? const Value.absent()
+              : Value(replyToSenderName),
+      replyToContent:
+          replyToContent == null && nullToAbsent
+              ? const Value.absent()
+              : Value(replyToContent),
     );
   }
 
@@ -412,6 +548,12 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
       localPath: serializer.fromJson<String?>(json['local_path']),
       mediaMimeType: serializer.fromJson<String?>(json['media_mime_type']),
       mediaSizeBytes: serializer.fromJson<int?>(json['media_size_bytes']),
+      replyToId: serializer.fromJson<String?>(json['reply_to_id']),
+      replyToSenderId: serializer.fromJson<String?>(json['reply_to_sender_id']),
+      replyToSenderName: serializer.fromJson<String?>(
+        json['reply_to_sender_name'],
+      ),
+      replyToContent: serializer.fromJson<String?>(json['reply_to_content']),
     );
   }
   @override
@@ -429,6 +571,10 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
       'local_path': serializer.toJson<String?>(localPath),
       'media_mime_type': serializer.toJson<String?>(mediaMimeType),
       'media_size_bytes': serializer.toJson<int?>(mediaSizeBytes),
+      'reply_to_id': serializer.toJson<String?>(replyToId),
+      'reply_to_sender_id': serializer.toJson<String?>(replyToSenderId),
+      'reply_to_sender_name': serializer.toJson<String?>(replyToSenderName),
+      'reply_to_content': serializer.toJson<String?>(replyToContent),
     };
   }
 
@@ -444,6 +590,10 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
     Value<String?> localPath = const Value.absent(),
     Value<String?> mediaMimeType = const Value.absent(),
     Value<int?> mediaSizeBytes = const Value.absent(),
+    Value<String?> replyToId = const Value.absent(),
+    Value<String?> replyToSenderId = const Value.absent(),
+    Value<String?> replyToSenderName = const Value.absent(),
+    Value<String?> replyToContent = const Value.absent(),
   }) => LocalMessage(
     id: id ?? this.id,
     conversationId: conversationId ?? this.conversationId,
@@ -458,6 +608,15 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
         mediaMimeType.present ? mediaMimeType.value : this.mediaMimeType,
     mediaSizeBytes:
         mediaSizeBytes.present ? mediaSizeBytes.value : this.mediaSizeBytes,
+    replyToId: replyToId.present ? replyToId.value : this.replyToId,
+    replyToSenderId:
+        replyToSenderId.present ? replyToSenderId.value : this.replyToSenderId,
+    replyToSenderName:
+        replyToSenderName.present
+            ? replyToSenderName.value
+            : this.replyToSenderName,
+    replyToContent:
+        replyToContent.present ? replyToContent.value : this.replyToContent,
   );
   LocalMessage copyWithCompanion(MessagesCompanion data) {
     return LocalMessage(
@@ -482,6 +641,19 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
           data.mediaSizeBytes.present
               ? data.mediaSizeBytes.value
               : this.mediaSizeBytes,
+      replyToId: data.replyToId.present ? data.replyToId.value : this.replyToId,
+      replyToSenderId:
+          data.replyToSenderId.present
+              ? data.replyToSenderId.value
+              : this.replyToSenderId,
+      replyToSenderName:
+          data.replyToSenderName.present
+              ? data.replyToSenderName.value
+              : this.replyToSenderName,
+      replyToContent:
+          data.replyToContent.present
+              ? data.replyToContent.value
+              : this.replyToContent,
     );
   }
 
@@ -498,7 +670,11 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
           ..write('thumbUrl: $thumbUrl, ')
           ..write('localPath: $localPath, ')
           ..write('mediaMimeType: $mediaMimeType, ')
-          ..write('mediaSizeBytes: $mediaSizeBytes')
+          ..write('mediaSizeBytes: $mediaSizeBytes, ')
+          ..write('replyToId: $replyToId, ')
+          ..write('replyToSenderId: $replyToSenderId, ')
+          ..write('replyToSenderName: $replyToSenderName, ')
+          ..write('replyToContent: $replyToContent')
           ..write(')'))
         .toString();
   }
@@ -516,6 +692,10 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
     localPath,
     mediaMimeType,
     mediaSizeBytes,
+    replyToId,
+    replyToSenderId,
+    replyToSenderName,
+    replyToContent,
   );
   @override
   bool operator ==(Object other) =>
@@ -531,7 +711,11 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
           other.thumbUrl == this.thumbUrl &&
           other.localPath == this.localPath &&
           other.mediaMimeType == this.mediaMimeType &&
-          other.mediaSizeBytes == this.mediaSizeBytes);
+          other.mediaSizeBytes == this.mediaSizeBytes &&
+          other.replyToId == this.replyToId &&
+          other.replyToSenderId == this.replyToSenderId &&
+          other.replyToSenderName == this.replyToSenderName &&
+          other.replyToContent == this.replyToContent);
 }
 
 class MessagesCompanion extends UpdateCompanion<LocalMessage> {
@@ -546,6 +730,10 @@ class MessagesCompanion extends UpdateCompanion<LocalMessage> {
   final Value<String?> localPath;
   final Value<String?> mediaMimeType;
   final Value<int?> mediaSizeBytes;
+  final Value<String?> replyToId;
+  final Value<String?> replyToSenderId;
+  final Value<String?> replyToSenderName;
+  final Value<String?> replyToContent;
   final Value<int> rowid;
   const MessagesCompanion({
     this.id = const Value.absent(),
@@ -559,6 +747,10 @@ class MessagesCompanion extends UpdateCompanion<LocalMessage> {
     this.localPath = const Value.absent(),
     this.mediaMimeType = const Value.absent(),
     this.mediaSizeBytes = const Value.absent(),
+    this.replyToId = const Value.absent(),
+    this.replyToSenderId = const Value.absent(),
+    this.replyToSenderName = const Value.absent(),
+    this.replyToContent = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   MessagesCompanion.insert({
@@ -573,6 +765,10 @@ class MessagesCompanion extends UpdateCompanion<LocalMessage> {
     this.localPath = const Value.absent(),
     this.mediaMimeType = const Value.absent(),
     this.mediaSizeBytes = const Value.absent(),
+    this.replyToId = const Value.absent(),
+    this.replyToSenderId = const Value.absent(),
+    this.replyToSenderName = const Value.absent(),
+    this.replyToContent = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        conversationId = Value(conversationId),
@@ -591,6 +787,10 @@ class MessagesCompanion extends UpdateCompanion<LocalMessage> {
     Expression<String>? localPath,
     Expression<String>? mediaMimeType,
     Expression<int>? mediaSizeBytes,
+    Expression<String>? replyToId,
+    Expression<String>? replyToSenderId,
+    Expression<String>? replyToSenderName,
+    Expression<String>? replyToContent,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -605,6 +805,10 @@ class MessagesCompanion extends UpdateCompanion<LocalMessage> {
       if (localPath != null) 'local_path': localPath,
       if (mediaMimeType != null) 'media_mime_type': mediaMimeType,
       if (mediaSizeBytes != null) 'media_size_bytes': mediaSizeBytes,
+      if (replyToId != null) 'reply_to_id': replyToId,
+      if (replyToSenderId != null) 'reply_to_sender_id': replyToSenderId,
+      if (replyToSenderName != null) 'reply_to_sender_name': replyToSenderName,
+      if (replyToContent != null) 'reply_to_content': replyToContent,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -621,6 +825,10 @@ class MessagesCompanion extends UpdateCompanion<LocalMessage> {
     Value<String?>? localPath,
     Value<String?>? mediaMimeType,
     Value<int?>? mediaSizeBytes,
+    Value<String?>? replyToId,
+    Value<String?>? replyToSenderId,
+    Value<String?>? replyToSenderName,
+    Value<String?>? replyToContent,
     Value<int>? rowid,
   }) {
     return MessagesCompanion(
@@ -635,6 +843,10 @@ class MessagesCompanion extends UpdateCompanion<LocalMessage> {
       localPath: localPath ?? this.localPath,
       mediaMimeType: mediaMimeType ?? this.mediaMimeType,
       mediaSizeBytes: mediaSizeBytes ?? this.mediaSizeBytes,
+      replyToId: replyToId ?? this.replyToId,
+      replyToSenderId: replyToSenderId ?? this.replyToSenderId,
+      replyToSenderName: replyToSenderName ?? this.replyToSenderName,
+      replyToContent: replyToContent ?? this.replyToContent,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -675,6 +887,18 @@ class MessagesCompanion extends UpdateCompanion<LocalMessage> {
     if (mediaSizeBytes.present) {
       map['media_size_bytes'] = Variable<int>(mediaSizeBytes.value);
     }
+    if (replyToId.present) {
+      map['reply_to_id'] = Variable<String>(replyToId.value);
+    }
+    if (replyToSenderId.present) {
+      map['reply_to_sender_id'] = Variable<String>(replyToSenderId.value);
+    }
+    if (replyToSenderName.present) {
+      map['reply_to_sender_name'] = Variable<String>(replyToSenderName.value);
+    }
+    if (replyToContent.present) {
+      map['reply_to_content'] = Variable<String>(replyToContent.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -695,6 +919,10 @@ class MessagesCompanion extends UpdateCompanion<LocalMessage> {
           ..write('localPath: $localPath, ')
           ..write('mediaMimeType: $mediaMimeType, ')
           ..write('mediaSizeBytes: $mediaSizeBytes, ')
+          ..write('replyToId: $replyToId, ')
+          ..write('replyToSenderId: $replyToSenderId, ')
+          ..write('replyToSenderName: $replyToSenderName, ')
+          ..write('replyToContent: $replyToContent, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1469,6 +1697,10 @@ typedef $MessagesCreateCompanionBuilder =
       Value<String?> localPath,
       Value<String?> mediaMimeType,
       Value<int?> mediaSizeBytes,
+      Value<String?> replyToId,
+      Value<String?> replyToSenderId,
+      Value<String?> replyToSenderName,
+      Value<String?> replyToContent,
       Value<int> rowid,
     });
 typedef $MessagesUpdateCompanionBuilder =
@@ -1484,6 +1716,10 @@ typedef $MessagesUpdateCompanionBuilder =
       Value<String?> localPath,
       Value<String?> mediaMimeType,
       Value<int?> mediaSizeBytes,
+      Value<String?> replyToId,
+      Value<String?> replyToSenderId,
+      Value<String?> replyToSenderName,
+      Value<String?> replyToContent,
       Value<int> rowid,
     });
 
@@ -1547,6 +1783,26 @@ class $MessagesFilterComposer extends Composer<_$LocalDatabase, Messages> {
 
   ColumnFilters<int> get mediaSizeBytes => $composableBuilder(
     column: $table.mediaSizeBytes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get replyToId => $composableBuilder(
+    column: $table.replyToId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get replyToSenderId => $composableBuilder(
+    column: $table.replyToSenderId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get replyToSenderName => $composableBuilder(
+    column: $table.replyToSenderName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get replyToContent => $composableBuilder(
+    column: $table.replyToContent,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -1613,6 +1869,26 @@ class $MessagesOrderingComposer extends Composer<_$LocalDatabase, Messages> {
     column: $table.mediaSizeBytes,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get replyToId => $composableBuilder(
+    column: $table.replyToId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get replyToSenderId => $composableBuilder(
+    column: $table.replyToSenderId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get replyToSenderName => $composableBuilder(
+    column: $table.replyToSenderName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get replyToContent => $composableBuilder(
+    column: $table.replyToContent,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $MessagesAnnotationComposer extends Composer<_$LocalDatabase, Messages> {
@@ -1663,6 +1939,24 @@ class $MessagesAnnotationComposer extends Composer<_$LocalDatabase, Messages> {
     column: $table.mediaSizeBytes,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get replyToId =>
+      $composableBuilder(column: $table.replyToId, builder: (column) => column);
+
+  GeneratedColumn<String> get replyToSenderId => $composableBuilder(
+    column: $table.replyToSenderId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get replyToSenderName => $composableBuilder(
+    column: $table.replyToSenderName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get replyToContent => $composableBuilder(
+    column: $table.replyToContent,
+    builder: (column) => column,
+  );
 }
 
 class $MessagesTableManager
@@ -1707,6 +2001,10 @@ class $MessagesTableManager
                 Value<String?> localPath = const Value.absent(),
                 Value<String?> mediaMimeType = const Value.absent(),
                 Value<int?> mediaSizeBytes = const Value.absent(),
+                Value<String?> replyToId = const Value.absent(),
+                Value<String?> replyToSenderId = const Value.absent(),
+                Value<String?> replyToSenderName = const Value.absent(),
+                Value<String?> replyToContent = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MessagesCompanion(
                 id: id,
@@ -1720,6 +2018,10 @@ class $MessagesTableManager
                 localPath: localPath,
                 mediaMimeType: mediaMimeType,
                 mediaSizeBytes: mediaSizeBytes,
+                replyToId: replyToId,
+                replyToSenderId: replyToSenderId,
+                replyToSenderName: replyToSenderName,
+                replyToContent: replyToContent,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -1735,6 +2037,10 @@ class $MessagesTableManager
                 Value<String?> localPath = const Value.absent(),
                 Value<String?> mediaMimeType = const Value.absent(),
                 Value<int?> mediaSizeBytes = const Value.absent(),
+                Value<String?> replyToId = const Value.absent(),
+                Value<String?> replyToSenderId = const Value.absent(),
+                Value<String?> replyToSenderName = const Value.absent(),
+                Value<String?> replyToContent = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MessagesCompanion.insert(
                 id: id,
@@ -1748,6 +2054,10 @@ class $MessagesTableManager
                 localPath: localPath,
                 mediaMimeType: mediaMimeType,
                 mediaSizeBytes: mediaSizeBytes,
+                replyToId: replyToId,
+                replyToSenderId: replyToSenderId,
+                replyToSenderName: replyToSenderName,
+                replyToContent: replyToContent,
                 rowid: rowid,
               ),
           withReferenceMapper:

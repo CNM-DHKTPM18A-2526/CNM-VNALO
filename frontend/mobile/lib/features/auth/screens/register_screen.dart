@@ -964,7 +964,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 hintText: t.displayNameHint,
                 hintStyle: TextStyle(color: isDarkMode ? DarkColors.textHint : const Color(0xFFB0B0B0)),
                 filled: true,
-                fillColor: isDarkMode ? DarkColors.surface : const Color(0xFFF9FAFB),
+                fillColor: isDarkMode ? DarkColors.surface : Colors.white,
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 border: OutlineInputBorder(
@@ -1070,7 +1070,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               padding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               decoration: BoxDecoration(
-                color: isDarkMode ? DarkColors.surface : LightColors.surfaceLight,
+                color: isDarkMode ? DarkColors.surface : Colors.white,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: isDarkMode ? DarkColors.divider : LightColors.divider),
               ),
@@ -1401,7 +1401,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   hintText: t.passwordHint,
                   hintStyle: TextStyle(color: isDarkMode ? Colors.white38 : const Color(0xFFB0B0B0)),
                   filled: true,
-                  fillColor: isDarkMode ? DarkColors.surface : const Color(0xFFF9FAFB),
+                  fillColor: isDarkMode ? DarkColors.surface : Colors.white,
                   suffixIcon: IconButton(
                     icon: Icon(
                       _showPasswordInRegister ? Icons.visibility_outlined : Icons.visibility_off_outlined,
@@ -1453,7 +1453,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   hintText: t.confirmPasswordHint,
                   hintStyle: TextStyle(color: isDarkMode ? Colors.white38 : const Color(0xFFB0B0B0)),
                   filled: true,
-                  fillColor: isDarkMode ? DarkColors.surface : const Color(0xFFF9FAFB),
+                  fillColor: isDarkMode ? DarkColors.surface : Colors.white,
                   suffixIcon: IconButton(
                     icon: Icon(
                       _showConfirmPasswordInRegister ? Icons.visibility_outlined : Icons.visibility_off_outlined,

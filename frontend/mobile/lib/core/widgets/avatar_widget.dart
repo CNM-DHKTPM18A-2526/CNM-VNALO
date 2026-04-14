@@ -29,20 +29,12 @@ class AvatarWidget extends StatefulWidget {
 }
 
 class _AvatarWidgetState extends State<AvatarWidget> {
-  static final RegExp _publicMediaPattern = RegExp(
-    r'^(.*/media/)public/([^/?]+)(\?.*)?$',
-  );
-  static final RegExp _saveMediaPattern = RegExp(
-    r'^(.*/media/)([^/?]+)/save/?(\?.*)?$',
-  );
-
-  List<String> _candidates = const [];
-  int _index = 0;
+  String? _resolvedUrl;
 
   @override
   void initState() {
     super.initState();
-    _refreshCandidates();
+    _resolve();
   }
 
   @override
@@ -50,44 +42,21 @@ class _AvatarWidgetState extends State<AvatarWidget> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.imageUrl != widget.imageUrl ||
         oldWidget.cacheVersion != widget.cacheVersion) {
-      _refreshCandidates();
+      _resolve();
     }
   }
 
-  void _refreshCandidates() {
+  void _resolve() {
     final resolved = AvatarResolver.resolveUrl(widget.imageUrl);
-    final withVersion = _appendCacheVersion(resolved, widget.cacheVersion);
-    if (withVersion == null || withVersion.isEmpty) {
-      _candidates = const [];
-      _index = 0;
-      return;
-    }
-
-    final candidates = <String>[withVersion];
-    final publicMatch = _publicMediaPattern.firstMatch(withVersion);
-    if (publicMatch != null) {
-      final prefix = publicMatch.group(1)!;
-      final mediaId = publicMatch.group(2)!;
-      final query = publicMatch.group(3) ?? '';
-      candidates.add('$prefix$mediaId/save$query');
-    } else {
-      final saveMatch = _saveMediaPattern.firstMatch(withVersion);
-      if (saveMatch != null) {
-        final prefix = saveMatch.group(1)!;
-        final mediaId = saveMatch.group(2)!;
-        final query = saveMatch.group(3) ?? '';
-        candidates.add('${prefix}public/$mediaId$query');
-      }
-    }
-
-    _candidates = candidates.toSet().toList();
-    _index = 0;
+    setState(() {
+      _resolvedUrl = _appendCacheVersion(resolved, widget.cacheVersion);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final activeUrl = _candidates.isEmpty ? null : _candidates[_index];
+    final activeUrl = _resolvedUrl;
     final initials = AvatarUtils.getInitials(widget.name);
     final initialsBg = AvatarUtils.getColor(widget.name);
     final auth = context.watch<AuthProvider>();
@@ -121,14 +90,6 @@ class _AvatarWidgetState extends State<AvatarWidget> {
                     placeholder: (_, __) =>
                         _initialsAvatar(initials, initialsBg),
                     errorWidget: (_, url, error) {
-                      if (_index < _candidates.length - 1) {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (mounted) {
-                            setState(() => _index += 1);
-                          }
-                        });
-                        return _initialsAvatar(initials, initialsBg);
-                      }
                       debugPrint('[AvatarWidget] Error loading $url: $error');
                       return _initialsAvatar(initials, initialsBg);
                     },

@@ -6,6 +6,7 @@ import 'package:vnalo_mobile/models/message_model.dart';
 class MessageActionMenu extends StatelessWidget {
   final Message message;
   final bool isMine;
+  final bool isCloud;
   final Function(String action) onAction;
 
   const MessageActionMenu({
@@ -13,6 +14,7 @@ class MessageActionMenu extends StatelessWidget {
     required this.message,
     required this.isMine,
     required this.onAction,
+    this.isCloud = false,
   });
 
   @override
@@ -29,8 +31,8 @@ class MessageActionMenu extends StatelessWidget {
       actionItems.addAll([
         _buildActionItem(context, 'reply', common.replyAction, Icons.reply_rounded, const Color(0xFF9C27B0)),
         _buildActionItem(context, 'forward', common.forwardAction, Icons.forward_rounded, const Color(0xFF2196F3)),
-        _buildActionItem(context, 'save', common.saveToDocsAction, Icons.folder_open_outlined, const Color(0xFF03A9F4)),
-        _buildActionItem(context, 'recall', common.recallAction, Icons.settings_backup_restore_rounded, Colors.orange),
+        if (!isCloud) _buildActionItem(context, 'save', common.saveToDocsAction, Icons.folder_open_outlined, const Color(0xFF03A9F4)),
+        if (!isCloud) _buildActionItem(context, 'recall', common.recallAction, Icons.settings_backup_restore_rounded, Colors.orange),
         
         _buildActionItem(context, 'copy', common.copyAction, Icons.copy_rounded, const Color(0xFF1E88E5)),
         _buildActionItem(context, 'pin', common.pinActionTag, Icons.push_pin_outlined, const Color(0xFFFF9800)),
@@ -49,7 +51,7 @@ class MessageActionMenu extends StatelessWidget {
       actionItems.addAll([
         _buildActionItem(context, 'reply', common.replyAction, Icons.reply_rounded, const Color(0xFF9C27B0)),
         _buildActionItem(context, 'forward', common.forwardAction, Icons.forward_rounded, const Color(0xFF2196F3)),
-        _buildActionItem(context, 'save', common.saveToDocsAction, Icons.folder_open_outlined, const Color(0xFF03A9F4)),
+        if (!isCloud) _buildActionItem(context, 'save', common.saveToDocsAction, Icons.folder_open_outlined, const Color(0xFF03A9F4)),
         _buildActionItem(context, 'copy', common.copyAction, Icons.copy_rounded, const Color(0xFF1E88E5)),
         
         _buildActionItem(context, 'pin', common.pinActionTag, Icons.push_pin_outlined, const Color(0xFFFF9800)),

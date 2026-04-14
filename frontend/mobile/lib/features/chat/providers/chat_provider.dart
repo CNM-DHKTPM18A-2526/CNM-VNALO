@@ -38,8 +38,10 @@ class ChatProvider extends ChangeNotifier {
   Message? _replyingTo;
   String? _highlightedMessageId;
   Timer? _highlightTimer;
+  Message? _lastCloudMessage;
 
   List<Conversation> get conversations => _conversations;
+  Message? get lastCloudMessage => _lastCloudMessage;
   bool get isLoading => _isLoading;
   String? get activeConversationId => _activeConversationId;
   Message? get replyingTo => _replyingTo;
@@ -94,6 +96,17 @@ class ChatProvider extends ChangeNotifier {
 
     try {
       final raw = await _chatService.getInbox();
+      
+      // Load last cloud message (Harden to prevent inbox blocking)
+      try {
+        final cloudMsgs = await _db.getMessagesByConversation('MY_DOCUMENTS');
+        if (cloudMsgs.isNotEmpty) {
+          _lastCloudMessage = _fromLocal(cloudMsgs.first);
+        }
+      } catch (e) {
+        debugPrint('Cloud preview loading failed: $e');
+      }
+      
       final backendIds = raw.map((c) => c.id).toSet();
       
       // Preserve locally created groups that are not yet in the backend inbox
@@ -118,6 +131,18 @@ class ChatProvider extends ChangeNotifier {
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  void refreshCloudPreview() async {
+    try {
+      final cloudMsgs = await _db.getMessagesByConversation('MY_DOCUMENTS');
+      if (cloudMsgs.isNotEmpty) {
+        _lastCloudMessage = _fromLocal(cloudMsgs.first);
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('refreshCloudPreview failure: $e');
     }
   }
 
@@ -248,6 +273,10 @@ class ChatProvider extends ChangeNotifier {
       mediaUrl: m.mediaUrl,
       mediaMimeType: m.mediaMimeType,
       mediaSizeBytes: m.mediaSizeBytes,
+      replyToId: m.replyToMessageId,
+      replyToSenderId: m.replyToSenderId,
+      replyToSenderName: m.replyToSenderName,
+      replyToContent: m.replyToContent,
     );
   }
 
@@ -262,6 +291,10 @@ class ChatProvider extends ChangeNotifier {
       mediaUrl: lm.mediaUrl,
       mediaMimeType: lm.mediaMimeType,
       mediaSizeBytes: lm.mediaSizeBytes,
+      replyToMessageId: lm.replyToId,
+      replyToSenderId: lm.replyToSenderId,
+      replyToSenderName: lm.replyToSenderName,
+      replyToContent: lm.replyToContent,
       status: MessageStatus.SENT,
     );
   }

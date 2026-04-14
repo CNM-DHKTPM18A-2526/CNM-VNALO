@@ -12,11 +12,17 @@ import 'package:record/record.dart';
 class ChatInputBar extends StatefulWidget {
   final String conversationId;
   final ValueChanged<String> onSend;
+  final Future<void> Function(List<XFile> images)? onSendImages;
+  final Future<void> Function(List<String> videoPaths)? onSendVideos;
+  final Future<void> Function(List<String> filePaths)? onSendFiles;
 
   const ChatInputBar({
     super.key,
     required this.conversationId,
     required this.onSend,
+    this.onSendImages,
+    this.onSendVideos,
+    this.onSendFiles,
   });
 
   @override
@@ -49,6 +55,10 @@ class _ChatInputBarState extends State<ChatInputBar> {
   Future<void> _pickImage() async {
     final List<XFile> images = await _picker.pickMultiImage();
     if (images.isNotEmpty && mounted) {
+      if (widget.onSendImages != null) {
+        await widget.onSendImages!(images);
+        return;
+      }
       final provider = context.read<ChatProvider>();
       for (final image in images) {
         final length = await image.length();
@@ -74,6 +84,11 @@ class _ChatInputBarState extends State<ChatInputBar> {
       allowMultiple: true,
     );
     if (result != null && mounted) {
+      final paths = result.files.map((f) => f.path).whereType<String>().toList();
+      if (widget.onSendVideos != null) {
+        await widget.onSendVideos!(paths);
+        return;
+      }
       final provider = context.read<ChatProvider>();
       for (final file in result.files) {
         if (file.path == null) continue;
@@ -96,6 +111,11 @@ class _ChatInputBarState extends State<ChatInputBar> {
   Future<void> _pickFile() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(allowMultiple: true);
     if (result != null && mounted) {
+      final paths = result.files.map((f) => f.path).whereType<String>().toList();
+      if (widget.onSendFiles != null) {
+        await widget.onSendFiles!(paths);
+        return;
+      }
       final provider = context.read<ChatProvider>();
       for (final file in result.files) {
         if (file.path == null) continue;

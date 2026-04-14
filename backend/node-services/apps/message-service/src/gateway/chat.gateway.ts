@@ -57,6 +57,65 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly conversationService: ConversationService,
   ) { }
 
+  // ─── Call Signaling ───────────────────────────────────────
+
+  @SubscribeMessage('call.offer')
+  async handleCallOffer(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: {
+      conversationId?: string;
+      callId?: string;
+      targetUserId?: string;
+      senderUserId?: string;
+      sdp?: Record<string, unknown>;
+      audioOnly?: boolean;
+    },
+  ) {
+    return this.forwardCallSignal(client, 'offer', data);
+  }
+
+  @SubscribeMessage('call.answer')
+  async handleCallAnswer(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: {
+      conversationId?: string;
+      callId?: string;
+      targetUserId?: string;
+      senderUserId?: string;
+      sdp?: Record<string, unknown>;
+    },
+  ) {
+    return this.forwardCallSignal(client, 'answer', data);
+  }
+
+  @SubscribeMessage('call.ice-candidate')
+  async handleCallIceCandidate(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: {
+      conversationId?: string;
+      callId?: string;
+      targetUserId?: string;
+      senderUserId?: string;
+      candidate?: Record<string, unknown>;
+    },
+  ) {
+    return this.forwardCallSignal(client, 'ice-candidate', data);
+  }
+
+  @SubscribeMessage('call.end')
+  async handleCallEnd(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: {
+      conversationId?: string;
+      callId?: string;
+      targetUserId?: string;
+      senderUserId?: string;
+      reason?: string;
+    },
+  ) {
+    return this.forwardCallSignal(client, 'end', data);
+  }
+
   // ─── Connection Lifecycle ─────────────────────────────────
 
   async handleConnection(client: Socket) {
@@ -163,6 +222,84 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {
     const room = this.getConversationRoom(data.conversationId);
     await client.leave(room);
+  }
+
+  private async forwardCallSignal(
+    client: Socket,
+    type: 'offer' | 'answer' | 'ice-candidate' | 'end',
+    data: {
+      conversationId?: string;
+      callId?: string;
+      targetUserId?: string;
+      senderUserId?: string;
+      sdp?: Record<string, unknown>;
+      candidate?: Record<string, unknown>;
+      reason?: string;
+      audioOnly?: boolean;
+    },
+  ) {
+    const senderUserId = client.data?.user?.userId as string | undefined;
+    const conversationId = data?.conversationId;
+    const callId = data?.callId;
+    const targetUserId = data?.targetUserId;
+
+    if (!senderUserId) {
+      this.logger.warn(`[Gateway.call.${type}] Missing sender identity`);
+      return { event: 'call.error', data: { error: 'Unauthenticated socket' } };
+    }
+
+    if (!conversationId || !callId || !targetUserId) {
+      this.logger.warn(
+        `[Gateway.call.${type}] Invalid payload sender=${senderUserId} conversationId=${conversationId} callId=${callId} target=${targetUserId}`,
+      );
+      return {
+        event: 'call.error',
+        data: { error: 'conversationId, callId and targetUserId are required' },
+      };
+    }
+
+    try {
+      await this.conversationService.assertMember(conversationId, senderUserId);
+      await this.conversationService.assertMember(conversationId, targetUserId);
+    } catch (err) {
+      this.logger.warn(
+        `[Gateway.call.${type}] Membership check failed sender=${senderUserId} target=${targetUserId} conv=${conversationId}: ${err.message}`,
+      );
+      return { event: 'call.error', data: { error: err.message } };
+    }
+
+    const payload: Record<string, unknown> = {
+      type,
+      conversationId,
+      callId,
+      senderUserId,
+      targetUserId,
+    };
+
+    if (data?.sdp != null) {
+      payload.sdp = data.sdp;
+    }
+    if (data?.candidate != null) {
+      payload.candidate = data.candidate;
+    }
+    if (data?.reason != null && data.reason.trim().length > 0) {
+      payload.reason = data.reason.trim();
+    }
+    if (type == 'offer' && data?.audioOnly != null) {
+      payload.audioOnly = data.audioOnly;
+    }
+
+    this.logger.log(
+      `[Gateway.call.${type}] sender=${senderUserId} target=${targetUserId} conv=${conversationId} callId=${callId}`,
+    );
+
+    this.emitToUser(targetUserId, `call.${type}`, payload);
+    this.emitToUser(targetUserId, 'call.signal', payload);
+
+    return {
+      event: `call.${type}.sent`,
+      data: { conversationId, callId, targetUserId },
+    };
   }
 
   /**
