@@ -135,7 +135,7 @@ class LocalDatabase extends _$LocalDatabase {
   Future<List<LocalMessageSearchResult>> searchMessages(String query) async {
     final results =
         await customSelect(
-          'SELECT m.*, c.name as conv_name, c.avatar_url as conv_avatar FROM messages m '
+          'SELECT DISTINCT m.*, c.name as conv_name, c.avatar_url as conv_avatar FROM messages m '
           'JOIN conversations c ON m.conversation_id = c.id '
           'WHERE m.id IN ( '
           '  SELECT DISTINCT f.external_id FROM messages_fts f WHERE f.content MATCH ? '

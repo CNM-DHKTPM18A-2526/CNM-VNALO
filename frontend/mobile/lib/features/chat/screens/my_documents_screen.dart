@@ -294,26 +294,26 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
                         child: _buildMessageList(isDarkMode),
                       ),
           ),
+          ChatInputBar(
+            conversationId: _convId,
+            onSend: (text) => _sendMessage(text),
+            onSendImages: (images) async {
+              for (var img in images) {
+                await _saveMedia(img.path, MessageType.IMAGE);
+              }
+            },
+            onSendVideos: (paths) async {
+              for (var p in paths) {
+                await _saveMedia(p, MessageType.VIDEO);
+              }
+            },
+            onSendFiles: (paths) async {
+              for (var p in paths) {
+                await _saveMedia(p, MessageType.FILE);
+              }
+            },
+          ),
         ],
-      ),
-      bottomNavigationBar: ChatInputBar(
-        conversationId: _convId,
-        onSend: (text) => _sendMessage(text),
-        onSendImages: (images) async {
-          for (var img in images) {
-            await _saveMedia(img.path, MessageType.IMAGE);
-          }
-        },
-        onSendVideos: (paths) async {
-          for (var p in paths) {
-            await _saveMedia(p, MessageType.VIDEO);
-          }
-        },
-        onSendFiles: (paths) async {
-          for (var p in paths) {
-            await _saveMedia(p, MessageType.FILE);
-          }
-        },
       ),
     );
   }

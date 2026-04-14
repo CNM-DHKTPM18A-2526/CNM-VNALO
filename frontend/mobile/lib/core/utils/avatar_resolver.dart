@@ -12,6 +12,9 @@ class AvatarResolver {
   static final RegExp _saveUrlPattern = RegExp(
     r'^(.*/media/)([^/?]+)/save/?(?:\?([^#]*))?$',
   );
+  static final RegExp _publicUrlPattern = RegExp(
+    r'^(.*/media/)public/([^/?]+)(?:\?([^#]*))?$',
+  );
 
   /// Checks if [url] points to the internal media service.
   static bool isInternalUrl(String? url) {
@@ -121,9 +124,16 @@ class AvatarResolver {
   }
 
   static String _normalizeSaveUrl(String input) {
-    // If we're already sending auth headers (implemented in widgets),
-    // we should NOT force a change to '/public' because the file
-    // might be private and require the current token.
+    // Proactively convert /public/ to /save/ if it's an internal media request.
+    // This allows us to use authenticated endpoints which are more reliable
+    // than anonymous public endpoints on restricted servers.
+    final publicMatch = _publicUrlPattern.firstMatch(input);
+    if (publicMatch != null) {
+      final prefix = publicMatch.group(1)!;
+      final mediaId = publicMatch.group(2)!;
+      final query = publicMatch.group(3) != null ? '?${publicMatch.group(3)}' : '';
+      return '$prefix$mediaId/save$query';
+    }
     return input;
   }
 }

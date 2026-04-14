@@ -747,7 +747,7 @@ class MessageBubble extends StatelessWidget {
             ? Image.file(File(url), fit: BoxFit.cover)
             : Builder(
                 builder: (context) {
-                  final token = context.read<AuthProvider>().accessToken;
+                  final token = context.watch<AuthProvider>().accessToken;
                   return CachedNetworkImage(
                     imageUrl: url,
                     fit: BoxFit.cover,
@@ -778,7 +778,7 @@ class MessageBubble extends StatelessWidget {
   Widget _buildSticker(BuildContext context) {
     final rawUrl = message.mediaUrl ?? '';
     final url = AvatarResolver.resolveUrl(rawUrl) ?? rawUrl;
-    final token = context.read<AuthProvider>().accessToken;
+    final token = context.watch<AuthProvider>().accessToken;
 
     return Container(
       width: 120,
@@ -866,7 +866,7 @@ class MessageBubble extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
                 child: Builder(
                   builder: (context) {
-                    final token = context.read<AuthProvider>().accessToken;
+                    final token = context.watch<AuthProvider>().accessToken;
                     return CachedNetworkImage(
                       imageUrl: url,
                       fit: BoxFit.cover,
@@ -1003,7 +1003,7 @@ class MessageBubble extends StatelessWidget {
               child: ClipOval(
               child: Builder(
                 builder: (context) {
-                  final token = context.read<AuthProvider>().accessToken;
+                  final token = context.watch<AuthProvider>().accessToken;
                   final url = AvatarResolver.resolveUrl(m.user?.avatarUrl) ??
                       'https://ui-avatars.com/api/?name=${m.user?.displayName ?? 'U'}';
                   return CachedNetworkImage(

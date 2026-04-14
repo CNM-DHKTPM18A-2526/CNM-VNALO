@@ -219,7 +219,7 @@ class _StickerPickerState extends State<StickerPicker> {
     if (url.isEmpty) return Icon(Icons.style, size: 24, color: isDarkMode ? DarkColors.textHint : Colors.black38);
     final resolvedUrl = AvatarResolver.resolveUrl(url) ?? url;
     debugPrint('[StickerPicker] raw=$url => resolved=$resolvedUrl');
-    final token = context.read<AuthProvider>().accessToken;
+    final token = context.watch<AuthProvider>().accessToken;
 
     return CachedNetworkImage(
       imageUrl: resolvedUrl,
@@ -421,7 +421,7 @@ class _StickerPickerState extends State<StickerPicker> {
                       borderRadius: BorderRadius.circular(8),
                       child: Builder(
                         builder: (context) {
-                          final token = context.read<AuthProvider>().accessToken;
+                          final token = context.watch<AuthProvider>().accessToken;
                           final url = pack['coverUrl'] ?? pack['thumbnailUrl'] ?? '';
                           return CachedNetworkImage(
                             imageUrl: url,
@@ -533,7 +533,7 @@ class _GifTabContentState extends State<_GifTabContent> {
                   borderRadius: BorderRadius.circular(8),
                   child: Builder(
                     builder: (context) {
-                      final token = context.read<AuthProvider>().accessToken;
+                      final token = context.watch<AuthProvider>().accessToken;
                       return CachedNetworkImage(
                         imageUrl: resolvedUrl, 
                         fit: BoxFit.cover, 
