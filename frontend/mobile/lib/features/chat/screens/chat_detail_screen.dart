@@ -225,7 +225,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             backgroundColor:
                 isDarkMode ? DarkColors.appBarBg : Colors.transparent,
             elevation: 0,
-            forceMaterialTransparency: true,
+            forceMaterialTransparency: !isDarkMode,
             foregroundColor: Colors.white,
             iconTheme: const IconThemeData(color: Colors.white),
             flexibleSpace:

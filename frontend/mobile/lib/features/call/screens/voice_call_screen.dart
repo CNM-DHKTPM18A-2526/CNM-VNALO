@@ -92,7 +92,10 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
       _ringtoneService.stop();
       _durationTimer?.cancel();
       _sendCallLogIfNeeded();
-      Future.delayed(const Duration(milliseconds: 1000), () {
+      
+      // Snappier return for timeout, standard for others
+      final bool isTimeout = _callService!.lastEndReason == 'no-answer-timeout';
+      Future.delayed(Duration(milliseconds: isTimeout ? 500 : 1000), () {
         if (mounted) Navigator.of(context).pop();
       });
     }

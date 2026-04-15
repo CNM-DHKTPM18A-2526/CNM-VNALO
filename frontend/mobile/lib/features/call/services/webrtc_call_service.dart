@@ -297,8 +297,7 @@ class WebRtcCallService extends ChangeNotifier {
 
     _ringTimeoutTimer = Timer(Duration(seconds: ringTimeoutSeconds), () async {
       if (_isEnded || _isConnected) return;
-      _errorMessage =
-          'Người nhận chưa bắt máy sau $ringTimeoutSeconds giây. Cuộc gọi đã tự động kết thúc.';
+
       debugPrint(
         '$_logPrefix ring timeout reached after $ringTimeoutSeconds seconds',
       );
