@@ -6,6 +6,8 @@ import 'package:vnalo_mobile/features/call/screens/video_call_screen.dart';
 import 'package:vnalo_mobile/features/call/screens/voice_call_screen.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
+import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
+import 'package:flutter_callkit_incoming/entities/entities.dart';
 
 class IncomingCallCoordinator extends StatefulWidget {
   const IncomingCallCoordinator({super.key});
@@ -17,8 +19,15 @@ class IncomingCallCoordinator extends StatefulWidget {
 class _IncomingCallCoordinatorState extends State<IncomingCallCoordinator> {
   SocketService? _socketService;
   StreamSubscription? _callSignalSub;
+  StreamSubscription? _callKitEventSub;
   final Set<String> _handledOffers = {};
   bool _isPresentingCall = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _callKitEventSub = FlutterCallkitIncoming.onEvent.listen(_onCallKitEvent);
+  }
 
   @override
   void didChangeDependencies() {
@@ -37,8 +46,42 @@ class _IncomingCallCoordinatorState extends State<IncomingCallCoordinator> {
   @override
   void dispose() {
     _callSignalSub?.cancel();
+    _callKitEventSub?.cancel();
     super.dispose();
   }
+
+  void _onCallKitEvent(CallEvent? event) {
+    if (event == null) return;
+    if (event.event == Event.actionCallAccept) {
+      final data = event.body['extra'] as Map<dynamic, dynamic>?;
+      if (data == null) return;
+      
+      _handleAcceptedFromCallKit(data.cast<String, dynamic>());
+    }
+  }
+
+  Future<void> _handleAcceptedFromCallKit(Map<String, dynamic> data) async {
+    final callId = data['callId']?.toString();
+    final conversationId = data['conversationId']?.toString();
+    final senderUserId = data['senderId']?.toString();
+    final initialSdp = data['initialSdp'];
+    
+    if (callId == null || conversationId == null || senderUserId == null) return;
+
+    debugPrint('[IncomingCallCoordinator] Handling CallKit acceptance for callID=$callId');
+
+    // Reuse the same logic as foreground signal
+    final signal = {
+      'type': 'offer',
+      'callId': callId,
+      'conversationId': conversationId,
+      'senderUserId': senderUserId,
+      'sdp': initialSdp,
+    };
+    
+    await _handleSignalEvent(signal);
+  }
+
 
   Future<void> _handleSignalEvent(Map<String, dynamic> signal) async {
     if (!mounted) return;

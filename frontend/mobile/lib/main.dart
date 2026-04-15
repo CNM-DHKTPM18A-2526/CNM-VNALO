@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'dart:async';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -27,8 +30,24 @@ import 'package:vnalo_mobile/features/profile/providers/avatar_cache_provider.da
 import 'package:vnalo_mobile/features/call/widgets/incoming_call_coordinator.dart';
 import 'package:vnalo_mobile/services/notification_service.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load environment variables
+  await dotenv.load(fileName: ".env");
+
+  // Initialize Firebase
+  await Firebase.initializeApp(
+    options: FirebaseOptions(
+      apiKey: dotenv.env['FIREBASE_API_KEY'] ?? '',
+      appId: dotenv.env['FIREBASE_APP_ID'] ?? '',
+      messagingSenderId: dotenv.env['FIREBASE_MESSAGING_SENDER_ID'] ?? '',
+      projectId: dotenv.env['FIREBASE_PROJECT_ID'] ?? '',
+    ),
+  );
+  
+  // Set the background messaging handler early on, as a named top-level function
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   // Initialize the AppConfig with the environment specified in the build configuration.
   // Usage: flutter run --dart-define=ENV=dev
@@ -78,6 +97,17 @@ void main() {
 
   runApp(const VnaloApp());
 }
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // We need to initialize Firebase here too if it was not already initialized in the background process
+  await Firebase.initializeApp();
+  debugPrint('Handling a background message: ${message.messageId}');
+  
+  // Hand off to NotificationService's static background handler logic
+  await NotificationService.handleBackgroundCallSignal(message);
+}
+
 
 class VnaloApp extends StatelessWidget {
   const VnaloApp({super.key});

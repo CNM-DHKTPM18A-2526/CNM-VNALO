@@ -10,6 +10,9 @@ import 'package:vnalo_mobile/features/call/screens/video_call_screen.dart';
 import 'package:vnalo_mobile/features/call/utils/call_id_generator.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
+import 'package:proximity_sensor/proximity_sensor.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:flutter/foundation.dart' as foundation;
 
 class VoiceCallScreen extends StatefulWidget {
   final String conversationId;
@@ -41,8 +44,10 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
   Timer? _durationTimer;
   int _callDurationSeconds = 0;
   bool _logSent = false;
-
   bool _isPopping = false;
+
+  bool _isNear = false;
+  StreamSubscription? _proximitySub;
 
   @override
   void initState() {
@@ -77,7 +82,21 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
     } else {
       await _ringtoneService.startRinging();
     }
+
+    // Enable WakeLock and Proximity Sensor
+    unawaited(WakelockPlus.enable());
+    _listenToProximity();
   }
+
+  void _listenToProximity() {
+    if (foundation.kIsWeb) return;
+    _proximitySub = ProximitySensor.events.listen((int event) {
+      setState(() {
+        _isNear = (event > 0);
+      });
+    });
+  }
+
 
   void _onServiceUpdate() {
     if (!mounted || _callService == null) return;
@@ -191,6 +210,8 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
   @override
   void dispose() {
     _durationTimer?.cancel();
+    _proximitySub?.cancel();
+    unawaited(WakelockPlus.disable());
     _callService?.removeListener(_onServiceUpdate);
     _callService?.dispose();
     _ringtoneService.dispose();
@@ -209,12 +230,16 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
     final bool isLight = Theme.of(context).brightness == Brightness.light;
 
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          color: isLight ? const Color(0xFF0068FF) : const Color(0xFF0F172A),
-        ),
-        child: Column(
-          children: [
+      body: Stack(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: isLight ? const Color(0xFF0068FF) : const Color(0xFF0F172A),
+            ),
+            child: Column(
+              children: [
+                // ... entire original column content ...
+
             // 1. TOP BAR (Standard Zalo Layout)
             SafeArea(
               child: Padding(
@@ -326,9 +351,18 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
 
             // 4. BOTTOM CONTROLS (Standard Zalo Row: Loa, Kết thúc, Mic)
             _buildControlButtons(_callService!),
-            const SizedBox(height: 48),
-          ],
-        ),
+            ],
+            ),
+          ),
+          
+          // Proximity Blackout Overlay
+          if (_isNear)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black,
+              ),
+            ),
+        ],
       ),
     );
   }

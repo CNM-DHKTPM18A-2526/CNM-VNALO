@@ -10,6 +10,7 @@ import 'package:vnalo_mobile/features/call/services/ringtone_service.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 class VideoCallScreen extends StatefulWidget {
   final String conversationId;
@@ -92,6 +93,9 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       } else {
         await _ringtoneService.startRinging();
       }
+
+      // Enable WakeLock
+      unawaited(WakelockPlus.enable());
     }
   }
 
@@ -214,6 +218,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     _ringtoneService.dispose();
     _localRenderer.dispose();
     _remoteRenderer.dispose();
+    unawaited(WakelockPlus.disable());
     super.dispose();
   }
 
