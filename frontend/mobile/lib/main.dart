@@ -113,13 +113,17 @@ class VnaloApp extends StatelessWidget {
                 db: context.read<LocalDatabase>(),
                 chatService: context.read<ChatService>(),
                 friendService: context.read<FriendService>(),
+                storageService: context.read<StorageService>(),
               ), // Moved sync logic to AuthProvider
         ),
         Provider<MediaService>(
           create: (context) => MediaService(context.read<ApiService>()),
         ),
         Provider<MediaCacheService>(
-          create: (context) => MediaCacheService(context.read<LocalDatabase>()),
+          create: (context) => MediaCacheService(
+            context.read<LocalDatabase>(),
+            context.read<StorageService>(),
+          ),
         ),
         Provider<NotificationService>(create: (_) => NotificationService()),
         ChangeNotifierProvider<ThemeProvider>(
@@ -140,7 +144,7 @@ class VnaloApp extends StatelessWidget {
                 context.read<LocalSyncService>(),
               ),
         ),
-        ChangeNotifierProvider<ChatProvider>(
+        ChangeNotifierProxyProvider<AuthProvider, ChatProvider>(
           create:
               (context) => ChatProvider(
                 chatService: context.read<ChatService>(),
@@ -149,6 +153,22 @@ class VnaloApp extends StatelessWidget {
                 db: context.read<LocalDatabase>(),
                 notificationService: context.read<NotificationService>(),
               ),
+          update: (context, auth, chat) {
+            if (chat == null) return chat!;
+            
+            // Sync current user ID
+            final newId = auth.user?.id;
+            final oldId = chat.currentUserId;
+            
+            if (newId != oldId) {
+              chat.setCurrentUserId(newId ?? '');
+              // If we just logged out (oldId was set, newId is null), clear memory
+              if (newId == null && oldId != null) {
+                chat.reset();
+              }
+            }
+            return chat;
+          },
         ),
         ChangeNotifierProvider<PostProvider>(
           create: (_) => PostProvider(),

@@ -3,11 +3,13 @@ import 'package:drift/drift.dart';
 import 'package:vnalo_mobile/core/database/local_database.dart';
 import 'package:vnalo_mobile/services/chat_service.dart';
 import 'package:vnalo_mobile/services/friend_service.dart';
+import 'package:vnalo_mobile/services/storage_service.dart';
 
 class LocalSyncService {
   final LocalDatabase db;
   final ChatService chatService;
   final FriendService friendService;
+  final StorageService storageService;
 
   bool _isSyncing = false;
 
@@ -15,6 +17,7 @@ class LocalSyncService {
     required this.db,
     required this.chatService,
     required this.friendService,
+    required this.storageService,
   });
 
   /// Sync data for the last 60 days
@@ -24,9 +27,15 @@ class LocalSyncService {
       return;
     }
 
+    final userId = await storageService.getUserId();
+    if (userId == null) {
+      debugPrint('[Sync] No userId found, skipping sync.');
+      return;
+    }
+
     _isSyncing = true;
     try {
-      debugPrint('[Sync] Starting... (60-day sync)');
+      debugPrint('[Sync] Starting... (60-day sync) for user: $userId');
       
       // 1. Sync contacts into local cache.
       final friends = await friendService.getFriends();
@@ -35,6 +44,7 @@ class LocalSyncService {
           db.contacts,
           friends.map((f) => ContactsCompanion.insert(
             id: f.id,
+            ownerId: userId,
             displayName: f.displayName,
             phone: Value(f.phone),
             avatarUrl: Value(f.avatarUrl),
@@ -50,6 +60,7 @@ class LocalSyncService {
           await db.into(db.conversations).insert(
             ConversationsCompanion.insert(
               id: conv.id,
+              ownerId: userId,
               name: Value(conv.title ?? 'Cuộc hội thoại'),
               type: conv.type.name,
               avatarUrl: Value(conv.avatarUrl),
@@ -66,6 +77,7 @@ class LocalSyncService {
               db.messages,
               messages.map((m) => MessagesCompanion.insert(
                 id: m.id,
+                ownerId: userId,
                 conversationId: conv.id,
                 senderId: m.senderId,
                 content: m.content ?? '',
