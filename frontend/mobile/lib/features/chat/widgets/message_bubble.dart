@@ -603,9 +603,9 @@ class MessageBubble extends StatelessWidget {
               callerUserId: currentUserId,
               audioOnly: false,
             ),
-            peerUserId: targetUserId,
-            peerName: targetDisplayName,
-            peerAvatar: targetAvatar,
+            targetUserId: targetUserId,
+            targetDisplayName: targetDisplayName,
+            targetAvatarUrl: targetAvatar,
             isCaller: true,
           );
         }
@@ -617,9 +617,9 @@ class MessageBubble extends StatelessWidget {
             callerUserId: currentUserId,
             audioOnly: true,
           ),
-          peerUserId: targetUserId,
-          peerName: targetDisplayName,
-          peerAvatar: targetAvatar,
+          targetUserId: targetUserId,
+          targetDisplayName: targetDisplayName,
+          targetAvatarUrl: targetAvatar,
           isCaller: true,
         );
       },
