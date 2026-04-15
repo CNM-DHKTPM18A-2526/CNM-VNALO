@@ -1,6 +1,7 @@
 -- Tables for main data
 CREATE TABLE messages (
     id TEXT NOT NULL PRIMARY KEY,
+    owner_id TEXT NOT NULL,
     conversation_id TEXT NOT NULL,
     sender_id TEXT NOT NULL,
     content TEXT NOT NULL,
@@ -19,8 +20,11 @@ CREATE TABLE messages (
     reply_to_content TEXT
 ) AS LocalMessage;
 
+CREATE INDEX idx_messages_owner ON messages(owner_id);
+
 CREATE TABLE contacts (
     id TEXT NOT NULL PRIMARY KEY,
+    owner_id TEXT NOT NULL,
     display_name TEXT NOT NULL,
     phone TEXT,
     avatar_url TEXT
@@ -28,6 +32,7 @@ CREATE TABLE contacts (
 
 CREATE TABLE conversations (
     id TEXT NOT NULL PRIMARY KEY,
+    owner_id TEXT NOT NULL,
     name TEXT,
     type TEXT NOT NULL,
     avatar_url TEXT,

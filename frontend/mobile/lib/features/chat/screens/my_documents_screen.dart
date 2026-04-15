@@ -84,18 +84,20 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
       final prefs = await SharedPreferences.getInstance();
       if (!mounted) return;
 
+      final auth = context.read<AuthProvider>();
+      final myId = auth.user?.id ?? 'ME';
+
       // 1. One-time Migration from SharedPreferences to SQLite
       final raw = prefs.getString(_storageKey);
       if (raw != null) {
         try {
           final List<dynamic> decoded = jsonDecode(raw);
-          final auth = context.read<AuthProvider>();
-          final myId = auth.user?.id ?? 'ME';
 
           final List<LocalMessage> toMigrate = [];
           for (final item in decoded) {
             toMigrate.add(LocalMessage(
               id: item['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+              ownerId: myId,
               conversationId: _convId,
               senderId: myId,
               messageType: 'TEXT',
@@ -113,7 +115,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
       }
 
       // 2. Fetch from SQLite
-      final msgs = await db.getMessagesByConversation(_convId);
+      final msgs = await db.getMessagesByConversation(_convId, myId);
       if (!mounted) return;
       setState(() {
         _messages.clear();
@@ -143,6 +145,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
 
     final msg = LocalMessage(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
+      ownerId: myId,
       conversationId: _convId,
       senderId: myId,
       messageType: 'TEXT',
@@ -418,7 +421,9 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
 
   void _deleteMessage(Message msg) async {
     final db = context.read<LocalDatabase>();
-    await db.deleteMessage(msg.id!);
+    final auth = context.read<AuthProvider>();
+    final myId = auth.user?.id ?? 'ME';
+    await db.deleteMessage(msg.id!, myId);
     setState(() {
       _messages.removeWhere((m) => m.id == msg.id);
     });
@@ -449,6 +454,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
     final optimisticId = 'opt-${DateTime.now().millisecondsSinceEpoch}';
     final optimistic = LocalMessage(
       id: optimisticId,
+      ownerId: myId,
       conversationId: _convId,
       senderId: myId,
       messageType: type.name,

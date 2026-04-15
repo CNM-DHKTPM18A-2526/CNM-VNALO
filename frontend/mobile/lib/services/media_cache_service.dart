@@ -5,19 +5,15 @@ import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:vnalo_mobile/core/database/local_database.dart';
+import 'package:vnalo_mobile/services/storage_service.dart';
 import 'package:open_file/open_file.dart';
 
 /// Manages on-demand file download + local-path caching.
-///
-/// Strategy:
-///  1. Check if local_path already stored in DB and file still exists → open immediately.
-///  2. Otherwise, download to <AppDocumentsDir>/vnalo_files/<messageId>.<ext>
-///  3. Persist the local_path back to [LocalDatabase] for future use.
-///  4. Open the file using the system default application.
 class MediaCacheService {
   final LocalDatabase _db;
+  final StorageService _storageService;
 
-  MediaCacheService(this._db);
+  MediaCacheService(this._db, this._storageService);
 
   static const String _filesDir = 'vnalo_files';
 
@@ -28,9 +24,15 @@ class MediaCacheService {
   /// Returns the local path if the file has already been downloaded.
   /// Pass [messageId] as stored in [LocalMessage.id].
   Future<String?> getLocalPath(String messageId) async {
+    final userId = await _storageService.getUserId();
+    if (userId == null) return null;
+
     final rows = await _db.customSelect(
-      'SELECT local_path FROM messages WHERE id = ? LIMIT 1',
-      variables: [Variable.withString(messageId)],
+      'SELECT local_path FROM messages WHERE id = ? AND owner_id = ? LIMIT 1',
+      variables: [
+        Variable.withString(messageId),
+        Variable.withString(userId),
+      ],
     ).get();
 
     if (rows.isEmpty) return null;
@@ -41,22 +43,22 @@ class MediaCacheService {
     final exists = await File(path).exists();
     if (!exists) {
       // Stale path — clear it
-      await _db.clearStalePaths([messageId]);
+      await _db.clearStalePaths([messageId], userId);
       return null;
     }
     return path;
   }
 
   /// Download a remote file on demand and persist the local path.
-  ///
-  /// Returns the local [File] path.
-  /// Throws on network errors so callers can show an error state.
   Future<String> downloadAndCache({
     required String messageId,
     required String remoteUrl,
     String? mimeType,
     Map<String, String>? headers,
   }) async {
+    final userId = await _storageService.getUserId();
+    if (userId == null) throw Exception('No authenticated user');
+
     // Guard — avoid double-download if another call is in-flight
     final existing = await getLocalPath(messageId);
     if (existing != null) return existing;
@@ -73,7 +75,7 @@ class MediaCacheService {
     }
 
     await localFile.writeAsBytes(response.bodyBytes);
-    await _db.updateLocalPath(messageId, localFile.path);
+    await _db.updateLocalPath(messageId, localFile.path, userId);
 
     debugPrint('[MediaCacheService] Cached at ${localFile.path}');
     return localFile.path;
@@ -100,13 +102,18 @@ class MediaCacheService {
   /// Delete all downloaded files and clear local_path in the DB.
   /// Called from Settings → "Clear media cache".
   Future<void> clearAll() async {
+    final userId = await _storageService.getUserId();
+    if (userId == null) return;
+
     final dir = await _localDir(_filesDir);
     if (await dir.exists()) {
       await dir.delete(recursive: true);
     }
-    // Mark all local_paths as NULL for all messages (bulk clear)
-    await _db.customStatement('UPDATE messages SET local_path = NULL');
-    debugPrint('[MediaCacheService] All media cache cleared.');
+    // Mark all local_paths as NULL for the current user's messages
+    await _db.customStatement(
+        'UPDATE messages SET local_path = NULL WHERE owner_id = ?',
+        [userId]);
+    debugPrint('[MediaCacheService] Media cache cleared for user $userId.');
   }
 
   // ---------------------------------------------------------------------------

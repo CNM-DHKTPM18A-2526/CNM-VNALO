@@ -17,6 +17,17 @@ class Messages extends Table with TableInfo<Messages, LocalMessage> {
     requiredDuringInsert: true,
     $customConstraints: 'NOT NULL PRIMARY KEY',
   );
+  static const VerificationMeta _ownerIdMeta = const VerificationMeta(
+    'ownerId',
+  );
+  late final GeneratedColumn<String> ownerId = GeneratedColumn<String>(
+    'owner_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
   static const VerificationMeta _conversationIdMeta = const VerificationMeta(
     'conversationId',
   );
@@ -176,6 +187,7 @@ class Messages extends Table with TableInfo<Messages, LocalMessage> {
   @override
   List<GeneratedColumn> get $columns => [
     id,
+    ownerId,
     conversationId,
     senderId,
     content,
@@ -207,6 +219,14 @@ class Messages extends Table with TableInfo<Messages, LocalMessage> {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
       context.missing(_idMeta);
+    }
+    if (data.containsKey('owner_id')) {
+      context.handle(
+        _ownerIdMeta,
+        ownerId.isAcceptableOrUnknown(data['owner_id']!, _ownerIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerIdMeta);
     }
     if (data.containsKey('conversation_id')) {
       context.handle(
@@ -335,6 +355,11 @@ class Messages extends Table with TableInfo<Messages, LocalMessage> {
             DriftSqlType.string,
             data['${effectivePrefix}id'],
           )!,
+      ownerId:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}owner_id'],
+          )!,
       conversationId:
           attachedDatabase.typeMapping.read(
             DriftSqlType.string,
@@ -410,6 +435,7 @@ class Messages extends Table with TableInfo<Messages, LocalMessage> {
 
 class LocalMessage extends DataClass implements Insertable<LocalMessage> {
   final String id;
+  final String ownerId;
   final String conversationId;
   final String senderId;
   final String content;
@@ -430,6 +456,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
   final String? replyToContent;
   const LocalMessage({
     required this.id,
+    required this.ownerId,
     required this.conversationId,
     required this.senderId,
     required this.content,
@@ -449,6 +476,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
+    map['owner_id'] = Variable<String>(ownerId);
     map['conversation_id'] = Variable<String>(conversationId);
     map['sender_id'] = Variable<String>(senderId);
     map['content'] = Variable<String>(content);
@@ -487,6 +515,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
   MessagesCompanion toCompanion(bool nullToAbsent) {
     return MessagesCompanion(
       id: Value(id),
+      ownerId: Value(ownerId),
       conversationId: Value(conversationId),
       senderId: Value(senderId),
       content: Value(content),
@@ -538,6 +567,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return LocalMessage(
       id: serializer.fromJson<String>(json['id']),
+      ownerId: serializer.fromJson<String>(json['owner_id']),
       conversationId: serializer.fromJson<String>(json['conversation_id']),
       senderId: serializer.fromJson<String>(json['sender_id']),
       content: serializer.fromJson<String>(json['content']),
@@ -561,6 +591,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
+      'owner_id': serializer.toJson<String>(ownerId),
       'conversation_id': serializer.toJson<String>(conversationId),
       'sender_id': serializer.toJson<String>(senderId),
       'content': serializer.toJson<String>(content),
@@ -580,6 +611,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
 
   LocalMessage copyWith({
     String? id,
+    String? ownerId,
     String? conversationId,
     String? senderId,
     String? content,
@@ -596,6 +628,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
     Value<String?> replyToContent = const Value.absent(),
   }) => LocalMessage(
     id: id ?? this.id,
+    ownerId: ownerId ?? this.ownerId,
     conversationId: conversationId ?? this.conversationId,
     senderId: senderId ?? this.senderId,
     content: content ?? this.content,
@@ -621,6 +654,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
   LocalMessage copyWithCompanion(MessagesCompanion data) {
     return LocalMessage(
       id: data.id.present ? data.id.value : this.id,
+      ownerId: data.ownerId.present ? data.ownerId.value : this.ownerId,
       conversationId:
           data.conversationId.present
               ? data.conversationId.value
@@ -661,6 +695,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
   String toString() {
     return (StringBuffer('LocalMessage(')
           ..write('id: $id, ')
+          ..write('ownerId: $ownerId, ')
           ..write('conversationId: $conversationId, ')
           ..write('senderId: $senderId, ')
           ..write('content: $content, ')
@@ -682,6 +717,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
   @override
   int get hashCode => Object.hash(
     id,
+    ownerId,
     conversationId,
     senderId,
     content,
@@ -702,6 +738,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
       identical(this, other) ||
       (other is LocalMessage &&
           other.id == this.id &&
+          other.ownerId == this.ownerId &&
           other.conversationId == this.conversationId &&
           other.senderId == this.senderId &&
           other.content == this.content &&
@@ -720,6 +757,7 @@ class LocalMessage extends DataClass implements Insertable<LocalMessage> {
 
 class MessagesCompanion extends UpdateCompanion<LocalMessage> {
   final Value<String> id;
+  final Value<String> ownerId;
   final Value<String> conversationId;
   final Value<String> senderId;
   final Value<String> content;
@@ -737,6 +775,7 @@ class MessagesCompanion extends UpdateCompanion<LocalMessage> {
   final Value<int> rowid;
   const MessagesCompanion({
     this.id = const Value.absent(),
+    this.ownerId = const Value.absent(),
     this.conversationId = const Value.absent(),
     this.senderId = const Value.absent(),
     this.content = const Value.absent(),
@@ -755,6 +794,7 @@ class MessagesCompanion extends UpdateCompanion<LocalMessage> {
   });
   MessagesCompanion.insert({
     required String id,
+    required String ownerId,
     required String conversationId,
     required String senderId,
     required String content,
@@ -771,12 +811,14 @@ class MessagesCompanion extends UpdateCompanion<LocalMessage> {
     this.replyToContent = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
+       ownerId = Value(ownerId),
        conversationId = Value(conversationId),
        senderId = Value(senderId),
        content = Value(content),
        createdAt = Value(createdAt);
   static Insertable<LocalMessage> custom({
     Expression<String>? id,
+    Expression<String>? ownerId,
     Expression<String>? conversationId,
     Expression<String>? senderId,
     Expression<String>? content,
@@ -795,6 +837,7 @@ class MessagesCompanion extends UpdateCompanion<LocalMessage> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (ownerId != null) 'owner_id': ownerId,
       if (conversationId != null) 'conversation_id': conversationId,
       if (senderId != null) 'sender_id': senderId,
       if (content != null) 'content': content,
@@ -815,6 +858,7 @@ class MessagesCompanion extends UpdateCompanion<LocalMessage> {
 
   MessagesCompanion copyWith({
     Value<String>? id,
+    Value<String>? ownerId,
     Value<String>? conversationId,
     Value<String>? senderId,
     Value<String>? content,
@@ -833,6 +877,7 @@ class MessagesCompanion extends UpdateCompanion<LocalMessage> {
   }) {
     return MessagesCompanion(
       id: id ?? this.id,
+      ownerId: ownerId ?? this.ownerId,
       conversationId: conversationId ?? this.conversationId,
       senderId: senderId ?? this.senderId,
       content: content ?? this.content,
@@ -856,6 +901,9 @@ class MessagesCompanion extends UpdateCompanion<LocalMessage> {
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<String>(id.value);
+    }
+    if (ownerId.present) {
+      map['owner_id'] = Variable<String>(ownerId.value);
     }
     if (conversationId.present) {
       map['conversation_id'] = Variable<String>(conversationId.value);
@@ -909,6 +957,7 @@ class MessagesCompanion extends UpdateCompanion<LocalMessage> {
   String toString() {
     return (StringBuffer('MessagesCompanion(')
           ..write('id: $id, ')
+          ..write('ownerId: $ownerId, ')
           ..write('conversationId: $conversationId, ')
           ..write('senderId: $senderId, ')
           ..write('content: $content, ')
@@ -943,6 +992,17 @@ class Contacts extends Table with TableInfo<Contacts, LocalContact> {
     requiredDuringInsert: true,
     $customConstraints: 'NOT NULL PRIMARY KEY',
   );
+  static const VerificationMeta _ownerIdMeta = const VerificationMeta(
+    'ownerId',
+  );
+  late final GeneratedColumn<String> ownerId = GeneratedColumn<String>(
+    'owner_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
   static const VerificationMeta _displayNameMeta = const VerificationMeta(
     'displayName',
   );
@@ -975,7 +1035,13 @@ class Contacts extends Table with TableInfo<Contacts, LocalContact> {
     $customConstraints: '',
   );
   @override
-  List<GeneratedColumn> get $columns => [id, displayName, phone, avatarUrl];
+  List<GeneratedColumn> get $columns => [
+    id,
+    ownerId,
+    displayName,
+    phone,
+    avatarUrl,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -992,6 +1058,14 @@ class Contacts extends Table with TableInfo<Contacts, LocalContact> {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
       context.missing(_idMeta);
+    }
+    if (data.containsKey('owner_id')) {
+      context.handle(
+        _ownerIdMeta,
+        ownerId.isAcceptableOrUnknown(data['owner_id']!, _ownerIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerIdMeta);
     }
     if (data.containsKey('display_name')) {
       context.handle(
@@ -1030,6 +1104,11 @@ class Contacts extends Table with TableInfo<Contacts, LocalContact> {
             DriftSqlType.string,
             data['${effectivePrefix}id'],
           )!,
+      ownerId:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}owner_id'],
+          )!,
       displayName:
           attachedDatabase.typeMapping.read(
             DriftSqlType.string,
@@ -1057,11 +1136,13 @@ class Contacts extends Table with TableInfo<Contacts, LocalContact> {
 
 class LocalContact extends DataClass implements Insertable<LocalContact> {
   final String id;
+  final String ownerId;
   final String displayName;
   final String? phone;
   final String? avatarUrl;
   const LocalContact({
     required this.id,
+    required this.ownerId,
     required this.displayName,
     this.phone,
     this.avatarUrl,
@@ -1070,6 +1151,7 @@ class LocalContact extends DataClass implements Insertable<LocalContact> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
+    map['owner_id'] = Variable<String>(ownerId);
     map['display_name'] = Variable<String>(displayName);
     if (!nullToAbsent || phone != null) {
       map['phone'] = Variable<String>(phone);
@@ -1083,6 +1165,7 @@ class LocalContact extends DataClass implements Insertable<LocalContact> {
   ContactsCompanion toCompanion(bool nullToAbsent) {
     return ContactsCompanion(
       id: Value(id),
+      ownerId: Value(ownerId),
       displayName: Value(displayName),
       phone:
           phone == null && nullToAbsent ? const Value.absent() : Value(phone),
@@ -1100,6 +1183,7 @@ class LocalContact extends DataClass implements Insertable<LocalContact> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return LocalContact(
       id: serializer.fromJson<String>(json['id']),
+      ownerId: serializer.fromJson<String>(json['owner_id']),
       displayName: serializer.fromJson<String>(json['display_name']),
       phone: serializer.fromJson<String?>(json['phone']),
       avatarUrl: serializer.fromJson<String?>(json['avatar_url']),
@@ -1110,6 +1194,7 @@ class LocalContact extends DataClass implements Insertable<LocalContact> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
+      'owner_id': serializer.toJson<String>(ownerId),
       'display_name': serializer.toJson<String>(displayName),
       'phone': serializer.toJson<String?>(phone),
       'avatar_url': serializer.toJson<String?>(avatarUrl),
@@ -1118,11 +1203,13 @@ class LocalContact extends DataClass implements Insertable<LocalContact> {
 
   LocalContact copyWith({
     String? id,
+    String? ownerId,
     String? displayName,
     Value<String?> phone = const Value.absent(),
     Value<String?> avatarUrl = const Value.absent(),
   }) => LocalContact(
     id: id ?? this.id,
+    ownerId: ownerId ?? this.ownerId,
     displayName: displayName ?? this.displayName,
     phone: phone.present ? phone.value : this.phone,
     avatarUrl: avatarUrl.present ? avatarUrl.value : this.avatarUrl,
@@ -1130,6 +1217,7 @@ class LocalContact extends DataClass implements Insertable<LocalContact> {
   LocalContact copyWithCompanion(ContactsCompanion data) {
     return LocalContact(
       id: data.id.present ? data.id.value : this.id,
+      ownerId: data.ownerId.present ? data.ownerId.value : this.ownerId,
       displayName:
           data.displayName.present ? data.displayName.value : this.displayName,
       phone: data.phone.present ? data.phone.value : this.phone,
@@ -1141,6 +1229,7 @@ class LocalContact extends DataClass implements Insertable<LocalContact> {
   String toString() {
     return (StringBuffer('LocalContact(')
           ..write('id: $id, ')
+          ..write('ownerId: $ownerId, ')
           ..write('displayName: $displayName, ')
           ..write('phone: $phone, ')
           ..write('avatarUrl: $avatarUrl')
@@ -1149,12 +1238,13 @@ class LocalContact extends DataClass implements Insertable<LocalContact> {
   }
 
   @override
-  int get hashCode => Object.hash(id, displayName, phone, avatarUrl);
+  int get hashCode => Object.hash(id, ownerId, displayName, phone, avatarUrl);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is LocalContact &&
           other.id == this.id &&
+          other.ownerId == this.ownerId &&
           other.displayName == this.displayName &&
           other.phone == this.phone &&
           other.avatarUrl == this.avatarUrl);
@@ -1162,12 +1252,14 @@ class LocalContact extends DataClass implements Insertable<LocalContact> {
 
 class ContactsCompanion extends UpdateCompanion<LocalContact> {
   final Value<String> id;
+  final Value<String> ownerId;
   final Value<String> displayName;
   final Value<String?> phone;
   final Value<String?> avatarUrl;
   final Value<int> rowid;
   const ContactsCompanion({
     this.id = const Value.absent(),
+    this.ownerId = const Value.absent(),
     this.displayName = const Value.absent(),
     this.phone = const Value.absent(),
     this.avatarUrl = const Value.absent(),
@@ -1175,14 +1267,17 @@ class ContactsCompanion extends UpdateCompanion<LocalContact> {
   });
   ContactsCompanion.insert({
     required String id,
+    required String ownerId,
     required String displayName,
     this.phone = const Value.absent(),
     this.avatarUrl = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
+       ownerId = Value(ownerId),
        displayName = Value(displayName);
   static Insertable<LocalContact> custom({
     Expression<String>? id,
+    Expression<String>? ownerId,
     Expression<String>? displayName,
     Expression<String>? phone,
     Expression<String>? avatarUrl,
@@ -1190,6 +1285,7 @@ class ContactsCompanion extends UpdateCompanion<LocalContact> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (ownerId != null) 'owner_id': ownerId,
       if (displayName != null) 'display_name': displayName,
       if (phone != null) 'phone': phone,
       if (avatarUrl != null) 'avatar_url': avatarUrl,
@@ -1199,6 +1295,7 @@ class ContactsCompanion extends UpdateCompanion<LocalContact> {
 
   ContactsCompanion copyWith({
     Value<String>? id,
+    Value<String>? ownerId,
     Value<String>? displayName,
     Value<String?>? phone,
     Value<String?>? avatarUrl,
@@ -1206,6 +1303,7 @@ class ContactsCompanion extends UpdateCompanion<LocalContact> {
   }) {
     return ContactsCompanion(
       id: id ?? this.id,
+      ownerId: ownerId ?? this.ownerId,
       displayName: displayName ?? this.displayName,
       phone: phone ?? this.phone,
       avatarUrl: avatarUrl ?? this.avatarUrl,
@@ -1218,6 +1316,9 @@ class ContactsCompanion extends UpdateCompanion<LocalContact> {
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<String>(id.value);
+    }
+    if (ownerId.present) {
+      map['owner_id'] = Variable<String>(ownerId.value);
     }
     if (displayName.present) {
       map['display_name'] = Variable<String>(displayName.value);
@@ -1238,6 +1339,7 @@ class ContactsCompanion extends UpdateCompanion<LocalContact> {
   String toString() {
     return (StringBuffer('ContactsCompanion(')
           ..write('id: $id, ')
+          ..write('ownerId: $ownerId, ')
           ..write('displayName: $displayName, ')
           ..write('phone: $phone, ')
           ..write('avatarUrl: $avatarUrl, ')
@@ -1261,6 +1363,17 @@ class Conversations extends Table
     type: DriftSqlType.string,
     requiredDuringInsert: true,
     $customConstraints: 'NOT NULL PRIMARY KEY',
+  );
+  static const VerificationMeta _ownerIdMeta = const VerificationMeta(
+    'ownerId',
+  );
+  late final GeneratedColumn<String> ownerId = GeneratedColumn<String>(
+    'owner_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
   );
   static const VerificationMeta _nameMeta = const VerificationMeta('name');
   late final GeneratedColumn<String> name = GeneratedColumn<String>(
@@ -1316,6 +1429,7 @@ class Conversations extends Table
   @override
   List<GeneratedColumn> get $columns => [
     id,
+    ownerId,
     name,
     type,
     avatarUrl,
@@ -1338,6 +1452,14 @@ class Conversations extends Table
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
       context.missing(_idMeta);
+    }
+    if (data.containsKey('owner_id')) {
+      context.handle(
+        _ownerIdMeta,
+        ownerId.isAcceptableOrUnknown(data['owner_id']!, _ownerIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerIdMeta);
     }
     if (data.containsKey('name')) {
       context.handle(
@@ -1390,6 +1512,11 @@ class Conversations extends Table
             DriftSqlType.string,
             data['${effectivePrefix}id'],
           )!,
+      ownerId:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}owner_id'],
+          )!,
       name: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}name'],
@@ -1427,6 +1554,7 @@ class Conversations extends Table
 class LocalConversation extends DataClass
     implements Insertable<LocalConversation> {
   final String id;
+  final String ownerId;
   final String? name;
   final String type;
   final String? avatarUrl;
@@ -1434,6 +1562,7 @@ class LocalConversation extends DataClass
   final DateTime updatedAt;
   const LocalConversation({
     required this.id,
+    required this.ownerId,
     this.name,
     required this.type,
     this.avatarUrl,
@@ -1444,6 +1573,7 @@ class LocalConversation extends DataClass
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
+    map['owner_id'] = Variable<String>(ownerId);
     if (!nullToAbsent || name != null) {
       map['name'] = Variable<String>(name);
     }
@@ -1461,6 +1591,7 @@ class LocalConversation extends DataClass
   ConversationsCompanion toCompanion(bool nullToAbsent) {
     return ConversationsCompanion(
       id: Value(id),
+      ownerId: Value(ownerId),
       name: name == null && nullToAbsent ? const Value.absent() : Value(name),
       type: Value(type),
       avatarUrl:
@@ -1482,6 +1613,7 @@ class LocalConversation extends DataClass
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return LocalConversation(
       id: serializer.fromJson<String>(json['id']),
+      ownerId: serializer.fromJson<String>(json['owner_id']),
       name: serializer.fromJson<String?>(json['name']),
       type: serializer.fromJson<String>(json['type']),
       avatarUrl: serializer.fromJson<String?>(json['avatar_url']),
@@ -1494,6 +1626,7 @@ class LocalConversation extends DataClass
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
+      'owner_id': serializer.toJson<String>(ownerId),
       'name': serializer.toJson<String?>(name),
       'type': serializer.toJson<String>(type),
       'avatar_url': serializer.toJson<String?>(avatarUrl),
@@ -1504,6 +1637,7 @@ class LocalConversation extends DataClass
 
   LocalConversation copyWith({
     String? id,
+    String? ownerId,
     Value<String?> name = const Value.absent(),
     String? type,
     Value<String?> avatarUrl = const Value.absent(),
@@ -1511,6 +1645,7 @@ class LocalConversation extends DataClass
     DateTime? updatedAt,
   }) => LocalConversation(
     id: id ?? this.id,
+    ownerId: ownerId ?? this.ownerId,
     name: name.present ? name.value : this.name,
     type: type ?? this.type,
     avatarUrl: avatarUrl.present ? avatarUrl.value : this.avatarUrl,
@@ -1520,6 +1655,7 @@ class LocalConversation extends DataClass
   LocalConversation copyWithCompanion(ConversationsCompanion data) {
     return LocalConversation(
       id: data.id.present ? data.id.value : this.id,
+      ownerId: data.ownerId.present ? data.ownerId.value : this.ownerId,
       name: data.name.present ? data.name.value : this.name,
       type: data.type.present ? data.type.value : this.type,
       avatarUrl: data.avatarUrl.present ? data.avatarUrl.value : this.avatarUrl,
@@ -1533,6 +1669,7 @@ class LocalConversation extends DataClass
   String toString() {
     return (StringBuffer('LocalConversation(')
           ..write('id: $id, ')
+          ..write('ownerId: $ownerId, ')
           ..write('name: $name, ')
           ..write('type: $type, ')
           ..write('avatarUrl: $avatarUrl, ')
@@ -1544,12 +1681,13 @@ class LocalConversation extends DataClass
 
   @override
   int get hashCode =>
-      Object.hash(id, name, type, avatarUrl, lastMessage, updatedAt);
+      Object.hash(id, ownerId, name, type, avatarUrl, lastMessage, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is LocalConversation &&
           other.id == this.id &&
+          other.ownerId == this.ownerId &&
           other.name == this.name &&
           other.type == this.type &&
           other.avatarUrl == this.avatarUrl &&
@@ -1559,6 +1697,7 @@ class LocalConversation extends DataClass
 
 class ConversationsCompanion extends UpdateCompanion<LocalConversation> {
   final Value<String> id;
+  final Value<String> ownerId;
   final Value<String?> name;
   final Value<String> type;
   final Value<String?> avatarUrl;
@@ -1567,6 +1706,7 @@ class ConversationsCompanion extends UpdateCompanion<LocalConversation> {
   final Value<int> rowid;
   const ConversationsCompanion({
     this.id = const Value.absent(),
+    this.ownerId = const Value.absent(),
     this.name = const Value.absent(),
     this.type = const Value.absent(),
     this.avatarUrl = const Value.absent(),
@@ -1576,6 +1716,7 @@ class ConversationsCompanion extends UpdateCompanion<LocalConversation> {
   });
   ConversationsCompanion.insert({
     required String id,
+    required String ownerId,
     this.name = const Value.absent(),
     required String type,
     this.avatarUrl = const Value.absent(),
@@ -1583,10 +1724,12 @@ class ConversationsCompanion extends UpdateCompanion<LocalConversation> {
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
+       ownerId = Value(ownerId),
        type = Value(type),
        updatedAt = Value(updatedAt);
   static Insertable<LocalConversation> custom({
     Expression<String>? id,
+    Expression<String>? ownerId,
     Expression<String>? name,
     Expression<String>? type,
     Expression<String>? avatarUrl,
@@ -1596,6 +1739,7 @@ class ConversationsCompanion extends UpdateCompanion<LocalConversation> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (ownerId != null) 'owner_id': ownerId,
       if (name != null) 'name': name,
       if (type != null) 'type': type,
       if (avatarUrl != null) 'avatar_url': avatarUrl,
@@ -1607,6 +1751,7 @@ class ConversationsCompanion extends UpdateCompanion<LocalConversation> {
 
   ConversationsCompanion copyWith({
     Value<String>? id,
+    Value<String>? ownerId,
     Value<String?>? name,
     Value<String>? type,
     Value<String?>? avatarUrl,
@@ -1616,6 +1761,7 @@ class ConversationsCompanion extends UpdateCompanion<LocalConversation> {
   }) {
     return ConversationsCompanion(
       id: id ?? this.id,
+      ownerId: ownerId ?? this.ownerId,
       name: name ?? this.name,
       type: type ?? this.type,
       avatarUrl: avatarUrl ?? this.avatarUrl,
@@ -1630,6 +1776,9 @@ class ConversationsCompanion extends UpdateCompanion<LocalConversation> {
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<String>(id.value);
+    }
+    if (ownerId.present) {
+      map['owner_id'] = Variable<String>(ownerId.value);
     }
     if (name.present) {
       map['name'] = Variable<String>(name.value);
@@ -1656,6 +1805,7 @@ class ConversationsCompanion extends UpdateCompanion<LocalConversation> {
   String toString() {
     return (StringBuffer('ConversationsCompanion(')
           ..write('id: $id, ')
+          ..write('ownerId: $ownerId, ')
           ..write('name: $name, ')
           ..write('type: $type, ')
           ..write('avatarUrl: $avatarUrl, ')
@@ -2099,6 +2249,10 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
   _$LocalDatabase(QueryExecutor e) : super(e);
   $LocalDatabaseManager get managers => $LocalDatabaseManager(this);
   late final Messages messages = Messages(this);
+  late final Index idxMessagesOwner = Index(
+    'idx_messages_owner',
+    'CREATE INDEX idx_messages_owner ON messages (owner_id)',
+  );
   late final Contacts contacts = Contacts(this);
   late final Conversations conversations = Conversations(this);
   late final PinnedMessages pinnedMessages = PinnedMessages(this);
@@ -2108,6 +2262,7 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     messages,
+    idxMessagesOwner,
     contacts,
     conversations,
     pinnedMessages,
@@ -2117,6 +2272,7 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
 typedef $MessagesCreateCompanionBuilder =
     MessagesCompanion Function({
       required String id,
+      required String ownerId,
       required String conversationId,
       required String senderId,
       required String content,
@@ -2136,6 +2292,7 @@ typedef $MessagesCreateCompanionBuilder =
 typedef $MessagesUpdateCompanionBuilder =
     MessagesCompanion Function({
       Value<String> id,
+      Value<String> ownerId,
       Value<String> conversationId,
       Value<String> senderId,
       Value<String> content,
@@ -2163,6 +2320,11 @@ class $MessagesFilterComposer extends Composer<_$LocalDatabase, Messages> {
   });
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ownerId => $composableBuilder(
+    column: $table.ownerId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2250,6 +2412,11 @@ class $MessagesOrderingComposer extends Composer<_$LocalDatabase, Messages> {
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get ownerId => $composableBuilder(
+    column: $table.ownerId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get conversationId => $composableBuilder(
     column: $table.conversationId,
     builder: (column) => ColumnOrderings(column),
@@ -2331,6 +2498,9 @@ class $MessagesAnnotationComposer extends Composer<_$LocalDatabase, Messages> {
   });
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get ownerId =>
+      $composableBuilder(column: $table.ownerId, builder: (column) => column);
 
   GeneratedColumn<String> get conversationId => $composableBuilder(
     column: $table.conversationId,
@@ -2421,6 +2591,7 @@ class $MessagesTableManager
           updateCompanionCallback:
               ({
                 Value<String> id = const Value.absent(),
+                Value<String> ownerId = const Value.absent(),
                 Value<String> conversationId = const Value.absent(),
                 Value<String> senderId = const Value.absent(),
                 Value<String> content = const Value.absent(),
@@ -2438,6 +2609,7 @@ class $MessagesTableManager
                 Value<int> rowid = const Value.absent(),
               }) => MessagesCompanion(
                 id: id,
+                ownerId: ownerId,
                 conversationId: conversationId,
                 senderId: senderId,
                 content: content,
@@ -2457,6 +2629,7 @@ class $MessagesTableManager
           createCompanionCallback:
               ({
                 required String id,
+                required String ownerId,
                 required String conversationId,
                 required String senderId,
                 required String content,
@@ -2474,6 +2647,7 @@ class $MessagesTableManager
                 Value<int> rowid = const Value.absent(),
               }) => MessagesCompanion.insert(
                 id: id,
+                ownerId: ownerId,
                 conversationId: conversationId,
                 senderId: senderId,
                 content: content,
@@ -2522,6 +2696,7 @@ typedef $MessagesProcessedTableManager =
 typedef $ContactsCreateCompanionBuilder =
     ContactsCompanion Function({
       required String id,
+      required String ownerId,
       required String displayName,
       Value<String?> phone,
       Value<String?> avatarUrl,
@@ -2530,6 +2705,7 @@ typedef $ContactsCreateCompanionBuilder =
 typedef $ContactsUpdateCompanionBuilder =
     ContactsCompanion Function({
       Value<String> id,
+      Value<String> ownerId,
       Value<String> displayName,
       Value<String?> phone,
       Value<String?> avatarUrl,
@@ -2546,6 +2722,11 @@ class $ContactsFilterComposer extends Composer<_$LocalDatabase, Contacts> {
   });
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ownerId => $composableBuilder(
+    column: $table.ownerId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2578,6 +2759,11 @@ class $ContactsOrderingComposer extends Composer<_$LocalDatabase, Contacts> {
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get ownerId => $composableBuilder(
+    column: $table.ownerId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get displayName => $composableBuilder(
     column: $table.displayName,
     builder: (column) => ColumnOrderings(column),
@@ -2604,6 +2790,9 @@ class $ContactsAnnotationComposer extends Composer<_$LocalDatabase, Contacts> {
   });
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get ownerId =>
+      $composableBuilder(column: $table.ownerId, builder: (column) => column);
 
   GeneratedColumn<String> get displayName => $composableBuilder(
     column: $table.displayName,
@@ -2649,12 +2838,14 @@ class $ContactsTableManager
           updateCompanionCallback:
               ({
                 Value<String> id = const Value.absent(),
+                Value<String> ownerId = const Value.absent(),
                 Value<String> displayName = const Value.absent(),
                 Value<String?> phone = const Value.absent(),
                 Value<String?> avatarUrl = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ContactsCompanion(
                 id: id,
+                ownerId: ownerId,
                 displayName: displayName,
                 phone: phone,
                 avatarUrl: avatarUrl,
@@ -2663,12 +2854,14 @@ class $ContactsTableManager
           createCompanionCallback:
               ({
                 required String id,
+                required String ownerId,
                 required String displayName,
                 Value<String?> phone = const Value.absent(),
                 Value<String?> avatarUrl = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ContactsCompanion.insert(
                 id: id,
+                ownerId: ownerId,
                 displayName: displayName,
                 phone: phone,
                 avatarUrl: avatarUrl,
@@ -2706,6 +2899,7 @@ typedef $ContactsProcessedTableManager =
 typedef $ConversationsCreateCompanionBuilder =
     ConversationsCompanion Function({
       required String id,
+      required String ownerId,
       Value<String?> name,
       required String type,
       Value<String?> avatarUrl,
@@ -2716,6 +2910,7 @@ typedef $ConversationsCreateCompanionBuilder =
 typedef $ConversationsUpdateCompanionBuilder =
     ConversationsCompanion Function({
       Value<String> id,
+      Value<String> ownerId,
       Value<String?> name,
       Value<String> type,
       Value<String?> avatarUrl,
@@ -2735,6 +2930,11 @@ class $ConversationsFilterComposer
   });
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ownerId => $composableBuilder(
+    column: $table.ownerId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2778,6 +2978,11 @@ class $ConversationsOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get ownerId => $composableBuilder(
+    column: $table.ownerId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get name => $composableBuilder(
     column: $table.name,
     builder: (column) => ColumnOrderings(column),
@@ -2815,6 +3020,9 @@ class $ConversationsAnnotationComposer
   });
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get ownerId =>
+      $composableBuilder(column: $table.ownerId, builder: (column) => column);
 
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
@@ -2866,6 +3074,7 @@ class $ConversationsTableManager
           updateCompanionCallback:
               ({
                 Value<String> id = const Value.absent(),
+                Value<String> ownerId = const Value.absent(),
                 Value<String?> name = const Value.absent(),
                 Value<String> type = const Value.absent(),
                 Value<String?> avatarUrl = const Value.absent(),
@@ -2874,6 +3083,7 @@ class $ConversationsTableManager
                 Value<int> rowid = const Value.absent(),
               }) => ConversationsCompanion(
                 id: id,
+                ownerId: ownerId,
                 name: name,
                 type: type,
                 avatarUrl: avatarUrl,
@@ -2884,6 +3094,7 @@ class $ConversationsTableManager
           createCompanionCallback:
               ({
                 required String id,
+                required String ownerId,
                 Value<String?> name = const Value.absent(),
                 required String type,
                 Value<String?> avatarUrl = const Value.absent(),
@@ -2892,6 +3103,7 @@ class $ConversationsTableManager
                 Value<int> rowid = const Value.absent(),
               }) => ConversationsCompanion.insert(
                 id: id,
+                ownerId: ownerId,
                 name: name,
                 type: type,
                 avatarUrl: avatarUrl,

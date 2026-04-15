@@ -210,9 +210,11 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
 
     setState(() => _isSearching = true);
 
+    final auth = context.read<AuthProvider>();
+    final userId = auth.user?.id ?? '';
     final db = context.read<LocalDatabase>();
-    final contactsTask = db.searchContacts(q);
-    final messagesTask = db.searchMessages(q);
+    final contactsTask = db.searchContacts(q, userId);
+    final messagesTask = db.searchMessages(q, userId);
 
     final localFriendMatch = _findFriendByPhoneQuery(q);
 
@@ -349,7 +351,8 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
       final db = context.read<LocalDatabase>();
       final chatService = context.read<ChatService>();
 
-      LocalConversation? localConv = await db.getLocalConversationById(msg.conversationId);
+      final userId = context.read<AuthProvider>().user?.id ?? '';
+      LocalConversation? localConv = await db.getLocalConversationById(msg.conversationId, userId);
       Conversation? conv;
       if (localConv != null) {
         conv = Conversation.fromLocal(localConv);
