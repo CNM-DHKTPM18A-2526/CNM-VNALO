@@ -4,6 +4,7 @@ import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/conversation_member_model.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
+import 'package:vnalo_mobile/models/message_reaction_model.dart';
 import 'package:vnalo_mobile/services/api_service.dart';
 
 class ChatService {
@@ -459,5 +460,29 @@ class ChatService {
   Future<List<dynamic>> getPinnedMessages(String conversationId) async {
     final response = await _apiService.get(_base, '/conversations/$conversationId/pins');
     return response['data'] ?? response as List;
+  }
+
+  // ─── Reactions ───────────────────────────────────────
+
+  /// Add a reaction to a message
+  Future<MessageReaction> addReaction(String messageId, String emoji) async {
+    final response = await _apiService.post(
+      _base,
+      '/messages/$messageId/reactions',
+      body: {'emoji': emoji},
+    );
+    return MessageReaction.fromJson(response['data'] ?? response);
+  }
+
+  /// Remove a reaction from a message
+  Future<void> removeReaction(String messageId) async {
+    await _apiService.delete(_base, '/messages/$messageId/reactions');
+  }
+
+  /// Get all reactions for a message
+  Future<List<MessageReaction>> getReactions(String messageId) async {
+    final response = await _apiService.get(_base, '/messages/$messageId/reactions');
+    final list = response['data'] as List? ?? [];
+    return list.map((r) => MessageReaction.fromJson(r)).toList();
   }
 }

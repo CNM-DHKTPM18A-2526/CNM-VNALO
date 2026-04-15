@@ -7,6 +7,7 @@ import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
 import 'package:vnalo_mobile/models/conversation_member_model.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
+import 'package:vnalo_mobile/models/message_reaction_model.dart';
 import 'package:vnalo_mobile/models/user_model.dart';
 import 'package:vnalo_mobile/services/chat_service.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
@@ -26,12 +27,15 @@ class ChatProvider extends ChangeNotifier {
   final Map<String, Timer> _retryTimers = {};
   final Map<String, int> _retryCounts = {};
   final Map<String, List<Message>> _pinnedMessages = {};
+  final Map<String, List<MessageReaction>> _reactions = {};
   final StreamSubscription<Message> _messageSub;
   final StreamSubscription<Map<String, dynamic>> _readSub;
   final StreamSubscription<Map<String, dynamic>> _deliveredSub;
   final StreamSubscription<Map<String, dynamic>> _recalledSub;
   final StreamSubscription<Map<String, dynamic>> _pinnedSub;
   final StreamSubscription<Map<String, dynamic>> _unpinnedSub;
+  final StreamSubscription<Map<String, dynamic>> _reactionAddedSub;
+  final StreamSubscription<Map<String, dynamic>> _reactionRemovedSub;
   final Random _random = Random.secure();
 
   List<Conversation> _conversations = [];
@@ -63,6 +67,9 @@ class ChatProvider extends ChangeNotifier {
   List<Message> getPinnedMessagesForConversation(String conversationId) =>
       _pinnedMessages[conversationId] ?? [];
 
+  List<MessageReaction> getReactionsForMessage(String messageId) =>
+      _reactions[messageId] ?? [];
+
   ChatProvider({
     required ChatService chatService,
     required SocketService socketService,
@@ -79,7 +86,9 @@ class ChatProvider extends ChangeNotifier {
         _deliveredSub = socketService.onDelivered.listen((_) {}),
         _recalledSub = socketService.onRecalled.listen((_) {}),
         _pinnedSub = socketService.onPinned.listen((_) {}),
-        _unpinnedSub = socketService.onUnpinned.listen((_) {}) {
+        _unpinnedSub = socketService.onUnpinned.listen((_) {}),
+        _reactionAddedSub = socketService.onReactionAdded.listen((_) {}),
+        _reactionRemovedSub = socketService.onReactionRemoved.listen((_) {}) {
     _notificationService.ensureInitialized();
     _messageSub.onData(_handleIncomingMessage);
     _readSub.onData(_handleReadEvent);
@@ -87,6 +96,8 @@ class ChatProvider extends ChangeNotifier {
     _recalledSub.onData(_handleRecalledEvent);
     _pinnedSub.onData(_handlePinnedEvent);
     _unpinnedSub.onData(_handleUnpinnedEvent);
+    _reactionAddedSub.onData(_handleReactionAddedEvent);
+    _reactionRemovedSub.onData(_handleReactionRemovedEvent);
   }
 
   List<Message> getMessages(String conversationId) =>
@@ -259,11 +270,21 @@ class ChatProvider extends ChangeNotifier {
         _messages[conversationId] = response;
         // Sync API messages to local DB in background
         _db.saveMessagesBatch(response.map(_toLocal).toList());
+        
+        // Load reactions for all messages
+        for (final message in response) {
+          loadReactions(message.id);
+        }
       } else {
         _messages[conversationId] = [
           ...(_messages[conversationId] ?? []),
           ...response,
         ];
+        
+        // Load reactions for newly loaded messages
+        for (final message in response) {
+          loadReactions(message.id);
+        }
       }
       notifyListeners();
     } catch (e, stack) {
@@ -313,6 +334,12 @@ class ChatProvider extends ChangeNotifier {
     _activeConversationId = conversationId;
     _socketService.joinConversation(conversationId);
     loadPinnedMessages(conversationId);
+
+    // Load reactions for messages in this conversation
+    final messages = _messages[conversationId] ?? [];
+    for (final message in messages) {
+      loadReactions(message.id);
+    }
 
     // Clear unread count locally
     final index = _conversations.indexWhere((c) => c.id == conversationId);
@@ -1565,5 +1592,104 @@ class ChatProvider extends ChangeNotifier {
       _pinnedMessages[conversationId] = updatedPins;
       notifyListeners();
     }
+  }
+
+  void _handleReactionAddedEvent(Map<String, dynamic> data) {
+    final messageId = data['messageId'];
+    if (messageId == null) return;
+
+    final reaction = MessageReaction.fromJson(data);
+    final currentReactions = _reactions[messageId] ?? [];
+    
+    // Remove existing reaction from the same user (if any)
+    final filteredReactions = currentReactions.where((r) => r.userId != reaction.userId).toList();
+    filteredReactions.add(reaction);
+    
+    _reactions[messageId] = filteredReactions;
+    notifyListeners();
+  }
+
+  void _handleReactionRemovedEvent(Map<String, dynamic> data) {
+    final messageId = data['messageId'];
+    final userId = data['userId'];
+    if (messageId == null || userId == null) return;
+
+    final currentReactions = _reactions[messageId] ?? [];
+    final filteredReactions = currentReactions.where((r) => r.userId != userId).toList();
+    
+    _reactions[messageId] = filteredReactions;
+    notifyListeners();
+  }
+
+  // ─── Reactions Methods ─────────────────────────────────────
+
+  Future<void> addReaction(String messageId, String emoji) async {
+    try {
+      // Optimistic update
+      final currentReactions = _reactions[messageId] ?? [];
+      final userReactionIndex = currentReactions.indexWhere((r) => r.userId == _currentUserId);
+      
+      final optimisticReaction = MessageReaction(
+        id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
+        conversationId: '',
+        messageId: messageId,
+        serverSeq: 0,
+        userId: _currentUserId ?? '',
+        emoji: emoji,
+        createdAt: DateTime.now(),
+      );
+      
+      final updatedReactions = List<MessageReaction>.from(currentReactions);
+      if (userReactionIndex >= 0) {
+        updatedReactions[userReactionIndex] = optimisticReaction;
+      } else {
+        updatedReactions.add(optimisticReaction);
+      }
+      
+      _reactions[messageId] = updatedReactions;
+      notifyListeners();
+      
+      // Only use REST API for now (WebSocket events not implemented on backend)
+      await _chatService.addReaction(messageId, emoji);
+      // _socketService.addReaction(messageId, emoji); // Disabled until backend implements WebSocket events
+    } catch (e) {
+      debugPrint('Error adding reaction: $e');
+      // Revert on error - reload reactions
+      await loadReactions(messageId);
+    }
+  }
+
+  Future<void> removeReaction(String messageId) async {
+    try {
+      // Optimistic update
+      final currentReactions = _reactions[messageId] ?? [];
+      final updatedReactions = currentReactions.where((r) => r.userId != _currentUserId).toList();
+      
+      _reactions[messageId] = updatedReactions;
+      notifyListeners();
+      
+      // Only use REST API for now (WebSocket events not implemented on backend)
+      await _chatService.removeReaction(messageId);
+      // _socketService.removeReaction(messageId); // Disabled until backend implements WebSocket events
+    } catch (e) {
+      debugPrint('Error removing reaction: $e');
+      // Revert on error - reload reactions
+      await loadReactions(messageId);
+    }
+  }
+
+  Future<void> loadReactions(String messageId) async {
+    try {
+      final reactions = await _chatService.getReactions(messageId);
+      _reactions[messageId] = reactions;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading reactions: $e');
+    }
+  }
+
+  void toggleReaction(String messageId, String emoji) async {
+    debugPrint('toggleReaction called: messageId=$messageId, emoji=$emoji, userId=$_currentUserId');
+    await addReaction(messageId, emoji);
   }
 }

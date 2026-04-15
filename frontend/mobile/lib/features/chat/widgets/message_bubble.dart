@@ -22,6 +22,9 @@ import 'package:vnalo_mobile/features/call/models/call_log_message.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/call/screens/video_call_screen.dart';
 import 'package:vnalo_mobile/features/call/screens/voice_call_screen.dart';
+import 'package:vnalo_mobile/features/chat/widgets/pinned_message_bar.dart';
+import 'package:vnalo_mobile/features/chat/widgets/message_reactions.dart';
+import 'package:vnalo_mobile/models/message_reaction_model.dart';
 
 class MessageBubble extends StatelessWidget {
   final Message message;
@@ -39,6 +42,10 @@ class MessageBubble extends StatelessWidget {
   final Function(Message)? onForwardAction;
   final Function(String)? onReplyTap;
   final bool showAvatar;
+  final List<MessageReaction>? reactions;
+  final String? currentUserId;
+  final Function(String emoji)? onToggleReaction;
+  final Function(String emoji)? onShowReactors;
 
   const MessageBubble({
     super.key,
@@ -57,6 +64,10 @@ class MessageBubble extends StatelessWidget {
     this.onDeleteAction,
     this.onForwardAction,
     this.showAvatar = false,
+    this.reactions,
+    this.currentUserId,
+    this.onToggleReaction,
+    this.onShowReactors,
   });
 
   @override
@@ -125,6 +136,13 @@ class MessageBubble extends StatelessWidget {
                 const SizedBox(height: 4),
                 _buildStatusLabel(context, isDarkMode, common),
               ],
+              if (reactions != null && reactions!.isNotEmpty && currentUserId != null)
+                MessageReactions(
+                  reactions: reactions!,
+                  currentUserId: currentUserId!,
+                  onToggleReaction: onToggleReaction,
+                  onShowReactors: onShowReactors,
+                ),
             ],
           ),
         ),
@@ -373,11 +391,19 @@ class MessageBubble extends StatelessWidget {
             }
           }
         } else if (action == 'pin') {
-          chatProvider.pinMessage(message.id);
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(common.pinActionTag)),
-            );
+          final pins = chatProvider.getPinnedMessagesForConversation(message.conversationId);
+          if (pins.length >= 3) {
+            // Already 3 pins — show dialog to unpin first
+            if (context.mounted) {
+              PinnedMessageBar.showPinLimitDialog(context, message);
+            }
+          } else {
+            chatProvider.pinMessage(message.id);
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(common.pinActionTag)),
+              );
+            }
           }
         } else if (action == 'unpin') {
           if (context.mounted) {
@@ -422,6 +448,17 @@ class MessageBubble extends StatelessWidget {
               context,
               MaterialPageRoute(builder: (_) => const ForwardScreen()),
             );
+          }
+        } else if (action.startsWith('emoji_')) {
+          final emoji = action.substring(6); // Remove 'emoji_' prefix
+          debugPrint('Emoji action received: $emoji');
+          // Close the action menu when selecting an emoji
+          Navigator.pop(context);
+          if (onToggleReaction != null) {
+            debugPrint('Calling onToggleReaction with emoji: $emoji');
+            onToggleReaction!(emoji);
+          } else {
+            debugPrint('onToggleReaction is null');
           }
         }
       },

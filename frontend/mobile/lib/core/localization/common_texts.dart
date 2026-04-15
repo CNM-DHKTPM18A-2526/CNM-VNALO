@@ -170,6 +170,12 @@ class CommonTexts {
   String get unpinAction => _isVi ? 'Bỏ ghim' : 'Unpin';
   String get confirmUnpinTitle => _isVi ? 'Bỏ ghim tin nhắn?' : 'Unpin message?';
   String get unpinSuccess => _isVi ? 'Bạn đã bỏ ghim thành công' : 'Unpinned successfully';
+  String get pinnedListTitle => _isVi ? 'Danh sách ghim' : 'Pinned messages';
+  String get pinLimitTitle => _isVi ? 'Danh sách tối đa 3 ghim.\nBạn cần bỏ bớt ghim cũ.' : 'Maximum 3 pinned messages.\nPlease unpin one first.';
+  String get addNewPin => _isVi ? 'THÊM GHIM MỚI' : 'ADD NEW PIN';
+  String get closeAction => _isVi ? 'ĐÓNG' : 'CLOSE';
+  String get collapseAction => _isVi ? 'Thu gọn' : 'Collapse';
+  String get editAction => _isVi ? 'Chỉnh sửa' : 'Edit';
   String get muteAction => _isVi ? 'Tắt' : 'Mute';
   String sayHelloTo(String name) =>
       _isVi ? 'Gửi lời chào $name' : 'Say hello to $name';

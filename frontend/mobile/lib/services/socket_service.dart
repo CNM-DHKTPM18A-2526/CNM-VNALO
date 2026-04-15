@@ -26,6 +26,10 @@ class SocketService {
       StreamController<Map<String, dynamic>>.broadcast();
   final _callSignalController =
       StreamController<Map<String, dynamic>>.broadcast();
+  final _reactionAddedController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final _reactionRemovedController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<Message> get onMessage =>
       _messageController.stream; // Stream for incoming messages
@@ -39,6 +43,8 @@ class SocketService {
   Stream<Map<String, dynamic>> get onPinned => _pinnedController.stream;
   Stream<Map<String, dynamic>> get onUnpinned => _unpinnedController.stream;
   Stream<Map<String, dynamic>> get onCallSignal => _callSignalController.stream;
+  Stream<Map<String, dynamic>> get onReactionAdded => _reactionAddedController.stream;
+  Stream<Map<String, dynamic>> get onReactionRemoved => _reactionRemovedController.stream;
 
   void _emitCallSignal(String type, dynamic data) {
     if (data is! Map) return;
@@ -134,6 +140,14 @@ class SocketService {
       final type = payload['type']?.toString();
       if (type == null || type.isEmpty) return;
       _callSignalController.add(payload);
+    });
+
+    _socket!.on('message.reaction.added', (data) {
+      _reactionAddedController.add(Map<String, dynamic>.from(data));
+    });
+
+    _socket!.on('message.reaction.removed', (data) {
+      _reactionRemovedController.add(Map<String, dynamic>.from(data));
     });
   }
 
@@ -317,6 +331,19 @@ class SocketService {
     });
   }
 
+  void addReaction(String messageId, String emoji) {
+    _socket?.emit('message.reaction.add', {
+      'messageId': messageId,
+      'emoji': emoji,
+    });
+  }
+
+  void removeReaction(String messageId) {
+    _socket?.emit('message.reaction.remove', {
+      'messageId': messageId,
+    });
+  }
+
   void disconnect() {
     _socket?.disconnect(); // Disconnect from the socket server
     _socket?.dispose(); // Dispose the socket instance to free up resources
@@ -334,5 +361,7 @@ class SocketService {
     _pinnedController.close();
     _unpinnedController.close();
     _callSignalController.close();
+    _reactionAddedController.close();
+    _reactionRemovedController.close();
   }
 }
