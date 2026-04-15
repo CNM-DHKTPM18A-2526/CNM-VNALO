@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:vnalo_mobile/config/call_config.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 
 class WebRtcCallService extends ChangeNotifier {
@@ -100,16 +101,7 @@ class WebRtcCallService extends ChangeNotifier {
       }
 
       final configuration = {
-        'iceServers': [
-          {'urls': 'stun:stun.l.google.com:19302'},
-          {'urls': 'stun:stun1.l.google.com:19302'},
-          // Placeholder for TURN servers - requires credentials for production
-          // {
-          //   'urls': 'turn:your-turn-server.com:3478',
-          //   'username': 'user',
-          //   'credential': 'password'
-          // },
-        ],
+        'iceServers': CallConfig.getIceServers(),
         'sdpSemantics': 'unified-plan',
       };
 
