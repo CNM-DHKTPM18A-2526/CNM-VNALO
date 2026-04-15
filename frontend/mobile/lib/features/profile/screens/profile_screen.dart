@@ -99,12 +99,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               color: Colors.transparent,
               child: Row(
                 children: [
-                  Icon(Icons.search, size: 24, color: isDarkMode ? searchHint : Colors.white),
+                  const Icon(Icons.search, size: 24, color: Colors.white),
                   const SizedBox(width: 8),
                   Text(
                     common.search,
-                    style: TextStyle(
-                      color: searchHint,
+                    style: const TextStyle(
+                      color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.w400,
                     ),

@@ -172,7 +172,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(
-                      color: isDarkMode ? Colors.white10 : Colors.transparent,
+                      color: Colors.transparent,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: TextField(
