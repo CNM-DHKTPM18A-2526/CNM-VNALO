@@ -8,6 +8,7 @@ import 'package:vnalo_mobile/services/socket_service.dart';
 import 'package:vnalo_mobile/services/storage_service.dart';
 
 import 'package:vnalo_mobile/services/local_sync_service.dart';
+import 'package:vnalo_mobile/core/utils/device_info_util.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService;
@@ -24,6 +25,9 @@ class AuthProvider extends ChangeNotifier {
   String? _warning;
   /// Cached access token for synchronous access (e.g. image loading headers).
   String? _accessToken;
+  
+  /// Set when the user is kicked out by another device.
+  String? _kickoutReason;
 
   User? get user => _user;
   bool get isLoading => _isLoading;
@@ -34,6 +38,8 @@ class AuthProvider extends ChangeNotifier {
   String? get warning => _warning;
   /// Current access token (cached in memory for synchronous access).
   String? get accessToken => _accessToken;
+  
+  String? get kickoutReason => _kickoutReason;
 
   AuthProvider(
     this._authService,
@@ -42,6 +48,10 @@ class AuthProvider extends ChangeNotifier {
     this._localSyncService,
   ) {
     AuthEvents.onSessionInvalidated = logout;
+    AuthEvents.onForceLogout = (reason) async {
+      _kickoutReason = reason;
+      await logout();
+    };
   }
 
   // Initialize the provider by checking if there's a valid token and fetching user info
@@ -74,9 +84,13 @@ class AuthProvider extends ChangeNotifier {
 
     // Attempt to login and handle success or error cases
     try {
+      final info = await DeviceInfoUtil.getDeviceInfo();
       final response = await _authService.login(
         phone: phone,
         password: password,
+        deviceId: info.deviceId,
+        deviceName: info.deviceName,
+        platform: info.platform,
       );
       final data = (response['data'] ?? response) as Map<String, dynamic>;
       final tokens = _extractTokens(data);
@@ -486,6 +500,11 @@ class AuthProvider extends ChangeNotifier {
     await _storageService.clearAll();
     _user = null;
     _accessToken = null;
+    notifyListeners();
+  }
+
+  void clearKickout() {
+    _kickoutReason = null;
     notifyListeners();
   }
 
