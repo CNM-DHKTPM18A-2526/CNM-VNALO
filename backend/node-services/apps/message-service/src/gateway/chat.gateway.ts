@@ -294,7 +294,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     );
 
     this.emitToUser(targetUserId, `call.${type}`, payload);
-    this.emitToUser(targetUserId, 'call.signal', payload);
 
     return {
       event: `call.${type}.sent`,

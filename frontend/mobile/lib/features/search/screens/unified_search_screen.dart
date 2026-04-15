@@ -8,6 +8,7 @@ import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
 import 'package:vnalo_mobile/features/call/models/call_log_message.dart';
 import 'package:vnalo_mobile/features/contacts/screens/send_request_screen.dart';
 import 'package:vnalo_mobile/features/call/screens/voice_call_screen.dart';
+import 'package:vnalo_mobile/features/call/utils/call_id_generator.dart';
 import 'package:vnalo_mobile/features/chat/screens/chat_detail_screen.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
@@ -979,10 +980,15 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
           MaterialPageRoute(
             builder: (_) => VoiceCallScreen(
               conversationId: resolvedConv!.id,
-              currentUserId: currentUserId,
-              targetUserId: peerUserId!,
-              targetDisplayName: peerDisplayName ?? 'User',
-              targetAvatarUrl: peerAvatarUrl,
+              callId: generateCallId(
+                conversationId: resolvedConv!.id,
+                callerUserId: currentUserId,
+                audioOnly: true,
+              ),
+              peerUserId: peerUserId!,
+              peerName: peerDisplayName ?? 'User',
+              peerAvatar: peerAvatarUrl,
+              isCaller: true,
             ),
           ),
         );

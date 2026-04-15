@@ -20,10 +20,9 @@ import 'package:vnalo_mobile/features/chat/screens/forward_screen.dart';
 import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/features/call/models/call_log_message.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
-import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/call/screens/video_call_screen.dart';
 import 'package:vnalo_mobile/features/call/screens/voice_call_screen.dart';
-import 'package:vnalo_mobile/core/utils/avatar_resolver.dart';
+import 'package:vnalo_mobile/features/call/utils/call_id_generator.dart';
 
 class MessageBubble extends StatelessWidget {
   final Message message;
@@ -599,19 +598,29 @@ class MessageBubble extends StatelessWidget {
         if (callLog.mediaType == CallMediaType.video) {
           return VideoCallScreen(
             conversationId: message.conversationId,
-            currentUserId: currentUserId,
-            targetUserId: targetUserId,
-            targetDisplayName: targetDisplayName,
-            targetAvatarUrl: targetAvatar,
+            callId: generateCallId(
+              conversationId: message.conversationId,
+              callerUserId: currentUserId,
+              audioOnly: false,
+            ),
+            peerUserId: targetUserId,
+            peerName: targetDisplayName,
+            peerAvatar: targetAvatar,
+            isCaller: true,
           );
         }
 
         return VoiceCallScreen(
           conversationId: message.conversationId,
-          currentUserId: currentUserId,
-          targetUserId: targetUserId,
-          targetDisplayName: targetDisplayName,
-          targetAvatarUrl: targetAvatar,
+          callId: generateCallId(
+            conversationId: message.conversationId,
+            callerUserId: currentUserId,
+            audioOnly: true,
+          ),
+          peerUserId: targetUserId,
+          peerName: targetDisplayName,
+          peerAvatar: targetAvatar,
+          isCaller: true,
         );
       },
     );
