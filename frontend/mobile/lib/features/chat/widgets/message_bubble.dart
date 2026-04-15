@@ -25,6 +25,7 @@ import 'package:vnalo_mobile/features/call/screens/voice_call_screen.dart';
 import 'package:vnalo_mobile/features/chat/widgets/pinned_message_bar.dart';
 import 'package:vnalo_mobile/features/chat/widgets/message_reactions.dart';
 import 'package:vnalo_mobile/models/message_reaction_model.dart';
+import 'package:vnalo_mobile/features/call/utils/call_id_generator.dart';
 
 class MessageBubble extends StatelessWidget {
   final Message message;
@@ -673,19 +674,29 @@ class MessageBubble extends StatelessWidget {
         if (callLog.mediaType == CallMediaType.video) {
           return VideoCallScreen(
             conversationId: message.conversationId,
-            currentUserId: currentUserId,
-            targetUserId: targetUserId,
-            targetDisplayName: targetDisplayName,
-            targetAvatarUrl: targetAvatar,
+            callId: generateCallId(
+              conversationId: message.conversationId,
+              callerUserId: currentUserId,
+              audioOnly: false,
+            ),
+            peerUserId: targetUserId,
+            peerName: targetDisplayName,
+            peerAvatar: targetAvatar,
+            isCaller: true,
           );
         }
 
         return VoiceCallScreen(
           conversationId: message.conversationId,
-          currentUserId: currentUserId,
-          targetUserId: targetUserId,
-          targetDisplayName: targetDisplayName,
-          targetAvatarUrl: targetAvatar,
+          callId: generateCallId(
+            conversationId: message.conversationId,
+            callerUserId: currentUserId,
+            audioOnly: true,
+          ),
+          peerUserId: targetUserId,
+          peerName: targetDisplayName,
+          peerAvatar: targetAvatar,
+          isCaller: true,
         );
       },
     );

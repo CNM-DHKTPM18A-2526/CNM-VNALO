@@ -16,6 +16,7 @@ import 'package:vnalo_mobile/core/utils/date_formatter.dart';
 import 'package:vnalo_mobile/features/chat/screens/chat_options_screen.dart';
 import 'package:vnalo_mobile/features/call/screens/video_call_screen.dart';
 import 'package:vnalo_mobile/features/call/screens/voice_call_screen.dart';
+import 'package:vnalo_mobile/features/call/utils/call_id_generator.dart';
 import 'package:vnalo_mobile/features/chat/screens/group_chat_options_screen.dart';
 import 'package:vnalo_mobile/features/chat/screens/reaction_detail_screen.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
@@ -307,10 +308,15 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       builder:
                           (_) => VoiceCallScreen(
                             conversationId: conv.id,
-                            currentUserId: currentUserId,
-                            targetUserId: peerUserId,
-                            targetDisplayName: displayName,
-                            targetAvatarUrl: avatarUrl,
+                            callId: generateCallId(
+                              conversationId: conv.id,
+                              callerUserId: currentUserId,
+                              audioOnly: true,
+                            ),
+                            peerUserId: peerUserId,
+                            peerName: displayName,
+                            peerAvatar: avatarUrl,
+                            isCaller: true,
                           ),
                     ),
                   );
@@ -340,10 +346,15 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       builder:
                           (_) => VideoCallScreen(
                             conversationId: conv.id,
-                            currentUserId: currentUserId,
-                            targetUserId: peerUserId,
-                            targetDisplayName: displayName,
-                            targetAvatarUrl: avatarUrl,
+                            callId: generateCallId(
+                              conversationId: conv.id,
+                              callerUserId: currentUserId,
+                              audioOnly: false,
+                            ),
+                            peerUserId: peerUserId,
+                            peerName: displayName,
+                            peerAvatar: avatarUrl,
+                            isCaller: true,
                           ),
                     ),
                   );
