@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/auth/localization/auth_texts.dart';
+import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/auth/screens/login_password_screen.dart';
 import 'package:vnalo_mobile/features/auth/screens/forgot_password_screen.dart';
 import 'package:vnalo_mobile/features/auth/screens/register_screen.dart';
@@ -23,6 +25,33 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
     _phoneController.addListener(_onPhoneChanged);
+    
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkKickout();
+    });
+  }
+
+  void _checkKickout() {
+    final auth = context.read<AuthProvider>();
+    if (auth.kickoutReason != null) {
+      final reason = auth.kickoutReason!;
+      auth.clearKickout();
+      
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: const Text('Thông báo'),
+          content: Text(reason),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Đóng'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   void _onPhoneChanged() {
