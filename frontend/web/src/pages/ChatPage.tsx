@@ -51,6 +51,9 @@ import type { Friend, UserLookupResult } from '../features/friends/friends.types
 import { useAuth } from '../features/auth/useAuth'
 import { Skeleton } from '../shared/components/ui/Skeleton'
 import { Card } from '../shared/components/ui/Card'
+import { Button } from '../shared/components/ui/Button'
+import { Modal } from '../shared/components/ui/Modal'
+import { Icon } from '../shared/components/Icon'
 import { useLanguage } from '../shared/i18n/LanguageContext'
 import {
   initializeSearchIndex,
@@ -62,7 +65,7 @@ import {
 } from '../features/chat/searchIndex'
 import { CreateGroupModal } from '../features/chat/components/CreateGroupModal'
 import { EditConversationNameModal } from '../features/chat/components/EditConversationNameModal'
-import { formatMessage, renderSystemMessage, formatMessageContent } from '../features/chat/utils/messageUtils'
+import { formatMessage, renderSystemMessage, formatMessageContent, formatMessagePreview } from '../features/chat/utils/messageUtils'
 import { UserStoreProvider, useUserStore } from '../features/chat/context/UserStoreContext'
 import type { SystemMessagePayload } from '../features/chat/chat.types'
 
@@ -231,26 +234,17 @@ function formatConversationPreview(
     return getConversationPreview(message, currentUserId, getDisplayName)
   }
 
-  let rawMessage =
-    typeof message === 'string' ? message : getConversationPreview(message, currentUserId, getDisplayName)
+  const isMe = typeof message !== 'string' && message.senderId === currentUserId;
+  const type = typeof message !== 'string' ? message.type : undefined;
+  const attachments = typeof message !== 'string' ? message.attachments : undefined;
+  let text = typeof message === 'string' ? message : message.text;
 
-  // Double check if the string itself is a JSON system message (common in sidebar previews)
-  if (typeof rawMessage === 'string' && rawMessage.startsWith('{"action":')) {
-    rawMessage = renderSystemMessage(rawMessage, currentUserId, getDisplayName)
-  } else if (typeof rawMessage === 'string' && rawMessage.startsWith('CALL_LOG::')) {
-    rawMessage = formatMessageContent(rawMessage)
+  // Preserve complex system formatting if content is JSON
+  if (text.startsWith('{"action":')) {
+    text = renderSystemMessage(text, currentUserId, getDisplayName);
   }
 
-  const content = String(rawMessage ?? '').trim()
-
-  if (!content) {
-    return ''
-  }
-
-  const previewSender = formatPreviewSenderName(senderName)
-  const result = previewSender ? `${previewSender}: ${content}` : content
-  const maxPreviewLength = 27
-  return result.length > maxPreviewLength ? `${result.slice(0, maxPreviewLength - 3).trimEnd()}...` : result
+  return formatMessagePreview(text, isMe, type, senderName || undefined, attachments);
 }
 
 function getDraftMessageType(payload: ChatComposePayload): ChatMessageType {
@@ -462,6 +456,9 @@ function ChatPageContent() {
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false)
   const [shareModalMessage, setShareModalMessage] = useState<ChatMessage | null>(null)
   const [isShareSubmitting, setIsShareSubmitting] = useState(false)
+  const [deletedTimestamps, setDeletedTimestamps] = useState<Record<string, number>>({})
+  const [confirmDeleteHistoryId, setConfirmDeleteHistoryId] = useState<string | null>(null)
+  const [confirmLeaveGroupOpen, setConfirmLeaveGroupOpen] = useState(false)
 
   const routedConversationIdRef = useRef('')
   const selectedConversationIdRef = useRef('')
@@ -477,6 +474,26 @@ function ChatPageContent() {
   const messageLoadRequestSeqRef = useRef(0)
   const pendingMetadataFetches = useRef<Map<string, Promise<void>>>(new Map())
   const processedMessageIds = useRef<Set<string>>(new Set())
+
+  // Load deleted timestamps from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('vnalo_deleted_timestamps')
+    if (saved) {
+      try {
+        setDeletedTimestamps(JSON.parse(saved))
+      } catch (e) {
+        console.warn('Failed to parse deleted timestamps', e)
+      }
+    }
+  }, [])
+
+  const handleDeleteHistory = (conversationId: string) => {
+    const timestamp = Date.now()
+    const newTimestamps = { ...deletedTimestamps, [conversationId]: timestamp }
+    setDeletedTimestamps(newTimestamps)
+    localStorage.setItem('vnalo_deleted_timestamps', JSON.stringify(newTimestamps))
+    setConfirmDeleteHistoryId(null)
+  }
 
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
@@ -511,8 +528,17 @@ function ChatPageContent() {
       return []
     }
 
-    return messagesByConversation[resolvedConversationId] ?? []
-  }, [messagesByConversation, routedConversationId, selectedConversationId])
+    const allMsgs = messagesByConversation[resolvedConversationId] ?? []
+    const deleteTime = deletedTimestamps[resolvedConversationId]
+    
+    if (!deleteTime) return allMsgs
+    
+    // Zalo style: Filter out messages sent BEFORE the delete moment
+    return allMsgs.filter(m => {
+      const msgTime = m.createdAt ? new Date(m.createdAt).getTime() : 0
+      return msgTime > deleteTime
+    })
+  }, [messagesByConversation, routedConversationId, selectedConversationId, deletedTimestamps])
 
   useEffect(() => {
     selectedMessagesRef.current = selectedMessages
@@ -604,9 +630,42 @@ function ChatPageContent() {
 
         const next = [...prev]
         const current = next[index]
+
+        let finalPreview = formattedPreview;
+        
+        // Inspect last few messages for grouping in sidebar
+        const conversationMsgs = messagesByConversation[conversationId] || [];
+        if (conversationMsgs.length > 0 && (message.type === 'image' || message.type === 'file')) {
+          const lastFew = [...conversationMsgs, message].slice(-5);
+          let count = 0;
+          const groupType = message.type;
+          
+          for (let i = lastFew.length - 1; i >= 0; i--) {
+            const m = lastFew[i];
+            const prevM = i > 0 ? lastFew[i-1] : null;
+            
+            const getMs = (msg: ChatMessage) => msg.createdAt ? Date.parse(msg.createdAt) : Date.parse(msg.timestamp);
+            const withinTime = !prevM || Math.abs(getMs(m) - getMs(prevM)) <= 60000;
+            const sameSender = !prevM || prevM.senderId === m.senderId;
+
+            if (m.type === groupType && withinTime && sameSender) {
+              count++;
+            } else {
+              break;
+            }
+          }
+
+          if (count > 1) {
+            const icon = groupType === 'image' ? '📷' : '📎';
+            const label = groupType === 'image' ? 'hình ảnh' : 'tệp tin';
+            const prefix = message.senderId === user?.id ? 'Bạn: ' : (senderName ? `${senderName}: ` : '');
+            finalPreview = `${prefix}${icon} ${count} ${label}`;
+          }
+        }
+
         next[index] = {
           ...current,
-          lastMessage: formattedPreview,
+          lastMessage: finalPreview,
           lastMessageAt: new Date().toISOString(),
           lastMessageSeq: message.serverSeq ?? current.lastMessageSeq,
           unreadCount: markAsReadNow ? 0 : current.unreadCount + (message.sender === 'me' ? 0 : 1),
@@ -1174,7 +1233,7 @@ function ChatPageContent() {
   }, [])
 
   const handleMessageContextMenuAction = useCallback(
-    (messageId: string, action: MessageContextMenuAction, message: ChatMessage) => {
+    (messageId: string, action: MessageContextMenuAction, message: ChatMessage, groupMessages?: ChatMessage[]) => {
       if (!messageId) {
         return
       }
@@ -1207,6 +1266,20 @@ function ChatPageContent() {
           return
         case 'share':
           setShareModalMessage(message)
+          return
+        case 'recallGroup':
+          if (groupMessages && groupMessages.length > 0) {
+            groupMessages.forEach((msg) => {
+              void handleRecallMessage(msg.id, msg.conversationId)
+            })
+          }
+          return
+        case 'deleteGroupSelf':
+          if (groupMessages && groupMessages.length > 0) {
+            groupMessages.forEach((msg) => {
+              void handleDeleteForMe(msg.id)
+            })
+          }
           return
         default:
           return
@@ -1914,6 +1987,16 @@ function ChatPageContent() {
             .map((message) => applyRestrictedMessage(mapRawMessage(message, user.id), isRestrictedMode))
             .filter((message) => !deletedMessageIds[message.id]),
         )
+
+        // Capture all recalled messages from the fetched data
+        const loadTimeRecalledIds: Record<string, true> = {};
+        mapped.forEach(m => {
+          if (m.isRecalled) loadTimeRecalledIds[m.id] = true;
+        });
+        if (Object.keys(loadTimeRecalledIds).length > 0) {
+          setRecalledMessageIds(prev => ({ ...prev, ...loadTimeRecalledIds }));
+        }
+
         setMessagesByConversation((prev) => ({
           ...prev,
           [conversationId]: mapped,
@@ -2303,11 +2386,14 @@ function ChatPageContent() {
           mediaThumbnailUrl: res.thumbnailUrl,
           mediaMimeType: res.mimeType,
           mediaSizeBytes: res.sizeBytes,
-          replyTo: replyTo,
-          replyToMessageId: replyTo?.id,
-          replyToSenderId: replyTo?.senderId,
-          replyToContent: replyTo?.preview,
         };
+
+        if (replyTo && i === 0) {
+          (payload as any).replyTo = replyTo;
+          (payload as any).replyToMessageId = replyTo.id;
+          (payload as any).replyToSenderId = replyTo.senderId;
+          (payload as any).replyToContent = replyTo.preview;
+        }
 
         const optimisticMessage: ChatMessage = {
           id: resClientMessageId,
@@ -2322,6 +2408,7 @@ function ChatPageContent() {
           mediaThumbnailUrl: res.thumbnailUrl,
           mediaMimeType: res.mimeType,
           mediaSizeBytes: res.sizeBytes,
+          createdAt: new Date().toISOString(),
           // We keep attachments in local state only for the UI to potentially group them
           attachments: [{
             url: res.url,
@@ -2329,34 +2416,56 @@ function ChatPageContent() {
             mimeType: res.mimeType,
             sizeBytes: res.sizeBytes,
             thumbnailUrl: res.thumbnailUrl
-          }] as any,
+          }],
           timestamp: formatMessageTimestamp(),
           deliveryState: 'sending',
-          replyTo: replyTo,
+          replyTo: i === 0 ? replyTo : null,
         };
 
-        setMessagesByConversation(prev => ({ ...prev, [targetConversationId]: upsertMessage(prev[targetConversationId] ?? [], optimisticMessage) }));
+        setMessagesByConversation(prev => ({ 
+          ...prev, 
+          [targetConversationId]: upsertMessage(prev[targetConversationId] ?? [], optimisticMessage) 
+        }));
         updateConversationAfterMessage(targetConversationId, optimisticMessage, true);
 
-        // Sequential sending with small delay
-        if (i > 0) await new Promise(r => setTimeout(r, 100));
-
+        // Send a message using socket, then fallback to REST if needed
         const ack = await emitSendMessage(payload);
         if (ack?.event === 'message.sent' && ack?.data) {
-          const mapped = { ...mapRawMessage(ack.data, user.id), clientMessageId: resClientMessageId, deliveryState: 'sent' as const };
-          setMessagesByConversation(prev => ({ ...prev, [targetConversationId]: upsertMessage(prev[targetConversationId] ?? [], mapped) }));
-          updateConversationAfterMessage(targetConversationId, mapped, true);
+          const serverMessage = { 
+            ...mapRawMessage(ack.data, user.id), 
+            clientMessageId: resClientMessageId, 
+            deliveryState: 'sent' as const, 
+            replyTo: i === 0 ? replyTo : null 
+          };
+          setMessagesByConversation(prev => ({ 
+            ...prev, 
+            [targetConversationId]: upsertMessage(prev[targetConversationId] ?? [], serverMessage) 
+          }));
+          updateConversationAfterMessage(targetConversationId, serverMessage, true);
         } else {
-          // REST fallback
           try {
-            const restMessage = await sendMessageViaRest(accessToken, { ...payload, messageType: payload.messageType as any });
+            const restMessage = await sendMessageViaRest(accessToken, {
+              ...payload,
+              messageType: payload.messageType as any
+            });
             if (restMessage?.id) {
-              const mapped = { ...mapRawMessage(restMessage, user.id), clientMessageId: resClientMessageId, deliveryState: 'sent' as const };
-              setMessagesByConversation(prev => ({ ...prev, [targetConversationId]: upsertMessage(prev[targetConversationId] ?? [], mapped) }));
+              const mapped = { 
+                ...mapRawMessage(restMessage, user.id), 
+                clientMessageId: resClientMessageId, 
+                deliveryState: 'sent' as const, 
+                replyTo: i === 0 ? replyTo : null 
+              };
+              setMessagesByConversation(prev => ({ 
+                ...prev, 
+                [targetConversationId]: upsertMessage(prev[targetConversationId] ?? [], mapped) 
+              }));
               updateConversationAfterMessage(targetConversationId, mapped, true);
             }
           } catch (e) {
-            setMessagesByConversation(prev => ({ ...prev, [targetConversationId]: markLocalMessageFailed(prev[targetConversationId] ?? [], resClientMessageId) }));
+            setMessagesByConversation(prev => ({ 
+              ...prev, 
+              [targetConversationId]: markLocalMessageFailed(prev[targetConversationId] ?? [], resClientMessageId) 
+            }));
           }
         }
       }
@@ -2558,10 +2667,14 @@ function ChatPageContent() {
     }
   };
 
-  const handleLeaveGroupClick = async () => {
+  const handleLeaveGroupClick = () => {
     if (!selectedConversationId || !user || !accessToken) return;
-    const isConfirmed = window.confirm("Bạn có chắc chắn muốn rời nhóm?");
-    if (!isConfirmed) return;
+    setConfirmLeaveGroupOpen(true);
+  };
+
+  const doLeaveGroup = async () => {
+    if (!selectedConversationId || !user || !accessToken) return;
+    setConfirmLeaveGroupOpen(false);
 
     try {
       // Emit structured SYSTEM message via socket FIRST while we still have permissions
@@ -2589,12 +2702,27 @@ function ChatPageContent() {
   };
 
   const sortedConversations = useMemo(() => {
-    return [...conversations].sort((a, b) => {
+    return [...conversations].map(conv => {
+      const deleteTime = deletedTimestamps[conv.id];
+      if (!deleteTime) return conv;
+
+      const lastMsgTime = new Date(conv.lastMessageAt || conv.updatedAt || 0).getTime();
+      
+      // If the last message is OLDER than the deletion moment, hide it in the preview
+      if (lastMsgTime <= deleteTime) {
+        return {
+          ...conv,
+          lastMessage: t('chat.historyDeletedPreview') || 'Bạn đã xóa lịch sử trò chuyện',
+          unreadCount: 0 // Hide unread count for deleted history conversations
+        };
+      }
+      return conv;
+    }).sort((a, b) => {
       const timeA = new Date(a.lastMessageAt || a.updatedAt || 0).getTime()
       const timeB = new Date(b.lastMessageAt || b.updatedAt || 0).getTime()
       return timeB - timeA
     })
-  }, [conversations])
+  }, [conversations, deletedTimestamps, t])
 
   if (isBootstrapping || isLoadingConversations) {
     return (
@@ -2680,14 +2808,27 @@ function ChatPageContent() {
         onClearMultiSelectMode={handleClearMultiSelectMode}
         onMessageContextMenuAction={handleMessageContextMenuAction}
       />
+
       <CreateGroupModal
         isOpen={isCreateGroupOpen}
-        friends={friendsDirectory}           // Danh sách bạn bè đã load
+        friends={friendsDirectory}
         isSubmitting={isCreatingGroup}
         onClose={() => setIsCreateGroupOpen(false)}
         onCreate={handleCreateGroup}
         initialMemberIds={preselectedMemberIds}
       />
+
+      <CreateGroupModal
+        isOpen={isAddMembersOpen}
+        friends={friendsDirectory}
+        mode="add-members"
+        isSubmitting={isAddingMembers}
+        onClose={() => setIsAddMembersOpen(false)}
+        onCreate={handleAddMembers}
+        initialMemberIds={selectedConversation?.participantUserIds ?? []}
+        existingMemberIds={selectedConversation?.participantUserIds ?? []}
+      />
+
       {rightSidebarContent ? (
         <aside className='chat-side-panel'>
           {rightSidebarContent === 'search' && selectedConversation ? (
@@ -2719,6 +2860,7 @@ function ChatPageContent() {
                   conversation={selectedConversation}
                   messages={selectedMessages}
                   onAddMembersClick={() => setIsAddMembersOpen(true)}
+                  onDeleteHistoryClick={() => setConfirmDeleteHistoryId(selectedConversationId || routedConversationId)}
                   onLeaveGroupClick={handleLeaveGroupClick}
                   onCreateGroupClick={handleCreateGroupFromDirect}
                   onEditGroupName={() => {
@@ -2738,17 +2880,6 @@ function ChatPageContent() {
           ) : null}
         </aside>
       ) : null}
-
-      <CreateGroupModal
-        isOpen={isAddMembersOpen}
-        friends={friendsDirectory}
-        mode="add-members"
-        isSubmitting={isAddingMembers}
-        onClose={() => setIsAddMembersOpen(false)}
-        onCreate={handleAddMembers}
-        initialMemberIds={selectedConversation?.participantUserIds ?? []}
-        existingMemberIds={selectedConversation?.participantUserIds ?? []}
-      />
 
       <MessageShareModal
         isOpen={Boolean(shareModalMessage)}
@@ -2772,6 +2903,44 @@ function ChatPageContent() {
         onClose={() => setIsEditConversationNameOpen(false)}
         onSubmit={editConversationNameMode === 'group' ? handleEditGroupName : handleEditNickname}
       />
+
+      <Modal
+        isOpen={!!confirmDeleteHistoryId}
+        onClose={() => setConfirmDeleteHistoryId(null)}
+        title={t('chat.confirmDeleteHistoryTitle')}
+        variant="confirm"
+        footer={
+          <div className="flex gap-3 justify-end w-full">
+            <button className="btn-zalo-secondary" onClick={() => setConfirmDeleteHistoryId(null)}>
+              {t('common.no')}
+            </button>
+            <button className="btn-zalo-danger" onClick={() => confirmDeleteHistoryId && handleDeleteHistory(confirmDeleteHistoryId)}>
+              {t('common.delete')}
+            </button>
+          </div>
+        }
+      >
+        {t('chat.confirmDeleteHistoryContent')}
+      </Modal>
+
+      <Modal
+        isOpen={confirmLeaveGroupOpen}
+        onClose={() => setConfirmLeaveGroupOpen(false)}
+        title="Xác nhận"
+        variant="confirm"
+        footer={
+          <div className="flex gap-3 justify-end w-full">
+            <button className="btn-zalo-secondary" onClick={() => setConfirmLeaveGroupOpen(false)}>
+              Không
+            </button>
+            <button className="btn-zalo-danger" onClick={doLeaveGroup}>
+              Rời nhóm
+            </button>
+          </div>
+        }
+      >
+        Bạn có chắc chắn muốn rời khỏi nhóm này không?
+      </Modal>
     </div>
   )
 }

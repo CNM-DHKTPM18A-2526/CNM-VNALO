@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../features/auth/useAuth'
-import { getOrCreateDirectConversation } from '../features/chat/chat.api'
+import { fetchInbox, getOrCreateDirectConversation } from '../features/chat/chat.api'
+import type { ConversationSummary } from '../features/chat/chat.types'
 import {
   initializeSearchIndex,
   searchUsersByPhoneLocal,
@@ -35,7 +36,6 @@ import { Button } from '../shared/components/ui/Button'
 import { Card } from '../shared/components/ui/Card'
 import { Modal } from '../shared/components/ui/Modal'
 import { useLanguage } from '../shared/i18n/LanguageContext'
-import { contactGroups } from '../shared/mock/data'
 import '../styles/contacts-page.css'
 
 type FeedbackState = {
@@ -113,7 +113,7 @@ function toCachedUserFromLookup(user: UserLookupResult): CachedUser {
 }
 
 export function ContactsPage() {
-  const { accessToken } = useAuth()
+  const { accessToken, user } = useAuth()
   const { t } = useLanguage()
   const navigate = useNavigate()
 
@@ -136,6 +136,8 @@ export function ContactsPage() {
   const [incomingRequests, setIncomingRequests] = useState<FriendRequest[]>([])
   const [sentRequests, setSentRequests] = useState<FriendRequest[]>([])
   const [stats, setStats] = useState<FriendStats | null>(null)
+  const [groups, setGroups] = useState<ConversationSummary[]>([])
+  const [isLoadingGroups, setIsLoadingGroups] = useState(true)
 
   const [isLoadingFriends, setIsLoadingFriends] = useState(true)
   const [isLoadingIncoming, setIsLoadingIncoming] = useState(true)
@@ -242,11 +244,23 @@ export function ContactsPage() {
       setIncomingRequests([])
       setSentRequests([])
       setStats(null)
+      setGroups([])
       setIsLoadingFriends(false)
       setIsLoadingIncoming(false)
       setIsLoadingSent(false)
+      setIsLoadingGroups(false)
       return
     }
+
+    // Fetch groups from inbox (filter GROUP type)
+    setIsLoadingGroups(true)
+    fetchInbox(accessToken, user?.id)
+      .then((conversations) => {
+        const groupConvs = conversations.filter((c) => c.isGroup && !c.isCloud)
+        setGroups(groupConvs)
+      })
+      .catch(() => setGroups([]))
+      .finally(() => setIsLoadingGroups(false))
 
     void Promise.all([
       refreshFriends(accessToken),
@@ -440,12 +454,12 @@ export function ContactsPage() {
 
   const filteredGroups = useMemo(
     () =>
-      contactGroups.filter(
+      groups.filter(
         (item) =>
-          item.name.toLowerCase().includes(normalizedKeyword) ||
-          item.description.toLowerCase().includes(normalizedKeyword),
+          !normalizedKeyword ||
+          (item.name ?? '').toLowerCase().includes(normalizedKeyword),
       ),
-    [normalizedKeyword],
+    [groups, normalizedKeyword],
   )
 
   const sidebarItems: SidebarItem[] = [
@@ -742,12 +756,18 @@ export function ContactsPage() {
 
         <div className='contacts-main'>
           <div className='contacts-titlebar'>
-            <Icon name='user' className='contacts-titlebar-icon' />
-            <div className='contacts-titlebar-text'>Danh sách bạn bè</div>
+            <Icon name={section === 'groups' ? 'group' : section === 'requests' ? 'userPlus' : 'user'} className='contacts-titlebar-icon' />
+            <div className='contacts-titlebar-text'>
+              {section === 'groups' ? 'Danh sách nhóm và cộng đồng' : section === 'requests' ? 'Lời mời kết bạn' : section === 'groupInvites' ? 'Lời mời nhóm và cộng đồng' : 'Danh sách bạn bè'}
+            </div>
           </div>
 
           <div className='contacts-summarybar'>
-            <div className='contacts-summarybar-text'>Bạn bè ({stats?.friendCount ?? friends.length})</div>
+            <div className='contacts-summarybar-text'>
+              {section === 'groups'
+                ? `Nhóm và cộng đồng (${groups.length})`
+                : `Bạn bè (${stats?.friendCount ?? friends.length})`}
+            </div>
           </div>
 
           <div className='contacts-filters-card'>
@@ -988,18 +1008,42 @@ export function ContactsPage() {
             ) : null}
 
             {section === 'groups' ? (
-              filteredGroups.length > 0 ? (
-                <section className='contacts-groups-list'>
+              isLoadingGroups ? (
+                <div className='contacts-loading-wrap'>
+                  <LoadingState label='Đang tải danh sách nhóm...' />
+                </div>
+              ) : filteredGroups.length > 0 ? (
+                <div className='contacts-groups-flat-list'>
                   {filteredGroups.map((group) => (
-                    <Card as='article' className='contacts-group-card' key={group.id}>
-                      <h3 className='contacts-group-card-title'>{group.name}</h3>
-                      <p className='contacts-group-card-desc'>{group.description}</p>
-                      <p className='contacts-group-card-meta'>{group.memberCount} thành viên</p>
-                    </Card>
+                    <button
+                      key={group.id}
+                      type='button'
+                      className='contacts-group-row'
+                      onClick={() => navigate(`/chat/${group.id}`)}
+                    >
+                      <UserAvatar
+                        imageUrl={group.avatarUrl ?? null}
+                        name={group.name ?? 'Nhóm'}
+                        size='md'
+                        isGroup
+                      />
+                      <div className='contacts-friend-copy'>
+                        <p className='contacts-friend-name'>{group.name ?? 'Nhóm không tên'}</p>
+                        <p className='contacts-friend-status'>
+                          {group.memberCount ? `${group.memberCount} thành viên` : 'Nhóm'}
+                        </p>
+                      </div>
+                    </button>
                   ))}
-                </section>
+                </div>
               ) : (
-                <EmptyState title={t('contacts.empty.noGroupsTitle')} description={t('contacts.empty.noGroupsDesc')} />
+                <div className='contacts-empty-center'>
+                  <div className='contacts-empty-icon-wrap'>
+                    <Icon name='group' className='contacts-empty-icon' />
+                  </div>
+                  <div className='contacts-empty-title'>Chưa có nhóm nào</div>
+                  <p className='contacts-empty-description'>Tạo nhóm chat để bắt đầu trò chuyện cùng bạn bè.</p>
+                </div>
               )
             ) : null}
 

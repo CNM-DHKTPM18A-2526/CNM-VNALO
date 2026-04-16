@@ -1,4 +1,5 @@
 import type { ChatAttachment, ChatMessage, ChatMessageType, ConversationSummary, ReplyMetadata } from './chat.types'
+import { formatMessageContent } from './utils/messageUtils'
 
 const fallbackProtocol = typeof window !== 'undefined' ? window.location.protocol.replace(':', '') : 'http'
 const fallbackHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
@@ -44,6 +45,9 @@ export type RawMessage = {
   mediaMimeType?: string | null
   mediaSizeBytes?: number | null
   attachments?: ChatAttachment[]
+  status?: string | null
+  recalledAt?: string | null
+  recalled_at?: string | null
 }
 
 type RawMessageLike = RawMessage & {
@@ -59,6 +63,9 @@ type RawMessageLike = RawMessage & {
   media_mime_type?: string | null
   media_size_bytes?: number | null
   attachments?: ChatAttachment[]
+  status?: string | null
+  recalledAt?: string | null
+  recalled_at?: string | null
 }
 
 type UploadResponse = {
@@ -219,6 +226,10 @@ function normalizeInboxPreview(rawPreview?: string | null): string {
     return ''
   }
 
+  // Handle specific multi-attachment strings if they come from backend or local cache
+  if (/📷\s*\d+\s*hình ảnh/i.test(preview)) return preview;
+  if (/📎\s*\d+\s*tệp tin/i.test(preview)) return preview;
+
   const lowered = preview.toLowerCase()
 
   if (lowered === '[sticker]' || lowered.startsWith('sticker://') || lowered.includes('sticker')) {
@@ -245,35 +256,25 @@ function normalizeInboxPreview(rawPreview?: string | null): string {
     return 'File'
   }
 
+  if (/CALL_LOG/i.test(preview)) {
+    return formatMessageContent(preview)
+  }
+
   return preview
 }
 
-function normalizeMessageType(raw: RawMessageLike): ChatMessageType {
-  const declaredType = String(raw.messageType ?? '').trim().toLowerCase()
-  const content = String(raw.content ?? '').trim()
+function normalizeMessageType(rawType: any, raw?: RawMessageLike): ChatMessageType {
+  const declaredType = String(rawType || '').trim().toLowerCase()
 
-  if (declaredType === 'image' || declaredType === 'file' || declaredType === 'sticker' || declaredType === 'text' || declaredType === 'system') {
+  if (declaredType === 'image' || declaredType === 'file' || declaredType === 'sticker' || declaredType === 'text' || declaredType === 'system' || declaredType === 'call') {
     return declaredType as ChatMessageType
   }
 
-  if (isImageMimeType(raw.mediaMimeType ?? raw.media_mime_type)) {
-    return 'image'
-  }
-
-  if (isImageUrl(raw.mediaUrl ?? raw.media_url)) {
-    return 'image'
-  }
-
-  if (raw.mediaUrl ?? raw.media_url) {
-    return 'file'
-  }
-
-  if (isImageUrl(content)) {
-    return 'image'
-  }
-
-  if (isHttpUrl(content)) {
-    return 'file'
+  // Optional guessing only if explicit type is missing
+  if (raw) {
+    if (isImageMimeType(raw.mediaMimeType ?? raw.media_mime_type)) return 'image'
+    if (isImageUrl(raw.mediaUrl ?? raw.media_url)) return 'image'
+    if (raw.mediaUrl ?? raw.media_url) return 'file'
   }
 
   return 'text'
@@ -389,13 +390,14 @@ export function mapRawMessage(raw: RawMessageLike, currentUserId: string): ChatM
   const mediaThumbnailUrl = raw.mediaThumbnailUrl ?? raw.media_thumbnail_url ?? null
   const mediaMimeType = raw.mediaMimeType ?? raw.media_mime_type ?? null
   const mediaSizeBytes = raw.mediaSizeBytes ?? raw.media_size_bytes ?? null
-  const type = normalizeMessageType(raw)
+  console.log('Mapped type debug:', (raw as any).type, raw.messageType)
+  const type = normalizeMessageType((raw as any).type || raw.messageType || (raw as any).message_type, raw)
   const mediaUrl = mediaUrlFromPayload ?? ((type === 'image' || type === 'file' || type === 'sticker') ? mediaUrlFromContent : null)
   const messageText = mediaUrlFromContent && content.trim() === mediaUrlFromContent ? '' : content
   const attachmentName = type === 'file' && messageText && !isHttpUrl(messageText) ? messageText : undefined
 
   let attachments: ChatAttachment[] | undefined = raw.attachments
-  if (!attachments && mediaUrl) {
+  if ((!attachments || attachments.length === 0) && mediaUrl) {
     attachments = [
       {
         url: mediaUrl,
@@ -432,7 +434,8 @@ export function mapRawMessage(raw: RawMessageLike, currentUserId: string): ChatM
         preview: raw.replyToContent || (raw as any).reply_to_content || '',
         type: 'text' // Fallback type
       } : null
-    )
+    ),
+    isRecalled: raw.status === 'RECALLED' || !!(raw.recalledAt || raw.recalled_at)
   }
 }
 

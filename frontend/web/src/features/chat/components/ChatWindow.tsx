@@ -17,6 +17,7 @@ import { useUserStore } from '../context/UserStoreContext'
 import { formatPresence } from '../utils/presenceUtils'
 import { ImageViewerProvider } from './ImageViewer'
 import { MessageBubble } from './MessageBubble'
+import { MessageGroupBubble } from './MessageGroupBubble'
 import { MessageInput } from './MessageInput'
 import type { MessageContextMenuAction } from './MessageContextMenu'
 
@@ -46,7 +47,7 @@ type ChatWindowProps = {
   isMultiSelectMode?: boolean
   onToggleMessageSelection?: (messageId: string) => void
   onClearMultiSelectMode?: () => void
-  onMessageContextMenuAction?: (messageId: string, action: MessageContextMenuAction, message: ChatMessage) => void
+  onMessageContextMenuAction?: (messageId: string, action: MessageContextMenuAction, message: ChatMessage, groupMessages?: ChatMessage[]) => void
 }
 
 export function ChatWindow({
@@ -194,7 +195,20 @@ export function ChatWindow({
 
   const handleReplyAction = (message: ChatMessage) => {
     console.log('[ChatWindow] Initiating reply to:', message.id)
-    setReplyMessage(message)
+    
+    // Clean up preview text for the quote. Use the same logic as Sidebar/Preview.
+    let cleanPreview = message.text;
+    if (cleanPreview.startsWith('{"action":')) {
+      cleanPreview = renderSystemMessage(cleanPreview, currentUserId || '', (id) => userMap[id]?.displayName || 'Người dùng');
+    } else if (cleanPreview.startsWith('CALL_LOG::')) {
+      const actorName = message.senderId === currentUserId ? 'Bạn' : (userMap[message.senderId]?.displayName || 'Người dùng');
+      cleanPreview = `${actorName} đã thực hiện cuộc gọi`;
+    }
+
+    setReplyMessage({
+      ...message,
+      text: cleanPreview // Use cleaned text for the reply preview
+    })
   }
 
   if (!conversation) {
@@ -304,123 +318,135 @@ export function ChatWindow({
               description={t('chat.windowEmptyDesc')}
             />
           ) : (() => {
-            // Virtual Grouping Logic (Zalo-style Album)
-            const renderedElements: React.ReactNode[] = [];
-            const processedIds = new Set<string>();
+            // Stable Virtual Grouping Logic (Zalo-style)
+            // Conditions: Same sender, same type (image/file), consecutive, gap <= 60s
+            type GroupedRenderItem = {
+              type: 'single' | 'group';
+              items: ChatMessage[];
+            };
 
-            for (let i = 0; i < conversationMessages.length; i++) {
-              const message = conversationMessages[i];
-              if (processedIds.has(message.id)) continue;
+            function getGroupedMessages(messages: ChatMessage[]): GroupedRenderItem[] {
+              const groups: GroupedRenderItem[] = [];
+              let currentGroup: ChatMessage[] = [];
 
-              const profile = userMap[message.senderId];
-              const isIncoming = message.sender !== 'me';
-              const previous = i > 0 ? conversationMessages[i - 1] : null;
+              for (let i = 0; i < messages.length; i++) {
+                const msg = messages[i];
+                const prevMsg = currentGroup[currentGroup.length - 1];
 
-              const isFirstInCluster =
-                !previous ||
-                previous.sender !== message.sender ||
-                previous.senderId !== message.senderId;
+                const msgIsRecalled = msg.isRecalled || recalledMessageIds[msg.id];
+                const prevIsRecalled = prevMsg && (prevMsg.isRecalled || recalledMessageIds[prevMsg.id]);
+                const canGroup = (msg.type === 'image' || msg.type === 'file') && !msgIsRecalled;
+                
+                const isSameSender = prevMsg && prevMsg.senderId === msg.senderId;
+                const isSameType = prevMsg && prevMsg.type === msg.type;
+                
+                // Use createdAt for reliable time difference calculation
+                const getMs = (m: ChatMessage) => m.createdAt ? Date.parse(m.createdAt) : 0;
+                const withinTime = prevMsg && Math.abs(getMs(msg) - getMs(prevMsg)) <= 60000;
 
-              // Identify if this is a media message that can be bundled
-              const isImage = message.type === 'image';
-
-              if (isImage && !recalledMessageIds[message.id]) {
-                const group: ChatMessage[] = [message];
-                let j = i + 1;
-                while (j < conversationMessages.length) {
-                  const nextMsg = conversationMessages[j];
-                  const timeDiff = Math.abs(Date.parse(nextMsg.timestamp) - Date.parse(message.timestamp));
-
-                  if (
-                    nextMsg.sender === message.sender &&
-                    nextMsg.type === 'image' &&
-                    !recalledMessageIds[nextMsg.id] &&
-                    timeDiff < 30000
-                  ) {
-                    group.push(nextMsg);
-                    processedIds.add(nextMsg.id);
-                    j++;
-                  } else {
-                    break;
+                if (canGroup && prevMsg && !prevIsRecalled && isSameSender && isSameType && withinTime) {
+                  currentGroup.push(msg);
+                } else {
+                  if (currentGroup.length > 0) {
+                    groups.push({
+                      type: currentGroup.length > 1 ? 'group' : 'single',
+                      items: [...currentGroup]
+                    });
                   }
-                }
-
-                if (group.length > 1) {
-                  const virtualMessage: ChatMessage = {
-                    ...message,
-                    attachments: group.map(m => ({
-                      url: m.mediaUrl || m.attachments?.[0]?.url || "",
-                      name: m.attachments?.[0]?.name || "Ảnh",
-                      mimeType: m.mediaMimeType || "image/jpeg",
-                      sizeBytes: m.mediaSizeBytes || 0,
-                      thumbnailUrl: m.mediaThumbnailUrl || null
-                    })) as any
-                  };
-
-                  renderedElements.push(
-                    <MessageBubble
-                      key={"group-" + message.id}
-                      message={virtualMessage}
-                      reactions={reactionStatesByMessage[message.id]?.reactions ?? {}}
-                      onAddReaction={(reactionKey) => onAddReaction?.(message.id, reactionKey)}
-                      onRemoveReaction={(reactionKey) => onRemoveReaction?.(message.id, reactionKey)}
-                      onContextMenuAction={(action, currentMsg) => onMessageContextMenuAction?.(message.id, action, currentMsg)}
-                      senderName={isIncoming ? (profile?.displayName || (conversation.isGroup ? 'Thành viên' : conversation.name)) : 'Bạn'}
-                      senderAvatarUrl={isIncoming ? (profile?.avatarUrl ?? (conversation.isGroup ? null : conversation.avatarUrl) ?? null) : null}
-                      showAvatar={isFirstInCluster && isIncoming}
-                      showSenderName={isFirstInCluster && isIncoming && conversation.isGroup}
-                      isPinned={Boolean(pinnedMessageIds[message.id])}
-                      isStarred={Boolean(starredMessageIds[message.id])}
-                      isRecalled={Boolean(recalledMessageIds[message.id])}
-                      isMultiSelectMode={isMultiSelectMode}
-                      isSelected={selectedMessageIds.includes(message.id)}
-                      onToggleSelection={() => onToggleMessageSelection?.(message.id)}
-                      isReadByPeer={
-                        message.sender === 'me' &&
-                        message.serverSeq !== undefined &&
-                        peerLastReadSeq !== undefined &&
-                        message.serverSeq <= peerLastReadSeq
-                      }
-                      isHighlighted={highlightedMessageId === message.id}
-                      currentUserId={currentUserId}
-                    />
-                  );
-                  continue;
+                  currentGroup = [msg];
                 }
               }
 
-              // Normal message rendering
-              renderedElements.push(
-                <MessageBubble
-                  key={message.id}
-                  message={message}
-                  reactions={reactionStatesByMessage[message.id]?.reactions ?? {}}
-                  onAddReaction={(reactionKey) => onAddReaction?.(message.id, reactionKey)}
-                  onRemoveReaction={(reactionKey) => onRemoveReaction?.(message.id, reactionKey)}
-                  onContextMenuAction={(action, currentMsg) => onMessageContextMenuAction?.(message.id, action, currentMsg)}
-                  senderName={isIncoming ? (userMap[message.senderId]?.displayName || profile?.displayName || (conversation.isGroup ? 'Thành viên' : conversation.name)) : 'Bạn'}
-                  senderAvatarUrl={isIncoming ? (userMap[message.senderId]?.avatarUrl || profile?.avatarUrl || (conversation.isGroup ? null : conversation.avatarUrl) || null) : null}
-                  showAvatar={isFirstInCluster && isIncoming}
-                  showSenderName={isFirstInCluster && isIncoming && conversation.isGroup}
-                  isPinned={Boolean(pinnedMessageIds[message.id])}
-                  isStarred={Boolean(starredMessageIds[message.id])}
-                  isRecalled={Boolean(recalledMessageIds[message.id])}
-                  isMultiSelectMode={isMultiSelectMode}
-                  isSelected={selectedMessageIds.includes(message.id)}
-                  onToggleSelection={() => onToggleMessageSelection?.(message.id)}
-                  isReadByPeer={
-                    message.sender === 'me' &&
-                    message.serverSeq !== undefined &&
-                    peerLastReadSeq !== undefined &&
-                    message.serverSeq <= peerLastReadSeq
-                  }
-                  isHighlighted={highlightedMessageId === message.id}
-                  currentUserId={currentUserId}
-                  onReply={() => handleReplyAction(message)}
-                  onJumpToOriginal={(id) => handleJumpToMessage(id)}
-                />
-              );
+              if (currentGroup.length > 0) {
+                groups.push({
+                  type: currentGroup.length > 1 ? 'group' : 'single',
+                  items: [...currentGroup]
+                });
+              }
+
+              return groups;
             }
+
+            const groupedItems = getGroupedMessages(conversationMessages);
+            const renderedElements: React.ReactNode[] = [];
+            let lastProcessedSenderId: string | null = null;
+
+            groupedItems.forEach((group, groupIdx) => {
+              const firstMsg = group.items[0];
+              const lastMsg = group.items[group.items.length - 1];
+              const isIncoming = firstMsg.sender !== 'me';
+              const profile = userMap[firstMsg.senderId];
+              
+              // Visual grouping flags (for first in cluster styling)
+              const isFirstInCluster = firstMsg.senderId !== lastProcessedSenderId;
+              lastProcessedSenderId = firstMsg.senderId;
+
+              if (group.type === 'group') {
+                renderedElements.push(
+                  <MessageGroupBubble
+                    key={"group-" + firstMsg.id}
+                    messages={group.items}
+                    senderName={isIncoming ? (profile?.displayName || (conversation.isGroup ? 'Thành viên' : conversation.name)) : 'Bạn'}
+                    senderAvatarUrl={isIncoming ? (profile?.avatarUrl ?? (conversation.isGroup ? null : conversation.avatarUrl) ?? null) : null}
+                    showAvatar={isFirstInCluster && isIncoming}
+                    showSenderName={isFirstInCluster && isIncoming && conversation.isGroup}
+                    reactionStatesByMessage={reactionStatesByMessage}
+                    onAddReaction={onAddReaction!}
+                    onRemoveReaction={onRemoveReaction!}
+                    onMessageContextMenuAction={onMessageContextMenuAction!}
+                    pinnedMessageIds={pinnedMessageIds}
+                    starredMessageIds={starredMessageIds}
+                    recalledMessageIds={recalledMessageIds}
+                    isRecalled={lastMsg.isRecalled || !!recalledMessageIds[lastMsg.id]}
+                    isMultiSelectMode={isMultiSelectMode}
+                    selectedMessageIds={selectedMessageIds}
+                    onToggleMessageSelection={onToggleMessageSelection!}
+                    peerLastReadSeq={peerLastReadSeq}
+                    highlightedMessageId={highlightedMessageId}
+                    currentUserId={currentUserId}
+                    handleReplyAction={handleReplyAction}
+                    handleJumpToMessage={handleJumpToMessage}
+                    isIncoming={isIncoming}
+                    isFirstInCluster={isFirstInCluster}
+                    isGroupConversation={conversation.isGroup || false}
+                  />
+                );
+              } else {
+                // Single message
+                const message = firstMsg;
+                renderedElements.push(
+                  <MessageBubble
+                    key={message.id}
+                    message={message}
+                    reactions={reactionStatesByMessage[message.id]?.reactions ?? {}}
+                    onAddReaction={(reactionKey) => onAddReaction?.(message.id, reactionKey)}
+                    onRemoveReaction={(reactionKey) => onRemoveReaction?.(message.id, reactionKey)}
+                    onContextMenuAction={(action, currentMsg) => onMessageContextMenuAction?.(message.id, action, currentMsg, group.items)}
+                    senderName={isIncoming ? (userMap[message.senderId]?.displayName || profile?.displayName || (conversation.isGroup ? 'Thành viên' : conversation.name)) : 'Bạn'}
+                    senderAvatarUrl={isIncoming ? (userMap[message.senderId]?.avatarUrl || profile?.avatarUrl || (conversation.isGroup ? null : conversation.avatarUrl) || null) : null}
+                    showAvatar={isFirstInCluster && isIncoming}
+                    showSenderName={isFirstInCluster && isIncoming && conversation.isGroup}
+                    isPinned={Boolean(pinnedMessageIds[message.id])}
+                    isStarred={Boolean(starredMessageIds[message.id])}
+                    isRecalled={message.isRecalled || Boolean(recalledMessageIds[message.id])}
+                    isMultiSelectMode={isMultiSelectMode}
+                    isSelected={selectedMessageIds.includes(message.id)}
+                    onToggleSelection={() => onToggleMessageSelection?.(message.id)}
+                    isReadByPeer={
+                      message.sender === 'me' &&
+                      message.serverSeq !== undefined &&
+                      peerLastReadSeq !== undefined &&
+                      message.serverSeq <= peerLastReadSeq
+                    }
+                    isHighlighted={highlightedMessageId === message.id}
+                    currentUserId={currentUserId}
+                    onReply={() => handleReplyAction(message)}
+                    onJumpToOriginal={(id) => handleJumpToMessage(id)}
+                  />
+                );
+              }
+            });
+
             return renderedElements;
           })()}
         </div>
