@@ -297,11 +297,16 @@ export class MessageService {
     const existing = await this.pinRepo.findOne({ where: { conversationId, messageId } });
     if (existing) throw new BadRequestException('Message is already pinned');
 
-    return this.pinRepo.save({
+    const saved = await this.pinRepo.save({
       conversationId,
       messageId,
       serverSeq: message.serverSeq,
       pinnedBy: userId,
+    });
+
+    return this.pinRepo.findOne({
+      where: { id: saved.id },
+      relations: ['message'],
     });
   }
 
@@ -320,6 +325,7 @@ export class MessageService {
     await this.conversationService.assertMember(conversationId, userId);
     return this.pinRepo.find({
       where: { conversationId },
+      relations: ['message'],
       order: { pinnedAt: 'DESC' },
     });
   }

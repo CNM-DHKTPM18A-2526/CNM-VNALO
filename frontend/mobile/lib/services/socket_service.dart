@@ -21,7 +21,15 @@ class SocketService {
       StreamController<Map<String, dynamic>>.broadcast();
   final _recalledController =
       StreamController<Map<String, dynamic>>.broadcast();
+  final _pinnedController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final _unpinnedController =
+      StreamController<Map<String, dynamic>>.broadcast();
   final _callSignalController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final _reactionAddedController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final _reactionRemovedController =
       StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<Message> get onMessage =>
@@ -33,7 +41,11 @@ class SocketService {
   Stream<Map<String, dynamic>> get onRead => _readController.stream;
   Stream<Map<String, dynamic>> get onDelivered => _deliveredController.stream;
   Stream<Map<String, dynamic>> get onRecalled => _recalledController.stream;
+  Stream<Map<String, dynamic>> get onPinned => _pinnedController.stream;
+  Stream<Map<String, dynamic>> get onUnpinned => _unpinnedController.stream;
   Stream<Map<String, dynamic>> get onCallSignal => _callSignalController.stream;
+  Stream<Map<String, dynamic>> get onReactionAdded => _reactionAddedController.stream;
+  Stream<Map<String, dynamic>> get onReactionRemoved => _reactionRemovedController.stream;
 
   void _emitCallSignal(String type, dynamic data) {
     if (data is! Map) return;
@@ -108,6 +120,14 @@ class SocketService {
       _recalledController.add(Map<String, dynamic>.from(data));
     });
 
+    _socket!.on('message.pinned', (data) {
+      _pinnedController.add(Map<String, dynamic>.from(data));
+    });
+
+    _socket!.on('message.unpinned', (data) {
+      _unpinnedController.add(Map<String, dynamic>.from(data));
+    });
+
     _socket!.on('call.offer', (data) => _emitCallSignal('offer', data));
     _socket!.on('call.answer', (data) => _emitCallSignal('answer', data));
     _socket!.on(
@@ -121,6 +141,13 @@ class SocketService {
       _callSignalController.add(payload);
     });
 
+    _socket!.on('message.reaction.added', (data) {
+      _reactionAddedController.add(Map<String, dynamic>.from(data));
+    });
+
+    _socket!.on('message.reaction.removed', (data) {
+      _reactionRemovedController.add(Map<String, dynamic>.from(data));
+    });
     _socket!.on('auth.logout.force', (data) {
       final reason = data is Map ? data['reason']?.toString() : null;
       AuthEvents.onForceLogout?.call(reason ?? 'Tài khoản đã đăng nhập từ thiết bị khác');
@@ -215,6 +242,20 @@ class SocketService {
     });
   }
 
+  void pinMessage(String messageId, String conversationId) {
+    _socket?.emit('message.pin', {
+      'messageId': messageId,
+      'conversationId': conversationId,
+    });
+  }
+
+  void unpinMessage(String messageId, String conversationId) {
+    _socket?.emit('message.unpin', {
+      'messageId': messageId,
+      'conversationId': conversationId,
+    });
+  }
+
   void sendCallOffer({
     required String conversationId,
     required String callId,
@@ -293,6 +334,19 @@ class SocketService {
     });
   }
 
+  void addReaction(String messageId, String emoji) {
+    _socket?.emit('message.reaction.add', {
+      'messageId': messageId,
+      'emoji': emoji,
+    });
+  }
+
+  void removeReaction(String messageId) {
+    _socket?.emit('message.reaction.remove', {
+      'messageId': messageId,
+    });
+  }
+
   void disconnect() {
     _socket?.disconnect(); // Disconnect from the socket server
     _socket?.dispose(); // Dispose the socket instance to free up resources
@@ -307,6 +361,10 @@ class SocketService {
     _readController.close();
     _deliveredController.close();
     _recalledController.close();
+    _pinnedController.close();
+    _unpinnedController.close();
     _callSignalController.close();
+    _reactionAddedController.close();
+    _reactionRemovedController.close();
   }
 }

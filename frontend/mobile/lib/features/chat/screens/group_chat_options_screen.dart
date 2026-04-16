@@ -14,6 +14,7 @@ import 'package:vnalo_mobile/features/chat/screens/group_settings_screen.dart';
 import 'package:vnalo_mobile/features/chat/screens/add_group_members_screen.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
+import 'package:vnalo_mobile/models/conversation_member_model.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 class GroupChatOptionsScreen extends StatefulWidget {
@@ -89,7 +90,10 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final common = CommonTexts.of(context);
     final userId = context.read<AuthProvider>().user?.id;
-    final myMember = conv.members.firstWhere((m) => m.userId == userId, orElse: () => conv.members.first);
+    // Safety check: if members list is empty (e.g. after disband), use a dummy to avoid crash
+    final myMember = conv.members.isEmpty 
+        ? ConversationMember(conversationId: conv.id, userId: 'none', joinedAt: DateTime.now())
+        : conv.members.firstWhere((m) => m.userId == userId, orElse: () => conv.members.first);
 
     return Scaffold(
       backgroundColor: isDarkMode ? DarkColors.scaffold : const Color(0xFFF4F5F7),
@@ -227,6 +231,7 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
   bool _isAdminOrOwner(Conversation conv, String? userId) {
     if (userId == null) return false;
     if (conv.createdBy == userId) return true;
+    if (conv.members.isEmpty) return false;
     final member = conv.members.firstWhere((m) => m.userId == userId, orElse: () => conv.members.first);
     return member.role == MemberRole.ADMIN || member.role == MemberRole.OWNER;
   }
@@ -428,6 +433,7 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
 
   void _confirmLeaveGroup(Conversation conv) {
     final userId = context.read<AuthProvider>().user?.id;
+    if (conv.members.isEmpty) return;
     final member = conv.members.firstWhere((m) => m.userId == userId, orElse: () => conv.members.first);
     
     if (member.role == MemberRole.OWNER || member.role == MemberRole.ADMIN) {

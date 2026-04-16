@@ -273,42 +273,42 @@ services:
           memory: 256M
           cpus: "0.5"
 
-  moderation-service:
-    build:
-      context: ../backend/java-services/services/moderation-service
-      dockerfile: Dockerfile
-    container_name: vnalo-moderation-service
-    ports:
-      - "8082:8082"
-    environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: ${DB_NAME:-vnalo_core}
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASS: ${DB_PASS:-postgres}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
-      JWT_ISSUER: ${JWT_ISSUER:-vnalo}
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - vnalo-network
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/api/v1/actuator/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 40s
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: "0.5"
+  # moderation-service:
+  #   build:
+  #     context: ../backend/java-services/services/moderation-service
+  #     dockerfile: Dockerfile
+  #   container_name: vnalo-moderation-service
+  #   ports:
+  #     - "8082:8082"
+  #   environment:
+  #     DB_HOST: postgres
+  #     DB_PORT: 5432
+  #     DB_NAME: ${DB_NAME:-vnalo_core}
+  #     DB_USER: ${DB_USER:-postgres}
+  #     DB_PASS: ${DB_PASS:-postgres}
+  #     REDIS_HOST: redis
+  #     REDIS_PORT: 6379
+  #     JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+  #     JWT_ISSUER: ${JWT_ISSUER:-vnalo}
+  #     SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   networks:
+  #     - vnalo-network
+  #   healthcheck:
+  #     test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/api/v1/actuator/health"]
+  #     interval: 30s
+  #     timeout: 5s
+  #     retries: 3
+  #     start_period: 40s
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 512M
+  #         cpus: "0.5"
 
   analytics-service:
     build:

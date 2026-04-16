@@ -363,6 +363,10 @@ export class ConversationService {
   async assertCanPinMessage(conversationId: string, userId: string): Promise<void> {
     const conversation = await this.getConversationOrFail(conversationId);
     const member = await this.assertMember(conversationId, userId);
+
+    // Always allow pinning in 1:1 chats. For groups, check allowMemberPin or admin/owner role.
+    if (conversation.type === ConversationType.DIRECT) return;
+
     if (member.role === MemberRole.MEMBER && !conversation.allowMemberPin) {
       throw new ForbiddenException('Only admin/owner can pin in this group');
     }

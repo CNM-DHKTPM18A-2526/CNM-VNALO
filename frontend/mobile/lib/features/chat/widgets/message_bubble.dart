@@ -22,6 +22,9 @@ import 'package:vnalo_mobile/features/call/models/call_log_message.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/call/screens/video_call_screen.dart';
 import 'package:vnalo_mobile/features/call/screens/voice_call_screen.dart';
+import 'package:vnalo_mobile/features/chat/widgets/pinned_message_bar.dart';
+import 'package:vnalo_mobile/features/chat/widgets/message_reactions.dart';
+import 'package:vnalo_mobile/models/message_reaction_model.dart';
 import 'package:vnalo_mobile/features/call/utils/call_id_generator.dart';
 
 class MessageBubble extends StatelessWidget {
@@ -40,6 +43,10 @@ class MessageBubble extends StatelessWidget {
   final Function(Message)? onForwardAction;
   final Function(String)? onReplyTap;
   final bool showAvatar;
+  final List<MessageReaction>? reactions;
+  final String? currentUserId;
+  final Function(String emoji)? onToggleReaction;
+  final Function(String emoji)? onShowReactors;
 
   const MessageBubble({
     super.key,
@@ -58,6 +65,10 @@ class MessageBubble extends StatelessWidget {
     this.onDeleteAction,
     this.onForwardAction,
     this.showAvatar = false,
+    this.reactions,
+    this.currentUserId,
+    this.onToggleReaction,
+    this.onShowReactors,
   });
 
   @override
@@ -126,6 +137,13 @@ class MessageBubble extends StatelessWidget {
                 const SizedBox(height: 4),
                 _buildStatusLabel(context, isDarkMode, common),
               ],
+              if (reactions != null && reactions!.isNotEmpty && currentUserId != null)
+                MessageReactions(
+                  reactions: reactions!,
+                  currentUserId: currentUserId!,
+                  onToggleReaction: onToggleReaction,
+                  onShowReactors: onShowReactors,
+                ),
             ],
           ),
         ),
@@ -238,6 +256,7 @@ class MessageBubble extends StatelessWidget {
         context.watch<ChatProvider>().highlightedMessageId == message.id;
 
     return GestureDetector(
+      onTap: message.replyToMessageId != null ? () => onReplyTap?.call(message.replyToMessageId!) : null,
       onLongPress: () => _showActionMenu(context, chatProvider),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 500),
@@ -278,6 +297,7 @@ class MessageBubble extends StatelessWidget {
       message: message,
       isMine: isMine,
       isCloud: isCloud,
+      isPinned: chatProvider.isMessagePinned(message.conversationId, message.id),
       position: position,
       size: size,
       child: _buildBubbleContent(context, isDarkMode),
@@ -299,11 +319,12 @@ class MessageBubble extends StatelessWidget {
            }
         } else if (action == 'recall') {
           if (context.mounted) {
+            final common = CommonTexts.of(context, listen: false);
             final confirmed = await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
-                title: Text(common.recallMessageTitle),
-                content: Text(common.recallMessagePrompt),
+                title: Text(common.recallAction),
+                content: Text(common.confirmRecallMessage),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, false),
@@ -312,7 +333,7 @@ class MessageBubble extends StatelessWidget {
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, true),
                     style: TextButton.styleFrom(foregroundColor: Colors.orange),
-                    child: Text(common.recallMessageTitle),
+                    child: Text(common.recallAction),
                   ),
                 ],
               ),
@@ -344,11 +365,12 @@ class MessageBubble extends StatelessWidget {
             return;
           }
           if (context.mounted) {
+            final common = CommonTexts.of(context, listen: false);
             final confirmed = await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
-                title: Text(common.deleteMessageTitle),
-                content: Text(common.deleteMessagePrompt),
+                title: Text(common.deleteForMeAction),
+                content: Text(common.deleteHistoryWarning),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, false),
@@ -357,7 +379,7 @@ class MessageBubble extends StatelessWidget {
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, true),
                     style: TextButton.styleFrom(foregroundColor: Colors.red),
-                    child: Text(common.deleteMessageTitle),
+                    child: Text(common.deleteForMeAction),
                   ),
                 ],
               ),
@@ -367,6 +389,51 @@ class MessageBubble extends StatelessWidget {
                 message.id,
                 message.conversationId,
               );
+            }
+          }
+        } else if (action == 'pin') {
+          final pins = chatProvider.getPinnedMessagesForConversation(message.conversationId);
+          if (pins.length >= 3) {
+            // Already 3 pins — show dialog to unpin first
+            if (context.mounted) {
+              PinnedMessageBar.showPinLimitDialog(context, message);
+            }
+          } else {
+            chatProvider.pinMessage(message.id);
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(common.pinActionTag)),
+              );
+            }
+          }
+        } else if (action == 'unpin') {
+          if (context.mounted) {
+            final common = CommonTexts.of(context, listen: false);
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: Text(common.confirmUnpinTitle),
+                content: Text('${common.confirmUnpinTitle} "${message.content ?? ''}"?'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: Text(common.cancel),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    style: TextButton.styleFrom(foregroundColor: Colors.red),
+                    child: Text(common.unpinAction),
+                  ),
+                ],
+              ),
+            );
+            if (confirmed == true) {
+              chatProvider.unpinMessage(message.id);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(common.unpinSuccess)),
+                );
+              }
             }
           }
         } else if (action == 'forward') {
@@ -383,12 +450,21 @@ class MessageBubble extends StatelessWidget {
               MaterialPageRoute(builder: (_) => const ForwardScreen()),
             );
           }
+        } else if (action.startsWith('emoji_')) {
+          final emoji = action.substring(6); // Remove 'emoji_' prefix
+          debugPrint('Emoji action received: $emoji');
+          // Close the action menu when selecting an emoji
+          Navigator.pop(context);
+          if (onToggleReaction != null) {
+            debugPrint('Calling onToggleReaction with emoji: $emoji');
+            onToggleReaction!(emoji);
+          } else {
+            debugPrint('onToggleReaction is null');
+          }
         }
       },
     );
   }
-
-
 
   Widget _renderTypeSpecificContent(BuildContext context, bool isDarkMode) {
     switch (message.messageType) {
@@ -732,118 +808,128 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
+  /// Trả về true nếu URL là ảnh GIF (từ Giphy, Tenor hoặc đuôi .gif)
+  bool _isGifUrl(String url) {
+    final lower = url.toLowerCase();
+    return lower.endsWith('.gif') ||
+        lower.contains('giphy.com') ||
+        lower.contains('tenor.com') ||
+        lower.contains('media.tenor') ||
+        lower.contains('media.giphy');
+  }
+
   Widget _buildImage(BuildContext context) {
     final rawUrl = message.mediaUrl ?? '';
     if (rawUrl.isEmpty) return const SizedBox.shrink();
 
     final isLocal = rawUrl.startsWith('/') || rawUrl.contains('Users') || rawUrl.contains('storage');
     final url = isLocal ? rawUrl : (AvatarResolver.resolveUrl(rawUrl) ?? rawUrl);
+    final isGif = !isLocal && _isGifUrl(rawUrl);
+
+    // GIF hiển thị nhỏ gọn (160×160), ảnh thường thì full width
+    final double maxW = isGif ? 160 : MediaQuery.of(context).size.width * 0.75;
+    final double maxH = isGif ? 160 : 300;
 
     return GestureDetector(
       onTap: () {
+        final auth = context.read<AuthProvider>();
         Navigator.of(context).push(
           MaterialPageRoute(
             builder:
-                (_) => FullScreenImageViewer(imageUrl: url, isLocal: isLocal),
+                (_) => FullScreenImageViewer(
+                  imageUrl: url,
+                  isLocal: isLocal,
+                  accessToken: auth.accessToken,
+                ),
           ),
         );
       },
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          maxHeight: 280,
-          minWidth: 150, // Minimum width so it doesn't look too skinny
-        ),
-        child: isLocal
-            ? Image.file(File(url), fit: BoxFit.cover)
-            : Builder(
-                builder: (context) {
-                  final token = context.watch<AuthProvider>().accessToken;
-                  return CachedNetworkImage(
+      child: Hero(
+        tag: 'message_${message.id}',
+        child: Container(
+          constraints: BoxConstraints(maxWidth: maxW, maxHeight: maxH),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child:
+              isLocal
+                  ? Image.file(File(rawUrl), fit: BoxFit.cover)
+                  : CachedNetworkImage(
                     imageUrl: url,
-                    fit: BoxFit.cover,
-                    httpHeaders: (token != null && AvatarResolver.isInternalUrl(url))
-                        ? {'Authorization': 'Bearer $token'}
+                    fit: isGif ? BoxFit.contain : BoxFit.cover,
+                    httpHeaders: (AvatarResolver.isInternalUrl(url))
+                        ? {'Authorization': 'Bearer ${context.read<AuthProvider>().accessToken}'}
                         : const {},
                     placeholder: (context, url) => Container(
-                      height: 200,
                       color: Colors.grey.shade200,
-                      child: const Center(
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
+                      width: isGif ? 160 : 200,
+                      height: isGif ? 160 : 200,
                     ),
-                    errorWidget: (context, url, error) => Container(
-                      height: 200,
-                      color: Colors.grey.shade200,
-                      child: const Center(
-                        child: Icon(Icons.broken_image, size: 40, color: Colors.grey),
-                      ),
-                    ),
-                  );
-                }
-              ),
-      ),
-    );
-  }
-
-  Widget _buildSticker(BuildContext context) {
-    final rawUrl = message.mediaUrl ?? '';
-    final url = AvatarResolver.resolveUrl(rawUrl) ?? rawUrl;
-    final token = context.watch<AuthProvider>().accessToken;
-
-    return Container(
-      width: 120,
-      height: 120,
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      child: CachedNetworkImage(
-        imageUrl: url,
-        fit: BoxFit.contain,
-        httpHeaders: (token != null && AvatarResolver.isInternalUrl(url))
-            ? {'Authorization': 'Bearer $token'}
-            : const {},
-        placeholder: (context, url) => const SizedBox.shrink(),
-        errorWidget:
-            (context, url, error) =>
-                const Icon(Icons.error_outline, color: Colors.grey),
+                    errorWidget: (context, url, error) => const Icon(Icons.error),
+                  ),
+        ),
       ),
     );
   }
 
   Widget _buildFileCard(BuildContext context, bool isDarkMode) {
-    return InkWell(
-      onTap: () {
-        if (message.mediaUrl != null) {
-          OpenFile.open(message.mediaUrl);
-        }
-      },
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+    final common = CommonTexts.of(context);
+    final fileName = message.content ?? 'File';
+    final isDownloaded = message.mediaUrl != null && File(message.mediaUrl!).existsSync();
+
+    return Container(
+      width: 240,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDarkMode ? DarkColors.surfaceLight : Colors.white.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.insert_drive_file, color: Colors.blue, size: 32),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  message.content ?? 'Document',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+          Row(
+            children: [
+              const Icon(Icons.insert_drive_file, color: Colors.white, size: 32),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      fileName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      isDownloaded ? common.downloadedLabel : common.documentLabel,
+                      style: const TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                  ],
                 ),
-                Text(
-                  message.mediaSizeBytes != null
-                      ? '${(message.mediaSizeBytes! / (1024 * 1024)).toStringAsFixed(2)} MB'
-                      : 'File',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color:
-                        isDarkMode ? DarkColors.textHint : Colors.grey.shade500,
-                  ),
-                ),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                if (isDownloaded) {
+                  OpenFile.open(message.mediaUrl);
+                } else {
+                  // Trigger download via ChatProvider
+                  context.read<ChatProvider>().downloadFile(message);
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: AppColors.primary,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: Text(isDownloaded ? common.openFileAction : common.downloadAction),
             ),
           ),
         ],
@@ -852,142 +938,75 @@ class MessageBubble extends StatelessWidget {
   }
 
   Widget _buildAudioPlayer(BuildContext context) {
-    return AudioPlayerWidget(audioUrl: message.mediaUrl ?? '', isMine: isMine);
+    final url = AvatarResolver.resolveUrl(message.mediaUrl ?? '') ?? '';
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: AudioPlayerWidget(
+        audioUrl: url,
+        isMine: isMine,
+        transcriptText: message.content,
+      ),
+    );
   }
 
+  Widget _buildSticker(BuildContext context) {
+    final url = message.mediaUrl ?? '';
+    if (url.isEmpty) return const SizedBox.shrink();
+    
+    return SizedBox(
+      width: 120,
+      height: 120,
+      child: CachedNetworkImage(
+        imageUrl: url,
+        placeholder: (context, url) => const SizedBox.shrink(),
+        errorWidget: (context, url, error) => const Icon(Icons.error),
+      ),
+    );
+  }
 
   Widget _buildVideoPlayer(BuildContext context) {
-    final thumbnailUrl = message.mediaThumbnailUrl ?? '';
-    final url = AvatarResolver.resolveUrl(thumbnailUrl.isNotEmpty ? thumbnailUrl : (message.mediaUrl ?? '')) ?? '';
-    
+    final common = CommonTexts.of(context);
     return Container(
       width: 200,
       height: 150,
       decoration: BoxDecoration(
-        color: Colors.black12,
+        color: Colors.black87,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          if (url.isNotEmpty)
-            Positioned.fill(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Builder(
-                  builder: (context) {
-                    final token = context.watch<AuthProvider>().accessToken;
-                    return CachedNetworkImage(
-                      imageUrl: url,
-                      fit: BoxFit.cover,
-                      httpHeaders: (token != null && AvatarResolver.isInternalUrl(url))
-                          ? {'Authorization': 'Bearer $token'}
-                          : const {},
-                      errorWidget: (_, __, ___) => const Center(child: Icon(Icons.videocam, size: 40, color: Colors.grey)),
-                    );
-                  }
-                ),
-              ),
-            ),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: const BoxDecoration(
-              color: Colors.black54,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.play_arrow, color: Colors.white, size: 30),
-          ),
-        ],
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.play_circle_fill, color: Colors.white, size: 48),
+            const SizedBox(height: 8),
+            Text(common.videoAction, style: const TextStyle(color: Colors.white)),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildStatusLabel(BuildContext context, bool isDarkMode, CommonTexts common) {
-    if (!showStatus && !showTime && readByMembers?.isEmpty == true) {
-      return const SizedBox.shrink();
-    }
-
-    final bool isImage =
-        message.messageType == MessageType.IMAGE ||
-        (groupedMessages != null && groupedMessages!.isNotEmpty);
-
+    final timeStr = DateFormatter.time(message.createdAt);
+    
     return Row(
       mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
       children: [
-        if (showTime && isImage) ...[
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              color:
-                  isDarkMode
-                      ? Colors.white10
-                      : Colors.black.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              DateFormatter.time(message.createdAt),
-              style: TextStyle(
-                fontSize: 10,
-                color: isDarkMode ? Colors.white70 : Colors.black54,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+        Text(
+          timeStr,
+          style: TextStyle(
+            fontSize: 11,
+            color: isDarkMode ? DarkColors.textHint : Colors.grey.shade500,
           ),
+        ),
+        if (isMine && showStatus) ...[
           const SizedBox(width: 4),
-        ],
-        if (showStatus) ...[
-          if (message.status == MessageStatus.SENDING)
-            Text(
-              common.msgSending,
-              style: TextStyle(fontSize: 10, color: Colors.grey),
-            )
-          else if (message.status == MessageStatus.FAILED)
-            Text(
-              common.msgSendFailed,
-              style: const TextStyle(fontSize: 10, color: Colors.red),
-            )
-          else
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color:
-                    isDarkMode
-                        ? Colors.white10
-                        : Colors.black.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    message.status == MessageStatus.DELIVERED ||
-                            message.status == MessageStatus.READ
-                        ? Icons.done_all
-                        : Icons.done,
-                    size: 12,
-                    color:
-                        message.status == MessageStatus.READ
-                            ? Colors.blue
-                            : (isDarkMode ? Colors.white70 : Colors.black54),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    _getStatusText(message.status, common),
-                    style: TextStyle(
-                      fontSize: 10,
-                      color:
-                          message.status == MessageStatus.READ
-                              ? Colors.blue
-                              : (isDarkMode ? Colors.white70 : Colors.black54),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          _StatusIcon(status: message.status),
         ],
         if (readByMembers != null && readByMembers!.isNotEmpty) ...[
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           _buildReadAvatars(),
         ],
       ],
@@ -1002,20 +1021,27 @@ class MessageBubble extends StatelessWidget {
     final displayed = readByMembers!.take(4).toList();
     final remainingCount = readByMembers!.length - displayed.length;
 
-    return Padding(
-      padding: const EdgeInsets.only(top: 2, right: 4),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ...displayed.map(
-            (m) => Padding(
-              padding: const EdgeInsets.only(left: 2),
-              child: ClipOval(
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ...displayed.map(
+          (m) => Padding(
+            padding: const EdgeInsets.only(left: 2),
+            child: ClipOval(
               child: Builder(
                 builder: (context) {
                   final token = context.watch<AuthProvider>().accessToken;
-                  final url = AvatarResolver.resolveUrl(m.user?.avatarUrl) ??
-                      'https://ui-avatars.com/api/?name=${m.user?.displayName ?? 'U'}';
+                  final url = AvatarResolver.resolveUrl(m.user?.avatarUrl);
+                  
+                  if (url == null) {
+                    return Container(
+                      width: 14,
+                      height: 14,
+                      color: Colors.grey,
+                      child: const Icon(Icons.person, size: 10, color: Colors.white),
+                    );
+                  }
+
                   return CachedNetworkImage(
                     imageUrl: url,
                     width: 14,
@@ -1024,50 +1050,33 @@ class MessageBubble extends StatelessWidget {
                     httpHeaders: (token != null && AvatarResolver.isInternalUrl(url))
                         ? {'Authorization': 'Bearer $token'}
                         : const {},
+                    placeholder: (_, __) => Container(width: 14, height: 14, color: Colors.grey.shade200),
                     errorWidget: (_, __, ___) => Container(
                       width: 14,
                       height: 14,
                       color: Colors.grey,
-                      child: const Icon(
-                        Icons.person,
-                        size: 10,
-                        color: Colors.white,
-                      ),
+                      child: const Icon(Icons.person, size: 10, color: Colors.white),
                     ),
                   );
                 }
               ),
+            ),
+          ),
+        ),
+        if (remainingCount > 0)
+          Padding(
+            padding: const EdgeInsets.only(left: 2),
+            child: Text(
+              '+$remainingCount',
+              style: const TextStyle(
+                fontSize: 10,
+                color: Colors.grey,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ),
-          if (remainingCount > 0)
-            Padding(
-              padding: const EdgeInsets.only(left: 2),
-              child: Text(
-                '+$remainingCount',
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: Colors.grey,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-        ],
-      ),
+      ],
     );
-  }
-
-  String _getStatusText(MessageStatus status, CommonTexts common) {
-    switch (status) {
-      case MessageStatus.SENT:
-        return common.msgSent;
-      case MessageStatus.DELIVERED:
-        return common.msgDelivered;
-      case MessageStatus.READ:
-        return common.msgSeen;
-      default:
-        return '';
-    }
   }
 
   Widget _buildReplyQuote(BuildContext context, bool isDarkMode) {
@@ -1077,55 +1086,82 @@ class MessageBubble extends StatelessWidget {
       replyName = chatProvider.getSenderName(message.conversationId, message.replyToSenderId!);
     }
 
-    return GestureDetector(
-      onTap: () {
-        if (message.replyToMessageId != null) {
-          onReplyTap?.call(message.replyToMessageId!);
-        }
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color:
-              isDarkMode
-                  ? Colors.white.withValues(alpha: 0.08)
-                  : const Color(0xFFF3F7FF),
-          borderRadius: BorderRadius.circular(10),
-          border: Border(
-            left: BorderSide(
-              color: isDarkMode ? Colors.blue[300]! : const Color(0xFF0068FF),
-              width: 2.5,
-            ),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color:
+            isDarkMode
+                ? Colors.white.withValues(alpha: 0.08)
+                : const Color(0xFFF3F7FF),
+        borderRadius: BorderRadius.circular(10),
+        border: Border(
+          left: BorderSide(
+            color: isDarkMode ? Colors.blue[300]! : const Color(0xFF0068FF),
+            width: 2.5,
           ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              replyName,
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-                color: isDarkMode ? Colors.blue[300] : const Color(0xFF0068FF),
-              ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            replyName,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+              color: isDarkMode ? Colors.blue[300] : const Color(0xFF0068FF),
             ),
-            const SizedBox(height: 2),
-            Text(
-              message.replyToContent ?? '[Media]',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 13,
-                color:
-                    isDarkMode
-                        ? DarkColors.textSecondary
-                        : const Color(0xFF4A4A4A),
-              ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            message.replyToContent ?? '[Media]',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13,
+              color:
+                  isDarkMode
+                      ? DarkColors.textSecondary
+                      : const Color(0xFF4A4A4A),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
+  }
+}
+
+class _StatusIcon extends StatelessWidget {
+  final MessageStatus status;
+
+  const _StatusIcon({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    switch (status) {
+      case MessageStatus.SENDING:
+        return const SizedBox(
+          width: 12,
+          height: 12,
+          child: CircularProgressIndicator(strokeWidth: 1.5, color: Colors.grey),
+        );
+      case MessageStatus.SENT:
+        return const Icon(Icons.check, size: 14, color: Colors.grey);
+      case MessageStatus.DELIVERED:
+        return const Icon(Icons.done_all, size: 14, color: Colors.grey);
+      case MessageStatus.READ:
+        return const Icon(Icons.done_all, size: 14, color: AppColors.primary);
+      case MessageStatus.FAILED:
+        return const Icon(Icons.error_outline, size: 14, color: Colors.red);
+      case MessageStatus.RECALLED:
+        return Icon(
+          Icons.history_rounded,
+          size: 14,
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Colors.white38
+              : Colors.grey.shade400,
+        );
+    }
   }
 }

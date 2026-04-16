@@ -192,12 +192,19 @@ class _ChatListScreenState extends State<ChatListScreen> {
               child: ListView.separated(
                 itemCount: chatProvider.conversations.length + 1,
                 separatorBuilder: (context, index) {
-                  if (index == 0) return const SizedBox.shrink(); // No separator after header
-                  return Divider(
-                    height: 1,
-                    thickness: 0.5,
-                    indent: 80,
-                    color: dividerColor,
+                  return Container(
+                    color: isDarkMode ? DarkColors.surface : Colors.white,
+                    child: Row(
+                      children: [
+                        const SizedBox(width: 80),
+                        Expanded(
+                          child: Container(
+                            height: 0.6,
+                            color: dividerColor,
+                          ),
+                        ),
+                      ],
+                    ),
                   );
                 },
                 itemBuilder: (context, index) {
@@ -233,6 +240,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           horizontal: 16,
                           vertical: 10,
                         ),
+
                       leading: Container(
                         width: 52,
                         height: 52,
@@ -248,16 +256,19 @@ class _ChatListScreenState extends State<ChatListScreen> {
                               bottom: 0,
                               right: 0,
                               child: Container(
+
                                 decoration: const BoxDecoration(
                                   color: Colors.orange,
                                   shape: BoxShape.circle,
                                 ),
                                 child: const Icon(Icons.check, color: Colors.white, size: 12),
+
                               ),
                             )
                           ],
                         ),
                       ),
+
                       title: Row(
                         children: [
                           Expanded(

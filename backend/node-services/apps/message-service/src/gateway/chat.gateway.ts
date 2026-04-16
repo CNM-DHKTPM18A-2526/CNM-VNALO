@@ -502,6 +502,57 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  /** Pin a message and broadcast to conversation room. */
+  @SubscribeMessage('message.pin')
+  async handlePinMessage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { messageId: string; conversationId: string },
+  ) {
+    const userId = client.data.user.userId;
+
+    try {
+      const pin = await this.messageService.pinMessage(userId, data.conversationId, data.messageId);
+
+      // Broadcast pinned event
+      const room = this.getConversationRoom(data.conversationId);
+      this.server.to(room).emit('message.pinned', {
+        pin,
+        pinnedBy: userId,
+      });
+
+      return { event: 'message.pinned', data: pin };
+    } catch (err) {
+      this.logger.error(`Pin message failed: ${err.message}`);
+      return { event: 'message.error', data: { error: err.message } };
+    }
+  }
+
+  /** Unpin a message and broadcast to conversation room. */
+  @SubscribeMessage('message.unpin')
+  async handleUnpinMessage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { messageId: string; conversationId: string },
+  ) {
+    const userId = client.data.user.userId;
+
+    try {
+      await this.messageService.unpinMessage(userId, data.conversationId, data.messageId);
+
+      // Broadcast unpinned event
+      const room = this.getConversationRoom(data.conversationId);
+      this.server.to(room).emit('message.unpinned', {
+        messageId: data.messageId,
+        conversationId: data.conversationId,
+        unpinnedBy: userId,
+      });
+
+      return { event: 'message.unpinned', data: { messageId: data.messageId } };
+    } catch (err) {
+      this.logger.error(`Unpin message failed: ${err.message}`);
+      return { event: 'message.error', data: { error: err.message } };
+    }
+  }
+
   // ─── Utility ──────────────────────────────────────────────
 
   /** Get the standard room name for a conversation. */
