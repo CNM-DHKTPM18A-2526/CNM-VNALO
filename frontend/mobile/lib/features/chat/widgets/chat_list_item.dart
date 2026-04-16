@@ -40,118 +40,106 @@ class ChatListItem extends StatelessWidget {
     final dividerColor = isDarkMode ? DarkColors.divider : const Color(0xFFE9EDF3);
     final lastPreview = _buildLastMessagePreview(currentUserId, common);
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Slidable(
-          endActionPane: ActionPane(
-            motion: const DrawerMotion(),
+    return Slidable(
+      endActionPane: ActionPane(
+        motion: const DrawerMotion(),
+        children: [
+          SlidableAction(
+            onPressed: (_) {},
+            backgroundColor: AppColors.pinIcon,
+            icon: Icons.push_pin,
+            label: common.pinAction,
+          ),
+          SlidableAction(
+            onPressed: (_) {},
+            backgroundColor: hintColor,
+            icon: Icons.notifications_off,
+            label: common.muteAction,
+          ),
+          SlidableAction(
+            onPressed: (_) {},
+            backgroundColor: AppColors.error,
+            icon: Icons.delete,
+            label: common.delete,
+          ),
+        ],
+      ),
+      child: ColoredBox(
+        color: conversation.isPinned ? pinnedTileColor : regularTileColor,
+        child: ListTile(
+          onTap: onTap,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          leading: (conversation.type == ConversationType.GROUP && (conversation.avatarUrl == null || conversation.avatarUrl!.isEmpty))
+              ? GroupAvatar(
+                  members: conversation.members
+                      .where((m) => m.userId != currentUserId)
+                      .take(4)
+                      .map((m) => (imageUrl: m.user?.avatarUrl, name: m.user?.displayName ?? 'User'))
+                      .toList(),
+                  size: 48,
+                )
+              : AvatarWidget(
+                  imageUrl: displayAvatar,
+                  name: displayName,
+                  size: 48,
+                  showOnline: conversation.type == ConversationType.DIRECT,
+                  cacheVersion: avatarVersion,
+                ),
+          title: Row(
             children: [
-              SlidableAction(
-                onPressed: (_) {},
-                backgroundColor: AppColors.pinIcon,
-                icon: Icons.push_pin,
-                label: common.pinAction,
+              Expanded(
+                child: Text(
+                  displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
               ),
-              SlidableAction(
-                onPressed: (_) {},
-                backgroundColor: hintColor,
-                icon: Icons.notifications_off,
-                label: common.muteAction,
-              ),
-              SlidableAction(
-                onPressed: (_) {},
-                backgroundColor: AppColors.error,
-                icon: Icons.delete,
-                label: common.delete,
+              if (conversation.isPinned)
+                Icon(Icons.push_pin, size: 14, color: AppColors.pinIcon),
+              const SizedBox(width: 4),
+              Text(
+                DateFormatter.relative(conversation.lastMessage?.createdAt),
+                style: TextStyle(fontSize: 12, color: secondaryTextColor),
               ),
             ],
           ),
-          child: ColoredBox(
-            color: conversation.isPinned ? pinnedTileColor : regularTileColor,
-            child: ListTile(
-              onTap: onTap,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              leading: (conversation.type == ConversationType.GROUP && (conversation.avatarUrl == null || conversation.avatarUrl!.isEmpty))
-                  ? GroupAvatar(
-                      members: conversation.members
-                          .where((m) => m.userId != currentUserId)
-                          .take(4)
-                          .map((m) => (imageUrl: m.user?.avatarUrl, name: m.user?.displayName ?? 'User'))
-                          .toList(),
-                      size: 48,
-                    )
-                  : AvatarWidget(
-                      imageUrl: displayAvatar,
-                      name: displayName,
-                      size: 48,
-                      showOnline: conversation.type == ConversationType.DIRECT,
-                      cacheVersion: avatarVersion,
-                    ),
-              title: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
+          subtitle: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  lastPreview ??
+                      (conversation.type == ConversationType.DIRECT
+                          ? common.sayHelloTo(displayName)
+                          : ''),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: conversation.lastMessage == null
+                        ? (isDarkMode ? DarkColors.primary : AppColors.primary)
+                        : secondaryTextColor,
                   ),
-                  if (conversation.isPinned)
-                    Icon(Icons.push_pin, size: 14, color: AppColors.pinIcon),
-                  const SizedBox(width: 4),
-                  Text(
-                    DateFormatter.relative(conversation.lastMessage?.createdAt),
-                    style: TextStyle(fontSize: 12, color: secondaryTextColor),
-                  ),
-                ],
+                ),
               ),
-              subtitle: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      lastPreview ??
-                          (conversation.type == ConversationType.DIRECT
-                              ? common.sayHelloTo(displayName)
-                              : ''),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: conversation.lastMessage == null
-                            ? (isDarkMode ? DarkColors.primary : AppColors.primary)
-                            : secondaryTextColor,
-                      ),
-                    ),
+              if (conversation.isMuted)
+                Icon(Icons.notifications_off, size: 14, color: hintColor),
+              if (conversation.unreadCount > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.unreadBadge,
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  if (conversation.isMuted)
-                    Icon(Icons.notifications_off, size: 14, color: hintColor),
-                  if (conversation.unreadCount > 0)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.unreadBadge,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        conversation.unreadCount > 99 ? '99+' : '${conversation.unreadCount}',
-                        style: const TextStyle(color: Colors.white, fontSize: 11),
-                      ),
-                    ),
-                ],
-              ),
-            ),
+                  child: Text(
+                    conversation.unreadCount > 99 ? '99+' : '${conversation.unreadCount}',
+                    style: const TextStyle(color: Colors.white, fontSize: 11),
+                  ),
+                ),
+            ],
           ),
         ),
-        Divider(
-          height: 1,
-          thickness: 0.5,
-          indent: 80,
-          endIndent: 0,
-          color: dividerColor,
-        ),
-      ],
+      ),
     );
   }
 
