@@ -29,6 +29,7 @@ type ConversationInfoProps = {
   onLeaveGroupClick?: () => void;
   onEditGroupName?: () => void;
   onEditNickname?: () => void;
+  onDeleteHistoryClick?: () => void;
 };
 
 type SectionKey = 'media' | 'files' | 'links' | 'security';
@@ -41,6 +42,7 @@ export function ConversationInfo({
   onCreateGroupClick,
   onEditGroupName,
   onEditNickname,
+  onDeleteHistoryClick,
   currentUserId
 }: ConversationInfoProps & { currentUserId?: string, onCreateGroupClick?: () => void }) {
   const { userMap, ensureUser } = useUserStore();
@@ -306,7 +308,7 @@ export function ConversationInfo({
       {/* Footer Actions */}
       <section className="mt-3 bg-white px-5 py-3">
         <FooterAction icon={TriangleAlert} label="Báo xấu" color="text-red-500" />
-        <FooterAction icon={Trash2} label="Xóa lịch sử trò chuyện" color="text-red-500" />
+        <FooterAction icon={Trash2} label="Xóa lịch sử trò chuyện" color="text-red-500" onClick={onDeleteHistoryClick} />
         {conversation.isGroup && (
           <FooterAction icon={LogOut} label="Rời nhóm" color="text-red-500" onClick={onLeaveGroupClick} />
         )}
