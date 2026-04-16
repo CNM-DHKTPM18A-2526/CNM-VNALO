@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 
 import { SearchInput } from '../../../shared/components/SearchInput'
 import { Icon } from '../../../shared/components/Icon'
@@ -24,17 +24,17 @@ type SearchUserEntry = {
 type ChatListProps = {
   conversations: ConversationSummary[]
   friendResults: UserLookupResult[]
-  selectedConversationId: string
+  activeConversationId?: string
   onSearchFriends: (keyword: string) => void
   onOpenFriendChat: (friend: UserLookupResult) => void | Promise<void>
   onSelectConversation: (conversationId: string) => void
   onCreateGroupClick?: () => void
 }
 
-export function ChatList({
+export const ChatList = memo(function ChatList({
   conversations,
   friendResults,
-  selectedConversationId,
+  activeConversationId,
   onSearchFriends,
   onOpenFriendChat,
   onSelectConversation,
@@ -234,12 +234,12 @@ export function ChatList({
         </div>
       </div>
       <div className='chat-list'>
-        {localConversationMatches.length > 0 ? <p>{t('chat.searchConversationsSection')}</p> : null}
+        {hasKeyword ? <p>{t('chat.searchConversationsSection')}</p> : null}
         {localConversationMatches.map((conversation, index) => (
           <ChatItem
             key={conversation.id}
             conversation={conversation}
-            active={conversation.id === selectedConversationId}
+            active={conversation.id === activeConversationId}
             index={index}
             onSelect={onSelectConversation}
           />
@@ -250,7 +250,7 @@ export function ChatList({
           <ChatItem
             key={`friend-${entry.user.id}`}
             conversation={entry.conversation}
-            active={false}
+            active={entry.conversation.id === activeConversationId}
             index={localConversationMatches.length + index}
             onSelect={() => {
               void onOpenFriendChat(entry.user)
@@ -311,4 +311,4 @@ export function ChatList({
       </Modal>
     </section>
   )
-}
+})

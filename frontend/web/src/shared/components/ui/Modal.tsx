@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 
-type ModalVariant = 'default' | 'image'
+type ModalVariant = 'default' | 'image' | 'confirm'
 
 type ModalProps = {
   isOpen: boolean
@@ -59,10 +59,12 @@ export function Modal({
             {description ? <p>{description}</p> : null}
           </div>
           <button aria-label={closeAriaLabel ?? 'Close'} className='modal-close-btn' onClick={onClose} type='button'>
-            ×
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M1 1L13 13M1 13L13 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
           </button>
         </div>
-        <div className='modal-body'>{children}</div>
+        <div className={variant === 'confirm' ? 'modal-body-confirm' : 'modal-body'}>{children}</div>
         {footer ? <div className='modal-footer'>{footer}</div> : null}
       </div>
     </div>,

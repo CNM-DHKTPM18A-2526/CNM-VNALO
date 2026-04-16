@@ -534,6 +534,35 @@
   gap: 12px;
 }
 
+/* Zalo-style flat group list */
+.contacts-groups-flat-list {
+  border: 1px solid #eef2f7;
+  border-radius: 10px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.contacts-group-row {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  padding: 11px 14px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.contacts-group-row + .contacts-group-row {
+  border-top: 1px solid #f1f5f9;
+}
+
+.contacts-group-row:hover {
+  background: #eef5ff;
+}
+
 .contacts-group-card,
 .contacts-request-card {
   border: 1px solid #e2e8f0;

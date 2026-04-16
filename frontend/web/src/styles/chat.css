@@ -132,13 +132,34 @@
   border: 1px solid transparent;
   border-radius: 10px;
   background: transparent;
+  color: inherit;
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 10px;
   padding: 10px;
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
   align-items: start;
+}
+
+/* Zalo Picker Custom Styles */
+.zalo-picker-content {
+  height: 250px !important;
+  overflow-y: auto !important;
+}
+
+.zalo-picker-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.zalo-picker-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.zalo-picker-content::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
 }
 
 .chat-item:hover {
@@ -677,7 +698,8 @@
   transition: transform var(--motion-fast), background var(--motion-fast), color var(--motion-fast), box-shadow var(--motion-fast);
 }
 
-.message-share-trigger {
+.message-share-trigger,
+.message-reply-trigger {
   width: 28px;
   height: 28px;
   border-radius: 999px;
@@ -691,13 +713,15 @@
   transition: transform var(--motion-fast), background var(--motion-fast), color var(--motion-fast), box-shadow var(--motion-fast);
 }
 
-.message-share-trigger:hover {
+.message-share-trigger:hover,
+.message-reply-trigger:hover {
   transform: scale(1.04);
   background: var(--surface-hover);
   color: var(--primary);
 }
 
-.message-share-trigger svg {
+.message-share-trigger svg,
+.message-reply-trigger svg {
   width: 16px;
   height: 16px;
 }
