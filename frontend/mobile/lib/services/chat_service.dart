@@ -344,6 +344,26 @@ class ChatService {
     await _apiService.delete(_base, '/conversations/$conversationId/members/$userId');
   }
 
+  Future<void> disbandGroup({
+    required String conversationId,
+    required String currentUserId,
+    required Iterable<String> memberIds,
+  }) async {
+    final uniqueMemberIds = <String>{
+      ...memberIds.where((id) => id.trim().isNotEmpty),
+      currentUserId,
+    }.toList();
+
+    for (final memberId in uniqueMemberIds) {
+      if (memberId == currentUserId) {
+        continue;
+      }
+      await removeMember(conversationId, memberId);
+    }
+
+    await removeMember(conversationId, currentUserId);
+  }
+
   Future<List<dynamic>> getJoinRequests(String conversationId) async {
     final response = await _apiService.get(_base, '/conversations/$conversationId/join-requests');
     return response['data'] ?? response;

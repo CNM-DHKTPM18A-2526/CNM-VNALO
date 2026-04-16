@@ -483,6 +483,7 @@ class ChatProvider extends ChangeNotifier {
     File? file,
     required MessageType type,
     String? mediaUrl,
+    String? content,
   }) async {
     final clientMessageId = _generateUuidV4();
     final fileName = file?.path.split('/').last ?? 'media';
@@ -494,7 +495,7 @@ class ChatProvider extends ChangeNotifier {
       senderId: _currentUserId ?? '',
       clientMessageId: clientMessageId,
       messageType: type,
-      content: fileName,
+      content: content ?? (type == MessageType.AUDIO ? '' : fileName),
       mediaSizeBytes: fileSize,
       status: MessageStatus.SENDING,
       createdAt: DateTime.now(),
@@ -517,7 +518,7 @@ class ChatProvider extends ChangeNotifier {
 
       final updated = optimistic.copyWith(
         mediaUrl: publicUrl,
-        content: fileName,
+        content: content ?? (type == MessageType.AUDIO ? (content ?? '') : (optimistic.content ?? fileName)),
         mediaSizeBytes: fileSize,
       );
       _replaceMessage(conversationId, optimistic.id, updated);
@@ -579,6 +580,19 @@ class ChatProvider extends ChangeNotifier {
       conversationId: conversationId,
       file: File(videoPath),
       type: MessageType.VIDEO,
+    );
+  }
+
+  void sendVoiceMessage({
+    required String conversationId,
+    required String audioPath,
+    String? transcription,
+  }) {
+    sendMediaMessage(
+      conversationId: conversationId,
+      file: File(audioPath),
+      type: MessageType.AUDIO,
+      content: transcription,
     );
   }
 
@@ -1377,7 +1391,18 @@ class ChatProvider extends ChangeNotifier {
   Future<void> updateWallpaperUrl(String conversationId, String imageUrl, {bool isGlobal = true}) async {
     try {
       await _chatService.updateWallpaper(conversationId, imageUrl, isGlobal: isGlobal);
-      await refreshConversation(conversationId);
+
+      // Update local state immediately — refreshConversation only returns conversation-level data
+      // and does NOT include personalWallpaperUrl (inbox-level personal setting per user).
+      final index = _conversations.indexWhere((c) => c.id == conversationId);
+      if (index >= 0) {
+        if (isGlobal) {
+          _conversations[index] = _conversations[index].copyWith(wallpaperUrl: imageUrl);
+        } else {
+          _conversations[index] = _conversations[index].copyWith(personalWallpaperUrl: imageUrl);
+        }
+        notifyListeners();
+      }
     } catch (e) {
       debugPrint('updateWallpaperUrl error: $e');
       rethrow;
@@ -1475,13 +1500,59 @@ class ChatProvider extends ChangeNotifier {
   }
 
   Future<void> disbandGroup(String conversationId) async {
+    final currentUserId = _currentUserId;
+    if (currentUserId == null) {
+      throw StateError('Current user is not available');
+    }
+
     try {
-      // Logic for disbanding: set status to DISABLED
-      await _chatService.updateGroup(conversationId, {'status': 'DISABLED'});
+      debugPrint('disbandGroup: Getting conversation $conversationId');
+      Conversation? latestConversation = await _chatService.getConversationById(conversationId);
+      if (latestConversation == null) {
+        final localIndex = _conversations.indexWhere((c) => c.id == conversationId);
+        if (localIndex >= 0) {
+          latestConversation = _conversations[localIndex];
+        }
+      }
+      debugPrint('disbandGroup: Conversation found: ${latestConversation != null}');
+      debugPrint('disbandGroup: Members count: ${latestConversation?.members.length ?? 0}');
+
+      // Check if conversation has members
+      if (latestConversation == null || latestConversation.members.isEmpty) {
+        debugPrint('disbandGroup: No members found, skipping disband');
+        _conversations.removeWhere((c) => c.id == conversationId);
+        if (_activeConversationId == conversationId) {
+          _activeConversationId = null;
+        }
+        notifyListeners();
+        return;
+      }
+
+      final memberIds = <String>{
+        currentUserId,
+        ...latestConversation.members
+            .where((member) => member.leftAt == null)
+            .map((member) => member.userId),
+      };
+      debugPrint('disbandGroup: MemberIds to remove: $memberIds');
+
+      await _chatService.disbandGroup(
+        conversationId: conversationId,
+        currentUserId: currentUserId,
+        memberIds: memberIds,
+      );
+
+      _messages.remove(conversationId);
+      _pinnedMessages.remove(conversationId);
       _conversations.removeWhere((c) => c.id == conversationId);
+      if (_activeConversationId == conversationId) {
+        _activeConversationId = null;
+      }
       notifyListeners();
+      debugPrint('disbandGroup: Successfully disbanded');
     } catch (e) {
       debugPrint('disbandGroup error: $e');
+      debugPrint('disbandGroup error stack: ${StackTrace.current}');
       rethrow;
     }
   }

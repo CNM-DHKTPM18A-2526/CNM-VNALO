@@ -10,6 +10,7 @@ import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/profile/providers/avatar_cache_provider.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
+import 'package:vnalo_mobile/models/conversation_member_model.dart';
 import 'package:vnalo_mobile/features/call/models/call_log_message.dart';
 
 class ChatListItem extends StatelessWidget {
@@ -159,7 +160,7 @@ class ChatListItem extends StatelessWidget {
     if (conversation.members.isEmpty) return '';
     final other = conversation.members.firstWhere(
       (m) => m.userId != currentUserId,
-      orElse: () => conversation.members.first,
+      orElse: () => conversation.members.isNotEmpty ? conversation.members.first : ConversationMember(conversationId: conversation.id, userId: 'none', joinedAt: DateTime.now()),
     );
     return other.userId;
   }

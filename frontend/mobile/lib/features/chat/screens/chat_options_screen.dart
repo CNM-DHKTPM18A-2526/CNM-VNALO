@@ -6,6 +6,7 @@ import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
+import 'package:vnalo_mobile/models/conversation_member_model.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
@@ -61,9 +62,11 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
 
   Future<void> _editNickname() async {
     final currentUserId = context.read<AuthProvider>().user?.id ?? '';
+    if (widget.conversation.members.isEmpty) return;
+    
     final otherMember = widget.conversation.members.firstWhere(
       (m) => m.userId != currentUserId,
-      orElse: () => widget.conversation.members.first
+      orElse: () => widget.conversation.members.first,
     );
 
     final controller = TextEditingController(text: otherMember.nickname ?? '');
@@ -257,6 +260,7 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
         children: [
           _buildQuickBtn(CupertinoIcons.search, common.searchMessagesAction, () => _showComingSoon('Tìm kiếm')),
           _buildQuickBtn(CupertinoIcons.person, common.viewProfileQuickAction, () => _showComingSoon('Trang cá nhân')),
+          _buildQuickBtn(CupertinoIcons.photo, common.changeWallpaperQuickAction, _openWallpaperSelection),
           _buildQuickBtn(
             conv.isMuted ? CupertinoIcons.bell_slash_fill : CupertinoIcons.bell,
             common.muteNotifsQuickAction,

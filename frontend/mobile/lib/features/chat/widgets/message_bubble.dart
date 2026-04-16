@@ -808,12 +808,27 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
+  /// Trả về true nếu URL là ảnh GIF (từ Giphy, Tenor hoặc đuôi .gif)
+  bool _isGifUrl(String url) {
+    final lower = url.toLowerCase();
+    return lower.endsWith('.gif') ||
+        lower.contains('giphy.com') ||
+        lower.contains('tenor.com') ||
+        lower.contains('media.tenor') ||
+        lower.contains('media.giphy');
+  }
+
   Widget _buildImage(BuildContext context) {
     final rawUrl = message.mediaUrl ?? '';
     if (rawUrl.isEmpty) return const SizedBox.shrink();
 
     final isLocal = rawUrl.startsWith('/') || rawUrl.contains('Users') || rawUrl.contains('storage');
     final url = isLocal ? rawUrl : (AvatarResolver.resolveUrl(rawUrl) ?? rawUrl);
+    final isGif = !isLocal && _isGifUrl(rawUrl);
+
+    // GIF hiển thị nhỏ gọn (160×160), ảnh thường thì full width
+    final double maxW = isGif ? 160 : MediaQuery.of(context).size.width * 0.75;
+    final double maxH = isGif ? 160 : 300;
 
     return GestureDetector(
       onTap: () {
@@ -832,10 +847,7 @@ class MessageBubble extends StatelessWidget {
       child: Hero(
         tag: 'message_${message.id}',
         child: Container(
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.75,
-            maxHeight: 300,
-          ),
+          constraints: BoxConstraints(maxWidth: maxW, maxHeight: maxH),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
           ),
@@ -845,11 +857,15 @@ class MessageBubble extends StatelessWidget {
                   ? Image.file(File(rawUrl), fit: BoxFit.cover)
                   : CachedNetworkImage(
                     imageUrl: url,
-                    fit: BoxFit.cover,
+                    fit: isGif ? BoxFit.contain : BoxFit.cover,
                     httpHeaders: (AvatarResolver.isInternalUrl(url))
                         ? {'Authorization': 'Bearer ${context.read<AuthProvider>().accessToken}'}
                         : const {},
-                    placeholder: (context, url) => Container(color: Colors.grey.shade200, width: 200, height: 200),
+                    placeholder: (context, url) => Container(
+                      color: Colors.grey.shade200,
+                      width: isGif ? 160 : 200,
+                      height: isGif ? 160 : 200,
+                    ),
                     errorWidget: (context, url, error) => const Icon(Icons.error),
                   ),
         ),
@@ -923,14 +939,13 @@ class MessageBubble extends StatelessWidget {
 
   Widget _buildAudioPlayer(BuildContext context) {
     final url = AvatarResolver.resolveUrl(message.mediaUrl ?? '') ?? '';
-    final token = context.read<AuthProvider>().accessToken;
     
-    return Container(
-      width: 200,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: AudioPlayerWidget(
         audioUrl: url,
         isMine: isMine,
+        transcriptText: message.content,
       ),
     );
   }
