@@ -59,7 +59,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
     if (id.isEmpty) return;
     try {
       await context.read<FriendService>().acceptRequest(id);
-      if (!mounted) return;
+      if (!context.mounted) return;
       setState(() => _incoming.removeWhere((r) => r['id']?.toString() == id));
 
       // Create direct conversation with the new friend
@@ -69,14 +69,14 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
         try {
           conversation = await context.read<ChatService>().getOrCreateDirect(friendUserId);
           // Refresh inbox so the new friend appears in the messages tab
-          if (mounted) {
+          if (context.mounted) {
             context.read<ChatProvider>().loadInbox();
           }
         } catch (_) {
           // Conversation creation may fail, continue to options screen
         }
       }
-      if (!mounted) return;
+      if (!context.mounted) return;
 
       Navigator.of(context).push(
         MaterialPageRoute(
@@ -89,7 +89,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
         ),
       );
     } on ApiException catch (e) {
-      if (!mounted) return;
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${common.errorOccurred}: ${e.message}')),
       );
@@ -102,13 +102,13 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
     if (id.isEmpty) return;
     try {
       await context.read<FriendService>().rejectRequest(id);
-      if (!mounted) return;
+      if (!context.mounted) return;
       setState(() => _incoming.removeWhere((r) => r['id']?.toString() == id));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(common.requestRejected)),
       );
     } on ApiException catch (e) {
-      if (!mounted) return;
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${common.errorOccurred}: ${e.message}')),
       );
@@ -284,13 +284,13 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
                 if (id.isEmpty) return;
                 try {
                   await context.read<FriendService>().cancelRequest(id);
-                  if (!mounted) return;
+                  if (!context.mounted) return;
                   setState(() => _sent.removeWhere((r) => r['id']?.toString() == id));
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text(common.requestCancelled)),
                   );
                 } catch (e) {
-                  if (!mounted) return;
+                if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('${common.errorOccurred}: $e')),
                   );

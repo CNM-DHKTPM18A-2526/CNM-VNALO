@@ -159,6 +159,7 @@ class NotificationService {
           audioSessionActive: true,
           maximumCallsPerCallGroup: 1,
           supportsDTMF: false,
+          ringtonePath: 'system_ringtone_default',
         ),
       );
 

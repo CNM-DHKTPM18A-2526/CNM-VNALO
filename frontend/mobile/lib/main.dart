@@ -33,18 +33,18 @@ import 'package:vnalo_mobile/services/notification_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load environment variables
-  await dotenv.load(fileName: ".env");
+  // Load environment variables if available. Missing .env should not crash
+  // startup because values may be provided via --dart-define.
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint(
+      'No .env file found; falling back to --dart-define values where available.',
+    );
+  }
 
-  // Initialize Firebase
-  await Firebase.initializeApp(
-    options: FirebaseOptions(
-      apiKey: dotenv.env['FIREBASE_API_KEY'] ?? '',
-      appId: dotenv.env['FIREBASE_APP_ID'] ?? '',
-      messagingSenderId: dotenv.env['FIREBASE_MESSAGING_SENDER_ID'] ?? '',
-      projectId: dotenv.env['FIREBASE_PROJECT_ID'] ?? '',
-    ),
-  );
+  // Initialize Firebase using robust options from AppConfig
+  await Firebase.initializeApp(options: AppConfig.getFirebaseOptions());
   
   // Set the background messaging handler early on, as a named top-level function
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
@@ -100,8 +100,8 @@ void main() async {
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // We need to initialize Firebase here too if it was not already initialized in the background process
-  await Firebase.initializeApp();
+  // Initialize Firebase with the same robust options as main
+  await Firebase.initializeApp(options: AppConfig.getFirebaseOptions());
   debugPrint('Handling a background message: ${message.messageId}');
   
   // Hand off to NotificationService's static background handler logic
@@ -184,20 +184,28 @@ class VnaloApp extends StatelessWidget {
                 notificationService: context.read<NotificationService>(),
               ),
           update: (context, auth, chat) {
-            if (chat == null) return chat!;
+            final currentChat =
+                chat ??
+                ChatProvider(
+                  chatService: context.read<ChatService>(),
+                  socketService: context.read<SocketService>(),
+                  mediaService: context.read<MediaService>(),
+                  db: context.read<LocalDatabase>(),
+                  notificationService: context.read<NotificationService>(),
+                );
             
             // Sync current user ID
             final newId = auth.user?.id;
-            final oldId = chat.currentUserId;
+            final oldId = currentChat.currentUserId;
             
             if (newId != oldId) {
-              chat.setCurrentUserId(newId ?? '');
+              currentChat.setCurrentUserId(newId ?? '');
               // If we just logged out (oldId was set, newId is null), clear memory
               if (newId == null && oldId != null) {
-                chat.reset();
+                currentChat.reset();
               }
             }
-            return chat;
+            return currentChat;
           },
         ),
         ChangeNotifierProvider<PostProvider>(

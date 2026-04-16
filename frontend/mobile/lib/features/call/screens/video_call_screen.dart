@@ -644,11 +644,17 @@ class _VideoActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor =
-        color ??
-        (destructive
-            ? const Color(0xFFFF3B30)
-            : Colors.white.withValues(alpha: 0.15));
+    Color? backgroundColor;
+    Color iconColor = Colors.white;
+
+    if (destructive) {
+      backgroundColor = const Color(0xFFFF3B30);
+    } else if (active) {
+      backgroundColor = Colors.white;
+      iconColor = const Color(0xFF0068FF); // Zalo Primary Blue
+    } else {
+      backgroundColor = color ?? Colors.white.withValues(alpha: 0.15);
+    }
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -659,7 +665,7 @@ class _VideoActionButton extends StatelessWidget {
             width: 72,
             height: 72,
             decoration: BoxDecoration(color: backgroundColor, shape: BoxShape.circle),
-            child: Center(child: Icon(icon, color: Colors.white, size: 34)),
+            child: Center(child: Icon(icon, color: iconColor, size: 34)),
           ),
         ),
         if (label != null) ...[

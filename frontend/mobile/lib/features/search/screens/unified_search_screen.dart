@@ -8,7 +8,6 @@ import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
 import 'package:vnalo_mobile/features/call/models/call_log_message.dart';
 import 'package:vnalo_mobile/features/contacts/screens/send_request_screen.dart';
 import 'package:vnalo_mobile/features/call/screens/voice_call_screen.dart';
-import 'package:vnalo_mobile/features/call/screens/video_call_screen.dart';
 import 'package:vnalo_mobile/features/call/utils/call_id_generator.dart';
 import 'package:vnalo_mobile/features/chat/screens/chat_detail_screen.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
@@ -499,7 +498,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                     children: [
                       Icon(
                         Icons.search,
-                        color: isDarkMode ? Colors.white : Colors.black54,
+                        color: isDarkMode ? Colors.white : Colors.black.withValues(alpha: 0.3),
                         size: 20,
                       ),
                       const SizedBox(width: 8),
@@ -515,8 +514,8 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                             hintText: common.searchHint,
                             hintStyle: TextStyle(
                               color: isDarkMode
-                                  ? Colors.white.withValues(alpha: 0.7)
-                                  : Colors.black54,
+                                  ? Colors.white.withValues(alpha: 0.4)
+                                  : Colors.black.withValues(alpha: 0.3),
                             ),
                             filled: true,
                             fillColor: Colors.transparent,
@@ -535,7 +534,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                           },
                           child: Icon(
                             Icons.close,
-                            color: isDarkMode ? Colors.white : Colors.black54,
+                            color: isDarkMode ? Colors.white : Colors.black.withValues(alpha: 0.3),
                             size: 20,
                           ),
                         ),
@@ -815,7 +814,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                       isVi ? 'Xem thêm' : 'See more',
                       style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13, color: Colors.black87),
                     ),
-                    const Icon(Icons.expand_more, size: 18, color: Colors.black54),
+                    Icon(Icons.expand_more, size: 18, color: Colors.black.withValues(alpha: 0.3)),
                   ],
                 ),
               ),
@@ -927,7 +926,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                       isVi ? 'Xem thêm' : 'See more',
                       style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13, color: Colors.black87),
                     ),
-                    const Icon(Icons.expand_more, size: 18, color: Colors.black54),
+                    Icon(Icons.expand_more, size: 18, color: Colors.black.withValues(alpha: 0.3)),
                   ],
                 ),
               ),
@@ -1192,7 +1191,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                       isVi ? 'Xem thêm' : 'See more',
                       style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13, color: Colors.black87),
                     ),
-                    const Icon(Icons.expand_more, size: 18, color: Colors.black54),
+                    Icon(Icons.expand_more, size: 18, color: Colors.black.withValues(alpha: 0.3)),
                   ],
                 ),
               ),
@@ -1251,7 +1250,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                       isVi ? 'Xem thêm' : 'See more',
                       style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13, color: Colors.black87),
                     ),
-                    const Icon(Icons.expand_more, size: 18, color: Colors.black54),
+                    Icon(Icons.expand_more, size: 18, color: Colors.black.withValues(alpha: 0.3)),
                   ],
                 ),
               ),
@@ -1391,7 +1390,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                   },
                   selectedColor: isDarkMode ? const Color(0xFF003D80) : const Color(0xFFE3F2FD),
                   backgroundColor: isDarkMode
-                      ? DarkColors.surfaceLight.withValues(alpha: 0.72)
+                      ? DarkColors.surfaceLight.withValues(alpha: 0.42)
                       : const Color(0xFFF1F5F9),
                   labelStyle: TextStyle(
                     color: isSelected
