@@ -1,4 +1,4 @@
-import type { ChatMessageType } from '../chat.types'
+import type { ChatMessageType, SystemMessagePayload } from '../chat.types'
 
 /**
  * Interface representing the parsed call log data.
@@ -71,9 +71,19 @@ export function formatMessagePreview(
   text: string | null | undefined,
   isMe: boolean,
   type?: ChatMessageType,
+  sender?: string,
 ): string {
   const content = text || ''
-  const prefix = isMe ? 'Bạn: ' : ''
+  let prefix = ''
+  if (isMe) {
+    prefix = 'Bạn: '
+  } else if (sender) {
+    prefix = sender + ': '
+  }
+  const maxPreviewLength = 27
+
+  const truncatePreview = (value: string) =>
+    value.length > maxPreviewLength ? `${value.slice(0, maxPreviewLength - 3).trimEnd()}...` : value
 
   if (type === 'image') return `${prefix}[Hình ảnh]`
   if (type === 'file') return `${prefix}[Tệp tin]`
@@ -81,16 +91,11 @@ export function formatMessagePreview(
 
   if (!content) return ''
 
-  // Fallback detections if type is not provided
-  if (content.startsWith('CALL_LOG::')) {
-    const callLogText = formatMessageContent(content)
-    return `${prefix}[${callLogText}]`
+  if (content === 'CALL LOG' || content === 'CALL_LOG' || content.startsWith(CALL_LOG_PREFIX)) {
+    return truncatePreview(`${prefix}${formatMessageContent(content)}`)
   }
-  
-  // Detect other types based on content patterns if necessary
-  // (e.g. if we know certain strings mean certain types)
 
-  return `${prefix}${content}`
+  return truncatePreview(`${prefix}${content}`)
 }
 
 /**
@@ -100,4 +105,62 @@ function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60)
   const secs = seconds % 60
   return `${mins}:${secs.toString().padStart(2, '0')}`
+}
+
+/**
+ * Parses and renders structured system messages for group chat.
+ * Handles personalization ("Bạn") and localized strings.
+ */
+export function renderSystemMessage(
+  content: string,
+  currentUserId: string,
+  getDisplayName: (id: string) => string,
+): string {
+  if (!content) return ''
+
+  // Support legacy string-based system messages
+  if (!content.includes('"action"')) {
+    return content
+  }
+
+  try {
+    const payload: SystemMessagePayload = JSON.parse(content)
+    const actorName = payload.actorId === currentUserId ? 'Bạn' : getDisplayName(payload.actorId)
+
+    switch (payload.action) {
+      case 'ADD_MEMBERS': {
+        const targets = (payload.targetMemberIds ?? [])
+          .map((id) => (id === currentUserId ? 'Bạn' : getDisplayName(id)))
+          .join(', ')
+        return `${actorName} đã thêm ${targets} vào nhóm`
+      }
+      case 'LEAVE_GROUP':
+        return `${actorName} đã rời khỏi nhóm`
+      case 'CREATE_GROUP':
+        return `${actorName} đã tạo nhóm`
+      case 'RENAME_GROUP':
+        return `${actorName} đã đổi tên nhóm thành "${payload.metadata?.newName || ''}"`
+      default:
+        return content
+    }
+  } catch (error) {
+    console.warn('[renderSystemMessage] Failed to parse system message JSON:', error)
+    return content
+  }
+}
+
+/**
+ * Centralized function to format message content for UI display.
+ * Used in both MessageBubble (chat) and Sidebar (preview).
+ */
+export function formatMessage(
+  message: { type: string; text: string },
+  currentUserId: string,
+  getDisplayName: (id: string) => string,
+): string {
+  if (message.type === 'system') {
+    return renderSystemMessage(message.text, currentUserId, getDisplayName)
+  }
+
+  return formatMessageContent(message.text)
 }

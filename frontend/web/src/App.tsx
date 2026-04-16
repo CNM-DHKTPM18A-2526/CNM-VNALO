@@ -7,7 +7,7 @@ import { LoginPage } from './pages/LoginPage'
 import { QrLoginPage } from './pages/QrLoginPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
-import { ChatPage } from './pages/ChatPage'
+import ChatPage from './pages/ChatPage'
 import { ContactsPage } from './pages/ContactsPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { DocumentsPage } from './pages/DocumentsPage'
@@ -31,8 +31,7 @@ function App() {
         }
       >
         <Route index element={<Navigate replace to='/chat' />} />
-        <Route path='chat' element={<ChatPage />} />
-        <Route path='chat/:conversationId' element={<ChatPage />} />
+        <Route path='chat/:conversationId?' element={<ChatPage />} />
         <Route path='contacts' element={<ContactsPage />} />
         <Route path='documents' element={<DocumentsPage />} />
         <Route path='profile' element={<ProfilePage />} />

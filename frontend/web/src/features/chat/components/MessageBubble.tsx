@@ -1,4 +1,4 @@
-import { MoreHorizontal, Pin, Share2, Star } from 'lucide-react'
+import { MoreHorizontal, Pin, Reply, Share2, Star } from 'lucide-react'
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 
 import type { ChatMessage, MessageReactionMap, ReactionKey } from '../chat.types'
@@ -9,24 +9,15 @@ import { DEFAULT_CHAT_STICKERS } from '../chat.stickers'
 import { useImageViewer } from '../context/ImageViewerContext'
 import { MessageReactionBar, MessageReactionSummary } from './MessageReaction'
 import { MessageContextMenu, type MessageContextMenuAction } from './MessageContextMenu'
-import { formatMessageContent } from '../utils/messageUtils'
-
-function getFileName(url?: string | null): string {
-  if (!url) {
-    return 'Tệp đính kèm'
-  }
-
-  try {
-    const pathname = new URL(url).pathname
-    const fileName = pathname.split('/').filter(Boolean).pop()
-    return fileName || 'Tệp đính kèm'
-  } catch {
-    return 'Tệp đính kèm'
-  }
-}
+import { formatMessage, formatMessageContent } from '../utils/messageUtils'
+import { useUserStore } from '../context/UserStoreContext'
 
 function getMessageMediaUrl(message: ChatMessage): string | null {
   return message.mediaUrl ?? message.attachments?.[0]?.url ?? null
+}
+
+function isImageAttachment(mimeType?: string | null, type?: string) {
+  return type === 'image' || mimeType?.startsWith('image/')
 }
 
 function resolveStickerSrc(message: ChatMessage): string | null {
@@ -59,6 +50,11 @@ type MessageBubbleProps = {
   onToggleSelection?: () => void
   isReadByPeer?: boolean
   isHighlighted?: boolean
+  isGroupedWithPrevious?: boolean
+  isGroupedWithNext?: boolean
+  currentUserId?: string
+  onReply?: () => void
+  onJumpToOriginal?: (messageId: string) => void
 }
 
 const HOVER_HIDE_DELAY_MS = 180
@@ -82,13 +78,31 @@ export function MessageBubble({
   onToggleSelection,
   isReadByPeer = false,
   isHighlighted = false,
+  isGroupedWithPrevious = false,
+  isGroupedWithNext = false,
+  currentUserId,
+  onReply,
+  onJumpToOriginal,
 }: MessageBubbleProps) {
+  const { userMap } = useUserStore()
   const { openImageViewerByMessageId } = useImageViewer()
-  const mediaSrc = getMessageMediaUrl(message)
   const stickerSrc = message.type === 'sticker' ? resolveStickerSrc(message) : null
+  const attachments = message.attachments ?? []
+  const imageAttachments = attachments.filter((attachment) => isImageAttachment(attachment.mimeType))
+  const fileAttachments = attachments.filter((attachment) => !isImageAttachment(attachment.mimeType))
+
   const stackRef = useRef<HTMLDivElement | null>(null)
   const contextMenuTriggerRef = useRef<HTMLButtonElement | null>(null)
   const contextMenuRef = useRef<HTMLDivElement | null>(null)
+
+  const isMyMessage = message.sender === 'me'
+
+  // Visual grouping classes
+  const groupingClasses = [
+    isGroupedWithPrevious ? 'message-grouped-prev' : '',
+    isGroupedWithNext ? 'message-grouped-next' : '',
+  ].filter(Boolean).join(' ')
+
   const hideTimerRef = useRef<number | null>(null)
   const [supportsHover, setSupportsHover] = useState(true)
   const [isMessageHovered, setIsMessageHovered] = useState(false)
@@ -96,8 +110,6 @@ export function MessageBubble({
   const [isReactionBarOpen, setIsReactionBarOpen] = useState(false)
   const [isContextMenuOpen, setIsContextMenuOpen] = useState(false)
   const [contextMenuPosition, setContextMenuPosition] = useState({ top: 0, left: 0 })
-
-  const isMyMessage = message.sender === 'me'
 
   const statusLabel = (() => {
     if (message.sender !== 'me') {
@@ -119,13 +131,27 @@ export function MessageBubble({
     return ' • Đã gửi'
   })()
 
-  const clearHideTimer = () => {
-    if (hideTimerRef.current === null) {
-      return
+  const handleContainerMouseEnter = () => {
+    if (!supportsHover || isRecalled) return
+    setIsMessageHovered(true)
+    if (hideTimerRef.current) {
+      window.clearTimeout(hideTimerRef.current)
+      hideTimerRef.current = null
     }
+  }
 
-    window.clearTimeout(hideTimerRef.current)
-    hideTimerRef.current = null
+  const handleContainerMouseLeave = () => {
+    if (isReactionBarOpen || isContextMenuOpen) return
+    hideTimerRef.current = window.setTimeout(() => {
+      setIsMessageHovered(false)
+    }, HOVER_HIDE_DELAY_MS)
+  }
+
+  const clearHideTimer = () => {
+    if (hideTimerRef.current) {
+      window.clearTimeout(hideTimerRef.current)
+      hideTimerRef.current = null
+    }
   }
 
   const closeReactionUi = () => {
@@ -136,30 +162,6 @@ export function MessageBubble({
 
   const closeContextMenu = () => {
     setIsContextMenuOpen(false)
-  }
-
-  const scheduleHideReactionUi = () => {
-    clearHideTimer()
-    hideTimerRef.current = window.setTimeout(() => {
-      closeReactionUi()
-    }, HOVER_HIDE_DELAY_MS)
-  }
-
-  const handleContainerMouseEnter = () => {
-    if (!supportsHover) {
-      return
-    }
-
-    clearHideTimer()
-    setIsMessageHovered(true)
-  }
-
-  const handleContainerMouseLeave = () => {
-    if (!supportsHover) {
-      return
-    }
-
-    scheduleHideReactionUi()
   }
 
   const handleReactionAdd = (reactionKey: ReactionKey) => {
@@ -236,7 +238,8 @@ export function MessageBubble({
   }
 
   const handleContextMenuAction = (action: MessageContextMenuAction) => {
-    if (action === 'copy') {
+    if (action === 'reply') {
+      onReply?.()
       return
     }
 
@@ -277,11 +280,10 @@ export function MessageBubble({
       }
 
       const target = event.target as Node
-      if (stack.contains(target)) {
-        return
+      if (!stack.contains(target)) {
+        closeReactionUi()
+        closeContextMenu()
       }
-
-      closeReactionUi()
     }
 
     window.addEventListener('pointerdown', onPointerDown)
@@ -289,7 +291,7 @@ export function MessageBubble({
     return () => {
       window.removeEventListener('pointerdown', onPointerDown)
     }
-  }, [])
+  }, [isReactionBarOpen, isContextMenuOpen])
 
   useEffect(() => {
     if (!isContextMenuOpen) {
@@ -336,7 +338,29 @@ export function MessageBubble({
 
   // Desktop uses hover state, mobile uses tap state.
   const showReactionTrigger = isReactionBarOpen || (supportsHover ? isMessageHovered : isMessageTapped)
-  const quickReactionEmoji = REACTION_OPTIONS.find((item) => item.key === quickReaction)?.emoji ?? '👍'
+  const quickReactionEmoji = REACTION_OPTIONS.find((item) => item.key === quickReaction)?.emoji ?? '❤️'
+
+  if (message.type === 'system') {
+    const getDisplayName = (id: string) => {
+      if (id === currentUserId) return 'Bạn'
+      return userMap[id]?.displayName || 'Người dùng'
+    }
+    const systemText = formatMessage(message, currentUserId || '', getDisplayName)
+
+    return (
+      <div
+        data-message-id={message.id}
+        className="w-full flex justify-center my-3"
+      >
+        <span
+          className="text-[13px] text-[#596677] leading-[18px] text-center"
+          dangerouslySetInnerHTML={{
+            __html: systemText.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-slate-800">$1</strong>')
+          }}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className={message.sender === 'me' ? 'message-row message-row-me' : 'message-row'} data-message-id={message.id}>
@@ -379,144 +403,190 @@ export function MessageBubble({
           </button>
         ) : null}
 
-          <div className={isMyMessage ? 'message-action-toolbar message-action-toolbar-me' : 'message-action-toolbar'}>
-            <button
-              type='button'
-              className='message-share-trigger'
-              onClick={handleShareClick}
-              aria-label='Chia sẻ tin nhắn'
-            >
-              <Share2 />
-            </button>
+        <div className={isMyMessage ? 'message-action-toolbar message-action-toolbar-me' : 'message-action-toolbar'}>
+          <button
+            type='button'
+            className='message-reply-trigger'
+            onClick={(e) => {
+              e.stopPropagation()
+              onReply?.()
+            }}
+            aria-label='Trả lời tin nhắn'
+          >
+            <Reply />
+          </button>
 
-            <button
-              ref={contextMenuTriggerRef}
-              type='button'
-              className='message-context-menu-trigger'
-              onClick={handleContextMenuTriggerClick}
-              aria-label='Mở menu tin nhắn'
-              aria-expanded={isContextMenuOpen}
-            >
-              <MoreHorizontal />
-            </button>
-          </div>
+          <button
+            type='button'
+            className='message-share-trigger'
+            onClick={handleShareClick}
+            aria-label='Chia sẻ tin nhắn'
+          >
+            <Share2 />
+          </button>
 
-          {isContextMenuOpen ? (
-            <MessageContextMenu
-              ref={contextMenuRef}
-              message={message}
-              isMyMessage={isMyMessage}
-              position={contextMenuPosition}
-              onClose={closeContextMenu}
-              onAction={handleContextMenuAction}
-            />
-          ) : null}
+          <button
+            ref={contextMenuTriggerRef}
+            type='button'
+            className='message-context-menu-trigger'
+            onClick={handleContextMenuTriggerClick}
+            aria-label='Mở menu tin nhắn'
+            aria-expanded={isContextMenuOpen}
+          >
+            <MoreHorizontal />
+          </button>
+        </div>
+
+        {isContextMenuOpen ? (
+          <MessageContextMenu
+            ref={contextMenuRef}
+            message={message}
+            isMyMessage={isMyMessage}
+            position={contextMenuPosition}
+            onClose={closeContextMenu}
+            onAction={handleContextMenuAction}
+          />
+        ) : null}
 
         <article
           className={
             isMyMessage
-              ? `message-bubble message-bubble-me${isHighlighted ? ' message-bubble-highlight' : ''}${isSelected ? ' message-bubble-selected' : ''}`
-              : `message-bubble${isHighlighted ? ' message-bubble-highlight' : ''}${isSelected ? ' message-bubble-selected' : ''}`
+              ? `message-bubble message-bubble-me ${groupingClasses}${isHighlighted ? ' message-bubble-highlight' : ''}${isSelected ? ' message-bubble-selected' : ''}`
+              : `message-bubble ${groupingClasses}${isHighlighted ? ' message-bubble-highlight' : ''}${isSelected ? ' message-bubble-selected' : ''}`
           }
           onClick={handleMessageTap}
         >
-        {!isMyMessage && showSenderName ? <div className='message-sender-name'>{senderName || 'Người dùng'}</div> : null}
+          {!isMyMessage && showSenderName ? <div className='message-sender-name'>{senderName || 'Người dùng'}</div> : null}
 
-        {isPinned || isStarred ? (
-          <div className='message-bubble-flag-row'>
-            {isPinned ? (
-              <span className='message-bubble-flag message-bubble-flag-pin'>
-                <Pin size={11} />
-                Ghim
-              </span>
-            ) : null}
-            {isStarred ? (
-              <span className='message-bubble-flag message-bubble-flag-star'>
-                <Star size={11} />
-                Đánh dấu
-              </span>
-            ) : null}
-          </div>
-        ) : null}
+          {isPinned || isStarred ? (
+            <div className='message-bubble-flag-row'>
+              {isPinned ? (
+                <span className='message-bubble-flag message-bubble-flag-pin'>
+                  <Pin size={11} />
+                  Ghim
+                </span>
+              ) : null}
+              {isStarred ? (
+                <span className='message-bubble-flag message-bubble-flag-star'>
+                  <Star size={11} />
+                  Đánh dấu
+                </span>
+              ) : null}
+            </div>
+          ) : null}
 
-        {isRecalled ? (
-          <div className='message-recalled-state'>
-            <span className='message-recalled-pill'>
-              <Pin size={11} />
-              Tin nhắn đã được thu hồi
-            </span>
-          </div>
-        ) : null}
-
-        {!isRecalled && message.type === 'image' ? (
-          mediaSrc ? (
-            <>
-              <button
-                type='button'
-                className='message-bubble-media message-bubble-image border-0 bg-transparent p-0'
-                onClick={(event) => {
-                  event.preventDefault()
-                  event.stopPropagation()
-                  openImageViewerByMessageId(message.id)
-                }}
-                aria-label='Xem ảnh toàn màn hình'
-              >
-                <img
-                  src={mediaSrc}
-                  alt='chat-image'
-                  className='chat-image'
-                  loading='eager'
-                  decoding='async'
-                  style={{
-                    width: '220px',
-                    maxWidth: '100%',
-                    height: 'auto',
-                    borderRadius: '10px',
-                    background: '#f1f5f9',
-                    border: '1px solid #dbe3ef',
-                  }}
-                />
-              </button>
-              {message.text ? <p>{message.text}</p> : null}
-            </>
-          ) : (
-            <p>Image not available</p>
-          )
-        ) : null}
-
-        {!isRecalled && message.type === 'sticker' && stickerSrc ? (
-          <>
-            <img className='message-bubble-media message-bubble-sticker' src={stickerSrc} alt={message.text || 'Sticker'} />
-            {message.text ? <p>{message.text}</p> : null}
-          </>
-        ) : null}
-
-        {!isRecalled && message.type === 'file' ? (
-          <>
-            <a
-              className='message-file-card'
-              href={message.mediaUrl ?? message.attachments?.[0]?.url ?? '#'}
-              target='_blank'
-              rel='noreferrer'
+          {!isRecalled && message.replyTo && (
+            <div 
+              className={`message-reply-quote mb-2 p-2 rounded bg-black/5 border-l-2 border-blue-500 cursor-pointer hover:bg-black/10 transition-colors`}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (message.replyTo) onJumpToOriginal?.(message.replyTo.id);
+              }}
             >
-              <span className='message-file-icon'>
-                <Icon name='attach' />
-              </span>
-              <span className='message-file-meta'>
-                <strong>{message.attachments?.[0]?.name ?? getFileName(message.mediaUrl ?? message.attachments?.[0]?.url)}</strong>
-                <span>{message.mediaMimeType ?? message.attachments?.[0]?.mimeType ?? 'Tệp đính kèm'}</span>
-              </span>
-            </a>
-            {message.text ? <p>{message.text}</p> : null}
-          </>
-        ) : null}
+              <p className="text-[11px] font-bold text-blue-600 truncate">
+                {message.replyTo.senderId && userMap[message.replyTo.senderId] 
+                  ? userMap[message.replyTo.senderId].displayName 
+                  : message.replyTo.senderName}
+              </p>
+              <p className="text-xs text-slate-500 truncate line-clamp-1">
+                {message.replyTo.preview}
+              </p>
+            </div>
+          )}
 
-        {!isRecalled && message.type === 'text' ? <p>{formatMessageContent(message.text)}</p> : null}
+          {isRecalled ? (
+            <div className='message-recalled-state'>
+              <span className='message-recalled-pill'>
+                <Pin size={11} />
+                Tin nhắn đã được thu hồi
+              </span>
+            </div>
+          ) : null}
 
-        <time>
-          {message.timestamp}
-          {statusLabel}
-        </time>
+          {!isRecalled && (imageAttachments.length > 0) && (
+            <div className={
+              imageAttachments.length === 1 ? 'message-bubble-images-single' :
+                imageAttachments.length === 2 ? 'message-bubble-images-grid grid-cols-2 gap-1' :
+                  imageAttachments.length === 3 ? 'message-bubble-images-staircase grid grid-cols-2 gap-1' :
+                    'message-bubble-images-grid grid-cols-2 gap-1'
+            }>
+              {imageAttachments.map((att, idx) => {
+                // Special layout for 3 images: first 2 are small (top), 3rd is big (bottom span 2)
+                const isStaircaseBottom = imageAttachments.length === 3 && idx === 2;
+
+                return (
+                  <button
+                    key={att.url + idx}
+                    type='button'
+                    className={`message-bubble-media message-bubble-image relative border-0 bg-transparent p-0 overflow-hidden ${isStaircaseBottom ? 'col-span-2' : ''}`}
+                    onClick={(event) => {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      openImageViewerByMessageId(message.id)
+                    }}
+                    aria-label={`Xem ảnh ${idx + 1}`}
+                  >
+                    <img
+                      src={att.url}
+                      alt='chat-image'
+                      className='chat-image object-cover w-full h-full'
+                      loading='eager'
+                      decoding='async'
+                      style={{
+                        maxHeight: imageAttachments.length === 1 ? '320px' : (isStaircaseBottom ? '200px' : '120px'),
+                        borderRadius: '4px',
+                        background: '#f1f5f9',
+                        border: '1px solid rgba(0,0,0,0.05)',
+                      }}
+                    />
+                    <span className='absolute top-1 left-1 bg-black/40 text-white text-[9px] px-1 rounded font-bold backdrop-blur-sm'>HD</span>
+                    {idx === 3 && imageAttachments.length > 4 && (
+                      <div className='absolute inset-0 bg-black/50 flex items-center justify-center text-white font-bold text-lg'>
+                        +{imageAttachments.length - 3}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {!isRecalled && (fileAttachments.length > 0) && (
+            <div className='message-bubble-attachments message-bubble-files flex flex-col gap-2 mt-1'>
+              {fileAttachments.map((att, idx) => (
+                <a
+                  key={att.url + idx}
+                  className='message-file-card'
+                  href={att.url}
+                  target='_blank'
+                  rel='noreferrer'
+                >
+                  <span className='message-file-icon'>
+                    <Icon name='attach' />
+                  </span>
+                  <span className='message-file-meta'>
+                    <strong>{att.name || 'Tệp đính kèm'}</strong>
+                    <span>{att.mimeType || 'Ứng dụng'}</span>
+                  </span>
+                </a>
+              ))}
+            </div>
+          )}
+
+          {!isRecalled && message.type === 'sticker' && stickerSrc ? (
+            <img className='message-bubble-media message-bubble-sticker' src={stickerSrc} alt={message.text || 'Sticker'} />
+          ) : null}
+
+          {!isRecalled && message.text && (
+            <p className={message.type === 'text' ? '' : 'mt-2'}>{formatMessageContent(message.text)}</p>
+          )}
+
+          {!isGroupedWithNext && (
+            <time>
+              {message.timestamp}
+              {statusLabel}
+            </time>
+          )}
         </article>
 
         <MessageReactionSummary reactions={reactions} onRemoveReaction={onRemoveReaction} />

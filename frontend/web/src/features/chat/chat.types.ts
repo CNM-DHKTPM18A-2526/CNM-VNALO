@@ -1,20 +1,34 @@
-export interface ConversationSummary {
+export type ConversationSummary = {
   id: string
+  userId?: string | null
   name: string
   avatarUrl?: string | null
-  lastMessage?: string | null
+  isStranger?: boolean
+  lastMessage: string
+  unreadCount: number
+  online?: boolean
+  isOnline?: boolean
+  lastMessageSeq?: number
   lastMessagePreview?: string | null
-  unreadCount?: number
+  lastMessageSenderId?: string | null
+  participantUserIds?: string[]
   lastMessageAt?: string | null
   updatedAt?: string | null
-  participantUserIds?: string[]
-  memberCount?: number
   lastSeenTime?: string | null
   isGroup?: boolean
   isCloud?: boolean
+  memberCount?: number
 }
 
-export type ChatMessageType = 'text' | 'image' | 'file' | 'sticker'
+export type ChatMessageType = 'text' | 'image' | 'file' | 'sticker' | 'system'
+
+export type ReplyMetadata = {
+  id: string
+  senderId?: string        // stored for name resolution after refresh
+  senderName: string
+  preview: string
+  type: ChatMessageType
+}
 
 export type MessageDeliveryState = 'sending' | 'sent' | 'read' | 'failed'
 
@@ -32,16 +46,39 @@ export type ChatSticker = {
   url: string
 }
 
+export type ReactionKey = 'like' | 'love' | 'haha' | 'wow' | 'sad' | 'angry'
+
+export type ReactionOption = {
+  key: ReactionKey
+  emoji: string
+  label: string
+}
+
+export type MessageReactionMap = Record<
+  ReactionKey,
+  {
+    count: number
+    myCount: number
+  }
+>
+
+export type MessageReactionState = {
+  reactions: MessageReactionMap
+  lastUsedReaction?: ReactionKey
+}
+
 export type ChatComposePayload = {
   text: string
   file?: File | null
+  files?: File[] | null
   sticker?: ChatSticker | null
+  replyTo?: ReplyMetadata | null
 }
 
 export type ChatMessage = {
   id: string
   conversationId: string
-  sender: 'me' | 'other'
+  sender: 'me' | 'other' | 'system'
   senderId: string
   type: ChatMessageType
   isLocal?: boolean
@@ -56,6 +93,7 @@ export type ChatMessage = {
   serverSeq?: number
   clientMessageId?: string
   deliveryState?: MessageDeliveryState
+  replyTo?: ReplyMetadata | null
 }
 
 export type MessageReadEvent = {
@@ -64,31 +102,16 @@ export type MessageReadEvent = {
   lastReadSeq: number
 }
 
-// -------------------- REACTION TYPES --------------------
-export type ReactionKey = 'like' | 'love' | 'haha' | 'wow' | 'sad' | 'angry'
-
-export type ReactionOption = {
-  key: ReactionKey
-  emoji: string
-  label: string
-}
-
-export type ReactionState = {
-  count: number
-  myCount: number
-}
-
-export type MessageReactionMap = Partial<Record<ReactionKey, ReactionState>>
-
-export type MessageReactionState = {
-  reactions: MessageReactionMap
-  lastUsedReaction?: ReactionKey
-}
-
-// -------------------- VIEWER TYPES --------------------
 export type ViewerImageItem = {
   messageId: string
   url: string
   senderName: string
   timestamp: string
+}
+
+export interface SystemMessagePayload {
+  action: 'ADD_MEMBERS' | 'LEAVE_GROUP' | 'CREATE_GROUP' | 'RENAME_GROUP';
+  actorId: string;
+  targetMemberIds?: string[];
+  metadata?: Record<string, any>;
 }

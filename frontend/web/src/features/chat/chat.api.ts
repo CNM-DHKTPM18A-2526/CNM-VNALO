@@ -1,9 +1,12 @@
-import type { ChatAttachment, ChatMessage, ChatMessageType, ConversationSummary } from './chat.types'
+import type { ChatAttachment, ChatMessage, ChatMessageType, ConversationSummary, ReplyMetadata } from './chat.types'
 
 const fallbackProtocol = typeof window !== 'undefined' ? window.location.protocol.replace(':', '') : 'http'
 const fallbackHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
 const MESSAGE_API_URL = import.meta.env.VITE_MESSAGE_API_URL ?? `${fallbackProtocol}://${fallbackHost}:3000/api/v1`
-const MEDIA_API_BASE_URL = import.meta.env.VITE_MEDIA_API_URL ?? 'http://localhost:8083'
+const MEDIA_API_BASE_URL = import.meta.env.VITE_MEDIA_API_URL ?? 'http://localhost:8083/api/v1'
+
+console.log('[chat.api] MESSAGE_API_URL:', MESSAGE_API_URL)
+console.log('[chat.api] MEDIA_API_BASE_URL:', MEDIA_API_BASE_URL)
 
 type InboxItem = {
   conversationId: string
@@ -18,12 +21,10 @@ type InboxItem = {
     title?: string | null
     type?: string
     avatarUrl?: string | null
-    avatar_url?: string | null
     members?: Array<{
       userId?: string
       nickname?: string | null
       avatarUrl?: string | null
-      avatar_url?: string | null
     }>
   } | null
 }
@@ -42,6 +43,7 @@ export type RawMessage = {
   mediaThumbnailUrl?: string | null
   mediaMimeType?: string | null
   mediaSizeBytes?: number | null
+  attachments?: ChatAttachment[]
 }
 
 type RawMessageLike = RawMessage & {
@@ -56,6 +58,7 @@ type RawMessageLike = RawMessage & {
   media_thumbnail_url?: string | null
   media_mime_type?: string | null
   media_size_bytes?: number | null
+  attachments?: ChatAttachment[]
 }
 
 type UploadResponse = {
@@ -121,6 +124,17 @@ export type SendMessageRequest = {
   mediaThumbnailUrl?: string | null
   mediaMimeType?: string | null
   mediaSizeBytes?: number | null
+  attachments?: Array<{
+    url: string
+    name?: string | null
+    mimeType?: string | null
+    sizeBytes?: number | null
+    thumbnailUrl?: string | null
+  }>
+  replyTo?: ReplyMetadata | null
+  replyToMessageId?: string | null
+  replyToSenderId?: string | null
+  replyToContent?: string | null
 }
 
 function formatTime(value?: string): string {
@@ -238,8 +252,8 @@ function normalizeMessageType(raw: RawMessageLike): ChatMessageType {
   const declaredType = String(raw.messageType ?? '').trim().toLowerCase()
   const content = String(raw.content ?? '').trim()
 
-  if (declaredType === 'image' || declaredType === 'file' || declaredType === 'sticker' || declaredType === 'text') {
-    return declaredType
+  if (declaredType === 'image' || declaredType === 'file' || declaredType === 'sticker' || declaredType === 'text' || declaredType === 'system') {
+    return declaredType as ChatMessageType
   }
 
   if (isImageMimeType(raw.mediaMimeType ?? raw.media_mime_type)) {
@@ -310,34 +324,39 @@ export async function fetchInbox(token: string, currentUserId?: string): Promise
   const data = await authorizedFetch<InboxItem[]>(token, '/inbox')
   const myId = String(currentUserId ?? '').trim()
 
-  return data.map((item) => {
-    const id = item.conversation?.id ?? item.conversationId
-    const title = item.conversation?.title?.trim()
-    const members = item.conversation?.members ?? []
-    const normalizedMembers = members.filter((member) => Boolean(member.userId))
-    const peerMember = normalizedMembers.find((member) => String(member.userId ?? '').trim() !== myId)
-      ?? normalizedMembers[0]
-    const partnerUserId = String(peerMember?.userId ?? '').trim() || null
-    const peerNickname = peerMember?.nickname?.trim()
-    const peerFallback = partnerUserId ? `Người dùng ${partnerUserId.slice(0, 8)}` : null
-    const normalizedPreview = normalizeInboxPreview(item.lastMessagePreview)
+  return data
+    .filter((item) => {
+      // If we have a members list, we MUST be in it to see the conversation
+      // (This filters out conversations we have left)
+      const members = item.conversation?.members ?? []
+      if (members.length > 0) {
+        return members.some((m) => String(m.userId ?? '').trim() === myId)
+      }
+      // Fallback: if no members returned (might be a different API response), 
+      // check participantUserIds if available
+      return true
+    })
+    .map((item) => {
+      const id = item.conversation?.id ?? item.conversationId
+      const title = item.conversation?.title?.trim()
+      const members = item.conversation?.members ?? []
+      const normalizedMembers = members.filter((member) => Boolean(member.userId))
+      const peerMember = normalizedMembers.find((member) => String(member.userId ?? '').trim() !== myId)
+        ?? normalizedMembers[0]
+      const partnerUserId = String(peerMember?.userId ?? '').trim() || null
+      const peerNickname = peerMember?.nickname?.trim()
+      const peerFallback = partnerUserId ? `Người dùng ${partnerUserId.slice(0, 8)}` : null
+      const normalizedPreview = normalizeInboxPreview(item.lastMessagePreview)
+      const isGroup = item.conversation?.type?.toUpperCase() === 'GROUP' || (item as any).isGroup === true
+      const avatarUrl = item.conversation?.avatarUrl ?? (item as any).avatarUrl ?? (item as any).avatar_url ?? null
 
-    const convo = item.conversation as (Record<string, unknown> | null | undefined)
-    const isGroup = (item.conversation?.type ?? convo?.type) === 'GROUP'
-    const name = isGroup
-      ? (title || (convo?.name as string | undefined) || 'Nhóm không tên')
-      : (title || peerNickname || peerFallback || `Trò chuyện ${id.slice(0, 8)}`)
-    const avatarUrl = isGroup
-      ? (item.conversation?.avatarUrl || (convo?.avatar_url as string | undefined) || null)
-      : (peerMember?.avatarUrl || (peerMember as (Record<string, unknown> | undefined))?.avatar_url as string | undefined || null)
+      // Fallback for direct chat only
+      const finalAvatarUrl = (!isGroup && !avatarUrl) ? (peerMember?.avatarUrl ?? null) : avatarUrl
 
-    return {
+      return {
         id,
         userId: partnerUserId,
-        isGroup,
-        name,
-        avatarUrl,
-        memberCount: members.length,
+        name: title && title.length > 0 ? title : peerNickname || peerFallback || `Trò chuyện ${id.slice(0, 8)}`,
         lastMessage: normalizedPreview,
         lastMessagePreview: normalizedPreview,
         unreadCount: item.unreadCount ?? 0,
@@ -350,12 +369,16 @@ export async function fetchInbox(token: string, currentUserId?: string): Promise
         lastMessageAt: item.lastMessageAt ?? null,
         updatedAt: item.updatedAt ?? null,
         lastSeenTime: item.lastMessageAt ?? null,
+        isGroup,
+        isCloud: id.startsWith('vnalo_cloud_') || item.conversationId?.startsWith('vnalo_cloud_'),
+        avatarUrl: finalAvatarUrl,
+        memberCount: members.length,
       }
     })
 }
 
 export function mapRawMessage(raw: RawMessageLike, currentUserId: string): ChatMessage {
-  const conversationId = raw.conversationId ?? raw.conversation_id ?? ''
+  const conversationId = raw.conversationId ?? raw.conversation_id ?? (raw as any).groupId ?? (raw as any).group_id ?? ''
   const senderId = raw.senderId ?? raw.sender_id ?? raw.from ?? ''
   const createdAt = raw.createdAt ?? raw.created_at
   const serverSeq = raw.serverSeq ?? raw.server_seq
@@ -371,24 +394,25 @@ export function mapRawMessage(raw: RawMessageLike, currentUserId: string): ChatM
   const messageText = mediaUrlFromContent && content.trim() === mediaUrlFromContent ? '' : content
   const attachmentName = type === 'file' && messageText && !isHttpUrl(messageText) ? messageText : undefined
 
-  const attachments: ChatAttachment[] | undefined = mediaUrl
-    ? [
-        {
-          url: mediaUrl,
-          name: attachmentName,
-          thumbnailUrl: mediaThumbnailUrl,
-          mimeType: mediaMimeType,
-          sizeBytes: mediaSizeBytes,
-        },
-      ]
-    : undefined
+  let attachments: ChatAttachment[] | undefined = raw.attachments
+  if (!attachments && mediaUrl) {
+    attachments = [
+      {
+        url: mediaUrl,
+        name: attachmentName,
+        thumbnailUrl: mediaThumbnailUrl,
+        mimeType: mediaMimeType,
+        sizeBytes: mediaSizeBytes,
+      },
+    ]
+  }
 
   return {
     id: raw.id,
     conversationId,
     senderId,
-    sender: senderId === currentUserId ? 'me' : 'other',
-    type,
+    sender: type === 'system' ? 'system' : (senderId === currentUserId ? 'me' : 'other'),
+    type: type as ChatMessageType,
     text: messageText,
     mediaUrl,
     mediaThumbnailUrl,
@@ -400,6 +424,15 @@ export function mapRawMessage(raw: RawMessageLike, currentUserId: string): ChatM
     serverSeq,
     clientMessageId,
     deliveryState: 'sent',
+    replyTo: (raw.replyTo || raw.reply_to) ? (raw.replyTo || raw.reply_to) : (
+      (raw.replyToMessageId || (raw as any).reply_to_message_id) ? {
+        id: raw.replyToMessageId || (raw as any).reply_to_message_id,
+        senderId: raw.replyToSenderId || (raw as any).reply_to_sender_id,
+        senderName: 'Người dùng', // Will be resolved by UI via senderId
+        preview: raw.replyToContent || (raw as any).reply_to_content || '',
+        type: 'text' // Fallback type
+      } : null
+    )
   }
 }
 
@@ -428,10 +461,17 @@ function extractRawMessages(payload: unknown): RawMessage[] {
   }
 
   if (candidate.data !== undefined) {
+    if (Array.isArray(candidate.data)) {
+      return candidate.data as RawMessage[]
+    }
     return extractRawMessages(candidate.data)
   }
 
   return []
+}
+
+export async function fetchConversation(token: string, conversationId: string): Promise<unknown> {
+  return authorizedFetch<unknown>(token, `/conversations/${conversationId}`)
 }
 
 export async function fetchMessages(token: string, conversationId: string, forceSync = false): Promise<RawMessage[]> {
@@ -456,6 +496,7 @@ export async function sendMessage(token: string, payload: SendMessageRequest): P
     mediaThumbnailUrl: payload.mediaThumbnailUrl ?? undefined,
     mediaMimeType: payload.mediaMimeType ?? undefined,
     mediaSizeBytes: payload.mediaSizeBytes ?? undefined,
+    attachments: payload.attachments ?? undefined,
   }
 
   return authorizedFetch<RawMessage>(token, '/messages', {
@@ -489,11 +530,11 @@ export async function searchConversationMessages(
   const data = await authorizedFetch<
     | SearchConversationMessagesResult
     | {
-        items?: RawMessage[]
-        total?: number
-        limit?: number
-        offset?: number
-      }
+      items?: RawMessage[]
+      total?: number
+      limit?: number
+      offset?: number
+    }
   >(token, endpoint)
 
   const payload = data && typeof data === 'object' && !Array.isArray(data) ? data : {}
@@ -505,6 +546,20 @@ export async function searchConversationMessages(
     limit: typeof payload.limit === 'number' ? payload.limit : items.length,
     offset: typeof payload.offset === 'number' ? payload.offset : 0,
   }
+}
+
+export async function renameGroupConversation(token: string, conversationId: string, name: string): Promise<unknown> {
+  return authorizedFetch<unknown>(token, `/conversations/${conversationId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ title: name }),
+  })
+}
+
+export async function setConversationNickname(token: string, conversationId: string, targetUserId: string, nickname: string): Promise<unknown> {
+  return authorizedFetch<unknown>(token, `/conversations/${conversationId}/member/${targetUserId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ nickname }),
+  })
 }
 
 export async function markConversationRead(token: string, conversationId: string, lastReadSeq: number): Promise<void> {
@@ -672,68 +727,211 @@ export async function createGroupConversation(
   token: string,
   payload: CreateGroupConversationPayload,
 ): Promise<string> {
-  const response = await fetch(`${MESSAGE_API_URL}/conversations/group`, {
+  const res = await authorizedFetch<any>(token, '/conversations/group', {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
     body: JSON.stringify({
       title: payload.title.trim(),
       memberIds: payload.memberUserIds,
       ...(payload.avatarUrl ? { avatarUrl: payload.avatarUrl } : {}),
     }),
-  })
+  });
 
-  const json = await response.json().catch(() => null)
-
-  if (!response.ok) {
-    const message = isRecord(json) && typeof json.message === 'string' ? json.message : null
-    throw new Error(message ?? 'Cannot create group conversation.')
+  // Extract ID from response which might be wrapped in { data: { id: ... } } or just { id: ... }
+  if (res && typeof res === 'object') {
+    if (typeof res.id === 'string') return res.id;
+    if (res.data && typeof res.data.id === 'string') return res.data.id;
+    if (typeof res.conversationId === 'string') return res.conversationId;
   }
 
-  const responsePayload = isRecord(json) && isRecord(json.data) ? json.data : json
-  const conversationId =
-    isRecord(responsePayload) && typeof responsePayload.id === 'string'
-      ? responsePayload.id
-      : isRecord(responsePayload) && typeof responsePayload.conversationId === 'string'
-        ? responsePayload.conversationId
-        : null
+  throw new Error('Malformed response from group creation API');
+}
+export async function fetchStickerPacks(token: string): Promise<any[]> {
+  const url = `${MEDIA_API_BASE_URL}/stickers/my-packs`
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
 
-  if (!conversationId) {
-    throw new Error('Invalid group creation response payload.')
+  if (!response.ok) throw new Error(`Failed to fetch sticker packs: ${response.status}`)
+
+  const json = await response.json();
+  const items = json.data?.content || json.data || json || [];
+
+  if (Array.isArray(items)) {
+    items.forEach((item: any) => {
+      if (item.coverUrl) item.coverUrl = normalizeMediaUrl(item.coverUrl);
+    });
   }
 
-  return conversationId
+  return items;
 }
 
-export async function fetchConversation(token: string, conversationId: string): Promise<Record<string, unknown> | null> {
-  const response = await fetch(`${MESSAGE_API_URL}/conversations/${conversationId}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  })
+export async function fetchStickerPackDetails(token: string, packId: string): Promise<any> {
+  const url = `${MEDIA_API_BASE_URL}/stickers/packs/${packId}`
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
 
-  if (!response.ok) return null;
-  const json = await response.json().catch(() => null);
-  const data = (json && typeof json === 'object' && !Array.isArray(json) && json.data) ? json.data : json;
-  
-  if (data) {
-    const raw = data as Record<string, unknown>
-    const isGroup = (raw.type ?? raw.type) === 'GROUP'
-    const title = (raw.title as string | undefined)?.trim()
-    const members = (raw.members as Array<Record<string, unknown>> | undefined) ?? []
-    return {
-      ...raw,
-      isGroup,
-      name: isGroup ? (title || (raw.name as string | undefined) || 'Nhóm không tên') : (title || 'Cuộc trò chuyện'),
-      avatarUrl: isGroup
-        ? ((raw.avatarUrl as string | undefined) || (raw.avatar_url as string | undefined) || null)
-        : ((raw.avatarUrl as string | undefined) || (raw.avatar_url as string | undefined) || null),
-      memberCount: members.length,
-      participantUserIds: members.map((m) => String(m.userId || '').trim()),
+  if (!response.ok) throw new Error(`Failed to fetch pack details: ${response.status}`)
+  const json = await response.json();
+  const data = json.data || json;
+
+  if (data && Array.isArray(data.stickers)) {
+    data.stickers.forEach((s: any) => {
+      if (s.url) s.url = normalizeMediaUrl(s.url);
+    });
+  }
+  if (data && data.coverUrl) {
+    data.coverUrl = normalizeMediaUrl(data.coverUrl);
+  }
+
+  return data;
+}
+
+export async function fetchMediaByCategory(token: string, category: 'EMOJI' | 'GIF'): Promise<any[]> {
+  const url = `${MEDIA_API_BASE_URL}/media?category=${category}&size=100`
+
+  try {
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    if (!response.ok) throw new Error(`Media API error: ${response.status}`)
+
+    const json = await response.json();
+    let items = json.data?.content || json.data || json || []
+    if (!Array.isArray(items)) items = []
+
+    // Fallback: Deep discovery from SYSTEM assets
+    if (items.length === 0) {
+      console.log(`[chat.api.fetchMediaByCategory] ${category} list empty, performing MASSIVE discovery (limit 3000)...`)
+      const fallbackUrl = `${MEDIA_API_BASE_URL}/media?size=3000`
+      const fbResponse = await fetch(fallbackUrl, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (fbResponse.ok) {
+        const fbJson = await fbResponse.json();
+        const fbItems = fbJson.data?.content || fbJson.data || fbJson || []
+
+        if (Array.isArray(fbItems) && fbItems.length > 0) {
+          console.log(`[chat.api.discovery] Total system assets found: ${fbItems.length}`);
+          const distinctCats = [...new Set(fbItems.map((m: any) => m.category))];
+          console.log(`[chat.api.discovery] Distinct categories in DB:`, distinctCats);
+
+          items = fbItems.filter((m: any) => {
+            const mCat = String(m.category).toUpperCase();
+            const targetCat = category.toUpperCase();
+            const name = String(m.originalFilename || '').toLowerCase();
+            const url = String(m.url || '').toLowerCase();
+            const keyword = category.toLowerCase(); // "emoji" or "gif"
+
+            // 1. Match by explicit category
+            if (mCat === targetCat) return true;
+
+            // 2. Match by keyword in name/url
+            if (name.includes(keyword) || url.includes(keyword)) return true;
+
+            // 3. Match by specific S3 folder path (e.g. ".../emoji/..." for EMOJI tab)
+            if (url.includes('s3.amazonaws.com') && url.includes(`/${keyword}/`)) return true;
+
+            return false;
+          });
+
+          // Prioritize S3 URLs over Tenor links
+          items.sort((a: any, b: any) => {
+            const aS3 = String(a.url || '').includes('s3.amazonaws.com');
+            const bS3 = String(b.url || '').includes('s3.amazonaws.com');
+            if (aS3 && !bS3) return -1;
+            if (!aS3 && bS3) return 1;
+            return 0;
+          });
+        }
+      }
+    }
+
+    // SYNTHETIC INJECTION: Add the specific S3 files you provided if no DB records match them
+    const S3_BUCKET_BASE = 'https://vnalo-media-cnm.s3.ap-southeast-1.amazonaws.com';
+    const S3_SYS_OWNER = '00000000-0000-0000-0000-000000000000';
+
+    if (category === 'GIF') {
+      const manualGifs = [
+        '231fb5027639114dd7cf3f8f3ef9cb86_1e11ebf8.gif',
+        '6be7aff1e380d160a12b24a9c7e84c31_02af819b.gif',
+        'anh-dong-dang-yeu-cua-chu-meo-dang-nhay_187a6c8f.gif',
+        'b0067ade5e832d2aefec8ee9bda50fdc_6e53714b.gif',
+        'cute-dragon-where-are-you_e1be4667.gif',
+        'hinh-anh-dong-de-thuong_026ab5d8.gif',
+        'image_861306190008386347778_644997d6.gif'
+      ];
+
+      manualGifs.reverse().forEach((filename, idx) => {
+        const url = `${S3_BUCKET_BASE}/gif/${S3_SYS_OWNER}/${filename}`;
+        if (!items.some((it: any) => it.url?.includes(filename))) {
+          items.unshift({
+            mediaId: `v-gif-${idx}`,
+            url,
+            category: 'GIF',
+            originalFilename: filename
+          });
+        }
+      });
+    } else if (category === 'EMOJI') {
+      // Manual emojis removed as requested
+    }
+
+    // Normalize URLs
+    if (Array.isArray(items)) {
+      items.forEach((item: any) => {
+        if (item.url) item.url = normalizeMediaUrl(item.url);
+        if (item.thumbnailUrl) item.thumbnailUrl = normalizeMediaUrl(item.thumbnailUrl);
+      });
+    }
+
+    return items
+  } catch (error) {
+    console.error(`[chat.api.fetchMediaByCategory] Exception:`, error)
+    throw error
+  }
+}
+
+/**
+ * Normalizes a media URL from the backend.
+ */
+function normalizeMediaUrl(url: string | null | undefined): string {
+  if (!url) return '';
+
+  let normalized = url;
+
+  // Fix S3 URLs missing region (common in seeded data)
+  if (normalized.startsWith('https://') && normalized.includes('.s3.amazonaws.com')) {
+    if (!normalized.match(/\.s3\.[a-z0-9-]+\.amazonaws\.com/)) {
+      normalized = normalized.replace('.s3.amazonaws.com', '.s3.ap-southeast-1.amazonaws.com');
+      console.log(`[chat.api.normalize] CORRECTED region: ${url} -> ${normalized}`);
     }
   }
-  return data;
+
+  if (normalized.startsWith('http')) {
+    console.log(`[chat.api.normalize] Final URL: ${normalized}`);
+    return normalized;
+  }
+
+  // Handle relative paths from backend local-storage
+  const backendHost = MEDIA_API_BASE_URL.split('/api/v1')[0];
+  const result = `${backendHost}${normalized.startsWith('/') ? '' : '/'}${normalized}`;
+  console.log(`[chat.api.normalize] Relative to Absolute: ${url} -> ${result}`);
+  return result;
+}
+
+
+export async function addMembersToConversation(token: string, conversationId: string, memberIds: string[]): Promise<void> {
+  await authorizedFetch(token, `/conversations/${conversationId}/members`, {
+    method: 'POST',
+    body: JSON.stringify({ memberIds }),
+  })
+}
+
+export async function leaveConversation(token: string, conversationId: string, userId: string): Promise<void> {
+  await authorizedFetch(token, `/conversations/${conversationId}/members/${userId}`, {
+    method: 'DELETE',
+  })
 }

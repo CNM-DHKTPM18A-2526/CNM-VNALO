@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   AlarmClock,
   BellOff,
@@ -13,20 +13,38 @@ import {
   Trash2,
   TriangleAlert,
   UserPlus,
+  UserPlus2,
+  LogOut
 } from 'lucide-react';
 
+import { useAuth } from '../../auth/useAuth';
 import type { ChatMessage, ConversationSummary } from '../chat.types';
 import { UserAvatar } from '../../../shared/components/UserAvatar';
+import { useUserStore } from '../context/UserStoreContext';
 
 type ConversationInfoProps = {
   conversation: ConversationSummary;
   messages: ChatMessage[];
-  userProfilesById?: Record<string, { displayName: string; avatarUrl: string | null }>;
+  onAddMembersClick?: () => void;
+  onLeaveGroupClick?: () => void;
+  onEditGroupName?: () => void;
+  onEditNickname?: () => void;
 };
 
 type SectionKey = 'media' | 'files' | 'links' | 'security';
 
-export function ConversationInfo({ conversation, messages, userProfilesById = {} }: ConversationInfoProps) {
+export function ConversationInfo({
+  conversation,
+  messages,
+  onAddMembersClick,
+  onLeaveGroupClick,
+  onCreateGroupClick,
+  onEditGroupName,
+  onEditNickname,
+  currentUserId
+}: ConversationInfoProps & { currentUserId?: string, onCreateGroupClick?: () => void }) {
+  const { userMap, ensureUser } = useUserStore();
+  const { accessToken } = useAuth();
   const [expanded, setExpanded] = useState<Record<SectionKey, boolean>>({
     media: true,
     files: true,
@@ -34,6 +52,25 @@ export function ConversationInfo({ conversation, messages, userProfilesById = {}
     security: true,
   });
   const [isHidden, setIsHidden] = useState(false);
+  const [membersExpanded, setMembersExpanded] = useState(true);
+
+  const allDisplayMemberIds = useMemo(() => {
+    const ids = [...(conversation.participantUserIds || [])];
+    if (currentUserId && !ids.includes(currentUserId)) {
+      ids.unshift(currentUserId);
+    }
+    return ids;
+  }, [conversation.participantUserIds, currentUserId]);
+
+  // Proactively fetch profiles for all members shown in the list
+  useEffect(() => {
+    if (!accessToken || allDisplayMemberIds.length === 0) return;
+    allDisplayMemberIds.forEach((id) => {
+      if (!userMap[id]) {
+        void ensureUser(accessToken, id);
+      }
+    });
+  }, [accessToken, allDisplayMemberIds, ensureUser]); // userMap is purposely omitted to avoid re-triggering while fetching
 
   const mediaItems = useMemo(() => {
     return messages
@@ -74,11 +111,9 @@ export function ConversationInfo({ conversation, messages, userProfilesById = {}
     return links.slice(0, 8);
   }, [messages]);
 
-  const toggleSection = (section: SectionKey | 'members') => {
+  const toggleSection = (section: SectionKey) => {
     setExpanded((prev) => ({ ...prev, [section]: !prev[section] }));
   };
-
-  const [membersExpanded, setMembersExpanded] = useState(true);
 
   return (
     <div className="h-full overflow-y-auto bg-[#F1F1F4] pb-20">
@@ -102,7 +137,10 @@ export function ConversationInfo({ conversation, messages, userProfilesById = {}
 
         <div className="mt-3 flex items-center justify-center gap-2">
           <h4 className="text-[22px] font-semibold text-slate-900">{conversation.name}</h4>
-          <button className="rounded-full border-0 p-1 shadow-none outline-none ring-0 hover:bg-gray-100 focus:outline-none">
+          <button 
+            className="rounded-full border-0 p-1 shadow-none outline-none ring-0 hover:bg-gray-100 focus:outline-none cursor-pointer"
+            onClick={() => conversation.isGroup ? onEditGroupName?.() : onEditNickname?.()}
+          >
             <Pencil size={18} className="text-gray-500" />
           </button>
         </div>
@@ -114,28 +152,33 @@ export function ConversationInfo({ conversation, messages, userProfilesById = {}
             </p>
             {/* Mock storage UI similar to Zalo */}
             <div className="mt-6 text-left">
-               <div className="flex justify-between text-[13px] mb-2 font-medium">
-                  <span className="text-gray-600">Dung lượng</span>
-                  <span className="text-gray-400">291 MB / 500 MB</span>
-               </div>
-               <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden flex">
-                  <div className="h-full bg-orange-400" style={{ width: '40%' }}></div>
-                  <div className="h-full bg-green-400" style={{ width: '15%' }}></div>
-               </div>
-               <div className="mt-2 flex gap-3 text-[11px] text-gray-400">
-                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-400"></span>Ảnh</span>
-                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400"></span>Video</span>
-               </div>
-               <button className="w-full mt-4 py-2 border border-gray-200 rounded-lg text-[14px] font-medium hover:bg-gray-50">
-                  Xem và dọn dẹp My Documents
-               </button>
+              <div className="flex justify-between text-[13px] mb-2 font-medium">
+                <span className="text-gray-600">Dung lượng</span>
+                <span className="text-gray-400">291 MB / 500 MB</span>
+              </div>
+              <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden flex">
+                <div className="h-full bg-orange-400" style={{ width: '40%' }}></div>
+                <div className="h-full bg-green-400" style={{ width: '15%' }}></div>
+              </div>
+              <div className="mt-2 flex gap-3 text-[11px] text-gray-400">
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-400"></span>Ảnh</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400"></span>Video</span>
+              </div>
+              <button className="w-full mt-4 py-2 border border-gray-200 rounded-lg text-[14px] font-medium hover:bg-gray-50">
+                Xem và dọn dẹp My Documents
+              </button>
             </div>
           </div>
         ) : (
           <div className="mt-6 grid grid-cols-3 gap-3">
             <ActionButton icon={BellOff} label="Tắt thông báo" />
             <ActionButton icon={Pin} label="Ghim hội thoại" />
-            <ActionButton icon={UserPlus} label="Tạo nhóm trò chuyện" />
+            
+            {conversation.isGroup ? (
+              <ActionButton icon={UserPlus2} label="Thêm thành viên" onClick={onAddMembersClick} />
+            ) : (
+              <ActionButton icon={UserPlus} label="Tạo nhóm trò chuyện" onClick={onCreateGroupClick} />
+            )}
           </div>
         )}
       </section>
@@ -144,18 +187,18 @@ export function ConversationInfo({ conversation, messages, userProfilesById = {}
       <section className="mt-3 bg-white px-5 py-2">
         <InfoRow icon={AlarmClock} text="Danh sách nhắc hẹn" />
         {conversation.isGroup && (
-          <Section title={`Thành viên nhóm (${(conversation.participantUserIds?.length ?? 0) + 1})`} expanded={membersExpanded} onToggle={() => setMembersExpanded(!membersExpanded)}>
-             <div className="space-y-3">
-               {(conversation.participantUserIds ?? []).map(userId => {
-                 const profile = userProfilesById[userId];
-                 return (
-                   <div key={userId} className="flex items-center gap-3">
-                     <UserAvatar name={profile?.displayName || 'Thành viên'} imageUrl={profile?.avatarUrl} size="sm" />
-                     <span className="text-[15px] text-slate-700">{profile?.displayName || `Người dùng ${userId.slice(0,6)}`}</span>
-                   </div>
-                 );
-               })}
-             </div>
+          <Section title={`Thành viên nhóm (${conversation.memberCount || allDisplayMemberIds.length})`} expanded={membersExpanded} onToggle={() => setMembersExpanded(!membersExpanded)}>
+            <div className="space-y-3">
+              {allDisplayMemberIds.map(userId => {
+                const profile = userMap[userId];
+                return (
+                  <div key={userId} className="flex items-center gap-3">
+                    <UserAvatar name={profile?.displayName || 'Thành viên'} imageUrl={profile?.avatarUrl} size="sm" />
+                    <span className="text-[15px] text-slate-700">{profile?.displayName || `Người dùng ${userId.slice(0, 6)}`}</span>
+                  </div>
+                );
+              })}
+            </div>
           </Section>
         )}
       </section>
@@ -264,6 +307,9 @@ export function ConversationInfo({ conversation, messages, userProfilesById = {}
       <section className="mt-3 bg-white px-5 py-3">
         <FooterAction icon={TriangleAlert} label="Báo xấu" color="text-red-500" />
         <FooterAction icon={Trash2} label="Xóa lịch sử trò chuyện" color="text-red-500" />
+        {conversation.isGroup && (
+          <FooterAction icon={LogOut} label="Rời nhóm" color="text-red-500" onClick={onLeaveGroupClick} />
+        )}
       </section>
     </div>
   );
@@ -271,10 +317,11 @@ export function ConversationInfo({ conversation, messages, userProfilesById = {}
 
 /* ====================== Helper Components ====================== */
 
-function ActionButton({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
+function ActionButton({ icon: Icon, label, onClick }: { icon: React.ElementType; label: string; onClick?: () => void }) {
   return (
     <button
       type="button"
+      onClick={onClick}
       className="flex flex-col items-center rounded-xl border-0 bg-transparent px-1 py-2 shadow-none outline-none ring-0 hover:bg-gray-50 focus:outline-none"
     >
       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200">
@@ -291,7 +338,7 @@ function InfoRow({ icon: Icon, text }: { icon: React.ElementType; text: string }
       type="button"
       className="flex w-full items-center gap-4 rounded-xl border-0 bg-transparent px-3 py-[13px] text-left shadow-none outline-none ring-0 hover:bg-gray-50 focus:outline-none active:bg-gray-100"
     >
-      <Icon size={20} className="text-slate-700" />   {/* giảm từ 22 → 20 */}
+      <Icon size={20} className="text-slate-700" />
       <span className="text-[16px] font-medium text-slate-700">{text}</span>
     </button>
   );
@@ -342,10 +389,11 @@ function EmptyState({ text }: { text: string }) {
   return <p className="py-8 text-center text-sm text-slate-500">{text}</p>;
 }
 
-function FooterAction({ icon: Icon, label, color }: { icon: React.ElementType; label: string; color: string }) {
+function FooterAction({ icon: Icon, label, color, onClick }: { icon: React.ElementType; label: string; color: string; onClick?: () => void }) {
   return (
     <button
       type="button"
+      onClick={onClick}
       className={`flex w-full items-center gap-3 rounded-xl border-0 bg-transparent px-3 py-[13px] text-left shadow-none outline-none ring-0 ${color} hover:bg-red-50 focus:outline-none active:bg-red-100`}
     >
       <Icon size={20} />

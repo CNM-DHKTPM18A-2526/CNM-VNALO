@@ -227,6 +227,24 @@ export function SearchGlobalPanel({
     return () => clearTimeout(timer)
   }, [query, performSearch])
 
+  const handleSelectResult = useCallback(
+    (result: GlobalSearchResult) => {
+      switch (result.type) {
+        case 'message':
+          onSelectMessage?.(result.id, result.conversationId!)
+          break
+        case 'conversation':
+          onSelectConversation?.(result.id)
+          break
+        case 'user':
+          onSelectUser?.(result.id)
+          break
+      }
+      onClose?.()
+    },
+    [onSelectMessage, onSelectConversation, onSelectUser, onClose],
+  )
+
   // Handle keyboard navigation
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -258,24 +276,6 @@ export function SearchGlobalPanel({
       }
     },
     [results, selectedIndex, onClose, handleSelectResult],
-  )
-
-  const handleSelectResult = useCallback(
-    (result: GlobalSearchResult) => {
-      switch (result.type) {
-        case 'message':
-          onSelectMessage?.(result.id, result.conversationId!)
-          break
-        case 'conversation':
-          onSelectConversation?.(result.id)
-          break
-        case 'user':
-          onSelectUser?.(result.id)
-          break
-      }
-      onClose?.()
-    },
-    [onSelectMessage, onSelectConversation, onSelectUser, onClose],
   )
 
   // Group results by type

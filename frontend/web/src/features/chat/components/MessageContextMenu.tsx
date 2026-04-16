@@ -1,11 +1,11 @@
-import { CheckSquare2, ChevronRight, Copy, Info, Pin, RotateCcw, Star, Trash2 } from 'lucide-react'
+import { CheckSquare2, ChevronRight, Copy, Info, Pin, Reply, RotateCcw, Star, Trash2 } from 'lucide-react'
 import { forwardRef, useMemo } from 'react'
 
 import type { CSSProperties } from 'react'
 
 import type { ChatMessage } from '../chat.types'
 
-export type MessageContextMenuAction = 'copy' | 'share' | 'pin' | 'star' | 'multiSelect' | 'details' | 'more' | 'recall' | 'deleteSelf'
+export type MessageContextMenuAction = 'reply' | 'copy' | 'share' | 'pin' | 'star' | 'multiSelect' | 'details' | 'more' | 'recall' | 'deleteSelf'
 
 type MessageContextMenuPosition = {
   top: number
