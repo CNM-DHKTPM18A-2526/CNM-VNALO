@@ -211,6 +211,11 @@ class CommonTexts {
   String get helloAction => _isVi ? 'Xin chào!' : 'Hello!';
   String get niceToMeetAction => _isVi ? 'Rất vui!' : 'Nice to meet!';
   String get hiAction => _isVi ? 'Chào bạn!' : 'Hi there!';
+  String get setGroupNameAction => _isVi ? 'Đặt tên nhóm' : 'Set group name';
+  String get groupCreatedNote => _isVi ? 'Bạn vừa tạo nhóm' : 'You just created the group';
+  String get groupMemberLabel => _isVi ? 'Thành viên' : 'Member';
+  String get waveHandAction => _isVi ? 'Vẫy tay chào' : 'Wave hand';
+  String get viewGroupQrAction => _isVi ? 'Xem mã QR tham gia nhóm' : 'View group QR code';
 
   // Wallpaper
   String get doneAction => _isVi ? 'XONG' : 'DONE';

@@ -724,18 +724,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(Icons.camera_alt, color: Colors.grey.shade400, size: 28),
-                ),
-                const SizedBox(height: 12),
+                           const SizedBox(height: 12),
                 Wrap(
                   alignment: WrapAlignment.center,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Text('Äáº·t tÃªn nhÃ³m', style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+                    Text(common.setGroupNameAction, style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
                     Icon(Icons.chevron_right, size: 18, color: Colors.grey.shade400),
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text('Báº¡n vá»«a táº¡o nhÃ³m', style: TextStyle(color: Colors.grey.shade400, fontSize: 13)),
+                Text(common.groupCreatedNote, style: TextStyle(color: Colors.grey.shade400, fontSize: 13)),
                 const SizedBox(height: 16),
                 // Tiny avatars row
                 SingleChildScrollView(
@@ -747,7 +746,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 4),
                         child: AvatarWidget(
                           imageUrl: m.user?.avatarUrl, 
-                          name: m.user?.displayName ?? m.nickname ?? 'ThÃ nh viÃªn', 
+                          name: m.user?.displayName ?? m.nickname ?? common.groupMemberLabel, 
                           size: 32
                         ),
                       )),
@@ -766,14 +765,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                _buildActionChip('ðŸ‘‹', 'Váº«y tay chÃ o'),
+                _buildActionChip('👋', common.waveHandAction),
               ],
             ),
           ),
           const SizedBox(height: 12),
           TextButton(
             onPressed: () {},
-            child: Text('Xem mÃ£ QR tham gia nhÃ³m', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
           ),
         ],
       ),
