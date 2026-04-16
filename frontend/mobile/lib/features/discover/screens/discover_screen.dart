@@ -18,7 +18,6 @@ class DiscoverScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final common = CommonTexts.of(context);
-    final searchHint = isDarkMode ? DarkColors.textHint : Colors.white.withValues(alpha: 0.8);
 
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.black : LightColors.scaffold,
@@ -51,12 +50,12 @@ class DiscoverScreen extends StatelessWidget {
               color: Colors.transparent,
               child: Row(
                 children: [
-                  Icon(Icons.search, size: 24, color: isDarkMode ? searchHint : Colors.white),
+                  const Icon(Icons.search, size: 24, color: Colors.white),
                   const SizedBox(width: 8),
                   Text(
                     common.search,
-                    style: TextStyle(
-                      color: isDarkMode ? searchHint : Colors.white.withValues(alpha: 0.8),
+                    style: const TextStyle(
+                      color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.w400,
                     ),

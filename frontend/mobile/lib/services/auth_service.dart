@@ -93,10 +93,13 @@ class AuthService {
     );
   }
 
-  // Login with phone and password
+  // Login with identifiers and device metadata
   Future<Map<String, dynamic>> login({
     required String phone,
     required String password,
+    String? deviceId,
+    String? deviceName,
+    String? platform,
   }) async {
     final normalized = _normalizePhone(phone);
     return await _apiService.post(
@@ -105,8 +108,9 @@ class AuthService {
       body: {
         'identifier': normalized,
         'password': password,
-        'platform': 'ANDROID',
-        'deviceName': 'VNALO Mobile',
+        'platform': platform ?? 'ANDROID',
+        'deviceName': deviceName ?? 'VNALO Mobile',
+        if (deviceId != null) 'deviceId': deviceId,
       },
     );
   }

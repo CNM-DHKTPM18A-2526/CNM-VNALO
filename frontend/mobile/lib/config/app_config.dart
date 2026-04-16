@@ -1,3 +1,5 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:vnalo_mobile/config/env.dart';
 
 // AppConfig is a singleton class that holds the configuration for the app. It is initialized with the environment configuration and can be accessed throughout the app.
@@ -162,6 +164,7 @@ class AppConfig {
         .replaceAll(RegExp(r'/+$'), '');
   }
 
+
   static String _normalizeSocketUrl(String rawUrl) {
     final trimmed = rawUrl.trim();
     if (trimmed.isEmpty) {
@@ -174,5 +177,45 @@ class AppConfig {
     }
 
     return uri.replace(path: '').toString().replaceAll(RegExp(r'/+$'), '');
+  }
+
+  /// Returns FirebaseOptions built from .env or --dart-define values.
+  /// Throws [StateError] if required keys are missing.
+  static FirebaseOptions getFirebaseOptions() {
+    final apiKey = _requireConfigValue('FIREBASE_API_KEY');
+    final appId = _requireConfigValue('FIREBASE_APP_ID');
+    final messagingSenderId = _requireConfigValue('FIREBASE_MESSAGING_SENDER_ID');
+    final projectId = _requireConfigValue('FIREBASE_PROJECT_ID');
+    final storageBucket = _readConfigValue('FIREBASE_STORAGE_BUCKET');
+
+    return FirebaseOptions(
+      apiKey: apiKey,
+      appId: appId,
+      messagingSenderId: messagingSenderId,
+      projectId: projectId,
+      storageBucket: storageBucket.isEmpty ? null : storageBucket,
+    );
+  }
+
+  static String _readConfigValue(String key) {
+    // Priority 1: .env file (if loaded)
+    final dotenvValue = dotenv.env[key];
+    if (dotenvValue != null && dotenvValue.isNotEmpty) {
+      return dotenvValue;
+    }
+
+    // Priority 2: --dart-define
+    return String.fromEnvironment(key, defaultValue: '');
+  }
+
+  static String _requireConfigValue(String key) {
+    final value = _readConfigValue(key);
+    if (value.isEmpty) {
+      throw StateError(
+        'Missing required configuration for $key. '
+        'Provide it in .env or via --dart-define=$key=<value>.',
+      );
+    }
+    return value;
   }
 }

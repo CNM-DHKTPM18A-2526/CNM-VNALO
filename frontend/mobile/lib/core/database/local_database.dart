@@ -12,67 +12,54 @@ class LocalDatabase extends _$LocalDatabase {
   LocalDatabase() : super(conn.openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5; // Schema version 5: Added owner_id for multi-user isolation.
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) async {
       await m.createAll();
-      // Fresh Install v2: Manually create FTS and Triggers
+      // Fresh Install: Manually create FTS and Triggers
       await _createFtsTables();
       await _createFtsTriggers();
       await _deduplicateFtsRows();
       await _createReadStateTable();
     },
     onUpgrade: (m, from, to) async {
-      if (from < 2) {
-        // SEQUENTIAL TRANSACTIONAL EXECUTION (managed by Drift runner)
+      if (from < 5) {
+        // PER-USER ISOLATION MIGRATION (v5)
+        // We drop and recreate all tables and triggers to ensure data privacy transition.
+        // Data will be re-synced from server on next login.
 
-        // 1. Drop old triggers (if any)
+        // 1. Drop old triggers
         await customStatement('DROP TRIGGER IF EXISTS messages_ai');
         await customStatement('DROP TRIGGER IF EXISTS messages_ad');
         await customStatement('DROP TRIGGER IF EXISTS contacts_ai');
         await customStatement('DROP TRIGGER IF EXISTS contacts_ad');
 
-        // 2. Re-create FTS tables (Independent FTS5 schema)
+        // 2. Drop old FTS tables
         await customStatement('DROP TABLE IF EXISTS messages_fts');
         await customStatement('DROP TABLE IF EXISTS contacts_fts');
 
-        // 3. Re-create FTS tables and rebuild indexes from source tables
-        await _createFtsTables();
-        await customStatement(
-          'INSERT INTO messages_fts(content, external_id) SELECT content, id FROM messages',
-        );
-        await customStatement(
-          'INSERT INTO contacts_fts(display_name, external_id) SELECT display_name, id FROM contacts',
-        );
+        // 3. Drop main tables to recreate with NEW schema (owner_id)
+        // Note: Drift's Migrator.deleteTable is safer but custom SQL works too.
+        await customStatement('DROP TABLE IF EXISTS messages');
+        await customStatement('DROP TABLE IF EXISTS conversations');
+        await customStatement('DROP TABLE IF EXISTS contacts');
+        await customStatement('DROP TABLE IF EXISTS conversation_read_state');
 
-        // 4. Re-create triggers after rebuild to avoid side effects during migration
+        // 4. Recreate everything
+        await m.createAll();
+        await _createFtsTables();
         await _createFtsTriggers();
-        await _deduplicateFtsRows();
-      }
-      if (from < 3) {
         await _createReadStateTable();
-      }
-      if (from < 4) {
-        // Safe addition: check for existence or catch duplicate name error
-        await _safeAddColumn(m, messages, messages.replyToId);
-        await _safeAddColumn(m, messages, messages.replyToSenderId);
-        await _safeAddColumn(m, messages, messages.replyToSenderName);
-        await _safeAddColumn(m, messages, messages.replyToContent);
+      } else {
+        // Standard legacy migrations for sub-v5 users (if any still bypass v5 logic)
+        if (from < 2) {
+           // Skip older logic as v5 drops everything anyway
+        }
       }
     },
   );
-
-  Future<void> _safeAddColumn(Migrator m, TableInfo table, GeneratedColumn column) async {
-    final result = await customSelect('PRAGMA table_info(${table.actualTableName})').get();
-    final columns = result.map((row) => row.read<String>('name')).toList();
-    if (!columns.contains(column.name)) {
-      await m.addColumn(table, column);
-    } else {
-      debugPrint('Column ${column.name} in ${table.actualTableName} already exists, skipping.');
-    }
-  }
 
   Future<void> _createReadStateTable() async {
     await customStatement(
@@ -85,34 +72,34 @@ class LocalDatabase extends _$LocalDatabase {
   }
 
   Future<void> _createFtsTables() async {
-    // FTS tables using explicit UNINDEXED column declaration.
+    // FTS tables with owner_id for efficient cross-user isolation
     await customStatement(
-      'CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(content, external_id UNINDEXED)',
+      'CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(content, owner_id UNINDEXED, external_id UNINDEXED)',
     );
     await customStatement(
-      'CREATE VIRTUAL TABLE IF NOT EXISTS contacts_fts USING fts5(display_name, external_id UNINDEXED)',
+      'CREATE VIRTUAL TABLE IF NOT EXISTS contacts_fts USING fts5(display_name, owner_id UNINDEXED, external_id UNINDEXED)',
     );
   }
 
   Future<void> _createFtsTriggers() async {
     await customStatement('''
       CREATE TRIGGER IF NOT EXISTS messages_ai AFTER INSERT ON messages BEGIN
-        INSERT INTO messages_fts(content, external_id) VALUES (new.content, new.id);
+        INSERT INTO messages_fts(content, owner_id, external_id) VALUES (new.content, new.owner_id, new.id);
       END;
     ''');
     await customStatement('''
       CREATE TRIGGER IF NOT EXISTS messages_ad AFTER DELETE ON messages BEGIN
-        DELETE FROM messages_fts WHERE external_id = old.id;
+        DELETE FROM messages_fts WHERE external_id = old.id AND owner_id = old.owner_id;
       END;
     ''');
     await customStatement('''
       CREATE TRIGGER IF NOT EXISTS contacts_ai AFTER INSERT ON contacts BEGIN
-        INSERT INTO contacts_fts(display_name, external_id) VALUES (new.display_name, new.id);
+        INSERT INTO contacts_fts(display_name, owner_id, external_id) VALUES (new.display_name, new.owner_id, new.id);
       END;
     ''');
     await customStatement('''
       CREATE TRIGGER IF NOT EXISTS contacts_ad AFTER DELETE ON contacts BEGIN
-        DELETE FROM contacts_fts WHERE external_id = old.id;
+        DELETE FROM contacts_fts WHERE external_id = old.id AND owner_id = old.owner_id;
       END;
     ''');
   }
@@ -120,27 +107,31 @@ class LocalDatabase extends _$LocalDatabase {
   Future<void> _deduplicateFtsRows() async {
     await customStatement(
       'DELETE FROM messages_fts WHERE rowid NOT IN ('
-      '  SELECT MIN(rowid) FROM messages_fts GROUP BY external_id'
+      '  SELECT MIN(rowid) FROM messages_fts GROUP BY external_id, owner_id'
       ')',
     );
     await customStatement(
       'DELETE FROM contacts_fts WHERE rowid NOT IN ('
-      '  SELECT MIN(rowid) FROM contacts_fts GROUP BY external_id'
+      '  SELECT MIN(rowid) FROM contacts_fts GROUP BY external_id, owner_id'
       ')',
     );
   }
 
   // --- SEARCH QUERIES ---
 
-  Future<List<LocalMessageSearchResult>> searchMessages(String query) async {
+  Future<List<LocalMessageSearchResult>> searchMessages(String query, String currentUserId) async {
     final results = await customSelect(
       'SELECT DISTINCT m.*, c.name as conv_name, c.type as conv_type, c.avatar_url as conv_avatar FROM messages m '
       'JOIN conversations c ON m.conversation_id = c.id '
-      'WHERE m.id IN ( '
-      '  SELECT DISTINCT f.external_id FROM messages_fts f WHERE f.content MATCH ? '
+      'WHERE m.owner_id = ? AND m.id IN ( '
+      '  SELECT DISTINCT f.external_id FROM messages_fts f WHERE f.owner_id = ? AND f.content MATCH ? '
       ') '
       'ORDER BY m.created_at DESC',
-      variables: [Variable.withString('$query*')],
+      variables: [
+        Variable.withString(currentUserId),
+        Variable.withString(currentUserId),
+        Variable.withString('$query*')
+      ],
     ).get();
 
     return results
@@ -148,6 +139,7 @@ class LocalDatabase extends _$LocalDatabase {
           (row) => LocalMessageSearchResult(
             message: LocalMessage(
               id: row.readNullable<String>('id') ?? '',
+              ownerId: row.readNullable<String>('owner_id') ?? '',
               content: row.readNullable<String>('content') ?? '',
               conversationId: row.readNullable<String>('conversation_id') ?? '',
               createdAt: row.readNullable<DateTime>('created_at') ?? DateTime.now(),
@@ -167,25 +159,29 @@ class LocalDatabase extends _$LocalDatabase {
         .toList();
   }
 
-  Future<List<LocalContact>> searchContacts(String query) async {
+  Future<List<LocalContact>> searchContacts(String query, String currentUserId) async {
     final results = await customSelect(
       'SELECT DISTINCT c.* FROM contacts c '
-      'WHERE c.id IN ( '
-      '  SELECT f.external_id FROM contacts_fts f WHERE f.display_name MATCH ? '
+      'WHERE c.owner_id = ? AND c.id IN ( '
+      '  SELECT f.external_id FROM contacts_fts f WHERE f.owner_id = ? AND f.display_name MATCH ? '
       '  UNION '
-      '  SELECT c2.id FROM contacts c2 WHERE c2.phone LIKE ? '
+      '  SELECT c2.id FROM contacts c2 WHERE c2.owner_id = ? AND c2.phone LIKE ? '
       ') '
       'ORDER BY c.display_name COLLATE NOCASE',
       variables: [
+        Variable.withString(currentUserId),
+        Variable.withString(currentUserId),
         Variable.withString('$query*'),
+        Variable.withString(currentUserId),
         Variable.withString('%$query%'),
       ],
     ).get();
 
     return results
-        .map(
+        .map<LocalContact>(
           (row) => LocalContact(
             id: row.readNullable<String>('id') ?? '',
+            ownerId: row.readNullable<String>('owner_id') ?? '',
             displayName: row.readNullable<String>('display_name') ?? '',
             phone: row.readNullable<String>('phone') ?? '',
             avatarUrl: row.readNullable<String>('avatar_url'),
@@ -195,11 +191,14 @@ class LocalDatabase extends _$LocalDatabase {
   }
 
 
-  Future<LocalConversation?> getLocalConversationById(String id) async {
+  Future<LocalConversation?> getLocalConversationById(String id, String currentUserId) async {
     final results =
         await customSelect(
-          'SELECT * FROM conversations WHERE id = ? LIMIT 1',
-          variables: [Variable.withString(id)],
+          'SELECT * FROM conversations WHERE id = ? AND owner_id = ? LIMIT 1',
+          variables: [
+            Variable.withString(id),
+            Variable.withString(currentUserId)
+          ],
         ).get();
 
     if (results.isEmpty) return null;
@@ -207,10 +206,11 @@ class LocalDatabase extends _$LocalDatabase {
     final row = results.first;
     return LocalConversation(
       id: row.read<String>('id'),
-      name: row.read<String>('name'),
+      ownerId: row.read<String>('owner_id'),
+      name: row.readNullable<String>('name'),
       type: row.read<String>('type'),
-      avatarUrl: row.read<String>('avatar_url'),
-      lastMessage: row.read<String>('last_message'),
+      avatarUrl: row.readNullable<String>('avatar_url'),
+      lastMessage: row.readNullable<String>('last_message'),
       updatedAt: row.read<DateTime>('updated_at'),
     );
   }
@@ -227,24 +227,25 @@ class LocalDatabase extends _$LocalDatabase {
     });
   }
 
-  Future<List<LocalMessage>> getMessagesByConversation(String conversationId) async {
+  Future<List<LocalMessage>> getMessagesByConversation(String conversationId, String currentUserId) async {
     final query = select(messages)
+      ..where((t) => t.ownerId.equals(currentUserId))
       ..where((t) => t.conversationId.equals(conversationId))
       ..orderBy([(t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc)]);
     return query.get();
   }
 
-  Future<int> deleteMessage(String messageId) {
-    return (delete(messages)..where((t) => t.id.equals(messageId))).go();
+  Future<int> deleteMessage(String messageId, String currentUserId) {
+    return (delete(messages)..where((t) => t.id.equals(messageId))..where((t) => t.ownerId.equals(currentUserId))).go();
   }
 
-  Future<void> updateLocalPath(String messageId, String localPath) {
-    return (update(messages)..where((t) => t.id.equals(messageId)))
+  Future<void> updateLocalPath(String messageId, String localPath, String currentUserId) {
+    return (update(messages)..where((t) => t.id.equals(messageId))..where((t) => t.ownerId.equals(currentUserId)))
         .write(MessagesCompanion(localPath: Value(localPath)));
   }
 
-  Future<void> clearStalePaths(List<String> ids) {
-    return (update(messages)..where((t) => t.id.isIn(ids)))
+  Future<void> clearStalePaths(List<String> ids, String currentUserId) {
+    return (update(messages)..where((t) => t.id.isIn(ids))..where((t) => t.ownerId.equals(currentUserId)))
         .write(const MessagesCompanion(localPath: Value(null)));
   }
 

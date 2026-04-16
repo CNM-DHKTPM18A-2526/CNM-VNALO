@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:vnalo_mobile/config/app_config.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
+import 'package:vnalo_mobile/services/auth_events.dart';
 
 class SocketService {
   io.Socket? _socket;
@@ -117,9 +118,12 @@ class SocketService {
     _socket!.on('call.signal', (data) {
       if (data is! Map) return;
       final payload = Map<String, dynamic>.from(data);
-      final type = payload['type']?.toString();
-      if (type == null || type.isEmpty) return;
       _callSignalController.add(payload);
+    });
+
+    _socket!.on('auth.logout.force', (data) {
+      final reason = data is Map ? data['reason']?.toString() : null;
+      AuthEvents.onForceLogout?.call(reason ?? 'Tài khoản đã đăng nhập từ thiết bị khác');
     });
   }
 

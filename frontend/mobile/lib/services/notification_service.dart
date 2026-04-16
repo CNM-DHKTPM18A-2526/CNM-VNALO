@@ -1,5 +1,8 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
+import 'package:flutter_callkit_incoming/entities/entities.dart';
+import 'package:uuid/uuid.dart';
 import 'dart:developer' as developer;
 import 'dart:convert';
 
@@ -78,8 +81,92 @@ class NotificationService {
       developer.log('App opened from notification: ${message.data}');
     });
 
+    // 5. Setup CallKit Listeners
+    FlutterCallkitIncoming.onEvent.listen(_onCallKitEvent);
+
     _initialized = true;
   }
+
+  static void _onCallKitEvent(CallEvent? event) {
+    if (event == null) return;
+    developer.log('[NotificationService] CallKit Event: ${event.event}');
+    
+    switch (event.event) {
+      case Event.actionCallAccept:
+        // Handle acceptance - redirection is typically handled by IncomingCallCoordinator
+        // but we can log it here.
+        break;
+      case Event.actionCallDecline:
+        // Handle decline
+        break;
+      default:
+        break;
+    }
+  }
+
+  /// Static handler for background messages, called from main.dart
+  static Future<void> handleBackgroundCallSignal(RemoteMessage message) async {
+    final data = message.data;
+    final type = data['type']?.toString();
+    
+    if (type == 'call_offer') {
+      final callId = data['callId']?.toString() ?? const Uuid().v4();
+      final conversationId = data['conversationId']?.toString() ?? '';
+      final senderName = data['senderName']?.toString() ?? 'VNALO Call';
+      final senderAvatar = data['senderAvatar']?.toString();
+      final audioOnly = data['audioOnly']?.toString() == 'true';
+
+      final params = CallKitParams(
+        id: callId,
+        nameCaller: senderName,
+        appName: 'VNALO',
+        avatar: senderAvatar,
+        handle: 'VNALO',
+        type: audioOnly ? 0 : 1, // 0: Audio, 1: Video
+        duration: 30000,
+        textAccept: 'Trả lời',
+        textDecline: 'Từ chối',
+        missedCallNotification: const NotificationParams(
+          showNotification: true,
+          isShowCallback: true,
+          subtitle: 'Cuộc gọi nhỡ',
+          callbackText: 'Gọi lại',
+        ),
+        extra: <String, dynamic>{
+          'conversationId': conversationId,
+          'callId': callId,
+          'senderId': data['senderUserId']?.toString(),
+          'initialSdp': data['sdp'],
+        },
+        android: const AndroidParams(
+          isCustomNotification: true,
+          isShowLogo: false,
+          ringtonePath: 'system_ringtone_default',
+          backgroundColor: '#0068FF',
+          backgroundUrl: 'assets/images/call_bg.png',
+          actionColor: '#4CAF50',
+          incomingCallNotificationChannelName: 'VNALO Incoming Call',
+        ),
+        ios: const IOSParams(
+          iconName: 'AppIcon',
+          handleType: 'generic',
+          supportsVideo: true,
+          maximumCallGroups: 1,
+          supportsGrouping: false,
+          supportsUngrouping: false,
+          supportsHolding: false,
+          audioSessionMode: 'default',
+          audioSessionActive: true,
+          maximumCallsPerCallGroup: 1,
+          supportsDTMF: false,
+          ringtonePath: 'system_ringtone_default',
+        ),
+      );
+
+      await FlutterCallkitIncoming.showCallkitIncoming(params);
+    }
+  }
+
 
   Future<void> ensureInitialized() => initialize();
 

@@ -1,34 +1,35 @@
 import 'dart:async';
 import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:provider/provider.dart';
-import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
+import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/call/models/call_log_message.dart';
 import 'package:vnalo_mobile/features/call/services/webrtc_call_service.dart';
-import 'package:vnalo_mobile/features/call/utils/call_duration_formatter.dart';
+import 'package:vnalo_mobile/features/call/services/ringtone_service.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
+import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 class VideoCallScreen extends StatefulWidget {
   final String conversationId;
-  final String currentUserId;
+  final String callId;
   final String targetUserId;
   final String targetDisplayName;
   final String? targetAvatarUrl;
   final bool isCaller;
-  final String? callId;
+  final Map<String, dynamic>? initialSdp;
 
   const VideoCallScreen({
     super.key,
     required this.conversationId,
-    required this.currentUserId,
+    required this.callId,
     required this.targetUserId,
     required this.targetDisplayName,
     this.targetAvatarUrl,
-    this.isCaller = true,
-    this.callId,
+    required this.isCaller,
+    this.initialSdp,
   });
 
   @override
@@ -36,314 +37,380 @@ class VideoCallScreen extends StatefulWidget {
 }
 
 class _VideoCallScreenState extends State<VideoCallScreen> {
-  late final WebRtcCallService _callService;
-  late final RTCVideoRenderer _localRenderer;
-  late final RTCVideoRenderer _remoteRenderer;
-  late final Timer _ticker;
-  late final String _callId;
+  WebRtcCallService? _callService;
+  final RingtoneService _ringtoneService = RingtoneService();
+  final RTCVideoRenderer _localRenderer = RTCVideoRenderer();
+  final RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
 
+  Timer? _durationTimer;
+  int _callDurationSeconds = 0;
   bool _logSent = false;
-  bool _didAutoClose = false;
-  String? _initError;
+  bool _showControls = true;
+  Timer? _hideControlsTimer;
+  bool _renderersInitialized = false;
+
+  // DRAGGABLE POSITION FOR LOCAL PREVIEW
+  Offset _localVideoOffset = const Offset(16, 120);
+  final double _popupWidth = 110;
+  final double _popupHeight = 165;
 
   @override
   void initState() {
     super.initState();
-    _callId =
-      widget.callId ??
-      'video-${DateTime.now().millisecondsSinceEpoch}-${widget.currentUserId}';
-    _localRenderer = RTCVideoRenderer();
-    _remoteRenderer = RTCVideoRenderer();
+    _syncInitializeService();
+    _asyncInitWork();
+  }
+
+  void _syncInitializeService() {
+    final auth = context.read<AuthProvider>();
+    final socket = context.read<SocketService>();
 
     _callService = WebRtcCallService(
-      socketService: context.read<SocketService>(),
+      socketService: socket,
       conversationId: widget.conversationId,
-      callId: _callId,
-      currentUserId: widget.currentUserId,
+      callId: widget.callId,
+      currentUserId: auth.user!.id,
       peerUserId: widget.targetUserId,
       audioOnly: false,
       isCaller: widget.isCaller,
-    )..addListener(_onCallStateChanged);
+      initialSdp: widget.initialSdp,
+    );
 
-    unawaited(_initRenderersAndCall());
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
-    });
+    _callService!.addListener(_onServiceUpdate);
   }
 
-  Future<void> _initRenderersAndCall() async {
-    try {
-      await _localRenderer.initialize();
-      await _remoteRenderer.initialize();
-      await _callService.initialize();
-      _syncRenderers();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _initError = 'Không thể khởi tạo màn hình video: $e';
-      });
+  Future<void> _asyncInitWork() async {
+    await _localRenderer.initialize();
+    await _remoteRenderer.initialize();
+    if (mounted) setState(() => _renderersInitialized = true);
+
+    if (_callService != null) {
+      await _callService!.initialize();
+      if (_callService!.errorMessage != null || _callService!.isEnded) return;
+
+      if (widget.isCaller) {
+        await _ringtoneService.startDialing();
+      } else {
+        await _ringtoneService.startRinging();
+      }
+
+      // Enable WakeLock
+      unawaited(WakelockPlus.enable());
     }
   }
 
-  void _syncRenderers() {
-    _localRenderer.srcObject = _callService.localStream;
-    _remoteRenderer.srcObject = _callService.remoteStream;
-  }
+  bool _isPopping = false;
 
-  void _onCallStateChanged() {
-    _syncRenderers();
-    if (!mounted) return;
+  void _onServiceUpdate() {
+    if (!mounted || _callService == null) return;
 
-    if (_callService.isEnded && !_didAutoClose) {
-      _didAutoClose = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && Navigator.canPop(context)) {
-          Navigator.pop(context);
-        }
+    if (_renderersInitialized) {
+      if (_callService!.localStream != null &&
+          _localRenderer.srcObject != _callService!.localStream) {
+        _localRenderer.srcObject = _callService!.localStream;
+      }
+      if (_callService!.remoteStream != null &&
+          _remoteRenderer.srcObject != _callService!.remoteStream) {
+        _remoteRenderer.srcObject = _callService!.remoteStream;
+      }
+    }
+
+    if (_callService!.isConnected && _durationTimer == null) {
+      _ringtoneService.stop();
+      _startDurationTimer();
+      _startHideControlsTimer();
+    }
+
+    if (_callService!.isEnded && !_isPopping) {
+      _isPopping = true;
+      _ringtoneService.stop();
+      _durationTimer?.cancel();
+      _hideControlsTimer?.cancel();
+      _sendCallLogIfNeeded();
+      
+      // Snappier return for timeout, standard for others
+      final bool isTimeout = _callService!.lastEndReason == 'no-answer-timeout';
+      Future.delayed(Duration(milliseconds: isTimeout ? 500 : 1000), () {
+        if (mounted) Navigator.of(context).pop();
       });
     }
 
     setState(() {});
   }
 
-  Future<void> _endCallAndClose() async {
-    await _callService.endCall();
-    _sendCallLogIfNeeded();
-    if (!mounted) return;
-    Navigator.pop(context);
+  void _startDurationTimer() {
+    _durationTimer?.cancel();
+    _durationTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() => _callDurationSeconds++);
+      }
+    });
   }
 
-  CallOutcome _deriveOutcome() {
-    if (_callService.connectedAt != null) {
-      return CallOutcome.answered;
-    }
+  void _startHideControlsTimer() {
+    _hideControlsTimer?.cancel();
+    _hideControlsTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted && _callService?.isConnected == true && _showControls) {
+        setState(() => _showControls = false);
+      }
+    });
+  }
 
-    switch (_callService.lastEndReason) {
-      case 'declined':
-        return CallOutcome.declined;
-      case 'missed':
-      case 'no-answer-timeout':
-        return CallOutcome.missed;
-      case 'busy':
-        return CallOutcome.busy;
-      case 'failed':
-      case 'permission-denied':
-        return CallOutcome.failed;
-      default:
-        return CallOutcome.canceled;
-    }
+  void _toggleControls() {
+    setState(() {
+      _showControls = !_showControls;
+      if (_showControls) _startHideControlsTimer();
+    });
   }
 
   void _sendCallLogIfNeeded() {
-    if (_logSent) return;
+    if (_logSent || !widget.isCaller || _callService == null) return;
     _logSent = true;
 
-    final durationSeconds =
-        _callService.connectedAt == null
-            ? 0
-            : DateTime.now().difference(_callService.connectedAt!).inSeconds;
+    final chatProvider = context.read<ChatProvider>();
+    final outcome = _deriveOutcome();
 
-    final payload = CallLogMessage(
-      callId: _callId,
+    final log = CallLogMessage(
+      callId: widget.callId,
       conversationId: widget.conversationId,
-      callerId: widget.isCaller ? widget.currentUserId : widget.targetUserId,
-      calleeId: widget.isCaller ? widget.targetUserId : widget.currentUserId,
+      callerId:
+          widget.isCaller ? _callService!.currentUserId : widget.targetUserId,
+      calleeId:
+          widget.isCaller ? widget.targetUserId : _callService!.currentUserId,
       mediaType: CallMediaType.video,
-      outcome: _deriveOutcome(),
-      durationSeconds: durationSeconds,
+      outcome: outcome,
+      durationSeconds: _callDurationSeconds,
       createdAt: DateTime.now(),
     );
 
-    context.read<ChatProvider>().sendMessage(
+    chatProvider.sendMessage(
       conversationId: widget.conversationId,
-      content: payload.toMessageContent(),
-      messageType: 'SYSTEM',
+      content: log.toMessageContent(),
     );
   }
 
-  String _buildStatusText() {
-    if (_callService.errorMessage != null) {
-      return _callService.errorMessage!;
+  CallOutcome _deriveOutcome() {
+    if (_callService?.connectedAt != null) return CallOutcome.answered;
+    switch (_callService?.lastEndReason) {
+      case 'declined':
+        return CallOutcome.declined;
+      case 'busy':
+        return CallOutcome.busy;
+      case 'no-answer-timeout':
+        return CallOutcome.missed;
+      case 'failed':
+        return CallOutcome.failed;
+      default:
+        return CallOutcome.missed;
     }
+  }
 
-    if (_callService.isConnected && _callService.connectedAt != null) {
-      final duration = DateTime.now().difference(_callService.connectedAt!);
-      return formatCallDuration(duration);
-    }
-
-    if (_callService.isInitializing) {
-      return 'Đang khởi tạo video...';
-    }
-
-    return widget.isCaller ? 'Đang gọi video...' : 'Cuộc gọi video đến...';
+  void _endCallAndClose() {
+    _callService?.endCall();
   }
 
   @override
   void dispose() {
-    _ticker.cancel();
-    _sendCallLogIfNeeded();
-    _callService.removeListener(_onCallStateChanged);
-    _callService.dispose();
+    _durationTimer?.cancel();
+    _hideControlsTimer?.cancel();
+    _callService?.removeListener(_onServiceUpdate);
+    _callService?.dispose();
+    _ringtoneService.dispose();
     _localRenderer.dispose();
     _remoteRenderer.dispose();
+    unawaited(WakelockPlus.disable());
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_initError != null) {
-      return Scaffold(
+    if (_callService == null) {
+      return const Scaffold(
         backgroundColor: Colors.black,
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.error_outline,
-                  color: Colors.white70,
-                  size: 42,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  _initError!,
-                  style: const TextStyle(color: Colors.white70),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: _endCallAndClose,
-                  child: const Text('Thoát'),
-                ),
-              ],
-            ),
-          ),
-        ),
+        body: Center(child: CircularProgressIndicator()),
       );
     }
 
-    final remoteStream = _callService.remoteStream;
+    final bool isConnected = _callService!.isConnected;
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child:
-                _callService.isConnected && remoteStream != null
-                    ? RTCVideoView(
-                      _remoteRenderer,
-                      objectFit:
-                          RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-                    )
-                    : ((_callService.localStream != null && _callService.isAccepted)
-                        ? RTCVideoView(
-                          _localRenderer,
-                          objectFit:
-                              RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
-                          mirror: true,
-                        )
-                        : _RemotePlaceholder(
-                          name: widget.targetDisplayName,
-                          avatarUrl: widget.targetAvatarUrl,
-                          status: _buildStatusText(),
-                        )),
-          ),
-          // Dark overlay to make UI more readable during ringing with local camera
-          if (!_callService.isConnected)
+      body: GestureDetector(
+        onTap: _toggleControls,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // 1. BACKGROUND: MIRRORED LOCAL CAMERA IF WAITING, ELSE REMOTE
             Positioned.fill(
-              child: Container(color: Colors.black.withValues(alpha: 0.15)),
+              child:
+                  isConnected &&
+                          _callService!.remoteStream != null &&
+                          _renderersInitialized
+                      ? RTCVideoView(
+                        _remoteRenderer,
+                        objectFit:
+                            RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                      )
+                      : (_callService!.localStream != null &&
+                              _renderersInitialized
+                          ? RTCVideoView(
+                            _localRenderer,
+                            mirror: true,
+                            objectFit:
+                                RTCVideoViewObjectFit
+                                    .RTCVideoViewObjectFitCover,
+                          )
+                          : _RemotePlaceholder(
+                            name: widget.targetDisplayName,
+                            avatarUrl: widget.targetAvatarUrl,
+                            status: _buildStatusText(),
+                          )),
             ),
-          // Backdrop for top controls shadow
-          if (!_callService.isConnected)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: 120,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.4),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          Positioned.fill(
-            child: SafeArea(
-              child: Column(
-                children: [
-                  const SizedBox(height: 12),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _TopCircleIconButton(
-                          icon: Icons.keyboard_arrow_down,
-                          onTap: _endCallAndClose,
-                        ),
-                        _TopCircleIconButton(
-                          icon: Icons.cached,
-                          onTap: () => unawaited(_callService.switchCamera()),
+
+            // 2. DRAGGABLE LOCAL PREVIEW (CONNECTED ONLY)
+            if (isConnected &&
+                _callService!.localStream != null &&
+                _renderersInitialized)
+              Positioned(
+                left: _localVideoOffset.dx,
+                top: _localVideoOffset.dy,
+                child: GestureDetector(
+                  onPanUpdate: (details) {
+                    setState(() {
+                      final size = MediaQuery.of(context).size;
+                      double newX = _localVideoOffset.dx + details.delta.dx;
+                      double newY = _localVideoOffset.dy + details.delta.dy;
+
+                      newX = newX.clamp(16.0, size.width - _popupWidth - 16);
+                      newY = newY.clamp(80.0, size.height - _popupHeight - 150);
+
+                      _localVideoOffset = Offset(newX, newY);
+                    });
+                  },
+                  child: Container(
+                    width: _popupWidth,
+                    height: _popupHeight,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white24, width: 1),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black45,
+                          blurRadius: 10,
+                          spreadRadius: 1,
                         ),
                       ],
                     ),
+                    clipBehavior: Clip.antiAlias,
+                    child: RTCVideoView(
+                      _localRenderer,
+                      mirror: true,
+                      objectFit:
+                          RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                    ),
                   ),
-                  const Spacer(),
-                  // Image/Avatar during ringing
-                  if (!_callService.isConnected) ...[
-                    AvatarWidget(
-                      imageUrl: widget.targetAvatarUrl,
-                      name: widget.targetDisplayName,
-                      size: 100,
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      widget.targetDisplayName,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w700,
-                        shadows: [
-                          Shadow(color: Colors.black45, blurRadius: 15),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _buildStatusText(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        shadows: [
-                          Shadow(color: Colors.black45, blurRadius: 10),
-                        ],
-                      ),
-                    ),
-                    const Spacer(),
-                  ],
+                ),
+              ),
+
+            // 3. OVERLAYS: ZALO STYLE
+            _buildOverlays(isConnected),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOverlays(bool isConnected) {
+    return AnimatedOpacity(
+      opacity: _showControls ? 1 : 0,
+      duration: const Duration(milliseconds: 300),
+      child: Stack(
+        children: [
+          // Top Bar: Back and Flip
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _TopCircleIconButton(
+                    icon: Icons.arrow_back_ios_new,
+                    onTap: _endCallAndClose,
+                  ),
+                  _TopCircleIconButton(
+                    icon: Icons.flip_camera_ios_outlined,
+                    onTap: () => _callService?.switchCamera(),
+                    isVisible: isConnected || widget.isCaller,
+                  ),
                 ],
               ),
             ),
           ),
-          // Remote Participant Overlay (if connected)
-          if (_callService.isConnected)
+
+          // Center-Top Info (Repositioned vertically like Zalo)
+          if (!isConnected)
+            Positioned(
+              top: 100,
+              left: 40,
+              right: 40,
+              child: Column(
+                children: [
+                  Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        width: 2,
+                      ),
+                    ),
+                    padding: const EdgeInsets.all(4),
+                    child: ClipOval(
+                      child: AvatarWidget(
+                        imageUrl: widget.targetAvatarUrl,
+                        name: widget.targetDisplayName,
+                        size: 92,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    widget.targetDisplayName,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                      shadows: [Shadow(color: Colors.black45, blurRadius: 15)],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _buildStatusText(),
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      shadows: [Shadow(color: Colors.black45, blurRadius: 10)],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          if (isConnected)
             Positioned(
               top: MediaQuery.of(context).padding.top + 80,
-              left: 16,
+              left: 20,
               child: _SmallParticipantView(
                 displayName: widget.targetDisplayName,
                 status: _buildStatusText(),
               ),
             ),
+
+          // Bottom Panel: 4 Buttons like Zalo
           Positioned(
             left: 0,
             right: 0,
@@ -353,8 +420,8 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                 filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
                 child: Container(
                   padding: const EdgeInsets.fromLTRB(16, 24, 16, 48),
-                  color: Colors.black.withValues(alpha: 0.25),
-                  child: _buildCallControls(_callService),
+                  color: Colors.black.withValues(alpha: 0.2),
+                  child: _buildCallControls(_callService!),
                 ),
               ),
             ),
@@ -363,15 +430,27 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       ),
     );
   }
-  Widget _buildCallControls(WebRtcCallService callService) {
-    if (callService.isEnded) {
-      return const SizedBox(height: 80);
+
+  String _buildStatusText() {
+    if (_callService == null) return '';
+    if (_callService!.errorMessage != null) return _callService!.errorMessage!;
+    if (_callService!.isEnded) return 'Cuộc gọi kết thúc';
+    if (_callService!.isConnected) {
+      final m = _callDurationSeconds ~/ 60;
+      final s = _callDurationSeconds % 60;
+      return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
     }
+    if (_callService!.isInitializing) return 'Đang khởi tạo...';
+    if (widget.isCaller) return 'Đang đổ chuông'; // Zalo style
+    return isAccepted ? 'Đang trả lời...' : 'Cuộc gọi đến...';
+  }
 
-    final isCaller = widget.isCaller;
-    final isAccepted = callService.isAccepted;
+  bool get isAccepted => _callService?.isAccepted ?? false;
 
-    if (!isCaller && !isAccepted) {
+  Widget _buildCallControls(WebRtcCallService callService) {
+    if (callService.isEnded) return const SizedBox(height: 80);
+
+    if (!widget.isCaller && !callService.isAccepted) {
       return Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
@@ -379,31 +458,32 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
             icon: Icons.call_end,
             label: 'Từ chối',
             onTap: () => callService.endCall(reason: 'declined'),
-            active: false,
             destructive: true,
           ),
           _VideoActionButton(
             icon: Icons.videocam,
             label: 'Chấp nhận',
             onTap: () => callService.acceptCall(),
-            active: true,
             color: const Color(0xFF4CD964),
           ),
         ],
       );
     }
 
+    // Standard 4-button row based on screenshot
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
         _VideoActionButton(
-          icon: callService.isCameraEnabled ? Icons.videocam : Icons.videocam_off,
+          icon:
+              callService.isCameraEnabled ? Icons.videocam : Icons.videocam_off,
           label: 'Camera',
           onTap: () => unawaited(callService.toggleCamera()),
           active: callService.isCameraEnabled,
         ),
         _VideoActionButton(
-          icon: callService.isMicrophoneEnabled ? Icons.mic : Icons.mic_off,
+          icon:
+              callService.isMicrophoneEnabled ? Icons.mic : Icons.mic_off,
           label: 'Mic',
           onTap: () => unawaited(callService.toggleMicrophone()),
           active: callService.isMicrophoneEnabled,
@@ -412,7 +492,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
           icon: Icons.call_end,
           label: 'Kết thúc',
           onTap: _endCallAndClose,
-          active: false,
           destructive: true,
         ),
         _VideoActionButton(
@@ -423,7 +502,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
               const SnackBar(content: Text('Tính năng đang phát triển')),
             );
           },
-          active: true,
         ),
       ],
     );
@@ -433,21 +511,28 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 class _TopCircleIconButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
+  final bool isVisible;
 
-  const _TopCircleIconButton({required this.icon, required this.onTap});
+  const _TopCircleIconButton({
+    required this.icon,
+    required this.onTap,
+    this.isVisible = true,
+  });
 
   @override
   Widget build(BuildContext context) {
+    if (!isVisible) return const SizedBox(width: 44, height: 44);
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         width: 44,
         height: 44,
         decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.5),
+          color: Colors.white.withValues(alpha: 0.15),
           shape: BoxShape.circle,
         ),
-        child: Center(child: Icon(icon, color: Colors.white, size: 28)),
+        child: Center(child: Icon(icon, color: Colors.white, size: 24)),
       ),
     );
   }
@@ -456,11 +541,7 @@ class _TopCircleIconButton extends StatelessWidget {
 class _SmallParticipantView extends StatelessWidget {
   final String displayName;
   final String status;
-
-  const _SmallParticipantView({
-    required this.displayName,
-    required this.status,
-  });
+  const _SmallParticipantView({required this.displayName, required this.status});
 
   @override
   Widget build(BuildContext context) {
@@ -556,18 +637,24 @@ class _VideoActionButton extends StatelessWidget {
     required this.icon,
     this.label,
     required this.onTap,
-    required this.active,
+    this.active = true,
     this.destructive = false,
     this.color,
   });
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor =
-        color ??
-            (destructive
-                ? const Color(0xFFFF3B30) // Solid Red like Zalo
-                : Colors.black.withValues(alpha: 0.5)); // Đồng bộ với Appbar
+    Color? backgroundColor;
+    Color iconColor = Colors.white;
+
+    if (destructive) {
+      backgroundColor = const Color(0xFFFF3B30);
+    } else if (active) {
+      backgroundColor = Colors.white;
+      iconColor = const Color(0xFF0068FF); // Zalo Primary Blue
+    } else {
+      backgroundColor = color ?? Colors.white.withValues(alpha: 0.15);
+    }
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -577,28 +664,17 @@ class _VideoActionButton extends StatelessWidget {
           child: Container(
             width: 72,
             height: 72,
-            decoration: BoxDecoration(
-              color: backgroundColor,
-              shape: BoxShape.circle,
-              boxShadow: [
-                if (destructive)
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.25),
-                    blurRadius: 12,
-                    spreadRadius: 1,
-                  ),
-              ],
-            ),
-            child: Center(child: Icon(icon, color: Colors.white, size: 34)),
+            decoration: BoxDecoration(color: backgroundColor, shape: BoxShape.circle),
+            child: Center(child: Icon(icon, color: iconColor, size: 34)),
           ),
         ),
         if (label != null) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Text(
             label!,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 12,
+              fontSize: 13,
               fontWeight: FontWeight.w500,
             ),
           ),

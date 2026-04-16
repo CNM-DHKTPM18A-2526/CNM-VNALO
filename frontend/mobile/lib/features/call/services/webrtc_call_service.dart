@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:vnalo_mobile/config/call_config.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 
 class WebRtcCallService extends ChangeNotifier {
@@ -18,6 +20,7 @@ class WebRtcCallService extends ChangeNotifier {
   final bool audioOnly;
   final bool isCaller;
   final int ringTimeoutSeconds;
+  final Map<String, dynamic>? initialSdp;
 
   RTCPeerConnection? _peerConnection;
   MediaStream? _localStream;
@@ -47,6 +50,7 @@ class WebRtcCallService extends ChangeNotifier {
     required this.peerUserId,
     required this.audioOnly,
     required this.isCaller,
+    this.initialSdp,
     int? ringTimeoutSeconds,
   }) : ringTimeoutSeconds =
            (ringTimeoutSeconds == null || ringTimeoutSeconds <= 0)
@@ -80,15 +84,25 @@ class WebRtcCallService extends ChangeNotifier {
 
     _signalSubscription = _socketService.onCallSignal.listen(_onSignalEvent);
     debugPrint(
-      '$_logPrefix initialize() start isCaller=$isCaller audioOnly=$audioOnly timeout=$ringTimeoutSeconds',
+      '$_logPrefix initialize() start isCaller=$isCaller audioOnly=$audioOnly timeout=$ringTimeoutSeconds hasInitialSdp=${initialSdp != null}',
     );
 
     try {
+      // Proactive permission check
+      final micStatus = await Permission.microphone.request();
+      if (micStatus.isDenied || micStatus.isPermanentlyDenied) {
+        throw 'Quyền micro bị từ chối';
+      }
+      if (!audioOnly) {
+        final camStatus = await Permission.camera.request();
+        if (camStatus.isDenied || camStatus.isPermanentlyDenied) {
+          throw 'Quyền camera bị từ chối';
+        }
+      }
+
       final configuration = {
-        'iceServers': [
-          {'urls': 'stun:stun.l.google.com:19302'},
-          {'urls': 'stun:stun1.l.google.com:19302'},
-        ],
+        'iceServers': CallConfig.getIceServers(),
+        'sdpSemantics': 'unified-plan',
       };
 
       _peerConnection = await createPeerConnection(configuration);
@@ -96,13 +110,16 @@ class WebRtcCallService extends ChangeNotifier {
       _registerPeerCallbacks();
 
       if (isCaller) {
-        _isAccepted = true; // Caller is always "accepted"
+        _isAccepted = true; 
         await _openLocalMedia();
         await Helper.setSpeakerphoneOn(_isSpeakerOn);
         await _createAndSendOffer();
         _startRingTimeoutCountdown();
       } else {
-        // Callee: Wait for user to press "Accept"
+        // Callee: Immediately process initial offer if provided
+        if (initialSdp != null) {
+          await _handleOffer(initialSdp!);
+        }
         await Helper.setSpeakerphoneOn(_isSpeakerOn);
       }
     } catch (e) {
@@ -116,7 +133,7 @@ class WebRtcCallService extends ChangeNotifier {
 
   String _mapInitError(Object error) {
     final text = error.toString().toLowerCase();
-    if (text.contains('permission') || text.contains('notallowed')) {
+    if (text.contains('permission') || text.contains('notallowed') || text.contains('từ chối')) {
       return 'Không có quyền truy cập camera/micro. Vui lòng cấp quyền rồi thử lại.';
     }
     return 'Không thể khởi tạo cuộc gọi: $error';
@@ -145,8 +162,30 @@ class WebRtcCallService extends ChangeNotifier {
       );
     };
 
+    _peerConnection?.onConnectionState = (RTCPeerConnectionState state) {
+      debugPrint('$_logPrefix onConnectionState=$state');
+      if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
+        if (!_isConnected) {
+          _isConnected = true;
+          _connectedAt = DateTime.now();
+          _ringTimeoutTimer?.cancel();
+          notifyListeners();
+        }
+      } else if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
+                 state == RTCPeerConnectionState.RTCPeerConnectionStateDisconnected ||
+                 state == RTCPeerConnectionState.RTCPeerConnectionStateClosed) {
+         _isConnected = false;
+         notifyListeners();
+      }
+    };
+
+    _peerConnection?.onSignalingState = (RTCSignalingState state) {
+      debugPrint('$_logPrefix onSignalingState=$state');
+    };
+
     _peerConnection?.onIceConnectionState = (RTCIceConnectionState state) {
       debugPrint('$_logPrefix onIceConnectionState=$state');
+      // Fallback for older WebRTC versions if onConnectionState is not consistent
       if (state == RTCIceConnectionState.RTCIceConnectionStateConnected ||
           state == RTCIceConnectionState.RTCIceConnectionStateCompleted) {
         if (!_isConnected) {
@@ -155,13 +194,6 @@ class WebRtcCallService extends ChangeNotifier {
           _ringTimeoutTimer?.cancel();
           notifyListeners();
         }
-      }
-
-      if (state == RTCIceConnectionState.RTCIceConnectionStateFailed ||
-          state == RTCIceConnectionState.RTCIceConnectionStateDisconnected ||
-          state == RTCIceConnectionState.RTCIceConnectionStateClosed) {
-        _isConnected = false;
-        notifyListeners();
       }
     };
   }
@@ -200,7 +232,6 @@ class WebRtcCallService extends ChangeNotifier {
 
       await _openLocalMedia();
       
-      // If we already have the offer, we can send the answer now
       if (_hasRemoteDescription) {
         await _createAndSendAnswer();
       }
@@ -258,8 +289,7 @@ class WebRtcCallService extends ChangeNotifier {
 
     _ringTimeoutTimer = Timer(Duration(seconds: ringTimeoutSeconds), () async {
       if (_isEnded || _isConnected) return;
-      _errorMessage =
-          'Người nhận chưa bắt máy sau $ringTimeoutSeconds giây. Cuộc gọi đã tự động kết thúc.';
+
       debugPrint(
         '$_logPrefix ring timeout reached after $ringTimeoutSeconds seconds',
       );
@@ -277,26 +307,20 @@ class WebRtcCallService extends ChangeNotifier {
       return;
     }
 
-    final senderUserId = _extractUserId(signal, [
-      'senderUserId',
-      'senderId',
-      'fromUserId',
-    ]);
-    if (senderUserId != null &&
-        senderUserId.isNotEmpty &&
-        senderUserId != peerUserId) {
-      return;
-    }
-
-    final targetUserId = _extractUserId(signal, ['targetUserId', 'toUserId']);
-    if (targetUserId != null &&
-        targetUserId.isNotEmpty &&
-        targetUserId != currentUserId) {
+    final senderUserId = _extractUserId(signal, ['senderUserId', 'senderId', 'fromUserId']);
+    if (senderUserId != null && senderUserId.isNotEmpty && senderUserId != peerUserId) {
       return;
     }
 
     final type = signal['type']?.toString();
     if (type == null || type.isEmpty) return;
+    
+    // De-duplication check: if we already have the remote description for this type, skip.
+    if (type == 'offer' && _hasRemoteDescription && !isCaller) {
+      debugPrint('$_logPrefix skipping duplicate offer signal');
+      return;
+    }
+
     debugPrint('$_logPrefix received signal type=$type');
 
     try {
@@ -322,8 +346,7 @@ class WebRtcCallService extends ChangeNotifier {
           break;
       }
     } catch (e) {
-      _errorMessage = 'Lỗi xử lý tín hiệu cuộc gọi: $e';
-      notifyListeners();
+      debugPrint('$_logPrefix error processing signal type=$type: $e');
     }
   }
 
@@ -352,8 +375,6 @@ class WebRtcCallService extends ChangeNotifier {
     _hasRemoteDescription = true;
     await _flushPendingCandidates();
 
-    // If already accepted (User pressed Accept button), send answer immediately.
-    // If not yet accepted, wait for acceptCall() to trigger answer.
     if (_isAccepted) {
       await _createAndSendAnswer();
     }
@@ -369,6 +390,12 @@ class WebRtcCallService extends ChangeNotifier {
       sdpMap['type']?.toString() ?? 'answer',
     );
 
+    // Guard against setting duplicate answers or racing signals
+    if (pc.signalingState == RTCSignalingState.RTCSignalingStateStable) {
+      debugPrint('$_logPrefix ignoring answer as pc is already stable');
+      return;
+    }
+
     await pc.setRemoteDescription(answer);
     debugPrint('$_logPrefix remote answer set');
     _hasRemoteDescription = true;
@@ -380,8 +407,11 @@ class WebRtcCallService extends ChangeNotifier {
     if (pc == null) return;
 
     final candidateMap = Map<String, dynamic>.from(signal['candidate'] ?? {});
+    final candidateString = candidateMap['candidate']?.toString();
+    if (candidateString == null) return;
+
     final candidate = RTCIceCandidate(
-      candidateMap['candidate']?.toString(),
+      candidateString,
       candidateMap['sdpMid']?.toString(),
       candidateMap['sdpMLineIndex'] is int
           ? candidateMap['sdpMLineIndex'] as int
@@ -406,15 +436,12 @@ class WebRtcCallService extends ChangeNotifier {
     for (final candidate in List<RTCIceCandidate>.from(_pendingCandidates)) {
       await pc.addCandidate(candidate);
     }
-    debugPrint(
-      '$_logPrefix flushed ${_pendingCandidates.length} queued ICE candidates',
-    );
+    debugPrint('$_logPrefix flushed ${_pendingCandidates.length} queued ICE candidates');
     _pendingCandidates.clear();
   }
 
   Future<void> toggleMicrophone() async {
-    final audioTracks =
-        _localStream?.getAudioTracks() ?? const <MediaStreamTrack>[];
+    final audioTracks = _localStream?.getAudioTracks() ?? const <MediaStreamTrack>[];
     if (audioTracks.isEmpty) return;
 
     _isMicrophoneEnabled = !_isMicrophoneEnabled;
@@ -432,8 +459,7 @@ class WebRtcCallService extends ChangeNotifier {
 
   Future<void> toggleCamera() async {
     if (audioOnly) return;
-    final videoTracks =
-        _localStream?.getVideoTracks() ?? const <MediaStreamTrack>[];
+    final videoTracks = _localStream?.getVideoTracks() ?? const <MediaStreamTrack>[];
     if (videoTracks.isEmpty) return;
 
     _isCameraEnabled = !_isCameraEnabled;
@@ -445,8 +471,7 @@ class WebRtcCallService extends ChangeNotifier {
 
   Future<void> switchCamera() async {
     if (audioOnly) return;
-    final videoTracks =
-        _localStream?.getVideoTracks() ?? const <MediaStreamTrack>[];
+    final videoTracks = _localStream?.getVideoTracks() ?? const <MediaStreamTrack>[];
     if (videoTracks.isEmpty) return;
 
     await Helper.switchCamera(videoTracks.first);
@@ -500,8 +525,7 @@ class WebRtcCallService extends ChangeNotifier {
     await _localStream?.dispose();
     _localStream = null;
 
-    final remoteTracks =
-        _remoteStream?.getTracks() ?? const <MediaStreamTrack>[];
+    final remoteTracks = _remoteStream?.getTracks() ?? const <MediaStreamTrack>[];
     for (final track in remoteTracks) {
       track.stop();
     }

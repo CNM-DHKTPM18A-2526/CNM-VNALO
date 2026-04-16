@@ -99,9 +99,11 @@ class ChatProvider extends ChangeNotifier {
       
       // Load last cloud message (Harden to prevent inbox blocking)
       try {
-        final cloudMsgs = await _db.getMessagesByConversation('MY_DOCUMENTS');
-        if (cloudMsgs.isNotEmpty) {
-          _lastCloudMessage = _fromLocal(cloudMsgs.first);
+        if (_currentUserId != null) {
+          final cloudMsgs = await _db.getMessagesByConversation('MY_DOCUMENTS', _currentUserId!);
+          if (cloudMsgs.isNotEmpty) {
+            _lastCloudMessage = _fromLocal(cloudMsgs.first);
+          }
         }
       } catch (e) {
         debugPrint('Cloud preview loading failed: $e');
@@ -136,10 +138,12 @@ class ChatProvider extends ChangeNotifier {
 
   void refreshCloudPreview() async {
     try {
-      final cloudMsgs = await _db.getMessagesByConversation('MY_DOCUMENTS');
-      if (cloudMsgs.isNotEmpty) {
-        _lastCloudMessage = _fromLocal(cloudMsgs.first);
-        notifyListeners();
+      if (_currentUserId != null) {
+        final cloudMsgs = await _db.getMessagesByConversation('MY_DOCUMENTS', _currentUserId!);
+        if (cloudMsgs.isNotEmpty) {
+          _lastCloudMessage = _fromLocal(cloudMsgs.first);
+          notifyListeners();
+        }
       }
     } catch (e) {
       debugPrint('refreshCloudPreview failure: $e');
@@ -263,8 +267,12 @@ class ChatProvider extends ChangeNotifier {
   }
 
   LocalMessage _toLocal(Message m) {
+    if (_currentUserId == null) {
+      throw StateError('Cannot map to local message without active currentUserId');
+    }
     return LocalMessage(
       id: m.id,
+      ownerId: _currentUserId!,
       conversationId: m.conversationId,
       senderId: m.senderId,
       content: m.content ?? '',
@@ -322,10 +330,12 @@ class ChatProvider extends ChangeNotifier {
     }
 
     // 1. Load from Local Cache FIRST (Optimistic UI)
-    final localMsgs = await _db.getMessagesByConversation(conversationId);
-    if (_activeConversationId == conversationId) {
-      _messages[conversationId] = localMsgs.map(_fromLocal).toList();
-      notifyListeners();
+    if (_currentUserId != null) {
+      final localMsgs = await _db.getMessagesByConversation(conversationId, _currentUserId!);
+      if (_activeConversationId == conversationId) {
+        _messages[conversationId] = localMsgs.map(_fromLocal).toList();
+        notifyListeners();
+      }
     }
 
     await loadMessages(conversationId);
@@ -622,7 +632,9 @@ class ChatProvider extends ChangeNotifier {
     if (list == null) return;
 
     _messages[conversationId] = list.where((m) => m.id != messageId).toList();
-    _db.deleteMessage(messageId);
+    if (_currentUserId != null) {
+      _db.deleteMessage(messageId, _currentUserId!);
+    }
     notifyListeners();
   }
 

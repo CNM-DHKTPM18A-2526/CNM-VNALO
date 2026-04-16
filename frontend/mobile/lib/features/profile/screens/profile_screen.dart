@@ -63,9 +63,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final searchHint = isDarkMode
-        ? DarkColors.textHint
-        : Colors.white.withValues(alpha: 0.8);
     final pageBg = isDarkMode ? Colors.black : AppColors.sectionBackground;
     final sectionBg = isDarkMode ? DarkColors.surface : Colors.white;
     final auth = context.watch<AuthProvider>();
@@ -99,12 +96,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               color: Colors.transparent,
               child: Row(
                 children: [
-                  Icon(Icons.search, size: 24, color: isDarkMode ? searchHint : Colors.white),
+                  const Icon(Icons.search, size: 24, color: Colors.white),
                   const SizedBox(width: 8),
                   Text(
                     common.search,
-                    style: TextStyle(
-                      color: searchHint,
+                    style: const TextStyle(
+                      color: Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.w400,
                     ),

@@ -86,7 +86,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
         appBar: AppBar(
           backgroundColor: isDarkMode ? appBarBg : Colors.transparent,
           elevation: 0,
-          forceMaterialTransparency: true,
+          forceMaterialTransparency: !isDarkMode,
           flexibleSpace: isDarkMode
               ? null
               : Container(
@@ -101,11 +101,11 @@ class _ContactsScreenState extends State<ContactsScreen> {
             },
             child: Row(
               children: [
-                Icon(Icons.search, size: 24, color: isDarkMode ? searchHint : Colors.white),
+                const Icon(Icons.search, size: 24, color: Colors.white),
                 const SizedBox(width: 8),
                 Text(
                   CommonTexts.of(context).search,
-                  style: TextStyle(color: searchHint, fontSize: 16, fontWeight: FontWeight.w400),
+                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w400),
                 ),
               ],
             ),
