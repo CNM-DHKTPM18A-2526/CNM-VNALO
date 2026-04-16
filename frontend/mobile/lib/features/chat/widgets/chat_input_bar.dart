@@ -174,13 +174,61 @@ class _ChatInputBarState extends State<ChatInputBar> {
               border: Border(
                 top: BorderSide(color: isDarkMode ? DarkColors.divider : Colors.black12, width: 0.5),
               ),
-            ),
-            child: SafeArea(
-              bottom: !_showStickers,
-              minimum: const EdgeInsets.symmetric(vertical: 2),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
+            // ),
+            // child: SafeArea(
+            //   bottom: !_showStickers,
+            //   minimum: const EdgeInsets.symmetric(vertical: 2),
+            //   child: Row(
+            //     crossAxisAlignment: CrossAxisAlignment.center,
+            //     children: [
+          ),
+          child: SafeArea(
+            bottom: !_showStickers,
+            minimum: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                IconButton(
+                  icon: Icon(
+                    _showStickers ? Icons.keyboard : Icons.emoji_emotions_outlined,
+                    color: isDarkMode ? DarkColors.textSecondary : const Color(0xFF5D6470),
+                  ),
+                  onPressed: () {
+                    setState(() => _showStickers = !_showStickers);
+                    if (_showStickers) FocusScope.of(context).unfocus();
+                  },
+                ),
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: TextField(
+                      controller: _controller,
+                      onChanged: (v) => setState(() => _hasText = v.trim().isNotEmpty),
+                      onTap: () => setState(() => _showStickers = false),
+                      minLines: 1,
+                      maxLines: 5,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: isDarkMode ? Colors.white : Colors.black87,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Tin nhắn',
+                        hintStyle: TextStyle(
+                          color: isDarkMode ? DarkColors.textHint : const Color(0xFFA1A3A7),
+                          fontSize: 16,
+                        ),
+                        isDense: true,
+                        filled: false, // Đảm bảo không bị fill màu xám mặc định
+                        contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                        border: InputBorder.none,
+                      ),
+                    ),
+                  ),
+                ),
+                if (_hasText)
                   IconButton(
                     icon: Icon(
                       _showStickers ? Icons.keyboard : Icons.emoji_emotions_outlined,
@@ -220,7 +268,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                             fontSize: 16,
                           ),
                           isDense: true,
-                          filled: false, // Đảm bảo không bị fill màu xám mặc định
+                          filled: false,
                           contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                           border: InputBorder.none,
                         ),

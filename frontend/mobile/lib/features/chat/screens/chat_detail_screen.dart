@@ -730,12 +730,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   alignment: WrapAlignment.center,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Text('Đặt tên nhóm', style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+                    Text('Äáº·t tÃªn nhÃ³m', style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
                     Icon(Icons.chevron_right, size: 18, color: Colors.grey.shade400),
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text('Bạn vừa tạo nhóm', style: TextStyle(color: Colors.grey.shade400, fontSize: 13)),
+                Text('Báº¡n vá»«a táº¡o nhÃ³m', style: TextStyle(color: Colors.grey.shade400, fontSize: 13)),
                 const SizedBox(height: 16),
                 // Tiny avatars row
                 SingleChildScrollView(
@@ -747,7 +747,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 4),
                         child: AvatarWidget(
                           imageUrl: m.user?.avatarUrl, 
-                          name: m.user?.displayName ?? m.nickname ?? 'Thành viên', 
+                          name: m.user?.displayName ?? m.nickname ?? 'ThÃ nh viÃªn', 
                           size: 32
                         ),
                       )),
@@ -766,14 +766,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                _buildActionChip('👋', 'Vẫy tay chào'),
+                _buildActionChip('ðŸ‘‹', 'Váº«y tay chÃ o'),
               ],
             ),
           ),
           const SizedBox(height: 12),
           TextButton(
             onPressed: () {},
-            child: Text('Xem mã QR tham gia nhóm', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+            child: Text('Xem mÃ£ QR tham gia nhÃ³m', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
           ),
         ],
       ),
@@ -829,10 +829,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 text: TextSpan(
                   style: TextStyle(fontSize: 14, color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade700, height: 1.4),
                   children: const [
-                    TextSpan(text: 'Chỉ '),
-                    TextSpan(text: 'trưởng và phó cộng đồng', style: TextStyle(fontWeight: FontWeight.bold)),
-                    TextSpan(text: ' được gửi tin nhắn vào cộng đồng. '),
-                    TextSpan(text: 'Tìm hiểu thêm', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.w500)),
+                    TextSpan(text: 'Chá»‰ '),
+                    TextSpan(text: 'trÆ°á»Ÿng vÃ  phÃ³ cá»™ng Ä‘á»“ng', style: TextStyle(fontWeight: FontWeight.bold)),
+                    TextSpan(text: ' Ä‘Æ°á»£c gá»­i tin nháº¯n vÃ o cá»™ng Ä‘á»“ng. '),
+                    TextSpan(text: 'TÃ¬m hiá»ƒu thÃªm', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.w500)),
                   ],
                 ),
               ),

@@ -148,7 +148,6 @@ class SocketService {
     _socket!.on('message.reaction.removed', (data) {
       _reactionRemovedController.add(Map<String, dynamic>.from(data));
     });
-
     _socket!.on('auth.logout.force', (data) {
       final reason = data is Map ? data['reason']?.toString() : null;
       AuthEvents.onForceLogout?.call(reason ?? 'Tài khoản đã đăng nhập từ thiết bị khác');
