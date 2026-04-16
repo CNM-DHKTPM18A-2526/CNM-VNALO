@@ -430,7 +430,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
             icon: callService.isMicrophoneEnabled ? Icons.mic : Icons.mic_off,
             label: 'Mic',
             onTap: () => callService.toggleMicrophone(),
-            active: !callService.isMicrophoneEnabled,
+            active: callService.isMicrophoneEnabled,
           ),
         ],
       ),
@@ -567,11 +567,17 @@ class _BottomControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor =
-        color ??
-        (destructive
-            ? const Color(0xFFFF3B30)
-            : Colors.black.withValues(alpha: 0.25));
+    Color? backgroundColor;
+    Color iconColor = Colors.white;
+
+    if (destructive) {
+      backgroundColor = const Color(0xFFFF3B30);
+    } else if (active) {
+      backgroundColor = Colors.white;
+      iconColor = const Color(0xFF0068FF); // Zalo Primary Blue
+    } else {
+      backgroundColor = color ?? Colors.black.withValues(alpha: 0.25);
+    }
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -582,7 +588,7 @@ class _BottomControl extends StatelessWidget {
             width: 72,
             height: 72,
             decoration: BoxDecoration(color: backgroundColor, shape: BoxShape.circle),
-            child: Center(child: Icon(icon, color: Colors.white, size: 36)),
+            child: Center(child: Icon(icon, color: iconColor, size: 36)),
           ),
         ),
         const SizedBox(height: 12),

@@ -2,8 +2,9 @@ String generateCallId({
   required String conversationId,
   required String callerUserId,
   required bool audioOnly,
+  int? timestampMs,
 }) {
   final mediaType = audioOnly ? 'voice' : 'video';
-  final timestamp = DateTime.now().millisecondsSinceEpoch;
+  final timestamp = timestampMs ?? DateTime.now().millisecondsSinceEpoch;
   return '$mediaType-$conversationId-$callerUserId-$timestamp';
 }
