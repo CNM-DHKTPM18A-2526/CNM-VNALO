@@ -724,7 +724,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(Icons.camera_alt, color: Colors.grey.shade400, size: 28),
-                           const SizedBox(height: 12),
+                ),
+                const SizedBox(height: 12),
                 Wrap(
                   alignment: WrapAlignment.center,
                   crossAxisAlignment: WrapCrossAlignment.center,
@@ -772,6 +773,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           const SizedBox(height: 12),
           TextButton(
             onPressed: () {},
+            child: Text(common.viewGroupQrAction, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
           ),
         ],
       ),
