@@ -20,7 +20,7 @@ export type ConversationSummary = {
   memberCount?: number
 }
 
-export type ChatMessageType = 'text' | 'image' | 'file' | 'sticker' | 'system'
+export type ChatMessageType = 'text' | 'image' | 'file' | 'sticker' | 'system' | 'call'
 
 export type ReplyMetadata = {
   id: string
@@ -94,6 +94,7 @@ export type ChatMessage = {
   clientMessageId?: string
   deliveryState?: MessageDeliveryState
   replyTo?: ReplyMetadata | null
+  isRecalled?: boolean
 }
 
 export type MessageReadEvent = {

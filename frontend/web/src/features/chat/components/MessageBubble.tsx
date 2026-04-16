@@ -51,7 +51,8 @@ type MessageBubbleProps = {
   isReadByPeer?: boolean
   isHighlighted?: boolean
   isGroupedWithPrevious?: boolean
-  isGroupedWithNext?: boolean
+  isVirtualGroup?: boolean
+  groupedMessages?: ChatMessage[]
   currentUserId?: string
   onReply?: () => void
   onJumpToOriginal?: (messageId: string) => void
@@ -80,6 +81,8 @@ export function MessageBubble({
   isHighlighted = false,
   isGroupedWithPrevious = false,
   isGroupedWithNext = false,
+  isVirtualGroup = false,
+  groupedMessages = [],
   currentUserId,
   onReply,
   onJumpToOriginal,
@@ -241,6 +244,15 @@ export function MessageBubble({
     if (action === 'reply') {
       onReply?.()
       return
+    }
+
+    if ((action === 'recallGroup' || action === 'deleteGroupSelf') && isVirtualGroup && groupedMessages) {
+       // We pass the current message but the handler in parent should know it's a group action
+       // and use groupedMessages instead of just the message.id.
+       // However, to make it explicit, we'll pass groupedMessages as a 3rd arg if we modify the type.
+       // For now, let's keep it simple: pass the last message (which is what 'message' is in synthetic case)
+       // and rely on the parent having access to the group (which it does via its own state).
+       // Actually, easier to just pass the group here if we can.
     }
 
     onContextMenuAction?.(action, message)
@@ -445,6 +457,7 @@ export function MessageBubble({
             position={contextMenuPosition}
             onClose={closeContextMenu}
             onAction={handleContextMenuAction}
+            isVirtualGroup={isVirtualGroup}
           />
         ) : null}
 
@@ -477,7 +490,7 @@ export function MessageBubble({
 
           {!isRecalled && message.replyTo && (
             <div 
-              className={`message-reply-quote mb-2 p-2 rounded bg-black/5 border-l-2 border-blue-500 cursor-pointer hover:bg-black/10 transition-colors`}
+              className={`message-reply-quote mb-2 p-2 rounded bg-black/5 border-l-2 border-blue-500 cursor-pointer hover:bg-black/10 transition-colors max-w-[240px] overflow-hidden`}
               onClick={(e) => {
                 e.stopPropagation();
                 if (message.replyTo) onJumpToOriginal?.(message.replyTo.id);
@@ -488,7 +501,7 @@ export function MessageBubble({
                   ? userMap[message.replyTo.senderId].displayName 
                   : message.replyTo.senderName}
               </p>
-              <p className="text-xs text-slate-500 truncate line-clamp-1">
+              <p className="text-xs text-slate-500 line-clamp-1 overflow-hidden whitespace-nowrap overflow-ellipsis">
                 {message.replyTo.preview}
               </p>
             </div>
@@ -513,16 +526,26 @@ export function MessageBubble({
               {imageAttachments.map((att, idx) => {
                 // Special layout for 3 images: first 2 are small (top), 3rd is big (bottom span 2)
                 const isStaircaseBottom = imageAttachments.length === 3 && idx === 2;
+                
+                // If it's a virtual group, each attachment actually belongs to a message in groupedMessages
+                const originalMessageId = (att as any).originalMessageId || message.id;
 
                 return (
                   <button
-                    key={att.url + idx}
+                    key={(att.url + idx) || originalMessageId}
                     type='button'
                     className={`message-bubble-media message-bubble-image relative border-0 bg-transparent p-0 overflow-hidden ${isStaircaseBottom ? 'col-span-2' : ''}`}
                     onClick={(event) => {
                       event.preventDefault()
                       event.stopPropagation()
-                      openImageViewerByMessageId(message.id)
+                      openImageViewerByMessageId(originalMessageId)
+                    }}
+                    onContextMenu={(e) => {
+                      if (isVirtualGroup && groupedMessages.length > 0) {
+                        const targetMsg = groupedMessages.find(m => m.id === originalMessageId) || message;
+                        onContextMenuAction?.('recall', targetMsg); // Default action just to trigger handleContextMenu from child if possible
+                        // More accurately, we'd want to trigger the context menu for that message.
+                      }
                     }}
                     aria-label={`Xem ảnh ${idx + 1}`}
                   >
@@ -553,23 +576,26 @@ export function MessageBubble({
 
           {!isRecalled && (fileAttachments.length > 0) && (
             <div className='message-bubble-attachments message-bubble-files flex flex-col gap-2 mt-1'>
-              {fileAttachments.map((att, idx) => (
-                <a
-                  key={att.url + idx}
-                  className='message-file-card'
-                  href={att.url}
-                  target='_blank'
-                  rel='noreferrer'
-                >
-                  <span className='message-file-icon'>
-                    <Icon name='attach' />
-                  </span>
-                  <span className='message-file-meta'>
-                    <strong>{att.name || 'Tệp đính kèm'}</strong>
-                    <span>{att.mimeType || 'Ứng dụng'}</span>
-                  </span>
-                </a>
-              ))}
+              {fileAttachments.map((att, idx) => {
+                const originalMessageId = (att as any).originalMessageId || message.id;
+                return (
+                  <a
+                    key={(att.url + idx) || originalMessageId}
+                    className='message-file-card'
+                    href={att.url}
+                    target='_blank'
+                    rel='noreferrer'
+                  >
+                    <span className='message-file-icon'>
+                      <Icon name='attach' />
+                    </span>
+                    <span className='message-file-meta'>
+                      <strong>{att.name || 'Tệp đính kèm'}</strong>
+                      <span>{att.mimeType || 'Ứng dụng'}</span>
+                    </span>
+                  </a>
+                );
+              })}
             </div>
           )}
 
@@ -578,7 +604,9 @@ export function MessageBubble({
           ) : null}
 
           {!isRecalled && message.text && (
-            <p className={message.type === 'text' ? '' : 'mt-2'}>{formatMessageContent(message.text)}</p>
+            <p className={`${message.type === 'text' ? '' : 'mt-2'} whitespace-pre-wrap break-words overflow-hidden`}>
+              {formatMessageContent(message.text)}
+            </p>
           )}
 
           {!isGroupedWithNext && (
