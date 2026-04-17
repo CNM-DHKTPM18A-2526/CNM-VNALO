@@ -92,26 +92,49 @@ public class GeminiAiService {
                 .path("text")
                 .asText();
 
-        // 4. Intent parsing
+        // 4. Intent parsing - Handle potential Markdown formatting from AI
         AiChatResponse response = new AiChatResponse();
-        if (isAnalyzingIntent && rawText.trim().startsWith("{")) {
-            try {
-                // Heuristic: If it looks like JSON, parse as a command
-                JsonNode cmdNode = objectMapper.readTree(rawText);
-                if (cmdNode.has("actionCommand")) {
-                    response.setActionCommand(cmdNode.get("actionCommand").asText());
-                    if (cmdNode.has("actionParams")) {
-                        response.setActionParams(objectMapper.convertValue(cmdNode.get("actionParams"), Map.class));
+        if (isAnalyzingIntent) {
+            String cleanJson = extractJson(rawText);
+            if (cleanJson != null) {
+                try {
+                    JsonNode cmdNode = objectMapper.readTree(cleanJson);
+                    if (cmdNode.has("actionCommand")) {
+                        response.setActionCommand(cmdNode.get("actionCommand").asText());
+                        if (cmdNode.has("actionParams")) {
+                            response.setActionParams(objectMapper.convertValue(cmdNode.get("actionParams"), Map.class));
+                        }
+                        response.setTextReply(""); // Command execution mode
+                        return response;
                     }
-                    response.setTextReply(""); // No text to speak, just execute command
-                    return response;
+                } catch (Exception e) {
+                    log.warn("Failed to parse extracted JSON: {}", e.getMessage());
                 }
-            } catch (Exception ignored) {
-                // Failed to parse as command, fallback to treating as regular text
             }
         }
 
         response.setTextReply(rawText);
         return response;
+    }
+
+    private String extractJson(String text) {
+        if (text == null) return null;
+        
+        // Try to find JSON within code blocks first
+        if (text.contains("```")) {
+            int start = text.indexOf("{");
+            int end = text.lastIndexOf("}");
+            if (start != -1 && end != -1 && start < end) {
+                return text.substring(start, end + 1);
+            }
+        }
+        
+        String trimmed = text.trim();
+        if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+            return trimmed;
+        }
+        
+        return null;
+    }
     }
 }
