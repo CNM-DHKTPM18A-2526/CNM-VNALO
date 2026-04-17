@@ -23,6 +23,7 @@ import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/call/screens/video_call_screen.dart';
 import 'package:vnalo_mobile/features/call/screens/voice_call_screen.dart';
 import 'package:vnalo_mobile/features/call/utils/call_id_generator.dart';
+import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
 
 class MessageBubble extends StatelessWidget {
   final Message message;
@@ -282,7 +283,10 @@ class MessageBubble extends StatelessWidget {
       size: size,
       child: _buildBubbleContent(context, isDarkMode),
       onAction: (action) async {
-        if (action == 'reply') {
+        if (action == 'ask_ai') {
+          final aiProvider = context.read<AiAssistantProvider>();
+          aiProvider.analyzeMessageContext(message);
+        } else if (action == 'reply') {
           if (onReplyAction != null) {
             onReplyAction!(message);
           } else {

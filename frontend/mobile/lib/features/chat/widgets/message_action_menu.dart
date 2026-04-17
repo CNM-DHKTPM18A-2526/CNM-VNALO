@@ -29,6 +29,7 @@ class MessageActionMenu extends StatelessWidget {
     if (isMine) {
       // Image 2 Order (Mine)
       actionItems.addAll([
+        _buildActionItem(context, 'ask_ai', 'Hỏi VNALO', Icons.psychology_outlined, const Color(0xFF4CAF50)),
         _buildActionItem(context, 'reply', common.replyAction, Icons.reply_rounded, const Color(0xFF9C27B0)),
         _buildActionItem(context, 'forward', common.forwardAction, Icons.forward_rounded, const Color(0xFF2196F3)),
         if (!isCloud) _buildActionItem(context, 'save', common.saveToDocsAction, Icons.folder_open_outlined, const Color(0xFF03A9F4)),
@@ -49,6 +50,7 @@ class MessageActionMenu extends StatelessWidget {
     } else {
       // Image 1 Order (Other)
       actionItems.addAll([
+        _buildActionItem(context, 'ask_ai', 'Hỏi VNALO', Icons.psychology_outlined, const Color(0xFF4CAF50)),
         _buildActionItem(context, 'reply', common.replyAction, Icons.reply_rounded, const Color(0xFF9C27B0)),
         _buildActionItem(context, 'forward', common.forwardAction, Icons.forward_rounded, const Color(0xFF2196F3)),
         if (!isCloud) _buildActionItem(context, 'save', common.saveToDocsAction, Icons.folder_open_outlined, const Color(0xFF03A9F4)),

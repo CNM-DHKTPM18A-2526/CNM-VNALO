@@ -4,6 +4,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:vnalo_mobile/features/ai_assistant/models/mascot_metadata.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vnalo_mobile/models/message_model.dart';
 
 enum AiState { idle, listening, thinking, speaking }
 
@@ -118,6 +119,35 @@ class AiAssistantProvider with ChangeNotifier {
     } catch (e) {
       debugPrint('AI Error: $e');
       _aiResponse = 'Xin lỗi, tôi đang gặp chút trục trặc mạng.';
+      await _tts.speak(_aiResponse);
+      _state = AiState.idle;
+    }
+    notifyListeners();
+  }
+
+  Future<void> analyzeMessageContext(Message message) async {
+    if (message.content == null || message.content!.isEmpty) return;
+
+    _state = AiState.thinking;
+    _isMascotVisible = true;
+    notifyListeners();
+
+    try {
+      final prompt = "Hãy giải thích hoặc tóm tắt ngắn gọn tin nhắn này cho tôi: \"${message.content}\"";
+      final response = await _aiService.chat(prompt, analyzeIntent: false);
+      
+      _aiResponse = response['textReply'] ?? '';
+
+      if (_aiResponse.isNotEmpty) {
+        _state = AiState.speaking;
+        notifyListeners();
+        await _tts.speak(_aiResponse);
+      }
+
+      _state = AiState.idle;
+    } catch (e) {
+      debugPrint('AI Context Analysis Error: $e');
+      _aiResponse = 'Tôi không thể phân tích tin nhắn này lúc này.';
       await _tts.speak(_aiResponse);
       _state = AiState.idle;
     }
