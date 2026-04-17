@@ -29,6 +29,9 @@ import 'package:vnalo_mobile/features/chat/providers/forward_provider.dart';
 import 'package:vnalo_mobile/features/profile/providers/avatar_cache_provider.dart';
 import 'package:vnalo_mobile/features/call/widgets/incoming_call_coordinator.dart';
 import 'package:vnalo_mobile/services/notification_service.dart';
+import 'package:vnalo_mobile/services/ai_service.dart';
+import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
+import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_floating_bubble.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -65,6 +68,10 @@ void main() async {
     defaultValue: '',
   );
   const socketOverride = String.fromEnvironment('SOCKET_URL', defaultValue: '');
+  const aiServiceOverride = String.fromEnvironment(
+    'AI_SERVICE_URL',
+    defaultValue: '',
+  );
 
   final env = Environment.values.firstWhere(
     (e) => e.name == envName,
@@ -77,6 +84,7 @@ void main() async {
         messageServiceOverride.isEmpty ? null : messageServiceOverride,
     mediaServiceUrl: mediaServiceOverride.isEmpty ? null : mediaServiceOverride,
     socketUrl: socketOverride.isEmpty ? null : socketOverride,
+    aiServiceUrl: aiServiceOverride.isEmpty ? null : aiServiceOverride,
   );
 
   if (env == Environment.dev) {
@@ -156,6 +164,9 @@ class VnaloApp extends StatelessWidget {
           ),
         ),
         Provider<NotificationService>(create: (_) => NotificationService()),
+        Provider<AiService>(
+          create: (context) => AiService(context.read<ApiService>()),
+        ),
         ChangeNotifierProvider<ThemeProvider>(
           create: (_) => ThemeProvider()..initialize(),
         ),
@@ -215,6 +226,9 @@ class VnaloApp extends StatelessWidget {
           create: (context) => ForwardProvider(context.read<ChatProvider>()),
           update: (context, chat, previous) => previous ?? ForwardProvider(chat),
         ),
+        ChangeNotifierProvider<AiAssistantProvider>(
+          create: (context) => AiAssistantProvider(context.read<AiService>()),
+        ),
       ],
       child: Consumer2<ThemeProvider, LanguageProvider>(
         builder: (_, themeProvider, languageProvider, __) {
@@ -230,6 +244,7 @@ class VnaloApp extends StatelessWidget {
                 children: [
                   content,
                   const IncomingCallCoordinator(),
+                  const AiFloatingBubble(),
                 ],
               );
             },
