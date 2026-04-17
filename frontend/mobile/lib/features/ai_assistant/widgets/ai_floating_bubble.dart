@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:o3d/o3d.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
+import 'package:vnalo_mobile/features/ai_assistant/screens/mascot_gallery_screen.dart';
 
 class AiFloatingBubble extends StatefulWidget {
   const AiFloatingBubble({super.key});
@@ -36,6 +37,12 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble> {
             aiProvider.stopListening();
           }
         },
+        onLongPress: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const MascotGalleryScreen()),
+          );
+        },
         child: MouseRegion(
           cursor: SystemMouseCursors.click,
           child: Column(
@@ -57,8 +64,9 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble> {
                 ),
                 child: ClipOval(
                   child: O3D(
+                    key: ValueKey(aiProvider.currentMascot.id), // Force rebuild when mascot changes
                     controller: _o3dController,
-                    src: 'https://modelviewer.dev/shared-assets/models/Astronaut.glb', // Default placeholder
+                    src: aiProvider.currentMascot.modelUrl,
                     autoPlay: true,
                     cameraTarget: CameraTarget(0, 0, 0),
                     cameraOrbit: CameraOrbit(0, 75, 105),

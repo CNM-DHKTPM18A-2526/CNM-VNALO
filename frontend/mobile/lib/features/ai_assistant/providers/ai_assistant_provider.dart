@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:vnalo_mobile/services/ai_service.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart';
+import 'package:vnalo_mobile/features/ai_assistant/models/mascot_metadata.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 enum AiState { idle, listening, thinking, speaking }
 
@@ -14,9 +16,33 @@ class AiAssistantProvider with ChangeNotifier {
   String _lastWords = '';
   String _aiResponse = '';
   bool _isMascotVisible = true;
+  MascotMetadata _currentMascot = MascotMetadata.defaultMascots.first;
 
   AiAssistantProvider(this._aiService) {
     _initTts();
+    _loadMascot();
+  }
+
+  MascotMetadata get currentMascot => _currentMascot;
+
+  Future<void> _loadMascot() async {
+    final prefs = await SharedPreferences.getInstance();
+    final mascotId = prefs.getString('vnalo_ai_mascot_id');
+    if (mascotId != null) {
+      final found = MascotMetadata.defaultMascots.firstWhere(
+        (m) => m.id == mascotId,
+        orElse: () => MascotMetadata.defaultMascots.first,
+      );
+      _currentMascot = found;
+      notifyListeners();
+    }
+  }
+
+  Future<void> setMascot(MascotMetadata mascot) async {
+    _currentMascot = mascot;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('vnalo_ai_mascot_id', mascot.id);
+    notifyListeners();
   }
 
   AiState get state => _state;
