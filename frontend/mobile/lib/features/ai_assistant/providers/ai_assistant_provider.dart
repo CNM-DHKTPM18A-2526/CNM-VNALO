@@ -154,6 +154,65 @@ class AiAssistantProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> translateMessage(Message message) async {
+    if (message.content == null || message.content!.isEmpty) return;
+
+    _state = AiState.thinking;
+    _isMascotVisible = true;
+    notifyListeners();
+
+    try {
+      final prompt = "Hãy dịch tin nhắn sau đây sang tiếng Việt một cách tự nhiên và chính xác nhất: \"${message.content}\"";
+      final response = await _aiService.chat(prompt, analyzeIntent: false);
+      
+      _aiResponse = response['textReply'] ?? '';
+
+      if (_aiResponse.isNotEmpty) {
+        _state = AiState.speaking;
+        notifyListeners();
+        await _tts.speak(_aiResponse);
+      }
+
+      _state = AiState.idle;
+    } catch (e) {
+      debugPrint('AI Translation Error: $e');
+      _aiResponse = 'Tôi không thể dịch tin nhắn này lúc này.';
+      await _tts.speak(_aiResponse);
+      _state = AiState.idle;
+    }
+    notifyListeners();
+  }
+
+  Future<void> summarizeVideo(Message message) async {
+    final videoUrl = message.mediaUrl ?? message.content ?? '';
+    if (videoUrl.isEmpty) return;
+
+    _state = AiState.thinking;
+    _isMascotVisible = true;
+    notifyListeners();
+
+    try {
+      final prompt = "Hãy đóng vai một trợ lý thông minh, xem xét nội dung (nếu là video nội bộ) hoặc URL video này: $videoUrl. Hãy tóm tắt nội dung chính hoặc cho tôi biết đây là loại video gì. Trả lời ngắn gọn.";
+      final response = await _aiService.chat(prompt, analyzeIntent: false);
+      
+      _aiResponse = response['textReply'] ?? '';
+
+      if (_aiResponse.isNotEmpty) {
+        _state = AiState.speaking;
+        notifyListeners();
+        await _tts.speak(_aiResponse);
+      }
+
+      _state = AiState.idle;
+    } catch (e) {
+      debugPrint('AI Video Summary Error: $e');
+      _aiResponse = 'Tôi gặp khó khăn khi truy cập video này.';
+      await _tts.speak(_aiResponse);
+      _state = AiState.idle;
+    }
+    notifyListeners();
+  }
+
   void _executeSystemAction(String command, dynamic params) {
      debugPrint('AI System Action: $command with params $params');
      // Future logic to trigger calls or navigation

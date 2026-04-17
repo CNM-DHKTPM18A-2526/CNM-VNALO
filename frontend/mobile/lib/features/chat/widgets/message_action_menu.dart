@@ -41,7 +41,9 @@ class MessageActionMenu extends StatelessWidget {
         _buildActionItem(context, 'multi', common.selectMultiAction, Icons.check_circle_outline_rounded, const Color(0xFF1976D2)),
         
         _buildActionItem(context, 'quick', common.quickReplyAction, Icons.bolt_rounded, const Color(0xFF1976D2)),
-        _buildActionItem(context, 'translate', common.translateAction, Icons.translate_rounded, const Color(0xFF4CAF50), labelExtra: common.newTagLabel),
+        _buildActionItem(context, 'ai_translate', 'Dịch bằng AI', Icons.translate_rounded, const Color(0xFF4CAF50), labelExtra: common.newTagLabel),
+        if (message.messageType == MessageType.VIDEO || (message.content?.contains('http') ?? false))
+           _buildActionItem(context, 'summarize_video', 'Tóm tắt Video', Icons.smart_display_outlined, Colors.redAccent),
         _buildActionItem(context, 'tts', common.speakAction, Icons.volume_up_outlined, const Color(0xFF9C27B0), labelExtra: common.newTagLabel),
         _buildActionItem(context, 'info', common.detailsAction, Icons.info_outline_rounded, Colors.blueGrey),
         
@@ -60,8 +62,9 @@ class MessageActionMenu extends StatelessWidget {
         _buildActionItem(context, 'reminder', common.reminderAction, Icons.access_time_rounded, const Color(0xFFE65100)),
         _buildActionItem(context, 'multi', common.selectMultiAction, Icons.check_circle_outline_rounded, const Color(0xFF1976D2)),
         _buildActionItem(context, 'quick', common.quickReplyAction, Icons.bolt_rounded, const Color(0xFF1976D2)),
-        
-        _buildActionItem(context, 'translate', common.translateAction, Icons.translate_rounded, const Color(0xFF4CAF50), labelExtra: common.newTagLabel),
+        _buildActionItem(context, 'ai_translate', 'Dịch bằng AI', Icons.translate_rounded, const Color(0xFF4CAF50), labelExtra: common.newTagLabel),
+        if (message.messageType == MessageType.VIDEO || (message.content?.contains('http') ?? false))
+           _buildActionItem(context, 'summarize_video', 'Tóm tắt Video', Icons.smart_display_outlined, Colors.redAccent),
         _buildActionItem(context, 'tts', common.speakAction, Icons.volume_up_outlined, const Color(0xFF9C27B0), labelExtra: common.newTagLabel),
         _buildActionItem(context, 'info', common.detailsAction, Icons.info_outline_rounded, Colors.blueGrey),
         _buildActionItem(context, 'delete', common.deleteForMeAction, Icons.delete_outline_rounded, Colors.redAccent),

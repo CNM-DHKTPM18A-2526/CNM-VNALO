@@ -286,6 +286,12 @@ class MessageBubble extends StatelessWidget {
         if (action == 'ask_ai') {
           final aiProvider = context.read<AiAssistantProvider>();
           aiProvider.analyzeMessageContext(message);
+        } else if (action == 'ai_translate') {
+          final aiProvider = context.read<AiAssistantProvider>();
+          aiProvider.translateMessage(message);
+        } else if (action == 'summarize_video') {
+          final aiProvider = context.read<AiAssistantProvider>();
+          aiProvider.summarizeVideo(message);
         } else if (action == 'reply') {
           if (onReplyAction != null) {
             onReplyAction!(message);
