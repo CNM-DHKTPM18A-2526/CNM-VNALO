@@ -163,16 +163,25 @@ export function searchConversationsLocal(keyword: string): ConversationSummary[]
   })
 }
 
-/**
- * Search users by phone number (exact match or prefix)
- */
 export function searchUsersByPhoneLocal(phoneNumber: string): CachedUser[] {
   if (!phoneNumber || phoneNumber.length < 2) return []
 
-  const normalizedPhone = phoneNumber.replace(/\D/g, '') // Remove non-digits
+  const normalize = (p: string) => {
+    let digits = p.replace(/\D/g, '')
+    if (digits.startsWith('0')) {
+      digits = '84' + digits.substring(1)
+    }
+    return digits
+  }
+
+  const searchDigits = normalize(phoneNumber)
+  if (!searchDigits) return []
+
   return memoryCache.users.filter((user) => {
-    const userPhone = (user.phone ?? '').replace(/\D/g, '')
-    return userPhone.includes(normalizedPhone) || normalizedPhone.includes(userPhone)
+    const userPhone = normalize(user.phone ?? '')
+    if (!userPhone) return false // Skip users without phone numbers
+
+    return userPhone.includes(searchDigits) || searchDigits.includes(userPhone)
   })
 }
 

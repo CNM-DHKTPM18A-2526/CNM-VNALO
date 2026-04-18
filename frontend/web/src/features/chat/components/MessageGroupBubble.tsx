@@ -11,8 +11,8 @@ type MessageGroupBubbleProps = {
   reactionStatesByMessage: Record<string, { reactions: MessageReactionMap }>
   onAddReaction: (messageId: string, reactionKey: ReactionKey) => void
   onRemoveReaction: (messageId: string, reactionKey: ReactionKey) => void
-  onMessageContextMenuAction: (messageId: string, action: MessageContextMenuAction, message: ChatMessage) => void
-  pinnedMessageIds: Record<string, boolean>
+  onMessageContextMenuAction: (messageId: string, action: MessageContextMenuAction, message: ChatMessage, groupMessages?: ChatMessage[]) => void
+  pinnedMessages: ChatMessage[]
   starredMessageIds: Record<string, boolean>
   recalledMessageIds: Record<string, boolean>
   isMultiSelectMode: boolean
@@ -26,6 +26,8 @@ type MessageGroupBubbleProps = {
   isIncoming: boolean
   isFirstInCluster: boolean
   isGroupConversation: boolean
+  onOpenUserProfile?: (userId: string) => void
+  isRecalled?: boolean
 }
 
 export function MessageGroupBubble({
@@ -38,7 +40,7 @@ export function MessageGroupBubble({
   onAddReaction,
   onRemoveReaction,
   onMessageContextMenuAction,
-  pinnedMessageIds,
+  pinnedMessages,
   starredMessageIds,
   recalledMessageIds,
   isMultiSelectMode,
@@ -49,15 +51,12 @@ export function MessageGroupBubble({
   currentUserId,
   handleReplyAction,
   handleJumpToMessage,
-  isIncoming,
-  isFirstInCluster,
-  isGroupConversation,
+  onOpenUserProfile,
+  isRecalled,
 }: MessageGroupBubbleProps) {
   if (messages.length === 0) return null;
 
-  const firstMsg = messages[0];
   const lastMsg = messages[messages.length - 1];
-  const type = firstMsg.type;
 
   // We wrap the entire group in a container that looks like a single message visually
   // but internally it maps over individual MessageBubbles with special 'isGroupedContent' flag
@@ -97,9 +96,9 @@ export function MessageGroupBubble({
       senderAvatarUrl={senderAvatarUrl}
       showAvatar={showAvatar}
       showSenderName={showSenderName}
-      isPinned={Boolean(pinnedMessageIds[lastMsg.id])}
+      isPinned={Boolean(pinnedMessages.find(pm => pm.id === lastMsg.id))}
       isStarred={Boolean(starredMessageIds[lastMsg.id])}
-      isRecalled={Boolean(recalledMessageIds[lastMsg.id])}
+      isRecalled={isRecalled || Boolean(recalledMessageIds[lastMsg.id])}
       isMultiSelectMode={isMultiSelectMode}
       isSelected={selectedMessageIds.includes(lastMsg.id)}
       onToggleSelection={() => onToggleMessageSelection?.(lastMsg.id)}
@@ -116,6 +115,7 @@ export function MessageGroupBubble({
       // New props for grouped rendering
       isVirtualGroup={true}
       groupedMessages={messages} // Pass full list for per-item context/reactions
+      onOpenUserProfile={onOpenUserProfile}
     />
   );
 }

@@ -56,6 +56,8 @@ type MessageBubbleProps = {
   currentUserId?: string
   onReply?: () => void
   onJumpToOriginal?: (messageId: string) => void
+  onOpenUserProfile?: (userId: string) => void
+  isGroupedWithNext?: boolean
 }
 
 const HOVER_HIDE_DELAY_MS = 180
@@ -86,6 +88,7 @@ export function MessageBubble({
   currentUserId,
   onReply,
   onJumpToOriginal,
+  onOpenUserProfile,
 }: MessageBubbleProps) {
   const { userMap } = useUserStore()
   const { openImageViewerByMessageId } = useImageViewer()
@@ -105,6 +108,14 @@ export function MessageBubble({
     isGroupedWithPrevious ? 'message-grouped-prev' : '',
     isGroupedWithNext ? 'message-grouped-next' : '',
   ].filter(Boolean).join(' ')
+
+  const handleAvatarClick = (e: ReactMouseEvent) => {
+    e.stopPropagation()
+    const targetUserId = isMyMessage ? currentUserId : message.senderId
+    if (targetUserId) {
+      onOpenUserProfile?.(targetUserId)
+    }
+  }
 
   const hideTimerRef = useRef<number | null>(null)
   const [supportsHover, setSupportsHover] = useState(true)
@@ -377,7 +388,10 @@ export function MessageBubble({
   return (
     <div className={message.sender === 'me' ? 'message-row message-row-me' : 'message-row'} data-message-id={message.id}>
       {!isMyMessage ? (
-        <div className={showAvatar ? 'message-row-avatar' : 'message-row-avatar message-row-avatar-spacer'}>
+        <div 
+          className={showAvatar ? 'message-row-avatar cursor-pointer hover:opacity-80 transition-opacity' : 'message-row-avatar message-row-avatar-spacer'}
+          onClick={showAvatar ? handleAvatarClick : undefined}
+        >
           {showAvatar ? <UserAvatar name={senderName || 'Người dùng'} imageUrl={senderAvatarUrl} size='sm' /> : null}
         </div>
       ) : null}
@@ -458,6 +472,7 @@ export function MessageBubble({
             onClose={closeContextMenu}
             onAction={handleContextMenuAction}
             isVirtualGroup={isVirtualGroup}
+            isPinned={isPinned}
           />
         ) : null}
 
@@ -540,7 +555,7 @@ export function MessageBubble({
                       event.stopPropagation()
                       openImageViewerByMessageId(originalMessageId)
                     }}
-                    onContextMenu={(e) => {
+                    onContextMenu={(_e) => {
                       if (isVirtualGroup && groupedMessages.length > 0) {
                         const targetMsg = groupedMessages.find(m => m.id === originalMessageId) || message;
                         onContextMenuAction?.('recall', targetMsg); // Default action just to trigger handleContextMenu from child if possible
@@ -609,12 +624,11 @@ export function MessageBubble({
             </p>
           )}
 
-          {!isGroupedWithNext && (
             <time>
+              {isPinned && <Icon name='pin' size={10} className='message-pin-icon inline-block mr-1' />}
               {message.timestamp}
               {statusLabel}
             </time>
-          )}
         </article>
 
         <MessageReactionSummary reactions={reactions} onRemoveReaction={onRemoveReaction} />
