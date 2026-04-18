@@ -192,19 +192,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
               child: ListView.separated(
                 itemCount: chatProvider.conversations.length + 1,
                 separatorBuilder: (context, index) {
-                  return Container(
-                    color: isDarkMode ? DarkColors.surface : Colors.white,
-                    child: Row(
-                      children: [
-                        const SizedBox(width: 80),
-                        Expanded(
-                          child: Container(
-                            height: 0.6,
-                            color: dividerColor,
-                          ),
-                        ),
-                      ],
-                    ),
+                  if (index == 0) return const SizedBox.shrink(); // No separator after header
+                  return Divider(
+                    height: 1,
+                    thickness: 0.5,
+                    indent: 80,
+                    color: dividerColor,
                   );
                 },
                 itemBuilder: (context, index) {
