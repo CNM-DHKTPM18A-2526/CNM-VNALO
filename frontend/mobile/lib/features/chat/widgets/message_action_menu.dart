@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
+import 'package:vnalo_mobile/models/conversation_enums.dart';
 
 class MessageActionMenu extends StatelessWidget {
   final Message message;

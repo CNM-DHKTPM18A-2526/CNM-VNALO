@@ -3,6 +3,7 @@ enum Environment { dev, staging, production }
 class EnvConfig {
   final Environment environment;
   final String coreServiceUrl;
+  final String messageServiceUrl;
   final String mediaServiceUrl;
   final String socketUrl;
   final String aiServiceUrl;

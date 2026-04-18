@@ -34,6 +34,8 @@ class AppConfig {
   /// This method should be called at the start of the app before accessing the configuration.
   static void initialize(
     Environment env, {
+    String? coreServiceUrl,
+    String? messageServiceUrl,
     String? mediaServiceUrl,
     String? socketUrl,
     String? aiServiceUrl,
