@@ -210,42 +210,39 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble> with SingleTickerPr
                     children: [
                       _buildBubbleIndicator(aiProvider),
                       const SizedBox(height: 8),
-                      AnimatedBuilder(
-                        animation: _pulseController,
-                        builder: (context, child) {
-                          final isSpeaking = aiProvider.state == AiState.speaking;
-                          final dy = isSpeaking ? sin(_pulseController.value * pi) * -5.0 : 0.0;
-                          return Transform.translate(
-                            offset: Offset(0, dy),
-                            child: Container(
-                              width: 120,
-                              height: 120,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: RadialGradient(
-                                  colors: [
-                                    isSpeaking 
-                                      ? Colors.greenAccent.withOpacity(0.3 + 0.2 * _pulseController.value) 
-                                      : Colors.blue.withOpacity(0.1),
-                                    Colors.transparent,
-                                  ],
-                                  stops: const [0.5, 1.0],
-                                ),
-                              ),
-                              child: child,
-                            ),
-                          );
-                        },
+                      Container(
+                        width: 120,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              aiProvider.state == AiState.speaking
+                                ? Colors.greenAccent.withOpacity(0.3)
+                                : Colors.blue.withOpacity(0.1),
+                              Colors.transparent,
+                            ],
+                            stops: const [0.5, 1.0],
+                          ),
+                        ),
                         child: ClipOval(
                           child: O3D(
                             key: ValueKey(aiProvider.currentMascot.id), // Force rebuild
                             controller: _o3dController,
                             src: aiProvider.currentMascot.modelUrl,
                             autoPlay: true,
-                            cameraTarget: CameraTarget(0, 0, 0),
+                            cameraTarget: aiProvider.state == AiState.thinking 
+                              ? CameraTarget(0, 0.5, 0) // Look up at head when thinking
+                              : CameraTarget(0, 0, 0),
                             cameraOrbit: CameraOrbit(0, 75, 105),
                           ),
                         ),
+                      ),
+                      // Auto-trigger animations based on provider state
+                      _AnimationListener(
+                        state: aiProvider.state,
+                        emotion: aiProvider.currentEmotion,
+                        controller: _o3dController,
                       ),
                       if (aiProvider.state != AiState.idle && aiProvider.state != AiState.speaking)
                         Padding(
@@ -306,4 +303,53 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble> with SingleTickerPr
       ),
     );
   }
+}
+
+/// Helper widget to bridge Provider state to O3D controller animations
+class _AnimationListener extends StatefulWidget {
+  final AiState state;
+  final String emotion;
+  final O3DController controller;
+
+  const _AnimationListener({
+    required this.state,
+    required this.emotion,
+    required this.controller,
+  });
+
+  @override
+  State<_AnimationListener> createState() => _AnimationListenerState();
+}
+
+class _AnimationListenerState extends State<_AnimationListener> {
+  @override
+  void didUpdateWidget(_AnimationListener oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.state != widget.state || oldWidget.emotion != widget.emotion) {
+      _applyAnimation();
+    }
+  }
+
+  void _applyAnimation() {
+    if (widget.state == AiState.speaking) {
+       widget.controller.play(animationName: 'Talking');
+    } else if (widget.state == AiState.thinking) {
+       widget.controller.play(animationName: 'Walking'); // "Pacing" while thinking
+    } else {
+      // Handle Emotions
+      switch (widget.emotion) {
+        case 'joyful':
+          widget.controller.play(animationName: 'Dance');
+          break;
+        case 'angry':
+          widget.controller.play(animationName: 'Angry');
+          break;
+        default:
+          widget.controller.play(animationName: 'Idle');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
 }

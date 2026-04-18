@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
@@ -26,11 +26,13 @@ import 'dart:async';
 class ChatDetailScreen extends StatefulWidget {
   final Conversation conversation;
   final User? friendUser;
+  final String? prefilledText;
 
   const ChatDetailScreen({
     super.key,
     required this.conversation,
     this.friendUser,
+    this.prefilledText,
   });
 
   @override
@@ -515,6 +517,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   ChatInputBar(
                     conversationId: conv.id,
                     onSend: (text) => chat.sendMessage(conversationId: conv.id, content: text),
+                    initialText: widget.prefilledText,
                   )
                 else
                   _buildReadOnlyBanner(),

@@ -9,6 +9,10 @@ import 'package:vnalo_mobile/features/discover/screens/discover_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/profile_screen.dart';
 import 'package:vnalo_mobile/features/timeline/screens/home_wall_screen.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
+import 'package:vnalo_mobile/features/chat/screens/chat_detail_screen.dart';
+import 'package:vnalo_mobile/features/call/screens/voice_call_screen.dart';
+import 'package:vnalo_mobile/features/call/screens/video_call_screen.dart';
+import 'package:vnalo_mobile/features/call/utils/call_utils.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
 import 'dart:async';
 
@@ -21,7 +25,7 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
-  StreamSubscription<String>? _actionSub;
+  StreamSubscription<AiCommand>? _actionSub;
 
   @override
   void initState() {
@@ -48,14 +52,87 @@ class _MainShellState extends State<MainShell> {
     }
   }
 
-  void _handleAiSystemAction(String command) {
-    final normalizedCommand = _normalizeAiSystemAction(command);
-    if (normalizedCommand == 'NAVIGATE_TO_SETTINGS') {
-      setState(() => _currentIndex = 4); // Chuyển sang Tab Cá nhân
-    } else if (normalizedCommand == 'NAVIGATE_TO_SCANNER') {
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const QrScannerScreen()));
-    } else if (normalizedCommand == 'NAVIGATE_TO_CHAT') {
-      setState(() => _currentIndex = 0);
+  void _handleAiSystemAction(AiCommand aiCmd) {
+    final chatProvider = context.read<ChatProvider>();
+    final command = _normalizeAiSystemAction(aiCmd.command);
+    final params = aiCmd.params as Map<String, dynamic>?;
+
+    debugPrint('AI System Action Triggered: $command with params: $params');
+
+    switch (command) {
+      case 'NAVIGATE_TO_SETTINGS':
+        setState(() => _currentIndex = 4);
+        break;
+      case 'NAVIGATE_TO_CHAT':
+        setState(() => _currentIndex = 0);
+        break;
+      case 'NAVIGATE_TO_SCANNER':
+        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const QrScannerScreen()));
+        break;
+      case 'NAVIGATE_TO_TIMELINE':
+        setState(() => _currentIndex = 3);
+        break;
+        
+      case 'OPEN_CHAT':
+      case 'SEND_MESSAGE':
+      case 'START_CALL':
+        final targetName = params?['target'] ?? params?['recipient'] ?? '';
+        final conversation = chatProvider.findConversationByName(targetName);
+        
+        if (conversation == null) {
+          debugPrint('AI Resolution Failed: Could not find conversation for "$targetName"');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Không tìm thấy "$targetName" trong danh bạ.'),
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: Colors.redAccent,
+              ),
+            );
+          }
+          return;
+        }
+
+        if (command == 'OPEN_CHAT' || command == 'SEND_MESSAGE') {
+          Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => ChatDetailScreen(
+              conversation: conversation,
+              prefilledText: command == 'SEND_MESSAGE' ? params?['content'] : null,
+            ),
+          ));
+        } else if (command == 'START_CALL') {
+          final isVideo = params?['callType'] == 'video';
+          Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => isVideo
+              ? VideoCallScreen(
+                  conversationId: conversation.id,
+                  callId: generateCallId(conversationId: conversation.id, callerId: chatProvider.currentUserId!),
+                  peerId: conversation.isDirect ? (conversation.members.firstWhere((m) => m.userId != chatProvider.currentUserId).userId) : '',
+                  peerName: conversation.displayName,
+                )
+              : VoiceCallScreen(
+                  conversationId: conversation.id,
+                  callId: generateCallId(conversationId: conversation.id, callerId: chatProvider.currentUserId!),
+                ),
+          ));
+        }
+        break;
+
+      case 'RECALL_MESSAGE':
+        if (chatProvider.activeConversationId != null && chatProvider.messages.isNotEmpty) {
+          try {
+            final lastMsg = chatProvider.messages.firstWhere(
+              (m) => m.senderId == chatProvider.currentUserId,
+            );
+            chatProvider.recallMessage(lastMsg.id, chatProvider.activeConversationId!);
+          } catch (_) {
+             debugPrint('AI Recall Failed: No recent message found from self');
+          }
+        }
+        break;
+
+      default:
+        debugPrint('Unknown AI Command: $command');
     }
   }
 

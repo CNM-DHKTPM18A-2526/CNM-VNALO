@@ -17,6 +17,7 @@ class AiAssistantProvider with ChangeNotifier {
   AiState _state = AiState.idle;
   String _lastWords = '';
   String _aiResponse = '';
+  String _currentEmotion = 'thinking';
   bool _isMascotVisible = true;
   MascotMetadata _currentMascot = MascotMetadata.defaultMascots.first;
   bool _enableDeepSummary = false; // VIP only feature (Currently disabled by default)
@@ -33,6 +34,7 @@ class AiAssistantProvider with ChangeNotifier {
   AiState get state => _state;
   String get lastWords => _lastWords;
   String get aiResponse => _aiResponse;
+  String get currentEmotion => _currentEmotion;
   bool get isMascotVisible => _isMascotVisible;
   Stream<String> get systemActionStream => _systemActionController.stream;
 
@@ -129,13 +131,13 @@ class AiAssistantProvider with ChangeNotifier {
       // Build context-aware prompt using session history
       String contextPrompt = '';
       if (_sessionHistory.isNotEmpty) {
-        contextPrompt += "Lịch sử trò chuyện ngắn gọn ngữ cảnh:\n";
+        contextPrompt += "Lịch sử trò chuyện gần đây:\n";
         for (var msg in _sessionHistory) {
           contextPrompt += "${msg['role']}: ${msg['text']}\n";
         }
         contextPrompt += "---\n";
       }
-      contextPrompt += "Yêu cầu mới: $text";
+      contextPrompt += text;
 
       final response = await _aiService.chat(
         contextPrompt, 
@@ -144,14 +146,15 @@ class AiAssistantProvider with ChangeNotifier {
       );
       
       _aiResponse = response['textReply'] ?? '';
+      _currentEmotion = response['emotion'] ?? 'joyful';
       final actionCommand = response['actionCommand'];
       final actionParams = response['actionParams'];
 
       // Save to history to maintain context
       _sessionHistory.add({'role': 'User', 'text': text});
       _sessionHistory.add({'role': 'AI', 'text': _aiResponse});
-      if (_sessionHistory.length > 8) {
-        _sessionHistory.removeRange(0, _sessionHistory.length - 8); // Keep last 4 turns (8 messages)
+      if (_sessionHistory.length > 10) {
+        _sessionHistory.removeRange(0, _sessionHistory.length - 10);
       }
 
       if (actionCommand != null) {
@@ -165,14 +168,19 @@ class AiAssistantProvider with ChangeNotifier {
       }
 
       _state = AiState.idle;
+      _currentEmotion = 'thinking'; // Reset for next turn
     } catch (e) {
       debugPrint('AI Error: $e');
       _aiResponse = 'Xin lỗi, tôi đang gặp chút trục trặc mạng.';
+      _currentEmotion = 'thinking';
+      _state = AiState.speaking;
       notifyListeners();
       await _tts.speak(_aiResponse);
       _state = AiState.idle;
+    } finally {
+      _state = AiState.idle;
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   Future<void> analyzeMessageContext(Message message) async {
@@ -265,11 +273,18 @@ class AiAssistantProvider with ChangeNotifier {
 
   void _executeSystemAction(String command, dynamic params) {
      debugPrint('Executing System Action: $command with params: $params');
-     _systemActionController.add(command);
+     _systemActionController.add(AiCommand(command: command, params: params));
   }
 
   void clearAiResponse() {
     _aiResponse = '';
     notifyListeners();
   }
+}
+
+class AiCommand {
+  final String command;
+  final dynamic params;
+
+  AiCommand({required this.command, this.params});
 }

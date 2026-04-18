@@ -16,6 +16,8 @@ class ChatInputBar extends StatefulWidget {
   final Future<void> Function(List<String> videoPaths)? onSendVideos;
   final Future<void> Function(List<String> filePaths)? onSendFiles;
 
+  final String? initialText;
+
   const ChatInputBar({
     super.key,
     required this.conversationId,
@@ -23,6 +25,7 @@ class ChatInputBar extends StatefulWidget {
     this.onSendImages,
     this.onSendVideos,
     this.onSendFiles,
+    this.initialText,
   });
 
   @override
@@ -36,6 +39,15 @@ class _ChatInputBarState extends State<ChatInputBar> {
   
   bool _hasText = false;
   bool _showStickers = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialText != null && widget.initialText!.isNotEmpty) {
+      _controller.text = widget.initialText!;
+      _hasText = true;
+    }
+  }
 
   @override
   void dispose() {

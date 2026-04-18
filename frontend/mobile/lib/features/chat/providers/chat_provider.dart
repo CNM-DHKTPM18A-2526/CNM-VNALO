@@ -1496,5 +1496,31 @@ class ChatProvider extends ChangeNotifier {
     } catch (e) {
       return [];
     }
+  /// Find a conversation by name (Friend name or Group title) for AI resolution
+  Conversation? findConversationByName(String name) {
+    if (name.isEmpty) return null;
+    final search = name.toLowerCase().trim();
+    
+    // 1. Exact match (case insensitive)
+    try {
+      return _conversations.firstWhere(
+        (c) {
+          final title = (c.isDirect ? c.displayName : c.title)?.toLowerCase() ?? '';
+          return title == search;
+        },
+      );
+    } catch (_) {
+      // 2. Fuzzy match (contains)
+      try {
+        return _conversations.firstWhere(
+          (c) {
+            final title = (c.isDirect ? c.displayName : c.title)?.toLowerCase() ?? '';
+            return title.contains(search);
+          },
+        );
+      } catch (_) {
+        return null;
+      }
+    }
   }
 }
