@@ -6,7 +6,7 @@ class AiService {
 
   AiService(this._apiService);
 
-  Future<Map<String, dynamic>> chat(String prompt, {String? contextId, bool analyzeIntent = false}) async {
+  Future<Map<String, dynamic>> chat(String prompt, {String? contextId, bool analyzeIntent = false, bool enableDeepSummary = false}) async {
     try {
       final response = await _apiService.post(
         AppConfig.instance.aiServiceUrl,
@@ -15,14 +15,15 @@ class AiService {
           'prompt': prompt,
           'contextId': contextId,
           'analyzeIntent': analyzeIntent,
+          'enableDeepSummary': enableDeepSummary,
         },
       );
 
-      if (response.statusCode == 200) {
-        return response.data as Map<String, dynamic>;
-      } else {
-        throw Exception('AI_SERVICE_UNAVAILABLE');
+      final data = response['data'];
+      if (data is Map<String, dynamic>) {
+        return data;
       }
+      throw Exception('AI_SERVICE_UNAVAILABLE - INVALID DATA FORMAT');
     } catch (e) {
       rethrow;
     }

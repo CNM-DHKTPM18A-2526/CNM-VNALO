@@ -32,16 +32,19 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble> with SingleTickerPr
     super.initState();
     _animationController = AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
     _animationController.addListener(() {
-      if (_positionAnimation != null) {
-        setState(() {
+      final hasPositionUpdate = _positionAnimation != null;
+      final hasScaleUpdate = _scaleAnimation != null;
+      if (!hasPositionUpdate && !hasScaleUpdate) {
+        return;
+      }
+      setState(() {
+        if (hasPositionUpdate) {
           _position = _positionAnimation!.value;
-        });
-      }
-      if (_scaleAnimation != null) {
-        setState(() {
+        }
+        if (hasScaleUpdate) {
           _currentScale = _scaleAnimation!.value;
-        });
-      }
+        }
+      });
     });
 
     // Schedule an initial snap to edge so it starts properly

@@ -19,6 +19,7 @@ class AiAssistantProvider with ChangeNotifier {
   String _aiResponse = '';
   bool _isMascotVisible = true;
   MascotMetadata _currentMascot = MascotMetadata.defaultMascots.first;
+  bool _enableDeepSummary = false; // VIP only feature (Currently disabled by default)
 
   final List<Map<String, String>> _sessionHistory = [];
   final _systemActionController = StreamController<String>.broadcast();
@@ -136,7 +137,11 @@ class AiAssistantProvider with ChangeNotifier {
       }
       contextPrompt += "Yêu cầu mới: $text";
 
-      final response = await _aiService.chat(contextPrompt, analyzeIntent: true);
+      final response = await _aiService.chat(
+        contextPrompt, 
+        analyzeIntent: true,
+        enableDeepSummary: _enableDeepSummary,
+      );
       
       _aiResponse = response['textReply'] ?? '';
       final actionCommand = response['actionCommand'];

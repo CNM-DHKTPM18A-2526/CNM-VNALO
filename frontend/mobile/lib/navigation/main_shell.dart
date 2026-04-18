@@ -38,12 +38,23 @@ class _MainShellState extends State<MainShell> {
     super.dispose();
   }
 
+  String _normalizeAiSystemAction(String command) {
+    switch (command.trim().toUpperCase()) {
+      case 'START_CALL':
+        return 'NAVIGATE_TO_CHAT';
+      // Future mappings can go here
+      default:
+        return command.trim().toUpperCase();
+    }
+  }
+
   void _handleAiSystemAction(String command) {
-    if (command == 'NAVIGATE_TO_SETTINGS') {
+    final normalizedCommand = _normalizeAiSystemAction(command);
+    if (normalizedCommand == 'NAVIGATE_TO_SETTINGS') {
       setState(() => _currentIndex = 4); // Chuyển sang Tab Cá nhân
-    } else if (command == 'NAVIGATE_TO_SCANNER') {
+    } else if (normalizedCommand == 'NAVIGATE_TO_SCANNER') {
       Navigator.of(context).push(MaterialPageRoute(builder: (_) => const QrScannerScreen()));
-    } else if (command == 'NAVIGATE_TO_CHAT') {
+    } else if (normalizedCommand == 'NAVIGATE_TO_CHAT') {
       setState(() => _currentIndex = 0);
     }
   }

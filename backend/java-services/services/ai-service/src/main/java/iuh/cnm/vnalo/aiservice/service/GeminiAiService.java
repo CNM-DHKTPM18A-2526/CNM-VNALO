@@ -85,12 +85,28 @@ public class GeminiAiService {
             return AiChatResponse.builder().textReply("I'm sorry, I couldn't process that.").build();
         }
 
-        String rawText = candidates.get(0)
-                .path("content")
-                .path("parts")
-                .get(0)
-                .path("text")
-                .asText();
+        String fallbackText = "I'm sorry, I couldn't process that.";
+        JsonNode firstCandidate = candidates.get(0);
+        if (firstCandidate == null) {
+            return AiChatResponse.builder().textReply(fallbackText).build();
+        }
+        
+        JsonNode contentNode = firstCandidate.path("content");
+        if (contentNode.isMissingNode()) {
+            return AiChatResponse.builder().textReply(fallbackText).build();
+        }
+        
+        JsonNode partsNode = contentNode.path("parts");
+        if (partsNode.isMissingNode() || !partsNode.isArray() || partsNode.size() == 0) {
+            return AiChatResponse.builder().textReply(fallbackText).build();
+        }
+        
+        JsonNode firstPart = partsNode.get(0);
+        if (firstPart == null) {
+            return AiChatResponse.builder().textReply(fallbackText).build();
+        }
+        
+        String rawText = firstPart.path("text").asText();
 
         // 4. Intent parsing - Handle potential Markdown formatting from AI
         AiChatResponse response = new AiChatResponse();
