@@ -62,6 +62,16 @@ class AiAssistantProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> summonMascot() async {
+    _isMascotVisible = true;
+    notifyListeners();
+    // Start listening directly to create a seamless assistant feel
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (_state == AiState.idle) {
+      await startListening();
+    }
+  }
+
   Future<void> startListening() async {
     bool available = await _stt.initialize(
       onStatus: (status) => debugPrint('STT Status: $status'),

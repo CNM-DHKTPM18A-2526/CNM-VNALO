@@ -4,6 +4,8 @@ import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
 import 'package:vnalo_mobile/features/search/screens/unified_search_screen.dart';
 import 'package:vnalo_mobile/core/models/menu_item_model.dart';
+import 'package:provider/provider.dart';
+import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
 
 class DiscoverScreen extends StatelessWidget {
   const DiscoverScreen({super.key});
@@ -84,6 +86,16 @@ class DiscoverScreen extends StatelessWidget {
     final common = CommonTexts.of(context);
     return [
       MenuItem(
+        key: 'vnaloAi',
+        icon: Icons.psychology_outlined,
+        title: 'Trợ lý ảo VNALO AI',
+        subtitle: 'Hỏi đáp, dịch thuật & tóm tắt thông minh',
+        onTap: () {
+          final aiProvider = context.read<AiAssistantProvider>();
+          aiProvider.summonMascot();
+        },
+      ),
+      MenuItem(
         key: 'vnShop',
         icon: Icons.storefront,
         title: 'VNALO Shop',
@@ -121,6 +133,7 @@ class DiscoverScreen extends StatelessWidget {
           return Column(
             children: [
               _DiscoverItem(
+                itemKey: item.key,
                 icon: item.icon,
                 title: item.title,
                 subtitle: item.subtitle ?? '',
@@ -145,12 +158,14 @@ class DiscoverScreen extends StatelessWidget {
 }
 
 class _DiscoverItem extends StatelessWidget {
+  final String itemKey;
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback? onTap;
 
   const _DiscoverItem({
+    required this.itemKey,
     required this.icon,
     required this.title,
     required this.subtitle,
@@ -160,18 +175,27 @@ class _DiscoverItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final isPremium = itemKey == 'vnaloAi';
+
     return ListTile(
       leading: Container(
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: (isDarkMode ? DarkColors.primary : AppColors.primary).withValues(alpha: 0.1),
+          color: isPremium ? null : (isDarkMode ? DarkColors.primary : AppColors.primary).withValues(alpha: 0.1),
+          gradient: isPremium
+              ? const LinearGradient(
+                  colors: [Color(0xFF8A2387), Color(0xFFE94057), Color(0xFFF27121)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(icon, color: isDarkMode ? DarkColors.primary : AppColors.primary),
+        child: Icon(icon, color: isPremium ? Colors.white : (isDarkMode ? DarkColors.primary : AppColors.primary)),
       ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 16)),
-      subtitle: Text(subtitle),
+      title: Text(title, style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16, color: isPremium && isDarkMode ? Colors.orange.shade300 : null)),
+      subtitle: Text(subtitle, style: isPremium && isDarkMode ? TextStyle(color: Colors.orange.shade100.withOpacity(0.7)) : null),
       trailing: Icon(Icons.chevron_right, color: isDarkMode ? DarkColors.textHint : Colors.grey.shade300),
       onTap: onTap,
     );
