@@ -137,6 +137,7 @@ export const ChatList = memo(function ChatList({
           unreadCount: 0,
           online: false,
           lastMessageSeq: 0,
+          avatarUrl: user.avatarUrl ?? null,
         },
       }
     })
@@ -162,6 +163,7 @@ export const ChatList = memo(function ChatList({
           unreadCount: 0,
           online: false,
           lastMessageSeq: 0,
+          avatarUrl: friend.avatarUrl ?? null,
         },
       })
     }
