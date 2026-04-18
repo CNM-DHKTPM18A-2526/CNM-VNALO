@@ -11,9 +11,120 @@ class AiFloatingBubble extends StatefulWidget {
   State<AiFloatingBubble> createState() => _AiFloatingBubbleState();
 }
 
-class _AiFloatingBubbleState extends State<AiFloatingBubble> {
+class _AiFloatingBubbleState extends State<AiFloatingBubble> with SingleTickerProviderStateMixin {
   Offset _position = const Offset(20, 100);
   final O3DController _o3dController = O3DController();
+
+  bool _isDragging = false;
+  bool _isHoveringTrash = false;
+
+  late AnimationController _animationController;
+  Animation<Offset>? _positionAnimation;
+  Animation<double>? _scaleAnimation;
+
+  double _currentScale = 0.8; // Default compact size at edge
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
+    _animationController.addListener(() {
+      if (_positionAnimation != null) {
+        setState(() {
+          _position = _positionAnimation!.value;
+        });
+      }
+      if (_scaleAnimation != null) {
+        setState(() {
+          _currentScale = _scaleAnimation!.value;
+        });
+      }
+    });
+
+    // Schedule an initial snap to edge so it starts properly
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+         _snapToEdge();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  void _onPanStart(DragStartDetails details) {
+    _animationController.stop();
+    setState(() {
+      _isDragging = true;
+      _isHoveringTrash = false;
+      // Expand to full size when driving
+      _scaleAnimation = Tween<double>(begin: _currentScale, end: 1.0).animate(
+        CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+      );
+    });
+    _animationController.forward(from: 0);
+  }
+
+  void _onPanUpdate(DragUpdateDetails details) {
+    setState(() {
+      _position += details.delta;
+
+      final screenSize = MediaQuery.of(context).size;
+      final trashCenter = Offset(screenSize.width / 2, screenSize.height - 80);
+      
+      // Center of the 120x120 bubble
+      final mascotCenter = Offset(_position.dx + 60, _position.dy + 60);
+
+      // Hitbox logic (snap to trash)
+      if ((mascotCenter - trashCenter).distance < 80) {
+        _isHoveringTrash = true;
+        // Suction effect towards the trash bin
+        _position = Offset(screenSize.width / 2 - 60, screenSize.height - 140);
+      } else {
+        _isHoveringTrash = false;
+      }
+    });
+  }
+
+  void _onPanEnd(DragEndDetails details, AiAssistantProvider provider) {
+    setState(() {
+      _isDragging = false;
+    });
+
+    if (_isHoveringTrash) {
+      provider.hideMascot();
+      _isHoveringTrash = false;
+      _position = const Offset(20, 100); // Reset position
+      return;
+    }
+
+    _snapToEdge();
+  }
+
+  void _snapToEdge() {
+    final screenSize = MediaQuery.of(context).size;
+    final isLeft = _position.dx + 60 < screenSize.width / 2;
+    
+    final targetX = isLeft ? -10.0 : screenSize.width - 110.0; // Slightly off edge
+    double targetY = _position.dy;
+    
+    // Prevent hiding in top/bottom areas
+    if (targetY < 40) targetY = 40;
+    if (targetY > screenSize.height - 160) targetY = screenSize.height - 160;
+
+    _positionAnimation = Tween<Offset>(begin: _position, end: Offset(targetX, targetY)).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic),
+    );
+    
+    _scaleAnimation = Tween<double>(begin: _currentScale, end: 0.8).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic),
+    );
+    
+    _animationController.forward(from: 0);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,76 +132,108 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble> {
 
     if (!aiProvider.isMascotVisible) return const SizedBox.shrink();
 
-    return Positioned(
-      left: _position.dx,
-      top: _position.dy,
-      child: GestureDetector(
-        onPanUpdate: (details) {
-          setState(() {
-            _position += details.delta;
-          });
-        },
-        onTap: () {
-          if (aiProvider.state == AiState.idle) {
-            aiProvider.startListening();
-          } else {
-            aiProvider.stopListening();
-          }
-        },
-        onLongPress: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const MascotGalleryScreen()),
-          );
-        },
-        child: MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildBubbleIndicator(aiProvider),
-              const SizedBox(height: 8),
-              Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      Colors.blue.withOpacity(0.1),
-                      Colors.transparent,
-                    ],
+    return Positioned.fill(
+      child: Stack(
+        children: [
+          if (_isDragging)
+            Positioned(
+              bottom: 40,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: _isHoveringTrash ? 80 : 60,
+                  height: _isHoveringTrash ? 80 : 60,
+                  decoration: BoxDecoration(
+                    color: _isHoveringTrash ? Colors.redAccent.withOpacity(0.9) : Colors.black54,
+                    shape: BoxShape.circle,
+                    boxShadow: _isHoveringTrash
+                        ? [const BoxShadow(color: Colors.red, blurRadius: 20, spreadRadius: 5)]
+                        : [],
                   ),
-                ),
-                child: ClipOval(
-                  child: O3D(
-                    key: ValueKey(aiProvider.currentMascot.id), // Force rebuild when mascot changes
-                    controller: _o3dController,
-                    src: aiProvider.currentMascot.modelUrl,
-                    autoPlay: true,
-                    cameraTarget: CameraTarget(0, 0, 0),
-                    cameraOrbit: CameraOrbit(0, 75, 105),
+                  child: Icon(
+                    Icons.delete_outline,
+                    color: Colors.white,
+                    size: _isHoveringTrash ? 40 : 30,
                   ),
                 ),
               ),
-              if (aiProvider.state != AiState.idle)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.7),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      aiProvider.state == AiState.listening ? "Đang nghe..." : "...",
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
-                    ),
+            ),
+          Positioned(
+            left: _position.dx,
+            top: _position.dy,
+            child: GestureDetector(
+              onPanStart: _onPanStart,
+              onPanUpdate: _onPanUpdate,
+              onPanEnd: (details) => _onPanEnd(details, aiProvider),
+              onTap: () {
+                if (aiProvider.state == AiState.idle) {
+                  aiProvider.startListening();
+                } else {
+                  aiProvider.stopListening();
+                }
+              },
+              onLongPress: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const MascotGalleryScreen()),
+                );
+              },
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: Transform.scale(
+                  scale: _currentScale,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildBubbleIndicator(aiProvider),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: 120,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              Colors.blue.withOpacity(0.1),
+                              Colors.transparent,
+                            ],
+                          ),
+                        ),
+                        child: ClipOval(
+                          child: O3D(
+                            key: ValueKey(aiProvider.currentMascot.id), // Force rebuild
+                            controller: _o3dController,
+                            src: aiProvider.currentMascot.modelUrl,
+                            autoPlay: true,
+                            cameraTarget: CameraTarget(0, 0, 0),
+                            cameraOrbit: CameraOrbit(0, 75, 105),
+                          ),
+                        ),
+                      ),
+                      if (aiProvider.state != AiState.idle)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.7),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              aiProvider.state == AiState.listening ? "Đang nghe..." : "...",
+                              style: const TextStyle(color: Colors.white, fontSize: 12),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-            ],
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

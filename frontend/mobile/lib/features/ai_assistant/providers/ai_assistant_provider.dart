@@ -62,6 +62,12 @@ class AiAssistantProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  void hideMascot() {
+    _isMascotVisible = false;
+    stopListening();
+    notifyListeners();
+  }
+
   Future<void> summonMascot() async {
     _isMascotVisible = true;
     notifyListeners();
