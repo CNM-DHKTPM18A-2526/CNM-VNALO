@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
+import 'package:vnalo_mobile/models/conversation_enums.dart';
 
 class MessageActionMenu extends StatelessWidget {
   final Message message;
@@ -31,6 +32,7 @@ class MessageActionMenu extends StatelessWidget {
     if (isMine) {
       // Image 2 Order (Mine)
       actionItems.addAll([
+        _buildActionItem(context, 'ask_ai', 'Hỏi VNALO', Icons.psychology_outlined, const Color(0xFF4CAF50)),
         _buildActionItem(context, 'reply', common.replyAction, Icons.reply_rounded, const Color(0xFF9C27B0)),
         _buildActionItem(context, 'forward', common.forwardAction, Icons.forward_rounded, const Color(0xFF2196F3)),
         if (!isCloud) _buildActionItem(context, 'save', common.saveToDocsAction, Icons.folder_open_outlined, const Color(0xFF03A9F4)),
@@ -48,7 +50,9 @@ class MessageActionMenu extends StatelessWidget {
         _buildActionItem(context, 'multi', common.selectMultiAction, Icons.check_circle_outline_rounded, const Color(0xFF1976D2)),
         
         _buildActionItem(context, 'quick', common.quickReplyAction, Icons.bolt_rounded, const Color(0xFF1976D2)),
-        _buildActionItem(context, 'translate', common.translateAction, Icons.translate_rounded, const Color(0xFF4CAF50), labelExtra: common.newTagLabel),
+        _buildActionItem(context, 'ai_translate', 'Dịch bằng AI', Icons.translate_rounded, const Color(0xFF4CAF50), labelExtra: common.newTagLabel),
+        if (message.messageType == MessageType.VIDEO || (message.content?.contains('http') ?? false))
+           _buildActionItem(context, 'summarize_video', 'Tóm tắt Video', Icons.smart_display_outlined, Colors.redAccent),
         _buildActionItem(context, 'tts', common.speakAction, Icons.volume_up_outlined, const Color(0xFF9C27B0), labelExtra: common.newTagLabel),
         _buildActionItem(context, 'info', common.detailsAction, Icons.info_outline_rounded, Colors.blueGrey),
         
@@ -57,6 +61,7 @@ class MessageActionMenu extends StatelessWidget {
     } else {
       // Image 1 Order (Other)
       actionItems.addAll([
+        _buildActionItem(context, 'ask_ai', 'Hỏi VNALO', Icons.psychology_outlined, const Color(0xFF4CAF50)),
         _buildActionItem(context, 'reply', common.replyAction, Icons.reply_rounded, const Color(0xFF9C27B0)),
         _buildActionItem(context, 'forward', common.forwardAction, Icons.forward_rounded, const Color(0xFF2196F3)),
         if (!isCloud) _buildActionItem(context, 'save', common.saveToDocsAction, Icons.folder_open_outlined, const Color(0xFF03A9F4)),
@@ -72,8 +77,9 @@ class MessageActionMenu extends StatelessWidget {
         _buildActionItem(context, 'reminder', common.reminderAction, Icons.access_time_rounded, const Color(0xFFE65100)),
         _buildActionItem(context, 'multi', common.selectMultiAction, Icons.check_circle_outline_rounded, const Color(0xFF1976D2)),
         _buildActionItem(context, 'quick', common.quickReplyAction, Icons.bolt_rounded, const Color(0xFF1976D2)),
-        
-        _buildActionItem(context, 'translate', common.translateAction, Icons.translate_rounded, const Color(0xFF4CAF50), labelExtra: common.newTagLabel),
+        _buildActionItem(context, 'ai_translate', 'Dịch bằng AI', Icons.translate_rounded, const Color(0xFF4CAF50), labelExtra: common.newTagLabel),
+        if (message.messageType == MessageType.VIDEO || (message.content?.contains('http') ?? false))
+           _buildActionItem(context, 'summarize_video', 'Tóm tắt Video', Icons.smart_display_outlined, Colors.redAccent),
         _buildActionItem(context, 'tts', common.speakAction, Icons.volume_up_outlined, const Color(0xFF9C27B0), labelExtra: common.newTagLabel),
         _buildActionItem(context, 'info', common.detailsAction, Icons.info_outline_rounded, Colors.blueGrey),
         _buildActionItem(context, 'delete', common.deleteForMeAction, Icons.delete_outline_rounded, Colors.redAccent),

@@ -38,6 +38,7 @@ class AppConfig {
     String? messageServiceUrl,
     String? mediaServiceUrl,
     String? socketUrl,
+    String? aiServiceUrl,
   }) {
     switch (env) {
       case Environment.dev:
@@ -56,6 +57,9 @@ class AppConfig {
               ),
           socketUrl: _normalizeSocketUrl(
             socketUrl ?? _buildServiceUrl(coreUri, 3000, ''),
+          ),
+          aiServiceUrl: _normalizeApiBaseUrl(
+            aiServiceUrl ?? _buildServiceUrl(coreUri, 8094, '/api/v1'),
           ),
           enableLogging: true,
         );
@@ -78,6 +82,9 @@ class AppConfig {
           socketUrl: _normalizeSocketUrl(
             socketUrl ?? 'https://staging-msg.vnalo.com',
           ),
+          aiServiceUrl: _normalizeApiBaseUrl(
+            aiServiceUrl ?? 'https://staging-ai.vnalo.com/api/v1',
+          ),
           enableLogging: true,
           enableCrashlytics: true,
         );
@@ -97,6 +104,9 @@ class AppConfig {
             mediaServiceUrl ?? 'https://media.vnalo.com/api/v1',
           ),
           socketUrl: _normalizeSocketUrl(socketUrl ?? 'https://msg.vnalo.com'),
+          aiServiceUrl: _normalizeApiBaseUrl(
+            aiServiceUrl ?? 'https://ai.vnalo.com/api/v1',
+          ),
           enableCrashlytics: true,
         );
         break;

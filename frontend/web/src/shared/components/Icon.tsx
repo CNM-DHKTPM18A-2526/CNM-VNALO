@@ -23,17 +23,22 @@ type IconName =
   | 'help'
   | 'close'
   | 'layoutSidebar'
-  | 'folder'
   | 'checkSquare'
   | 'cloud'
   | 'briefcase'
+  | 'folder'
+  | 'pin'
+  | 'copy'
+  | 'chevronUp'
+  | 'unfold_more'
 
 type IconProps = {
   name: IconName
   className?: string
+  size?: number | string
 }
 
-export function Icon({ name, className }: IconProps) {
+export function Icon({ name, className, size = 24 }: IconProps) {
   const commonProps = {
     viewBox: '0 0 24 24',
     fill: 'none',
@@ -42,6 +47,8 @@ export function Icon({ name, className }: IconProps) {
     strokeLinecap: 'round' as const,
     strokeLinejoin: 'round' as const,
     className,
+    width: size,
+    height: size,
     'aria-hidden': true,
   }
 
@@ -297,6 +304,41 @@ export function Icon({ name, className }: IconProps) {
     return (
       <svg {...commonProps}>
         <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
+      </svg>
+    )
+  }
+
+  if (name === 'pin') {
+    return (
+      <svg {...commonProps}>
+        <line x1='12' x2='12' y1='17' y2='22' />
+        <path d='M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z' />
+      </svg>
+    )
+  }
+
+  if (name === 'copy') {
+    return (
+      <svg {...commonProps}>
+        <rect x='9' y='9' width='13' height='13' rx='2' ry='2' />
+        <path d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1' />
+      </svg>
+    )
+  }
+
+  if (name === 'chevronUp') {
+    return (
+      <svg {...commonProps}>
+        <polyline points='18 15 12 9 6 15' />
+      </svg>
+    )
+  }
+
+  if (name === 'unfold_more') {
+    return (
+      <svg {...commonProps}>
+        <polyline points='7 15 12 20 17 15' />
+        <polyline points='7 9 12 4 17 9' />
       </svg>
     )
   }

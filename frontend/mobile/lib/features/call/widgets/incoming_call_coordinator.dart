@@ -105,26 +105,27 @@ class _IncomingCallCoordinatorState extends State<IncomingCallCoordinator> {
 
     debugPrint('[IncomingCallCoordinator] Received offer for callID=$callId');
 
-    // Wait for auth to be ready if needed
+    // Wait for auth to be ready if needed, but be less strict
     final auth = context.read<AuthProvider>();
-    if (!auth.isInitialized || auth.user == null) {
-      debugPrint('[IncomingCallCoordinator] Auth not ready, waiting...');
+    if (!auth.isInitialized || auth.accessToken == null) {
+      debugPrint('[IncomingCallCoordinator] Auth/Token not ready, waiting...');
       var checks = 0;
-      while ((!auth.isInitialized || auth.user == null) && checks < 10) {
+      while ((!auth.isInitialized || auth.accessToken == null) && checks < 8) {
         await Future.delayed(const Duration(milliseconds: 500));
         checks++;
       }
     }
 
-    final currentUserId = auth.user?.id;
-    if (currentUserId == null) {
-      debugPrint('[IncomingCallCoordinator] Auth failed after delay, ignoring offer');
+    final accessToken = auth.accessToken;
+    if (accessToken == null) {
+      debugPrint('[IncomingCallCoordinator] No token after delay, ignoring offer');
       return;
     }
 
+    final currentUserId = auth.user?.id;
     // If signal was meant for someone else, ignore (unlikely due to emitToUser)
     final targetUserId = signal['targetUserId']?.toString() ?? signal['toUserId']?.toString();
-    if (targetUserId != null && targetUserId != currentUserId) {
+    if (targetUserId != null && currentUserId != null && targetUserId != currentUserId) {
       debugPrint('[IncomingCallCoordinator] Signal reached wrong user: $targetUserId != $currentUserId');
       return;
     }

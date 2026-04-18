@@ -125,9 +125,19 @@ class WebRtcCallService extends ChangeNotifier {
     } catch (e) {
       _errorMessage = _mapInitError(e);
       debugPrint('$_logPrefix initialize() failed error=$_errorMessage');
+      _safeEndCall(); // Cleanup resources on initialization failure
     } finally {
       _isInitializing = false;
       notifyListeners();
+    }
+  }
+
+  /// Safely tears down all resources without throwing. Called on init failure.
+  void _safeEndCall() {
+    try {
+      endCall();
+    } catch (e) {
+      debugPrint('$_logPrefix emergency cleanup error: $e');
     }
   }
 

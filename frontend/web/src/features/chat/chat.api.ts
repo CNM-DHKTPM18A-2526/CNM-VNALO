@@ -426,12 +426,12 @@ export function mapRawMessage(raw: RawMessageLike, currentUserId: string): ChatM
     serverSeq,
     clientMessageId,
     deliveryState: 'sent',
-    replyTo: (raw.replyTo || raw.reply_to) ? (raw.replyTo || raw.reply_to) : (
-      (raw.replyToMessageId || (raw as any).reply_to_message_id) ? {
-        id: raw.replyToMessageId || (raw as any).reply_to_message_id,
-        senderId: raw.replyToSenderId || (raw as any).reply_to_sender_id,
+    replyTo: ((raw as any).replyTo || (raw as any).reply_to) ? ((raw as any).replyTo || (raw as any).reply_to) : (
+      ((raw as any).replyToMessageId || (raw as any).reply_to_message_id) ? {
+        id: (raw as any).replyToMessageId || (raw as any).reply_to_message_id,
+        senderId: (raw as any).replyToSenderId || (raw as any).reply_to_sender_id,
         senderName: 'Người dùng', // Will be resolved by UI via senderId
-        preview: raw.replyToContent || (raw as any).reply_to_content || '',
+        preview: (raw as any).replyToContent || (raw as any).reply_to_content || '',
         type: 'text' // Fallback type
       } : null
     ),

@@ -35,13 +35,15 @@ export type FriendStats = {
 
 export type UserLookupResult = {
   id: string
-  phone: string | null
-  email: string | null
+  phone?: string | null
+  email?: string | null
   displayName: string | null
   avatarUrl: string | null
   coverUrl: string | null
-  bio: string | null
+  bio?: string | null
   statusMessage: string | null
+  gender?: string | null
+  dob?: string | null
 }
 
 export type FriendshipStatus = {

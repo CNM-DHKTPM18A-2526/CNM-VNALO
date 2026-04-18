@@ -1,4 +1,4 @@
-import { CheckSquare2, ChevronRight, Copy, Info, Pin, Reply, RotateCcw, Star, Trash2 } from 'lucide-react'
+import { CheckSquare2, ChevronRight, Copy, Info, Pin, RotateCcw, Star, Trash2 } from 'lucide-react'
 import { forwardRef, useMemo } from 'react'
 
 import type { CSSProperties } from 'react'
@@ -19,6 +19,7 @@ type MessageContextMenuProps = {
   onClose: () => void
   onAction?: (action: MessageContextMenuAction) => void
   isVirtualGroup?: boolean
+  isPinned?: boolean
 }
 
 type MenuItemConfig = {
@@ -67,7 +68,7 @@ async function copyMessageToClipboard(text: string) {
 }
 
 export const MessageContextMenu = forwardRef<HTMLDivElement, MessageContextMenuProps>(function MessageContextMenu(
-  { message, isMyMessage, position, onClose, onAction, isVirtualGroup },
+  { message, isMyMessage, position, onClose, onAction, isVirtualGroup, isPinned },
   ref,
 ) {
   const menuStyle = useMemo<CSSProperties>(
@@ -117,7 +118,9 @@ export const MessageContextMenu = forwardRef<HTMLDivElement, MessageContextMenuP
               <span className='message-context-menu-item-icon'>
                 <IconComponent />
               </span>
-              <span className='message-context-menu-item-label'>{item.label}</span>
+              <span className='message-context-menu-item-label'>
+                {item.action === 'pin' ? (isPinned ? 'Bỏ ghim' : 'Ghim tin nhắn') : item.label}
+              </span>
             </button>
           )
         })}
