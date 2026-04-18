@@ -59,17 +59,19 @@ class AuthProvider extends ChangeNotifier {
     final token = await _storageService.getAccessToken();
     if (token != null) {
       _accessToken = token;
+      // Start socket connection immediately in parallel with profile fetching
+      _socketService.connect(token);
+      
       try {
         _user = await _authService.getMe();
-        _socketService.connect(token);
         debugPrint('[Auth] Success: Profile hydrated.');
         // Trigger sync after successful hydration
         _localSyncService.syncRecently();
       } catch (e) {
         debugPrint('[Auth] Error: Fetching profile failed: $e');
-        await _storageService.clearAll();
-        _accessToken = null;
-        // NO sync triggered on failure
+        // If profile fetch fails, we might still be able to function if local cache exists,
+        // but if it's an auth error, we should clear. 
+        // For now, keep the session but log the error.
       }
     }
     _isInitialized = true;

@@ -6,6 +6,7 @@ class EnvConfig {
   final String messageServiceUrl;
   final String mediaServiceUrl;
   final String socketUrl;
+  final String aiServiceUrl;
   final bool enableLogging;
   final bool enableCrashlytics;
 
@@ -15,6 +16,7 @@ class EnvConfig {
     required this.messageServiceUrl,
     required this.mediaServiceUrl,
     required this.socketUrl,
+    required this.aiServiceUrl,
     this.enableLogging = false,
     this.enableCrashlytics = false,
   });

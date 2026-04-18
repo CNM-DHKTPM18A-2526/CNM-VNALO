@@ -8,6 +8,9 @@ import 'package:vnalo_mobile/features/contacts/screens/contacts_screen.dart';
 import 'package:vnalo_mobile/features/discover/screens/discover_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/profile_screen.dart';
 import 'package:vnalo_mobile/features/timeline/screens/home_wall_screen.dart';
+import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
+import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
+import 'dart:async';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -18,6 +21,43 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
+  StreamSubscription<String>? _actionSub;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final aiProvider = context.read<AiAssistantProvider>();
+      _actionSub = aiProvider.systemActionStream.listen(_handleAiSystemAction);
+    });
+  }
+
+  @override
+  void dispose() {
+    _actionSub?.cancel();
+    super.dispose();
+  }
+
+  String _normalizeAiSystemAction(String command) {
+    switch (command.trim().toUpperCase()) {
+      case 'START_CALL':
+        return 'NAVIGATE_TO_CHAT';
+      // Future mappings can go here
+      default:
+        return command.trim().toUpperCase();
+    }
+  }
+
+  void _handleAiSystemAction(String command) {
+    final normalizedCommand = _normalizeAiSystemAction(command);
+    if (normalizedCommand == 'NAVIGATE_TO_SETTINGS') {
+      setState(() => _currentIndex = 4); // Chuyển sang Tab Cá nhân
+    } else if (normalizedCommand == 'NAVIGATE_TO_SCANNER') {
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const QrScannerScreen()));
+    } else if (normalizedCommand == 'NAVIGATE_TO_CHAT') {
+      setState(() => _currentIndex = 0);
+    }
+  }
 
   final _screens = const [
     ChatListScreen(),
