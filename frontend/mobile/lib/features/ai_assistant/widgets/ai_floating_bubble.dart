@@ -3,6 +3,8 @@ import 'package:o3d/o3d.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
 import 'package:vnalo_mobile/features/ai_assistant/screens/mascot_gallery_screen.dart';
+import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_chat_board.dart';
+import 'dart:math';
 
 class AiFloatingBubble extends StatefulWidget {
   const AiFloatingBubble({super.key});
@@ -19,6 +21,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble> with SingleTickerPr
   bool _isHoveringTrash = false;
 
   late AnimationController _animationController;
+  late AnimationController _pulseController;
   Animation<Offset>? _positionAnimation;
   Animation<double>? _scaleAnimation;
 
@@ -47,11 +50,14 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble> with SingleTickerPr
          _snapToEdge();
       }
     });
+
+    _pulseController = AnimationController(vsync: this, duration: const Duration(milliseconds: 500))..repeat(reverse: true);
   }
 
   @override
   void dispose() {
     _animationController.dispose();
+    _pulseController.dispose();
     super.dispose();
   }
 
@@ -160,6 +166,18 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble> with SingleTickerPr
                 ),
               ),
             ),
+            
+          // Generative UI Chat Board
+          if (aiProvider.aiResponse.isNotEmpty && !_isDragging)
+            Positioned(
+              left: _position.dx < MediaQuery.of(context).size.width / 2 ? _position.dx + 110 : null,
+              right: _position.dx >= MediaQuery.of(context).size.width / 2 ? MediaQuery.of(context).size.width - _position.dx + 10 : null,
+              top: max(_position.dy - 50, 60),
+              child: AiChatBoard(
+                onClose: () => aiProvider.clearAiResponse(),
+              ),
+            ),
+
           Positioned(
             left: _position.dx,
             top: _position.dy,
@@ -189,18 +207,32 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble> with SingleTickerPr
                     children: [
                       _buildBubbleIndicator(aiProvider),
                       const SizedBox(height: 8),
-                      Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: RadialGradient(
-                            colors: [
-                              Colors.blue.withOpacity(0.1),
-                              Colors.transparent,
-                            ],
-                          ),
-                        ),
+                      AnimatedBuilder(
+                        animation: _pulseController,
+                        builder: (context, child) {
+                          final isSpeaking = aiProvider.state == AiState.speaking;
+                          final dy = isSpeaking ? sin(_pulseController.value * pi) * -5.0 : 0.0;
+                          return Transform.translate(
+                            offset: Offset(0, dy),
+                            child: Container(
+                              width: 120,
+                              height: 120,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: RadialGradient(
+                                  colors: [
+                                    isSpeaking 
+                                      ? Colors.greenAccent.withOpacity(0.3 + 0.2 * _pulseController.value) 
+                                      : Colors.blue.withOpacity(0.1),
+                                    Colors.transparent,
+                                  ],
+                                  stops: const [0.5, 1.0],
+                                ),
+                              ),
+                              child: child,
+                            ),
+                          );
+                        },
                         child: ClipOval(
                           child: O3D(
                             key: ValueKey(aiProvider.currentMascot.id), // Force rebuild
@@ -212,7 +244,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble> with SingleTickerPr
                           ),
                         ),
                       ),
-                      if (aiProvider.state != AiState.idle)
+                      if (aiProvider.state != AiState.idle && aiProvider.state != AiState.speaking)
                         Padding(
                           padding: const EdgeInsets.only(top: 8.0),
                           child: Container(

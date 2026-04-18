@@ -5,6 +5,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 import 'package:vnalo_mobile/features/ai_assistant/models/mascot_metadata.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
+import 'dart:async';
 
 enum AiState { idle, listening, thinking, speaking }
 
@@ -19,12 +20,20 @@ class AiAssistantProvider with ChangeNotifier {
   bool _isMascotVisible = true;
   MascotMetadata _currentMascot = MascotMetadata.defaultMascots.first;
 
+  final List<Map<String, String>> _sessionHistory = [];
+  final _systemActionController = StreamController<String>.broadcast();
+
   AiAssistantProvider(this._aiService) {
     _initTts();
     _loadMascot();
   }
 
   MascotMetadata get currentMascot => _currentMascot;
+  AiState get state => _state;
+  String get lastWords => _lastWords;
+  String get aiResponse => _aiResponse;
+  bool get isMascotVisible => _isMascotVisible;
+  Stream<String> get systemActionStream => _systemActionController.stream;
 
   Future<void> _loadMascot() async {
     final prefs = await SharedPreferences.getInstance();
@@ -46,15 +55,16 @@ class AiAssistantProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  AiState get state => _state;
-  String get lastWords => _lastWords;
-  String get aiResponse => _aiResponse;
-  bool get isMascotVisible => _isMascotVisible;
-
   void _initTts() {
     _tts.setLanguage("vi-VN");
     _tts.setPitch(1.0);
     _tts.setSpeechRate(0.5);
+  }
+
+  @override
+  void dispose() {
+    _systemActionController.close();
+    super.dispose();
   }
 
   void toggleMascot() {
@@ -92,7 +102,7 @@ class AiAssistantProvider with ChangeNotifier {
       await _stt.listen(
         onResult: (result) {
           _lastWords = result.recognizedWords;
-          if (result.finalResult) {
+          if (result.finalResult && _lastWords.isNotEmpty) {
             _handleCommand(_lastWords);
           }
           notifyListeners();
@@ -115,11 +125,29 @@ class AiAssistantProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await _aiService.chat(text, analyzeIntent: true);
+      // Build context-aware prompt using session history
+      String contextPrompt = '';
+      if (_sessionHistory.isNotEmpty) {
+        contextPrompt += "Lịch sử trò chuyện ngắn gọn ngữ cảnh:\n";
+        for (var msg in _sessionHistory) {
+          contextPrompt += "${msg['role']}: ${msg['text']}\n";
+        }
+        contextPrompt += "---\n";
+      }
+      contextPrompt += "Yêu cầu mới: $text";
+
+      final response = await _aiService.chat(contextPrompt, analyzeIntent: true);
       
       _aiResponse = response['textReply'] ?? '';
       final actionCommand = response['actionCommand'];
       final actionParams = response['actionParams'];
+
+      // Save to history to maintain context
+      _sessionHistory.add({'role': 'User', 'text': text});
+      _sessionHistory.add({'role': 'AI', 'text': _aiResponse});
+      if (_sessionHistory.length > 8) {
+        _sessionHistory.removeRange(0, _sessionHistory.length - 8); // Keep last 4 turns (8 messages)
+      }
 
       if (actionCommand != null) {
         _executeSystemAction(actionCommand, actionParams);
@@ -135,6 +163,7 @@ class AiAssistantProvider with ChangeNotifier {
     } catch (e) {
       debugPrint('AI Error: $e');
       _aiResponse = 'Xin lỗi, tôi đang gặp chút trục trặc mạng.';
+      notifyListeners();
       await _tts.speak(_aiResponse);
       _state = AiState.idle;
     }
@@ -230,7 +259,12 @@ class AiAssistantProvider with ChangeNotifier {
   }
 
   void _executeSystemAction(String command, dynamic params) {
-     debugPrint('AI System Action: $command with params $params');
-     // Future logic to trigger calls or navigation
+     debugPrint('Executing System Action: $command with params: $params');
+     _systemActionController.add(command);
+  }
+
+  void clearAiResponse() {
+    _aiResponse = '';
+    notifyListeners();
   }
 }
