@@ -8,6 +8,7 @@ import { SearchMessagesPanel } from '../features/chat/components/SearchMessagesP
 import { SearchGlobalPanel } from '../features/chat/components/SearchGlobalPanel'
 import { MessageShareModal } from '../features/chat/components/MessageShareModal'
 import { ChatWindow } from '../features/chat/components/ChatWindow'
+import { UserProfileModal } from '../features/chat/components/UserProfileModal'
 import type { MessageContextMenuAction } from '../features/chat/components/MessageContextMenu'
 import {
   addMessageReaction,
@@ -51,9 +52,7 @@ import type { Friend, UserLookupResult } from '../features/friends/friends.types
 import { useAuth } from '../features/auth/useAuth'
 import { Skeleton } from '../shared/components/ui/Skeleton'
 import { Card } from '../shared/components/ui/Card'
-import { Button } from '../shared/components/ui/Button'
 import { Modal } from '../shared/components/ui/Modal'
-import { Icon } from '../shared/components/Icon'
 import { useLanguage } from '../shared/i18n/LanguageContext'
 import {
   initializeSearchIndex,
@@ -65,7 +64,7 @@ import {
 } from '../features/chat/searchIndex'
 import { CreateGroupModal } from '../features/chat/components/CreateGroupModal'
 import { EditConversationNameModal } from '../features/chat/components/EditConversationNameModal'
-import { formatMessage, renderSystemMessage, formatMessageContent, formatMessagePreview } from '../features/chat/utils/messageUtils'
+import { formatMessage, renderSystemMessage, formatMessagePreview } from '../features/chat/utils/messageUtils'
 import { UserStoreProvider, useUserStore } from '../features/chat/context/UserStoreContext'
 import type { SystemMessagePayload } from '../features/chat/chat.types'
 
@@ -210,19 +209,8 @@ function getConversationPreview(
   return formatMessage(message, currentUserId, getDisplayName)
 }
 
-function formatPreviewSenderName(displayName?: string | null): string {
-  const normalized = String(displayName ?? '').trim().replace(/\s+/g, ' ')
-  if (!normalized) {
-    return ''
-  }
 
-  const parts = normalized.split(' ')
-  if (parts.length <= 2) {
-    return normalized
-  }
 
-  return parts.slice(-2).join(' ')
-}
 
 function formatConversationPreview(
   senderName: string | null | undefined,
@@ -448,17 +436,21 @@ function ChatPageContent() {
   const [isSocketConnected, setIsSocketConnected] = useState(false)
   const [rightSidebarContent, setRightSidebarContent] = useState<'info' | 'search' | 'global-search' | null>('info')
   const [jumpToMessageId, setJumpToMessageId] = useState<string | null>(null)
-  const [pinnedMessageIds, setPinnedMessageIds] = useState<Record<string, true>>({})
+  const [pinnedMessageIds, setPinnedMessageIds] = useState<Record<string, string[]>>({})
+  const [pinnedMessages, setPinnedMessages] = useState<Record<string, ChatMessage[]>>({})
   const [starredMessageIds, setStarredMessageIds] = useState<Record<string, true>>({})
   const [recalledMessageIds, setRecalledMessageIds] = useState<Record<string, true>>({})
   const [deletedMessageIds, setDeletedMessageIds] = useState<Record<string, true>>({})
   const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([])
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false)
+
   const [shareModalMessage, setShareModalMessage] = useState<ChatMessage | null>(null)
   const [isShareSubmitting, setIsShareSubmitting] = useState(false)
   const [deletedTimestamps, setDeletedTimestamps] = useState<Record<string, number>>({})
   const [confirmDeleteHistoryId, setConfirmDeleteHistoryId] = useState<string | null>(null)
   const [confirmLeaveGroupOpen, setConfirmLeaveGroupOpen] = useState(false)
+  const [selectedProfileUserId, setSelectedProfileUserId] = useState<string | null>(null)
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
 
   const routedConversationIdRef = useRef('')
   const selectedConversationIdRef = useRef('')
@@ -467,6 +459,10 @@ function ChatPageContent() {
   const friendIdSetRef = useRef<Set<string>>(new Set())
   const lastLoadedMessagesKeyRef = useRef('')
   const userMapRef = useRef<Record<string, { displayName: string; avatarUrl: string | null }>>({})
+
+  // Hard guards for pinned messages
+  const loadingPinnedRef = useRef<Record<string, boolean>>({})
+  const lastConvRef = useRef<string | null>(null)
 
   useEffect(() => {
     userMapRef.current = userMap
@@ -530,9 +526,9 @@ function ChatPageContent() {
 
     const allMsgs = messagesByConversation[resolvedConversationId] ?? []
     const deleteTime = deletedTimestamps[resolvedConversationId]
-    
+
     if (!deleteTime) return allMsgs
-    
+
     // Zalo style: Filter out messages sent BEFORE the delete moment
     return allMsgs.filter(m => {
       const msgTime = m.createdAt ? new Date(m.createdAt).getTime() : 0
@@ -632,18 +628,18 @@ function ChatPageContent() {
         const current = next[index]
 
         let finalPreview = formattedPreview;
-        
+
         // Inspect last few messages for grouping in sidebar
         const conversationMsgs = messagesByConversation[conversationId] || [];
         if (conversationMsgs.length > 0 && (message.type === 'image' || message.type === 'file')) {
           const lastFew = [...conversationMsgs, message].slice(-5);
           let count = 0;
           const groupType = message.type;
-          
+
           for (let i = lastFew.length - 1; i >= 0; i--) {
             const m = lastFew[i];
-            const prevM = i > 0 ? lastFew[i-1] : null;
-            
+            const prevM = i > 0 ? lastFew[i - 1] : null;
+
             const getMs = (msg: ChatMessage) => msg.createdAt ? Date.parse(msg.createdAt) : Date.parse(msg.timestamp);
             const withinTime = !prevM || Math.abs(getMs(m) - getMs(prevM)) <= 60000;
             const sameSender = !prevM || prevM.senderId === m.senderId;
@@ -666,7 +662,7 @@ function ChatPageContent() {
         next[index] = {
           ...current,
           lastMessage: finalPreview,
-          lastMessageAt: new Date().toISOString(),
+          lastMessageAt: message.type === 'system' ? current.lastMessageAt : new Date().toISOString(),
           lastMessageSeq: message.serverSeq ?? current.lastMessageSeq,
           unreadCount: markAsReadNow ? 0 : current.unreadCount + (message.sender === 'me' ? 0 : 1),
         }
@@ -754,28 +750,32 @@ function ChatPageContent() {
     await Promise.all(messageIds.map((messageId) => syncMessageReaction(messageId)))
   }, [accessToken, syncMessageReaction])
 
-  const syncPinnedMessages = useCallback(
+  const loadPinnedMessages = useCallback(
     async (conversationId: string) => {
-      if (!accessToken || !conversationId) {
-        return
-      }
+      if (!accessToken || !conversationId) return
+
+      // Hard guard: avoid double/simultaneous calls for same conversation
+      if (loadingPinnedRef.current[conversationId]) return
+      loadingPinnedRef.current[conversationId] = true
 
       try {
         const pins = await fetchPinnedMessages(accessToken, conversationId)
-        const nextPinnedIds = pins.reduce<Record<string, true>>((acc, pin) => {
-          if (pin.messageId) {
-            acc[pin.messageId] = true
-          }
-          return acc
-        }, {})
+        const ids = pins.map(p => p.messageId).filter(Boolean) as string[]
 
-        setPinnedMessageIds(nextPinnedIds)
+        setPinnedMessageIds((prev) => ({
+          ...prev,
+          [conversationId]: ids,
+        }))
       } catch (error) {
-        console.warn('[ChatPage.syncPinnedMessages] Failed to fetch pinned messages', { conversationId, error })
+        console.warn('[ChatPage.loadPinnedMessages] Failed to fetch pinned messages', { conversationId, error })
+      } finally {
+        loadingPinnedRef.current[conversationId] = false
       }
     },
     [accessToken],
   )
+
+  const syncPinnedMessages = loadPinnedMessages
 
   const { emitSendMessage, emitRecallMessage, joinConversation, markAsRead, getSocket } = useChatSocket({
     token: accessToken,
@@ -1195,26 +1195,36 @@ function ChatPageContent() {
         return
       }
 
-      const isPinned = Boolean(pinnedMessageIds[messageId])
+      const currentPins = pinnedMessageIds[conversationId] || []
+      const isPinned = currentPins.includes(messageId)
 
       try {
         if (isPinned) {
           await unpinMessage(accessToken, conversationId, messageId)
-          setPinnedMessageIds((prev) => {
-            const next = { ...prev }
-            delete next[messageId]
-            return next
-          })
+          setPinnedMessageIds((prev) => ({
+            ...prev,
+            [conversationId]: currentPins.filter((id) => id !== messageId),
+          }))
+          return
+        }
+
+        if (currentPins.length >= 3) {
+          toast.error('Chỉ được ghim tối đa 3 tin nhắn')
           return
         }
 
         await pinMessage(accessToken, conversationId, messageId)
-        await syncPinnedMessages(conversationId)
+        setPinnedMessageIds((prev) => ({
+          ...prev,
+          [conversationId]: [...currentPins, messageId],
+        }))
       } catch (error) {
-        console.error('[ChatPage.handleTogglePinMessage] Failed to toggle pin', { messageId, conversationId, error })
+        const action = isPinned ? 'bỏ ghim' : 'ghim'
+        console.error(`[ChatPage.handleTogglePinMessage] Failed to ${action} message`, error)
+        toast.error(`Không thể ${action} tin nhắn. Vui lòng thử lại sau.`)
       }
     },
-    [accessToken, pinnedMessageIds, syncPinnedMessages],
+    [accessToken, pinnedMessageIds],
   )
 
   const toggleMessageIdInList = useCallback((messageId: string) => {
@@ -1378,6 +1388,7 @@ function ChatPageContent() {
     },
     [accessToken, emitSendMessage, joinConversation, shareModalMessage],
   )
+
 
 
   // Sync effect: Fetch profile for all group members when a conversation is opened
@@ -1720,7 +1731,7 @@ function ChatPageContent() {
         // Refresh conversation list to sync with backend
         await loadInbox(accessToken, groupId);
 
-        toast.success(`✅ Đã tạo nhóm "${groupName}" thành công!`);
+
         navigate(`/chat/${groupId}`);
         setIsCreateGroupOpen(false);
       } catch (error) {
@@ -1737,7 +1748,7 @@ function ChatPageContent() {
 
 
   useEffect(() => {
-    if (!accessToken || !user) {
+    if (!accessToken) {
       setConversations([])
       setMessagesByConversation({})
       setSelectedConversationId('')
@@ -1748,21 +1759,12 @@ function ChatPageContent() {
       return
     }
 
-    const tokenPayload = parseJwtPayload(accessToken)
-    const rawRestrictedClaim = tokenPayload?.restrictedWebMode
-    const tokenRestricted = isRestrictedWebToken(accessToken)
-    console.log('[ChatPage.auth] Token policy decoded:', {
-      tokenRestricted,
-      rawRestrictedClaim,
-      rawRestrictedClaimType: typeof rawRestrictedClaim,
-      accessTokenTail: accessToken.slice(-12),
-    })
-
-    // Do not hard-lock composer from token claim; backend enforces real permission.
-    setIsRestrictedMode(false)
-
+    // SINGLE ENTRY for loadInbox
     void loadInbox(accessToken)
-  }, [accessToken, loadInbox, user])
+    
+    // Reset restricted mode locally
+    setIsRestrictedMode(false)
+  }, [accessToken, loadInbox])
 
   useEffect(() => {
     if (!routedConversationId) {
@@ -1786,12 +1788,18 @@ function ChatPageContent() {
       }
 
       const normalizedPhone = normalizedKeyword.replace(/\D/g, '')
+      let phoneSearchTerm = normalizedKeyword
+      if (normalizedKeyword.startsWith('0') && normalizedPhone.length >= 9) {
+        phoneSearchTerm = '+84' + normalizedKeyword.substring(1)
+      }
 
       try {
         if (normalizedPhone.length >= 2 && normalizedPhone.length >= Math.max(2, normalizedKeyword.length - 2)) {
-          const user = await getUserByPhone(accessToken, normalizedKeyword)
-          setFriendResults(user ? [user] : [])
-          return
+          const user = await getUserByPhone(accessToken, phoneSearchTerm)
+          if (user) {
+            setFriendResults([user])
+            return
+          }
         }
 
         const users = await searchUsers(accessToken, normalizedKeyword)
@@ -1912,6 +1920,11 @@ function ChatPageContent() {
     },
     [accessToken, user, handleGlobalSearchSelectConversation],
   )
+
+  const handleOpenUserProfile = useCallback((userId: string) => {
+    setSelectedProfileUserId(userId)
+    setIsProfileModalOpen(true)
+  }, [])
 
 
 
@@ -2422,24 +2435,24 @@ function ChatPageContent() {
           replyTo: i === 0 ? replyTo : null,
         };
 
-        setMessagesByConversation(prev => ({ 
-          ...prev, 
-          [targetConversationId]: upsertMessage(prev[targetConversationId] ?? [], optimisticMessage) 
+        setMessagesByConversation(prev => ({
+          ...prev,
+          [targetConversationId]: upsertMessage(prev[targetConversationId] ?? [], optimisticMessage)
         }));
         updateConversationAfterMessage(targetConversationId, optimisticMessage, true);
 
         // Send a message using socket, then fallback to REST if needed
         const ack = await emitSendMessage(payload);
         if (ack?.event === 'message.sent' && ack?.data) {
-          const serverMessage = { 
-            ...mapRawMessage(ack.data, user.id), 
-            clientMessageId: resClientMessageId, 
-            deliveryState: 'sent' as const, 
-            replyTo: i === 0 ? replyTo : null 
+          const serverMessage = {
+            ...mapRawMessage(ack.data, user.id),
+            clientMessageId: resClientMessageId,
+            deliveryState: 'sent' as const,
+            replyTo: i === 0 ? replyTo : null
           };
-          setMessagesByConversation(prev => ({ 
-            ...prev, 
-            [targetConversationId]: upsertMessage(prev[targetConversationId] ?? [], serverMessage) 
+          setMessagesByConversation(prev => ({
+            ...prev,
+            [targetConversationId]: upsertMessage(prev[targetConversationId] ?? [], serverMessage)
           }));
           updateConversationAfterMessage(targetConversationId, serverMessage, true);
         } else {
@@ -2449,22 +2462,22 @@ function ChatPageContent() {
               messageType: payload.messageType as any
             });
             if (restMessage?.id) {
-              const mapped = { 
-                ...mapRawMessage(restMessage, user.id), 
-                clientMessageId: resClientMessageId, 
-                deliveryState: 'sent' as const, 
-                replyTo: i === 0 ? replyTo : null 
+              const mapped = {
+                ...mapRawMessage(restMessage, user.id),
+                clientMessageId: resClientMessageId,
+                deliveryState: 'sent' as const,
+                replyTo: i === 0 ? replyTo : null
               };
-              setMessagesByConversation(prev => ({ 
-                ...prev, 
-                [targetConversationId]: upsertMessage(prev[targetConversationId] ?? [], mapped) 
+              setMessagesByConversation(prev => ({
+                ...prev,
+                [targetConversationId]: upsertMessage(prev[targetConversationId] ?? [], mapped)
               }));
               updateConversationAfterMessage(targetConversationId, mapped, true);
             }
           } catch (e) {
-            setMessagesByConversation(prev => ({ 
-              ...prev, 
-              [targetConversationId]: markLocalMessageFailed(prev[targetConversationId] ?? [], resClientMessageId) 
+            setMessagesByConversation(prev => ({
+              ...prev,
+              [targetConversationId]: markLocalMessageFailed(prev[targetConversationId] ?? [], resClientMessageId)
             }));
           }
         }
@@ -2600,7 +2613,7 @@ function ChatPageContent() {
       )
       toast.success('Đổi tên nhóm thành công')
 
-      const actorName = user?.displayName || 'Người dùng'
+      const actorName = user?.name || 'Người dùng'
       void emitSendMessage({
         conversationId: selectedConversationId,
         content: `${actorName} đã đổi tên nhóm thành "${newName}"`,
@@ -2707,7 +2720,7 @@ function ChatPageContent() {
       if (!deleteTime) return conv;
 
       const lastMsgTime = new Date(conv.lastMessageAt || conv.updatedAt || 0).getTime();
-      
+
       // If the last message is OLDER than the deletion moment, hide it in the preview
       if (lastMsgTime <= deleteTime) {
         return {
@@ -2723,6 +2736,20 @@ function ChatPageContent() {
       return timeB - timeA
     })
   }, [conversations, deletedTimestamps, t])
+
+  const visibleConversations = useMemo(() => {
+    return sortedConversations.filter((conv) => {
+      const deletedAt = deletedTimestamps[conv.id];
+      if (!deletedAt) return true;
+
+      // ONLY use lastMessageAt (real message timestamp)
+      if (!conv.lastMessageAt) return false;
+
+      const lastMessageTime = new Date(conv.lastMessageAt).getTime();
+
+      return lastMessageTime > deletedAt;
+    });
+  }, [sortedConversations, deletedTimestamps]);
 
   if (isBootstrapping || isLoadingConversations) {
     return (
@@ -2771,7 +2798,7 @@ function ChatPageContent() {
   return (
     <div className={rightSidebarContent ? 'chat-layout' : 'chat-layout chat-layout-sidebar-closed'}>
       <ChatList
-        conversations={sortedConversations}
+        conversations={visibleConversations}
         friendResults={friendResults}
         activeConversationId={routedConversationId || selectedConversationId}
         onSearchFriends={handleSearchFriends}
@@ -2790,6 +2817,7 @@ function ChatPageContent() {
         rightSidebarContent={rightSidebarContent}
         jumpToMessageId={jumpToMessageId}
         onJumpToMessageHandled={() => setJumpToMessageId(null)}
+        onOpenUserProfile={handleOpenUserProfile}
         isRestrictedMode={isRestrictedMode}
         peerLastReadSeq={(routedConversationId || selectedConversationId)
           ? peerLastReadByConversation[routedConversationId || selectedConversationId]
@@ -2797,7 +2825,8 @@ function ChatPageContent() {
         reactionStatesByMessage={reactionStatesByMessage}
         onAddReaction={handleAddReaction}
         onRemoveReaction={handleRemoveReaction}
-        pinnedMessageIds={pinnedMessageIds}
+        pinnedMessages={selectedConversationId ? pinnedMessages[selectedConversationId] : []}
+        onUnpinMessage={(id) => handleTogglePinMessage(id, selectedConversationId!)}
         starredMessageIds={starredMessageIds}
         recalledMessageIds={recalledMessageIds}
         deletedMessageIds={deletedMessageIds}
@@ -2941,6 +2970,102 @@ function ChatPageContent() {
       >
         Bạn có chắc chắn muốn rời khỏi nhóm này không?
       </Modal>
+
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        userId={selectedProfileUserId}
+        accessToken={accessToken}
+        initialUser={selectedProfileUserId ? userMap[selectedProfileUserId] : undefined}
+        onMessage={handleOpenFriendChat}
+      />
+
+      {/* Pinned Messages Logic Hooks */}
+      <PinnedLogicHooks 
+        accessToken={accessToken} 
+        isBootstrapping={isBootstrapping}
+        selectedConversationId={selectedConversationId}
+        loadPinnedMessages={loadPinnedMessages}
+        pinnedMessageIds={pinnedMessageIds}
+        setPinnedMessageIds={setPinnedMessageIds}
+        messagesByConversation={messagesByConversation}
+        setPinnedMessages={setPinnedMessages}
+        lastConvRef={lastConvRef}
+      />
     </div>
   )
 }
+
+/**
+ * Extracted hooks to avoid cluttering main component and ensure they are after declarations.
+ */
+function PinnedLogicHooks({ 
+  accessToken, isBootstrapping, selectedConversationId, loadPinnedMessages,
+  pinnedMessageIds, setPinnedMessageIds, messagesByConversation, setPinnedMessages,
+  lastConvRef
+}: any) {
+  // ISOLATED PINNED FETCH (NO loadInbox call)
+  useEffect(() => {
+    if (!accessToken || isBootstrapping || !selectedConversationId) return
+    
+    // Avoid re-fetching same conversation (Double Guard)
+    if (lastConvRef.current === selectedConversationId) return
+    lastConvRef.current = selectedConversationId
+
+    void loadPinnedMessages(selectedConversationId)
+  }, [accessToken, isBootstrapping, selectedConversationId, loadPinnedMessages, lastConvRef])
+
+  // Mapping Pinned IDs -> Message Objects (with placeholder support)
+  useEffect(() => {
+    if (!selectedConversationId) return
+
+    const ids = pinnedMessageIds[selectedConversationId] || []
+    const convMessages = messagesByConversation[selectedConversationId] || []
+
+    const mapped = ids.map((id: string) => {
+      const found = convMessages.find((m: any) => m.id === id)
+      if (found) return found
+
+      // Return placeholder for unloaded messages
+      return {
+        id,
+        conversationId: selectedConversationId,
+        content: 'Tin nhắn đã ghim',
+        text: 'Tin nhắn đã ghim',
+        type: 'text' as any,
+        sender: 'system' as any,
+        senderId: 'system',
+        timestamp: '',
+        deliveryState: 'sent' as any,
+        isPlaceholder: true, // Custom flag for UI
+      }
+    })
+
+    setPinnedMessages((prev: any) => ({
+      ...prev,
+      [selectedConversationId]: mapped,
+    }))
+  }, [messagesByConversation, pinnedMessageIds, selectedConversationId, setPinnedMessages])
+
+  // Auto clean pinned IDs when messages are recalled
+  useEffect(() => {
+    if (!selectedConversationId) return
+    const ids = pinnedMessageIds[selectedConversationId] || []
+    const convMessages = messagesByConversation[selectedConversationId] || []
+
+    const validIds = ids.filter((id: string) => {
+      const msg = convMessages.find((m: any) => m.id === id)
+      return msg ? !msg.isRecalled : true
+    })
+
+    if (validIds.length !== ids.length) {
+      setPinnedMessageIds((prev: any) => ({
+        ...prev,
+        [selectedConversationId]: validIds,
+      }))
+    }
+  }, [messagesByConversation, selectedConversationId, pinnedMessageIds, setPinnedMessageIds])
+
+  return null;
+}
+

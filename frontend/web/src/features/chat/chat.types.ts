@@ -95,6 +95,7 @@ export type ChatMessage = {
   deliveryState?: MessageDeliveryState
   replyTo?: ReplyMetadata | null
   isRecalled?: boolean
+  isPlaceholder?: boolean
 }
 
 export type MessageReadEvent = {
