@@ -57,6 +57,7 @@ class _LoginPasswordScreenState extends State<LoginPasswordScreen> {
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final t = AuthTexts.of(context);
+    final appBarFg = isDarkMode ? Colors.white : const Color(0xFF171717);
     final scaffoldBg = isDarkMode ? DarkColors.scaffold : Colors.white;
     final textColor = isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary;
 
@@ -65,9 +66,15 @@ class _LoginPasswordScreenState extends State<LoginPasswordScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        leading: BackButton(color: appBarFg),
         title: Text(
           t.enterPasswordTitle,
-          style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: appBarFg,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
       body: SafeArea(

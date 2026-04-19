@@ -121,6 +121,7 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/images/welcome/
     - .env
     - assets/icons/app_icon.png
     - assets/sounds/

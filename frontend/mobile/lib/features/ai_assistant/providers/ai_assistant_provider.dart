@@ -18,7 +18,7 @@ class AiAssistantProvider with ChangeNotifier {
   String _lastWords = '';
   String _aiResponse = '';
   String _currentEmotion = 'thinking';
-  bool _isMascotVisible = true;
+  bool _isMascotVisible = false;
   MascotMetadata _currentMascot = MascotMetadata.defaultMascots.first;
   bool _enableDeepSummary = false; // VIP only feature (Currently disabled by default)
 
@@ -27,7 +27,18 @@ class AiAssistantProvider with ChangeNotifier {
 
   AiAssistantProvider(this._aiService) {
     _initTts();
-    _loadMascot();
+    _initPersistence();
+  }
+
+  Future<void> _initPersistence() async {
+    await _loadMascot();
+    await _loadVisibility();
+  }
+
+  Future<void> _loadVisibility() async {
+    final prefs = await SharedPreferences.getInstance();
+    _isMascotVisible = prefs.getBool('vnalo_ai_is_visible') ?? false;
+    notifyListeners();
   }
 
   MascotMetadata get currentMascot => _currentMascot;
@@ -70,19 +81,25 @@ class AiAssistantProvider with ChangeNotifier {
     super.dispose();
   }
 
-  void toggleMascot() {
+  void toggleMascot() async {
     _isMascotVisible = !_isMascotVisible;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('vnalo_ai_is_visible', _isMascotVisible);
     notifyListeners();
   }
 
-  void hideMascot() {
+  void hideMascot() async {
     _isMascotVisible = false;
     stopListening();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('vnalo_ai_is_visible', false);
     notifyListeners();
   }
 
   Future<void> summonMascot() async {
     _isMascotVisible = true;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('vnalo_ai_is_visible', true);
     notifyListeners();
     // Start listening directly to create a seamless assistant feel
     await Future.delayed(const Duration(milliseconds: 300));
