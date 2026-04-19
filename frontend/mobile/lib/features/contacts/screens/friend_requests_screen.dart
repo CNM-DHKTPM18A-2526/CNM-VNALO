@@ -8,6 +8,7 @@ import 'package:vnalo_mobile/services/api_service.dart';
 import 'package:vnalo_mobile/services/chat_service.dart';
 import 'package:vnalo_mobile/services/friend_service.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
+import 'package:vnalo_mobile/features/contacts/providers/contact_provider.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
 
 class FriendRequestsScreen extends StatefulWidget {
@@ -17,7 +18,8 @@ class FriendRequestsScreen extends StatefulWidget {
   State<FriendRequestsScreen> createState() => _FriendRequestsScreenState();
 }
 
-class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
+class _FriendRequestsScreenState extends State<FriendRequestsScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   List<Map<String, dynamic>> _incoming = [];
   List<Map<String, dynamic>> _sent = [];
   bool _loadingIncoming = true;
@@ -26,7 +28,14 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -37,7 +46,14 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
     final fs = context.read<FriendService>();
     try {
       final res = await fs.getIncomingRequests();
-      if (mounted) setState(() { _incoming = res; _loadingIncoming = false; });
+      if (mounted) {
+        setState(() { 
+          _incoming = res; 
+          _loadingIncoming = false; 
+        });
+        // Sync global badge count
+        context.read<ContactProvider>().updatePendingCount(res.length);
+      }
     } catch (_) {
       if (mounted) setState(() => _loadingIncoming = false);
     }
@@ -60,6 +76,10 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
     try {
       await context.read<FriendService>().acceptRequest(id);
       if (!context.mounted) return;
+      
+      // Update global badge count
+      context.read<ContactProvider>().fetchPendingRequestCount();
+      
       setState(() => _incoming.removeWhere((r) => r['id']?.toString() == id));
 
       // Create direct conversation with the new friend
@@ -103,6 +123,10 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
     try {
       await context.read<FriendService>().rejectRequest(id);
       if (!context.mounted) return;
+      
+      // Update global badge count
+      context.read<ContactProvider>().fetchPendingRequestCount();
+
       setState(() => _incoming.removeWhere((r) => r['id']?.toString() == id));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(common.requestRejected)),
@@ -120,34 +144,61 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final common = CommonTexts.of(context);
 
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          backgroundColor: isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg,
-          title: Text(common.friendRequests, style: const TextStyle(fontWeight: FontWeight.w700)),
-          actions: [
-            IconButton(icon: const Icon(Icons.settings_outlined), onPressed: () {}),
-          ],
-          bottom: TabBar(
-            dividerColor: Colors.transparent,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white60,
-            indicatorColor: Colors.white,
-            indicatorWeight: 3,
-            labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-            tabs: [
-              Tab(text: '${common.receivedTab}  ${_incoming.length}'),
-              Tab(text: common.sentTab),
-            ],
+    return Scaffold(
+      backgroundColor: isDarkMode ? DarkColors.scaffold : Colors.white,
+      appBar: AppBar(
+        forceMaterialTransparency: !isDarkMode,
+        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
+        elevation: 0,
+        titleSpacing: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: isDarkMode 
+          ? null 
+          : Container(decoration: const BoxDecoration(gradient: AppColors.appBarGradient)),
+        title: Text(
+          common.friendRequests, 
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w600
+          )
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined, color: Colors.white), 
+            onPressed: () {}
           ),
-        ),
-        body: TabBarView(
-          children: [
-            _buildIncomingTab(isDarkMode),
-            _buildSentTab(isDarkMode),
-          ],
-        ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Container(
+            color: isDarkMode ? DarkColors.surface : Colors.white,
+            child: TabBar(
+              controller: _tabController,
+              dividerColor: Colors.transparent,
+              labelColor: isDarkMode ? DarkColors.primary : AppColors.primary,
+              unselectedLabelColor: Colors.grey,
+              indicatorColor: isDarkMode ? DarkColors.primary : AppColors.primary,
+              indicatorWeight: 3,
+              labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+              tabs: [
+                Tab(text: '${common.receivedTab}  ${_incoming.length}'),
+                Tab(text: common.sentTab),
+              ],
+            ),
+          ),
+          const Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildIncomingTab(isDarkMode),
+                _buildSentTab(isDarkMode),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -191,9 +242,9 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+        color: isDarkMode ? DarkColors.surface : Colors.white,
         border: Border(
-          bottom: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
+          bottom: BorderSide(color: Colors.grey.withValues(alpha: 0.1)),
         ),
       ),
       child: Row(
@@ -212,11 +263,12 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
                 Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton(
+                      child: ElevatedButton(
                         onPressed: () => _reject(req),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: isDarkMode ? Colors.white : Colors.black87,
-                          side: BorderSide(color: Colors.grey.shade400),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isDarkMode ? const Color(0xFF2C2C2C) : const Color(0xFFE5E7EB),
+                          foregroundColor: isDarkMode ? Colors.white : const Color(0xFF111827),
+                          elevation: 0,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                           padding: const EdgeInsets.symmetric(vertical: 8),
                         ),
@@ -225,11 +277,12 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: OutlinedButton(
+                      child: ElevatedButton(
                         onPressed: () => _accept(req),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: isDarkMode ? DarkColors.primary : AppColors.primary,
-                          side: BorderSide(color: isDarkMode ? DarkColors.primary : AppColors.primary),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isDarkMode ? DarkColors.primary : AppColors.primary,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                           padding: const EdgeInsets.symmetric(vertical: 8),
                         ),

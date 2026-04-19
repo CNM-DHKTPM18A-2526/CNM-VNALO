@@ -4,7 +4,6 @@ import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/auth/localization/auth_texts.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/auth/screens/login_password_screen.dart';
-import 'package:vnalo_mobile/features/auth/screens/forgot_password_screen.dart';
 import 'package:vnalo_mobile/features/auth/screens/register_screen.dart';
 import 'package:vnalo_mobile/features/auth/widgets/phone_input.dart';
 
@@ -104,7 +103,8 @@ class _LoginScreenState extends State<LoginScreen> {
           t.enterPhoneTitle,
           style: TextStyle(
             color: isDarkMode ? Colors.white : const Color(0xFF171717),
-            fontWeight: FontWeight.w700,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),

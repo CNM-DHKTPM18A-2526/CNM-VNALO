@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:vnalo_mobile/features/contacts/providers/contact_provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
@@ -38,6 +39,9 @@ class _MainShellState extends State<MainShell> {
 
       final socketService = context.read<SocketService>();
       _callErrorSub = socketService.onCallError.listen(_handleCallErrorSignal);
+
+      // Initial fetch for friend request badge
+      context.read<ContactProvider>().fetchPendingRequestCount();
     });
   }
 
@@ -230,13 +234,14 @@ class _MainShellState extends State<MainShell> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       body: IndexedStack(index: _currentIndex, children: _screens),
-      bottomNavigationBar: Consumer<ChatProvider>(
-        builder: (context, chatProvider, child) {
+      bottomNavigationBar: Consumer2<ChatProvider, ContactProvider>(
+        builder: (context, chatProvider, contactProvider, child) {
           int unreadCount = 0;
           for (var c in chatProvider.conversations) {
             unreadCount += c.unreadCount;
           }
 
+          final pendingFriendCount = contactProvider.pendingRequestCount;
           final common = CommonTexts.of(context);
 
           return BottomNavigationBar(
@@ -259,7 +264,13 @@ class _MainShellState extends State<MainShell> {
                 label: common.messagesTab,
               ),
               BottomNavigationBarItem(
-                icon: const Icon(Icons.contacts_outlined),
+                icon: pendingFriendCount > 0
+                  ? Badge(
+                      label: Text(pendingFriendCount > 99 ? '99+' : pendingFriendCount.toString()),
+                      backgroundColor: AppColors.unreadBadge,
+                      child: const Icon(Icons.contacts_outlined),
+                    )
+                  : const Icon(Icons.contacts_outlined),
                 label: common.contactsTab,
               ),
               BottomNavigationBarItem(

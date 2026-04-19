@@ -13,6 +13,7 @@ import 'package:vnalo_mobile/services/friend_service.dart';
 import 'package:vnalo_mobile/features/chat/screens/create_group_screen.dart';
 import 'package:vnalo_mobile/features/search/screens/unified_search_screen.dart';
 import 'package:vnalo_mobile/core/localization/common_texts.dart';
+import 'package:vnalo_mobile/features/contacts/providers/contact_provider.dart';
 
 class ContactsScreen extends StatefulWidget {
   const ContactsScreen({super.key});
@@ -24,20 +25,21 @@ class ContactsScreen extends StatefulWidget {
 class _ContactsScreenState extends State<ContactsScreen> {
   List<User> _friends = [];
   bool _isLoading = true;
-  int _pendingCount = 0;
 
   @override
   void initState() {
     super.initState();
     _loadFriends();
-    _loadPendingCount();
+    // Fetch via provider
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<ContactProvider>().fetchPendingRequestCount();
+      }
+    });
   }
 
   Future<void> _loadPendingCount() async {
-    try {
-      final count = await context.read<FriendService>().getPendingRequestCount();
-      if (mounted) setState(() => _pendingCount = count);
-    } catch (_) {}
+    await context.read<ContactProvider>().fetchPendingRequestCount();
   }
 
   Future<void> _loadFriends() async {
@@ -197,19 +199,23 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     CommonTexts.of(context).friendRequests,
                     style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
                   ),
-                  trailing: _pendingCount > 0
-                      ? Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            '$_pendingCount',
-                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-                          ),
-                        )
-                      : null,
+                  trailing: Consumer<ContactProvider>(
+                    builder: (context, provider, child) {
+                      final count = provider.pendingRequestCount;
+                      if (count <= 0) return const SizedBox.shrink();
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '$count',
+                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                      );
+                    },
+                  ),
                   onTap: () async {
                     await Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const FriendRequestsScreen()),

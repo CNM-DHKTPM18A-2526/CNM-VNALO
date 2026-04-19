@@ -32,6 +32,7 @@ import 'package:vnalo_mobile/services/notification_service.dart';
 import 'package:vnalo_mobile/services/ai_service.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_floating_bubble.dart';
+import 'package:vnalo_mobile/features/contacts/providers/contact_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -164,6 +165,9 @@ class VnaloApp extends StatelessWidget {
           ),
         ),
         Provider<NotificationService>(create: (_) => NotificationService()),
+        ChangeNotifierProvider(
+          create: (ctx) => ContactProvider(ctx.read<FriendService>()),
+        ),
         Provider<AiService>(
           create: (context) => AiService(context.read<ApiService>()),
         ),

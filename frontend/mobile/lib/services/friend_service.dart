@@ -120,12 +120,31 @@ class FriendService {
   }
 
   Future<int> getPendingRequestCount() async {
-    final response = await _apiService.get(_base, '/friends/stats');
-    final data = response['data'];
-    if (data is Map<String, dynamic>) {
-      return (data['pendingRequestCount'] as num?)?.toInt() ?? 0;
+    try {
+      final response = await _apiService.get(_base, '/friends/stats');
+      final data = response['data'];
+      int count = 0;
+      if (data is Map<String, dynamic>) {
+        count = (data['pendingRequestCount'] as num?)?.toInt() ?? 0;
+      }
+      
+      // Fallback: if count is 0, verify with incoming requests list
+      // sometimes stats might be out of sync or structured differently
+      if (count == 0) {
+        final incoming = await getIncomingRequests();
+        return incoming.length;
+      }
+      
+      return count;
+    } catch (_) {
+      // Final fallback on error
+      try {
+        final incoming = await getIncomingRequests();
+        return incoming.length;
+      } catch (__) {
+        return 0;
+      }
     }
-    return 0;
   }
 
   Future<List<User>> searchUsers(String keyword) async {

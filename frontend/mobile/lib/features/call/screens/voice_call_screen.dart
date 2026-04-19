@@ -348,12 +348,23 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
             ),
 
             const Spacer(flex: 5),
-
-            // 4. BOTTOM CONTROLS (Standard Zalo Row: Loa, Kết thúc, Mic)
-            _buildControlButtons(_callService!),
             ],
+          ),
+        ),
+
+        // 4. BOTTOM CONTROLS (Standard Zalo Row: Loa, Kết thúc, Mic)
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 24),
+              child: _buildControlButtons(_callService!),
             ),
           ),
+        ),
           
           // Proximity Blackout Overlay
           if (_isNear)
@@ -451,10 +462,10 @@ class _TopCircleIconButton extends StatelessWidget {
         width: 44,
         height: 44,
         decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.25),
+          color: Colors.black.withValues(alpha: 0.5), // Xanh đen mờ chuẩn (Premium Glass)
           shape: BoxShape.circle,
         ),
-        child: Center(child: Icon(icon, color: Colors.white, size: 24)),
+        child: Center(child: Icon(icon, color: Colors.white, size: 28)),
       ),
     );
   }
@@ -572,11 +583,9 @@ class _BottomControl extends StatelessWidget {
 
     if (destructive) {
       backgroundColor = const Color(0xFFFF3B30);
-    } else if (active) {
-      backgroundColor = Colors.white;
-      iconColor = const Color(0xFF0068FF); // Zalo Primary Blue
     } else {
-      backgroundColor = color ?? Colors.black.withValues(alpha: 0.25);
+      backgroundColor = color ?? Colors.black.withValues(alpha: 0.5); // Xanh đen mờ chuẩn
+      iconColor = Colors.white;
     }
 
     return Column(

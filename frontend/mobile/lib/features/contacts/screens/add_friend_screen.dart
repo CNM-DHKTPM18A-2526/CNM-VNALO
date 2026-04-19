@@ -135,13 +135,24 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
     final common = CommonTexts.of(context);
 
     return Scaffold(
-      backgroundColor: scaffoldBg,
+      backgroundColor: isDarkMode ? DarkColors.scaffold : Colors.white,
       appBar: AppBar(
-        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.white,
-        surfaceTintColor: isDarkMode ? DarkColors.appBarBg : Colors.white,
-        foregroundColor: isDarkMode ? Colors.white : Colors.black,
+        forceMaterialTransparency: !isDarkMode,
+        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
         elevation: 0,
-        title: Text(common.addFriendHeader, style: const TextStyle(fontWeight: FontWeight.w700)),
+        titleSpacing: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: isDarkMode 
+          ? null 
+          : Container(decoration: const BoxDecoration(gradient: AppColors.appBarGradient)),
+        title: Text(
+          common.addFriendHeader, 
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 18, 
+            fontWeight: FontWeight.w600
+          )
+        ),
       ),
       body: ListView(
         children: [
@@ -225,7 +236,7 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
                            ? const SizedBox(
                                width: 20,
                                height: 20,
-                               child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                               child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                              )
                            : Icon(
                                Icons.arrow_forward,
@@ -268,10 +279,16 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
           if (_qrPayload == null && !_isLoadingQr)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: OutlinedButton.icon(
+              child: ElevatedButton.icon(
                 onPressed: _loadMyQr,
                 icon: const Icon(Icons.refresh),
                 label: Text(common.reloadQr),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isDarkMode ? const Color(0xFF2C2C2C) : const Color(0xFFE5E7EB),
+                  foregroundColor: isDarkMode ? Colors.white : const Color(0xFF111827),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
               ),
             ),
           const SizedBox(height: 12),
