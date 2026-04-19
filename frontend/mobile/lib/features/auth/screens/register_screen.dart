@@ -604,8 +604,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ? Text(
                 t.enterPhoneTitle,
                 style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
                   color: isDarkMode ? Colors.white : const Color(0xFF171717),
                 ),
               )

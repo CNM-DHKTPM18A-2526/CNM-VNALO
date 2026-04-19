@@ -23,23 +23,33 @@ class OtpInput extends StatelessWidget {
       textAlign: TextAlign.center,
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
       style: TextStyle(
-        fontSize: 18,
-        letterSpacing: 4,
-        fontWeight: FontWeight.bold,
-        color: isDarkMode ? Colors.white : Colors.black,
+        fontSize: 24,
+        letterSpacing: 8,
+        fontWeight: FontWeight.w700,
+        color: isDarkMode ? Colors.white : const Color(0xFF1F2937),
       ),
       decoration: InputDecoration(
-        hintText: 'Nhập mã OTP',
+        hintText: '●●●●●●',
+        hintStyle: TextStyle(
+          color: isDarkMode ? Colors.white24 : Colors.black12,
+          letterSpacing: 8,
+        ),
         counterText: '',
         filled: true,
-        fillColor: isDarkMode ? DarkColors.surface : Colors.white,
+        fillColor: isDarkMode ? DarkColors.surface : const Color(0xFFF9FAFB),
+        contentPadding: const EdgeInsets.symmetric(vertical: 16),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: isDarkMode ? DarkColors.divider : LightColors.divider),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: isDarkMode ? DarkColors.divider : const Color(0xFFE5E7EB),
+          ),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: isDarkMode ? DarkColors.primary : AppColors.primary, width: 2),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: isDarkMode ? DarkColors.primary : AppColors.primary,
+            width: 1.5,
+          ),
         ),
       ),
       onChanged: (value) {

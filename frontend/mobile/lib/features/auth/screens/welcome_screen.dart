@@ -303,6 +303,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                               backgroundColor: isDarkMode ? DarkColors.surface : Colors.white,
                               foregroundColor: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
                               elevation: 0,
+                              side: BorderSide(
+                                color: isDarkMode ? DarkColors.divider : LightColors.divider,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(999),
                               ),
