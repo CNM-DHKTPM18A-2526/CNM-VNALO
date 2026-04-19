@@ -149,9 +149,8 @@ export function useChatSocket({
     socket.on('presence.changed', handlePresenceChanged)
 
     socket.onAny((event, ...args) => {
-      if (String(event).includes('presence') || event === 'connect' || event === 'disconnect') {
-        console.log('[useChatSocket.onAny] socket event:', event, 'payload:', args)
-      }
+      // Log all events to help debug WebRTC signaling
+      console.log('[useChatSocket.onAny] Received socket event:', event, 'Payload:', args)
     })
 
     if (socket.connected && socket.id) {
@@ -225,6 +224,11 @@ export function useChatSocket({
     return getOrCreateChatService().getSocket()
   }, [])
 
+  const getRootSocket = useCallback(() => {
+    if (!token) return null
+    return getOrCreateChatService().getRootSocket(token)
+  }, [token])
+
   return {
     connect,
     disconnect,
@@ -234,6 +238,7 @@ export function useChatSocket({
     markAsRead,
     isConnected,
     getSocket,
+    getRootSocket,
     waitForConnect: waitForSocketConnect,
   }
 }

@@ -31,6 +31,10 @@ type IconName =
   | 'copy'
   | 'chevronUp'
   | 'unfold_more'
+  | 'mic'
+  | 'micOff'
+  | 'phoneOff'
+  | 'cameraOff'
 
 type IconProps = {
   name: IconName
@@ -339,6 +343,48 @@ export function Icon({ name, className, size = 24 }: IconProps) {
       <svg {...commonProps}>
         <polyline points='7 15 12 20 17 15' />
         <polyline points='7 9 12 4 17 9' />
+      </svg>
+    )
+  }
+
+  if (name === 'mic') {
+    return (
+      <svg {...commonProps}>
+        <path d='M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3Z' />
+        <path d='M19 10v2a7 7 0 0 1-14 0v-2' />
+        <line x1='12' y1='19' x2='12' y2='23' />
+        <line x1='8' y1='23' x2='16' y2='23' />
+      </svg>
+    )
+  }
+
+  if (name === 'micOff') {
+    return (
+      <svg {...commonProps}>
+        <line x1='1' y1='1' x2='23' y2='23' />
+        <path d='M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6' />
+        <path d='M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23' />
+        <line x1='12' y1='19' x2='12' y2='23' />
+        <line x1='8' y1='23' x2='16' y2='23' />
+      </svg>
+    )
+  }
+
+  if (name === 'phoneOff') {
+    return (
+      <svg {...commonProps}>
+        <circle cx='12' cy='12' r='10' fill='#ff4d4f' stroke='none' />
+        <path d='M7 12h10' stroke='white' strokeWidth='2.5' />
+      </svg>
+    )
+  }
+
+  if (name === 'cameraOff') {
+    return (
+      <svg {...commonProps}>
+        <line x1='1' y1='1' x2='23' y2='23' />
+        <path d='M16 16v1.25c0 .41-.34.75-.75.75H3.75c-.41 0-.75-.34-.75-.75V7c0-.41.34-.75.75-.75H5m3.75 0h6.5c.41 0 .75.34.75.75V11' />
+        <path d='m16 10 5-3v10l-2.43-1.46' />
       </svg>
     )
   }
