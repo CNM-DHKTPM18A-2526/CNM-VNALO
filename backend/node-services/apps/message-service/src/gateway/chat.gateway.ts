@@ -10,6 +10,8 @@ import { MessageService } from '../message/message.service';
 import { SendMessageDto } from '../dto/send-message.dto';
 import { WsJwtGuard } from '../auth/ws-jwt.guard';
 import { ConversationService } from '../conversation/conversation.service';
+import { InjectRedis } from '@nestjs-modules/ioredis';
+import type Redis from 'ioredis';
 
 const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? 'http://localhost:3000,http://localhost:5173')
   .split(',')
@@ -55,6 +57,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly jwtService: JwtService,
     private readonly messageService: MessageService,
     private readonly conversationService: ConversationService,
+    @InjectRedis()
+    private readonly redis: Redis,
   ) { }
 
   // ─── Call Signaling ───────────────────────────────────────
@@ -570,6 +574,29 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const sockets = this.userSockets.get(userId);
     
     if (!sockets || sockets.size === 0) {
+      if (event === 'call.offer') {
+        const offlinePayload = {
+          channel: 'CALL_OFFLINE',
+          targetUserId: userId,
+          event,
+          payload: data,
+          createdAt: new Date().toISOString(),
+        };
+
+        this.redis
+          .publish('CALL_OFFLINE', JSON.stringify(offlinePayload))
+          .then(() => {
+            this.logger.log(
+              `[Gateway.emitToUser] Published CALL_OFFLINE event for user=${userId} callId=${data?.callId ?? 'unknown'}`,
+            );
+          })
+          .catch((err) => {
+            this.logger.error(
+              `[Gateway.emitToUser] Failed to publish CALL_OFFLINE for user=${userId}: ${err.message}`,
+            );
+          });
+      }
+
       this.logger.warn(
         `[Gateway.emitToUser] ⚠️  User ${userId} has no active sockets, event='${event}' will not be sent`,
       );

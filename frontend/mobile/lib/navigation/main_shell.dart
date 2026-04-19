@@ -14,6 +14,7 @@ import 'package:vnalo_mobile/features/call/screens/voice_call_screen.dart';
 import 'package:vnalo_mobile/features/call/screens/video_call_screen.dart';
 import 'package:vnalo_mobile/features/call/utils/call_id_generator.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
+import 'package:vnalo_mobile/services/socket_service.dart';
 import 'dart:async';
 
 class MainShell extends StatefulWidget {
@@ -26,6 +27,7 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
   StreamSubscription<AiCommand>? _actionSub;
+  StreamSubscription<Map<String, dynamic>>? _callErrorSub;
 
   @override
   void initState() {
@@ -33,13 +35,68 @@ class _MainShellState extends State<MainShell> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final aiProvider = context.read<AiAssistantProvider>();
       _actionSub = aiProvider.systemActionStream.listen(_handleAiSystemAction);
+
+      final socketService = context.read<SocketService>();
+      _callErrorSub = socketService.onCallError.listen(_handleCallErrorSignal);
     });
   }
 
   @override
   void dispose() {
     _actionSub?.cancel();
+    _callErrorSub?.cancel();
     super.dispose();
+  }
+
+  void _showErrorSnackBar(String message) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+  }
+
+  Future<void> _handleNavigateTo(Map<String, dynamic>? params) async {
+    final page = (params?['page'] ?? '').toString().trim().toLowerCase();
+
+    if (page.isEmpty) {
+      _showErrorSnackBar('Lệnh NAVIGATE_TO thiếu tham số page.');
+      return;
+    }
+
+    switch (page) {
+      case 'chat':
+        setState(() => _currentIndex = 0);
+        break;
+      case 'timeline':
+        setState(() => _currentIndex = 3);
+        break;
+      case 'settings':
+      case 'profile':
+        setState(() => _currentIndex = 4);
+        break;
+      case 'scanner':
+        await Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => const QrScannerScreen()));
+        break;
+      default:
+        _showErrorSnackBar('Không hỗ trợ điều hướng AI tới "$page".');
+    }
+  }
+
+  void _handleCallErrorSignal(Map<String, dynamic> payload) {
+    final detail =
+        payload['error']?.toString().trim().isNotEmpty == true
+            ? payload['error'].toString().trim()
+            : 'Lỗi signaling cuộc gọi từ server.';
+    _showErrorSnackBar('Lỗi cuộc gọi: $detail');
   }
 
   String _normalizeAiSystemAction(String command) {
@@ -62,36 +119,32 @@ class _MainShellState extends State<MainShell> {
     debugPrint('AI System Action Triggered: $command with params: $params');
 
     switch (command) {
+      case 'NAVIGATE_TO':
+        _handleNavigateTo(params);
+        break;
       case 'NAVIGATE_TO_SETTINGS':
-        setState(() => _currentIndex = 4);
+        _handleNavigateTo({'page': 'settings'});
         break;
       case 'NAVIGATE_TO_CHAT':
-        setState(() => _currentIndex = 0);
+        _handleNavigateTo({'page': 'chat'});
         break;
       case 'NAVIGATE_TO_SCANNER':
-        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const QrScannerScreen()));
+        _handleNavigateTo({'page': 'scanner'});
         break;
       case 'NAVIGATE_TO_TIMELINE':
-        setState(() => _currentIndex = 3);
+        _handleNavigateTo({'page': 'timeline'});
         break;
         
       case 'OPEN_CHAT':
       case 'SEND_MESSAGE':
       case 'START_CALL':
-        final targetName = params?['target'] ?? params?['recipient'] ?? '';
+        final targetName =
+            (params?['target'] ?? params?['recipient'] ?? '').toString();
         final conversation = chatProvider.findConversationByName(targetName);
         
         if (conversation == null) {
           debugPrint('AI Resolution Failed: Could not find conversation for "$targetName"');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Không tìm thấy "$targetName" trong danh bạ.'),
-                behavior: SnackBarBehavior.floating,
-                backgroundColor: Colors.redAccent,
-              ),
-            );
-          }
+          _showErrorSnackBar('Không tìm thấy "$targetName" trong danh bạ.');
           return;
         }
 
@@ -113,6 +166,13 @@ class _MainShellState extends State<MainShell> {
             ),
           ));
         } else if (command == 'START_CALL') {
+          if (!isDirect || peerUserId.isEmpty) {
+            _showErrorSnackBar(
+              'Tính năng gọi điện hiện chỉ hỗ trợ hội thoại 1-1.',
+            );
+            return;
+          }
+
           final isVideo = params?['callType'] == 'video';
           final callId = generateCallId(
             conversationId: conversation.id,
