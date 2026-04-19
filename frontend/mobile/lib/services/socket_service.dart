@@ -54,7 +54,7 @@ class SocketService {
     if (data is! Map) return;
     final payload = Map<String, dynamic>.from(data);
     debugPrint(
-      '[SocketService][CALL][RECV] type=$type callId=${payload['callId']} conversationId=${payload['conversationId']} sender=${payload['senderUserId'] ?? payload['senderId'] ?? payload['fromUserId']} target=${payload['targetUserId'] ?? payload['toUserId']}',
+      '🟢 [SocketService][CALL][RECV] type=$type callId=${payload['callId']} conversationId=${payload['conversationId']} sender=${payload['senderUserId'] ?? payload['senderId'] ?? payload['fromUserId']} target=${payload['targetUserId'] ?? payload['toUserId']}',
     );
     _callSignalController.add({'type': type, ...payload});
   }

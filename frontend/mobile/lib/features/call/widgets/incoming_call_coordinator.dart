@@ -6,6 +6,7 @@ import 'package:vnalo_mobile/features/call/screens/video_call_screen.dart';
 import 'package:vnalo_mobile/features/call/screens/voice_call_screen.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
+import 'package:vnalo_mobile/main.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
 
@@ -173,7 +174,13 @@ class _IncomingCallCoordinatorState extends State<IncomingCallCoordinator> {
 
     _isPresentingCall = true;
     try {
-      await Navigator.of(context, rootNavigator: true).push(
+      final nav = navigatorKey.currentState;
+      if (nav == null) {
+        debugPrint('[IncomingCallCoordinator] Navigator state is null! Cannot push call screen.');
+        return;
+      }
+
+      await nav.push(
         MaterialPageRoute(
           builder: (_) => audioOnly
               ? VoiceCallScreen(
