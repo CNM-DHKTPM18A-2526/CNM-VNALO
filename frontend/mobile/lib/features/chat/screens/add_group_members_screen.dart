@@ -19,9 +19,10 @@ class AddGroupMembersScreen extends StatefulWidget {
 class _AddGroupMembersScreenState extends State<AddGroupMembersScreen> {
   final TextEditingController _searchController = TextEditingController();
   List<User> _friends = [];
-  List<User> _filteredFriends = [];
-  final Set<String> _selectedUserIds = {};
+  Map<String, List<User>> _groupedFriends = {};
+  List<User> _selectedUsers = [];
   bool _isLoading = true;
+  bool _seeRecentHistory = true;
 
   @override
   void initState() {
@@ -38,14 +39,16 @@ class _AddGroupMembersScreenState extends State<AddGroupMembersScreen> {
   Future<void> _loadFriends() async {
     try {
       final friends = await context.read<FriendService>().getFriends();
-      // Filter out people already in conversation
-      final existingMemberIds = widget.conversation.members.map((m) => m.userId).toSet();
-      final availableFriends = friends.where((f) => !existingMemberIds.contains(f.id)).toList();
+      // Filter out people who are ALREADY ACTIVE in conversation
+      final activeMemberIds = widget.conversation.members
+          .where((m) => m.leftAt == null)
+          .map((m) => m.userId).toSet();
+      final availableFriends = friends.where((f) => !activeMemberIds.contains(f.id)).toList();
       
       if (mounted) {
         setState(() {
           _friends = availableFriends;
-          _filteredFriends = availableFriends;
+          _groupFriends(availableFriends);
           _isLoading = false;
         });
       }
@@ -54,58 +57,65 @@ class _AddGroupMembersScreenState extends State<AddGroupMembersScreen> {
     }
   }
 
+  void _groupFriends(List<User> friends) {
+    // Sort friends by display name
+    friends.sort((a, b) => a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()));
+    
+    final grouped = <String, List<User>>{};
+    for (final friend in friends) {
+      final firstLetter = friend.displayName.isNotEmpty 
+          ? friend.displayName[0].toUpperCase()
+          : '#';
+      if (!grouped.containsKey(firstLetter)) {
+        grouped[firstLetter] = [];
+      }
+      grouped[firstLetter]!.add(friend);
+    }
+    
+    _groupedFriends = Map.fromEntries(
+      grouped.entries.toList()..sort((a, b) => a.key.compareTo(b.key))
+    );
+  }
+
   void _onSearchChanged(String query) {
     setState(() {
       if (query.isEmpty) {
-        _filteredFriends = _friends;
+        _groupFriends(_friends);
       } else {
-        _filteredFriends = _friends.where((f) {
+        final filtered = _friends.where((f) {
           final q = query.toLowerCase();
           return f.displayName.toLowerCase().contains(q) || (f.phone?.contains(q) ?? false);
         }).toList();
+        _groupFriends(filtered);
       }
     });
   }
 
-  void _toggleSelection(String userId) {
+  void _toggleSelection(User user) {
     setState(() {
-      if (_selectedUserIds.contains(userId)) {
-        _selectedUserIds.remove(userId);
+      final index = _selectedUsers.indexWhere((u) => u.id == user.id);
+      if (index >= 0) {
+        _selectedUsers.removeAt(index);
       } else {
-        _selectedUserIds.add(userId);
+        _selectedUsers.add(user);
       }
     });
   }
 
   Future<void> _addMembers() async {
-    if (_selectedUserIds.isEmpty) return;
+    if (_selectedUsers.isEmpty) return;
 
-    try {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => const Center(child: CircularProgressIndicator()),
+    // Fire and forget (Optimistic UI)
+    context.read<ChatProvider>().addMembersToGroup(
+      widget.conversation.id,
+      _selectedUsers,
+    );
+
+    if (mounted) {
+      Navigator.pop(context); // Close screen immediately
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đang thêm thành viên vào nhóm...')),
       );
-
-      await context.read<ChatProvider>().addMembersToGroup(
-        widget.conversation.id,
-        _selectedUserIds.toList(),
-      );
-
-      if (mounted) {
-        Navigator.pop(context); // Close loading
-        Navigator.pop(context); // Close screen
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã thêm thành viên vào nhóm')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        Navigator.pop(context); // Close loading
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi thêm thành viên: $e')),
-        );
-      }
     }
   }
 
@@ -114,75 +124,191 @@ class _AddGroupMembersScreenState extends State<AddGroupMembersScreen> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDarkMode ? DarkColors.scaffold : const Color(0xFFF4F5F7),
+      backgroundColor: Colors.white,
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Thêm thành viên', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-            Text('Đã chọn: ${_selectedUserIds.length}', style: const TextStyle(fontSize: 12, color: Colors.white70)),
+             const Text('Thêm vào nhóm', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.black87)),
+             Text('Đã chọn: ${_selectedUsers.length}', style: const TextStyle(fontSize: 13, color: Colors.black54)),
           ],
         ),
-        actions: [
-          if (_selectedUserIds.isNotEmpty)
-            TextButton(
-              onPressed: _addMembers,
-              child: const Text('THÊM', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            ),
-        ],
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: isDarkMode ? null : AppColors.appBarGradient,
-            color: isDarkMode ? DarkColors.appBarBg : null,
-          ),
-        ),
+        backgroundColor: Colors.white,
+        elevation: 0.5,
       ),
       body: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
-            color: isDarkMode ? DarkColors.surface : Colors.white,
-            child: TextField(
-              controller: _searchController,
-              onChanged: _onSearchChanged,
-              decoration: InputDecoration(
-                hintText: 'Tìm kiếm bạn bè',
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: isDarkMode ? Colors.white10 : Colors.grey.shade100,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: Colors.white,
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: _onSearchChanged,
+                    decoration: InputDecoration(
+                      hintText: 'Tìm tên hoặc số điện thoại',
+                      prefixIcon: const Icon(Icons.search, size: 20),
+                      filled: true,
+                      fillColor: Colors.grey.shade100,
+                      isDense: true,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                  ),
                 ),
-                contentPadding: EdgeInsets.zero,
-              ),
+                const SizedBox(width: 12),
+                Text('123', style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
             ),
           ),
+          ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.link, color: Colors.blue, size: 24),
+            ),
+            title: const Text('Mời vào nhóm bằng link', style: TextStyle(fontSize: 16)),
+            onTap: () {
+               ScaffoldMessenger.of(context).showSnackBar(
+                 const SnackBar(content: Text('Tính năng mời bằng link đang được phát triển')),
+               );
+            },
+          ),
+          const Divider(height: 1, thickness: 0.5),
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _filteredFriends.isEmpty
+                : _friends.isEmpty
                     ? const Center(child: Text('Không có bạn bè khả dụng'))
-                    : ListView.builder(
-                        itemCount: _filteredFriends.length,
-                        itemBuilder: (context, index) {
-                          final user = _filteredFriends[index];
-                          final isSelected = _selectedUserIds.contains(user.id);
-                          return CheckboxListTile(
-                            value: isSelected,
-                            onChanged: (_) => _toggleSelection(user.id),
-                            title: Text(user.displayName),
-                            secondary: AvatarWidget(
-                              imageUrl: user.avatarUrl,
-                              name: user.displayName,
-                              size: 40,
+                    : ListView(
+                        children: _groupedFriends.entries.expand((entry) {
+                          return [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                              color: Colors.grey.shade100,
+                              width: double.infinity,
+                              child: Text(entry.key, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black54)),
                             ),
-                            controlAffinity: ListTileControlAffinity.trailing,
-                            activeColor: AppColors.primary,
-                          );
-                        },
+                            ...entry.value.map((user) {
+                              final isSelected = _selectedUsers.any((u) => u.id == user.id);
+                              return InkWell(
+                                onTap: () => _toggleSelection(user),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                  child: Row(
+                                    children: [
+                                      AvatarWidget(imageUrl: user.avatarUrl, name: user.displayName, size: 44),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(user.displayName, style: const TextStyle(fontSize: 16)),
+                                      ),
+                                      Container(
+                                        width: 22,
+                                        height: 22,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          border: isSelected ? null : Border.all(color: Colors.grey.shade400, width: 1.5),
+                                          color: isSelected ? Colors.blue : Colors.transparent,
+                                        ),
+                                        child: isSelected ? const Icon(Icons.check, size: 14, color: Colors.white) : null,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }),
+                          ];
+                        }).toList(),
                       ),
           ),
+          if (_selectedUsers.isNotEmpty)
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, -2))],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                   Container(
+                    height: 80,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: _selectedUsers.length,
+                            itemBuilder: (context, index) {
+                              final user = _selectedUsers[index];
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    AvatarWidget(imageUrl: user.avatarUrl, name: user.displayName, size: 50),
+                                    Positioned(
+                                      top: 4,
+                                      right: 4,
+                                      child: GestureDetector(
+                                        onTap: () => _toggleSelection(user),
+                                        child: Container(
+                                          decoration: BoxDecoration(color: Colors.grey.shade400, shape: BoxShape.circle),
+                                          child: const Icon(Icons.close, size: 14, color: Colors.white),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(right: 16, left: 8),
+                          child: SizedBox(
+                            width: 56,
+                            height: 56,
+                            child: FloatingActionButton(
+                              onPressed: _addMembers,
+                              backgroundColor: Colors.blue,
+                              elevation: 2,
+                              child: const Icon(Icons.arrow_forward, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1, thickness: 0.5),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    child: Row(
+                      children: [
+                        const Expanded(child: Text('Thành viên mới xem được tin gửi gần đây', style: TextStyle(fontSize: 14))),
+                        Switch.adaptive(
+                          value: _seeRecentHistory,
+                          onChanged: (v) => setState(() => _seeRecentHistory = v),
+                          activeColor: Colors.blue,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );

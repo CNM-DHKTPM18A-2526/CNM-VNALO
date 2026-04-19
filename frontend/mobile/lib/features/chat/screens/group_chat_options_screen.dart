@@ -16,6 +16,8 @@ import 'package:vnalo_mobile/models/conversation_model.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/conversation_member_model.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 class GroupChatOptionsScreen extends StatefulWidget {
   final Conversation conversation;
@@ -28,6 +30,7 @@ class GroupChatOptionsScreen extends StatefulWidget {
 
 class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
   bool _isLoadingMedia = true;
+  bool _isUpdatingAvatar = false;
   List<dynamic> _recentMedia = [];
 
   @override
@@ -80,6 +83,62 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
 
     if (newName != null && newName.trim().isNotEmpty && mounted) {
       await context.read<ChatProvider>().updateGroupInfo(widget.conversation.id, title: newName.trim());
+    }
+  }
+
+  Future<void> _changeGroupAvatar() async {
+    final common = CommonTexts.of(context, listen: false);
+    final picker = ImagePicker();
+
+    final source = await showCupertinoModalPopup<ImageSource>(
+      context: context,
+      builder: (context) => CupertinoActionSheet(
+        title: const Text('Đổi ảnh nhóm'),
+        actions: [
+          CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(context, ImageSource.camera),
+            child: const Text('Chụp ảnh mới'),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(context, ImageSource.gallery),
+            child: const Text('Chọn từ thư viện'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(context),
+          isDefaultAction: true,
+          child: Text(common.cancel),
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
+    final pickedFile = await picker.pickImage(
+      source: source,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 85,
+    );
+
+    if (pickedFile != null && mounted) {
+      setState(() => _isUpdatingAvatar = true);
+      try {
+        await context.read<ChatProvider>().updateGroupAvatarFile(
+          widget.conversation.id,
+          File(pickedFile.path),
+        );
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Không thể cập nhật ảnh nhóm')),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isUpdatingAvatar = false);
+        }
+      }
     }
   }
 
@@ -136,7 +195,7 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
               )),
             ),
             _buildDivider(),
-            _buildTile(CupertinoIcons.person_2, 'Xem thành viên (${conv.members.length})', 
+            _buildTile(CupertinoIcons.person_2, 'Xem thành viên (${conv.activeMemberCount})', 
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GroupMembersScreen(conversation: conv)))),
             _buildDivider(),
             _buildTile(CupertinoIcons.person_badge_plus, 'Duyệt thành viên', 
@@ -244,18 +303,26 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
         children: [
           Stack(
             children: [
-              GroupAvatar(
-                members: conv.members.map((m) => (
-                  imageUrl: m.user?.avatarUrl,
-                  name: m.user?.displayName ?? m.nickname ?? 'User',
-                )).toList(),
-                size: 100,
-              ),
+              (conv.avatarUrl != null && conv.avatarUrl!.isNotEmpty)
+                  ? AvatarWidget(
+                      imageUrl: conv.avatarUrl,
+                      name: conv.title ?? 'Group',
+                      size: 100,
+                    )
+                  : GroupAvatar(
+                      members: conv.members
+                          .map((m) => (
+                                imageUrl: m.user?.avatarUrl,
+                                name: m.user?.displayName ?? m.nickname ?? 'User',
+                              ))
+                          .toList(),
+                      size: 100,
+                    ),
               Positioned(
                 bottom: 0,
                 right: 0,
                 child: GestureDetector(
-                  onTap: () => _showComingSoon('Đổi ảnh nhóm'),
+                  onTap: _isUpdatingAvatar ? null : _changeGroupAvatar,
                   child: Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
@@ -263,7 +330,13 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 2),
                     ),
-                    child: const Icon(Icons.camera_alt, size: 18, color: Colors.blue),
+                    child: _isUpdatingAvatar
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.camera_alt, size: 18, color: Colors.blue),
                   ),
                 ),
               ),

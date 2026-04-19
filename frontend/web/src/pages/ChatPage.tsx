@@ -9,6 +9,7 @@ import { SearchGlobalPanel } from '../features/chat/components/SearchGlobalPanel
 import { MessageShareModal } from '../features/chat/components/MessageShareModal'
 import { ChatWindow } from '../features/chat/components/ChatWindow'
 import { UserProfileModal } from '../features/chat/components/UserProfileModal'
+import { CallModal } from '../features/chat/components/CallModal'
 import type { MessageContextMenuAction } from '../features/chat/components/MessageContextMenu'
 import {
   addMessageReaction,
@@ -50,6 +51,7 @@ import { getFriends, getUserById, searchUsers } from '../features/friends/friend
 import { getUserByPhone } from '../features/friends/friends.api'
 import type { Friend, UserLookupResult } from '../features/friends/friends.types'
 import { useAuth } from '../features/auth/useAuth'
+import { WebRtcCallService } from '../features/chat/webrtcCallService'
 import { Skeleton } from '../shared/components/ui/Skeleton'
 import { Card } from '../shared/components/ui/Card'
 import { Modal } from '../shared/components/ui/Modal'
@@ -64,7 +66,7 @@ import {
 } from '../features/chat/searchIndex'
 import { CreateGroupModal } from '../features/chat/components/CreateGroupModal'
 import { EditConversationNameModal } from '../features/chat/components/EditConversationNameModal'
-import { formatMessage, renderSystemMessage, formatMessagePreview } from '../features/chat/utils/messageUtils'
+import { formatMessage, renderSystemMessage, formatMessagePreview, formatMessageTimestamp, normalizeMessage } from '../features/chat/utils/messageUtils'
 import { UserStoreProvider, useUserStore } from '../features/chat/context/UserStoreContext'
 import type { SystemMessagePayload } from '../features/chat/chat.types'
 
@@ -174,13 +176,7 @@ function resolveDeliveryState(
 
   return rank[incoming] >= rank[current] ? incoming : current
 }
-
-function formatMessageTimestamp(): string {
-  return new Date().toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
+// Moved to messageUtils.ts
 
 function markLocalMessageFailed(messages: ChatMessage[], clientMessageId: string): ChatMessage[] {
   return messages.map((message) => {
@@ -200,6 +196,8 @@ function toSocketMessageType(type: ChatMessageType): Uppercase<ChatMessageType> 
   return type.toUpperCase() as Uppercase<ChatMessageType>
 }
 
+
+// Removed local normalizeMessage, now imported from ../features/chat/utils/messageUtils
 
 function getConversationPreview(
   message: ChatMessage,
@@ -419,6 +417,7 @@ export default function ChatPage() {
 function ChatPageContent() {
   const { userMap, upsertUser, ensureUser } = useUserStore()
   const { isBootstrapping, accessToken, user } = useAuth()
+  const currentUserId = user?.id || ''
   const { t } = useLanguage()
   const navigate = useNavigate()
   const { conversationId: conversationIdFromUrl } = useParams<{ conversationId?: string }>()
@@ -447,10 +446,72 @@ function ChatPageContent() {
   const [shareModalMessage, setShareModalMessage] = useState<ChatMessage | null>(null)
   const [isShareSubmitting, setIsShareSubmitting] = useState(false)
   const [deletedTimestamps, setDeletedTimestamps] = useState<Record<string, number>>({})
+  const [pinnedConversationIds, setPinnedConversationIds] = useState<Record<string, boolean>>({})
   const [confirmDeleteHistoryId, setConfirmDeleteHistoryId] = useState<string | null>(null)
   const [confirmLeaveGroupOpen, setConfirmLeaveGroupOpen] = useState(false)
   const [selectedProfileUserId, setSelectedProfileUserId] = useState<string | null>(null)
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
+
+  // CALL STATE
+  const [callState, setCallState] = useState<{
+    isOpen: boolean
+    type: 'audio' | 'video'
+    direction: 'outgoing' | 'incoming'
+    status: 'connecting' | 'connected' | 'failed'
+    peerId?: string
+    startedAt?: number
+    callId?: string
+    localStream?: MediaStream | null
+    remoteStream?: MediaStream | null
+    isMicOn?: boolean
+    isCameraOn?: boolean
+    hasRemoteDescription?: boolean
+    error?: string | null
+  }>({
+    isOpen: false,
+    type: 'audio',
+    direction: 'outgoing',
+    status: 'connecting',
+    isMicOn: true,
+    isCameraOn: true,
+  })
+
+  // WEBRTC SERVICE REF
+  const callServiceRef = useRef<WebRtcCallService | null>(null)
+
+  // SYNC CALL STATE TO REF FOR LISTENERS
+  const callStateRef = useRef(callState)
+  useEffect(() => {
+    callStateRef.current = callState
+  }, [callState])
+
+  // Initialize call service with state syncing
+  if (!callServiceRef.current) {
+    callServiceRef.current = new WebRtcCallService((serviceState) => {
+      setCallState((prev) => {
+        let status: 'connecting' | 'connected' | 'failed' = 'connecting'
+        if (serviceState.isConnected) status = 'connected'
+        else if (serviceState.error) status = 'failed'
+        else if (prev.status === 'failed') status = 'failed' // Maintain failure state
+
+        return {
+          ...prev,
+          status,
+          startedAt: serviceState.startedAt,
+          localStream: serviceState.localStream,
+          remoteStream: serviceState.remoteStream,
+          isMicOn: serviceState.isMicOn,
+          isCameraOn: serviceState.isCameraOn,
+          hasRemoteDescription: serviceState.hasRemoteDescription,
+          error: serviceState.error,
+        }
+      })
+
+      if (serviceState.isEnded && callState.isOpen) {
+        // We'll handle termination in the component logic or here
+      }
+    })
+  }
 
   const routedConversationIdRef = useRef('')
   const selectedConversationIdRef = useRef('')
@@ -464,6 +525,9 @@ function ChatPageContent() {
   const loadingPinnedRef = useRef<Record<string, boolean>>({})
   const lastConvRef = useRef<string | null>(null)
 
+  // WebRTC Signal Deduplication (prevents double-triggering from specific + generic events)
+  const processedSignalsRef = useRef<Set<string>>(new Set())
+
   useEffect(() => {
     userMapRef.current = userMap
   }, [userMap])
@@ -471,14 +535,23 @@ function ChatPageContent() {
   const pendingMetadataFetches = useRef<Map<string, Promise<void>>>(new Map())
   const processedMessageIds = useRef<Set<string>>(new Set())
 
-  // Load deleted timestamps from localStorage on mount
+  // Load deleted timestamps & pinned conversations from localStorage on mount
   useEffect(() => {
-    const saved = localStorage.getItem('vnalo_deleted_timestamps')
-    if (saved) {
+    const savedDeleted = localStorage.getItem('vnalo_deleted_timestamps')
+    if (savedDeleted) {
       try {
-        setDeletedTimestamps(JSON.parse(saved))
+        setDeletedTimestamps(JSON.parse(savedDeleted))
       } catch (e) {
         console.warn('Failed to parse deleted timestamps', e)
+      }
+    }
+
+    const savedPinned = localStorage.getItem('vnalo_pinned_conversations')
+    if (savedPinned) {
+      try {
+        setPinnedConversationIds(JSON.parse(savedPinned))
+      } catch (e) {
+        console.warn('Failed to parse pinned conversations', e)
       }
     }
   }, [])
@@ -490,6 +563,20 @@ function ChatPageContent() {
     localStorage.setItem('vnalo_deleted_timestamps', JSON.stringify(newTimestamps))
     setConfirmDeleteHistoryId(null)
   }
+
+  const handleTogglePinConversation = useCallback((conversationId: string) => {
+    setPinnedConversationIds((prev) => {
+      const isCurrentlyPinned = !!prev[conversationId]
+      const next = { ...prev }
+      if (isCurrentlyPinned) {
+        delete next[conversationId]
+      } else {
+        next[conversationId] = true
+      }
+      localStorage.setItem('vnalo_pinned_conversations', JSON.stringify(next))
+      return next
+    })
+  }, [])
 
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
@@ -800,7 +887,7 @@ function ChatPageContent() {
       if (raw.id) processedMessageIds.current.add(raw.id)
 
       const senderId = raw.senderId || raw.from || ''
-      const mapped = applyRestrictedMessage(mapRawMessage(raw, user.id), isRestrictedMode)
+      const mapped = applyRestrictedMessage(normalizeMessage(mapRawMessage(raw, user.id)), isRestrictedMode)
 
       if (!mapped.conversationId) {
         return
@@ -872,9 +959,18 @@ function ChatPageContent() {
 
         // Proactively fetch profiles for all users mentioned in the system message
         try {
-          const payload: SystemMessagePayload = JSON.parse(mapped.text)
+          const payload = JSON.parse(mapped.text) as SystemMessagePayload;
           const involvedIds = [payload.actorId, ...(payload.targetMemberIds ?? [])].filter(Boolean)
           involvedIds.forEach((id) => void ensureUser(accessToken, id))
+
+          // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          // PIN/UNPIN REAL-TIME SYNC
+          // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          const actionPayload = payload as any; 
+          if (actionPayload.action === 'PIN_MESSAGE' || actionPayload.action === 'UNPIN_MESSAGE') {
+            console.log(`[ChatPage.onMessageReceived] Real-time ${actionPayload.action} signal received for conversation:`, mapped.conversationId);
+            void syncPinnedMessages(mapped.conversationId);
+          }
         } catch (e) {
           /* ignore parse errors */
         }
@@ -896,7 +992,9 @@ function ChatPageContent() {
           const existingIndex = prev.findIndex((conversation) => conversation.id === mapped.conversationId)
 
           if (existingIndex === -1) {
-            // Should be handled by discovery above, but fallback for safety
+            // DISCOVERY FALLBACK: If discovery fetch hasn't finished, create placeholder
+            // CRITICAL: We don't know if it's a group yet, so we must be CAREFUL.
+            // Zalo usually waits for metadata, but if we must create one, use generic name for now.
             return [
               {
                 id: mapped.conversationId,
@@ -921,14 +1019,31 @@ function ChatPageContent() {
 
           const next = [...prev]
           const current = next[existingIndex]
-          const shouldReplaceName =
-            !current.name?.trim() ||
-            current.name.startsWith('Trò chuyện ') ||
-            current.name.startsWith('Nguoi dung ')
+          
+          // PROTECT CONVERSATION IDENTITY
+          const isGroup = current.isGroup;
+          const isFromMe = mapped.senderId === user.id;
+          
+          let updatedAvatarUrl = current.avatarUrl;
+          let updatedName = current.name;
+
+          if (isGroup) {
+            // Group Protection: Always keep existing group identity (null -> collage)
+            updatedAvatarUrl = current.avatarUrl ?? null;
+            updatedName = current.name ?? profile.displayName;
+          } else {
+            // 1-on-1 Protection: Only update if message is from the partner
+            // If message is from ME, keep existing partner name/avatar
+            if (!isFromMe) {
+              updatedAvatarUrl = profile.avatarUrl ?? current.avatarUrl;
+              updatedName = profile.displayName ?? current.name;
+            }
+          }
+
           next[existingIndex] = {
             ...current,
-            name: shouldReplaceName ? profile.displayName : current.name,
-            avatarUrl: current.avatarUrl ?? profile.avatarUrl,
+            name: updatedName,
+            avatarUrl: updatedAvatarUrl,
             lastMessage: formatConversationPreview(
               profile.displayName,
               mapped,
@@ -936,11 +1051,11 @@ function ChatPageContent() {
               (id) => userMapRef.current[id]?.displayName || 'Người dùng',
             ),
             lastMessageAt: new Date().toISOString(),
-            isStranger:
-              senderId && friendIdSetRef.current.has(senderId)
-                ? false
+            isStranger: 
+              senderId && friendIdSetRef.current.has(senderId) 
+                ? false 
                 : current.isStranger ?? Boolean(senderId),
-            participantUserIds:
+            participantUserIds: 
               current.participantUserIds && senderId
                 ? Array.from(new Set([...current.participantUserIds, senderId]))
                 : current.participantUserIds ?? (senderId ? [senderId] : undefined),
@@ -1191,7 +1306,7 @@ function ChatPageContent() {
 
   const handleTogglePinMessage = useCallback(
     async (messageId: string, conversationId: string) => {
-      if (!accessToken) {
+      if (!accessToken || !user) {
         return
       }
 
@@ -1205,6 +1320,19 @@ function ChatPageContent() {
             ...prev,
             [conversationId]: currentPins.filter((id) => id !== messageId),
           }))
+          
+          // Emit signal to sync other clients
+          void emitSendMessage({
+            conversationId,
+            content: JSON.stringify({ 
+              action: 'UNPIN_MESSAGE', 
+              messageId, 
+              conversationId,
+              actorId: user.id 
+            }),
+            messageType: 'SYSTEM',
+            clientMessageId: crypto.randomUUID()
+          });
           return
         }
 
@@ -1218,13 +1346,26 @@ function ChatPageContent() {
           ...prev,
           [conversationId]: [...currentPins, messageId],
         }))
+
+        // Emit signal to sync other clients
+        void emitSendMessage({
+          conversationId,
+          content: JSON.stringify({ 
+            action: 'PIN_MESSAGE', 
+            messageId, 
+            conversationId,
+            actorId: user.id 
+          }),
+          messageType: 'SYSTEM',
+          clientMessageId: crypto.randomUUID()
+        });
       } catch (error) {
         const action = isPinned ? 'bỏ ghim' : 'ghim'
         console.error(`[ChatPage.handleTogglePinMessage] Failed to ${action} message`, error)
         toast.error(`Không thể ${action} tin nhắn. Vui lòng thử lại sau.`)
       }
     },
-    [accessToken, pinnedMessageIds],
+    [accessToken, pinnedMessageIds, user, emitSendMessage],
   )
 
   const toggleMessageIdInList = useCallback((messageId: string) => {
@@ -1304,43 +1445,23 @@ function ChatPageContent() {
         return
       }
 
-      const trimmedNote = note.trim()
-      const mediaUrl = shareModalMessage.mediaUrl ?? shareModalMessage.attachments?.[0]?.url ?? null
-      const mediaThumbnailUrl = shareModalMessage.mediaThumbnailUrl ?? shareModalMessage.attachments?.[0]?.thumbnailUrl ?? null
-      const mediaMimeType = shareModalMessage.mediaMimeType ?? shareModalMessage.attachments?.[0]?.mimeType ?? null
-      const mediaSizeBytes = shareModalMessage.mediaSizeBytes ?? shareModalMessage.attachments?.[0]?.sizeBytes ?? null
-      const messageType =
-        shareModalMessage.type === 'image'
-          ? 'IMAGE'
-          : shareModalMessage.type === 'file'
-            ? 'FILE'
-            : shareModalMessage.type === 'sticker'
-              ? 'STICKER'
-              : 'TEXT'
-
-      const payloadContent =
-        (shareModalMessage.text ?? '').trim().length > 0
-          ? shareModalMessage.text
-          : shareModalMessage.type === 'image'
-            ? mediaUrl ?? '[image]'
-            : shareModalMessage.type === 'file'
-              ? shareModalMessage.attachments?.[0]?.name ?? mediaUrl ?? '[file]'
-              : shareModalMessage.type === 'sticker'
-                ? '[sticker]'
-                : ''
-
       setIsShareSubmitting(true)
+      const trimmedNote = note.trim()
+      const attachments = shareModalMessage.attachments || []
 
       try {
         for (const userId of targetUserIds) {
           const conversationId = await getOrCreateDirectConversation(accessToken, userId)
           await joinConversation(conversationId)
 
+          // 1. Send Note first
           if (trimmedNote) {
+            const noteClientId = crypto.randomUUID();
             const noteAck = await emitSendMessage({
               conversationId,
               content: trimmedNote,
               messageType: 'TEXT',
+              clientMessageId: noteClientId,
             })
 
             if (noteAck?.event !== 'message.sent') {
@@ -1348,30 +1469,65 @@ function ChatPageContent() {
                 conversationId,
                 content: trimmedNote,
                 messageType: 'TEXT',
+                clientMessageId: noteClientId,
               })
             }
           }
 
-          const shareAck = await emitSendMessage({
-            conversationId,
-            content: payloadContent,
-            messageType: toSocketMessageType(shareModalMessage.type),
-            mediaUrl,
-            mediaThumbnailUrl,
-            mediaMimeType,
-            mediaSizeBytes,
-          })
+          // 2. Determine and Send Message Content
+          // If the original message has multiple attachments, we must split them
+          if (attachments.length > 1) {
+            for (const att of attachments) {
+              const attClientId = crypto.randomUUID();
+              const payload = {
+                conversationId,
+                content: att.name || '',
+                messageType: toSocketMessageType(shareModalMessage.type),
+                mediaUrl: att.url,
+                mediaThumbnailUrl: att.thumbnailUrl,
+                mediaMimeType: att.mimeType,
+                mediaSizeBytes: att.sizeBytes,
+                clientMessageId: attClientId,
+              }
 
-          if (shareAck?.event !== 'message.sent') {
-            await sendMessageViaRest(accessToken, {
+              const ack = await emitSendMessage(payload)
+              if (ack?.event !== 'message.sent') {
+                await sendMessageViaRest(accessToken, {
+                  ...payload,
+                  messageType: (shareModalMessage.type === 'image' ? 'IMAGE' : 'FILE') as any
+                })
+              }
+            }
+          } else {
+            // Singular message (text, sticker, or single image/file)
+            const mediaUrl = shareModalMessage.mediaUrl ?? attachments[0]?.url ?? null
+            const mediaThumbnailUrl = shareModalMessage.mediaThumbnailUrl ?? attachments[0]?.thumbnailUrl ?? null
+            const mediaMimeType = shareModalMessage.mediaMimeType ?? attachments[0]?.mimeType ?? null
+            const mediaSizeBytes = shareModalMessage.mediaSizeBytes ?? attachments[0]?.sizeBytes ?? null
+            
+            const payloadContent = (shareModalMessage.text ?? '').trim().length > 0
+              ? shareModalMessage.text
+              : ""
+
+            const singularClientId = crypto.randomUUID();
+            const payload = {
               conversationId,
-              content: payloadContent || undefined,
-              messageType,
+              content: payloadContent,
+              messageType: toSocketMessageType(shareModalMessage.type),
               mediaUrl,
               mediaThumbnailUrl,
               mediaMimeType,
               mediaSizeBytes,
-            })
+              clientMessageId: singularClientId,
+            }
+
+            const ack = await emitSendMessage(payload)
+            if (ack?.event !== 'message.sent') {
+              await sendMessageViaRest(accessToken, {
+                ...payload,
+                messageType: (shareModalMessage.type === 'image' ? 'IMAGE' : (shareModalMessage.type === 'file' ? 'FILE' : (shareModalMessage.type === 'sticker' ? 'STICKER' : 'TEXT'))) as any
+              })
+            }
           }
         }
 
@@ -1388,6 +1544,405 @@ function ChatPageContent() {
     },
     [accessToken, emitSendMessage, joinConversation, shareModalMessage],
   )
+
+  const handleInitiateCall = useCallback(async (type: 'audio' | 'video') => {
+    if (!selectedConversationId) return;
+
+    const callId = `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const socket = getSocket();
+    if (!socket) return;
+
+    const peerUserId = selectedConversation?.userId || selectedConversationId;
+    console.log('[CALL][INITIATE]', { type, conversationId: selectedConversationId, peerUserId });
+
+    setCallState({
+      isOpen: true,
+      type,
+      direction: 'outgoing',
+      status: 'connecting',
+      peerId: peerUserId,
+      callId,
+      isMicOn: true,
+      isCameraOn: type === 'video',
+    });
+
+    await callServiceRef.current?.initialize({
+      socket,
+      conversationId: selectedConversationId,
+      callId,
+      currentUserId,
+      peerUserId: peerUserId,
+      audioOnly: type === 'audio',
+      isCaller: true,
+    });
+  }, [selectedConversationId, selectedConversation, currentUserId, getSocket]);
+
+
+  const handleEndCall = useCallback(async (reasonArg: any = 'hangup') => {
+    const reason = typeof reasonArg === 'string' ? reasonArg : 'hangup';
+    const currentCall = callStateRef.current;
+    if (!currentCall.isOpen || !selectedConversationIdRef.current) return;
+
+    const { type, direction, startedAt, callId, peerId } = currentCall;
+    const duration = startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0;
+
+    let outcome: 'completed' | 'canceled' | 'missed' = 'completed';
+    if (!startedAt) {
+      outcome = direction === 'outgoing' ? 'canceled' : 'missed';
+    }
+
+    console.log(`[CALL_LOG] Ending call. Reason: ${reason}, Outcome: ${outcome}, Duration: ${duration}s`);
+
+    // Stop WebRTC service
+    const shouldNotify = reason !== 'remote-ended';
+    callServiceRef.current?.endCall(reason, shouldNotify);
+
+    const targetConvId = selectedConversationIdRef.current;
+    const peerUserId = peerId || selectedConversation?.userId || targetConvId;
+
+    // Reset UI State immediately
+    setCallState({
+      isOpen: false,
+      type: 'audio',
+      direction: 'outgoing',
+      status: 'connecting',
+    });
+
+    if (callId) {
+      const keysToDelete = Array.from(processedSignalsRef.current).filter(k => k.startsWith(callId));
+      keysToDelete.forEach(k => processedSignalsRef.current.delete(k));
+    }
+
+    // 1. Construct final log data
+    const logData = {
+      v: 1,
+      callId: String(callId || ''),
+      conversationId: String(targetConvId),
+      callerId: direction === 'outgoing' ? currentUserId : peerUserId,
+      calleeId: direction === 'outgoing' ? peerUserId : currentUserId,
+      mediaType: type === 'video' ? 'video' : 'voice',
+      outcome,
+      durationSeconds: duration,
+      createdAt: new Date().toISOString(),
+    };
+
+    const logText = `CALL_LOG::${JSON.stringify(logData)}`;
+    // 3. Robust Send Pipeline (Shadow Process)
+    // ONLY the Caller (outgoing) is responsible for saving & showing optimistic log to avoid duplicates
+    if (direction === 'outgoing') {
+      // 2. OPTIMISTIC UI: Add to chat immediately for caller
+      const clientMessageId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+      
+      const optimisticLog: ChatMessage = {
+        id: clientMessageId,
+        clientMessageId,
+        conversationId: targetConvId,
+        sender: 'me',
+        senderId: currentUserId,
+        type: 'call',
+        text: logText,
+        timestamp: formatMessageTimestamp(),
+        createdAt: new Date().toISOString(),
+        deliveryState: 'sending',
+        isLocal: true
+      };
+
+      console.log('[CALL_LOG] Adding optimistic message to UI', clientMessageId);
+      setMessagesByConversation(prev => ({
+        ...prev,
+        [targetConvId]: upsertMessage(prev[targetConvId] ?? [], optimisticLog)
+      }));
+      updateConversationAfterMessage(targetConvId, optimisticLog, true);
+
+      (async () => {
+        let success = false;
+        const maxRetries = 2;
+        // ... (existing pipeline logic)
+
+        // --- SOCKET ATTEMPT (with Retry & Timeout) ---
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          console.log(`[CALL_LOG] Socket Attempt ${attempt}/${maxRetries}...`);
+          try {
+            // Wrap emit in a timeout promise
+            const ack = await Promise.race([
+              emitSendMessage({
+                conversationId: targetConvId,
+                content: logText,
+                messageType: 'TEXT', // BYPASS Restricted Mode using TEXT type
+                clientMessageId
+              }),
+              new Promise<null>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 4000))
+            ]);
+
+            if (ack?.event === 'message.sent' && ack?.data) {
+              console.log('[CALL_LOG] Socket send SUCCESS', ack.data.id);
+              const serverMsg = {
+                ...normalizeMessage(mapRawMessage(ack.data, currentUserId)),
+                clientMessageId,
+                deliveryState: 'sent' as const
+              };
+              setMessagesByConversation(prev => ({
+                ...prev,
+                [targetConvId]: upsertMessage(prev[targetConvId] ?? [], serverMsg)
+              }));
+              updateConversationAfterMessage(targetConvId, serverMsg, true);
+              success = true;
+              break;
+            } else {
+              console.warn(`[CALL_LOG] Socket attempt ${attempt} failed: No ACK or wrong event`);
+            }
+          } catch (err) {
+            console.warn(`[CALL_LOG] Socket attempt ${attempt} error:`, err instanceof Error ? err.message : err);
+          }
+        }
+
+        // --- REST FALLBACK ---
+        if (!success) {
+          console.warn('[CALL_LOG] Socket failed after retries, falling back to REST API');
+          try {
+            const restRes = await sendMessageViaRest(accessToken || '', {
+              conversationId: targetConvId,
+              content: logText,
+              messageType: 'TEXT', // BYPASS Restricted Mode
+              clientMessageId
+            });
+
+            if (restRes?.id) {
+              console.log('[CALL_LOG] REST fallback SUCCESS', restRes.id);
+              const serverMsg = {
+                ...normalizeMessage(mapRawMessage(restRes, currentUserId)),
+                clientMessageId,
+                deliveryState: 'sent' as const
+              };
+              setMessagesByConversation(prev => ({
+                ...prev,
+                [targetConvId]: upsertMessage(prev[targetConvId] ?? [], serverMsg)
+              }));
+              updateConversationAfterMessage(targetConvId, serverMsg, true);
+              success = true;
+            }
+          } catch (restErr) {
+            console.error('[CALL_LOG] REST fallback CRITICAL FAILURE', restErr);
+          }
+        }
+
+        // --- FINAL ERROR STATE ---
+        if (!success) {
+          console.error('[CALL_LOG] Failed to save call log after all attempts.');
+          setMessagesByConversation(prev => ({
+            ...prev,
+            [targetConvId]: markLocalMessageFailed(prev[targetConvId] ?? [], clientMessageId)
+          }));
+        }
+      })();
+    } else {
+      console.log('[CALL_LOG] Skipping send pipeline (current user is the receiver)');
+    }
+  }, [selectedConversation, currentUserId, emitSendMessage, accessToken, updateConversationAfterMessage]);
+
+  const isAnsweringRef = useRef(false);
+  const handleAnswerCall = useCallback(async () => {
+    if (!callServiceRef.current || !callStateRef.current.isOpen || isAnsweringRef.current) return;
+    if (callStateRef.current.status === 'connected') return;
+
+    isAnsweringRef.current = true;
+    console.log('[ChatPage.handleAnswerCall] Answering call...');
+
+    // Safety watchdog: If it takes more than 15s to answer, fail the call to unstick UI
+    const watchdog = setTimeout(() => {
+      if (isAnsweringRef.current && callStateRef.current.status !== 'connected') {
+        console.warn('[ChatPage.handleAnswerCall] Watchdog triggered: Answer taking too long, resetting.');
+        handleEndCall('handshake-timeout');
+        isAnsweringRef.current = false;
+      }
+    }, 15000);
+
+    try {
+      setCallState(prev => ({ ...prev, status: 'connecting' }));
+      await callServiceRef.current.acceptCall();
+      // Status will be updated to 'connected' by WebRTC event listeners
+    } catch (error) {
+      console.error('[ChatPage.handleAnswerCall] Failed to answer call:', error);
+      handleEndCall('media-failed');
+    } finally {
+      clearTimeout(watchdog);
+      isAnsweringRef.current = false;
+    }
+  }, [handleEndCall]);
+
+  const handleToggleMic = useCallback(() => {
+    callServiceRef.current?.toggleMic();
+  }, []);
+
+  const handleToggleCamera = useCallback(() => {
+    callServiceRef.current?.toggleCamera();
+  }, []);
+
+  const handleCallAnswer = async (data: any) => {
+    const signalData = Array.isArray(data) ? data[0] : data;
+    const callId = signalData.callId;
+    if (!callId) return;
+
+    const sigKey = `${callId}_answer`;
+    if (processedSignalsRef.current.has(sigKey)) return;
+    processedSignalsRef.current.add(sigKey);
+
+    console.log('[CALL][RECEIVE ANSWER]', signalData);
+    if (callId === callStateRef.current.callId) {
+      await callServiceRef.current?.handleAnswer(signalData.sdp || signalData.answer?.sdp);
+    }
+  };
+
+  const handleCallIce = async (data: any) => {
+    const signalData = Array.isArray(data) ? data[0] : data;
+    const callId = signalData.callId;
+    const candidate = signalData.candidate?.candidate || signalData.candidate;
+    if (!callId || !candidate) return;
+
+    const sigKey = `${callId}_ice_${candidate}`;
+    if (processedSignalsRef.current.has(sigKey)) return;
+    processedSignalsRef.current.add(sigKey);
+
+    console.log('[CALL][RECEIVE ICE]', signalData);
+    if (callId === callStateRef.current.callId) {
+      await callServiceRef.current?.handleIceCandidate(signalData.candidate);
+    }
+  };
+
+  const handleCallEnd = useCallback(async (data: any) => {
+    const signalData = Array.isArray(data) ? data[0] : data;
+    console.log('[CALL][RECEIVE END]', signalData);
+    if (signalData.callId === callStateRef.current.callId) {
+      handleEndCall(signalData.reason || 'remote-ended');
+    }
+  }, [handleEndCall]);
+
+  const handleCallOffer = async (data: any) => {
+    // Robust unwrap: Support direct object, socket.io array-wrapping, or nested 'data'/'offer'
+    let signalData = Array.isArray(data) ? data[0] : data;
+    if (signalData && signalData.data) signalData = signalData.data;
+    if (signalData && signalData.offer && !signalData.sdp) signalData = signalData.offer;
+
+    const callId = signalData?.callId;
+    if (!callId || !getSocket()) return;
+
+    const sigKey = `${callId}_offer`;
+    if (processedSignalsRef.current.has(sigKey)) return;
+    processedSignalsRef.current.add(sigKey);
+
+    console.log('[CALL][RECEIVE OFFER] Hardened parsing:', signalData);
+
+    // Support aliased keys from mobile clients at root or in nested object
+    const peerUserId = signalData.senderUserId || signalData.callerId || signalData.fromUserId;
+    const conversationId = signalData.conversationId || signalData.roomId;
+
+    if (callStateRef.current.isOpen) {
+      console.warn('[ChatPage] Already in a call, ignoring offer');
+      return;
+    }
+
+    setCallState({
+      isOpen: true,
+      type: signalData.audioOnly ? 'audio' : 'video',
+      direction: 'incoming',
+      status: 'connecting',
+      peerId: peerUserId,
+      callId: callId,
+      isMicOn: true,
+      isCameraOn: !signalData.audioOnly,
+    });
+
+    if (peerUserId && accessToken) {
+      void ensureUser(accessToken, peerUserId);
+    }
+
+    await callServiceRef.current?.initialize({
+      socket: getSocket()!,
+      conversationId: conversationId,
+      callId: callId,
+      currentUserId,
+      peerUserId: peerUserId,
+      audioOnly: signalData.audioOnly,
+      isCaller: false,
+      initialSdp: signalData.sdp || signalData.offer?.sdp || signalData.data?.sdp,
+    });
+  };
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // STABLE SIGNALING HANDLERS (using Refs to prevent listener churn)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const handleEndCallRef = useRef(handleEndCall);
+  useEffect(() => { handleEndCallRef.current = handleEndCall; }, [handleEndCall]);
+
+  const signalHandlersRef = useRef({
+    handleCallOffer,
+    handleCallAnswer,
+    handleCallIce,
+    handleCallEnd
+  });
+
+  useEffect(() => {
+    signalHandlersRef.current = {
+      handleCallOffer,
+      handleCallAnswer,
+      handleCallIce,
+      handleCallEnd
+    };
+  }, [handleCallOffer, handleCallAnswer, handleCallIce, handleCallEnd]);
+
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket || !currentUserId) return;
+
+    console.log('[ChatPage.signaling] Registering stable listeners');
+
+    const onOffer = (data: any) => signalHandlersRef.current.handleCallOffer(data);
+    const onAnswer = (data: any) => signalHandlersRef.current.handleCallAnswer(data);
+    const onIce = (data: any) => signalHandlersRef.current.handleCallIce(data);
+    const onEnd = (data: any) => signalHandlersRef.current.handleCallEnd(data);
+
+    // Colon notation
+    socket.on('call:offer', onOffer);
+    socket.on('call:answer', onAnswer);
+    socket.on('call:ice-candidate', onIce);
+    socket.on('call:end', onEnd);
+
+    // Dot notation (fallback)
+    socket.on('call.offer', onOffer);
+    socket.on('call.answer', onAnswer);
+    socket.on('call.ice-candidate', onIce);
+    socket.on('call.end', onEnd);
+
+    // Generic signal (fallback)
+    const onGenericSignal = (data: any) => {
+      // Robust unwrapping: check for direct payload or nested 'data', 'offer', 'answer', 'candidate' keys
+      const signalData = data.data || data.offer || data.answer || data.candidate || (Array.isArray(data) ? data[0] : data);
+      const type = data.type || signalData?.type;
+
+      console.log('[CALL][RECEIVE GENERIC SIGNAL]', { type, signalData });
+
+      if (type === 'offer') signalHandlersRef.current.handleCallOffer(signalData);
+      else if (type === 'answer') signalHandlersRef.current.handleCallAnswer(signalData);
+      else if (type === 'ice-candidate') signalHandlersRef.current.handleCallIce(signalData);
+      else if (type === 'end') signalHandlersRef.current.handleCallEnd(signalData);
+    };
+    socket.on('call:signal', onGenericSignal);
+    socket.on('call.signal', onGenericSignal);
+
+    return () => {
+      console.log('[ChatPage.signaling] Cleaning up listeners');
+      socket.off('call:offer', onOffer);
+      socket.off('call:answer', onAnswer);
+      socket.off('call:ice-candidate', onIce);
+      socket.off('call:end', onEnd);
+      socket.off('call.offer', onOffer);
+      socket.off('call.answer', onAnswer);
+      socket.off('call.ice-candidate', onIce);
+      socket.off('call.end', onEnd);
+      socket.off('call:signal', onGenericSignal);
+      socket.off('call.signal', onGenericSignal);
+    };
+  }, [getSocket, currentUserId]);
 
 
 
@@ -1761,7 +2316,7 @@ function ChatPageContent() {
 
     // SINGLE ENTRY for loadInbox
     void loadInbox(accessToken)
-    
+
     // Reset restricted mode locally
     setIsRestrictedMode(false)
   }, [accessToken, loadInbox])
@@ -1832,12 +2387,13 @@ function ChatPageContent() {
 
             setConversations(prev => prev.map(conv => {
               if (conv.id !== conversationId) return conv;
+              const isGroup = conv.isGroup;
               return {
                 ...conv,
                 memberCount: members.length || conv.memberCount,
                 participantUserIds: participantIds,
-                avatarUrl: inner.avatarUrl || conv.avatarUrl,
-                name: inner.title || conv.name,
+                avatarUrl: isGroup ? (inner.avatarUrl || conv.avatarUrl) : (inner.avatarUrl || conv.avatarUrl),
+                name: isGroup ? (inner.title || conv.name) : (inner.title || conv.name),
               };
             }));
 
@@ -1960,12 +2516,13 @@ function ChatPageContent() {
 
                 setConversations(prev => prev.map(conv => {
                   if (conv.id !== conversationId) return conv;
+                  const isGroup = conv.isGroup;
                   return {
                     ...conv,
                     memberCount: members.length || conv.memberCount,
                     participantUserIds: participantIds,
-                    avatarUrl: inner.avatarUrl || conv.avatarUrl,
-                    name: inner.title || conv.name,
+                    avatarUrl: isGroup ? (inner.avatarUrl || conv.avatarUrl) : (inner.avatarUrl || conv.avatarUrl),
+                    name: isGroup ? (inner.title || conv.name) : (inner.title || conv.name),
                   };
                 }));
 
@@ -1997,7 +2554,7 @@ function ChatPageContent() {
         console.log('Dữ liệu tin nhắn nhận được:', rawMessages)
         const mapped = sortMessages(
           rawMessages
-            .map((message) => applyRestrictedMessage(mapRawMessage(message, user.id), isRestrictedMode))
+            .map((message) => applyRestrictedMessage(normalizeMessage(mapRawMessage(message, user.id)), isRestrictedMode))
             .filter((message) => !deletedMessageIds[message.id]),
         )
 
@@ -2091,11 +2648,6 @@ function ChatPageContent() {
 
   useEffect(() => {
     const socket = getSocket()
-    console.log('Trạng thái Socket:', socket?.connected ?? false, 'ID:', socket?.id ?? 'unknown')
-  }, [conversations, getSocket])
-
-  useEffect(() => {
-    const socket = getSocket()
     const currentConnected = Boolean(socket?.connected)
 
     if (!previousSocketConnectedRef.current && currentConnected && conversations.length > 0) {
@@ -2162,26 +2714,51 @@ function ChatPageContent() {
     navigate(`/chat/${fallbackConversationId}`, { replace: true })
   }, [conversations, navigate, routedConversationId, selectedConversationId])
 
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // SMART JOIN ROOMS (Only join once per session/reconnect)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const joinedIdsRef = useRef<Set<string>>(new Set())
+
   useEffect(() => {
-    if (conversations.length === 0 || !isSocketConnected) {
+    if (!isSocketConnected) {
+      console.log('[ChatPage.join] Socket disconnected, resetting joined cache')
+      joinedIdsRef.current.clear()
       return
     }
 
-    console.log('[ChatPage.joinEffect] conversations changed while socket connected, re-joining rooms')
-    void joinAllConversations(conversations)
-  }, [conversationIdsSignature, conversations, isSocketConnected, joinAllConversations])
+    const currentIds = conversations.map((c) => c.id)
+    const newIds = currentIds.filter((id) => !joinedIdsRef.current.has(id))
+
+    if (newIds.length > 0) {
+      console.log('[ChatPage.join] 🚀 Joining new conversations:', newIds.length, '/', currentIds.length)
+      newIds.forEach((id) => {
+        joinedIdsRef.current.add(id)
+        void joinConversation(id)
+      })
+    }
+  }, [conversationIdsSignature, isSocketConnected, joinConversation])
+
+  // 1. Mark as read on conversation change or new messages (with guard)
+  const lastEmittedReadRef = useRef<Record<string, number>>({})
 
   useEffect(() => {
     if (!selectedConversationId) {
       return
     }
 
-    const latestSeq = messagesByConversation[selectedConversationId]?.at(-1)?.serverSeq
+    const convMessages = messagesByConversation[selectedConversationId] || []
+    const latestSeq = convMessages.at(-1)?.serverSeq
+
     if (latestSeq === undefined) {
       return
     }
 
-    markAsRead({ conversationId: selectedConversationId, lastReadSeq: latestSeq })
+    // GUARD: Only emit if sequence has actually increased OR conversation changed to prevent infinite loop
+    if (latestSeq > (lastEmittedReadRef.current[selectedConversationId] ?? 0)) {
+      console.log('[ChatPage.effect] auto-markAsRead:', { selectedConversationId, latestSeq })
+      lastEmittedReadRef.current[selectedConversationId] = latestSeq
+      markAsRead({ conversationId: selectedConversationId, lastReadSeq: latestSeq })
+    }
   }, [markAsRead, messagesByConversation, selectedConversationId])
 
   useEffect(() => {
@@ -2731,14 +3308,24 @@ function ChatPageContent() {
       }
       return conv;
     }).sort((a, b) => {
+      // 1. PINNED SORTING
+      const isPinnedA = !!pinnedConversationIds[a.id]
+      const isPinnedB = !!pinnedConversationIds[b.id]
+      if (isPinnedA && !isPinnedB) return -1
+      if (!isPinnedA && isPinnedB) return 1
+
+      // 2. RECENCY SORTING
       const timeA = new Date(a.lastMessageAt || a.updatedAt || 0).getTime()
       const timeB = new Date(b.lastMessageAt || b.updatedAt || 0).getTime()
       return timeB - timeA
     })
-  }, [conversations, deletedTimestamps, t])
+  }, [conversations, deletedTimestamps, pinnedConversationIds, t])
 
   const visibleConversations = useMemo(() => {
-    return sortedConversations.filter((conv) => {
+    return sortedConversations.map(conv => ({
+      ...conv,
+      isPinned: !!pinnedConversationIds[conv.id]
+    })).filter((conv) => {
       const deletedAt = deletedTimestamps[conv.id];
       if (!deletedAt) return true;
 
@@ -2749,7 +3336,7 @@ function ChatPageContent() {
 
       return lastMessageTime > deletedAt;
     });
-  }, [sortedConversations, deletedTimestamps]);
+  }, [sortedConversations, deletedTimestamps, pinnedConversationIds]);
 
   if (isBootstrapping || isLoadingConversations) {
     return (
@@ -2836,6 +3423,7 @@ function ChatPageContent() {
         onToggleMessageSelection={toggleMessageIdInList}
         onClearMultiSelectMode={handleClearMultiSelectMode}
         onMessageContextMenuAction={handleMessageContextMenuAction}
+        onInitiateCall={handleInitiateCall}
       />
 
       <CreateGroupModal
@@ -2900,6 +3488,7 @@ function ChatPageContent() {
                     setEditConversationNameMode('nickname')
                     setIsEditConversationNameOpen(true)
                   }}
+                  onTogglePinConversation={() => handleTogglePinConversation(selectedConversation.id)}
                   currentUserId={user?.id}
                 />
               ) : (
@@ -2980,9 +3569,26 @@ function ChatPageContent() {
         onMessage={handleOpenFriendChat}
       />
 
+      <CallModal
+        isOpen={callState.isOpen}
+        type={callState.type}
+        status={callState.status}
+        peerName={callState.peerId ? (userMap[callState.peerId]?.displayName || 'Người dùng') : (selectedConversation?.name || 'Người dùng')}
+        peerAvatar={callState.peerId ? userMap[callState.peerId]?.avatarUrl : selectedConversation?.avatarUrl}
+        localStream={callState.localStream}
+        remoteStream={callState.remoteStream}
+        isMicOn={callState.isMicOn}
+        isCameraOn={callState.isCameraOn}
+        hasRemoteDescription={callState.hasRemoteDescription}
+        onEnd={handleEndCall}
+        onAnswer={handleAnswerCall}
+        onToggleMic={handleToggleMic}
+        onToggleCamera={handleToggleCamera}
+      />
+
       {/* Pinned Messages Logic Hooks */}
-      <PinnedLogicHooks 
-        accessToken={accessToken} 
+      <PinnedLogicHooks
+        accessToken={accessToken}
         isBootstrapping={isBootstrapping}
         selectedConversationId={selectedConversationId}
         loadPinnedMessages={loadPinnedMessages}
@@ -2999,7 +3605,7 @@ function ChatPageContent() {
 /**
  * Extracted hooks to avoid cluttering main component and ensure they are after declarations.
  */
-function PinnedLogicHooks({ 
+function PinnedLogicHooks({
   accessToken, isBootstrapping, selectedConversationId, loadPinnedMessages,
   pinnedMessageIds, setPinnedMessageIds, messagesByConversation, setPinnedMessages,
   lastConvRef
@@ -3007,7 +3613,7 @@ function PinnedLogicHooks({
   // ISOLATED PINNED FETCH (NO loadInbox call)
   useEffect(() => {
     if (!accessToken || isBootstrapping || !selectedConversationId) return
-    
+
     // Avoid re-fetching same conversation (Double Guard)
     if (lastConvRef.current === selectedConversationId) return
     lastConvRef.current = selectedConversationId

@@ -18,6 +18,7 @@ export type ConversationSummary = {
   isGroup?: boolean
   isCloud?: boolean
   memberCount?: number
+  isPinned?: boolean
 }
 
 export type ChatMessageType = 'text' | 'image' | 'file' | 'sticker' | 'system' | 'call'
@@ -112,7 +113,7 @@ export type ViewerImageItem = {
 }
 
 export interface SystemMessagePayload {
-  action: 'ADD_MEMBERS' | 'LEAVE_GROUP' | 'CREATE_GROUP' | 'RENAME_GROUP';
+  action: 'ADD_MEMBERS' | 'LEAVE_GROUP' | 'CREATE_GROUP' | 'RENAME_GROUP' | 'PIN_MESSAGE' | 'UNPIN_MESSAGE';
   actorId: string;
   targetMemberIds?: string[];
   metadata?: Record<string, any>;

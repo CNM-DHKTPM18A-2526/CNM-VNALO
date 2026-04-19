@@ -1,6 +1,30 @@
-import type { ChatMessageType, SystemMessagePayload } from '../chat.types'
+import type { ChatMessage, ChatMessageType, SystemMessagePayload } from '../chat.types'
 
 export const CALL_LOG_PREFIX = 'CALL_LOG::'
+
+/**
+ * Normalizes a message to ensure consistent typing for call logs.
+ */
+export function normalizeMessage(msg: ChatMessage): ChatMessage {
+  if (!msg) return msg
+
+  const isCall =
+    msg.type === 'call' ||
+    (msg.text && (
+      msg.text.startsWith(CALL_LOG_PREFIX) ||
+      msg.text.includes('"type":"audio"') ||
+      msg.text.includes('"type":"video"')
+    ))
+
+  if (isCall) {
+    return {
+      ...msg,
+      type: 'call',
+    }
+  }
+
+  return msg
+}
 
 /**
  * Interface representing the parsed call log data.
@@ -17,9 +41,16 @@ export interface CallLogData {
   createdAt: string
 }
 
-export function formatMessageContent(text: string): string {
+export function formatMessageTimestamp(): string {
+  return new Date().toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+export function formatMessageContent(text: string, currentUserId?: string): string {
   if (!text) return ''
-  
+
   const match = text.match(/CALL\s*_?LOG/i)
   if (!match) {
     return text
@@ -27,10 +58,18 @@ export function formatMessageContent(text: string): string {
 
   const prefix = text.slice(0, match.index)
   const lowerText = text.toLowerCase()
-  
+
   // Determine call type
   const isVideo = lowerText.includes('video')
   const typeStr = isVideo ? 'video' : 'thoại'
+
+  // Try to parse JSON for more accurate direction
+  let logData: any = null
+  try {
+    if (text.includes('::')) {
+      logData = JSON.parse(text.split('::')[1])
+    }
+  } catch (e) { /* ignore */ }
 
   // Determine outcome via simple keywords (resilient to truncation)
   let formatted = `Cuộc gọi ${typeStr}`
@@ -39,20 +78,48 @@ export function formatMessageContent(text: string): string {
   else if (lowerText.includes('rejected') || lowerText.includes('busy')) formatted = `Cuộc gọi ${typeStr} bị từ chối`
   else if (lowerText.includes('completed')) {
     const durationMatch = text.match(/"durationSeconds"\s*:\s*(\d+)/i)
-    if (durationMatch) {
-      formatted = `Cuộc gọi ${typeStr} (${formatDuration(parseInt(durationMatch[1], 10))})`
+    const durationStr = durationMatch ? ` (${formatDuration(parseInt(durationMatch[1], 10))})` : ''
+
+    if (logData && currentUserId) {
+      if (logData.callerId === currentUserId) {
+        formatted = `Cuộc gọi ${typeStr} đi${durationStr}`
+      } else {
+        formatted = `Cuộc gọi ${typeStr} đến${durationStr}`
+      }
     } else {
-      formatted = `Cuộc gọi ${typeStr} đã kết thúc`
+      formatted = `Cuộc gọi ${typeStr} đã kết thúc${durationStr}`
     }
   }
-  
+
   return `${prefix}${formatted}`
 }
 
-export function parseCallLog(text: string): any | null {
-  // Legacy support for other parts of the system if needed
-  if (!/CALL\s*_?LOG/i.test(text)) return null
-  return { outcome: 'unknown' } // Minimal object to satisfy truthy checks
+export function parseCallLog(text: string): CallLogData | null {
+  if (!text || (!text.startsWith(CALL_LOG_PREFIX) && !text.includes('CALL_LOG::'))) return null
+  
+  try {
+    const jsonPart = text.includes('::') ? text.split('::')[1] : text
+    return JSON.parse(jsonPart) as CallLogData
+  } catch (e) {
+    console.warn('[messageUtils.parseCallLog] Failed to parse JSON:', e)
+    return null
+  }
+}
+
+/**
+ * Formats seconds into "X phút Y giây" or just "Y giây"
+ */
+export function formatDurationZalo(seconds: number): string {
+  if (typeof seconds !== 'number' || isNaN(seconds) || seconds <= 0) return ''
+  
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  
+  if (mins > 0) {
+    return `${mins} phút ${secs > 0 ? `${secs} giây` : ''}`.trim()
+  }
+  
+  return `${secs} giây`
 }
 
 /**
@@ -88,7 +155,8 @@ export function formatMessagePreview(
   if (type === 'sticker') return `${prefix}[Sticker]`
 
   if (type === 'call') {
-    return truncatePreview(`${prefix}${formatMessageContent(content)}`)
+    return truncatePreview(`${prefix}${formatMessageContent(content, isMe ? undefined : 'peer')}`)
+    // Simplified isMe check for preview
   }
 
   if (!content) return ''
@@ -150,6 +218,10 @@ export function renderSystemMessage(
         return `${actorName} đã tạo nhóm`
       case 'RENAME_GROUP':
         return `${actorName} đã đổi tên nhóm thành "${payload.metadata?.newName || ''}"`
+      case 'PIN_MESSAGE':
+        return `${actorName} đã ghim một tin nhắn`
+      case 'UNPIN_MESSAGE':
+        return `${actorName} đã bỏ ghim một tin nhắn`
       default:
         return content
     }
@@ -172,5 +244,5 @@ export function formatMessage(
     return renderSystemMessage(message.text, currentUserId, getDisplayName)
   }
 
-  return formatMessageContent(message.text)
-}
+  return formatMessageContent(message.text, currentUserId)
+}

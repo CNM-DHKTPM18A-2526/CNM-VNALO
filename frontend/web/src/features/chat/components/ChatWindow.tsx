@@ -15,6 +15,7 @@ import type {
 } from '../chat.types'
 import { useUserStore } from '../context/UserStoreContext'
 import { formatPresence } from '../utils/presenceUtils'
+import { getGroupCollageData } from '../../../shared/utils/avatarUtils'
 import { ImageViewerProvider } from './ImageViewer'
 import { MessageBubble } from './MessageBubble'
 import { MessageGroupBubble } from './MessageGroupBubble'
@@ -58,6 +59,7 @@ type ChatWindowProps = {
   pinnedMessages?: ChatMessage[]
   onUnpinMessage?: (messageId: string) => void
   onTogglePin?: (message: ChatMessage) => void
+  onInitiateCall?: (type: 'audio' | 'video') => void
 }
 
 export function ChatWindow({
@@ -89,6 +91,7 @@ export function ChatWindow({
   onMessageContextMenuAction,
   pinnedMessages = [],
   onUnpinMessage,
+  onInitiateCall,
 }: ChatWindowProps) {
   const { userMap } = useUserStore()
   const { t } = useLanguage()
@@ -240,6 +243,10 @@ export function ChatWindow({
   const statusText = isOnline ? 'Đang hoạt động' : formatPresence(false, lastSeenTime)
   const isStranger = Boolean(conversation.isStranger)
 
+  const collageData = conversation && conversation.isGroup && !conversation.avatarUrl 
+    ? getGroupCollageData(conversation, userMap) 
+    : { avatars: [], extraCount: 0 }
+
   return (
     <section className='chat-window'>
       <header className='chat-window-header'>
@@ -251,6 +258,8 @@ export function ChatWindow({
               size='md'
               isGroup={conversation.isGroup}
               isCloud={conversation.isCloud}
+              memberAvatars={collageData.avatars}
+              extraCount={collageData.extraCount}
             />
             {isOnline && !conversation.isCloud && (
               <span className='absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full' />
@@ -271,10 +280,18 @@ export function ChatWindow({
           </div>
         </div>
         <div className='chat-window-header-actions'>
-          <button className='chat-header-action-btn' type='button'>
+          <button
+            className='chat-header-action-btn'
+            type='button'
+            onClick={() => onInitiateCall?.('audio')}
+          >
             <Icon name='phone' />
           </button>
-          <button className='chat-header-action-btn' type='button'>
+          <button
+            className='chat-header-action-btn'
+            type='button'
+            onClick={() => onInitiateCall?.('video')}
+          >
             <Icon name='video' />
           </button>
           <button
@@ -476,6 +493,7 @@ export function ChatWindow({
                     isFirstInCluster={isFirstInCluster}
                     isGroupConversation={conversation.isGroup || false}
                     onOpenUserProfile={onOpenUserProfile}
+                    onInitiateCall={onInitiateCall}
                   />
                 );
               } else {
@@ -509,6 +527,7 @@ export function ChatWindow({
                     onReply={() => handleReplyAction(message)}
                     onJumpToOriginal={(id) => handleJumpToMessage(id)}
                     onOpenUserProfile={onOpenUserProfile}
+                    onInitiateCall={onInitiateCall}
                   />
                 );
               }

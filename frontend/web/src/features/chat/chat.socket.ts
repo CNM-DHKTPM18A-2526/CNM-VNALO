@@ -60,73 +60,92 @@ export type PresenceChangedPayload = {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // SOCKET SINGLETON (prevents React StrictMode re-renders from creating new instances)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-let globalSocket: Socket | null = null
+let globalSocketManager: any = null
 let globalSocketToken: string | null = null
 
-export function getOrCreateSocket(token: string): Socket {
+let globalChatSocket: Socket | null = null
+let globalRootSocket: Socket | null = null
+
+export function getOrCreateSocketManager(token: string): { chat: Socket; root: Socket } {
   const incomingToken = token.trim()
 
-  if (globalSocket && globalSocketToken && globalSocketToken !== incomingToken) {
-    console.log('[Socket.singleton] Token changed, recreating socket connection')
-    globalSocket.disconnect()
-    globalSocket = null
+  if (globalSocketManager && globalSocketToken && globalSocketToken !== incomingToken) {
+    console.log('[SocketManager] Token changed, recreating connection')
+    globalChatSocket?.disconnect()
+    globalRootSocket?.disconnect()
+    globalChatSocket = null
+    globalRootSocket = null
+    globalSocketManager = null
   }
 
-  if (globalSocket && globalSocket.connected) {
-    console.log('[Socket.singleton] Reusing existing connected socket, ID:', globalSocket.id)
-    return globalSocket
+  if (globalChatSocket && globalRootSocket && globalSocketToken === incomingToken) {
+    return { chat: globalChatSocket, root: globalRootSocket }
   }
 
-  if (globalSocket && !globalSocket.connected) {
-    console.log('[Socket.singleton] Socket exists but disconnected, reconnecting...')
-    globalSocket.connect()
-    return globalSocket
+  if (!globalSocketManager) {
+    console.log('[SocketManager] Initializing Manager connection to:', SOCKET_URL)
+    globalSocketToken = incomingToken
+
+    // Create sockets for both namespaces sharing the same connection
+    const options = {
+      transports: ['websocket'],
+      auth: { token },
+      reconnection: true,
+    }
+
+    // Use only the /chat namespace as the primary connection, matching Mobile.
+    // We point everything to this one instance to avoid identity fragmentation.
+    globalSocketManager = io(`${SOCKET_URL}/chat`, options)
+    globalChatSocket = globalSocketManager
+    globalRootSocket = globalSocketManager // Shadow reference for backward compatibility
+
+    if (globalChatSocket) {
+      globalChatSocket.on('connect', () => {
+        console.log('[Socket.CHAT] ✅ Connected Unified Socket:', globalChatSocket?.id)
+      })
+
+      // Listen to everything for heavy debugging
+      globalChatSocket.onAny((event, ...args) => {
+        if (typeof event === 'string' && event.startsWith('call.')) {
+          console.log(`[Socket.CHAT][SIGNAL] ${event} received:`, args)
+        }
+      })
+    }
   }
 
-  console.log('[Socket.singleton] Creating new socket connection to:', `${SOCKET_URL}/chat`)
-  globalSocketToken = incomingToken
-  globalSocket = io(`${SOCKET_URL}/chat`, {
-    transports: ['websocket'],
-    auth: { token },
-    reconnection: true,
-    reconnectionAttempts: Infinity,
-    reconnectionDelay: 1000,
-    reconnectionDelayMax: 8000,
-  })
+  return { chat: globalChatSocket!, root: globalRootSocket! }
+}
 
-  globalSocket.on('connect', () => {
-    console.log('[Socket.lifecycle] ✅ CONNECTED, socket.id:', globalSocket?.id)
-  })
+export function getOrCreateRootSocket(token: string): Socket {
+  return getOrCreateSocketManager(token).root
+}
 
-  globalSocket.on('connect_error', (err) => {
-    console.error('[Socket.lifecycle] ❌ CONNECTION ERROR:', err)
-  })
-
-  globalSocket.on('disconnect', (reason) => {
-    console.log('[Socket.lifecycle] ⚪ DISCONNECTED, reason:', reason)
-  })
-
-  return globalSocket
+export function getOrCreateSocket(token: string): Socket {
+  return getOrCreateSocketManager(token).chat
 }
 
 export function disconnectSocket() {
-  if (globalSocket) {
-    console.log('[Socket.singleton] Disconnecting socket')
-    globalSocket.disconnect()
-    globalSocket = null
-    globalSocketToken = null
+  if (globalChatSocket) {
+    globalChatSocket.disconnect()
+    globalChatSocket = null
   }
+  if (globalRootSocket) {
+    globalRootSocket.disconnect()
+    globalRootSocket = null
+  }
+  globalSocketManager = null
+  globalSocketToken = null
 }
 
 export function waitForSocketConnect(timeoutMs: number = 5000): Promise<boolean> {
   return new Promise((resolve) => {
-    if (!globalSocket) {
-      console.warn('[Socket.waitForConnect] No global socket')
+    if (!globalChatSocket) {
+      console.warn('[Socket.waitForConnect] No global chat socket')
       return resolve(false)
     }
 
-    if (globalSocket.connected) {
-      console.log('[Socket.waitForConnect] Socket already connected, ID:', globalSocket.id)
+    if (globalChatSocket.connected) {
+      console.log('[Socket.waitForConnect] Socket already connected, ID:', globalChatSocket.id)
       return resolve(true)
     }
 
@@ -135,9 +154,9 @@ export function waitForSocketConnect(timeoutMs: number = 5000): Promise<boolean>
       resolve(false)
     }, timeoutMs)
 
-    globalSocket.once('connect', () => {
+    globalChatSocket.once('connect', () => {
       clearTimeout(timer)
-      console.log('[Socket.waitForConnect] Socket connected successfully, ID:', globalSocket?.id)
+      console.log('[Socket.waitForConnect] Socket connected successfully, ID:', globalChatSocket?.id)
       resolve(true)
     })
   })
@@ -151,6 +170,10 @@ export class ChatSocketService {
     this.socket = getOrCreateSocket(token)
     console.log('[ChatSocketService.connect] Socket obtained, ID:', this.socket.id)
     return this.socket
+  }
+
+  getRootSocket(token: string): Socket {
+    return getOrCreateRootSocket(token)
   }
 
   disconnect() {
@@ -313,6 +336,11 @@ export class ChatSocketService {
       this.joinedConversations = new Set<string>()
     }
 
+    if (this.joinedConversations.has(conversationId)) {
+      // Already joined, skip to avoid infinite loop
+      return true
+    }
+
     if (!this.socket.connected) {
       console.log('[JOIN] ⏳ Socket not connected yet, waiting for connect event...')
       const connected = await waitForSocketConnect(5000)
@@ -324,6 +352,14 @@ export class ChatSocketService {
 
     console.log('[JOIN] 🚀 Emitting join for:', conversationId, '| Socket ID:', this.socket.id)
     this.socket.emit('conversation.join', { conversationId })
+
+    // Also join on root socket for signaling if it exists. 
+    // Do NOT check for .connected, Socket.io will buffer the emit if needed.
+    if (globalRootSocket) {
+      console.log('[JOIN.ROOT] Emitting join for:', conversationId)
+      globalRootSocket.emit('conversation.join', { conversationId })
+    }
+
     this.joinedConversations.add(conversationId)
     console.log('[JOIN] ✅ Join emitted for conversation:', conversationId)
 

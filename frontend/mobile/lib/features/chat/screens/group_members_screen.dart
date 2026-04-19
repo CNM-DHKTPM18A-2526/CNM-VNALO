@@ -26,14 +26,15 @@ class GroupMembersScreen extends StatelessWidget {
       (c) => c.id == conversation.id, 
       orElse: () => conversation
     );
+    final activeMembers = conv.members.where((m) => m.leftAt == null).toList();
     final currentUserId = context.watch<AuthProvider>().user?.id ?? '';
-    final isOwnerOrAdmin = conv.members.any((m) => 
+    final isOwnerOrAdmin = activeMembers.any((m) => 
       m.userId == currentUserId && (m.role == MemberRole.OWNER || m.role == MemberRole.ADMIN)
     );
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    // Sort members: OWNER first, then ADMIN, then by name
-    final sortedMembers = List<ConversationMember>.from(conv.members)
+    // Sort active members: OWNER first, then ADMIN, then by name
+    final sortedMembers = List<ConversationMember>.from(activeMembers)
       ..sort((a, b) {
         if (a.role == MemberRole.OWNER) return -1;
         if (b.role == MemberRole.OWNER) return 1;
@@ -45,7 +46,7 @@ class GroupMembersScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: isDarkMode ? DarkColors.scaffold : const Color(0xFFF4F5F7),
       appBar: AppBar(
-        title: Text('Thành viên (${conv.members.length})', 
+        title: Text('Thành viên (${activeMembers.length})', 
           style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w600)),
         flexibleSpace: Container(
           decoration: BoxDecoration(
@@ -147,7 +148,7 @@ class GroupMembersScreen extends StatelessWidget {
           CupertinoActionSheetAction(
             onPressed: () {
                Navigator.pop(context);
-               context.read<ChatProvider>().updateMemberRole(conv.id, member.userId, 'OWNER');
+               context.read<ChatProvider>().transferOwnership(conv.id, member.userId);
             },
             child: const Text('Chuyển quyền Trưởng nhóm'),
           ),
