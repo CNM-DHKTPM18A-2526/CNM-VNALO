@@ -21,6 +21,7 @@ import { useAuth } from '../../auth/useAuth';
 import type { ChatMessage, ConversationSummary } from '../chat.types';
 import { UserAvatar } from '../../../shared/components/UserAvatar';
 import { useUserStore } from '../context/UserStoreContext';
+import { getGroupCollageData } from '../../../shared/utils/avatarUtils';
 
 type ConversationInfoProps = {
   conversation: ConversationSummary;
@@ -39,12 +40,17 @@ export function ConversationInfo({
   messages,
   onAddMembersClick,
   onLeaveGroupClick,
-  onCreateGroupClick,
   onEditGroupName,
   onEditNickname,
   onDeleteHistoryClick,
+  onTogglePinConversation,
+  onCreateGroupClick,
   currentUserId
-}: ConversationInfoProps & { currentUserId?: string, onCreateGroupClick?: () => void }) {
+}: ConversationInfoProps & {
+  currentUserId?: string;
+  onCreateGroupClick?: () => void;
+  onTogglePinConversation?: () => void;
+}) {
   const { userMap, ensureUser } = useUserStore();
   const { accessToken } = useAuth();
   const [expanded, setExpanded] = useState<Record<SectionKey, boolean>>({
@@ -127,14 +133,24 @@ export function ConversationInfo({
       {/* Profile Section */}
       <section className="bg-white px-5 pb-6 pt-6">
         <div className="flex justify-center">
-          <UserAvatar
-            name={conversation.name}
-            imageUrl={conversation.avatarUrl ?? null}
-            size="lg"
-            className="h-20 w-20 shadow-lg ring-2 ring-white"
-            isGroup={conversation.isGroup}
-            isCloud={conversation.isCloud}
-          />
+          {(() => {
+            const collageData = conversation.isGroup && !conversation.avatarUrl 
+              ? getGroupCollageData(conversation, userMap) 
+              : { avatars: [], extraCount: 0 };
+            
+            return (
+              <UserAvatar
+                name={conversation.name}
+                imageUrl={conversation.avatarUrl ?? null}
+                size="lg"
+                className="h-20 w-20 shadow-lg ring-2 ring-white"
+                isGroup={conversation.isGroup}
+                isCloud={conversation.isCloud}
+                memberAvatars={collageData.avatars}
+                extraCount={collageData.extraCount}
+              />
+            );
+          })()}
         </div>
 
         <div className="mt-3 flex items-center justify-center gap-2">
@@ -174,7 +190,12 @@ export function ConversationInfo({
         ) : (
           <div className="mt-6 grid grid-cols-3 gap-3">
             <ActionButton icon={BellOff} label="Tắt thông báo" />
-            <ActionButton icon={Pin} label="Ghim hội thoại" />
+            <ActionButton 
+              icon={Pin} 
+              label={conversation.isPinned ? "Bỏ ghim hội thoại" : "Ghim hội thoại"} 
+              isActive={conversation.isPinned}
+              onClick={onTogglePinConversation} 
+            />
             
             {conversation.isGroup ? (
               <ActionButton icon={UserPlus2} label="Thêm thành viên" onClick={onAddMembersClick} />
@@ -319,17 +340,29 @@ export function ConversationInfo({
 
 /* ====================== Helper Components ====================== */
 
-function ActionButton({ icon: Icon, label, onClick }: { icon: React.ElementType; label: string; onClick?: () => void }) {
+function ActionButton({ 
+  icon: Icon, 
+  label, 
+  onClick, 
+  isActive 
+}: { 
+  icon: React.ElementType; 
+  label: string; 
+  onClick?: () => void;
+  isActive?: boolean;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex flex-col items-center rounded-xl border-0 bg-transparent px-1 py-2 shadow-none outline-none ring-0 hover:bg-gray-50 focus:outline-none"
+      className="flex flex-col items-center rounded-xl border-0 bg-transparent px-1 py-2 shadow-none outline-none ring-0 hover:bg-gray-50 focus:outline-none group"
     >
-      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200">
-        <Icon size={16} className="text-slate-600" />
+      <div className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors ${isActive ? 'bg-[#E6F3FF]' : 'bg-gray-200 group-hover:bg-gray-300'}`}>
+        <Icon size={16} className={isActive ? 'text-[#0091FF]' : 'text-slate-600'} />
       </div>
-      <span className="mt-2 text-center text-[11px] font-medium leading-[1.25] text-slate-700">{label}</span>
+      <span className={`mt-2 text-center text-[11px] font-medium leading-[1.25] ${isActive ? 'text-[#0091FF]' : 'text-slate-700'}`}>
+        {label}
+      </span>
     </button>
   );
 }

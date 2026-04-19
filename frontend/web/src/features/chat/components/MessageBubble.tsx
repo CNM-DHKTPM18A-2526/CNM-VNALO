@@ -11,6 +11,7 @@ import { MessageReactionBar, MessageReactionSummary } from './MessageReaction'
 import { MessageContextMenu, type MessageContextMenuAction } from './MessageContextMenu'
 import { formatMessage, formatMessageContent } from '../utils/messageUtils'
 import { useUserStore } from '../context/UserStoreContext'
+import { CallLogBubble } from './CallLogBubble'
 
 function getMessageMediaUrl(message: ChatMessage): string | null {
   return message.mediaUrl ?? message.attachments?.[0]?.url ?? null
@@ -57,6 +58,7 @@ type MessageBubbleProps = {
   onReply?: () => void
   onJumpToOriginal?: (messageId: string) => void
   onOpenUserProfile?: (userId: string) => void
+  onInitiateCall?: (type: 'audio' | 'video') => void
   isGroupedWithNext?: boolean
 }
 
@@ -89,6 +91,7 @@ export function MessageBubble({
   onReply,
   onJumpToOriginal,
   onOpenUserProfile,
+  onInitiateCall,
 }: MessageBubbleProps) {
   const { userMap } = useUserStore()
   const { openImageViewerByMessageId } = useImageViewer()
@@ -258,12 +261,12 @@ export function MessageBubble({
     }
 
     if ((action === 'recallGroup' || action === 'deleteGroupSelf') && isVirtualGroup && groupedMessages) {
-       // We pass the current message but the handler in parent should know it's a group action
-       // and use groupedMessages instead of just the message.id.
-       // However, to make it explicit, we'll pass groupedMessages as a 3rd arg if we modify the type.
-       // For now, let's keep it simple: pass the last message (which is what 'message' is in synthetic case)
-       // and rely on the parent having access to the group (which it does via its own state).
-       // Actually, easier to just pass the group here if we can.
+      // We pass the current message but the handler in parent should know it's a group action
+      // and use groupedMessages instead of just the message.id.
+      // However, to make it explicit, we'll pass groupedMessages as a 3rd arg if we modify the type.
+      // For now, let's keep it simple: pass the last message (which is what 'message' is in synthetic case)
+      // and rely on the parent having access to the group (which it does via its own state).
+      // Actually, easier to just pass the group here if we can.
     }
 
     onContextMenuAction?.(action, message)
@@ -388,7 +391,7 @@ export function MessageBubble({
   return (
     <div className={message.sender === 'me' ? 'message-row message-row-me' : 'message-row'} data-message-id={message.id}>
       {!isMyMessage ? (
-        <div 
+        <div
           className={showAvatar ? 'message-row-avatar cursor-pointer hover:opacity-80 transition-opacity' : 'message-row-avatar message-row-avatar-spacer'}
           onClick={showAvatar ? handleAvatarClick : undefined}
         >
@@ -479,9 +482,10 @@ export function MessageBubble({
         <article
           className={
             isMyMessage
-              ? `message-bubble message-bubble-me ${groupingClasses}${isHighlighted ? ' message-bubble-highlight' : ''}${isSelected ? ' message-bubble-selected' : ''}`
-              : `message-bubble ${groupingClasses}${isHighlighted ? ' message-bubble-highlight' : ''}${isSelected ? ' message-bubble-selected' : ''}`
+              ? `message-bubble message-bubble-me ${groupingClasses}${isHighlighted ? ' message-bubble-highlight' : ''}${isSelected ? ' message-bubble-selected' : ''} ${message.type === 'call' ? 'message-bubble-call' : ''}`
+              : `message-bubble ${groupingClasses}${isHighlighted ? ' message-bubble-highlight' : ''}${isSelected ? ' message-bubble-selected' : ''} ${message.type === 'call' ? 'message-bubble-call' : ''}`
           }
+          style={message.type === 'call' ? { background: 'none', border: 'none', padding: 0, boxShadow: 'none' } : {}}
           onClick={handleMessageTap}
         >
           {!isMyMessage && showSenderName ? <div className='message-sender-name'>{senderName || 'Người dùng'}</div> : null}
@@ -504,7 +508,7 @@ export function MessageBubble({
           ) : null}
 
           {!isRecalled && message.replyTo && (
-            <div 
+            <div
               className={`message-reply-quote mb-2 p-2 rounded bg-black/5 border-l-2 border-blue-500 cursor-pointer hover:bg-black/10 transition-colors max-w-[240px] overflow-hidden`}
               onClick={(e) => {
                 e.stopPropagation();
@@ -512,8 +516,8 @@ export function MessageBubble({
               }}
             >
               <p className="text-[11px] font-bold text-blue-600 truncate">
-                {message.replyTo.senderId && userMap[message.replyTo.senderId] 
-                  ? userMap[message.replyTo.senderId].displayName 
+                {message.replyTo.senderId && userMap[message.replyTo.senderId]
+                  ? userMap[message.replyTo.senderId].displayName
                   : message.replyTo.senderName}
               </p>
               <p className="text-xs text-slate-500 line-clamp-1 overflow-hidden whitespace-nowrap overflow-ellipsis">
@@ -541,7 +545,7 @@ export function MessageBubble({
               {imageAttachments.map((att, idx) => {
                 // Special layout for 3 images: first 2 are small (top), 3rd is big (bottom span 2)
                 const isStaircaseBottom = imageAttachments.length === 3 && idx === 2;
-                
+
                 // If it's a virtual group, each attachment actually belongs to a message in groupedMessages
                 const originalMessageId = (att as any).originalMessageId || message.id;
 
@@ -605,7 +609,7 @@ export function MessageBubble({
                       <Icon name='attach' />
                     </span>
                     <span className='message-file-meta'>
-                      <strong>{att.name || 'Tệp đính kèm'}</strong>
+                      <strong>{att.name || 'Tệp tin'}</strong>
                       <span>{att.mimeType || 'Ứng dụng'}</span>
                     </span>
                   </a>
@@ -618,17 +622,25 @@ export function MessageBubble({
             <img className='message-bubble-media message-bubble-sticker' src={stickerSrc} alt={message.text || 'Sticker'} />
           ) : null}
 
-          {!isRecalled && message.text && (
-            <p className={`${message.type === 'text' ? '' : 'mt-2'} whitespace-pre-wrap break-words overflow-hidden`}>
-              {formatMessageContent(message.text)}
-            </p>
+          {!isRecalled && (
+            message.type === 'call' ? (
+              <CallLogBubble 
+                message={message} 
+                currentUserId={currentUserId} 
+                onInitiateCall={onInitiateCall} 
+              />
+            ) : message.text ? (
+              <div className={`${message.type === 'text' ? '' : 'mt-2'} whitespace-pre-wrap break-words overflow-hidden flex items-center gap-2`}>
+                <span>{formatMessageContent(message.text)}</span>
+              </div>
+            ) : null
           )}
 
-            <time>
-              {isPinned && <Icon name='pin' size={10} className='message-pin-icon inline-block mr-1' />}
-              {message.timestamp}
-              {statusLabel}
-            </time>
+          <time>
+            {isPinned && <Icon name='pin' size={10} className='message-pin-icon inline-block mr-1' />}
+            {message.timestamp}
+            {statusLabel}
+          </time>
         </article>
 
         <MessageReactionSummary reactions={reactions} onRemoveReaction={onRemoveReaction} />

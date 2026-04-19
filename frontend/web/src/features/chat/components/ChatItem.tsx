@@ -1,6 +1,8 @@
 import type { ConversationSummary } from '../chat.types'
 import { UserAvatar } from '../../../shared/components/UserAvatar'
 import { formatPresence } from '../utils/presenceUtils'
+import { getGroupCollageData } from '../../../shared/utils/avatarUtils'
+import { useUserStore } from '../context/UserStoreContext'
 
 type ChatItemProps = {
   conversation: ConversationSummary
@@ -10,9 +12,14 @@ type ChatItemProps = {
 }
 
 export function ChatItem({ conversation, active, index, onSelect }: ChatItemProps) {
+  const { userMap } = useUserStore()
   const isOnline = conversation?.online
   const lastSeenTime = conversation?.lastSeenTime ?? conversation?.updatedAt ?? conversation?.lastMessageAt ?? null
   const statusText = isOnline ? 'Đang hoạt động' : formatPresence(false, lastSeenTime)
+
+  const collageData = conversation.isGroup && !conversation.avatarUrl 
+    ? getGroupCollageData(conversation, userMap) 
+    : { avatars: [], extraCount: 0 }
 
   return (
     <button
@@ -26,7 +33,14 @@ export function ChatItem({ conversation, active, index, onSelect }: ChatItemProp
       type='button'
     >
       <div className='chat-item-avatar-wrap'>
-        <UserAvatar name={conversation?.name ?? ''} imageUrl={conversation?.avatarUrl ?? null} size='md' />
+        <UserAvatar 
+          name={conversation?.name ?? ''} 
+          imageUrl={conversation?.avatarUrl ?? null} 
+          size='md' 
+          isGroup={conversation.isGroup}
+          memberAvatars={collageData.avatars}
+          extraCount={collageData.extraCount}
+        />
         {isOnline ? <span className='chat-item-online-dot' /> : null}
       </div>
       <div className='chat-item-content'>
