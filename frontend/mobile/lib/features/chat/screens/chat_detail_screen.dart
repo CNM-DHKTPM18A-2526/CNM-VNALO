@@ -9,8 +9,8 @@ import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/features/chat/widgets/chat_input_bar.dart';
 import 'package:vnalo_mobile/features/chat/widgets/message_bubble.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
-import 'package:vnalo_mobile/models/conversation_model.dart';
 import 'package:vnalo_mobile/models/conversation_member_model.dart';
+import 'package:vnalo_mobile/models/conversation_model.dart';
 import 'package:vnalo_mobile/models/user_model.dart';
 import 'package:vnalo_mobile/core/utils/date_formatter.dart';
 import 'package:vnalo_mobile/features/chat/screens/chat_options_screen.dart';
@@ -18,9 +18,12 @@ import 'package:vnalo_mobile/features/call/screens/video_call_screen.dart';
 import 'package:vnalo_mobile/features/call/screens/voice_call_screen.dart';
 import 'package:vnalo_mobile/features/call/utils/call_id_generator.dart';
 import 'package:vnalo_mobile/features/chat/screens/group_chat_options_screen.dart';
+import 'package:vnalo_mobile/features/chat/screens/reaction_detail_screen.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
+import 'package:vnalo_mobile/models/message_reaction_model.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:vnalo_mobile/core/utils/avatar_resolver.dart';
+import 'package:vnalo_mobile/features/chat/widgets/pinned_message_bar.dart';
 import 'dart:async';
 
 class ChatDetailScreen extends StatefulWidget {
@@ -214,7 +217,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         final wallpaperUrl = conv.personalWallpaperUrl ?? conv.wallpaperUrl;
 
         final isRestrictedSending = conv.type == ConversationType.GROUP && chat.isReadOnlyForMembers(conv.id);
-        final myMember = conv.members.firstWhere((m) => m.userId == currentUserId, orElse: () => conv.members.first);
+        final myMember = conv.members.isEmpty 
+            ? ConversationMember(conversationId: conv.id, userId: 'none', joinedAt: DateTime.now())
+            : conv.members.firstWhere((m) => m.userId == currentUserId, orElse: () => conv.members.first);
         final canSend = !isRestrictedSending || myMember.role == MemberRole.OWNER || myMember.role == MemberRole.ADMIN;
 
         return Scaffold(
@@ -363,6 +368,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     : null,
             child: Column(
               children: [
+                PinnedMessageBar(
+                  conversationId: conv.id,
+                  onMessageTap: (msgId) {
+                    final rawItems = chat.getMessagesForConversation(conv.id);
+                    _jumpToMessage(msgId, rawItems);
+                  },
+                ),
                 Expanded(
                   child: Builder(
                     builder: (context) {
@@ -507,6 +519,16 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                                 message.status == MessageStatus.FAILED
                                     ? () => chat.retryMessage(message)
                                     : null,
+                            reactions: chat.getReactionsForMessage(message.id),
+                            currentUserId: _chatProvider?.currentUserId,
+                            onToggleReaction: (emoji) {
+                              debugPrint('onToggleReaction callback called in chat_detail_screen: emoji=$emoji');
+                              _chatProvider?.toggleReaction(message.id, emoji);
+                            },
+                            onShowReactors: (emoji) {
+                              debugPrint('onShowReactors callback called: emoji=$emoji');
+                              _showReactionDetail(message.id, emoji);
+                            },
                           );
                         },
                       );
@@ -633,14 +655,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
-                    _buildActionChip('ðŸ‘‹', common.helloAction),
-                    const SizedBox(width: 8),
-                    _buildActionChip('ðŸ˜Š', common.niceToMeetAction),
-                    const SizedBox(width: 8),
-                    _buildActionChip('ðŸŽ‰', common.hiAction),
+                    _buildActionChip('👋', common.helloAction),
+                    _buildActionChip('😊', common.niceToMeetAction),
+                    _buildActionChip('🎉', common.hiAction),
                   ],
                 ),
               ],
@@ -707,15 +729,16 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   child: Icon(Icons.camera_alt, color: Colors.grey.shade400, size: 28),
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Text('Äáº·t tÃªn nhÃ³m', style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+                    Text(common.setGroupNameAction, style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
                     Icon(Icons.chevron_right, size: 18, color: Colors.grey.shade400),
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text('Báº¡n vá»«a táº¡o nhÃ³m', style: TextStyle(color: Colors.grey.shade400, fontSize: 13)),
+                Text(common.groupCreatedNote, style: TextStyle(color: Colors.grey.shade400, fontSize: 13)),
                 const SizedBox(height: 16),
                 // Tiny avatars row
                 SingleChildScrollView(
@@ -727,7 +750,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 4),
                         child: AvatarWidget(
                           imageUrl: m.user?.avatarUrl, 
-                          name: m.user?.displayName ?? m.nickname ?? 'ThÃ nh viÃªn', 
+                          name: m.user?.displayName ?? m.nickname ?? common.groupMemberLabel, 
                           size: 32
                         ),
                       )),
@@ -746,14 +769,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                _buildActionChip('ðŸ‘‹', 'Váº«y tay chÃ o'),
+                _buildActionChip('👋', common.waveHandAction),
               ],
             ),
           ),
           const SizedBox(height: 12),
           TextButton(
             onPressed: () {},
-            child: Text('Xem mÃ£ QR tham gia nhÃ³m', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+            child: Text(common.viewGroupQrAction, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
           ),
         ],
       ),
@@ -820,6 +843,42 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  void _showReactionDetail(String messageId, String emoji) {
+    final reactions = _chatProvider?.getReactionsForMessage(messageId) ?? [];
+    final filteredReactions = reactions.where((r) => r.emoji == emoji).toList();
+    
+    if (filteredReactions.isEmpty) return;
+
+    // Close any open dialogs (action menu)
+    Navigator.pop(context);
+
+    // Fetch user profiles for reactors
+    final userIds = filteredReactions.map((r) => r.userId).toSet();
+    final users = <String, User>{};
+    
+    for (final userId in userIds) {
+      final member = widget.conversation.members.firstWhere(
+        (m) => m.userId == userId,
+        orElse: () => ConversationMember(
+          conversationId: widget.conversation.id,
+          userId: userId,
+          role: MemberRole.MEMBER,
+          joinedAt: DateTime.now(),
+        ),
+      );
+      if (member.user != null) {
+        users[userId] = member.user!;
+      }
+    }
+
+    ReactionDetailScreen.show(
+      context,
+      emoji: emoji,
+      reactions: filteredReactions,
+      users: users,
     );
   }
 }

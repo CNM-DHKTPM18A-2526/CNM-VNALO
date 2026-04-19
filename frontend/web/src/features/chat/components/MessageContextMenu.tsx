@@ -5,7 +5,7 @@ import type { CSSProperties } from 'react'
 
 import type { ChatMessage } from '../chat.types'
 
-export type MessageContextMenuAction = 'copy' | 'share' | 'pin' | 'star' | 'multiSelect' | 'details' | 'more' | 'recall' | 'deleteSelf'
+export type MessageContextMenuAction = 'reply' | 'copy' | 'share' | 'pin' | 'star' | 'multiSelect' | 'details' | 'more' | 'recall' | 'deleteSelf' | 'recallGroup' | 'deleteGroupSelf'
 
 type MessageContextMenuPosition = {
   top: number
@@ -18,6 +18,8 @@ type MessageContextMenuProps = {
   position: MessageContextMenuPosition
   onClose: () => void
   onAction?: (action: MessageContextMenuAction) => void
+  isVirtualGroup?: boolean
+  isPinned?: boolean
 }
 
 type MenuItemConfig = {
@@ -37,6 +39,8 @@ const MENU_ITEMS: MenuItemConfig[] = [
   { action: 'more', label: 'Tùy chọn khác', icon: ChevronRight },
   { action: 'recall', label: 'Thu hồi', icon: RotateCcw },
   { action: 'deleteSelf', label: 'Xóa chỉ ở phía tôi', icon: Trash2, danger: true },
+  { action: 'recallGroup', label: 'Thu hồi cả nhóm', icon: RotateCcw },
+  { action: 'deleteGroupSelf', label: 'Xóa phía tôi cả nhóm', icon: Trash2, danger: true },
 ]
 
 const MENU_WIDTH = 256
@@ -64,7 +68,7 @@ async function copyMessageToClipboard(text: string) {
 }
 
 export const MessageContextMenu = forwardRef<HTMLDivElement, MessageContextMenuProps>(function MessageContextMenu(
-  { message, isMyMessage, position, onClose, onAction },
+  { message, isMyMessage, position, onClose, onAction, isVirtualGroup, isPinned },
   ref,
 ) {
   const menuStyle = useMemo<CSSProperties>(
@@ -76,7 +80,14 @@ export const MessageContextMenu = forwardRef<HTMLDivElement, MessageContextMenuP
     [position.left, position.top],
   )
 
-  const visibleItems = MENU_ITEMS.filter((item) => item.action !== 'recall' || isMyMessage)
+  const visibleItems = MENU_ITEMS.filter((item) => {
+    // Basic recall only for my messages
+    if (item.action === 'recall') return isMyMessage;
+    // Group actions only if it's actually a virtual group
+    if (item.action === 'recallGroup') return isVirtualGroup && isMyMessage;
+    if (item.action === 'deleteGroupSelf') return isVirtualGroup;
+    return true;
+  })
 
   const handleItemClick = async (action: MessageContextMenuAction) => {
     try {
@@ -107,7 +118,9 @@ export const MessageContextMenu = forwardRef<HTMLDivElement, MessageContextMenuP
               <span className='message-context-menu-item-icon'>
                 <IconComponent />
               </span>
-              <span className='message-context-menu-item-label'>{item.label}</span>
+              <span className='message-context-menu-item-label'>
+                {item.action === 'pin' ? (isPinned ? 'Bỏ ghim' : 'Ghim tin nhắn') : item.label}
+              </span>
             </button>
           )
         })}

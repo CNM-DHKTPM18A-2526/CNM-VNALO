@@ -820,6 +820,14 @@
   gap: 14px;
 }
 
+.modal-body-confirm {
+  padding: 24px 20px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
 .profile-image-preview-wrap {
   display: grid;
   place-items: center;
@@ -995,6 +1003,39 @@
   color: var(--text);
   background: var(--surface-muted);
   border: 1px solid var(--border);
+}
+
+/* Zalo styles */
+.btn-zalo-secondary {
+  background-color: #eaebed;
+  color: #081c36;
+  font-weight: 600;
+  border-radius: 4px;
+  padding: 8px 20px;
+  min-width: 90px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-zalo-secondary:hover {
+  background-color: #dfe0e2;
+}
+
+.btn-zalo-danger {
+  background-color: #c13123;
+  color: #ffffff;
+  font-weight: 600;
+  border-radius: 4px;
+  padding: 8px 20px;
+  min-width: 90px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-zalo-danger:hover {
+  background-color: #ab2b1f;
 }
 
 .ui-textfield {

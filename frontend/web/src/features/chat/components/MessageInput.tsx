@@ -1,43 +1,45 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import {
   AtSign,
-  ChevronDown,
   Ellipsis,
   ImageIcon,
   Mic,
   Paperclip,
-  SendHorizontal,
   Smile,
   Sticker,
   ThumbsUp,
-  Type,
+  History,
+  Search,
+  Minimize2,
+  ChevronLeft,
+  ChevronRight,
+  Settings,
+  Plus,
+  X,
 } from 'lucide-react'
 
-import { DEFAULT_CHAT_STICKERS } from '../chat.stickers'
-import type { ChatComposePayload, ChatSticker } from '../chat.types'
+import type { ChatComposePayload } from '../chat.types'
+import { useAuth } from '../../auth/useAuth'
+import { fetchStickerPacks, fetchStickerPackDetails, fetchMediaByCategory } from '../chat.api'
 
-type EmojiTabKey = 'recent' | 'smileys' | 'hearts' | 'objects'
-
-const RECENT_EMOJI_STORAGE_KEY = 'vnalo.recent-emojis'
-
-const EMOJI_TAB_ITEMS: Array<{ key: EmojiTabKey; label: string }> = [
-  { key: 'recent', label: 'Gần đây' },
-  { key: 'smileys', label: 'Mặt cười' },
-  { key: 'hearts', label: 'Trái tim' },
-  { key: 'objects', label: 'Đồ vật' },
-]
-
-const EMOJI_BY_TAB: Record<Exclude<EmojiTabKey, 'recent'>, string[]> = {
-  smileys: ['😀', '😁', '😂', '🤣', '😊', '😍', '🥰', '😎', '🤔', '😭', '😡', '🥳'],
-  hearts: ['❤️', '🩷', '🧡', '💛', '💚', '💙', '💜', '🤍', '🖤', '💖', '💘', '💕'],
-  objects: ['👍', '🙏', '👏', '🔥', '✨', '🎉', '📷', '🎵', '🎁', '💡', '📌', '✅'],
-}
+type PickerTab = 'STICKER' | 'EMOJI' | 'GIF'
 
 type MessageInputProps = {
   onSend: (message: ChatComposePayload) => void
   recipientName?: string
   placeholder?: string
   disabled?: boolean
+  replyMessage?: any | null
+  onCancelReply?: () => void
+}
+
+type FilePreviewItem = {
+  file: File
+  previewUrl: string | null
+}
+
+function getFileIdentity(file: File) {
+  return `${file.name}-${file.size}-${file.lastModified}`
 }
 
 export function MessageInput({
@@ -45,197 +47,205 @@ export function MessageInput({
   recipientName,
   placeholder,
   disabled = false,
+  replyMessage,
+  onCancelReply,
 }: MessageInputProps) {
+  const { accessToken } = useAuth()
   const [messageText, setMessageText] = useState('')
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [isStickerOpen, setIsStickerOpen] = useState(false)
-  const [isEmojiOpen, setIsEmojiOpen] = useState(false)
-  const [activeEmojiTab, setActiveEmojiTab] = useState<EmojiTabKey>('smileys')
-  const [recentEmojis, setRecentEmojis] = useState<string[]>([])
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+
+  // Unified Picker State
+  const [isPickerOpen, setIsPickerOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState<PickerTab>('STICKER')
+
+  // Asset States
+  const [stickerPacks, setStickerPacks] = useState<any[]>([])
+  const [selectedPack, setSelectedPack] = useState<any | null>(null)
+  const [emojis, setEmojis] = useState<any[]>([])
+  const [gifs, setGifs] = useState<any[]>([])
+  const [isLoadingAssets, setIsLoadingAssets] = useState(false)
+  const [assetError, setAssetError] = useState<string | null>(null)
+
   const [error, setError] = useState('')
-  const [fileInputMode, setFileInputMode] = useState<'image' | 'file'>('file')
   const [isFocused, setIsFocused] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const emojiPanelRef = useRef<HTMLDivElement | null>(null)
+  const pickerPanelRef = useRef<HTMLDivElement | null>(null)
+  const stickerTriggerRef = useRef<HTMLButtonElement | null>(null)
   const emojiTriggerRef = useRef<HTMLButtonElement | null>(null)
 
-  const resolvedRecipientName = recipientName?.trim() || 'người nhận'
-  const dynamicPlaceholder = placeholder || `Nhập @, tin nhắn tới ${resolvedRecipientName}`
-  const hasTypedContent = messageText.trim().length > 0
+  const dynamicPlaceholder = placeholder || `Nhập @, tin nhắn tới ${recipientName?.trim() || 'người nhận'}`
+  const hasAttachments = selectedFiles.length > 0
 
-  const canSend = useMemo(() => Boolean(messageText.trim() || selectedFile), [messageText, selectedFile])
+  const canSend = useMemo(() => Boolean(messageText.trim() || hasAttachments), [messageText, hasAttachments])
 
-  const filePreviewUrl = useMemo(() => (selectedFile ? URL.createObjectURL(selectedFile) : null), [selectedFile])
+  const filePreviewItems = useMemo<FilePreviewItem[]>(
+    () =>
+      selectedFiles.map((file) => ({
+        file,
+        previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
+      })),
+    [selectedFiles],
+  )
 
-  const visibleEmojis = useMemo(() => {
-    if (activeEmojiTab === 'recent') {
-      return recentEmojis
-    }
-
-    return EMOJI_BY_TAB[activeEmojiTab]
-  }, [activeEmojiTab, recentEmojis])
-
+  // Close picker when clicking outside
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(RECENT_EMOJI_STORAGE_KEY)
-      if (!raw) {
-        return
-      }
-
-      const parsed = JSON.parse(raw) as unknown
-      if (Array.isArray(parsed)) {
-        const validated = parsed.filter((item): item is string => typeof item === 'string').slice(0, 16)
-        // Use requestAnimationFrame to avoid synchronous setState in effect warning
-        requestAnimationFrame(() => {
-          setRecentEmojis(validated)
-        })
-      }
-    } catch {
-      requestAnimationFrame(() => {
-        setRecentEmojis([])
-      })
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!isEmojiOpen) {
-      return
-    }
+    if (!isPickerOpen) return
 
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node
-      const inPanel = emojiPanelRef.current?.contains(target)
-      const inTrigger = emojiTriggerRef.current?.contains(target)
-
-      if (inPanel || inTrigger) {
-        return
+      if (!pickerPanelRef.current?.contains(target) &&
+        !stickerTriggerRef.current?.contains(target) &&
+        !emojiTriggerRef.current?.contains(target)) {
+        setIsPickerOpen(false)
       }
-
-      setIsEmojiOpen(false)
     }
 
     window.addEventListener('pointerdown', onPointerDown)
-    return () => {
-      window.removeEventListener('pointerdown', onPointerDown)
-    }
-  }, [isEmojiOpen])
+    return () => window.removeEventListener('pointerdown', onPointerDown)
+  }, [isPickerOpen])
 
+  // Fetch Assets when tab changes or picker opens
   useEffect(() => {
-    return () => {
-      if (filePreviewUrl) {
-        URL.revokeObjectURL(filePreviewUrl)
+    if (!isPickerOpen || !accessToken) return
+
+    const loadAssets = async () => {
+      setIsLoadingAssets(true)
+      setAssetError(null)
+      try {
+        if (activeTab === 'STICKER' && stickerPacks.length === 0) {
+          const packs = await fetchStickerPacks(accessToken)
+          setStickerPacks(packs)
+          if (packs.length > 0) {
+            const packId = packs[0].stickerPackId || packs[0].id
+            const detail = await fetchStickerPackDetails(accessToken, packId)
+            setSelectedPack(detail)
+          }
+        } else if (activeTab === 'EMOJI' && emojis.length === 0) {
+          const list = await fetchMediaByCategory(accessToken, 'EMOJI')
+          setEmojis(list)
+        } else if (activeTab === 'GIF' && gifs.length === 0) {
+          const list = await fetchMediaByCategory(accessToken, 'GIF')
+          setGifs(list)
+        }
+      } catch (err) {
+        console.error('Failed to load assets:', err)
+        setAssetError('Không tải được dữ liệu. Vui lòng thử lại.')
+      } finally {
+        setIsLoadingAssets(false)
       }
     }
-  }, [filePreviewUrl])
 
-  const openFilePicker = (mode: 'image' | 'file') => {
-    if (disabled) {
+    void loadAssets()
+  }, [isPickerOpen, activeTab, accessToken, stickerPacks.length, emojis.length, gifs.length])
+
+  const handlePackSelect = async (pack: any) => {
+    if (!accessToken) return
+    setIsLoadingAssets(true)
+    try {
+      const packId = pack.stickerPackId || pack.id
+      const detail = await fetchStickerPackDetails(accessToken, packId)
+      setSelectedPack(detail)
+    } finally {
+      setIsLoadingAssets(false)
+    }
+  }
+
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? [])
+    event.target.value = ''
+    if (files.length === 0) return
+
+    const invalidFile = files.find((file) => {
+      const isImage = file.type.startsWith('image/')
+      return file.size > (isImage ? 8 : 20) * 1024 * 1024
+    })
+
+    if (invalidFile) {
+      setError(invalidFile.type.startsWith('image/') ? 'Ảnh/Video vượt quá 8 MB.' : 'Tệp vượt quá 20 MB.')
       return
     }
 
     setError('')
-    setFileInputMode(mode)
-    fileInputRef.current?.click()
-  }
-
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] ?? null
-    event.target.value = ''
-
-    if (!file) {
-      return
-    }
-
-    const isImage = file.type.startsWith('image/')
-    const sizeLimit = isImage ? 8 * 1024 * 1024 : 20 * 1024 * 1024
-
-    if (file.size > sizeLimit) {
-      setError(isImage ? 'Ảnh/Video vượt quá 8 MB.' : 'Tệp vượt quá 20 MB.')
-      return
-    }
-
-    setSelectedFile(file)
+    setSelectedFiles((prev) => [...prev, ...files])
   }
 
   const submitMessage = (payload?: ChatComposePayload) => {
     const draft = payload ?? {
       text: messageText,
-      file: selectedFile,
+      files: selectedFiles,
       sticker: null,
     }
 
-    const trimmed = draft.text.trim()
+    if (!draft.text.trim() && !draft.files?.length && !draft.sticker) return
+    if (disabled) return
 
-    if (!trimmed && !draft.file && !draft.sticker) {
-      return
+    // Attach reply metadata if present
+    if (replyMessage) {
+      draft.replyTo = {
+        id: replyMessage.id,
+        senderId: replyMessage.senderId,
+        senderName: replyMessage.sender === 'me' ? 'Bạn' : (replyMessage.senderName || 'Người dùng'),
+        preview: replyMessage.text?.slice(0, 50) || (replyMessage.type === 'image' ? '[Hình ảnh]' : '[Tin nhắn]'),
+        type: replyMessage.type
+      }
+      console.log('[MessageInput] Attached replyTo to draft:', draft.replyTo)
     }
 
-    if (disabled) {
-      return
-    }
-
-    onSend({
-      text: trimmed,
-      file: draft.file ?? null,
-      sticker: draft.sticker ?? null,
-    })
-
+    onSend(draft)
     setMessageText('')
-    setSelectedFile(null)
+    setSelectedFiles([])
     setError('')
   }
 
-  const handleStickerSend = (sticker: ChatSticker) => {
-    if (disabled) {
-      return
+  const handleStickerClick = () => {
+    if (disabled) return
+    if (isPickerOpen && activeTab === 'STICKER') {
+      setIsPickerOpen(false)
+    } else {
+      setIsPickerOpen(true)
+      setActiveTab('STICKER')
     }
-
-    submitMessage({
-      text: messageText,
-      file: null,
-      sticker,
-    })
-
-    setIsStickerOpen(false)
   }
 
-  const handleSendClick = () => {
-    submitMessage()
-  }
-
-  const onStickerClick = () => {
-    if (disabled) {
-      return
+  const handleEmojiTriggerClick = () => {
+    if (disabled) return
+    if (isPickerOpen && activeTab === 'EMOJI') {
+      setIsPickerOpen(false)
+    } else {
+      setIsPickerOpen(true)
+      setActiveTab('EMOJI')
     }
-
-    setIsStickerOpen((prev) => !prev)
-    setIsEmojiOpen(false)
   }
 
-  const onEmojiClick = () => {
-    if (disabled) {
-      return
+  const handleAssetSelect = (type: 'STICKER' | 'EMOJI' | 'GIF', item: any) => {
+    const assetId = item.stickerId || item.mediaId || item.id
+    if (type === 'STICKER') {
+      submitMessage({
+        text: '',
+        files: [],
+        sticker: { id: assetId, name: item.name || 'Sticker', url: item.url }
+      })
+    } else if (type === 'GIF') {
+      onSend({
+        text: '',
+        files: [],
+        file: null,
+        sticker: { id: assetId, name: 'GIF', url: item.url }
+      } as any)
+    } else if (type === 'EMOJI') {
+      submitMessage({
+        text: '',
+        files: [],
+        sticker: { id: assetId, name: 'Emoji', url: item.url }
+      })
     }
-
-    setIsEmojiOpen((prev) => !prev)
-    if (!isEmojiOpen) {
-      setActiveEmojiTab((prev) => (recentEmojis.length > 0 ? 'recent' : prev))
-    }
-    setIsStickerOpen(false)
+    setIsPickerOpen(false)
   }
 
-  const handlePickEmoji = (emoji: string) => {
-    setMessageText((prev) => `${prev}${emoji}`)
-    setRecentEmojis((prev) => {
-      const next = [emoji, ...prev.filter((item) => item !== emoji)].slice(0, 16)
-      window.localStorage.setItem(RECENT_EMOJI_STORAGE_KEY, JSON.stringify(next))
-      return next
-    })
-    setIsEmojiOpen(false)
+  const removeSelectedFile = (fileToRemove: File) => {
+    const identity = getFileIdentity(fileToRemove)
+    setSelectedFiles((prev) => prev.filter((file) => getFileIdentity(file) !== identity))
   }
-
-  const previewSrc = (filePreviewUrl ?? '').trim()
-  const isSelectedImage = Boolean(selectedFile?.type.startsWith('image/'))
 
   return (
     <footer className='message-input'>
@@ -243,205 +253,354 @@ export function MessageInput({
         ref={fileInputRef}
         type='file'
         className='message-input-file'
-        accept={fileInputMode === 'image' ? 'image/*,video/*' : '*/*'}
+        multiple
+        style={{ display: 'none' }}
         onChange={handleFileChange}
       />
 
-      {selectedFile ? (
+      {filePreviewItems.length > 0 && (
         <div className='message-input-preview'>
-          {isSelectedImage && previewSrc ? (
-            <img className='message-input-preview-image' src={previewSrc} alt={selectedFile.name} />
-          ) : (
-            <div className='message-input-preview-file'>
-              <Paperclip size={16} />
-              <div>
-                <strong>{selectedFile.name}</strong>
-                <span>{Math.ceil(selectedFile.size / 1024)} KB</span>
+          <div className='flex flex-wrap gap-2'>
+            {filePreviewItems.map((item) => (
+              <div key={getFileIdentity(item.file)} className='relative h-20 w-20 overflow-hidden rounded-lg border bg-slate-100'>
+                {item.previewUrl ? (
+                  <img className='h-full w-full object-cover' src={item.previewUrl} alt='preview' />
+                ) : (
+                  <div className='flex h-full w-full items-center justify-center'><Paperclip size={20} /></div>
+                )}
+                <button
+                  className='absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/50 text-white text-xs'
+                  onClick={() => removeSelectedFile(item.file)}
+                >
+                  ×
+                </button>
               </div>
-            </div>
-          )}
-          <button
-            className='message-input-preview-remove'
-            type='button'
-            onClick={() => setSelectedFile(null)}
-            aria-label='Xóa tệp đính kèm'
+            ))}
+          </div>
+        </div>
+      )}
+
+      {replyMessage && (
+        <div className="flex items-center gap-3 bg-slate-50 border-t border-slate-100 px-4 py-2 animate-in fade-in slide-in-from-bottom-1">
+          <div className="flex-1 min-w-0 border-l-2 border-blue-500 pl-3">
+            <p className="text-xs font-bold text-blue-600 truncate">
+              Đang trả lời {replyMessage.sender === 'me' ? 'chính mình' : replyMessage.senderName}
+            </p>
+            <p className="text-sm text-slate-500 truncate">
+              {replyMessage.type === 'image' ? '[Hình ảnh]' : 
+               replyMessage.type === 'sticker' ? '[Sticker]' : 
+               replyMessage.type === 'file' ? '[Tệp tin]' : 
+               replyMessage.text}
+            </p>
+          </div>
+          <button 
+            onClick={onCancelReply}
+            className="p-1 hover:bg-slate-200 rounded-full transition-colors text-slate-400"
           >
-            ×
+            <X size={16} />
           </button>
         </div>
-      ) : null}
+      )}
 
-      <div className='flex flex-col gap-2 rounded-[16px] bg-white p-2'>
-        {/* Toolbar (row 1): horizontal, scrollable on mobile */}
-        <div className='flex items-center gap-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
-          {/* Sticker button on toolbar (separate from emoji button on input right). */}
-          <ToolIconButton label='Sticker' disabled={disabled} onClick={onStickerClick}>
+      <div className='flex flex-col gap-2 rounded-[16px] bg-white p-2 border border-slate-100 shadow-sm'>
+        <div className='flex items-center gap-1 overflow-x-auto px-1 [scrollbar-width:none]'>
+          <ToolIconButton ref={stickerTriggerRef} label='Sticker' disabled={disabled} onClick={handleStickerClick} active={isPickerOpen && activeTab === 'STICKER'}>
             <Sticker size={24} />
           </ToolIconButton>
-          <ToolIconButton label='Ảnh/Video' disabled={disabled} onClick={() => openFilePicker('image')}>
+          <ToolIconButton label='Image' disabled={disabled} onClick={() => openFilePicker('image')}>
             <ImageIcon size={24} />
           </ToolIconButton>
-          <ToolIconButton label='Đính kèm file' disabled={disabled} onClick={() => openFilePicker('file')}>
+          <ToolIconButton label='File' disabled={disabled} onClick={() => openFilePicker('file')}>
             <Paperclip size={24} />
           </ToolIconButton>
-          <ToolIconButton label='Mention' disabled={disabled}>
-            <AtSign size={24} />
-          </ToolIconButton>
-          <ToolIconButton label='Định dạng chữ' disabled={disabled} className='w-12'>
-            <span className='inline-flex items-center gap-0.5'>
-              <Type size={22} />
-              <ChevronDown size={14} />
-            </span>
-          </ToolIconButton>
-          <ToolIconButton label='Ghi âm' disabled={disabled}>
-            <Mic size={24} />
-          </ToolIconButton>
-          <ToolIconButton label='Sticker nhanh' disabled={disabled} onClick={onStickerClick}>
-            <Sticker size={24} />
-          </ToolIconButton>
-          <ToolIconButton label='Thêm' disabled={disabled}>
-            <Ellipsis size={24} />
-          </ToolIconButton>
+          <ToolIconButton label='Mention' disabled={disabled}><AtSign size={24} /></ToolIconButton>
+          <ToolIconButton label='Voice' disabled={disabled}><Mic size={24} /></ToolIconButton>
+          <div className='flex-1' />
+          <ToolIconButton label='More' disabled={disabled}><Ellipsis size={24} /></ToolIconButton>
         </div>
 
-        {/* Input Bar (row 2): input in center, actions on the right */}
-        <div
-          className={`flex h-[50px] items-center gap-2 rounded-full border bg-white px-4 transition ${
-            isFocused ? 'border-sky-300 shadow-[0_0_0_3px_rgba(0,122,255,0.12)]' : 'border-slate-200'
-          } ${disabled ? 'opacity-70' : ''}`}
-        >
-          <div className='flex min-w-0 flex-1 items-center'>
-            <input
-              className='h-full w-full border-0 bg-transparent text-[15px] text-slate-800 outline-none placeholder:text-slate-400'
-              placeholder={dynamicPlaceholder}
-              value={messageText}
-              disabled={disabled}
-              onFocus={() => setIsFocused(true)}
-              onBlur={() => setIsFocused(false)}
-              onChange={(event) => setMessageText(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && !event.shiftKey) {
-                  event.preventDefault()
-                  handleSendClick()
-                }
-              }}
-            />
-          </div>
-
-          <div className='flex shrink-0 items-center gap-1'>
-            {/* Emoji button beside input (opens emoji picker). */}
+        <div className={`flex h-[48px] items-center gap-2 rounded-full transition ${isFocused ? 'bg-white ring-1 ring-slate-200 shadow-sm' : 'bg-white border-0 opacity-90'}`}>
+          <input
+            className='h-full w-full border-0 bg-white text-[15px] outline-none placeholder:text-slate-400'
+            placeholder={dynamicPlaceholder}
+            value={messageText}
+            disabled={disabled}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            onChange={(e) => setMessageText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                submitMessage()
+              }
+            }}
+          />
+          <div className='flex items-center gap-1 bg-white'>
             <button
               ref={emojiTriggerRef}
-              type='button'
-              className='inline-flex h-9 w-9 items-center justify-center rounded-full border-0 bg-transparent text-slate-500 transition hover:bg-slate-100'
-              aria-label='Mở emoji'
-              disabled={disabled}
-              onClick={onEmojiClick}
+              onClick={handleEmojiTriggerClick}
+              className={`p-2 rounded-full transition-all border-0
+              ${isPickerOpen
+                  ? 'text-blue-500 bg-blue-50'
+                  : 'text-slate-600 bg-white hover:bg-slate-100'
+                }`}
             >
-              <Smile size={24} />
+              <Smile size={24} strokeWidth={1.5} />
             </button>
-
             <button
-              type='button'
-              className={`inline-flex h-9 w-9 items-center justify-center rounded-full border-0 bg-transparent transition ${
-                hasTypedContent ? 'text-[#007AFF] hover:bg-blue-50' : 'text-slate-500 hover:bg-slate-100'
-              }`}
-              onClick={hasTypedContent ? handleSendClick : undefined}
-              disabled={disabled || (hasTypedContent ? !canSend : false)}
-              aria-label={hasTypedContent ? 'Gửi tin nhắn' : 'Thả like nhanh'}
+              onClick={() => {
+                if (canSend) {
+                  submitMessage();
+                } else {
+                  // Send like emoji
+                  onSend({
+                    text: '👍'
+                  });
+                }
+              }}
+              disabled={disabled}
+              className={`p-2 rounded-full transition-all border-0 bg-transparent ${canSend ? 'text-blue-500 hover:bg-blue-50 hover:scale-105 active:scale-95' : 'text-slate-400 hover:bg-slate-100'}`}
             >
-              <span key={hasTypedContent ? 'send' : 'like'} className='inline-flex items-center justify-center animate-[reaction-pop_160ms_ease-out]'>
-                {hasTypedContent ? <SendHorizontal size={24} /> : <ThumbsUp size={24} />}
-              </span>
+              {canSend ? (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                </svg>
+              ) : (
+                <ThumbsUp size={24} strokeWidth={1.5} className="text-yellow-500" />
+              )}
             </button>
           </div>
         </div>
       </div>
 
-      {error ? <p className='message-input-error'>{error}</p> : null}
+      {error ? <p className='px-2 text-red-500 text-xs mt-1'>{error}</p> : null}
 
-      {isEmojiOpen ? (
-        <div ref={emojiPanelRef} className='message-input-sticker-panel'>
-          <div className='mb-2 flex items-center gap-1 border-b border-slate-200 pb-2'>
-            {EMOJI_TAB_ITEMS.map((tab) => (
+      {isPickerOpen && (
+        <div
+          ref={pickerPanelRef}
+          className='absolute bottom-full mb-2 left-0 w-[350px] animate-in fade-in slide-in-from-bottom-2 duration-200 shadow-2xl border border-slate-200 rounded-xl overflow-hidden flex flex-col'
+          style={{ backgroundColor: '#ffffff', zIndex: 100 }}
+        >
+          {/* Zalo Tabs */}
+          <div
+            className='flex items-center border-b border-slate-100 sticky top-0 z-10'
+            style={{ backgroundColor: '#ffffff' }}
+          >
+            {(['STICKER', 'EMOJI', 'GIF'] as PickerTab[]).map(tab => (
               <button
-                key={tab.key}
-                type='button'
-                onClick={() => setActiveEmojiTab(tab.key)}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                  activeEmojiTab === tab.key
-                    ? 'bg-sky-100 text-sky-700'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`flex-1 py-2.5 text-[13px] font-bold border-0 outline-none transition-all relative ${activeTab === tab ? 'text-blue-600' : 'text-slate-500'}`}
+                style={{ backgroundColor: '#ffffff' }}
               >
-                {tab.label}
+                {tab === 'STICKER' ? 'STICKER' : tab === 'EMOJI' ? 'EMOJI' : 'GIF'}
+                {activeTab === tab && (
+                  <div className='absolute bottom-0 left-0 right-0 h-[2px] bg-blue-600' />
+                )}
               </button>
             ))}
+            <div className='h-4 w-[1px] bg-slate-200 mx-1' />
+            <button className='px-4 text-blue-500'><Minimize2 size={16} /></button>
           </div>
 
-          <div className='flex flex-wrap gap-2 p-1'>
-            {visibleEmojis.length > 0 ? (
-              visibleEmojis.map((emoji) => (
+          {/* Search Bar */}
+          {activeTab === 'STICKER' && (
+            <div className='px-3 py-2 bg-white'>
+              <div className='relative flex items-center bg-slate-50 rounded-full px-3 py-1.5 border border-slate-100'>
+                <Search size={14} className='text-slate-400 mr-2' />
+                <input
+                  type='text'
+                  placeholder='Tìm kiếm sticker'
+                  className='bg-transparent border-none outline-none text-[13px] w-full text-slate-600'
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Content Area */}
+          <div
+            className='flex-1 zalo-picker-content'
+            style={{
+              backgroundColor: '#ffffff'
+            }}
+          >
+            {isLoadingAssets ? (
+              <div className='flex h-full flex-col items-center justify-center gap-2 text-slate-400 text-sm'>
+                <div className='h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent' />
+                Đang tải...
+              </div>
+            ) : assetError ? (
+              <div className='flex h-full flex-col items-center justify-center gap-2 p-4 text-center'>
+                <p className='text-slate-500 text-sm'>{assetError}</p>
                 <button
-                  key={`${activeEmojiTab}-${emoji}`}
-                  type='button'
-                  className='inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-2xl transition hover:bg-slate-50'
-                  onClick={() => handlePickEmoji(emoji)}
-                  aria-label={`Chọn emoji ${emoji}`}
+                  onClick={() => {
+                    setStickerPacks([]);
+                    setEmojis([]);
+                    setGifs([]);
+                  }}
+                  className='bg-blue-50 text-blue-600 px-4 py-1.5 rounded-full text-sm font-medium hover:bg-blue-100 transition'
                 >
-                  {emoji}
+                  Thử lại
                 </button>
-              ))
+              </div>
             ) : (
-              <p className='px-2 py-3 text-sm text-slate-500'>Chưa có emoji gần đây</p>
+              <div className='p-3'>
+                {activeTab === 'STICKER' && (
+                  <div className='flex flex-col gap-5'>
+                    <div>
+                      <h4 className='text-[12px] font-bold text-slate-600 mb-2 px-1'>Gần đây</h4>
+                      <div className='grid grid-cols-4 gap-2'>
+                        {selectedPack?.stickers?.slice(0, 4).map((item: any) => (
+                          <button
+                            key={`rec-${item.stickerId || item.id}`}
+                            onClick={() => handleAssetSelect('STICKER', item)}
+                            className='aspect-square rounded-lg transition-all hover:scale-110 active:scale-95'
+                          >
+                            <img src={item.url} alt={item.name} className='h-full w-full object-contain' />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className='text-[12px] font-bold text-slate-600 mb-2 px-1'>{selectedPack?.name || 'Stickers'}</h4>
+                      <div className='grid grid-cols-4 gap-2'>
+                        {selectedPack?.stickers?.map((item: any) => (
+                          <button
+                            key={item.stickerId || item.id}
+                            onClick={() => handleAssetSelect('STICKER', item)}
+                            className='aspect-square rounded-lg transition-all hover:scale-110 active:scale-95 border-0 bg-transparent'
+                          >
+                            <img src={item.url} alt={item.name} className='h-full w-full object-contain' />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'EMOJI' && (
+                  <div className='flex flex-col gap-6'>
+                    {/* Recently Used Section */}
+                    {emojis.length > 0 && (
+                      <div>
+                        <h4 className='text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 px-1'>Gần đây</h4>
+                        <div className='grid grid-cols-9 gap-1'>
+                          {emojis.slice(0, 9).map((item: any) => (
+                            <button
+                              key={`rec-${item.mediaId || item.id}`}
+                              onClick={() => handleAssetSelect('EMOJI', item)}
+                              className='aspect-square transition-all active:scale-95 border-0 bg-transparent'
+                            >
+                              <img src={item.url} alt='Emoji' className='h-full w-full object-contain p-0.5' />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Standard Emotions Section (Zalo Style) */}
+                    <div>
+                      <h4 className='text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 px-1'>Cảm xúc</h4>
+                      <div className='grid grid-cols-9 gap-1'>
+                        {/* Render standard emojis + fetched ones */}
+                        {STANDARD_EMOJI_LIST.map((emojiChar, i) => (
+                          <button
+                            key={`std-${i}`}
+                            onClick={() => {
+                              setMessageText(prev => prev + emojiChar);
+                            }}
+                            className='aspect-square flex items-center justify-center text-3xl transition-all active:scale-75 select-none border-0 bg-transparent'
+                          >
+                            {emojiChar}
+                          </button>
+                        ))}
+                        {emojis.map((item: any) => (
+                          <button
+                            key={item.mediaId || item.id}
+                            onClick={() => handleAssetSelect('EMOJI', item)}
+                            className='aspect-square transition-all active:scale-95 border-0 bg-transparent'
+                          >
+                            <img src={item.url} alt='Emoji' className='h-full w-full object-contain p-0.5' />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'GIF' && (
+                  <div className='grid grid-cols-2 gap-3'>
+                    {gifs.map((item: any) => (
+                      <button
+                        key={item.mediaId || item.id}
+                        onClick={() => handleAssetSelect('GIF', item)}
+                        className='aspect-video rounded-xl overflow-hidden transition-all active:scale-95 border-0 bg-transparent'
+                      >
+                        <img src={item.url} alt='GIF' className='h-full w-full object-cover' />
+                      </button>
+                    ))}
+                    {gifs.length === 0 && (
+                      <div className='col-span-2 flex flex-col items-center justify-center h-40 text-slate-400 text-sm'>
+                        Chưa có GIF nào
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
           </div>
-        </div>
-      ) : null}
 
-      {isStickerOpen ? (
-        <div className='message-input-sticker-panel'>
-          <div className='message-input-sticker-grid'>
-            {DEFAULT_CHAT_STICKERS.map((sticker) => (
-              <button
-                key={sticker.id}
-                className='message-input-sticker-option'
-                type='button'
-                disabled={disabled}
-                onClick={() => handleStickerSend(sticker)}
-                title={sticker.name}
-              >
-                {sticker.url ? <img src={sticker.url} alt={sticker.name} /> : null}
-                <span>{sticker.name}</span>
-              </button>
-            ))}
+          {/* Zalo Footer Sticker Bar */}
+          <div className='flex items-center bg-white h-11 shrink-0 px-1'>
+            <button className='h-full px-2 text-slate-400 border-0 bg-white hover:text-slate-600 transition'><ChevronLeft size={16} /></button>
+            <button className='h-full px-2 text-blue-500 border-0 bg-white'><History size={20} /></button>
+
+            <div className='flex-1 flex items-center overflow-x-auto [scrollbar-width:none] px-1 gap-1 bg-white'>
+              {stickerPacks.map(pack => (
+                <button
+                  key={pack.stickerPackId || pack.id}
+                  onClick={() => handlePackSelect(pack)}
+                  className={`h-9 w-9 shrink-0 flex items-center justify-center rounded transition-all border-0 ${(selectedPack?.stickerPackId || selectedPack?.id) === (pack.stickerPackId || pack.id) ? 'bg-slate-100 shadow-inner' : 'bg-white hover:bg-slate-50'}`}
+                >
+                  <img src={pack.coverUrl || pack.thumbnailUrl || pack.avatarUrl} className='h-6 w-6 object-contain' alt='pack' />
+                </button>
+              ))}
+            </div>
+
+            <button className='h-full px-2 text-slate-400 border-0 bg-white hover:text-slate-600 transition'><Settings size={16} /></button>
+            <button className='h-full px-2 text-slate-400 border-0 bg-white hover:text-slate-600 transition'><ChevronRight size={16} /></button>
+            <button className='h-full px-3 text-slate-400 border-0 bg-white hover:text-slate-600 transition font-light text-xl'><Plus size={18} /></button>
           </div>
         </div>
-      ) : null}
+      )}
     </footer>
   )
 }
 
-type ToolIconButtonProps = {
-  children: ReactNode
-  label: string
-  disabled?: boolean
-  className?: string
-  onClick?: () => void
-}
-
-function ToolIconButton({ children, label, disabled = false, className, onClick }: ToolIconButtonProps) {
+const ToolIconButton = ({ children, label, disabled = false, className, onClick, active }: any) => {
   return (
     <button
       type='button'
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-0 bg-transparent text-slate-500 transition hover:bg-slate-100 ${
-        className ?? ''
-      }`}
+      className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-0 transition ${active ? 'bg-sky-50 text-sky-600' : 'bg-transparent text-slate-500 hover:bg-slate-100'} ${className ?? ''}`}
     >
       {children}
     </button>
   )
+}
+
+// Standards
+const STANDARD_EMOJI_LIST = [
+  '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐', '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕', '🤑', '🤠', '😈', '👿', '👹', '👺', '🤡', '👻', '💀', '☠️', '👽', '👾', '🤖', '💩', '😺', '😸', '😻', '😼', '😽', '🙀', '😿', '😾'
+];
+
+function openFilePicker(mode: 'image' | 'file') {
+  const input = document.querySelector('.message-input-file') as HTMLInputElement;
+  if (input) {
+    input.accept = mode === 'image' ? 'image/*,video/*' : '*/*';
+    input.click();
+  }
 }

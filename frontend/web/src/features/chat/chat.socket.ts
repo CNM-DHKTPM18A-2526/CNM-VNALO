@@ -1,6 +1,6 @@
 import { io, type Socket } from 'socket.io-client'
 import type { RawMessage } from './chat.api'
-import type { ChatMessageType } from './chat.types'
+import type { ChatMessageType, ReplyMetadata } from './chat.types'
 
 const fallbackProtocol = typeof window !== 'undefined' ? window.location.protocol.replace(':', '') : 'http'
 const fallbackHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
@@ -17,6 +17,14 @@ export type SocketMessagePayload = {
   mediaMimeType?: string | null
   mediaSizeBytes?: number | null
   clientMessageId?: string
+  attachments?: Array<{
+    url: string
+    name?: string | null
+    mimeType?: string | null
+    sizeBytes?: number | null
+    thumbnailUrl?: string | null
+  }>
+  replyTo?: ReplyMetadata | null
 }
 
 export type SendMessageAck = {

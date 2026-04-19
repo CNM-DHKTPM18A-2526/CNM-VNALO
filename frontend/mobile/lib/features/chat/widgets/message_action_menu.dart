@@ -8,6 +8,7 @@ class MessageActionMenu extends StatelessWidget {
   final Message message;
   final bool isMine;
   final bool isCloud;
+  final bool isPinned;
   final Function(String action) onAction;
 
   const MessageActionMenu({
@@ -16,6 +17,7 @@ class MessageActionMenu extends StatelessWidget {
     required this.isMine,
     required this.onAction,
     this.isCloud = false,
+    this.isPinned = false,
   });
 
   @override
@@ -37,7 +39,13 @@ class MessageActionMenu extends StatelessWidget {
         if (!isCloud) _buildActionItem(context, 'recall', common.recallAction, Icons.settings_backup_restore_rounded, Colors.orange),
         
         _buildActionItem(context, 'copy', common.copyAction, Icons.copy_rounded, const Color(0xFF1E88E5)),
-        _buildActionItem(context, 'pin', common.pinActionTag, Icons.push_pin_outlined, const Color(0xFFFF9800)),
+        _buildActionItem(
+          context, 
+          isPinned ? 'unpin' : 'pin', 
+          isPinned ? common.unpinAction : common.pinActionTag, 
+          Icons.push_pin_outlined, 
+          const Color(0xFFFF9800)
+        ),
         _buildActionItem(context, 'reminder', common.reminderAction, Icons.access_time_rounded, const Color(0xFFE65100)),
         _buildActionItem(context, 'multi', common.selectMultiAction, Icons.check_circle_outline_rounded, const Color(0xFF1976D2)),
         
@@ -59,7 +67,13 @@ class MessageActionMenu extends StatelessWidget {
         if (!isCloud) _buildActionItem(context, 'save', common.saveToDocsAction, Icons.folder_open_outlined, const Color(0xFF03A9F4)),
         _buildActionItem(context, 'copy', common.copyAction, Icons.copy_rounded, const Color(0xFF1E88E5)),
         
-        _buildActionItem(context, 'pin', common.pinActionTag, Icons.push_pin_outlined, const Color(0xFFFF9800)),
+        _buildActionItem(
+          context, 
+          isPinned ? 'unpin' : 'pin', 
+          isPinned ? common.unpinAction : common.pinActionTag, 
+          Icons.push_pin_outlined, 
+          const Color(0xFFFF9800)
+        ),
         _buildActionItem(context, 'reminder', common.reminderAction, Icons.access_time_rounded, const Color(0xFFE65100)),
         _buildActionItem(context, 'multi', common.selectMultiAction, Icons.check_circle_outline_rounded, const Color(0xFF1976D2)),
         _buildActionItem(context, 'quick', common.quickReplyAction, Icons.bolt_rounded, const Color(0xFF1976D2)),
@@ -78,7 +92,7 @@ class MessageActionMenu extends StatelessWidget {
         // 1. Emoji Bar
         Container(
           height: 56,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
             color: backgroundColor.withValues(alpha: 0.95),
             borderRadius: BorderRadius.circular(28),
@@ -91,7 +105,7 @@ class MessageActionMenu extends StatelessWidget {
             ],
           ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               _buildEmoji('❤️'),
               _buildEmoji('👍'),

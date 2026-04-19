@@ -9,6 +9,7 @@ import type { Friend } from '../../friends/friends.types';
 type CreateGroupModalProps = {
   isOpen: boolean;
   friends: Friend[];
+  mode?: 'create' | 'add-members';
   isSubmitting?: boolean;
   onClose: () => void;
   onCreate: (
@@ -16,6 +17,8 @@ type CreateGroupModalProps = {
     avatarUrl: string | null,
     selectedMemberIds: string[]
   ) => Promise<void>;
+  initialMemberIds?: string[];
+  existingMemberIds?: string[];
 };
 
 type FilterType = 'all' | 'customer' | 'family' | 'work' | 'friends' | 'later';
@@ -58,9 +61,12 @@ function resolveFriendLabel(friend: Friend): string {
 export function CreateGroupModal({
   isOpen,
   friends,
+  mode = 'create',
   isSubmitting = false,
   onClose,
   onCreate,
+  initialMemberIds = [],
+  existingMemberIds = [],
 }: CreateGroupModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -73,16 +79,16 @@ export function CreateGroupModal({
   // Reset khi mở modal
   useEffect(() => {
     if (!isOpen) return;
-    
+
     // Use requestAnimationFrame to avoid synchronous setState in effect warning
     requestAnimationFrame(() => {
       setGroupName('');
       setSearchKeyword('');
-      setSelectedMemberIds([]);
+      setSelectedMemberIds(initialMemberIds);
       setActiveFilter('all');
       setAvatarPreviewUrl(null);
     });
-  }, [isOpen]);
+  }, [isOpen, initialMemberIds]);
 
   const filterTabs: Array<{ id: FilterType; label: string }> = [
     { id: 'all', label: 'Tất cả' },
@@ -108,16 +114,25 @@ export function CreateGroupModal({
 
   const selectedMembers = useMemo(() => friends.filter((f) => selectedMemberIds.includes(f.friendId)), [friends, selectedMemberIds]);
 
-  const isValid = groupName.trim().length > 0 && selectedMemberIds.length >= 1;
+  const newSelectedMemberIds = useMemo(() => 
+    selectedMemberIds.filter(id => !existingMemberIds.includes(id)), 
+  [selectedMemberIds, existingMemberIds]);
+
+  const isValid = mode === 'create' 
+    ? (groupName.trim().length > 0 && selectedMemberIds.length >= 1) 
+    : newSelectedMemberIds.length >= 1;
+
   const canSubmit = isValid && !isSubmitting;
 
   const toggleMemberSelection = useCallback((friendId: string) => {
+    if (existingMemberIds.includes(friendId)) return;
     setSelectedMemberIds((prev) =>
       prev.includes(friendId) ? prev.filter((id) => id !== friendId) : [...prev, friendId]
     );
-  }, []);
+  }, [existingMemberIds]);
 
   const handleRemoveMember = (id: string) => {
+    if (existingMemberIds.includes(id)) return;
     setSelectedMemberIds((prev) => prev.filter((mid) => mid !== id));
   };
 
@@ -131,42 +146,46 @@ export function CreateGroupModal({
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
-    await onCreate(groupName.trim(), avatarPreviewUrl, selectedMemberIds);
+    // For 'add-members', only send the NEWLY selected people to the API
+    const idsToSubmit = mode === 'create' ? selectedMemberIds : newSelectedMemberIds;
+    await onCreate(groupName.trim(), avatarPreviewUrl, idsToSubmit);
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Tạo nhóm">
+    <Modal isOpen={isOpen} onClose={onClose} title={mode === 'create' ? "Tạo nhóm" : "Thêm thành viên"}>
       <div className="flex flex-col h-[600px] max-h-[85vh] -m-5 bg-white overflow-hidden">
 
         {/* Top section: Avatar + Tên nhóm */}
-        <div className="flex items-center gap-4 px-5 pt-4 pb-3 border-b border-gray-200 shrink-0">
-          <div className="relative cursor-pointer group shrink-0" onClick={handleAvatarClick}>
-            <div className="w-[50px] h-[50px] rounded-full overflow-hidden border border-gray-200 bg-white flex items-center justify-center transition-colors group-hover:bg-gray-50">
-              {avatarPreviewUrl ? (
-                <img src={avatarPreviewUrl} alt="Group" className="w-full h-full object-cover" />
-              ) : (
-                <Camera size={20} strokeWidth={2} className="text-[#596677]" />
-              )}
+        {mode === 'create' && (
+          <div className="flex items-center gap-4 px-5 pt-4 pb-3 border-b border-gray-200 shrink-0">
+            <div className="relative cursor-pointer group shrink-0" onClick={handleAvatarClick}>
+              <div className="w-[50px] h-[50px] rounded-full overflow-hidden border border-gray-200 bg-white flex items-center justify-center transition-colors group-hover:bg-gray-50">
+                {avatarPreviewUrl ? (
+                  <img src={avatarPreviewUrl} alt="Group" className="w-full h-full object-cover" />
+                ) : (
+                  <Camera size={20} strokeWidth={2} className="text-[#596677]" />
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarFileChange}
+                className="hidden"
+              />
             </div>
+
             <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleAvatarFileChange}
-              className="hidden"
+              type="text"
+              className="flex-1 text-[15px] font-medium border-b border-[#0068ff] outline-none py-1.5 transition-colors placeholder-[#8b9bb4] bg-transparent text-gray-900"
+              placeholder="Nhập tên nhóm..."
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+              maxLength={100}
+              disabled={isSubmitting}
             />
           </div>
-
-          <input
-            type="text"
-            className="flex-1 text-[15px] font-medium border-b border-[#0068ff] outline-none py-1.5 transition-colors placeholder-[#8b9bb4] bg-transparent text-gray-900"
-            placeholder="Nhập tên nhóm..."
-            value={groupName}
-            onChange={(e) => setGroupName(e.target.value)}
-            maxLength={100}
-            disabled={isSubmitting}
-          />
-        </div>
+        )}
 
         {/* Search bar */}
         <div className="px-5 pt-4 pb-3 shrink-0">
@@ -207,18 +226,23 @@ export function CreateGroupModal({
         {/* Selected members */}
         {selectedMembers.length > 0 && (
           <div className="flex gap-3 overflow-x-auto px-5 pb-2 border-b border-gray-100 min-h-[56px] items-center shrink-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            {selectedMembers.map((member) => (
-              <div key={member.friendId} className="relative shrink-0 w-[42px] h-[42px] group">
-                <UserAvatar name={resolveFriendLabel(member)} imageUrl={member.avatarUrl} size="md" />
-                <button
-                  type="button"
-                  className="absolute -top-1 -right-1 bg-white rounded-full p-[2px] shadow-sm text-gray-400 group-hover:text-red-500 z-10 border border-gray-200 transition-colors cursor-pointer"
-                  onClick={() => handleRemoveMember(member.friendId)}
-                >
-                  <X size={12} />
-                </button>
-              </div>
-            ))}
+            {selectedMembers.map((member) => {
+              const isLocked = existingMemberIds.includes(member.friendId);
+              return (
+                <div key={member.friendId} className="relative shrink-0 w-[42px] h-[42px] group">
+                  <UserAvatar name={resolveFriendLabel(member)} imageUrl={member.avatarUrl} size="md" />
+                  {!isLocked && (
+                    <button
+                      type="button"
+                      className="absolute -top-1 -right-1 bg-white rounded-full p-[2px] shadow-sm text-gray-400 group-hover:text-red-500 z-10 border border-gray-200 transition-colors cursor-pointer"
+                      onClick={() => handleRemoveMember(member.friendId)}
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -230,19 +254,21 @@ export function CreateGroupModal({
               <div className="space-y-0.5 mt-1">
                 {filteredFriends.slice(0, 4).map((friend) => {
                   const isSelected = selectedMemberIds.includes(friend.friendId);
+                  const isLocked = existingMemberIds.includes(friend.friendId);
                   return (
                     <div
                       key={`recent-${friend.friendId}`}
-                      className={`flex items-center gap-4 px-5 py-2.5 cursor-pointer transition-colors ${isSelected ? 'bg-blue-50/50' : 'hover:bg-gray-50'}`}
-                      onClick={() => toggleMemberSelection(friend.friendId)}
+                      className={`flex items-center gap-4 px-5 py-2.5 transition-colors ${isLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'} ${isSelected ? 'bg-blue-50/50' : 'hover:bg-gray-50'}`}
+                      onClick={() => !isLocked && toggleMemberSelection(friend.friendId)}
                     >
-                      <div className={`w-[22px] h-[22px] flex-shrink-0 rounded-full border-[1.5px] flex items-center justify-center transition-colors ${isSelected ? 'bg-[#0068ff] border-[#0068ff]' : 'border-[#d6dbe1] bg-white'}`}>
+                      <div className={`w-[22px] h-[22px] flex-shrink-0 rounded-full border-[1.5px] flex items-center justify-center transition-colors ${isSelected ? (isLocked ? 'bg-gray-300 border-gray-300' : 'bg-[#0068ff] border-[#0068ff]') : 'border-[#d6dbe1] bg-white'}`}>
                         {isSelected && <Check size={14} strokeWidth={3} className="text-white" />}
                       </div>
                       <UserAvatar name={resolveFriendLabel(friend)} imageUrl={friend.avatarUrl} size="md" />
                       <div className="flex-1 min-w-0">
                         <div className="text-[15px] font-normal text-black truncate">{resolveFriendLabel(friend)}</div>
                       </div>
+                      {isLocked && <span className="text-[12px] text-gray-400 font-medium">Đã vào nhóm</span>}
                     </div>
                   );
                 })}
@@ -258,13 +284,14 @@ export function CreateGroupModal({
                 <div className="space-y-0.5 pt-1">
                   {groupedFriends[letter].map((friend) => {
                     const isSelected = selectedMemberIds.includes(friend.friendId);
+                    const isLocked = existingMemberIds.includes(friend.friendId);
                     return (
                       <div
                         key={friend.friendId}
-                        className={`flex items-center gap-4 px-5 py-2.5 cursor-pointer transition-colors ${isSelected ? 'bg-blue-50/50' : 'hover:bg-gray-50'}`}
-                        onClick={() => toggleMemberSelection(friend.friendId)}
+                        className={`flex items-center gap-4 px-5 py-2.5 transition-colors ${isLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'} ${isSelected ? 'bg-blue-50/50' : 'hover:bg-gray-50'}`}
+                        onClick={() => !isLocked && toggleMemberSelection(friend.friendId)}
                       >
-                        <div className={`w-[22px] h-[22px] flex-shrink-0 rounded-full border-[1.5px] flex items-center justify-center transition-colors ${isSelected ? 'bg-[#0068ff] border-[#0068ff]' : 'border-[#d6dbe1] bg-white'}`}>
+                        <div className={`w-[22px] h-[22px] flex-shrink-0 rounded-full border-[1.5px] flex items-center justify-center transition-colors ${isSelected ? (isLocked ? 'bg-gray-300 border-gray-300' : 'bg-[#0068ff] border-[#0068ff]') : 'border-[#d6dbe1] bg-white'}`}>
                           {isSelected && <Check size={14} strokeWidth={3} className="text-white" />}
                         </div>
                         <UserAvatar name={resolveFriendLabel(friend)} imageUrl={friend.avatarUrl} size="md" />
@@ -272,6 +299,7 @@ export function CreateGroupModal({
                           <div className="text-[15px] font-normal text-black truncate">{resolveFriendLabel(friend)}</div>
                           {friend.statusMessage && <div className="text-[13px] text-[#596677] truncate">{friend.statusMessage}</div>}
                         </div>
+                        {isLocked && <span className="text-[12px] text-gray-400 font-medium">Đã vào nhóm</span>}
                       </div>
                     );
                   })}
@@ -298,7 +326,7 @@ export function CreateGroupModal({
             onClick={handleSubmit}
             disabled={!canSubmit}
           >
-            {isSubmitting ? 'Đang tạo...' : 'Tạo nhóm'}
+            {isSubmitting ? (mode === 'create' ? 'Đang tạo...' : 'Đang thêm...') : (mode === 'create' ? 'Tạo nhóm' : 'Xác nhận')}
           </button>
         </div>
 

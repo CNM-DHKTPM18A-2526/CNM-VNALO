@@ -8,6 +8,7 @@ import { SearchMessagesPanel } from '../features/chat/components/SearchMessagesP
 import { SearchGlobalPanel } from '../features/chat/components/SearchGlobalPanel'
 import { MessageShareModal } from '../features/chat/components/MessageShareModal'
 import { ChatWindow } from '../features/chat/components/ChatWindow'
+import { UserProfileModal } from '../features/chat/components/UserProfileModal'
 import type { MessageContextMenuAction } from '../features/chat/components/MessageContextMenu'
 import {
   addMessageReaction,
@@ -28,6 +29,10 @@ import {
   unpinMessage,
   uploadChatMedia,
   fetchConversation,
+  addMembersToConversation,
+  leaveConversation,
+  renameGroupConversation,
+  setConversationNickname,
 } from '../features/chat/chat.api';
 import type { RawMessage } from '../features/chat/chat.api'
 import { REACTION_OPTIONS } from '../features/chat/chat.constants'
@@ -39,6 +44,7 @@ import type {
   ChatMessageType,
   ConversationSummary,
   MessageDeliveryState,
+  MessageReactionMap,
 } from '../features/chat/chat.types'
 import { getFriends, getUserById, searchUsers } from '../features/friends/friends.api'
 import { getUserByPhone } from '../features/friends/friends.api'
@@ -46,6 +52,7 @@ import type { Friend, UserLookupResult } from '../features/friends/friends.types
 import { useAuth } from '../features/auth/useAuth'
 import { Skeleton } from '../shared/components/ui/Skeleton'
 import { Card } from '../shared/components/ui/Card'
+import { Modal } from '../shared/components/ui/Modal'
 import { useLanguage } from '../shared/i18n/LanguageContext'
 import {
   initializeSearchIndex,
@@ -56,7 +63,10 @@ import {
   type CachedUser,
 } from '../features/chat/searchIndex'
 import { CreateGroupModal } from '../features/chat/components/CreateGroupModal'
-import { formatMessageContent } from '../features/chat/utils/messageUtils'
+import { EditConversationNameModal } from '../features/chat/components/EditConversationNameModal'
+import { formatMessage, renderSystemMessage, formatMessagePreview } from '../features/chat/utils/messageUtils'
+import { UserStoreProvider, useUserStore } from '../features/chat/context/UserStoreContext'
+import type { SystemMessagePayload } from '../features/chat/chat.types'
 
 // Fallback toast object to prevent crashes if toast library is missing
 const toast = {
@@ -190,56 +200,39 @@ function toSocketMessageType(type: ChatMessageType): Uppercase<ChatMessageType> 
   return type.toUpperCase() as Uppercase<ChatMessageType>
 }
 
-function getConversationPreview(message: ChatMessage): string {
-  if (message.text.startsWith('CALL_LOG::')) {
-    return `[${formatMessageContent(message.text)}]`
-  }
 
-  switch (message.type) {
-    case 'image':
-      return 'Ảnh'
-    case 'file':
-      return 'File'
-    case 'sticker':
-      return 'Sticker'
-    default:
-      return message.text.trim()
-  }
+function getConversationPreview(
+  message: ChatMessage,
+  currentUserId: string,
+  getDisplayName: (id: string) => string,
+): string {
+  return formatMessage(message, currentUserId, getDisplayName)
 }
 
-function formatPreviewSenderName(displayName?: string | null): string {
-  const normalized = String(displayName ?? '').trim().replace(/\s+/g, ' ')
-  if (!normalized) {
-    return ''
+
+
+
+function formatConversationPreview(
+  senderName: string | null | undefined,
+  message: ChatMessage | string,
+  currentUserId: string,
+  getDisplayName: (id: string) => string,
+): string {
+  if (typeof message !== 'string' && message.type === 'system') {
+    return getConversationPreview(message, currentUserId, getDisplayName)
   }
 
-  const parts = normalized.split(' ')
-  if (parts.length <= 2) {
-    return normalized
+  const isMe = typeof message !== 'string' && message.senderId === currentUserId;
+  const type = typeof message !== 'string' ? message.type : undefined;
+  const attachments = typeof message !== 'string' ? message.attachments : undefined;
+  let text = typeof message === 'string' ? message : message.text;
+
+  // Preserve complex system formatting if content is JSON
+  if (text.startsWith('{"action":')) {
+    text = renderSystemMessage(text, currentUserId, getDisplayName);
   }
 
-  return parts.slice(-2).join(' ')
-}
-
-function formatConversationPreview(senderName: string | null | undefined, message: ChatMessage | string): string {
-  const rawMessage = typeof message === 'string' ? message : getConversationPreview(message)
-  const content = String(rawMessage ?? '').trim()
-
-  if (!content) {
-    return ''
-  }
-
-  const previewSender = formatPreviewSenderName(senderName)
-  if (!previewSender) {
-    return content
-  }
-
-  const prefix = `${previewSender}:`
-  if (content.startsWith(prefix)) {
-    return content
-  }
-
-  return `${previewSender}: ${content}`
+  return formatMessagePreview(text, isMe, type, senderName || undefined, attachments);
 }
 
 function getDraftMessageType(payload: ChatComposePayload): ChatMessageType {
@@ -247,8 +240,11 @@ function getDraftMessageType(payload: ChatComposePayload): ChatMessageType {
     return 'sticker'
   }
 
-  if (payload.file) {
-    return payload.file.type.startsWith('image/') ? 'image' : 'file'
+  const files = [payload.file, ...(payload.files ?? [])].filter((f): f is File => !!f)
+  if (files.length > 0) {
+    // If all files are images, type is image. Otherwise it's file.
+    const allImages = files.every(f => f.type.startsWith('image/'))
+    return allImages ? 'image' : 'file'
   }
 
   return 'text'
@@ -336,13 +332,8 @@ function persistDeletedMessageIds(userId: string, deletedMap: Record<string, tru
   }
 }
 
-type CachedUserProfile = {
-  displayName: string
-  avatarUrl: string | null
-}
-
-function fallbackUserDisplayName(userId: string): string {
-  return `Nguoi dung ${userId.slice(0, 8)}`
+function fallbackUserDisplayName(_userId: string): string {
+  return 'Người dùng'
 }
 
 function applyRestrictedMessage(message: ChatMessage, restricted: boolean): ChatMessage {
@@ -417,7 +408,16 @@ function isRestrictedWebToken(token: string): boolean {
   return restrictedWebMode && platform === 'web'
 }
 
-export function ChatPage() {
+export default function ChatPage() {
+  return (
+    <UserStoreProvider>
+      <ChatPageContent />
+    </UserStoreProvider>
+  )
+}
+
+function ChatPageContent() {
+  const { userMap, upsertUser, ensureUser } = useUserStore()
   const { isBootstrapping, accessToken, user } = useAuth()
   const { t } = useLanguage()
   const navigate = useNavigate()
@@ -433,31 +433,76 @@ export function ChatPage() {
   const [reactionStatesByMessage, setReactionStatesByMessage] = useState<Record<string, MessageReactionState>>({})
   const [friendResults, setFriendResults] = useState<UserLookupResult[]>([])
   const [friendsDirectory, setFriendsDirectory] = useState<Friend[]>([])
-  const [userProfileCache, setUserProfileCache] = useState<Record<string, CachedUserProfile>>({})
   const [isSocketConnected, setIsSocketConnected] = useState(false)
   const [rightSidebarContent, setRightSidebarContent] = useState<'info' | 'search' | 'global-search' | null>('info')
   const [jumpToMessageId, setJumpToMessageId] = useState<string | null>(null)
-  const [pinnedMessageIds, setPinnedMessageIds] = useState<Record<string, true>>({})
+  const [pinnedMessageIds, setPinnedMessageIds] = useState<Record<string, string[]>>({})
+  const [pinnedMessages, setPinnedMessages] = useState<Record<string, ChatMessage[]>>({})
   const [starredMessageIds, setStarredMessageIds] = useState<Record<string, true>>({})
   const [recalledMessageIds, setRecalledMessageIds] = useState<Record<string, true>>({})
   const [deletedMessageIds, setDeletedMessageIds] = useState<Record<string, true>>({})
   const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([])
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false)
-  const [isTokenRestrictedMode, setIsTokenRestrictedMode] = useState(false)
+
   const [shareModalMessage, setShareModalMessage] = useState<ChatMessage | null>(null)
   const [isShareSubmitting, setIsShareSubmitting] = useState(false)
+  const [deletedTimestamps, setDeletedTimestamps] = useState<Record<string, number>>({})
+  const [confirmDeleteHistoryId, setConfirmDeleteHistoryId] = useState<string | null>(null)
+  const [confirmLeaveGroupOpen, setConfirmLeaveGroupOpen] = useState(false)
+  const [selectedProfileUserId, setSelectedProfileUserId] = useState<string | null>(null)
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
 
+  const routedConversationIdRef = useRef('')
   const selectedConversationIdRef = useRef('')
   const selectedMessagesRef = useRef<ChatMessage[]>([])
   const conversationsRef = useRef<ConversationSummary[]>([])
   const friendIdSetRef = useRef<Set<string>>(new Set())
-  const userProfileCacheRef = useRef<Record<string, CachedUserProfile>>({})
-  const pendingProfileLookupRef = useRef<Set<string>>(new Set())
   const lastLoadedMessagesKeyRef = useRef('')
+  const userMapRef = useRef<Record<string, { displayName: string; avatarUrl: string | null }>>({})
+
+  // Hard guards for pinned messages
+  const loadingPinnedRef = useRef<Record<string, boolean>>({})
+  const lastConvRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    userMapRef.current = userMap
+  }, [userMap])
   const messageLoadRequestSeqRef = useRef(0)
+  const pendingMetadataFetches = useRef<Map<string, Promise<void>>>(new Map())
+  const processedMessageIds = useRef<Set<string>>(new Set())
+
+  // Load deleted timestamps from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('vnalo_deleted_timestamps')
+    if (saved) {
+      try {
+        setDeletedTimestamps(JSON.parse(saved))
+      } catch (e) {
+        console.warn('Failed to parse deleted timestamps', e)
+      }
+    }
+  }, [])
+
+  const handleDeleteHistory = (conversationId: string) => {
+    const timestamp = Date.now()
+    const newTimestamps = { ...deletedTimestamps, [conversationId]: timestamp }
+    setDeletedTimestamps(newTimestamps)
+    localStorage.setItem('vnalo_deleted_timestamps', JSON.stringify(newTimestamps))
+    setConfirmDeleteHistoryId(null)
+  }
 
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+  const [isAddMembersOpen, setIsAddMembersOpen] = useState(false);
+  const [isAddingMembers, setIsAddingMembers] = useState(false);
+  const [preselectedMemberIds, setPreselectedMemberIds] = useState<string[]>([]);
+
+  const [isEditConversationNameOpen, setIsEditConversationNameOpen] = useState(false);
+  const [editConversationNameMode, setEditConversationNameMode] = useState<'group' | 'nickname'>('group');
+
+  useEffect(() => {
+    routedConversationIdRef.current = routedConversationId
+  }, [routedConversationId])
 
   useEffect(() => {
     selectedConversationIdRef.current = routedConversationId || selectedConversationId
@@ -467,9 +512,6 @@ export function ChatPage() {
     conversationsRef.current = conversations
   }, [conversations])
 
-  useEffect(() => {
-    userProfileCacheRef.current = userProfileCache
-  }, [userProfileCache])
 
   const selectedConversation = useMemo(
     () => conversations.find((conversation) => conversation.id === (routedConversationId || selectedConversationId)),
@@ -482,8 +524,17 @@ export function ChatPage() {
       return []
     }
 
-    return messagesByConversation[resolvedConversationId] ?? []
-  }, [messagesByConversation, routedConversationId, selectedConversationId])
+    const allMsgs = messagesByConversation[resolvedConversationId] ?? []
+    const deleteTime = deletedTimestamps[resolvedConversationId]
+
+    if (!deleteTime) return allMsgs
+
+    // Zalo style: Filter out messages sent BEFORE the delete moment
+    return allMsgs.filter(m => {
+      const msgTime = m.createdAt ? new Date(m.createdAt).getTime() : 0
+      return msgTime > deleteTime
+    })
+  }, [messagesByConversation, routedConversationId, selectedConversationId, deletedTimestamps])
 
   useEffect(() => {
     selectedMessagesRef.current = selectedMessages
@@ -560,8 +611,12 @@ export function ChatPage() {
       const senderName =
         message.senderId === user?.id
           ? user?.name?.trim() || fallbackUserDisplayName(message.senderId)
-          : userProfileCacheRef.current[message.senderId]?.displayName || fallbackUserDisplayName(message.senderId)
-      const formattedPreview = formatConversationPreview(senderName, message)
+          : userMapRef.current[message.senderId]?.displayName || fallbackUserDisplayName(message.senderId)
+      const getName = (id: string) => {
+        if (id === user?.id) return 'Bạn'
+        return userMapRef.current[id]?.displayName || 'Người dùng'
+      }
+      const formattedPreview = formatConversationPreview(senderName, message, user?.id || '', getName)
 
       setConversations((prev) => {
         const index = prev.findIndex((conversation) => conversation.id === conversationId)
@@ -571,9 +626,43 @@ export function ChatPage() {
 
         const next = [...prev]
         const current = next[index]
+
+        let finalPreview = formattedPreview;
+
+        // Inspect last few messages for grouping in sidebar
+        const conversationMsgs = messagesByConversation[conversationId] || [];
+        if (conversationMsgs.length > 0 && (message.type === 'image' || message.type === 'file')) {
+          const lastFew = [...conversationMsgs, message].slice(-5);
+          let count = 0;
+          const groupType = message.type;
+
+          for (let i = lastFew.length - 1; i >= 0; i--) {
+            const m = lastFew[i];
+            const prevM = i > 0 ? lastFew[i - 1] : null;
+
+            const getMs = (msg: ChatMessage) => msg.createdAt ? Date.parse(msg.createdAt) : Date.parse(msg.timestamp);
+            const withinTime = !prevM || Math.abs(getMs(m) - getMs(prevM)) <= 60000;
+            const sameSender = !prevM || prevM.senderId === m.senderId;
+
+            if (m.type === groupType && withinTime && sameSender) {
+              count++;
+            } else {
+              break;
+            }
+          }
+
+          if (count > 1) {
+            const icon = groupType === 'image' ? '📷' : '📎';
+            const label = groupType === 'image' ? 'hình ảnh' : 'tệp tin';
+            const prefix = message.senderId === user?.id ? 'Bạn: ' : (senderName ? `${senderName}: ` : '');
+            finalPreview = `${prefix}${icon} ${count} ${label}`;
+          }
+        }
+
         next[index] = {
           ...current,
-          lastMessage: formattedPreview,
+          lastMessage: finalPreview,
+          lastMessageAt: message.type === 'system' ? current.lastMessageAt : new Date().toISOString(),
           lastMessageSeq: message.serverSeq ?? current.lastMessageSeq,
           unreadCount: markAsReadNow ? 0 : current.unreadCount + (message.sender === 'me' ? 0 : 1),
         }
@@ -586,7 +675,7 @@ export function ChatPage() {
 
   const toReactionState = useCallback(
     (rows: Array<{ userId: string; emoji: string }>): MessageReactionState => {
-      const reactions: MessageReactionState['reactions'] = {}
+      const reactions = {} as MessageReactionMap
 
       for (const row of rows) {
         const reactionKey = EMOJI_TO_REACTION_KEY[row.emoji]
@@ -661,28 +750,32 @@ export function ChatPage() {
     await Promise.all(messageIds.map((messageId) => syncMessageReaction(messageId)))
   }, [accessToken, syncMessageReaction])
 
-  const syncPinnedMessages = useCallback(
+  const loadPinnedMessages = useCallback(
     async (conversationId: string) => {
-      if (!accessToken || !conversationId) {
-        return
-      }
+      if (!accessToken || !conversationId) return
+
+      // Hard guard: avoid double/simultaneous calls for same conversation
+      if (loadingPinnedRef.current[conversationId]) return
+      loadingPinnedRef.current[conversationId] = true
 
       try {
         const pins = await fetchPinnedMessages(accessToken, conversationId)
-        const nextPinnedIds = pins.reduce<Record<string, true>>((acc, pin) => {
-          if (pin.messageId) {
-            acc[pin.messageId] = true
-          }
-          return acc
-        }, {})
+        const ids = pins.map(p => p.messageId).filter(Boolean) as string[]
 
-        setPinnedMessageIds(nextPinnedIds)
+        setPinnedMessageIds((prev) => ({
+          ...prev,
+          [conversationId]: ids,
+        }))
       } catch (error) {
-        console.warn('[ChatPage.syncPinnedMessages] Failed to fetch pinned messages', { conversationId, error })
+        console.warn('[ChatPage.loadPinnedMessages] Failed to fetch pinned messages', { conversationId, error })
+      } finally {
+        loadingPinnedRef.current[conversationId] = false
       }
     },
     [accessToken],
   )
+
+  const syncPinnedMessages = loadPinnedMessages
 
   const { emitSendMessage, emitRecallMessage, joinConversation, markAsRead, getSocket } = useChatSocket({
     token: accessToken,
@@ -694,17 +787,22 @@ export function ChatPage() {
     onDisconnected: () => {
       setIsSocketConnected(false)
     },
-    onMessageReceived: (raw: RawMessage) => {
+    onMessageReceived: async (raw: RawMessage) => {
       if (!user || !accessToken) {
         return
       }
 
-      const senderId = raw.senderId || raw.from || ''
+      // 1. Deduplication
+      if (raw.id && processedMessageIds.current.has(raw.id)) {
+        console.log('[ChatPage.onMessageReceived] Skipping duplicate message:', raw.id)
+        return
+      }
+      if (raw.id) processedMessageIds.current.add(raw.id)
 
+      const senderId = raw.senderId || raw.from || ''
       const mapped = applyRestrictedMessage(mapRawMessage(raw, user.id), isRestrictedMode)
 
       if (!mapped.conversationId) {
-        console.warn('[ChatPage.onMessageReceived] Missing conversationId in payload, skipping render', raw)
         return
       }
 
@@ -712,10 +810,79 @@ export function ChatPage() {
         return
       }
 
-      console.log('[ChatPage.onMessageReceived] Realtime message mapped:', {
+      // 2. Realtime Discovery & Sync
+      const exists = conversationsRef.current.some((c) => c.id === mapped.conversationId)
+      if (!exists) {
+        // Discovery: Fetch metadata for a conversation we don't know yet
+        if (!pendingMetadataFetches.current.has(mapped.conversationId)) {
+          console.log('🔍 [onMessageReceived] Discovering new conversation:', mapped.conversationId)
+          const fetchPromise = (async () => {
+            try {
+              const rawConvo = await fetchConversation(accessToken, mapped.conversationId)
+              if (rawConvo) {
+                const c = rawConvo as any
+                const inner = c.conversation || c
+                const members = inner.members || []
+                const myId = String(user?.id ?? '').trim()
+                const participantIds = members
+                  .map((m: any) => String(m.userId ?? '').trim())
+                  .filter((id: string) => id && id !== myId)
+
+                const freshConvo: ConversationSummary = {
+                  id: inner.id || c.id,
+                  isGroup: (inner.type || c.type) === 'GROUP',
+                  name: inner.title || c.title || 'Nhóm mới',
+                  avatarUrl: inner.avatarUrl || c.avatarUrl || null,
+                  lastMessage: 'Cuộc trò chuyện mới',
+                  unreadCount: 0,
+                  participantUserIds: participantIds,
+                  memberCount: members.length,
+                  lastMessageAt: inner.updatedAt || c.updatedAt || new Date().toISOString(),
+                  updatedAt: inner.updatedAt || c.updatedAt || new Date().toISOString(),
+                }
+
+                // Seed cache with members of the newly discovered conversation
+                members.forEach((m: any) => {
+                  const mid = String(m.userId ?? '').trim()
+                  if (mid) {
+                    upsertUser(mid, {
+                      displayName: m.nickname || m.displayName || fallbackUserDisplayName(mid),
+                      avatarUrl: m.avatarUrl || null
+                    })
+                  }
+                })
+
+                setConversations((prev) => [freshConvo, ...prev.filter((p) => p.id !== freshConvo.id)])
+              }
+            } catch (e) {
+              console.warn('[onMessageReceived] Discovery fetch failed:', e)
+            } finally {
+              pendingMetadataFetches.current.delete(mapped.conversationId)
+            }
+          })()
+          pendingMetadataFetches.current.set(mapped.conversationId, fetchPromise)
+          await fetchPromise
+        } else {
+          // Wait for existing fetch
+          await pendingMetadataFetches.current.get(mapped.conversationId)
+        }
+      } else if (mapped.type === 'system') {
+        // Refresh: If it's a SYSTEM message (add/leave), refresh metadata to update member count/names
+        void loadInbox(accessToken, mapped.conversationId)
+
+        // Proactively fetch profiles for all users mentioned in the system message
+        try {
+          const payload: SystemMessagePayload = JSON.parse(mapped.text)
+          const involvedIds = [payload.actorId, ...(payload.targetMemberIds ?? [])].filter(Boolean)
+          involvedIds.forEach((id) => void ensureUser(accessToken, id))
+        } catch (e) {
+          /* ignore parse errors */
+        }
+      }
+
+      console.log('[ChatPage.onMessageReceived] Processing message:', {
         messageId: mapped.id,
         conversationId: mapped.conversationId,
-        selectedConversationId: selectedConversationIdRef.current,
         sender: mapped.sender,
       })
 
@@ -724,22 +891,29 @@ export function ChatPage() {
         navigate(`/chat/${mapped.conversationId}`)
       }
 
-      void ensureUserProfile(accessToken, senderId).then((profile) => {
+      void ensureUser(accessToken, senderId).then((profile) => {
         setConversations((prev) => {
           const existingIndex = prev.findIndex((conversation) => conversation.id === mapped.conversationId)
 
           if (existingIndex === -1) {
+            // Should be handled by discovery above, but fallback for safety
             return [
               {
                 id: mapped.conversationId,
                 name: profile.displayName,
                 avatarUrl: profile.avatarUrl,
                 isStranger: senderId ? !friendIdSetRef.current.has(senderId) : false,
-                lastMessage: formatConversationPreview(profile.displayName, mapped),
+                lastMessage: formatConversationPreview(
+                  profile.displayName,
+                  mapped,
+                  user.id,
+                  (id) => userMapRef.current[id]?.displayName || 'Người dùng',
+                ),
                 unreadCount: mapped.sender === 'me' ? 0 : 1,
                 online: false,
                 lastMessageSeq: mapped.serverSeq,
                 participantUserIds: senderId ? [senderId] : undefined,
+                lastMessageAt: new Date().toISOString(),
               },
               ...prev,
             ]
@@ -755,7 +929,13 @@ export function ChatPage() {
             ...current,
             name: shouldReplaceName ? profile.displayName : current.name,
             avatarUrl: current.avatarUrl ?? profile.avatarUrl,
-            lastMessage: formatConversationPreview(profile.displayName, mapped),
+            lastMessage: formatConversationPreview(
+              profile.displayName,
+              mapped,
+              user.id,
+              (id) => userMapRef.current[id]?.displayName || 'Người dùng',
+            ),
+            lastMessageAt: new Date().toISOString(),
             isStranger:
               senderId && friendIdSetRef.current.has(senderId)
                 ? false
@@ -1015,26 +1195,36 @@ export function ChatPage() {
         return
       }
 
-      const isPinned = Boolean(pinnedMessageIds[messageId])
+      const currentPins = pinnedMessageIds[conversationId] || []
+      const isPinned = currentPins.includes(messageId)
 
       try {
         if (isPinned) {
           await unpinMessage(accessToken, conversationId, messageId)
-          setPinnedMessageIds((prev) => {
-            const next = { ...prev }
-            delete next[messageId]
-            return next
-          })
+          setPinnedMessageIds((prev) => ({
+            ...prev,
+            [conversationId]: currentPins.filter((id) => id !== messageId),
+          }))
+          return
+        }
+
+        if (currentPins.length >= 3) {
+          toast.error('Chỉ được ghim tối đa 3 tin nhắn')
           return
         }
 
         await pinMessage(accessToken, conversationId, messageId)
-        await syncPinnedMessages(conversationId)
+        setPinnedMessageIds((prev) => ({
+          ...prev,
+          [conversationId]: [...currentPins, messageId],
+        }))
       } catch (error) {
-        console.error('[ChatPage.handleTogglePinMessage] Failed to toggle pin', { messageId, conversationId, error })
+        const action = isPinned ? 'bỏ ghim' : 'ghim'
+        console.error(`[ChatPage.handleTogglePinMessage] Failed to ${action} message`, error)
+        toast.error(`Không thể ${action} tin nhắn. Vui lòng thử lại sau.`)
       }
     },
-    [accessToken, pinnedMessageIds, syncPinnedMessages],
+    [accessToken, pinnedMessageIds],
   )
 
   const toggleMessageIdInList = useCallback((messageId: string) => {
@@ -1053,7 +1243,7 @@ export function ChatPage() {
   }, [])
 
   const handleMessageContextMenuAction = useCallback(
-    (messageId: string, action: MessageContextMenuAction, message: ChatMessage) => {
+    (messageId: string, action: MessageContextMenuAction, message: ChatMessage, groupMessages?: ChatMessage[]) => {
       if (!messageId) {
         return
       }
@@ -1086,6 +1276,20 @@ export function ChatPage() {
           return
         case 'share':
           setShareModalMessage(message)
+          return
+        case 'recallGroup':
+          if (groupMessages && groupMessages.length > 0) {
+            groupMessages.forEach((msg) => {
+              void handleRecallMessage(msg.id, msg.conversationId)
+            })
+          }
+          return
+        case 'deleteGroupSelf':
+          if (groupMessages && groupMessages.length > 0) {
+            groupMessages.forEach((msg) => {
+              void handleDeleteForMe(msg.id)
+            })
+          }
           return
         default:
           return
@@ -1185,94 +1389,16 @@ export function ChatPage() {
     [accessToken, emitSendMessage, joinConversation, shareModalMessage],
   )
 
-  const getCachedProfileFromStore = useCallback(
-    (userId: string): CachedUserProfile | null => {
-      const cached = userProfileCacheRef.current[userId]
-      if (cached) {
-        return cached
-      }
 
-      const fromFriendResults = friendResults.find((friend) => friend.id === userId)
-      if (fromFriendResults) {
-        return {
-          displayName:
-            fromFriendResults.displayName?.trim() ||
-            fromFriendResults.phone ||
-            fromFriendResults.email ||
-            fallbackUserDisplayName(userId),
-          avatarUrl: fromFriendResults.avatarUrl ?? null,
-        }
-      }
 
-      const fromConversation = conversationsRef.current.find((conversation) =>
-        (conversation.participantUserIds ?? []).includes(userId),
-      )
-
-      if (fromConversation?.name) {
-        return {
-          displayName: fromConversation.name,
-          avatarUrl: null,
-        }
-      }
-
-      return null
-    },
-    [friendResults],
-  )
-
-  const ensureUserProfile = useCallback(
-    async (token: string, userId: string): Promise<CachedUserProfile> => {
-      const fromStore = getCachedProfileFromStore(userId)
-      if (fromStore) {
-        setUserProfileCache((prev) => ({
-          ...prev,
-          [userId]: fromStore,
-        }))
-        return fromStore
-      }
-
-      if (pendingProfileLookupRef.current.has(userId)) {
-        return {
-          displayName: fallbackUserDisplayName(userId),
-          avatarUrl: null,
-        }
-      }
-
-      pendingProfileLookupRef.current.add(userId)
-
-      try {
-        const profile = await getUserById(token, userId)
-        const resolved: CachedUserProfile = {
-          displayName:
-            profile?.displayName?.trim() || profile?.phone || profile?.email || fallbackUserDisplayName(userId),
-          avatarUrl: profile?.avatarUrl ?? null,
-        }
-
-        setUserProfileCache((prev) => ({
-          ...prev,
-          [userId]: resolved,
-        }))
-
-        return resolved
-      } catch {
-        const fallback = {
-          displayName: fallbackUserDisplayName(userId),
-          avatarUrl: null,
-        }
-
-        setUserProfileCache((prev) => ({
-          ...prev,
-          [userId]: fallback,
-        }))
-
-        return fallback
-      } finally {
-        pendingProfileLookupRef.current.delete(userId)
-      }
-    },
-    [getCachedProfileFromStore],
-  )
-
+  // Sync effect: Fetch profile for all group members when a conversation is opened
+  useEffect(() => {
+    if (!accessToken || !selectedConversationId) return;
+    const selected = conversations.find(c => c.id === selectedConversationId);
+    if (selected?.participantUserIds) {
+      selected.participantUserIds.forEach(id => void ensureUser(accessToken, id));
+    }
+  }, [accessToken, selectedConversationId, conversations, ensureUser]);
 
   const loadInbox = useCallback(
     async (token: string, preferredConversationId?: string) => {
@@ -1284,48 +1410,14 @@ export function ChatPage() {
           getSyncPolicy(token).catch(() => null),
           getFriends(token).catch(() => []),
         ])
-        let items = itemsResult;
+        let items = itemsResult as any[];
 
-        // Identify existing self-chat or Inject virtual "My Documents"
-        const myDocsId = `vnalo_cloud_${user?.id}`;
-        let hasSelfChat = false;
-        items = items.map(it => {
-          // A self-chat is a non-group chat with no other participants (only self, who is filtered out)
-          const isSelf = !it.isGroup && it.participantUserIds?.length === 0;
-          if (isSelf) {
-            hasSelfChat = true;
-            return {
-              ...it,
-              name: 'My Documents',
-              isCloud: true,
-              avatarUrl: 'cloud_icon',
-            };
-          }
-          return it;
-        });
+        const targetId = preferredConversationId || routedConversationIdRef.current;
 
-        if (!hasSelfChat) {
-          const myDocsEntry: ConversationSummary = {
-            id: myDocsId,
-            name: 'My Documents',
-            isGroup: false,
-            isCloud: true,
-            avatarUrl: 'cloud_icon',
-            lastMessage: 'Lưu và đồng bộ dữ liệu giữa các thiết bị',
-            unreadCount: 0,
-            participantUserIds: [user?.id ?? ''],
-            lastMessageAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-          items = [myDocsEntry, ...items];
-        }
-
-        const targetId = preferredConversationId || routedConversationId;
-        
         // Collect IDs to proactively fetch
         const proactiveIds = new Set<string>();
         if (targetId) proactiveIds.add(targetId);
-        
+
         try {
           const storedPending = localStorage.getItem(`vnalo_pending_groups_${user?.id}`);
           const pendingIds: string[] = storedPending ? JSON.parse(storedPending) : [];
@@ -1335,34 +1427,36 @@ export function ChatPage() {
         }
 
         const missingIds = Array.from(proactiveIds).filter(id => !items.some(it => it.id === id));
-        
+
         if (missingIds.length > 0) {
           console.log("🔍 [ChatPage] Proactively fetching missing conversations:", missingIds);
           const fetchedResults = await Promise.all(
             missingIds.map(id => fetchConversation(token, id).catch(() => null))
           );
-          
+
           const myId = String(user?.id ?? '').trim();
           fetchedResults.forEach(rawConvo => {
             if (rawConvo) {
-              const members = rawConvo.conversation?.members || rawConvo.members || [];
+              const c = rawConvo as any;
+              const inner = c.conversation || c;
+              const members = inner.members || [];
               const participantIds = members
-                .map((m: { userId?: string }) => String(m.userId ?? '').trim())
+                .map((m: any) => String(m.userId ?? '').trim())
                 .filter((id: string) => id && id !== myId);
 
               const freshConvo: ConversationSummary = {
-                id: rawConvo.id || (rawConvo.conversation?.id as string),
-                isGroup: (rawConvo.type || rawConvo.conversation?.type) === 'GROUP',
-                name: rawConvo.title || rawConvo.conversation?.title || "Nhóm mới",
-                avatarUrl: rawConvo.avatarUrl || rawConvo.conversation?.avatarUrl || null,
+                id: inner.id || c.id,
+                isGroup: (inner.type || c.type) === 'GROUP',
+                name: inner.title || c.title || "Nhóm mới",
+                avatarUrl: inner.avatarUrl || c.avatarUrl || null,
                 lastMessage: "Nhóm mới được tạo",
                 unreadCount: 0,
                 participantUserIds: participantIds,
                 memberCount: members.length,
-                lastMessageAt: rawConvo.updatedAt || new Date().toISOString(),
-                updatedAt: rawConvo.updatedAt || new Date().toISOString(),
+                lastMessageAt: inner.updatedAt || c.updatedAt || new Date().toISOString(),
+                updatedAt: inner.updatedAt || c.updatedAt || new Date().toISOString(),
               };
-              
+
               // Only add if not already present (double check for safety)
               if (!items.some(it => it.id === freshConvo.id)) {
                 items = [freshConvo, ...items];
@@ -1407,25 +1501,19 @@ export function ChatPage() {
           previewNameById.set(user.id, user.name?.trim() || fallbackUserDisplayName(user.id))
         }
 
-        setUserProfileCache((prev) => {
-          const next = { ...prev }
-          for (const friend of friends) {
-            if (!friend.friendId) {
-              continue
-            }
-
-            next[friend.friendId] = {
+        friends.forEach((friend) => {
+          if (friend.friendId) {
+            upsertUser(friend.friendId, {
               displayName: friend.nickname?.trim() || friend.displayName?.trim() || fallbackUserDisplayName(friend.friendId),
               avatarUrl: friend.avatarUrl ?? null,
-            }
+            })
           }
-          return next
         })
 
         const unresolvedPeerIds = [
           ...new Set(
             items
-              .flatMap((item) => item.participantUserIds ?? [])
+              .flatMap((item) => (item as any).participantUserIds ?? [])
               .filter((peerId): peerId is string => typeof peerId === 'string' && peerId !== user?.id && !friendNameById.has(peerId)),
           ),
         ]
@@ -1450,29 +1538,38 @@ export function ChatPage() {
           }
         }
 
-        setUserProfileCache((prev) => {
-          const next = { ...prev }
-          for (const fallback of fallbackProfiles) {
-            next[fallback.peerId] = {
-              displayName: fallback.name || fallbackUserDisplayName(fallback.peerId),
-              avatarUrl: fallback.avatarUrl,
-            }
+        // Seed cache with members of all group conversations in inbox
+        items.forEach((it: any) => {
+          if (it.conversation?.members) {
+            it.conversation.members.forEach((m: any) => {
+              const mid = String(m.userId ?? '').trim()
+              if (mid) {
+                upsertUser(mid, {
+                  displayName: m.nickname || m.displayName || m.name || (mid === user?.id ? 'Bạn' : 'Người dùng'),
+                  avatarUrl: m.avatarUrl || null
+                })
+              }
+            })
           }
-
-          return next
         })
 
-        const mappedItems = items.map((item) => {
-          const peerId = (item.participantUserIds ?? []).find((participantId) => participantId !== user?.id)
+        const mappedItems = items.map((item: any) => {
+          const peerId = (item.participantUserIds ?? []).find((participantId: string) => participantId !== user?.id)
           const isGroup = item.isGroup;
           const resolvedPeerName = !isGroup && peerId ? friendNameById.get(peerId) : null
           const resolvedPeerAvatar = !isGroup && peerId ? (friendAvatarById.get(peerId) ?? null) : null
           const resolvedLastMessageSenderName = item.lastMessageSenderId
             ? (previewNameById.get(item.lastMessageSenderId) ?? null)
             : null
+          const getName = (id: string) => {
+            if (id === user?.id) return 'Bạn'
+            return userMapRef.current[id]?.displayName || previewNameById.get(id) || 'Người dùng'
+          }
           const formattedLastMessage = formatConversationPreview(
             resolvedLastMessageSenderName,
             item.lastMessagePreview ?? item.lastMessage ?? '',
+            user?.id || '',
+            getName,
           )
           const isStranger = !isGroup && peerId ? !friendIdSet.has(peerId) : false
 
@@ -1503,28 +1600,47 @@ export function ChatPage() {
         setIsRestrictedMode(false)
         console.log('🚀 [DEBUG] Inbox items from API:', mappedItems);
 
+        const deduplicateById = (items: ConversationSummary[]): ConversationSummary[] => {
+          const seen = new Set<string>()
+          const seenPeers = new Set<string>()
+          return items.filter((item) => {
+            if (seen.has(item.id)) return false
+
+            if (!item.isGroup && !item.isCloud) {
+              const peerId = (item.participantUserIds ?? []).find(id => id !== user?.id)
+              if (peerId) {
+                if (seenPeers.has(peerId)) return false
+                seenPeers.add(peerId)
+              }
+            }
+
+            seen.add(item.id)
+            return true
+          })
+        }
+
         setConversations((prev) => {
           if (!targetId) {
-            return mappedItems
+            return deduplicateById(mappedItems)
           }
 
           if (mappedItems.some((item) => item.id === targetId)) {
-            return mappedItems
+            return deduplicateById(mappedItems)
           }
 
           const preserved = prev.find((item) => item.id === targetId)
           if (!preserved) {
-            return mappedItems
+            return deduplicateById(mappedItems)
           }
 
-          return [preserved, ...mappedItems]
+          return deduplicateById([preserved, ...mappedItems])
         })
         setSelectedConversationId((prev) => {
           if (preferredConversationId) {
             return preferredConversationId
           }
-          if (routedConversationId && mappedItems.some((item) => item.id === routedConversationId)) {
-            return routedConversationId
+          if (routedConversationIdRef.current && mappedItems.some((item) => item.id === routedConversationIdRef.current)) {
+            return routedConversationIdRef.current
           }
           if (prev && mappedItems.some((item) => item.id === prev)) {
             return prev
@@ -1539,7 +1655,7 @@ export function ChatPage() {
         setIsLoadingConversations(false)
       }
     },
-    [routedConversationId, user?.id, user?.name],
+    [user?.id, user?.name, upsertUser],
   )
 
   const handleCreateGroup = useCallback(
@@ -1599,10 +1715,23 @@ export function ChatPage() {
           console.warn("Failed to save pending group ID:", e);
         }
 
+        // Emit structured SYSTEM message via socket
+        const systemPayload = JSON.stringify({
+          action: 'CREATE_GROUP',
+          actorId: user.id
+        });
+
+        void emitSendMessage({
+          conversationId: groupId,
+          content: systemPayload,
+          messageType: 'SYSTEM',
+          clientMessageId: crypto.randomUUID()
+        });
+
         // Refresh conversation list to sync with backend
         await loadInbox(accessToken, groupId);
 
-        toast.success(`✅ Đã tạo nhóm "${groupName}" thành công!`);
+
         navigate(`/chat/${groupId}`);
         setIsCreateGroupOpen(false);
       } catch (error) {
@@ -1613,40 +1742,29 @@ export function ChatPage() {
         setIsCreatingGroup(false);
       }
     },
-    [accessToken, user, navigate, loadInbox]
+    [accessToken, user, navigate, loadInbox, emitSendMessage]
   );
 
 
 
   useEffect(() => {
-    if (!accessToken || !user) {
+    if (!accessToken) {
       setConversations([])
       setMessagesByConversation({})
       setSelectedConversationId('')
       setFriendResults([])
       setFriendsDirectory([])
       setShareModalMessage(null)
-      setIsTokenRestrictedMode(false)
       lastLoadedMessagesKeyRef.current = ''
       return
     }
 
-    const tokenPayload = parseJwtPayload(accessToken)
-    const rawRestrictedClaim = tokenPayload?.restrictedWebMode
-    const tokenRestricted = isRestrictedWebToken(accessToken)
-    setIsTokenRestrictedMode(false)
-    console.log('[ChatPage.auth] Token policy decoded:', {
-      tokenRestricted,
-      rawRestrictedClaim,
-      rawRestrictedClaimType: typeof rawRestrictedClaim,
-      accessTokenTail: accessToken.slice(-12),
-    })
-
-    // Do not hard-lock composer from token claim; backend enforces real permission.
-    setIsRestrictedMode(false)
-
+    // SINGLE ENTRY for loadInbox
     void loadInbox(accessToken)
-  }, [accessToken, loadInbox, user])
+    
+    // Reset restricted mode locally
+    setIsRestrictedMode(false)
+  }, [accessToken, loadInbox])
 
   useEffect(() => {
     if (!routedConversationId) {
@@ -1670,12 +1788,18 @@ export function ChatPage() {
       }
 
       const normalizedPhone = normalizedKeyword.replace(/\D/g, '')
+      let phoneSearchTerm = normalizedKeyword
+      if (normalizedKeyword.startsWith('0') && normalizedPhone.length >= 9) {
+        phoneSearchTerm = '+84' + normalizedKeyword.substring(1)
+      }
 
       try {
         if (normalizedPhone.length >= 2 && normalizedPhone.length >= Math.max(2, normalizedKeyword.length - 2)) {
-          const user = await getUserByPhone(accessToken, normalizedKeyword)
-          setFriendResults(user ? [user] : [])
-          return
+          const user = await getUserByPhone(accessToken, phoneSearchTerm)
+          if (user) {
+            setFriendResults([user])
+            return
+          }
         }
 
         const users = await searchUsers(accessToken, normalizedKeyword)
@@ -1689,12 +1813,77 @@ export function ChatPage() {
   )
 
   const handleSelectConversation = useCallback(
-    (conversationId: string) => {
+    async (conversationId: string) => {
       setSelectedConversationId(conversationId)
-      navigate(`/chat/${conversationId}`)
+      navigate('/chat/' + conversationId)
+
+      // Proactively refresh metadata for the selected conversation
+      if (accessToken && conversationId && !conversationId.startsWith('vnalo_cloud_')) {
+        try {
+          const detailRaw = await fetchConversation(accessToken, conversationId);
+          if (detailRaw) {
+            const c = detailRaw as any;
+            const inner = c.conversation || c;
+            const members = inner.members || [];
+            const myId = String(user?.id ?? '').trim();
+            const participantIds = members
+              .map((m: any) => String(m.userId ?? '').trim())
+              .filter((id: string) => id && id !== myId);
+
+            setConversations(prev => prev.map(conv => {
+              if (conv.id !== conversationId) return conv;
+              return {
+                ...conv,
+                memberCount: members.length || conv.memberCount,
+                participantUserIds: participantIds,
+                avatarUrl: inner.avatarUrl || conv.avatarUrl,
+                name: inner.title || conv.name,
+              };
+            }));
+
+            // Fetch missing profiles for members
+            const missingProfiles = participantIds.filter((id: string) => !userMapRef.current[id]);
+            if (missingProfiles.length > 0) {
+              const fetched = await Promise.all(
+                missingProfiles.map((id: string) => getUserById(accessToken, id).catch(() => null))
+              );
+              fetched.forEach((p, idx) => {
+                const pid = missingProfiles[idx];
+                if (p && pid) {
+                  upsertUser(pid, {
+                    displayName: p.displayName?.trim() || p.phone || p.email || fallbackUserDisplayName(pid),
+                    avatarUrl: p.avatarUrl ?? null,
+                  });
+                }
+              });
+            }
+          }
+        } catch (e) {
+          console.warn('[ChatPage] metadata refresh failed:', e);
+        }
+      }
     },
-    [navigate],
+    [accessToken, navigate, user?.id, upsertUser],
   )
+
+  const handleOpenCreateGroupModal = useCallback(() => {
+    setPreselectedMemberIds([]);
+    setIsCreateGroupOpen(true)
+  }, [])
+
+  const handleCreateGroupFromDirect = useCallback(() => {
+    if (selectedConversation && !selectedConversation.isGroup) {
+      const peerId = (selectedConversation.participantUserIds ?? [])[0];
+      if (peerId) {
+        setPreselectedMemberIds([peerId]);
+      } else {
+        setPreselectedMemberIds([]);
+      }
+    } else {
+      setPreselectedMemberIds([]);
+    }
+    setIsCreateGroupOpen(true);
+  }, [selectedConversation]);
 
   // Handlers for global search panel
   const handleGlobalSearchSelectMessage = useCallback(
@@ -1732,40 +1921,19 @@ export function ChatPage() {
     [accessToken, user, handleGlobalSearchSelectConversation],
   )
 
-  const activeConversationId = routedConversationId || selectedConversationId
-
-  // Auto-resolve virtual "My Documents" to real ID
-  useEffect(() => {
-    if (!accessToken || !user || !activeConversationId) return;
-    
-    if (activeConversationId === `vnalo_cloud_${user.id}`) {
-      void (async () => {
-        try {
-          console.log('[ChatPage] Resolving virtual Cloud chat to real ID...');
-          const realId = await getOrCreateDirectConversation(accessToken, user.id);
-          
-          // Map virtual entry to real one in state
-          setConversations(prev => prev.map(c => 
-            c.id === activeConversationId ? { ...c, id: realId } : c
-          ));
-          
-          // Switch to real ID
-          setSelectedConversationId(realId);
-          navigate(`/chat/${realId}`);
-        } catch (err) {
-          console.error('[ChatPage] Failed to resolve cloud chat:', err);
-        }
-      })();
-    }
-  }, [accessToken, activeConversationId, navigate, user]);
+  const handleOpenUserProfile = useCallback((userId: string) => {
+    setSelectedProfileUserId(userId)
+    setIsProfileModalOpen(true)
+  }, [])
 
 
-  useEffect(() => {
-    if (!accessToken || !activeConversationId || !user) {
+
+  const handleLoadConversationMessages = useCallback((conversationId: string) => {
+    if (!accessToken || !conversationId || !user) {
       return
     }
 
-    const loadKey = `${activeConversationId}:${isRestrictedMode ? 'restricted' : 'full'}`
+    const loadKey = `${conversationId}:${isRestrictedMode ? 'restricted' : 'full'}`
     if (lastLoadedMessagesKeyRef.current === loadKey) {
       return
     }
@@ -1776,27 +1944,85 @@ export function ChatPage() {
 
     void (async () => {
       try {
-        const isVirtualCloud = activeConversationId === `vnalo_cloud_${user.id}`;
-        const rawMessages = isVirtualCloud ? [] : await fetchMessages(accessToken, activeConversationId)
+        // Proactively refresh metadata to ensure member count etc is updated
+        if (accessToken && !conversationId.startsWith('vnalo_cloud_')) {
+          void (async () => {
+            try {
+              const detailRaw = await fetchConversation(accessToken, conversationId);
+              if (detailRaw) {
+                const c = detailRaw as any;
+                const inner = c.conversation || c;
+                const members = inner.members || [];
+                const myId = String(user?.id ?? '').trim();
+                const participantIds = members
+                  .map((m: any) => String(m.userId ?? '').trim())
+                  .filter((id: string) => id && id !== myId);
+
+                setConversations(prev => prev.map(conv => {
+                  if (conv.id !== conversationId) return conv;
+                  return {
+                    ...conv,
+                    memberCount: members.length || conv.memberCount,
+                    participantUserIds: participantIds,
+                    avatarUrl: inner.avatarUrl || conv.avatarUrl,
+                    name: inner.title || conv.name,
+                  };
+                }));
+
+                // Fetch missing profiles
+                const missingProfiles = participantIds.filter((id: string) => !userMapRef.current[id]);
+                if (missingProfiles.length > 0) {
+                  const fetched = await Promise.all(
+                    missingProfiles.map((id: string) => getUserById(accessToken, id).catch(() => null))
+                  );
+                  fetched.forEach((p, idx) => {
+                    const pid = missingProfiles[idx];
+                    if (p && pid) {
+                      upsertUser(pid, {
+                        displayName: p.displayName?.trim() || p.phone || p.email || fallbackUserDisplayName(pid),
+                        avatarUrl: p.avatarUrl ?? null,
+                      });
+                    }
+                  });
+                }
+              }
+            } catch (e) {
+              console.warn('[ChatPage] metadata refresh failed:', e);
+            }
+          })();
+        }
+
+        const isVirtualCloud = conversationId === `vnalo_cloud_${user.id}`
+        const rawMessages = isVirtualCloud ? [] : await fetchMessages(accessToken, conversationId)
         console.log('Dữ liệu tin nhắn nhận được:', rawMessages)
         const mapped = sortMessages(
           rawMessages
             .map((message) => applyRestrictedMessage(mapRawMessage(message, user.id), isRestrictedMode))
             .filter((message) => !deletedMessageIds[message.id]),
         )
+
+        // Capture all recalled messages from the fetched data
+        const loadTimeRecalledIds: Record<string, true> = {};
+        mapped.forEach(m => {
+          if (m.isRecalled) loadTimeRecalledIds[m.id] = true;
+        });
+        if (Object.keys(loadTimeRecalledIds).length > 0) {
+          setRecalledMessageIds(prev => ({ ...prev, ...loadTimeRecalledIds }));
+        }
+
         setMessagesByConversation((prev) => ({
           ...prev,
-          [activeConversationId]: mapped,
+          [conversationId]: mapped,
         }))
-        void syncPinnedMessages(activeConversationId)
+        void syncPinnedMessages(conversationId)
         void syncConversationReactions()
 
         const newestSeq = mapped[mapped.length - 1]?.serverSeq
         if (newestSeq !== undefined) {
-          void markConversationRead(accessToken, activeConversationId, newestSeq).catch(() => undefined)
+          void markConversationRead(accessToken, conversationId, newestSeq).catch(() => undefined)
           setConversations((prev) =>
             prev.map((conversation) =>
-              conversation.id === activeConversationId
+              conversation.id === conversationId
                 ? {
                   ...conversation,
                   unreadCount: 0,
@@ -1814,7 +2040,7 @@ export function ChatPage() {
         }
       }
     })()
-  }, [accessToken, activeConversationId, deletedMessageIds, isRestrictedMode, syncConversationReactions, syncPinnedMessages, user])
+  }, [accessToken, deletedMessageIds, isRestrictedMode, syncConversationReactions, syncPinnedMessages, user, upsertUser])
 
 
 
@@ -1988,13 +2214,19 @@ export function ChatPage() {
         return
       }
 
-      const restrictedByToken = accessToken ? isRestrictedWebToken(accessToken) : false
-      if (restrictedByToken || isTokenRestrictedMode || isRestrictedMode) {
-        console.warn('[ChatPage.send] Token indicates restricted mode, but send is still allowed by client-side override')
-      }
-
       const content = getDraftContent(draft)
       const messageType = getDraftMessageType(draft)
+      let replyTo = draft.replyTo
+
+      // Resolve better senderName if possible
+      if (replyTo && replyTo.senderId && userMap[replyTo.senderId]) {
+        replyTo = {
+          ...replyTo,
+          senderName: userMap[replyTo.senderId].displayName || replyTo.senderName
+        };
+      }
+
+      console.log('[ChatPage.send] Draft replyTo:', replyTo)
 
       // Fallback resolve virtual "My Documents" to real conversation if needed
       let targetConversationId = conversationId;
@@ -2002,12 +2234,11 @@ export function ChatPage() {
         try {
           const realId = await getOrCreateDirectConversation(accessToken, user.id);
           targetConversationId = realId;
-          // Sync state
           setConversations(prev => prev.map(c => c.id === conversationId ? { ...c, id: realId } : c));
           setSelectedConversationId(realId);
         } catch (err) {
           console.error('[ChatPage.send] Final attempt to resolve cloud chat failed', err);
-          return; // Cannot send to virtual ID
+          return;
         }
       }
 
@@ -2016,347 +2247,243 @@ export function ChatPage() {
           ? crypto.randomUUID()
           : `${Date.now()}-${Math.random().toString(16).slice(2)}`
 
-      let mediaUrl: string | null = null
-      let mediaThumbnailUrl: string | null = null
-      let mediaMimeType: string | null = null
-      let mediaSizeBytes: number | null = null
-      let localPreviewUrl: string | null = null
+      // 1. Collect all files to upload
+      const allFiles = (draft.files && draft.files.length > 0
+        ? draft.files
+        : (draft.file ? [draft.file] : [])).filter((f): f is File => !!f);
+      const isMultiFile = allFiles.length > 0;
 
-      if (draft.file && messageType === 'image') {
-        localPreviewUrl = URL.createObjectURL(draft.file)
+      // 2. Handle Optimistic UI for files/images (Initial local preview)
+      const localPreviewUrls: string[] = [];
+      if (isMultiFile) {
+        const optimisticAttachments = allFiles.map(file => {
+          const isImg = file.type.startsWith('image/');
+          const previewUrl = isImg ? URL.createObjectURL(file) : '';
+          if (previewUrl) localPreviewUrls.push(previewUrl);
 
-        const optimisticPreviewMessage: ChatMessage = {
+          return {
+            url: previewUrl || '',
+            name: file.name,
+            mimeType: file.type,
+            sizeBytes: file.size,
+          };
+        });
+
+        // If it's a single file, we can show it optimistically as one bubble initially.
+        // But for consistency with the new "individual message" flow, if multi-file, we can skip this single bubble 
+        // and just let the loop below handle optimistic bubbles.
+        if (allFiles.length === 1) {
+          const optimisticMessage: ChatMessage = {
+            id: clientMessageId,
+            clientMessageId,
+            conversationId: targetConversationId,
+            sender: 'me',
+            senderId: user.id,
+            type: messageType,
+            isLocal: true,
+            text: content,
+            attachments: optimisticAttachments,
+            mediaUrl: optimisticAttachments[0]?.url || null,
+            timestamp: formatMessageTimestamp(),
+            deliveryState: 'sending',
+          };
+          setMessagesByConversation(prev => ({ ...prev, [targetConversationId]: upsertMessage(prev[targetConversationId] ?? [], optimisticMessage) }));
+        }
+      }
+
+      // 3. Upload all files concurrently
+      let uploadResults: Array<{ url: string, mimeType: string | null, sizeBytes: number | null, thumbnailUrl: string | null }> = [];
+      try {
+        if (isMultiFile) {
+          const uploadPromises = allFiles.map(file => uploadChatMedia(accessToken, file));
+          uploadResults = await Promise.all(uploadPromises);
+
+          // Cleanup blob URLs
+          queueMicrotask(() => {
+            localPreviewUrls.forEach(url => URL.revokeObjectURL(url));
+          });
+        }
+      } catch (uploadError) {
+        console.error('[ChatPage.send] Multi-upload failed', uploadError);
+        return;
+      }
+
+      // 4. Handle sticker case (override first media if needed)
+      if (draft.sticker && uploadResults.length === 0) {
+        const sUrl = draft.sticker.url || `sticker://${encodeURIComponent(draft.sticker.id)}`;
+        const isUrlSticker = Boolean(draft.sticker.url);
+
+        uploadResults = [{
+          url: sUrl,
+          mimeType: isUrlSticker ? 'image/webp' : 'application/x-chat-sticker',
+          sizeBytes: 0,
+          thumbnailUrl: null
+        }];
+      }
+
+      // 5. Send logic
+      // Case A: Text only (no files, no sticker)
+      if (uploadResults.length === 0) {
+        const payload: any = {
+          conversationId: targetConversationId,
+          content: content,
+          clientMessageId,
+          messageType: toSocketMessageType('text'),
+        };
+
+        if (replyTo) {
+          payload.replyTo = replyTo;
+          payload.replyToMessageId = replyTo.id;
+          payload.replyToSenderId = replyTo.senderId;
+          payload.replyToContent = replyTo.preview;
+        }
+
+        const optimisticTextMessage: ChatMessage = {
           id: clientMessageId,
           clientMessageId,
-          conversationId,
+          conversationId: targetConversationId,
           sender: 'me',
           senderId: user.id,
-          type: 'image',
-          isLocal: true,
+          type: 'text',
+          isLocal: false,
           text: content,
-          mediaUrl: localPreviewUrl,
-          mediaMimeType: draft.file.type || null,
-          mediaSizeBytes: draft.file.size,
-          attachments: [
-            {
-              url: localPreviewUrl,
-              mimeType: draft.file.type || null,
-              sizeBytes: draft.file.size,
-            },
-          ],
           timestamp: formatMessageTimestamp(),
           deliveryState: 'sending',
-        }
+          replyTo: replyTo,
+        };
+        console.log('[ChatPage.send] Optimistic message replyTo:', optimisticTextMessage.replyTo)
+        setMessagesByConversation(prev => ({ ...prev, [targetConversationId]: upsertMessage(prev[targetConversationId] ?? [], optimisticTextMessage) }));
+        updateConversationAfterMessage(targetConversationId, optimisticTextMessage, true);
 
-        console.log('[OPTIMISTIC MESSAGE]', optimisticPreviewMessage)
-
-        setMessagesByConversation((prev) => {
-          const current = prev[targetConversationId] ?? []
-          return {
-            ...prev,
-            [targetConversationId]: upsertMessage(current, optimisticPreviewMessage),
-          }
-        })
-
-        updateConversationAfterMessage(targetConversationId, optimisticPreviewMessage, true)
-      }
-
-      if (draft.file) {
-        try {
-          const uploadResult = await uploadChatMedia(accessToken, draft.file)
-          console.log('[UPLOAD RESULT]', uploadResult)
-          mediaUrl = uploadResult.url
-          mediaThumbnailUrl = uploadResult.thumbnailUrl
-          mediaMimeType = uploadResult.mimeType
-          mediaSizeBytes = uploadResult.sizeBytes
-
-          if (messageType === 'image') {
-            if (!mediaUrl) {
-              console.warn('[ChatPage.send] Upload finished but mediaUrl is missing for image message')
-              return
+        const ack = await emitSendMessage(payload);
+        if (ack?.event === 'message.sent' && ack?.data) {
+          const serverMessage = { ...mapRawMessage(ack.data, user.id), clientMessageId, deliveryState: 'sent' as const, replyTo: replyTo };
+          setMessagesByConversation(prev => ({ ...prev, [targetConversationId]: upsertMessage(prev[targetConversationId] ?? [], serverMessage) }));
+          updateConversationAfterMessage(targetConversationId, serverMessage, true);
+        } else {
+          try {
+            const restMessage = await sendMessageViaRest(accessToken, {
+              ...payload,
+              messageType: payload.messageType
+            });
+            if (restMessage?.id) {
+              const mapped = { ...mapRawMessage(restMessage, user.id), clientMessageId, deliveryState: 'sent' as const, replyTo: replyTo };
+              setMessagesByConversation(prev => ({ ...prev, [targetConversationId]: upsertMessage(prev[targetConversationId] ?? [], mapped) }));
+              updateConversationAfterMessage(targetConversationId, mapped, true);
             }
-
-            const uploadedImageUrl = mediaUrl
-            let previousBlobUrl: string | null = null
-            setMessagesByConversation((prev) => {
-              const current = prev[targetConversationId] ?? []
-              return {
-                ...prev,
-                [targetConversationId]: current.map((message) => {
-                  if (message.clientMessageId !== clientMessageId) {
-                    return message
-                  }
-
-                  if (message.mediaUrl?.startsWith('blob:')) {
-                    previousBlobUrl = message.mediaUrl
-                  }
-
-                  return {
-                    ...message,
-                    isLocal: false,
-                    mediaUrl: uploadedImageUrl,
-                    mediaThumbnailUrl,
-                    mediaMimeType,
-                    mediaSizeBytes,
-                    attachments: [
-                      {
-                        url: uploadedImageUrl,
-                        thumbnailUrl: mediaThumbnailUrl,
-                        mimeType: mediaMimeType,
-                        sizeBytes: mediaSizeBytes,
-                      },
-                    ],
-                  }
-                }),
-              }
-            })
-
-            if (previousBlobUrl && previousBlobUrl !== uploadedImageUrl) {
-              queueMicrotask(() => {
-                URL.revokeObjectURL(previousBlobUrl as string)
-              })
-            }
+          } catch (e) {
+            setMessagesByConversation(prev => ({ ...prev, [targetConversationId]: markLocalMessageFailed(prev[targetConversationId] ?? [], clientMessageId) }));
           }
-        } catch (error) {
-          console.error('[ChatPage.send] Upload failed', error)
-
-          if (messageType === 'image') {
-            setMessagesByConversation((prev) => {
-              const current = prev[targetConversationId] ?? []
-              return {
-                ...prev,
-                [targetConversationId]: markLocalMessageFailed(current, clientMessageId),
-              }
-            })
-          }
-          return
         }
-      } else if (draft.sticker) {
-        mediaUrl = `sticker://${encodeURIComponent(draft.sticker.id)}`
-        mediaMimeType = 'application/x-chat-sticker'
+        return;
       }
 
-      if (messageType === 'image' && !mediaUrl) {
-        console.warn('[ChatPage.send] Skip optimistic image message because mediaUrl is missing')
-        return
-      }
+      // Case B: Files/Images/Stickers (Loop for each)
+      // The backend explicitly rejects "attachments" property (Error 400), 
+      // so we MUST send each file as an individual message.
 
-      console.log('[ChatPage.send] Start:', {
-        clientMessageId,
-        conversationId: targetConversationId,
-        contentLength: content.length,
-        messageType,
-      })
+      for (let i = 0; i < uploadResults.length; i++) {
+        const res = uploadResults[i];
+        const resClientMessageId = i === 0 ? clientMessageId : (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
 
-      const optimisticMessage: ChatMessage = {
-        id: clientMessageId,
-        clientMessageId,
-        conversationId: targetConversationId,
-        sender: 'me',
-        senderId: user.id,
-        type: messageType,
-        isLocal: false,
-        text: content,
-        mediaUrl,
-        mediaThumbnailUrl,
-        mediaMimeType,
-        mediaSizeBytes,
-        attachments: mediaUrl
-          ? [
-            {
-              url: mediaUrl,
-              name: draft.file?.name ?? undefined,
-              thumbnailUrl: mediaThumbnailUrl,
-              mimeType: mediaMimeType,
-              sizeBytes: mediaSizeBytes,
-            },
-          ]
-          : undefined,
-        timestamp: formatMessageTimestamp(),
-        deliveryState: 'sending',
-      }
+        // No filename content as requested by user
+        const resContent = (i === 0 && content.trim().length > 0) ? content : "";
+        const resTypeStr = res.mimeType?.startsWith('image/') ? 'image' : (res.mimeType === 'application/x-chat-sticker' ? 'sticker' : 'file');
 
-      console.log('[OPTIMISTIC MESSAGE]', optimisticMessage)
-
-      const payloadContent =
-        content.trim().length > 0
-          ? content
-          : messageType === 'image'
-            ? mediaUrl ?? '[image]'
-            : messageType === 'file'
-              ? draft.file?.name ?? mediaUrl ?? '[file]'
-              : messageType === 'sticker'
-                ? '[sticker]'
-                : content
-
-      const payload = {
-        conversationId: targetConversationId,
-        content: payloadContent,
-        clientMessageId,
-        messageType: toSocketMessageType(messageType),
-        mediaUrl,
-        mediaThumbnailUrl,
-        mediaMimeType,
-        mediaSizeBytes,
-      }
-
-      console.log('[SEND PAYLOAD]', payload)
-
-      if (messageType !== 'image') {
-        setMessagesByConversation((prev) => {
-          const current = prev[targetConversationId] ?? []
-          return {
-            ...prev,
-            [targetConversationId]: upsertMessage(current, optimisticMessage),
-          }
-        })
-
-        updateConversationAfterMessage(targetConversationId, optimisticMessage, true)
-      }
-
-      console.log('[ChatPage.send] Emitting message...')
-      const ack = await emitSendMessage(payload)
-
-      console.log('[ChatPage.send] ACK received:', ack, 'event:', ack?.event)
-
-      if (ack?.event === 'message.sent' && ack?.data) {
-        console.log('[ChatPage.send] Success, got message.sent')
-        const mappedServerMessage = mapRawMessage(ack.data, user.id)
-        const resolvedMediaUrl = mappedServerMessage.mediaUrl ?? mediaUrl ?? null
-        const serverMessage: ChatMessage = {
-          ...mappedServerMessage,
-          clientMessageId,
-          type: messageType === 'image' ? 'image' : mappedServerMessage.type,
-          isLocal: false,
-          mediaUrl: resolvedMediaUrl,
-          mediaThumbnailUrl: mappedServerMessage.mediaThumbnailUrl ?? mediaThumbnailUrl,
-          mediaMimeType: mappedServerMessage.mediaMimeType ?? mediaMimeType,
-          mediaSizeBytes: mappedServerMessage.mediaSizeBytes ?? mediaSizeBytes,
-          attachments: resolvedMediaUrl
-            ? [
-              {
-                url: resolvedMediaUrl,
-                name: draft.file?.name ?? mappedServerMessage.attachments?.[0]?.name ?? undefined,
-                thumbnailUrl: mappedServerMessage.mediaThumbnailUrl ?? mediaThumbnailUrl,
-                mimeType: mappedServerMessage.mediaMimeType ?? mediaMimeType,
-                sizeBytes: mappedServerMessage.mediaSizeBytes ?? mediaSizeBytes,
-              },
-            ]
-            : mappedServerMessage.attachments,
-          deliveryState: 'sent' as const,
-        }
-        setMessagesByConversation((prev) => {
-          const current = prev[targetConversationId] ?? []
-          return {
-            ...prev,
-            [targetConversationId]: upsertMessage(current, serverMessage),
-          }
-        })
-
-        updateConversationAfterMessage(targetConversationId, serverMessage, true)
-        return
-      }
-
-      console.warn('[ChatPage.send] No valid ACK, trying REST fallback /messages before marking failed')
-      try {
-        const restMessage = await sendMessageViaRest(accessToken, {
+        const payload = {
           conversationId: targetConversationId,
-          content: payloadContent,
-          clientMessageId,
-          messageType: payload.messageType,
-          mediaUrl,
-          mediaThumbnailUrl,
-          mediaMimeType,
-          mediaSizeBytes,
-        })
+          content: resContent,
+          clientMessageId: resClientMessageId,
+          messageType: toSocketMessageType(resTypeStr as any),
+          mediaUrl: res.url,
+          mediaThumbnailUrl: res.thumbnailUrl,
+          mediaMimeType: res.mimeType,
+          mediaSizeBytes: res.sizeBytes,
+        };
 
-        if (restMessage?.id) {
-          console.log('[ChatPage.send] REST fallback send succeeded')
-          const mappedRestMessage: ChatMessage = {
-            ...mapRawMessage(restMessage, user.id),
-            clientMessageId,
-            deliveryState: 'sent',
-          }
-
-          setMessagesByConversation((prev) => {
-            const current = prev[targetConversationId] ?? []
-            return {
-              ...prev,
-              [targetConversationId]: upsertMessage(current, mappedRestMessage),
-            }
-          })
-
-          updateConversationAfterMessage(targetConversationId, mappedRestMessage, true)
-          return
+        if (replyTo && i === 0) {
+          (payload as any).replyTo = replyTo;
+          (payload as any).replyToMessageId = replyTo.id;
+          (payload as any).replyToSenderId = replyTo.senderId;
+          (payload as any).replyToContent = replyTo.preview;
         }
-      } catch (restFallbackError) {
-        console.warn('[ChatPage.send] REST fallback failed, continue reconcile flow', restFallbackError)
 
-        const message = restFallbackError instanceof Error ? restFallbackError.message : String(restFallbackError)
-        if (message.toLowerCase().includes('restricted web session cannot send messages')) {
-          setMessagesByConversation((prev) => {
-            const current = prev[targetConversationId] ?? []
-            return {
-              ...prev,
-              [targetConversationId]: markLocalMessageFailed(current, clientMessageId),
-            }
-          })
-          console.warn('[ChatPage.send] Send blocked by restricted web policy; message marked failed immediately')
-          return
-        }
-      }
+        const optimisticMessage: ChatMessage = {
+          id: resClientMessageId,
+          clientMessageId: resClientMessageId,
+          conversationId: targetConversationId,
+          sender: 'me',
+          senderId: user.id,
+          type: resTypeStr as any,
+          isLocal: false,
+          text: resContent,
+          mediaUrl: res.url,
+          mediaThumbnailUrl: res.thumbnailUrl,
+          mediaMimeType: res.mimeType,
+          mediaSizeBytes: res.sizeBytes,
+          createdAt: new Date().toISOString(),
+          // We keep attachments in local state only for the UI to potentially group them
+          attachments: [{
+            url: res.url,
+            name: allFiles[i]?.name || "Tệp",
+            mimeType: res.mimeType,
+            sizeBytes: res.sizeBytes,
+            thumbnailUrl: res.thumbnailUrl
+          }],
+          timestamp: formatMessageTimestamp(),
+          deliveryState: 'sending',
+          replyTo: i === 0 ? replyTo : null,
+        };
 
-      console.warn('[ChatPage.send] No valid ACK, reconciling from API before marking failed')
-      try {
-        const latestRawMessages = await fetchMessages(accessToken, conversationId)
-        const matchedRawMessage = latestRawMessages.find((message) => {
-          const sameClientMessageId =
-            message.clientMessageId === clientMessageId ||
-            (message as RawMessage & { client_message_id?: string | null }).client_message_id === clientMessageId
-
-          if (sameClientMessageId) {
-            return true
-          }
-
-          return (
-            (message.senderId ?? message.from ?? '') === user.id &&
-            String(message.content ?? '').trim() === payloadContent.trim()
-          )
-        })
-
-        if (matchedRawMessage) {
-          console.log('[ChatPage.send] Message found in API after ACK timeout, marking sent')
-          const reconciledMessage: ChatMessage = {
-            ...mapRawMessage(matchedRawMessage, user.id),
-            clientMessageId,
-            deliveryState: 'sent',
-          }
-
-          setMessagesByConversation((prev) => {
-            const current = prev[conversationId] ?? []
-            return {
-              ...prev,
-              [conversationId]: upsertMessage(current, reconciledMessage),
-            }
-          })
-
-          updateConversationAfterMessage(conversationId, reconciledMessage, true)
-          return
-        }
-      } catch (reconcileError) {
-        console.warn('[ChatPage.send] Reconcile after ACK timeout failed', reconcileError)
-      }
-
-      console.log('[ChatPage.send] Failed after reconcile, marking as failed')
-      setMessagesByConversation((prev) => {
-        const current = prev[conversationId] ?? []
-        return {
+        setMessagesByConversation(prev => ({
           ...prev,
-          [conversationId]: markLocalMessageFailed(current, clientMessageId),
+          [targetConversationId]: upsertMessage(prev[targetConversationId] ?? [], optimisticMessage)
+        }));
+        updateConversationAfterMessage(targetConversationId, optimisticMessage, true);
+
+        // Send a message using socket, then fallback to REST if needed
+        const ack = await emitSendMessage(payload);
+        if (ack?.event === 'message.sent' && ack?.data) {
+          const serverMessage = {
+            ...mapRawMessage(ack.data, user.id),
+            clientMessageId: resClientMessageId,
+            deliveryState: 'sent' as const,
+            replyTo: i === 0 ? replyTo : null
+          };
+          setMessagesByConversation(prev => ({
+            ...prev,
+            [targetConversationId]: upsertMessage(prev[targetConversationId] ?? [], serverMessage)
+          }));
+          updateConversationAfterMessage(targetConversationId, serverMessage, true);
+        } else {
+          try {
+            const restMessage = await sendMessageViaRest(accessToken, {
+              ...payload,
+              messageType: payload.messageType as any
+            });
+            if (restMessage?.id) {
+              const mapped = {
+                ...mapRawMessage(restMessage, user.id),
+                clientMessageId: resClientMessageId,
+                deliveryState: 'sent' as const,
+                replyTo: i === 0 ? replyTo : null
+              };
+              setMessagesByConversation(prev => ({
+                ...prev,
+                [targetConversationId]: upsertMessage(prev[targetConversationId] ?? [], mapped)
+              }));
+              updateConversationAfterMessage(targetConversationId, mapped, true);
+            }
+          } catch (e) {
+            setMessagesByConversation(prev => ({
+              ...prev,
+              [targetConversationId]: markLocalMessageFailed(prev[targetConversationId] ?? [], resClientMessageId)
+            }));
+          }
         }
-      })
+      }
     },
-    [accessToken, emitSendMessage, isRestrictedMode, isTokenRestrictedMode, routedConversationId, selectedConversationId, updateConversationAfterMessage, user],
+    [accessToken, emitSendMessage, isRestrictedMode, routedConversationId, selectedConversationId, updateConversationAfterMessage, user],
   )
 
   const handleSearchConversation = useCallback(
@@ -2475,6 +2602,155 @@ export function ChatPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  const handleEditGroupName = async (newName: string) => {
+    if (!selectedConversationId || !accessToken) return
+    try {
+      await renameGroupConversation(accessToken, selectedConversationId, newName)
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === selectedConversationId ? { ...c, name: newName } : c
+        )
+      )
+      toast.success('Đổi tên nhóm thành công')
+
+      const actorName = user?.name || 'Người dùng'
+      void emitSendMessage({
+        conversationId: selectedConversationId,
+        content: `${actorName} đã đổi tên nhóm thành "${newName}"`,
+        messageType: 'SYSTEM',
+        clientMessageId: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : String(Date.now()),
+      })
+    } catch (err) {
+      toast.error('Có lỗi xảy ra khi đổi tên nhóm')
+      console.error(err)
+    }
+  }
+
+  const handleEditNickname = async (newNickname: string) => {
+    if (!selectedConversationId || !accessToken) return
+    const targetUserId = selectedConversation?.userId || selectedConversation?.participantUserIds?.[0]
+    if (!targetUserId) {
+      toast.error('Không tìm thấy người dùng để cập nhật tên gợi nhớ')
+      return;
+    }
+    try {
+      await setConversationNickname(accessToken, selectedConversationId, targetUserId, newNickname)
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === selectedConversationId ? { ...c, name: newNickname } : c
+        )
+      )
+      toast.success('Cập nhật tên gợi nhớ thành công')
+    } catch (err) {
+      toast.error('Có lỗi xảy ra khi cập nhật tên gợi nhớ')
+      console.error(err)
+    }
+  }
+
+  const handleAddMembers = async (
+    _groupName: string,
+    _avatarUrl: string | null,
+    selectedMemberIds: string[]
+  ) => {
+    if (!selectedConversationId || !user || !accessToken) return;
+    setIsAddingMembers(true);
+    try {
+      await addMembersToConversation(accessToken, selectedConversationId, selectedMemberIds);
+
+      // Emit structured SYSTEM message via socket to notify all members (real-time sync)
+      const systemPayload = JSON.stringify({
+        action: 'ADD_MEMBERS',
+        actorId: user.id,
+        targetMemberIds: selectedMemberIds
+      });
+
+      void emitSendMessage({
+        conversationId: selectedConversationId,
+        content: systemPayload,
+        messageType: 'SYSTEM',
+        clientMessageId: crypto.randomUUID()
+      });
+
+      setIsAddMembersOpen(false);
+    } catch (error) {
+      console.error('Failed to add members:', error);
+      toast.error('Thêm thành viên thất bại');
+    } finally {
+      setIsAddingMembers(false);
+    }
+  };
+
+  const handleLeaveGroupClick = () => {
+    if (!selectedConversationId || !user || !accessToken) return;
+    setConfirmLeaveGroupOpen(true);
+  };
+
+  const doLeaveGroup = async () => {
+    if (!selectedConversationId || !user || !accessToken) return;
+    setConfirmLeaveGroupOpen(false);
+
+    try {
+      // Emit structured SYSTEM message via socket FIRST while we still have permissions
+      const systemPayload = JSON.stringify({
+        action: 'LEAVE_GROUP',
+        actorId: user.id
+      });
+
+      void emitSendMessage({
+        conversationId: selectedConversationId,
+        content: systemPayload,
+        messageType: 'SYSTEM',
+        clientMessageId: crypto.randomUUID()
+      });
+
+      // Then actually leave via API
+      await leaveConversation(accessToken, selectedConversationId, user.id);
+
+      setConversations((prev) => prev.filter(c => c.id !== selectedConversationId));
+      navigate('/chat');
+    } catch (error) {
+      console.error('Failed to leave group:', error);
+      toast.error('Rời nhóm thất bại');
+    }
+  };
+
+  const sortedConversations = useMemo(() => {
+    return [...conversations].map(conv => {
+      const deleteTime = deletedTimestamps[conv.id];
+      if (!deleteTime) return conv;
+
+      const lastMsgTime = new Date(conv.lastMessageAt || conv.updatedAt || 0).getTime();
+
+      // If the last message is OLDER than the deletion moment, hide it in the preview
+      if (lastMsgTime <= deleteTime) {
+        return {
+          ...conv,
+          lastMessage: t('chat.historyDeletedPreview') || 'Bạn đã xóa lịch sử trò chuyện',
+          unreadCount: 0 // Hide unread count for deleted history conversations
+        };
+      }
+      return conv;
+    }).sort((a, b) => {
+      const timeA = new Date(a.lastMessageAt || a.updatedAt || 0).getTime()
+      const timeB = new Date(b.lastMessageAt || b.updatedAt || 0).getTime()
+      return timeB - timeA
+    })
+  }, [conversations, deletedTimestamps, t])
+
+  const visibleConversations = useMemo(() => {
+    return sortedConversations.filter((conv) => {
+      const deletedAt = deletedTimestamps[conv.id];
+      if (!deletedAt) return true;
+
+      // ONLY use lastMessageAt (real message timestamp)
+      if (!conv.lastMessageAt) return false;
+
+      const lastMessageTime = new Date(conv.lastMessageAt).getTime();
+
+      return lastMessageTime > deletedAt;
+    });
+  }, [sortedConversations, deletedTimestamps]);
+
   if (isBootstrapping || isLoadingConversations) {
     return (
       <div className={rightSidebarContent ? 'chat-layout' : 'chat-layout chat-layout-sidebar-closed'}>
@@ -2522,25 +2798,26 @@ export function ChatPage() {
   return (
     <div className={rightSidebarContent ? 'chat-layout' : 'chat-layout chat-layout-sidebar-closed'}>
       <ChatList
-        conversations={conversations}
+        conversations={visibleConversations}
         friendResults={friendResults}
-        selectedConversationId={routedConversationId || selectedConversationId}
+        activeConversationId={routedConversationId || selectedConversationId}
         onSearchFriends={handleSearchFriends}
         onOpenFriendChat={handleOpenFriendChat}
         onSelectConversation={handleSelectConversation}
-        onCreateGroupClick={() => setIsCreateGroupOpen(true)}
-
+        onCreateGroupClick={handleOpenCreateGroupModal}
       />
       <ChatWindow
         conversation={selectedConversation}
         messages={selectedMessages}
         isLoadingMessages={isLoadingMessages}
+        onLoadConversationMessages={handleLoadConversationMessages}
         onSend={handleSend}
         onToggleSearchSidebar={handleToggleSearchSidebar}
         onToggleInfoSidebar={handleToggleInfoSidebar}
         rightSidebarContent={rightSidebarContent}
         jumpToMessageId={jumpToMessageId}
         onJumpToMessageHandled={() => setJumpToMessageId(null)}
+        onOpenUserProfile={handleOpenUserProfile}
         isRestrictedMode={isRestrictedMode}
         peerLastReadSeq={(routedConversationId || selectedConversationId)
           ? peerLastReadByConversation[routedConversationId || selectedConversationId]
@@ -2548,24 +2825,39 @@ export function ChatPage() {
         reactionStatesByMessage={reactionStatesByMessage}
         onAddReaction={handleAddReaction}
         onRemoveReaction={handleRemoveReaction}
-        pinnedMessageIds={pinnedMessageIds}
+        pinnedMessages={selectedConversationId ? pinnedMessages[selectedConversationId] : []}
+        onUnpinMessage={(id) => handleTogglePinMessage(id, selectedConversationId!)}
         starredMessageIds={starredMessageIds}
         recalledMessageIds={recalledMessageIds}
         deletedMessageIds={deletedMessageIds}
-        userProfilesById={userProfileCache}
+        currentUserId={user?.id}
         selectedMessageIds={selectedMessageIds}
         isMultiSelectMode={isMultiSelectMode}
         onToggleMessageSelection={toggleMessageIdInList}
         onClearMultiSelectMode={handleClearMultiSelectMode}
         onMessageContextMenuAction={handleMessageContextMenuAction}
       />
+
       <CreateGroupModal
         isOpen={isCreateGroupOpen}
-        friends={friendsDirectory}           // Danh sách bạn bè đã load
+        friends={friendsDirectory}
         isSubmitting={isCreatingGroup}
         onClose={() => setIsCreateGroupOpen(false)}
         onCreate={handleCreateGroup}
+        initialMemberIds={preselectedMemberIds}
       />
+
+      <CreateGroupModal
+        isOpen={isAddMembersOpen}
+        friends={friendsDirectory}
+        mode="add-members"
+        isSubmitting={isAddingMembers}
+        onClose={() => setIsAddMembersOpen(false)}
+        onCreate={handleAddMembers}
+        initialMemberIds={selectedConversation?.participantUserIds ?? []}
+        existingMemberIds={selectedConversation?.participantUserIds ?? []}
+      />
+
       {rightSidebarContent ? (
         <aside className='chat-side-panel'>
           {rightSidebarContent === 'search' && selectedConversation ? (
@@ -2596,7 +2888,19 @@ export function ChatPage() {
                 <ConversationInfo
                   conversation={selectedConversation}
                   messages={selectedMessages}
-                  userProfilesById={userProfileCache}
+                  onAddMembersClick={() => setIsAddMembersOpen(true)}
+                  onDeleteHistoryClick={() => setConfirmDeleteHistoryId(selectedConversationId || routedConversationId)}
+                  onLeaveGroupClick={handleLeaveGroupClick}
+                  onCreateGroupClick={handleCreateGroupFromDirect}
+                  onEditGroupName={() => {
+                    setEditConversationNameMode('group')
+                    setIsEditConversationNameOpen(true)
+                  }}
+                  onEditNickname={() => {
+                    setEditConversationNameMode('nickname')
+                    setIsEditConversationNameOpen(true)
+                  }}
+                  currentUserId={user?.id}
                 />
               ) : (
                 <p>{t('pages.chat.sideInfoFallback')}</p>
@@ -2618,6 +2922,150 @@ export function ChatPage() {
         }}
         onShare={handleShareMessage}
       />
+
+      <EditConversationNameModal
+        isOpen={isEditConversationNameOpen}
+        mode={editConversationNameMode}
+        defaultValue={selectedConversation?.name || ''}
+        avatarUrl={selectedConversation?.avatarUrl}
+        conversationName={selectedConversation?.name}
+        onClose={() => setIsEditConversationNameOpen(false)}
+        onSubmit={editConversationNameMode === 'group' ? handleEditGroupName : handleEditNickname}
+      />
+
+      <Modal
+        isOpen={!!confirmDeleteHistoryId}
+        onClose={() => setConfirmDeleteHistoryId(null)}
+        title={t('chat.confirmDeleteHistoryTitle')}
+        variant="confirm"
+        footer={
+          <div className="flex gap-3 justify-end w-full">
+            <button className="btn-zalo-secondary" onClick={() => setConfirmDeleteHistoryId(null)}>
+              {t('common.no')}
+            </button>
+            <button className="btn-zalo-danger" onClick={() => confirmDeleteHistoryId && handleDeleteHistory(confirmDeleteHistoryId)}>
+              {t('common.delete')}
+            </button>
+          </div>
+        }
+      >
+        {t('chat.confirmDeleteHistoryContent')}
+      </Modal>
+
+      <Modal
+        isOpen={confirmLeaveGroupOpen}
+        onClose={() => setConfirmLeaveGroupOpen(false)}
+        title="Xác nhận"
+        variant="confirm"
+        footer={
+          <div className="flex gap-3 justify-end w-full">
+            <button className="btn-zalo-secondary" onClick={() => setConfirmLeaveGroupOpen(false)}>
+              Không
+            </button>
+            <button className="btn-zalo-danger" onClick={doLeaveGroup}>
+              Rời nhóm
+            </button>
+          </div>
+        }
+      >
+        Bạn có chắc chắn muốn rời khỏi nhóm này không?
+      </Modal>
+
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        userId={selectedProfileUserId}
+        accessToken={accessToken}
+        initialUser={selectedProfileUserId ? userMap[selectedProfileUserId] : undefined}
+        onMessage={handleOpenFriendChat}
+      />
+
+      {/* Pinned Messages Logic Hooks */}
+      <PinnedLogicHooks 
+        accessToken={accessToken} 
+        isBootstrapping={isBootstrapping}
+        selectedConversationId={selectedConversationId}
+        loadPinnedMessages={loadPinnedMessages}
+        pinnedMessageIds={pinnedMessageIds}
+        setPinnedMessageIds={setPinnedMessageIds}
+        messagesByConversation={messagesByConversation}
+        setPinnedMessages={setPinnedMessages}
+        lastConvRef={lastConvRef}
+      />
     </div>
   )
 }
+
+/**
+ * Extracted hooks to avoid cluttering main component and ensure they are after declarations.
+ */
+function PinnedLogicHooks({ 
+  accessToken, isBootstrapping, selectedConversationId, loadPinnedMessages,
+  pinnedMessageIds, setPinnedMessageIds, messagesByConversation, setPinnedMessages,
+  lastConvRef
+}: any) {
+  // ISOLATED PINNED FETCH (NO loadInbox call)
+  useEffect(() => {
+    if (!accessToken || isBootstrapping || !selectedConversationId) return
+    
+    // Avoid re-fetching same conversation (Double Guard)
+    if (lastConvRef.current === selectedConversationId) return
+    lastConvRef.current = selectedConversationId
+
+    void loadPinnedMessages(selectedConversationId)
+  }, [accessToken, isBootstrapping, selectedConversationId, loadPinnedMessages, lastConvRef])
+
+  // Mapping Pinned IDs -> Message Objects (with placeholder support)
+  useEffect(() => {
+    if (!selectedConversationId) return
+
+    const ids = pinnedMessageIds[selectedConversationId] || []
+    const convMessages = messagesByConversation[selectedConversationId] || []
+
+    const mapped = ids.map((id: string) => {
+      const found = convMessages.find((m: any) => m.id === id)
+      if (found) return found
+
+      // Return placeholder for unloaded messages
+      return {
+        id,
+        conversationId: selectedConversationId,
+        content: 'Tin nhắn đã ghim',
+        text: 'Tin nhắn đã ghim',
+        type: 'text' as any,
+        sender: 'system' as any,
+        senderId: 'system',
+        timestamp: '',
+        deliveryState: 'sent' as any,
+        isPlaceholder: true, // Custom flag for UI
+      }
+    })
+
+    setPinnedMessages((prev: any) => ({
+      ...prev,
+      [selectedConversationId]: mapped,
+    }))
+  }, [messagesByConversation, pinnedMessageIds, selectedConversationId, setPinnedMessages])
+
+  // Auto clean pinned IDs when messages are recalled
+  useEffect(() => {
+    if (!selectedConversationId) return
+    const ids = pinnedMessageIds[selectedConversationId] || []
+    const convMessages = messagesByConversation[selectedConversationId] || []
+
+    const validIds = ids.filter((id: string) => {
+      const msg = convMessages.find((m: any) => m.id === id)
+      return msg ? !msg.isRecalled : true
+    })
+
+    if (validIds.length !== ids.length) {
+      setPinnedMessageIds((prev: any) => ({
+        ...prev,
+        [selectedConversationId]: validIds,
+      }))
+    }
+  }, [messagesByConversation, selectedConversationId, pinnedMessageIds, setPinnedMessageIds])
+
+  return null;
+}
+

@@ -10,6 +10,7 @@ class FocusedMessageDialog extends StatelessWidget {
   final Size size;
   final Widget child; // The bubble widget to show in focus
   final bool isCloud;
+  final bool isPinned;
   final Function(String action) onAction;
 
   const FocusedMessageDialog({
@@ -21,86 +22,115 @@ class FocusedMessageDialog extends StatelessWidget {
     required this.child,
     required this.onAction,
     this.isCloud = false,
+    this.isPinned = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
+    final safeAreaTop = MediaQuery.of(context).padding.top;
     final safeAreaBottom = MediaQuery.of(context).padding.bottom;
-    
-    // Estimated height for the menu (Emoji box + spacing + Action box)
-    const double estimatedMenuHeight = 520.0;
-    const double spacing = 12.0;
-    const double margin = 16.0;
-
-    // Check if there is enough space below the bubble
-    double bubbleTop = position.dy;
-    double bubbleBottom = bubbleTop + size.height;
-    
-    // Calculate how much we need to shift the bubble up if it's too low
-    double availableSpaceBelow = screenHeight - bubbleBottom - safeAreaBottom - margin;
-    
-    if (availableSpaceBelow < estimatedMenuHeight) {
-      // Shift upward by the missing amount
-      double shift = estimatedMenuHeight - availableSpaceBelow;
-      bubbleTop -= shift;
-      // Ensure it doesn't go above screen top
-      if (bubbleTop < 40) bubbleTop = 40; 
-    }
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          // 1. Dark blurred background
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0.0, end: 1.0),
-              duration: const Duration(milliseconds: 200),
-              builder: (context, value, child) {
-                return BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 5 * value, sigmaY: 5 * value),
-                  child: Container(
-                    color: Colors.black.withValues(alpha: 0.4 * value),
-                    width: double.infinity,
-                    height: double.infinity,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final h = constraints.maxHeight;
+          final w = constraints.maxWidth;
+          
+          // Minimum menu height we want to preserve
+          const double minMenuHeight = 250.0;
+          const double preferredMenuHeight = 500.0;
+          const double spacing = 12.0;
+          const double margin = 16.0;
+          const double topThreshold = 60.0; // Avoid being too close to top
+
+          // 1. Calculate how much space we have for the bubble
+          double availableForBubble = h - minMenuHeight - spacing - margin - safeAreaTop - topThreshold;
+          
+          double effectiveBubbleHeight = size.height;
+          if (effectiveBubbleHeight > availableForBubble) {
+            effectiveBubbleHeight = availableForBubble;
+          }
+
+          // 2. Determine bubble top
+          double bubbleTop = position.dy;
+          double menuTop = bubbleTop + effectiveBubbleHeight + spacing;
+          
+          // If menu goes off bottom, shift everything up
+          if (menuTop + preferredMenuHeight > h - margin) {
+             double shift = (menuTop + preferredMenuHeight) - (h - margin);
+             bubbleTop -= shift;
+             // Ensure it doesn't go above safe area
+             if (bubbleTop < safeAreaTop + topThreshold) {
+                bubbleTop = safeAreaTop + topThreshold;
+             }
+             menuTop = bubbleTop + effectiveBubbleHeight + spacing;
+          }
+
+          // 3. Final calculations for menu height
+          double availableMenuHeight = h - menuTop - margin;
+          if (availableMenuHeight < minMenuHeight) {
+            // This happens if effectiveBubbleHeight was still too large, 
+            // recalculate everything based on absolute minimums
+            availableMenuHeight = minMenuHeight;
+            menuTop = h - margin - availableMenuHeight;
+            bubbleTop = menuTop - spacing - effectiveBubbleHeight;
+          }
+
+          return Stack(
+            children: [
+              // 1. Background
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                  child: Container(color: Colors.black.withValues(alpha: 0.4)),
+                ),
+              ),
+
+              // 2. Bubble
+              Positioned(
+                top: bubbleTop,
+                left: position.dx,
+                width: size.width,
+                height: effectiveBubbleHeight,
+                child: ClipRect(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: child,
                   ),
-                );
-              },
-            ),
-          ),
-          
-          // 2. The Bubble (Highlighted)
-          Positioned(
-            top: bubbleTop,
-            left: position.dx,
-            width: size.width,
-            child: Hero(
-              tag: 'msg_${message.id}',
-              child: Material(
-                color: Colors.transparent,
-                child: child,
+                ),
               ),
-            ),
-          ),
-          
-          // 3. The Action Menu (Always Below)
-          Positioned(
-            top: bubbleTop + size.height + spacing,
-            left: 20,
-            right: 20,
-            child: Material(
-              color: Colors.transparent,
-              child: MessageActionMenu(
-                message: message,
-                isMine: isMine,
-                isCloud: isCloud,
-                onAction: onAction,
+
+              // 3. Menu
+              Positioned(
+                top: menuTop,
+                left: 20,
+                right: 20,
+                height: availableMenuHeight,
+                child: Material(
+                  color: Colors.transparent,
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        MessageActionMenu(
+                          message: message,
+                          isMine: isMine,
+                          isCloud: isCloud,
+                          isPinned: isPinned,
+                          onAction: onAction,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -114,6 +144,7 @@ class FocusedMessageDialog extends StatelessWidget {
     required Widget child,
     required Function(String action) onAction,
     bool isCloud = false,
+    bool isPinned = false,
   }) {
     Navigator.push(
       context,
@@ -124,6 +155,7 @@ class FocusedMessageDialog extends StatelessWidget {
           message: message,
           isMine: isMine,
           isCloud: isCloud,
+          isPinned: isPinned,
           position: position,
           size: size,
           onAction: onAction,

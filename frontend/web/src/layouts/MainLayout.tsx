@@ -60,7 +60,7 @@ export function MainLayout() {
             onOpenSettingsModal={handleOpenSettings}
           />
         ) : null}
-        <main className={isChatWorkspace ? 'workspace-main workspace-main-chat page-enter' : 'workspace-main page-enter'} key={location.pathname}>
+        <main className={isChatWorkspace ? 'workspace-main workspace-main-chat page-enter' : 'workspace-main page-enter'}>
           <Outlet />
         </main>
       </section>

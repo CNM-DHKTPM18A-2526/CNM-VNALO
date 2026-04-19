@@ -486,7 +486,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
               ),
               Expanded(
                 child: Container(
-                  height: 38,
+                  height: 40,
                   decoration: BoxDecoration(
                     color: isDarkMode
                         ? Colors.white.withValues(alpha: 0.1)

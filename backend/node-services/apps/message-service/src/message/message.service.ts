@@ -52,11 +52,9 @@ export class MessageService {
    * - Updates inbox for all active members within a transaction (CQRS)
    */
   async sendMessage(userId: string, dto: SendMessageDto, access?: AccessPolicyContext): Promise<Message> {
-    // TODO: Re-enable restrictedWeb check after core-service JWT generation is verified
-    // Temporarily disabled to test message delivery
-    // if (this.isRestrictedWeb(access)) {
-    //   throw new ForbiddenException('Restricted web session cannot send messages.');
-    // }
+    if (this.isRestrictedWeb(access)) {
+      throw new ForbiddenException('Restricted web session cannot send messages.');
+    }
 
     // Verify sender is a member
     await this.conversationService.assertMember(dto.conversationId, userId);
@@ -297,11 +295,16 @@ export class MessageService {
     const existing = await this.pinRepo.findOne({ where: { conversationId, messageId } });
     if (existing) throw new BadRequestException('Message is already pinned');
 
-    return this.pinRepo.save({
+    const saved = await this.pinRepo.save({
       conversationId,
       messageId,
       serverSeq: message.serverSeq,
       pinnedBy: userId,
+    });
+
+    return this.pinRepo.findOne({
+      where: { id: saved.id },
+      relations: ['message'],
     });
   }
 
@@ -320,6 +323,7 @@ export class MessageService {
     await this.conversationService.assertMember(conversationId, userId);
     return this.pinRepo.find({
       where: { conversationId },
+      relations: ['message'],
       order: { pinnedAt: 'DESC' },
     });
   }
@@ -576,10 +580,8 @@ export class MessageService {
   }
 
   private isRestrictedWeb(access?: AccessPolicyContext): boolean {
-    // Temporary override: do not enforce restricted web filtering in message-service
-    // so chat history remains visible after page refresh.
-    // TODO: Re-enable when core-service restrictedWebMode policy is fully aligned.
-    return false;
+    if (!access) return false;
+    return access.clientPlatform === 'WEB' && Boolean(access.restrictedWebMode);
   }
 
   private resolveLoginTime(epochSec?: number): Date {

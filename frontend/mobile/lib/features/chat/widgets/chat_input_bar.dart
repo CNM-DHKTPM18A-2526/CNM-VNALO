@@ -5,6 +5,7 @@ import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/chat/widgets/sticker_picker.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
+import 'package:vnalo_mobile/features/chat/widgets/voice_recording_overlay.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:record/record.dart';
@@ -39,6 +40,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
   
   bool _hasText = false;
   bool _showStickers = false;
+  bool _showVoiceRecording = false;
 
   @override
   void initState() {
@@ -157,13 +159,40 @@ class _ChatInputBarState extends State<ChatInputBar> {
       mainAxisSize: MainAxisSize.min,
       children: [
         _buildReplyPreview(context),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-          decoration: BoxDecoration(
-            color: bgColor,
-            border: Border(
-              top: BorderSide(color: isDarkMode ? DarkColors.divider : Colors.black12, width: 0.5),
-            ),
+        if (_showVoiceRecording)
+          VoiceRecordingOverlay(
+            conversationId: widget.conversationId,
+            onCancel: () => setState(() => _showVoiceRecording = false),
+            onSendAudio: (path, transcription) {
+              context.read<ChatProvider>().sendVoiceMessage(
+                conversationId: widget.conversationId,
+                audioPath: path,
+                transcription: transcription,
+              );
+              setState(() => _showVoiceRecording = false);
+            },
+            onSendText: (text) {
+              if (text.isNotEmpty) {
+                widget.onSend(text);
+              }
+              setState(() => _showVoiceRecording = false);
+            },
+          )
+        else
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+            decoration: BoxDecoration(
+              color: bgColor,
+              border: Border(
+                top: BorderSide(color: isDarkMode ? DarkColors.divider : Colors.black12, width: 0.5),
+              ),
+            // ),
+            // child: SafeArea(
+            //   bottom: !_showStickers,
+            //   minimum: const EdgeInsets.symmetric(vertical: 2),
+            //   child: Row(
+            //     crossAxisAlignment: CrossAxisAlignment.center,
+            //     children: [
           ),
           child: SafeArea(
             bottom: !_showStickers,
@@ -211,33 +240,39 @@ class _ChatInputBarState extends State<ChatInputBar> {
                     ),
                   ),
                 ),
-                if (_hasText)
-                  IconButton(
-                    icon: Icon(Icons.send, color: isDarkMode ? DarkColors.primary : AppColors.primary),
-                    onPressed: _onSend,
-                  )
-                else
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: Icon(Icons.more_horiz, color: isDarkMode ? DarkColors.textSecondary : const Color(0xFF5D6470)),
-                        onPressed: () => _showAttachmentMenu(context),
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.mic_none_outlined, color: isDarkMode ? DarkColors.textSecondary : const Color(0xFF5D6470)),
-                        onPressed: () {},
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.image_outlined, color: isDarkMode ? DarkColors.textSecondary : const Color(0xFF5D6470)),
-                        onPressed: _pickImage,
-                      ),
-                    ],
-                  ),
-              ],
+                  if (_hasText)
+                    IconButton(
+                      icon: Icon(Icons.send, color: isDarkMode ? DarkColors.primary : AppColors.primary),
+                      onPressed: _onSend,
+                    )
+                  else
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.more_horiz, color: isDarkMode ? DarkColors.textSecondary : const Color(0xFF5D6470)),
+                          onPressed: () => _showAttachmentMenu(context),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.mic_none_outlined, color: isDarkMode ? DarkColors.textSecondary : const Color(0xFF5D6470)),
+                          onPressed: () {
+                            setState(() {
+                              _showVoiceRecording = true;
+                              _showStickers = false;
+                            });
+                            FocusScope.of(context).unfocus();
+                          },
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.image_outlined, color: isDarkMode ? DarkColors.textSecondary : const Color(0xFF5D6470)),
+                          onPressed: _pickImage,
+                        ),
+                      ],
+                    ),
+                ],
+              ),
             ),
           ),
-        ),
         if (_showStickers)
           StickerPicker(
             conversationId: widget.conversationId,
@@ -260,10 +295,10 @@ class _ChatInputBarState extends State<ChatInputBar> {
                final selection = _controller.selection;
                if (selection.start >= 0 && selection.end >= 0) {
                  final newText = text.replaceRange(selection.start, selection.end, emoji);
-                 _controller.value = TextEditingValue(
-                   text: newText,
-                   selection: TextSelection.collapsed(offset: selection.start + emoji.length),
-                 );
+                  _controller.value = TextEditingValue(
+                    text: newText,
+                    selection: TextSelection.collapsed(offset: (selection.start + emoji.length).toInt()),
+                  );
                } else {
                  _controller.text = text + emoji;
                  _controller.selection = TextSelection.fromPosition(TextPosition(offset: _controller.text.length));

@@ -1817,6 +1817,434 @@ class ConversationsCompanion extends UpdateCompanion<LocalConversation> {
   }
 }
 
+class PinnedMessages extends Table
+    with TableInfo<PinnedMessages, LocalPinnedMessage> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  PinnedMessages(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL PRIMARY KEY',
+  );
+  static const VerificationMeta _conversationIdMeta = const VerificationMeta(
+    'conversationId',
+  );
+  late final GeneratedColumn<String> conversationId = GeneratedColumn<String>(
+    'conversation_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _messageIdMeta = const VerificationMeta(
+    'messageId',
+  );
+  late final GeneratedColumn<String> messageId = GeneratedColumn<String>(
+    'message_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  static const VerificationMeta _serverSeqMeta = const VerificationMeta(
+    'serverSeq',
+  );
+  late final GeneratedColumn<int> serverSeq = GeneratedColumn<int>(
+    'server_seq',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: '',
+  );
+  static const VerificationMeta _pinnedByMeta = const VerificationMeta(
+    'pinnedBy',
+  );
+  late final GeneratedColumn<String> pinnedBy = GeneratedColumn<String>(
+    'pinned_by',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: '',
+  );
+  static const VerificationMeta _pinnedAtMeta = const VerificationMeta(
+    'pinnedAt',
+  );
+  late final GeneratedColumn<DateTime> pinnedAt = GeneratedColumn<DateTime>(
+    'pinned_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    conversationId,
+    messageId,
+    serverSeq,
+    pinnedBy,
+    pinnedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'pinned_messages';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LocalPinnedMessage> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('conversation_id')) {
+      context.handle(
+        _conversationIdMeta,
+        conversationId.isAcceptableOrUnknown(
+          data['conversation_id']!,
+          _conversationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_conversationIdMeta);
+    }
+    if (data.containsKey('message_id')) {
+      context.handle(
+        _messageIdMeta,
+        messageId.isAcceptableOrUnknown(data['message_id']!, _messageIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_messageIdMeta);
+    }
+    if (data.containsKey('server_seq')) {
+      context.handle(
+        _serverSeqMeta,
+        serverSeq.isAcceptableOrUnknown(data['server_seq']!, _serverSeqMeta),
+      );
+    }
+    if (data.containsKey('pinned_by')) {
+      context.handle(
+        _pinnedByMeta,
+        pinnedBy.isAcceptableOrUnknown(data['pinned_by']!, _pinnedByMeta),
+      );
+    }
+    if (data.containsKey('pinned_at')) {
+      context.handle(
+        _pinnedAtMeta,
+        pinnedAt.isAcceptableOrUnknown(data['pinned_at']!, _pinnedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_pinnedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  LocalPinnedMessage map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalPinnedMessage(
+      id:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}id'],
+          )!,
+      conversationId:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}conversation_id'],
+          )!,
+      messageId:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}message_id'],
+          )!,
+      serverSeq: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}server_seq'],
+      ),
+      pinnedBy: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pinned_by'],
+      ),
+      pinnedAt:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.dateTime,
+            data['${effectivePrefix}pinned_at'],
+          )!,
+    );
+  }
+
+  @override
+  PinnedMessages createAlias(String alias) {
+    return PinnedMessages(attachedDatabase, alias);
+  }
+
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class LocalPinnedMessage extends DataClass
+    implements Insertable<LocalPinnedMessage> {
+  final String id;
+  final String conversationId;
+  final String messageId;
+  final int? serverSeq;
+  final String? pinnedBy;
+  final DateTime pinnedAt;
+  const LocalPinnedMessage({
+    required this.id,
+    required this.conversationId,
+    required this.messageId,
+    this.serverSeq,
+    this.pinnedBy,
+    required this.pinnedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['conversation_id'] = Variable<String>(conversationId);
+    map['message_id'] = Variable<String>(messageId);
+    if (!nullToAbsent || serverSeq != null) {
+      map['server_seq'] = Variable<int>(serverSeq);
+    }
+    if (!nullToAbsent || pinnedBy != null) {
+      map['pinned_by'] = Variable<String>(pinnedBy);
+    }
+    map['pinned_at'] = Variable<DateTime>(pinnedAt);
+    return map;
+  }
+
+  PinnedMessagesCompanion toCompanion(bool nullToAbsent) {
+    return PinnedMessagesCompanion(
+      id: Value(id),
+      conversationId: Value(conversationId),
+      messageId: Value(messageId),
+      serverSeq:
+          serverSeq == null && nullToAbsent
+              ? const Value.absent()
+              : Value(serverSeq),
+      pinnedBy:
+          pinnedBy == null && nullToAbsent
+              ? const Value.absent()
+              : Value(pinnedBy),
+      pinnedAt: Value(pinnedAt),
+    );
+  }
+
+  factory LocalPinnedMessage.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalPinnedMessage(
+      id: serializer.fromJson<String>(json['id']),
+      conversationId: serializer.fromJson<String>(json['conversation_id']),
+      messageId: serializer.fromJson<String>(json['message_id']),
+      serverSeq: serializer.fromJson<int?>(json['server_seq']),
+      pinnedBy: serializer.fromJson<String?>(json['pinned_by']),
+      pinnedAt: serializer.fromJson<DateTime>(json['pinned_at']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'conversation_id': serializer.toJson<String>(conversationId),
+      'message_id': serializer.toJson<String>(messageId),
+      'server_seq': serializer.toJson<int?>(serverSeq),
+      'pinned_by': serializer.toJson<String?>(pinnedBy),
+      'pinned_at': serializer.toJson<DateTime>(pinnedAt),
+    };
+  }
+
+  LocalPinnedMessage copyWith({
+    String? id,
+    String? conversationId,
+    String? messageId,
+    Value<int?> serverSeq = const Value.absent(),
+    Value<String?> pinnedBy = const Value.absent(),
+    DateTime? pinnedAt,
+  }) => LocalPinnedMessage(
+    id: id ?? this.id,
+    conversationId: conversationId ?? this.conversationId,
+    messageId: messageId ?? this.messageId,
+    serverSeq: serverSeq.present ? serverSeq.value : this.serverSeq,
+    pinnedBy: pinnedBy.present ? pinnedBy.value : this.pinnedBy,
+    pinnedAt: pinnedAt ?? this.pinnedAt,
+  );
+  LocalPinnedMessage copyWithCompanion(PinnedMessagesCompanion data) {
+    return LocalPinnedMessage(
+      id: data.id.present ? data.id.value : this.id,
+      conversationId:
+          data.conversationId.present
+              ? data.conversationId.value
+              : this.conversationId,
+      messageId: data.messageId.present ? data.messageId.value : this.messageId,
+      serverSeq: data.serverSeq.present ? data.serverSeq.value : this.serverSeq,
+      pinnedBy: data.pinnedBy.present ? data.pinnedBy.value : this.pinnedBy,
+      pinnedAt: data.pinnedAt.present ? data.pinnedAt.value : this.pinnedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalPinnedMessage(')
+          ..write('id: $id, ')
+          ..write('conversationId: $conversationId, ')
+          ..write('messageId: $messageId, ')
+          ..write('serverSeq: $serverSeq, ')
+          ..write('pinnedBy: $pinnedBy, ')
+          ..write('pinnedAt: $pinnedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, conversationId, messageId, serverSeq, pinnedBy, pinnedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalPinnedMessage &&
+          other.id == this.id &&
+          other.conversationId == this.conversationId &&
+          other.messageId == this.messageId &&
+          other.serverSeq == this.serverSeq &&
+          other.pinnedBy == this.pinnedBy &&
+          other.pinnedAt == this.pinnedAt);
+}
+
+class PinnedMessagesCompanion extends UpdateCompanion<LocalPinnedMessage> {
+  final Value<String> id;
+  final Value<String> conversationId;
+  final Value<String> messageId;
+  final Value<int?> serverSeq;
+  final Value<String?> pinnedBy;
+  final Value<DateTime> pinnedAt;
+  final Value<int> rowid;
+  const PinnedMessagesCompanion({
+    this.id = const Value.absent(),
+    this.conversationId = const Value.absent(),
+    this.messageId = const Value.absent(),
+    this.serverSeq = const Value.absent(),
+    this.pinnedBy = const Value.absent(),
+    this.pinnedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PinnedMessagesCompanion.insert({
+    required String id,
+    required String conversationId,
+    required String messageId,
+    this.serverSeq = const Value.absent(),
+    this.pinnedBy = const Value.absent(),
+    required DateTime pinnedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       conversationId = Value(conversationId),
+       messageId = Value(messageId),
+       pinnedAt = Value(pinnedAt);
+  static Insertable<LocalPinnedMessage> custom({
+    Expression<String>? id,
+    Expression<String>? conversationId,
+    Expression<String>? messageId,
+    Expression<int>? serverSeq,
+    Expression<String>? pinnedBy,
+    Expression<DateTime>? pinnedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (conversationId != null) 'conversation_id': conversationId,
+      if (messageId != null) 'message_id': messageId,
+      if (serverSeq != null) 'server_seq': serverSeq,
+      if (pinnedBy != null) 'pinned_by': pinnedBy,
+      if (pinnedAt != null) 'pinned_at': pinnedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PinnedMessagesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? conversationId,
+    Value<String>? messageId,
+    Value<int?>? serverSeq,
+    Value<String?>? pinnedBy,
+    Value<DateTime>? pinnedAt,
+    Value<int>? rowid,
+  }) {
+    return PinnedMessagesCompanion(
+      id: id ?? this.id,
+      conversationId: conversationId ?? this.conversationId,
+      messageId: messageId ?? this.messageId,
+      serverSeq: serverSeq ?? this.serverSeq,
+      pinnedBy: pinnedBy ?? this.pinnedBy,
+      pinnedAt: pinnedAt ?? this.pinnedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (conversationId.present) {
+      map['conversation_id'] = Variable<String>(conversationId.value);
+    }
+    if (messageId.present) {
+      map['message_id'] = Variable<String>(messageId.value);
+    }
+    if (serverSeq.present) {
+      map['server_seq'] = Variable<int>(serverSeq.value);
+    }
+    if (pinnedBy.present) {
+      map['pinned_by'] = Variable<String>(pinnedBy.value);
+    }
+    if (pinnedAt.present) {
+      map['pinned_at'] = Variable<DateTime>(pinnedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PinnedMessagesCompanion(')
+          ..write('id: $id, ')
+          ..write('conversationId: $conversationId, ')
+          ..write('messageId: $messageId, ')
+          ..write('serverSeq: $serverSeq, ')
+          ..write('pinnedBy: $pinnedBy, ')
+          ..write('pinnedAt: $pinnedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$LocalDatabase extends GeneratedDatabase {
   _$LocalDatabase(QueryExecutor e) : super(e);
   $LocalDatabaseManager get managers => $LocalDatabaseManager(this);
@@ -1827,6 +2255,7 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
   );
   late final Contacts contacts = Contacts(this);
   late final Conversations conversations = Conversations(this);
+  late final PinnedMessages pinnedMessages = PinnedMessages(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1836,6 +2265,7 @@ abstract class _$LocalDatabase extends GeneratedDatabase {
     idxMessagesOwner,
     contacts,
     conversations,
+    pinnedMessages,
   ];
 }
 
@@ -2713,6 +3143,234 @@ typedef $ConversationsProcessedTableManager =
       LocalConversation,
       PrefetchHooks Function()
     >;
+typedef $PinnedMessagesCreateCompanionBuilder =
+    PinnedMessagesCompanion Function({
+      required String id,
+      required String conversationId,
+      required String messageId,
+      Value<int?> serverSeq,
+      Value<String?> pinnedBy,
+      required DateTime pinnedAt,
+      Value<int> rowid,
+    });
+typedef $PinnedMessagesUpdateCompanionBuilder =
+    PinnedMessagesCompanion Function({
+      Value<String> id,
+      Value<String> conversationId,
+      Value<String> messageId,
+      Value<int?> serverSeq,
+      Value<String?> pinnedBy,
+      Value<DateTime> pinnedAt,
+      Value<int> rowid,
+    });
+
+class $PinnedMessagesFilterComposer
+    extends Composer<_$LocalDatabase, PinnedMessages> {
+  $PinnedMessagesFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get conversationId => $composableBuilder(
+    column: $table.conversationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get messageId => $composableBuilder(
+    column: $table.messageId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get serverSeq => $composableBuilder(
+    column: $table.serverSeq,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pinnedBy => $composableBuilder(
+    column: $table.pinnedBy,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get pinnedAt => $composableBuilder(
+    column: $table.pinnedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $PinnedMessagesOrderingComposer
+    extends Composer<_$LocalDatabase, PinnedMessages> {
+  $PinnedMessagesOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get conversationId => $composableBuilder(
+    column: $table.conversationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get messageId => $composableBuilder(
+    column: $table.messageId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get serverSeq => $composableBuilder(
+    column: $table.serverSeq,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pinnedBy => $composableBuilder(
+    column: $table.pinnedBy,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get pinnedAt => $composableBuilder(
+    column: $table.pinnedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $PinnedMessagesAnnotationComposer
+    extends Composer<_$LocalDatabase, PinnedMessages> {
+  $PinnedMessagesAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get conversationId => $composableBuilder(
+    column: $table.conversationId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get messageId =>
+      $composableBuilder(column: $table.messageId, builder: (column) => column);
+
+  GeneratedColumn<int> get serverSeq =>
+      $composableBuilder(column: $table.serverSeq, builder: (column) => column);
+
+  GeneratedColumn<String> get pinnedBy =>
+      $composableBuilder(column: $table.pinnedBy, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get pinnedAt =>
+      $composableBuilder(column: $table.pinnedAt, builder: (column) => column);
+}
+
+class $PinnedMessagesTableManager
+    extends
+        RootTableManager<
+          _$LocalDatabase,
+          PinnedMessages,
+          LocalPinnedMessage,
+          $PinnedMessagesFilterComposer,
+          $PinnedMessagesOrderingComposer,
+          $PinnedMessagesAnnotationComposer,
+          $PinnedMessagesCreateCompanionBuilder,
+          $PinnedMessagesUpdateCompanionBuilder,
+          (
+            LocalPinnedMessage,
+            BaseReferences<_$LocalDatabase, PinnedMessages, LocalPinnedMessage>,
+          ),
+          LocalPinnedMessage,
+          PrefetchHooks Function()
+        > {
+  $PinnedMessagesTableManager(_$LocalDatabase db, PinnedMessages table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer:
+              () => $PinnedMessagesFilterComposer($db: db, $table: table),
+          createOrderingComposer:
+              () => $PinnedMessagesOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer:
+              () => $PinnedMessagesAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> conversationId = const Value.absent(),
+                Value<String> messageId = const Value.absent(),
+                Value<int?> serverSeq = const Value.absent(),
+                Value<String?> pinnedBy = const Value.absent(),
+                Value<DateTime> pinnedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PinnedMessagesCompanion(
+                id: id,
+                conversationId: conversationId,
+                messageId: messageId,
+                serverSeq: serverSeq,
+                pinnedBy: pinnedBy,
+                pinnedAt: pinnedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String conversationId,
+                required String messageId,
+                Value<int?> serverSeq = const Value.absent(),
+                Value<String?> pinnedBy = const Value.absent(),
+                required DateTime pinnedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => PinnedMessagesCompanion.insert(
+                id: id,
+                conversationId: conversationId,
+                messageId: messageId,
+                serverSeq: serverSeq,
+                pinnedBy: pinnedBy,
+                pinnedAt: pinnedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper:
+              (p0) =>
+                  p0
+                      .map(
+                        (e) => (
+                          e.readTable(table),
+                          BaseReferences(db, table, e),
+                        ),
+                      )
+                      .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $PinnedMessagesProcessedTableManager =
+    ProcessedTableManager<
+      _$LocalDatabase,
+      PinnedMessages,
+      LocalPinnedMessage,
+      $PinnedMessagesFilterComposer,
+      $PinnedMessagesOrderingComposer,
+      $PinnedMessagesAnnotationComposer,
+      $PinnedMessagesCreateCompanionBuilder,
+      $PinnedMessagesUpdateCompanionBuilder,
+      (
+        LocalPinnedMessage,
+        BaseReferences<_$LocalDatabase, PinnedMessages, LocalPinnedMessage>,
+      ),
+      LocalPinnedMessage,
+      PrefetchHooks Function()
+    >;
 
 class $LocalDatabaseManager {
   final _$LocalDatabase _db;
@@ -2723,4 +3381,6 @@ class $LocalDatabaseManager {
       $ContactsTableManager(_db, _db.contacts);
   $ConversationsTableManager get conversations =>
       $ConversationsTableManager(_db, _db.conversations);
+  $PinnedMessagesTableManager get pinnedMessages =>
+      $PinnedMessagesTableManager(_db, _db.pinnedMessages);
 }

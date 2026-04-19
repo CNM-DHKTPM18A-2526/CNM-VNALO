@@ -3,6 +3,8 @@ export const translations = {
     common: {
       appName: 'VNALO',
       loading: 'Loading...',
+      no: 'No',
+      delete: 'Delete',
     },
     sidebar: {
       chat: 'Chat',
@@ -241,6 +243,8 @@ export const translations = {
       offline: 'Offline',
       loadingConversation: 'Loading conversation...',
       messageInputPlaceholder: 'Type a message...',
+      confirmDeleteHistoryTitle: 'Confirm',
+      confirmDeleteHistoryContent: 'The entire chat history will be permanently deleted.\nAre you sure you want to delete?',
     },
     notifications: {
       emptyTitle: 'No notifications',
@@ -438,6 +442,8 @@ export const translations = {
     common: {
       appName: 'VNALO',
       loading: 'Đang tải...',
+      no: 'Không',
+      delete: 'Xóa',
     },
     sidebar: {
       chat: 'Hội thoại',
@@ -677,6 +683,8 @@ export const translations = {
       offline: 'Ngoại tuyến',
       loadingConversation: 'Đang tải hội thoại...',
       messageInputPlaceholder: 'Nhập tin nhắn...',
+      confirmDeleteHistoryTitle: 'Xác nhận',
+      confirmDeleteHistoryContent: 'Toàn bộ nội dung trò chuyện sẽ bị xóa vĩnh viễn.\nBạn có chắc chắn muốn xóa?',
     },
     notifications: {
       emptyTitle: 'Không có thông báo',

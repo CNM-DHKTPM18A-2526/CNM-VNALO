@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Icon } from '../shared/components/Icon'
 import { useLanguage } from '../shared/i18n/LanguageContext'
 

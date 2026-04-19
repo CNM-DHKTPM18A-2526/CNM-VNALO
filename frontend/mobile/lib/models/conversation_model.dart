@@ -139,7 +139,7 @@ class Conversation {
       if (members.isEmpty) return title ?? 'Người dùng';
       final other = members.firstWhere(
         (m) => m.userId != currentUserId,
-        orElse: () => members.first,
+        orElse: () => members.isNotEmpty ? members.first : ConversationMember(conversationId: id, userId: 'unknown', joinedAt: DateTime.now()),
       );
 
       // For direct conversations, use the other user's nickname or display name
@@ -178,7 +178,7 @@ class Conversation {
     // For direct conversations, use the other user's avatar
     final other = members.firstWhere(
       (m) => m.userId != currentUserId,
-      orElse: () => members.first,
+      orElse: () => members.isNotEmpty ? members.first : ConversationMember(conversationId: id, userId: 'unknown', joinedAt: DateTime.now()),
     );
 
     // Fallback to conversation avatar when peer profile is not hydrated yet.
