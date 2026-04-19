@@ -1,37 +1,36 @@
-# Call System UI Specification
+# Call System Module Specification (L2)
 
-## 1. Page Context
-- **Feature**: Real-time Communication (Voice & Video)
-- **Files**: 
-    - `lib/features/call/screens/voice_call_screen.dart`
-    - `lib/features/call/screens/video_call_screen.dart`
-- **Layer Strategy**: Immersive Layer (Dark Focus)
+## 🎯 1. Outcomes
+Enable high-quality, real-time Voice and Video communication between two users (P2P) with a professional "Premium Glass" UI that remains responsive across background/foreground transitions.
 
-## 2. Layout Structure
-- **AppBar**:
-    - Style: `transparent` (Overlay on video/gradient).
-    - Actions: Back arrow (Mini-call toggle), Flip Camera (Video).
-    - Button Style: Translucent Xanh Đen (`Colors.black.withValues(alpha: 0.5)`), size 44x44, icon 28.
-- **Body**: 
-    - Video Call: Fullscreen remote stream, draggable local preview (top-right).
-    - Voice Call: User avatar center, pulse animation, blurred cover background.
-- **Controls Bar**: 
-    - Position: **Floating Bottom** (Directly on background).
-    - Style: No background panel or blur (Glassmorphism removed for maximum immersion).
-    - Buttons: Loa/Camera, Mic, End Call, More (Video only).
-- **Background**: Dark Gradient (Voice) / Remote Video Stream (Video).
+## 🚧 2. Scope Boundaries
+- **In-Scope**: One-to-one P2P calls, WebRTC signaling via Socket.io, CallKit integration (iOS/Android), Floating premium buttons layout.
+- **Out-of-Scope**: Group calls (>2 participants), PSTN integration, Screen sharing, Call recording.
 
-## 3. Component Details
-- **Control Buttons**: 
-    - Style: Circular, **Translucent Dark** aesthetic.
-    - Colors: **Xanh Đen Mờ** (`Colors.black.withValues(alpha: 0.5)`).
-    - Size: 72x72, Icon 36.
-- **End Call Button**: 
-    - Style: Solid Red (`Color(0xFFFF3B30)`), white icon.
+## 🛑 3. Constraints & Assumptions
+- **Constraint**: Must use HSL colors and alpha 0.5 overlays for all control buttons.
+- **Constraint**: Bottom controls must be exactly 24px above bottom safe area.
+- **Assumption**: STUN/TURN servers are available for P2P connection fallback.
+- **Assumption**: The Node.js gateway is the reliable broker for `call.offer` and `call.answer` signals.
 
-## 4. Positioning & Ergonomics
-- **Placement**: Unified `Positioned(bottom: 0)` structure with `SafeArea`.
-- **Bottom Clearance**: Standardized **24px** padding from the safe area edge to provide a comfortable, lowered ergonomic feel.
+## 💡 4. Prior Decisions
+- **Standardized Ergonomics**: Use `Positioned(bottom: 0)` to ensure consistent control strip placement regardless of aspect ratio.
+- **Background Sync**: Use `IncomingCallCoordinator` as a global persistent widget to listen for socket signals while the app is alive.
 
-## 5. Theme Adaptation
-- **Fixed Mode**: Always **Dark Theme** to ensure focus and reduce glare. Uses `Color(0xFF0F172A)` as deep navy base.
+## 📝 5. Task Breakdown (Feature Delta)
+- [x] Refactor UI to remove separate glass panels and use unified floating buttons.
+- [x] Standardize color tokens to `Colors.black.withValues(alpha: 0.5)`.
+- [ ] Implement robust `senderId` mapping in `IncomingCallCoordinator` (P0 fix identified in audit).
+- [ ] Implement timeout handling if target doesn't answer after 30 seconds.
+
+## ✅ 6. Verification Criteria
+- **Functional**: The recipient must receive the call waiting screen when an `offer` is received.
+- **UI**: Bottom buttons must align exactly at the 24px coordinate.
+- **Signaling**: Sdp/Ice-candidates must successfully traverse the Node.js gateway.
+- **Gherkin**:
+    ```gherkin
+    Given User A calls User B
+    When User B is in foreground
+    Then User B sees the IncomingCall screen with Answer/Decline buttons
+    And Background is blurred or darkened with alpha 0.5
+    ```
