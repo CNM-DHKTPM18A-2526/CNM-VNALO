@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:provider/provider.dart';
@@ -415,14 +414,11 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
             left: 0,
             right: 0,
             bottom: 0,
-            child: ClipRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 48),
-                  color: Colors.black.withValues(alpha: 0.2),
-                  child: _buildCallControls(_callService!),
-                ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 24),
+                child: _buildCallControls(_callService!),
               ),
             ),
           ),
@@ -529,10 +525,10 @@ class _TopCircleIconButton extends StatelessWidget {
         width: 44,
         height: 44,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.15),
+          color: Colors.black.withValues(alpha: 0.5), // Xanh đen mờ chuẩn (Premium Glass)
           shape: BoxShape.circle,
         ),
-        child: Center(child: Icon(icon, color: Colors.white, size: 24)),
+        child: Center(child: Icon(icon, color: Colors.white, size: 28)),
       ),
     );
   }
@@ -649,11 +645,9 @@ class _VideoActionButton extends StatelessWidget {
 
     if (destructive) {
       backgroundColor = const Color(0xFFFF3B30);
-    } else if (active) {
-      backgroundColor = Colors.white;
-      iconColor = const Color(0xFF0068FF); // Zalo Primary Blue
     } else {
-      backgroundColor = color ?? Colors.white.withValues(alpha: 0.15);
+      backgroundColor = color ?? Colors.black.withValues(alpha: 0.5); // Xanh đen mờ chuẩn
+      iconColor = Colors.white;
     }
 
     return Column(
