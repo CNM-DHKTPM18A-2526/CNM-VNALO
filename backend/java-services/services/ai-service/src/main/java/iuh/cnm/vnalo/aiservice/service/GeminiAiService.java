@@ -56,17 +56,20 @@ public class GeminiAiService {
     }
 
     private Map<String, Object> buildGeminiPayload(AiChatRequest request) {
-        // Construct System Instructions for VNALO Mascot if intention analysis is required
-        String promptText = request.getPrompt();
+        StringBuilder promptBuilder = new StringBuilder();
         
-        if (request.isAnalyzeIntent()) {
-            promptText = "System Instruction: You are VNALO, a lively 3D virtual assistant for a social app. " +
-                         "If the user asks to start a call, output ONLY a JSON formatted like {\"actionCommand\": \"START_CALL\", \"actionParams\": {\"target\": \"name\"}}. " +
-                         "Otherwise, reply naturally. \nUser Input: " + request.getPrompt();
-        }
+        // 1. Inject Unified System Instruction first
+        promptBuilder.append("SYSTEM INSTRUCTION:\n")
+                     .append(iuh.cnm.vnalo.aiservice.knowledge.SystemPrompt.VNALO_SYSTEM_PROMPT)
+                     .append("\n---\n");
+        
+        // 2. Add context if any (Reserved for future RAG/History expansion)
+        
+        // 3. Current User Input
+        promptBuilder.append("USER INPUT: ").append(request.getPrompt());
 
         Map<String, Object> part = new HashMap<>();
-        part.put("text", promptText);
+        part.put("text", promptBuilder.toString());
 
         Map<String, Object> content = new HashMap<>();
         content.put("parts", List.of(part));
@@ -87,64 +90,65 @@ public class GeminiAiService {
 
         String fallbackText = "I'm sorry, I couldn't process that.";
         JsonNode firstCandidate = candidates.get(0);
-        if (firstCandidate == null) {
-            return AiChatResponse.builder().textReply(fallbackText).build();
-        }
-        
         JsonNode contentNode = firstCandidate.path("content");
-        if (contentNode.isMissingNode()) {
-            return AiChatResponse.builder().textReply(fallbackText).build();
-        }
-        
         JsonNode partsNode = contentNode.path("parts");
+        
         if (partsNode.isMissingNode() || !partsNode.isArray() || partsNode.size() == 0) {
             return AiChatResponse.builder().textReply(fallbackText).build();
         }
         
-        JsonNode firstPart = partsNode.get(0);
-        if (firstPart == null) {
-            return AiChatResponse.builder().textReply(fallbackText).build();
-        }
-        
-        String rawText = firstPart.path("text").asText();
+        String rawText = partsNode.get(0).path("text").asText();
 
-        // 4. Intent parsing - Handle potential Markdown formatting from AI
+        // Intent parsing - Handle JSON within response
         AiChatResponse response = new AiChatResponse();
-        if (isAnalyzingIntent) {
-            String cleanJson = extractJson(rawText);
-            if (cleanJson != null) {
-                try {
-                    JsonNode cmdNode = objectMapper.readTree(cleanJson);
-                    if (cmdNode.has("actionCommand")) {
-                        response.setActionCommand(cmdNode.get("actionCommand").asText());
-                        if (cmdNode.has("actionParams")) {
-                            response.setActionParams(objectMapper.convertValue(cmdNode.get("actionParams"), Map.class));
-                        }
-                        response.setTextReply(""); // Command execution mode
-                        return response;
-                    }
-                } catch (Exception e) {
-                    log.warn("Failed to parse extracted JSON: {}", e.getMessage());
+        String cleanJson = extractJson(rawText);
+        
+        if (cleanJson != null) {
+            try {
+                JsonNode cmdNode = objectMapper.readTree(cleanJson);
+                
+                // Map the JSON schema to DTO
+                response.setTextReply(cmdNode.path("textReply").asText(""));
+                response.setActionCommand(cmdNode.path("actionCommand").asText(null));
+                response.setEmotion(cmdNode.path("emotion").asText("thinking"));
+                
+                if (cmdNode.has("actionParams")) {
+                    response.setActionParams(objectMapper.convertValue(cmdNode.get("actionParams"), Map.class));
                 }
+                
+                // If it's a valid action but textReply is empty, use a default acknowledgment
+                if (response.getActionCommand() != null && response.getTextReply().isEmpty()) {
+                    response.setTextReply("Đã rõ, tôi đang thực hiện lệnh của bạn...");
+                }
+                
+                return response;
+            } catch (Exception e) {
+                log.warn("Failed to parse extracted JSON: {}. Falling back to raw text.", e.getMessage());
             }
         }
 
+        // Fallback for natural language responses
         response.setTextReply(rawText);
+        response.setEmotion("thinking");
         return response;
     }
 
     private String extractJson(String text) {
         if (text == null) return null;
         
-        // Try to find JSON within code blocks first
-        if (text.contains("```")) {
-            int start = text.indexOf("{");
-            int end = text.lastIndexOf("}");
-            if (start != -1 && end != -1 && start < end) {
-                return text.substring(start, end + 1);
+        // 1. Try to find the outermost { ... } block
+        int start = text.indexOf("{");
+        int end = text.lastIndexOf("}");
+        
+        if (start != -1 && end != -1 && start < end) {
+            String candidate = text.substring(start, end + 1);
+            // Quick sanity check: simple check if it even looks like JSON
+            if (candidate.contains(":") && (candidate.contains("\"textReply\"") || candidate.contains("\"actionCommand\""))) {
+                return candidate;
             }
         }
         
+        // 2. Fallback to trimmed direct match
         String trimmed = text.trim();
         if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
             return trimmed;
