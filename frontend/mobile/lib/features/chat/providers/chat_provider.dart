@@ -1626,6 +1626,50 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
+  /// Find a conversation by name (Friend name or Group title) for AI resolution.
+  Conversation? findConversationByName(String name) {
+    if (name.isEmpty) return null;
+    final search = name.toLowerCase().trim();
+
+    String getLabel(Conversation conversation) {
+      if (conversation.type == ConversationType.GROUP) {
+        return (conversation.title ?? '').toLowerCase();
+      }
+
+      if (_currentUserId == null) {
+        return (conversation.title ?? '').toLowerCase();
+      }
+
+      ConversationMember? peer;
+      for (final member in conversation.members) {
+        if (member.userId != _currentUserId) {
+          peer = member;
+          break;
+        }
+      }
+
+      return (peer?.nickname ??
+              peer?.user?.displayName ??
+              conversation.title ??
+              '')
+          .toLowerCase();
+    }
+
+    for (final conversation in _conversations) {
+      if (getLabel(conversation) == search) {
+        return conversation;
+      }
+    }
+
+    for (final conversation in _conversations) {
+      if (getLabel(conversation).contains(search)) {
+        return conversation;
+      }
+    }
+
+    return null;
+  }
+
   void pinMessage(String messageId) {
     if (_activeConversationId == null) return;
     _socketService.pinMessage(messageId, _activeConversationId!);

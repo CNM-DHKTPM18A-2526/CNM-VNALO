@@ -27,6 +27,8 @@ class SocketService {
       StreamController<Map<String, dynamic>>.broadcast();
   final _callSignalController =
       StreamController<Map<String, dynamic>>.broadcast();
+  final _callErrorController =
+      StreamController<Map<String, dynamic>>.broadcast();
   final _reactionAddedController =
       StreamController<Map<String, dynamic>>.broadcast();
   final _reactionRemovedController =
@@ -44,6 +46,7 @@ class SocketService {
   Stream<Map<String, dynamic>> get onPinned => _pinnedController.stream;
   Stream<Map<String, dynamic>> get onUnpinned => _unpinnedController.stream;
   Stream<Map<String, dynamic>> get onCallSignal => _callSignalController.stream;
+  Stream<Map<String, dynamic>> get onCallError => _callErrorController.stream;
   Stream<Map<String, dynamic>> get onReactionAdded => _reactionAddedController.stream;
   Stream<Map<String, dynamic>> get onReactionRemoved => _reactionRemovedController.stream;
 
@@ -135,6 +138,17 @@ class SocketService {
       (data) => _emitCallSignal('ice-candidate', data),
     );
     _socket!.on('call.end', (data) => _emitCallSignal('end', data));
+    _socket!.on('call.error', (data) {
+      final payload =
+          data is Map
+              ? Map<String, dynamic>.from(data)
+              : {
+                'error':
+                    data?.toString() ?? 'Unknown call signaling error from server',
+              };
+      debugPrint('[SocketService][CALL][ERROR] payload=$payload');
+      _callErrorController.add(payload);
+    });
     _socket!.on('call.signal', (data) {
       if (data is! Map) return;
       final payload = Map<String, dynamic>.from(data);
@@ -364,6 +378,7 @@ class SocketService {
     _pinnedController.close();
     _unpinnedController.close();
     _callSignalController.close();
+    _callErrorController.close();
     _reactionAddedController.close();
     _reactionRemovedController.close();
   }

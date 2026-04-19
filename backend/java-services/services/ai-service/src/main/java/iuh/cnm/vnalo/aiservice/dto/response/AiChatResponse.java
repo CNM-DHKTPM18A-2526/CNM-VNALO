@@ -21,6 +21,9 @@ public class AiChatResponse {
     // Parameters for the command (e.g., {"targetUser": "user_123", "isVideo": true})
     private Map<String, Object> actionParams;
 
+    // AI Animation state (e.g., "joyful", "thinking")
+    private String emotion;
+
     // Billing/Quota limits tracking
     private int estimatedTokens;
 }
