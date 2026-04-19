@@ -34,6 +34,9 @@ import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provid
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_floating_bubble.dart';
 import 'package:vnalo_mobile/features/contacts/providers/contact_provider.dart';
 
+// Global key to allow navigation from anywhere (e.g. IncomingCallCoordinator)
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -47,8 +50,15 @@ void main() async {
     );
   }
 
-  // Initialize Firebase using robust options from AppConfig
-  await Firebase.initializeApp(options: AppConfig.getFirebaseOptions());
+  // Initialize Firebase using robust options from AppConfig.
+  // Using try-catch to safely handle Hot Restarts where the app might already be initialized native-side.
+  try {
+    await Firebase.initializeApp(options: AppConfig.getFirebaseOptions());
+  } catch (e) {
+    if (!e.toString().contains('duplicate-app')) {
+      rethrow;
+    }
+  }
   
   // Set the background messaging handler early on, as a named top-level function
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
@@ -109,8 +119,15 @@ void main() async {
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Initialize Firebase with the same robust options as main
-  await Firebase.initializeApp(options: AppConfig.getFirebaseOptions());
+  // Initialize Firebase for background handler. 
+  // Using try-catch to avoid duplicate app errors in background tasks.
+  try {
+    await Firebase.initializeApp(options: AppConfig.getFirebaseOptions());
+  } catch (e) {
+    if (!e.toString().contains('duplicate-app')) {
+      rethrow;
+    }
+  }
   debugPrint('Handling a background message: ${message.messageId}');
   
   // Hand off to NotificationService's static background handler logic
@@ -237,6 +254,7 @@ class VnaloApp extends StatelessWidget {
       child: Consumer2<ThemeProvider, LanguageProvider>(
         builder: (_, themeProvider, languageProvider, __) {
           return MaterialApp(
+            navigatorKey: navigatorKey,
             title: 'VNALO',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,

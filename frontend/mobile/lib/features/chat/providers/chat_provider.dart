@@ -59,10 +59,14 @@ class ChatProvider extends ChangeNotifier {
   List<Message> get messages =>
       _activeConversationId == null
           ? []
-          : (_messages[_activeConversationId!] ?? []);
+          : (_messages[_activeConversationId!] ?? [])
+              .where((m) => m.content?.startsWith('[ACTION:') != true)
+              .toList();
 
   List<Message> getMessagesForConversation(String conversationId) =>
-      _messages[conversationId] ?? [];
+      (_messages[conversationId] ?? [])
+          .where((m) => m.content?.startsWith('[ACTION:') != true)
+          .toList();
 
   List<Message> getPinnedMessagesForConversation(String conversationId) =>
       _pinnedMessages[conversationId] ?? [];
@@ -143,10 +147,19 @@ class ChatProvider extends ChangeNotifier {
 
       final combined = [...raw, ...localEmptyGroups];
 
-      _conversations = combined
-          .map(_sanitizeConversation)
-          .whereType<Conversation>()
-          .toList();
+      _conversations = combined.map((remoteConv) {
+        final localConv = _conversations.firstWhere((c) => c.id == remoteConv.id, orElse: () => remoteConv);
+        // Use the remoteConv as base, but merge members from localConv if it exists and is different
+        return _mergeAndSanitize(remoteConv, local: localConv == remoteConv ? null : localConv);
+      })
+      .whereType<Conversation>()
+      // FILTER: Only keep groups where I am currently an active member
+      // This solves the database persistence issue where old groups stay in the server inbox
+      .where((c) {
+        if (c.type == ConversationType.DIRECT) return true;
+        return c.members.any((m) => m.userId == _currentUserId && m.leftAt == null);
+      })
+      .toList();
       await _applyLocalReadStateOverrides();
       _sortConversations();
     } catch (e) {
@@ -169,6 +182,35 @@ class ChatProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('refreshCloudPreview failure: $e');
     }
+  }
+
+  /// Combined helper to merge local optimistic members with remote server data
+  /// and then apply standard sanitization (Dual Owner fix, membership check, etc.)
+  Conversation? _mergeAndSanitize(Conversation remote, {Conversation? local}) {
+    if (local == null) {
+      return _sanitizeConversation(remote);
+    }
+
+    // 1. Merge Members: Protect optimistic updates from being overwritten by stale server data
+    final remoteMembers = remote.members;
+    final mergedMembers = List<ConversationMember>.from(remoteMembers);
+    
+    // Check for members that exist locally but are missing from the server's current view
+    for (final localM in local.members) {
+      final isMissingInRemote = !remoteMembers.any((rm) => rm.userId == localM.userId);
+      // Protection period: 60 seconds
+      final isVeryRecent = localM.joinedAt.isAfter(DateTime.now().subtract(const Duration(seconds: 60)));
+      
+      if (isMissingInRemote && isVeryRecent && localM.leftAt == null) {
+        mergedMembers.add(localM);
+        debugPrint('Sync protection: Preserved optimistic member ${localM.userId} in ${remote.id}');
+      }
+    }
+
+    final mergedConv = remote.copyWith(members: mergedMembers);
+    
+    // 2. Sanitize: Resolve conflicts (like multiple owners) and check active status
+    return _sanitizeConversation(mergedConv);
   }
 
   Conversation? _sanitizeConversation(Conversation conv) {
@@ -689,15 +731,24 @@ class ChatProvider extends ChangeNotifier {
 
   // Delete a message only for current user.
   Future<void> deleteForMe(String messageId, String conversationId) async {
-    await _chatService.deleteForMe(messageId);
+    // Step 1: Surgical Local Update for immediate feedback
     final list = _messages[conversationId];
-    if (list == null) return;
-
-    _messages[conversationId] = list.where((m) => m.id != messageId).toList();
-    if (_currentUserId != null) {
-      _db.deleteMessage(messageId, _currentUserId!);
+    if (list != null) {
+      _messages[conversationId] = list.where((m) => m.id != messageId).toList();
+      notifyListeners();
     }
-    notifyListeners();
+    
+    // Step 2: Background tasks
+    try {
+      await _chatService.deleteForMe(messageId);
+      if (_currentUserId != null) {
+        _db.deleteMessage(messageId, _currentUserId!);
+      }
+    } catch (e) {
+      debugPrint('deleteForMe error: $e');
+      // In a more robust implementation, we could revert if the API fails,
+      // but usually standard sync handles this.
+    }
   }
 
   // Reset in-memory chat state on logout.
@@ -750,6 +801,27 @@ class ChatProvider extends ChangeNotifier {
   }
 
   void _handleIncomingMessage(Message message) {
+    // 1. SIGNAL MESSAGE HANDLING (Real-time Sync for Disband/Remove)
+    // Since backend doesn't emit dedicated socket events, we use hidden "Signal Messages"
+    // that are broadcasted as normal messages but intercepted here.
+    if (message.messageType == MessageType.SYSTEM || message.content?.startsWith('[ACTION:') == true) {
+      final content = message.content ?? '';
+      if (content == '[ACTION:DISBAND]') {
+        debugPrint('SIGNAL: Group ${message.conversationId} disbanded. Removing...');
+        _removeConversationLocally(message.conversationId);
+        return;
+      }
+      if (content.startsWith('[ACTION:REMOVE:')) {
+        // Extract userId: [ACTION:REMOVE:user-uuid-here]
+        final targetUserId = content.replaceFirst('[ACTION:REMOVE:', '').replaceFirst(']', '');
+        if (targetUserId == _currentUserId) {
+          debugPrint('SIGNAL: I was removed from ${message.conversationId}. Removing...');
+          _removeConversationLocally(message.conversationId);
+          return;
+        }
+      }
+    }
+
     final conversationId = message.conversationId;
 
     // Resolve mediaId to URL if it's just an ID
@@ -854,6 +926,16 @@ class ChatProvider extends ChangeNotifier {
     // Persist newly received message to local DB
     _db.saveMessage(_toLocal(resolvedMessage));
 
+    notifyListeners();
+  }
+
+  void _removeConversationLocally(String conversationId) {
+    _conversations.removeWhere((c) => c.id == conversationId);
+    if (_activeConversationId == conversationId) {
+      _activeConversationId = null;
+    }
+    _messages.remove(conversationId);
+    _pinnedMessages.remove(conversationId);
     notifyListeners();
   }
 
@@ -1324,18 +1406,21 @@ class ChatProvider extends ChangeNotifier {
     try {
       final updated = await _chatService.getConversationById(conversationId);
       if (updated != null) {
-        final sanitized = _sanitizeConversation(updated);
         final index = _conversations.indexWhere((c) => c.id == conversationId);
         
-        if (sanitized == null) {
-          // If the user left, remove from local list entirely
-          if (index >= 0) {
+        if (index >= 0) {
+          final localConv = _conversations[index];
+          final sanitized = _mergeAndSanitize(updated, local: localConv);
+          
+          if (sanitized == null) {
             _conversations.removeAt(index);
+          } else {
+            _conversations[index] = sanitized;
           }
         } else {
-          if (index >= 0) {
-            _conversations[index] = sanitized;
-          } else {
+          // If not in local list yet, use standard sanitization
+          final sanitized = _sanitizeConversation(updated);
+          if (sanitized != null) {
             _conversations.insert(0, sanitized);
           }
         }
@@ -1357,6 +1442,21 @@ class ChatProvider extends ChangeNotifier {
     bool? allowMemberPin,
     bool? allowMemberEditInfo,
   }) async {
+    // Step 1: Optimistic UI Update
+    final index = _conversations.indexWhere((c) => c.id == conversationId);
+    if (index >= 0) {
+      _conversations[index] = _conversations[index].copyWith(
+        title: title ?? _conversations[index].title,
+        description: description ?? _conversations[index].description,
+        avatarUrl: avatarUrl ?? _conversations[index].avatarUrl,
+        joinMode: joinMode != null ? enumFromString(JoinMode.values, joinMode) : _conversations[index].joinMode,
+        allowMemberInvite: allowMemberInvite ?? _conversations[index].allowMemberInvite,
+        allowMemberPin: allowMemberPin ?? _conversations[index].allowMemberPin,
+        allowMemberEditInfo: allowMemberEditInfo ?? _conversations[index].allowMemberEditInfo,
+      );
+      notifyListeners();
+    }
+
     try {
       final Map<String, dynamic> body = {};
       if (title != null) body['title'] = title;
@@ -1367,21 +1467,8 @@ class ChatProvider extends ChangeNotifier {
       if (allowMemberPin != null) body['allowMemberPin'] = allowMemberPin;
       if (allowMemberEditInfo != null) body['allowMemberEditInfo'] = allowMemberEditInfo;
 
-      final updated = await _chatService.updateGroup(conversationId, body);
-      
-      final index = _conversations.indexWhere((c) => c.id == conversationId);
-      if (index >= 0) {
-        _conversations[index] = _conversations[index].copyWith(
-          title: updated.title,
-          description: updated.description,
-          avatarUrl: updated.avatarUrl,
-          joinMode: updated.joinMode,
-          allowMemberInvite: updated.allowMemberInvite,
-          allowMemberPin: updated.allowMemberPin,
-          allowMemberEditInfo: updated.allowMemberEditInfo,
-        );
-        notifyListeners();
-      }
+      await _chatService.updateGroup(conversationId, body);
+      // No need to update local state again since we did it optimistically.
     } catch (e) {
       debugPrint('updateGroupInfo error: $e');
       rethrow;
@@ -1409,6 +1496,17 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> updateGroupAvatarFile(String conversationId, File file) async {
+    try {
+      final mediaId = await _mediaService.uploadFile(file, MediaCategory.CHAT_IMAGE);
+      final imageUrl = _mediaService.getPublicUrl(mediaId);
+      await updateGroupInfo(conversationId, avatarUrl: imageUrl);
+    } catch (e) {
+      debugPrint('updateGroupAvatarFile error: $e');
+      rethrow;
+    }
+  }
+
   Future<void> updateWallpaperFile(String conversationId, File file, {bool isGlobal = true}) async {
     try {
       final mediaId = await _mediaService.uploadFile(file, MediaCategory.CHAT_IMAGE);
@@ -1432,59 +1530,112 @@ class ChatProvider extends ChangeNotifier {
   }
 
   Future<void> transferOwnership(String conversationId, String targetUserId) async {
-    try {
-      final myId = _currentUserId;
-      if (myId == null) return;
+    final myId = _currentUserId;
+    if (myId == null) return;
 
-      // Step 1: Promote target to OWNER via API
+    // Step 1: Surgical Local Update for immediate feedback (Optimistic UI)
+    final index = _conversations.indexWhere((c) => c.id == conversationId);
+    if (index >= 0) {
+      final conv = _conversations[index];
+      final updatedMembers = conv.members.map((m) {
+        if (m.userId == targetUserId) {
+          return m.copyWith(role: MemberRole.OWNER);
+        } else if (m.userId == myId) {
+          return m.copyWith(role: MemberRole.MEMBER);
+        }
+        return m;
+      }).toList();
+      
+      _conversations[index] = conv.copyWith(members: updatedMembers);
+      notifyListeners();
+    }
+
+    try {
+      // Step 2: API Update
       await _chatService.updateMemberRole(conversationId, targetUserId, 'OWNER');
       
-      // Step 2: Surgical Local Update for immediate visual feedback
-      final index = _conversations.indexWhere((c) => c.id == conversationId);
-      if (index >= 0) {
-        final conv = _conversations[index];
-        final updatedMembers = conv.members.map((m) {
-          if (m.userId == targetUserId) {
-            return m.copyWith(role: MemberRole.OWNER);
-          } else if (m.userId == myId) {
-            return m.copyWith(role: MemberRole.MEMBER);
-          }
-          return m;
-        }).toList();
-        
-        _conversations[index] = conv.copyWith(members: updatedMembers);
-        notifyListeners();
-      }
-      
-      // Step 3: full refresh for sync (Optional, skip to keep surgical state stable)
-      // await refreshConversation(conversationId);
+      // Step 3: Unified Sync
+      await refreshConversation(conversationId);
     } catch (e) {
       debugPrint('transferOwnership error: $e');
+      // ROLLBACK: Sync back to server truth if API fails
+      await refreshConversation(conversationId);
       rethrow;
     }
   }
 
-  Future<void> addMembersToGroup(String conversationId, List<String> memberIds) async {
-    try {
-      await _chatService.addMembers(conversationId, memberIds);
-      // Wait a bit for backend to process then refresh
-      await refreshConversation(conversationId);
+  Future<void> addMembersToGroup(String conversationId, List<User> newUsers) async {
+    // Step 1: Surgical Local Update for immediate visual feedback (TRUE Optimistic UI)
+    final index = _conversations.indexWhere((c) => c.id == conversationId);
+    if (index >= 0) {
+      final conv = _conversations[index];
+      final currentMembers = List<ConversationMember>.from(conv.members);
+      
+      for (final user in newUsers) {
+        final existingIndex = currentMembers.indexWhere((m) => m.userId == user.id);
+        if (existingIndex >= 0) {
+          // Update existing entry (handle re-invites correctly)
+          currentMembers[existingIndex] = currentMembers[existingIndex].copyWith(
+            leftAt: null,
+            joinedAt: DateTime.now(),
+            role: MemberRole.MEMBER,
+            user: user,
+          );
+        } else {
+          // Add new entry
+          currentMembers.add(ConversationMember(
+            conversationId: conversationId,
+            userId: user.id,
+            joinedAt: DateTime.now(),
+            role: MemberRole.MEMBER,
+            user: user,
+          ));
+        }
+      }
+      
+      _conversations[index] = conv.copyWith(members: currentMembers);
       notifyListeners();
+      debugPrint('addMembersToGroup (Optimistic): Added/Updated ${newUsers.length} members. New total: ${currentMembers.length}');
+    }
+
+    try {
+      final memberIds = newUsers.map((u) => u.id).toList();
+      await _chatService.addMembers(conversationId, memberIds);
+      
+      // Step 2: Synchronization Delay
+      // Allow the backend some time to process the addition before we refresh the state.
+      await Future.delayed(const Duration(seconds: 2));
+      
+      // Step 3: Server Refresh
+      await refreshConversation(conversationId);
+      debugPrint('addMembersToGroup: Successfully synced with server for $conversationId');
     } catch (e) {
-      debugPrint('addMembersToGroup error: $e');
+      debugPrint('addMembersToGroup API error: $e');
+      // ROLLBACK: If the API fails, sync back to server truth immediately.
+      // This will remove the optimistic members that weren't actually added.
+      await refreshConversation(conversationId);
       rethrow;
     }
   }
 
   Future<void> removeMember(String conversationId, String userId) async {
+    // Step 1: Surgical Local Update for immediate feedback
+    final index = _conversations.indexWhere((c) => c.id == conversationId);
+    if (index >= 0) {
+      final members = _conversations[index].members.where((m) => m.userId != userId).toList();
+      _conversations[index] = _conversations[index].copyWith(members: members);
+      notifyListeners();
+    }
+
     try {
+      // NOTIFY: Send signal message so the target user's app knows they were removed in real-time
+      await _socketService.sendMessage(
+        conversationId: conversationId,
+        content: '[ACTION:REMOVE:$userId]',
+        messageType: 'SYSTEM',
+      );
+      
       await _chatService.removeMember(conversationId, userId);
-      final index = _conversations.indexWhere((c) => c.id == conversationId);
-      if (index >= 0) {
-        final members = _conversations[index].members.where((m) => m.userId != userId).toList();
-        _conversations[index] = _conversations[index].copyWith(members: members);
-        notifyListeners();
-      }
     } catch (e) {
       debugPrint('removeMember error: $e');
       rethrow;
@@ -1494,9 +1645,17 @@ class ChatProvider extends ChangeNotifier {
   Future<void> leaveGroup(String conversationId) async {
     final userId = _currentUserId;
     if (userId == null) return;
-    await removeMember(conversationId, userId);
+    
+    // Step 1: Remove conversation immediately from UI
     _conversations.removeWhere((c) => c.id == conversationId);
     notifyListeners();
+
+    try {
+      await removeMember(conversationId, userId);
+    } catch (e) {
+      debugPrint('leaveGroup error: $e');
+      // If error, maybe we should reload inbox, but usually user wants to get out anyway.
+    }
   }
 
   Future<void> disbandGroup(String conversationId) async {
@@ -1505,55 +1664,33 @@ class ChatProvider extends ChangeNotifier {
       throw StateError('Current user is not available');
     }
 
+    // Step 1: Instant UI Cleanup
+    final convToRemove = _conversations.firstWhere((c) => c.id == conversationId, 
+      orElse: () => throw Exception('Conversation not found'));
+    
+    final memberIdsToNotify = convToRemove.members
+        .where((m) => m.leftAt == null)
+        .map((m) => m.userId)
+        .toList();
+
     try {
-      debugPrint('disbandGroup: Getting conversation $conversationId');
-      Conversation? latestConversation = await _chatService.getConversationById(conversationId);
-      if (latestConversation == null) {
-        final localIndex = _conversations.indexWhere((c) => c.id == conversationId);
-        if (localIndex >= 0) {
-          latestConversation = _conversations[localIndex];
-        }
-      }
-      debugPrint('disbandGroup: Conversation found: ${latestConversation != null}');
-      debugPrint('disbandGroup: Members count: ${latestConversation?.members.length ?? 0}');
-
-      // Check if conversation has members
-      if (latestConversation == null || latestConversation.members.isEmpty) {
-        debugPrint('disbandGroup: No members found, skipping disband');
-        _conversations.removeWhere((c) => c.id == conversationId);
-        if (_activeConversationId == conversationId) {
-          _activeConversationId = null;
-        }
-        notifyListeners();
-        return;
-      }
-
-      final memberIds = <String>{
-        currentUserId,
-        ...latestConversation.members
-            .where((member) => member.leftAt == null)
-            .map((member) => member.userId),
-      };
-      debugPrint('disbandGroup: MemberIds to remove: $memberIds');
-
+      // NOTIFY: Send signal message so everyone's app knows the group is disbanded in real-time
+      await _socketService.sendMessage(
+        conversationId: conversationId,
+        content: '[ACTION:DISBAND]',
+        messageType: 'SYSTEM',
+      );
+      
+      _removeConversationLocally(conversationId);
+      
       await _chatService.disbandGroup(
         conversationId: conversationId,
         currentUserId: currentUserId,
-        memberIds: memberIds,
+        memberIds: memberIdsToNotify,
       );
-
-      _messages.remove(conversationId);
-      _pinnedMessages.remove(conversationId);
-      _conversations.removeWhere((c) => c.id == conversationId);
-      if (_activeConversationId == conversationId) {
-        _activeConversationId = null;
-      }
-      notifyListeners();
-      debugPrint('disbandGroup: Successfully disbanded');
+      debugPrint('disbandGroup: Successfully signaled and started disband cleanup');
     } catch (e) {
       debugPrint('disbandGroup error: $e');
-      debugPrint('disbandGroup error stack: ${StackTrace.current}');
-      rethrow;
     }
   }
 
@@ -1594,18 +1731,40 @@ class ChatProvider extends ChangeNotifier {
   }
 
   Future<void> updateMemberRole(String conversationId, String userId, String role) async {
-    try {
-      await _chatService.updateMemberRole(conversationId, userId, role);
-      final updated = await _chatService.getConversationById(conversationId);
-      if (updated != null) {
-        final index = _conversations.indexWhere((c) => c.id == conversationId);
-        if (index >= 0) {
-          _conversations[index] = updated;
-          notifyListeners();
+    final memberRole = enumFromString(MemberRole.values, role);
+    final myId = _currentUserId;
+
+    // Step 1: Surgical Local Update for immediate feedback (Optimistic UI)
+    final index = _conversations.indexWhere((c) => c.id == conversationId);
+    if (index >= 0) {
+      final conv = _conversations[index];
+      
+      final updatedMembers = conv.members.map((m) {
+        if (m.userId == userId) {
+          return m.copyWith(role: memberRole);
         }
-      }
+        // Enforce exactly 1 owner if someone is being promoted to OWNER
+        if (memberRole == MemberRole.OWNER && m.role == MemberRole.OWNER) {
+          return m.copyWith(role: MemberRole.MEMBER);
+        }
+        return m;
+      }).toList();
+      
+      _conversations[index] = conv.copyWith(members: updatedMembers);
+      notifyListeners();
+      debugPrint('updateMemberRole (Optimistic): Updated user $userId to $role');
+    }
+
+    try {
+      // Step 2: API Update
+      await _chatService.updateMemberRole(conversationId, userId, role);
+      
+      // Step 3: Unified Sync
+      await refreshConversation(conversationId);
     } catch (e) {
       debugPrint('updateMemberRole error: $e');
+      // ROLLBACK: Sync back to server truth if API fails (e.g., 404 Member Not Found)
+      await refreshConversation(conversationId);
       rethrow;
     }
   }

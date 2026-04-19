@@ -23,8 +23,10 @@ enum MessageType {
 enum MessageStatus { SENDING, SENT, DELIVERED, READ, FAILED, RECALLED }
 
 T enumFromString<T>(List<T> values, String value) {
-  return values.firstWhere(
-    (e) => e.toString().split('.').last == value,
-    orElse: () => values.first,
-  );
+  for (final v in values) {
+    if (v.toString().split('.').last == value) {
+      return v;
+    }
+  }
+  return values.first;
 }

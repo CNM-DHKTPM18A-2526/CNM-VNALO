@@ -210,7 +210,24 @@ class WebRtcCallService extends ChangeNotifier {
 
   Future<void> _openLocalMedia() async {
     final mediaConstraints = {
-      'audio': true,
+      'audio': {
+        'echoCancellation': true,
+        'noiseSuppression': true,
+        'autoGainControl': true,
+        // WebRTC specific (Chromium/Android) flags to force hardware AEC/NS
+        'mandatory': {
+          'googEchoCancellation': true,
+          'googEchoCancellation2': true,
+          'googNoiseSuppression': true,
+          'googNoiseSuppression2': true,
+          'googHighpassFilter': true,
+          'googTypingNoiseDetection': true,
+          'googAudioMirroring': false,
+          'googAutoGainControl': true,
+          'googAutoGainControl2': true,
+        },
+        'optional': [],
+      },
       'video':
           audioOnly
               ? false
@@ -240,6 +257,8 @@ class WebRtcCallService extends ChangeNotifier {
       _isAccepted = true;
       notifyListeners();
 
+      // Ensure the correct audio mode is set for communication before opening media
+      await Helper.setSpeakerphoneOn(_isSpeakerOn);
       await _openLocalMedia();
       
       if (_hasRemoteDescription) {
