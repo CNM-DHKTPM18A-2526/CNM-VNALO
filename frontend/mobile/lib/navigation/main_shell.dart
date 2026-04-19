@@ -12,7 +12,7 @@ import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provid
 import 'package:vnalo_mobile/features/chat/screens/chat_detail_screen.dart';
 import 'package:vnalo_mobile/features/call/screens/voice_call_screen.dart';
 import 'package:vnalo_mobile/features/call/screens/video_call_screen.dart';
-import 'package:vnalo_mobile/features/call/utils/call_utils.dart';
+import 'package:vnalo_mobile/features/call/utils/call_id_generator.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
 import 'dart:async';
 
@@ -44,9 +44,11 @@ class _MainShellState extends State<MainShell> {
 
   String _normalizeAiSystemAction(String command) {
     switch (command.trim().toUpperCase()) {
-      case 'START_CALL':
+      case 'MỞ SETTINGS':
+      case 'CÀI ĐẶT':
+        return 'NAVIGATE_TO_SETTINGS';
+      case 'MỞ CHAT':
         return 'NAVIGATE_TO_CHAT';
-      // Future mappings can go here
       default:
         return command.trim().toUpperCase();
     }
@@ -93,26 +95,45 @@ class _MainShellState extends State<MainShell> {
           return;
         }
 
+        final currentUserId = chatProvider.currentUserId ?? '';
+        final isDirect = conversation.type.name == 'DIRECT';
+        final peerMember = isDirect
+            ? conversation.members.where((m) => m.userId != currentUserId).firstOrNull
+            : null;
+        final peerUserId = peerMember?.userId ?? '';
+        final peerName = conversation.getDisplayName(currentUserId);
+
+        final prefilledText = command == 'SEND_MESSAGE' ? (params?['content'] as String?) : null;
+
         if (command == 'OPEN_CHAT' || command == 'SEND_MESSAGE') {
           Navigator.of(context).push(MaterialPageRoute(
             builder: (_) => ChatDetailScreen(
               conversation: conversation,
-              prefilledText: command == 'SEND_MESSAGE' ? params?['content'] : null,
+              prefilledText: prefilledText,
             ),
           ));
         } else if (command == 'START_CALL') {
           final isVideo = params?['callType'] == 'video';
+          final callId = generateCallId(
+            conversationId: conversation.id,
+            callerUserId: currentUserId,
+            audioOnly: !isVideo,
+          );
           Navigator.of(context).push(MaterialPageRoute(
             builder: (_) => isVideo
               ? VideoCallScreen(
                   conversationId: conversation.id,
-                  callId: generateCallId(conversationId: conversation.id, callerId: chatProvider.currentUserId!),
-                  peerId: conversation.isDirect ? (conversation.members.firstWhere((m) => m.userId != chatProvider.currentUserId).userId) : '',
-                  peerName: conversation.displayName,
+                  callId: callId,
+                  targetUserId: peerUserId,
+                  targetDisplayName: peerName,
+                  isCaller: true,
                 )
               : VoiceCallScreen(
                   conversationId: conversation.id,
-                  callId: generateCallId(conversationId: conversation.id, callerId: chatProvider.currentUserId!),
+                  callId: callId,
+                  targetUserId: peerUserId,
+                  targetDisplayName: peerName,
+                  isCaller: true,
                 ),
           ));
         }

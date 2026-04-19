@@ -13,7 +13,7 @@ class AiFloatingBubble extends StatefulWidget {
   State<AiFloatingBubble> createState() => _AiFloatingBubbleState();
 }
 
-class _AiFloatingBubbleState extends State<AiFloatingBubble> with SingleTickerProviderStateMixin {
+class _AiFloatingBubbleState extends State<AiFloatingBubble> with TickerProviderStateMixin {
   Offset _position = const Offset(20, 100);
   final O3DController _o3dController = O3DController();
 
@@ -331,23 +331,26 @@ class _AnimationListenerState extends State<_AnimationListener> {
   }
 
   void _applyAnimation() {
+    String? animName;
     if (widget.state == AiState.speaking) {
-       widget.controller.play(animationName: 'Talking');
+      animName = 'Talking';
     } else if (widget.state == AiState.thinking) {
-       widget.controller.play(animationName: 'Walking'); // "Pacing" while thinking
+      animName = 'Walking'; // "Pacing" while thinking
     } else {
-      // Handle Emotions
       switch (widget.emotion) {
         case 'joyful':
-          widget.controller.play(animationName: 'Dance');
+          animName = 'Dance';
           break;
         case 'angry':
-          widget.controller.play(animationName: 'Angry');
+          animName = 'Angry';
           break;
         default:
-          widget.controller.play(animationName: 'Idle');
+          animName = null; // Let autoPlay handle idle
       }
     }
+
+    widget.controller.animationName = animName;
+    widget.controller.play();
   }
 
   @override

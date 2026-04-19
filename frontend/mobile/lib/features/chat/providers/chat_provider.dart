@@ -1496,31 +1496,33 @@ class ChatProvider extends ChangeNotifier {
     } catch (e) {
       return [];
     }
+  }
+
   /// Find a conversation by name (Friend name or Group title) for AI resolution
   Conversation? findConversationByName(String name) {
     if (name.isEmpty) return null;
     final search = name.toLowerCase().trim();
-    
-    // 1. Exact match (case insensitive)
-    try {
-      return _conversations.firstWhere(
-        (c) {
-          final title = (c.isDirect ? c.displayName : c.title)?.toLowerCase() ?? '';
-          return title == search;
-        },
-      );
-    } catch (_) {
-      // 2. Fuzzy match (contains)
-      try {
-        return _conversations.firstWhere(
-          (c) {
-            final title = (c.isDirect ? c.displayName : c.title)?.toLowerCase() ?? '';
-            return title.contains(search);
-          },
-        );
-      } catch (_) {
-        return null;
+
+    String _getLabel(Conversation c) {
+      if (c.type == ConversationType.GROUP) {
+        return (c.title ?? '').toLowerCase();
       }
+      // For direct: use the peer member's nickname/displayName or fallback to title
+      if (_currentUserId == null) return (c.title ?? '').toLowerCase();
+      final peer = c.members.where((m) => m.userId != _currentUserId).firstOrNull;
+      return (peer?.nickname ?? peer?.user?.displayName ?? c.title ?? '').toLowerCase();
     }
+
+    // 1. Exact match
+    try {
+      return _conversations.firstWhere((c) => _getLabel(c) == search);
+    } catch (_) {}
+
+    // 2. Contains match
+    try {
+      return _conversations.firstWhere((c) => _getLabel(c).contains(search));
+    } catch (_) {}
+
+    return null;
   }
 }

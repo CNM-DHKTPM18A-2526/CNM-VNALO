@@ -23,7 +23,7 @@ class AiAssistantProvider with ChangeNotifier {
   bool _enableDeepSummary = false; // VIP only feature (Currently disabled by default)
 
   final List<Map<String, String>> _sessionHistory = [];
-  final _systemActionController = StreamController<String>.broadcast();
+  final _systemActionController = StreamController<AiCommand>.broadcast();
 
   AiAssistantProvider(this._aiService) {
     _initTts();
@@ -36,7 +36,7 @@ class AiAssistantProvider with ChangeNotifier {
   String get aiResponse => _aiResponse;
   String get currentEmotion => _currentEmotion;
   bool get isMascotVisible => _isMascotVisible;
-  Stream<String> get systemActionStream => _systemActionController.stream;
+  Stream<AiCommand> get systemActionStream => _systemActionController.stream;
 
   Future<void> _loadMascot() async {
     final prefs = await SharedPreferences.getInstance();
