@@ -1,0 +1,32 @@
+import type { ConversationSummary } from '../../features/chat/chat.types'
+
+/**
+ * Resolves avatar URLs for a group collage.
+ * @param conversation The conversation summary
+ * @param userMap A map of user profiles from the store
+ * @returns An array of up to 3 avatar URLs and the count of remaining members
+ */
+export function getGroupCollageData(
+  conversation: ConversationSummary,
+  userMap: Record<string, { avatarUrl: string | null; displayName?: string }>
+): { avatars: (string | null)[]; extraCount: number } {
+  if (!conversation.participantUserIds || conversation.participantUserIds.length === 0) {
+    return { avatars: [], extraCount: 0 }
+  }
+
+  // Filter out users without avatars if possible, or just take first 3
+  // Zalo usually shows the first few participants
+  const participantIds = conversation.participantUserIds;
+  
+  const avatars = participantIds
+    .map(id => userMap[id]?.avatarUrl)
+    .filter((url): url is string => !!url) // We only want valid image URLs for the collage
+    .slice(0, 3);
+
+  const extraCount = Math.max(0, participantIds.length - 3);
+
+  return { 
+    avatars, 
+    extraCount 
+  };
+}
