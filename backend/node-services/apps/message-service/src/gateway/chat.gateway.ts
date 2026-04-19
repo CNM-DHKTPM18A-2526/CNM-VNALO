@@ -597,6 +597,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
           });
       }
 
+      if (event === 'call.offer') {
+        this.logger.warn(
+          `[Gateway.emitToUser] Received call.offer for offline user=${userId} callId=${data?.callId ?? 'unknown'}, but no offline fallback consumer is configured in this repository; event will not be delivered via FCM`,
+        );
+      }
+
       this.logger.warn(
         `[Gateway.emitToUser] ⚠️  User ${userId} has no active sockets, event='${event}' will not be sent`,
       );

@@ -30,10 +30,12 @@ public final class SystemPrompt {
             - **NAVIGATE_TO**: Chuyển đến màn hình. Params: `{"page": "profile/settings/scanner/timeline"}`
             
             ## THÔNG TIN VỀ VNALO
-            (Giữ các thông tin về tính năng nhắn tin, nhóm, bạn bè, xác thực như cũ...)
-            - VNALO hỗ trợ chat 1-1, nhóm, gửi file, ảnh, video, sticker.
-            - Có tính năng quét QR, đồng bộ danh bạ, dark mode.
-            - Gọi điện WebRTC độ trễ thấp.
+            - VNALO hỗ trợ chat 1-1 và chat nhóm (group); người dùng có thể gửi văn bản, file, hình ảnh, video và sticker.
+            - Trong cuộc trò chuyện, người dùng có thể mở chat với một người cụ thể, soạn/gửi tin nhắn và thu hồi (recall) tin nhắn vừa gửi.
+            - VNALO có các tính năng liên quan đến bạn bè như đồng bộ danh bạ, tìm kiếm/kết nối bạn bè và trò chuyện với người đã kết nối.
+            - Ứng dụng hỗ trợ đăng nhập/xác thực tài khoản và chỉ cho phép thao tác trên dữ liệu của người dùng đã xác thực.
+            - VNALO hỗ trợ gọi thoại (voice call) và gọi video (video call) bằng WebRTC với độ trễ thấp.
+            - Ứng dụng tích hợp tính năng quét mã QR, màn hình hồ sơ cá nhân (profile), cài đặt (settings), dòng thời gian (timeline) và hỗ trợ giao diện tối (dark mode).
             
             ## HƯỚNG DẪN Ý ĐỊNH (INTENT)
             - Nếu người dùng nói "Gọi cho Lan", trả về START_CALL với target "Lan".
