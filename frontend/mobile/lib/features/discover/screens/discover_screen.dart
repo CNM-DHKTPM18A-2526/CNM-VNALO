@@ -11,9 +11,9 @@ class DiscoverScreen extends StatelessWidget {
   const DiscoverScreen({super.key});
 
   void _openQrScanner(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const QrScannerScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const QrScannerScreen()));
   }
 
   @override
@@ -27,22 +27,24 @@ class DiscoverScreen extends StatelessWidget {
         backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
         elevation: 0,
         forceMaterialTransparency: !isDarkMode,
-        flexibleSpace: isDarkMode
-            ? null
-            : Container(
-                decoration: const BoxDecoration(
-                  gradient: AppColors.appBarGradient,
+        flexibleSpace:
+            isDarkMode
+                ? null
+                : Container(
+                  decoration: const BoxDecoration(
+                    gradient: AppColors.appBarGradient,
+                  ),
                 ),
-              ),
         title: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => const UnifiedSearchScreen(
-                  initialTab: SearchInitialTab.discover,
-                  searchTag: 'search_bar_discover',
-                ),
+                builder:
+                    (_) => const UnifiedSearchScreen(
+                      initialTab: SearchInitialTab.discover,
+                      searchTag: 'search_bar_discover',
+                    ),
               ),
             );
           },
@@ -74,11 +76,7 @@ class DiscoverScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: ListView(
-        children: [
-          _buildServicesSection(context, isDarkMode),
-        ],
-      ),
+      body: ListView(children: [_buildServicesSection(context, isDarkMode)]),
     );
   }
 
@@ -92,7 +90,11 @@ class DiscoverScreen extends StatelessWidget {
         subtitle: 'Hỏi đáp, dịch thuật & tóm tắt thông minh',
         onTap: () {
           final aiProvider = context.read<AiAssistantProvider>();
-          aiProvider.summonMascot();
+          aiProvider.summonMascot(
+            startListening: true,
+            persist: false,
+            source: 'discover_entry',
+          );
         },
       ),
       MenuItem(
@@ -182,21 +184,52 @@ class _DiscoverItem extends StatelessWidget {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: isPremium ? null : (isDarkMode ? DarkColors.primary : AppColors.primary).withValues(alpha: 0.1),
-          gradient: isPremium
-              ? const LinearGradient(
-                  colors: [Color(0xFF8A2387), Color(0xFFE94057), Color(0xFFF27121)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : null,
+          color:
+              isPremium
+                  ? null
+                  : (isDarkMode ? DarkColors.primary : AppColors.primary)
+                      .withValues(alpha: 0.1),
+          gradient:
+              isPremium
+                  ? const LinearGradient(
+                    colors: [
+                      Color(0xFF8A2387),
+                      Color(0xFFE94057),
+                      Color(0xFFF27121),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                  : null,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(icon, color: isPremium ? Colors.white : (isDarkMode ? DarkColors.primary : AppColors.primary)),
+        child: Icon(
+          icon,
+          color:
+              isPremium
+                  ? Colors.white
+                  : (isDarkMode ? DarkColors.primary : AppColors.primary),
+        ),
       ),
-      title: Text(title, style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16, color: isPremium && isDarkMode ? Colors.orange.shade300 : null)),
-      subtitle: Text(subtitle, style: isPremium && isDarkMode ? TextStyle(color: Colors.orange.shade100.withOpacity(0.7)) : null),
-      trailing: Icon(Icons.chevron_right, color: isDarkMode ? DarkColors.textHint : Colors.grey.shade300),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontWeight: FontWeight.w500,
+          fontSize: 16,
+          color: isPremium && isDarkMode ? Colors.orange.shade300 : null,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style:
+            isPremium && isDarkMode
+                ? TextStyle(color: Colors.orange.shade100.withOpacity(0.7))
+                : null,
+      ),
+      trailing: Icon(
+        Icons.chevron_right,
+        color: isDarkMode ? DarkColors.textHint : Colors.grey.shade300,
+      ),
       onTap: onTap,
     );
   }

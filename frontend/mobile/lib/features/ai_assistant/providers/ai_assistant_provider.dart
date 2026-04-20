@@ -1,44 +1,56 @@
-import 'package:flutter/material.dart';
-import 'package:vnalo_mobile/services/ai_service.dart';
-import 'package:flutter_tts/flutter_tts.dart';
-import 'package:speech_to_text/speech_to_text.dart';
-import 'package:vnalo_mobile/features/ai_assistant/models/mascot_metadata.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:vnalo_mobile/models/message_model.dart';
 import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:speech_to_text/speech_to_text.dart';
+import 'package:uuid/uuid.dart';
+import 'package:vnalo_mobile/features/ai_assistant/models/mascot_metadata.dart';
+import 'package:vnalo_mobile/models/message_model.dart';
+import 'package:vnalo_mobile/services/ai_service.dart';
 
 enum AiState { idle, listening, thinking, speaking }
 
 class AiAssistantProvider with ChangeNotifier {
+  static const String _visibilityPrefKey = 'vnalo_ai_is_visible';
+  static const String _mascotPrefKey = 'vnalo_ai_mascot_id';
+  static const String _defaultLocaleId = 'vi_VN';
+  static const Duration _aiTimeout = Duration(seconds: 25);
+
   final AiService _aiService;
   final FlutterTts _tts = FlutterTts();
   final SpeechToText _stt = SpeechToText();
+  final Uuid _uuid = const Uuid();
 
   AiState _state = AiState.idle;
   String _lastWords = '';
   String _aiResponse = '';
-  String _currentEmotion = 'thinking';
-  bool _isMascotVisible = false;
+  String _currentEmotion = 'neutral';
+
+  bool _persistentEnabled = false;
+  bool _provisionallyVisible = false;
+  bool _isSessionActive = false;
+
   MascotMetadata _currentMascot = MascotMetadata.defaultMascots.first;
-  bool _enableDeepSummary = false; // VIP only feature (Currently disabled by default)
+  bool _enableDeepSummary = false;
 
   final List<Map<String, String>> _sessionHistory = [];
-  final _systemActionController = StreamController<AiCommand>.broadcast();
+  final StreamController<AiCommand> _systemActionController =
+      StreamController<AiCommand>.broadcast();
+
+  bool _isSttInitialized = false;
+  bool _isPipelineLocked = false;
+  int _operationToken = 0;
+  String _activeTraceId = '';
+
+  DateTime? _lastFinalResultAt;
+  String _lastFinalResultText = '';
 
   AiAssistantProvider(this._aiService) {
+    _activeTraceId = _uuid.v4();
     _initTts();
-    _initPersistence();
-  }
-
-  Future<void> _initPersistence() async {
-    await _loadMascot();
-    await _loadVisibility();
-  }
-
-  Future<void> _loadVisibility() async {
-    final prefs = await SharedPreferences.getInstance();
-    _isMascotVisible = prefs.getBool('vnalo_ai_is_visible') ?? false;
-    notifyListeners();
+    unawaited(_initPersistence());
   }
 
   MascotMetadata get currentMascot => _currentMascot;
@@ -46,255 +58,747 @@ class AiAssistantProvider with ChangeNotifier {
   String get lastWords => _lastWords;
   String get aiResponse => _aiResponse;
   String get currentEmotion => _currentEmotion;
-  bool get isMascotVisible => _isMascotVisible;
+
+  bool get persistentEnabled => _persistentEnabled;
+  bool get provisionallyVisible => _provisionallyVisible;
+  bool get isSessionActive => _isSessionActive;
+  bool get isBusy => _state != AiState.idle || _isPipelineLocked;
+  bool get isMascotVisible =>
+      _persistentEnabled || _provisionallyVisible || _isSessionActive;
+
   Stream<AiCommand> get systemActionStream => _systemActionController.stream;
 
-  Future<void> _loadMascot() async {
+  Future<void> _initPersistence() async {
     final prefs = await SharedPreferences.getInstance();
-    final mascotId = prefs.getString('vnalo_ai_mascot_id');
-    if (mascotId != null) {
-      final found = MascotMetadata.defaultMascots.firstWhere(
-        (m) => m.id == mascotId,
-        orElse: () => MascotMetadata.defaultMascots.first,
-      );
-      _currentMascot = found;
-      notifyListeners();
+    await _loadMascot(prefs: prefs);
+    _persistentEnabled = prefs.getBool(_visibilityPrefKey) ?? false;
+
+    _logEvent(
+      'PERSISTENCE_LOADED',
+      data: {
+        'persistentEnabled': _persistentEnabled,
+        'mascotId': _currentMascot.id,
+      },
+    );
+    notifyListeners();
+  }
+
+  Future<void> _loadMascot({SharedPreferences? prefs}) async {
+    final store = prefs ?? await SharedPreferences.getInstance();
+    final mascotId = store.getString(_mascotPrefKey);
+    if (mascotId == null) {
+      return;
     }
+
+    final found = MascotMetadata.defaultMascots.firstWhere(
+      (m) => m.id == mascotId,
+      orElse: () => MascotMetadata.defaultMascots.first,
+    );
+    _currentMascot = found;
   }
 
   Future<void> setMascot(MascotMetadata mascot) async {
     _currentMascot = mascot;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('vnalo_ai_mascot_id', mascot.id);
+    await prefs.setString(_mascotPrefKey, mascot.id);
+
+    _logEvent(
+      'MASCOT_SET',
+      data: {'mascotId': mascot.id, 'renderMode': mascot.renderMode.name},
+    );
     notifyListeners();
   }
 
   void _initTts() {
-    _tts.setLanguage("vi-VN");
-    _tts.setPitch(1.0);
-    _tts.setSpeechRate(0.5);
+    unawaited(_tts.awaitSpeakCompletion(true));
+    unawaited(_tts.setLanguage('vi-VN'));
+    unawaited(_tts.setPitch(1.0));
+    unawaited(_tts.setSpeechRate(0.5));
+
+    _tts.setStartHandler(() {
+      _logEvent('TTS_START');
+    });
+    _tts.setCompletionHandler(() {
+      _logEvent('TTS_COMPLETE');
+    });
+    _tts.setCancelHandler(() {
+      _logEvent('TTS_CANCEL', level: 'WARN');
+    });
+    _tts.setErrorHandler((message) {
+      _logEvent('TTS_ERROR', level: 'ERROR', data: {'message': message});
+      if (_state == AiState.speaking) {
+        _transitionTo(AiState.idle, reason: 'tts_error');
+        _isSessionActive = false;
+        _syncVisibilityAfterSession();
+      }
+    });
   }
 
   @override
   void dispose() {
+    unawaited(_stt.stop());
+    unawaited(_tts.stop());
     _systemActionController.close();
     super.dispose();
   }
 
-  void toggleMascot() async {
-    _isMascotVisible = !_isMascotVisible;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('vnalo_ai_is_visible', _isMascotVisible);
-    notifyListeners();
+  Future<void> toggleMascot() async {
+    await setPersistentEnabled(!_persistentEnabled, reason: 'toggle');
   }
 
-  void hideMascot() async {
-    _isMascotVisible = false;
-    stopListening();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('vnalo_ai_is_visible', false);
-    notifyListeners();
-  }
-
-  Future<void> summonMascot() async {
-    _isMascotVisible = true;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('vnalo_ai_is_visible', true);
-    notifyListeners();
-    // Start listening directly to create a seamless assistant feel
-    await Future.delayed(const Duration(milliseconds: 300));
-    if (_state == AiState.idle) {
-      await startListening();
+  Future<void> setPersistentEnabled(
+    bool enabled, {
+    String reason = 'user_intent',
+  }) async {
+    _persistentEnabled = enabled;
+    if (!enabled && !_isSessionActive && _aiResponse.isEmpty) {
+      _provisionallyVisible = false;
     }
-  }
 
-  Future<void> startListening() async {
-    bool available = await _stt.initialize(
-      onStatus: (status) => debugPrint('STT Status: $status'),
-      onError: (error) => debugPrint('STT Error: $error'),
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_visibilityPrefKey, enabled);
+
+    _logEvent(
+      'VISIBILITY_PERSISTENT_SET',
+      data: {'enabled': enabled, 'reason': reason},
     );
+    notifyListeners();
+  }
 
-    if (available) {
-      _state = AiState.listening;
-      _lastWords = '';
-      notifyListeners();
+  Future<void> hideMascot({String reason = 'user_hide'}) async {
+    _cancelActiveOperation(reason: reason);
+    await _stopAllInteractions(reason: reason, keepResponse: false);
 
-      await _stt.listen(
-        onResult: (result) {
-          _lastWords = result.recognizedWords;
-          if (result.finalResult && _lastWords.isNotEmpty) {
-            _handleCommand(_lastWords);
-          }
-          notifyListeners();
-        },
-        localeId: "vi_VN",
-      );
+    _persistentEnabled = false;
+    _provisionallyVisible = false;
+    _aiResponse = '';
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_visibilityPrefKey, false);
+
+    _logEvent('MASCOT_HIDE', data: {'reason': reason});
+    notifyListeners();
+  }
+
+  Future<void> summonMascot({
+    bool startListening = true,
+    bool persist = false,
+    String source = 'discover',
+  }) async {
+    if (persist) {
+      await setPersistentEnabled(true, reason: '$source.persist');
+    } else {
+      _setProvisionallyVisible(true, reason: '$source.contextual_summon');
+    }
+
+    if (startListening) {
+      await Future.delayed(const Duration(milliseconds: 120));
+      await onPrimaryAction(source: '$source.auto_listen');
     }
   }
 
-  Future<void> stopListening() async {
+  Future<void> onPrimaryAction({String source = 'bubble'}) async {
+    if (_state == AiState.listening) {
+      await stopListening(reason: '$source.toggle_stop');
+      return;
+    }
+
+    if (_state == AiState.thinking || _state == AiState.speaking) {
+      await stopCurrentPipeline(reason: '$source.interrupt');
+      return;
+    }
+
+    await startListening(source: source);
+  }
+
+  Future<void> startListening({String source = 'bubble'}) async {
+    if (_state == AiState.listening) {
+      _logEvent(
+        'STT_START_SKIPPED',
+        data: {'reason': 'already_listening', 'source': source},
+      );
+      return;
+    }
+
+    if (_isPipelineLocked) {
+      _logEvent(
+        'STT_START_SKIPPED',
+        level: 'WARN',
+        data: {'reason': 'pipeline_locked', 'source': source},
+      );
+      return;
+    }
+
+    final traceId = _newTraceId('stt');
+    final token = _beginOperation(traceId: traceId);
+
+    _setProvisionallyVisible(true, reason: 'stt_start:$source');
+    await _tts.stop();
+
+    final available = await _ensureSttInitialized();
+    if (!_isCurrentOperation(token)) {
+      return;
+    }
+
+    if (!available) {
+      _aiResponse = 'Thiết bị chưa sẵn sàng micro để nghe lệnh.';
+      _transitionTo(AiState.idle, reason: 'stt_unavailable', traceId: traceId);
+      _syncVisibilityAfterSession();
+      notifyListeners();
+      return;
+    }
+
+    _isSessionActive = true;
+    _lastWords = '';
+    _transitionTo(
+      AiState.listening,
+      reason: 'start_listening',
+      traceId: traceId,
+      notify: false,
+    );
+    notifyListeners();
+
+    await _stt.listen(
+      onResult: (result) {
+        if (!_isCurrentOperation(token)) {
+          return;
+        }
+
+        _lastWords = result.recognizedWords.trim();
+        notifyListeners();
+
+        if (result.finalResult &&
+            _lastWords.isNotEmpty &&
+            !_isDuplicateFinalResult(_lastWords)) {
+          unawaited(_handleCommand(_lastWords, parentTraceId: traceId));
+        }
+      },
+      localeId: _defaultLocaleId,
+    );
+  }
+
+  Future<void> stopListening({String reason = 'manual'}) async {
     await _stt.stop();
-    _state = AiState.idle;
+    _isSessionActive = false;
+    _transitionTo(AiState.idle, reason: reason);
+    _syncVisibilityAfterSession();
     notifyListeners();
   }
 
-  Future<void> _handleCommand(String text) async {
-    if (text.isEmpty) return;
+  Future<void> stopCurrentPipeline({String reason = 'manual'}) async {
+    _cancelActiveOperation(reason: reason);
+    await _stopAllInteractions(reason: reason, keepResponse: true);
+  }
 
-    _state = AiState.thinking;
-    notifyListeners();
+  Future<void> _handleCommand(String text, {String? parentTraceId}) async {
+    final normalized = text.trim();
+    if (normalized.isEmpty) {
+      return;
+    }
+
+    if (_isPipelineLocked) {
+      _logEvent(
+        'PIPELINE_DROP',
+        level: 'WARN',
+        data: {'reason': 'pipeline_locked', 'text': normalized},
+      );
+      return;
+    }
+
+    _isPipelineLocked = true;
+    final traceId = parentTraceId ?? _newTraceId('voice_command');
+    final token = _beginOperation(traceId: traceId);
+
+    _isSessionActive = true;
+    _transitionTo(
+      AiState.thinking,
+      reason: 'command_received',
+      traceId: traceId,
+    );
+    await _stt.stop();
 
     try {
-      // Build context-aware prompt using session history
-      String contextPrompt = '';
-      if (_sessionHistory.isNotEmpty) {
-        contextPrompt += "Lịch sử trò chuyện gần đây:\n";
-        for (var msg in _sessionHistory) {
-          contextPrompt += "${msg['role']}: ${msg['text']}\n";
-        }
-        contextPrompt += "---\n";
-      }
-      contextPrompt += text;
+      final contextPrompt = _buildContextPrompt(normalized);
+      final response = await _aiService
+          .chat(
+            contextPrompt,
+            analyzeIntent: true,
+            enableDeepSummary: _enableDeepSummary,
+          )
+          .timeout(_aiTimeout);
 
-      final response = await _aiService.chat(
-        contextPrompt, 
-        analyzeIntent: true,
-        enableDeepSummary: _enableDeepSummary,
-      );
-      
-      _aiResponse = response['textReply'] ?? '';
-      _currentEmotion = response['emotion'] ?? 'joyful';
-      final actionCommand = response['actionCommand'];
+      if (!_isCurrentOperation(token)) {
+        return;
+      }
+
+      _aiResponse = (response['textReply'] ?? '').toString().trim();
+      _currentEmotion = (response['emotion'] ?? 'neutral').toString();
+      final actionCommand = response['actionCommand']?.toString();
       final actionParams = response['actionParams'];
 
-      // Save to history to maintain context
-      _sessionHistory.add({'role': 'User', 'text': text});
-      _sessionHistory.add({'role': 'AI', 'text': _aiResponse});
-      if (_sessionHistory.length > 10) {
-        _sessionHistory.removeRange(0, _sessionHistory.length - 10);
-      }
+      _recordHistory(userText: normalized, aiText: _aiResponse);
 
-      if (actionCommand != null) {
-        _executeSystemAction(actionCommand, actionParams);
+      if (actionCommand != null && actionCommand.isNotEmpty) {
+        _executeSystemAction(actionCommand, actionParams, traceId: traceId);
       }
 
       if (_aiResponse.isNotEmpty) {
-        _state = AiState.speaking;
+        _transitionTo(
+          AiState.speaking,
+          reason: 'speak_response',
+          traceId: traceId,
+        );
         notifyListeners();
-        await _tts.speak(_aiResponse);
+        await _safeSpeak(_aiResponse, token: token, traceId: traceId);
       }
-
-      _state = AiState.idle;
-      _currentEmotion = 'thinking'; // Reset for next turn
-    } catch (e) {
-      debugPrint('AI Error: $e');
-      _aiResponse = 'Xin lỗi, tôi đang gặp chút trục trặc mạng.';
-      _currentEmotion = 'thinking';
-      _state = AiState.speaking;
-      notifyListeners();
-      await _tts.speak(_aiResponse);
-      _state = AiState.idle;
+    } on TimeoutException {
+      if (_isCurrentOperation(token)) {
+        await _handleFailure(
+          token: token,
+          traceId: traceId,
+          event: 'AI_TIMEOUT',
+          fallbackMessage: 'AI đang phản hồi chậm, vui lòng thử lại sau.',
+        );
+      }
+    } catch (error) {
+      if (_isCurrentOperation(token)) {
+        await _handleFailure(
+          token: token,
+          traceId: traceId,
+          event: 'AI_ERROR',
+          fallbackMessage: 'Xin lỗi, tôi đang gặp chút trục trặc mạng.',
+          error: error,
+        );
+      }
     } finally {
-      _state = AiState.idle;
-      notifyListeners();
+      if (_isCurrentOperation(token)) {
+        _isPipelineLocked = false;
+        _isSessionActive = false;
+        _currentEmotion = 'neutral';
+        _transitionTo(
+          AiState.idle,
+          reason: 'pipeline_complete',
+          traceId: traceId,
+          notify: false,
+        );
+        _syncVisibilityAfterSession();
+        notifyListeners();
+      }
     }
   }
 
   Future<void> analyzeMessageContext(Message message) async {
-    if (message.content == null || message.content!.isEmpty) return;
-
-    _state = AiState.thinking;
-    _isMascotVisible = true;
-    notifyListeners();
-
-    try {
-      final prompt = "Hãy giải thích hoặc tóm tắt ngắn gọn tin nhắn này cho tôi: \"${message.content}\"";
-      final response = await _aiService.chat(prompt, analyzeIntent: false);
-      
-      _aiResponse = response['textReply'] ?? '';
-
-      if (_aiResponse.isNotEmpty) {
-        _state = AiState.speaking;
-        notifyListeners();
-        await _tts.speak(_aiResponse);
-      }
-
-      _state = AiState.idle;
-    } catch (e) {
-      debugPrint('AI Context Analysis Error: $e');
-      _aiResponse = 'Tôi không thể phân tích tin nhắn này lúc này.';
-      await _tts.speak(_aiResponse);
-      _state = AiState.idle;
+    final content = message.content?.trim();
+    if (content == null || content.isEmpty) {
+      return;
     }
-    notifyListeners();
+
+    await _runContextualPrompt(
+      source: 'analyze_message',
+      prompt:
+          'Hãy giải thích hoặc tóm tắt ngắn gọn tin nhắn này cho tôi: "$content"',
+      fallbackMessage: 'Tôi không thể phân tích tin nhắn này lúc này.',
+    );
   }
 
   Future<void> translateMessage(Message message) async {
-    if (message.content == null || message.content!.isEmpty) return;
-
-    _state = AiState.thinking;
-    _isMascotVisible = true;
-    notifyListeners();
-
-    try {
-      final prompt = "Hãy dịch tin nhắn sau đây sang tiếng Việt một cách tự nhiên và chính xác nhất: \"${message.content}\"";
-      final response = await _aiService.chat(prompt, analyzeIntent: false);
-      
-      _aiResponse = response['textReply'] ?? '';
-
-      if (_aiResponse.isNotEmpty) {
-        _state = AiState.speaking;
-        notifyListeners();
-        await _tts.speak(_aiResponse);
-      }
-
-      _state = AiState.idle;
-    } catch (e) {
-      debugPrint('AI Translation Error: $e');
-      _aiResponse = 'Tôi không thể dịch tin nhắn này lúc này.';
-      await _tts.speak(_aiResponse);
-      _state = AiState.idle;
+    final content = message.content?.trim();
+    if (content == null || content.isEmpty) {
+      return;
     }
-    notifyListeners();
+
+    await _runContextualPrompt(
+      source: 'translate_message',
+      prompt:
+          'Hãy dịch tin nhắn sau đây sang tiếng Việt một cách tự nhiên và chính xác nhất: "$content"',
+      fallbackMessage: 'Tôi không thể dịch tin nhắn này lúc này.',
+    );
   }
 
   Future<void> summarizeVideo(Message message) async {
-    final videoUrl = message.mediaUrl ?? message.content ?? '';
-    if (videoUrl.isEmpty) return;
+    final videoUrl = (message.mediaUrl ?? message.content ?? '').trim();
+    if (videoUrl.isEmpty) {
+      return;
+    }
 
-    _state = AiState.thinking;
-    _isMascotVisible = true;
-    notifyListeners();
+    await _runContextualPrompt(
+      source: 'summarize_video',
+      prompt:
+          'Hãy đóng vai một trợ lý thông minh, xem xét nội dung (nếu là video nội bộ) hoặc URL video này: $videoUrl. Hãy tóm tắt nội dung chính hoặc cho tôi biết đây là loại video gì. Trả lời ngắn gọn.',
+      fallbackMessage: 'Tôi gặp khó khăn khi truy cập video này.',
+    );
+  }
+
+  Future<void> _runContextualPrompt({
+    required String source,
+    required String prompt,
+    required String fallbackMessage,
+  }) async {
+    if (_isPipelineLocked) {
+      _logEvent(
+        'CONTEXT_PROMPT_SKIPPED',
+        level: 'WARN',
+        data: {'reason': 'pipeline_locked', 'source': source},
+      );
+      return;
+    }
+
+    _isPipelineLocked = true;
+    final traceId = _newTraceId(source);
+    final token = _beginOperation(traceId: traceId);
+
+    _setProvisionallyVisible(true, reason: '$source.contextual_visible');
+    _isSessionActive = true;
+    _transitionTo(
+      AiState.thinking,
+      reason: '$source.thinking',
+      traceId: traceId,
+    );
 
     try {
-      final prompt = "Hãy đóng vai một trợ lý thông minh, xem xét nội dung (nếu là video nội bộ) hoặc URL video này: $videoUrl. Hãy tóm tắt nội dung chính hoặc cho tôi biết đây là loại video gì. Trả lời ngắn gọn.";
-      final response = await _aiService.chat(prompt, analyzeIntent: false);
-      
-      _aiResponse = response['textReply'] ?? '';
+      await _stt.stop();
+      final response = await _aiService
+          .chat(prompt, analyzeIntent: false)
+          .timeout(_aiTimeout);
 
-      if (_aiResponse.isNotEmpty) {
-        _state = AiState.speaking;
-        notifyListeners();
-        await _tts.speak(_aiResponse);
+      if (!_isCurrentOperation(token)) {
+        return;
       }
 
-      _state = AiState.idle;
-    } catch (e) {
-      debugPrint('AI Video Summary Error: $e');
-      _aiResponse = 'Tôi gặp khó khăn khi truy cập video này.';
-      await _tts.speak(_aiResponse);
-      _state = AiState.idle;
+      _aiResponse = (response['textReply'] ?? '').toString().trim();
+      if (_aiResponse.isEmpty) {
+        _aiResponse = fallbackMessage;
+      }
+
+      _transitionTo(
+        AiState.speaking,
+        reason: '$source.speaking',
+        traceId: traceId,
+      );
+      notifyListeners();
+      await _safeSpeak(_aiResponse, token: token, traceId: traceId);
+    } on TimeoutException {
+      if (_isCurrentOperation(token)) {
+        await _handleFailure(
+          token: token,
+          traceId: traceId,
+          event: 'CONTEXT_TIMEOUT',
+          fallbackMessage: fallbackMessage,
+        );
+      }
+    } catch (error) {
+      if (_isCurrentOperation(token)) {
+        await _handleFailure(
+          token: token,
+          traceId: traceId,
+          event: 'CONTEXT_ERROR',
+          fallbackMessage: fallbackMessage,
+          error: error,
+        );
+      }
+    } finally {
+      if (_isCurrentOperation(token)) {
+        _isPipelineLocked = false;
+        _isSessionActive = false;
+        _currentEmotion = 'neutral';
+        _transitionTo(
+          AiState.idle,
+          reason: '$source.complete',
+          traceId: traceId,
+          notify: false,
+        );
+        _syncVisibilityAfterSession();
+        notifyListeners();
+      }
     }
+  }
+
+  Future<bool> _ensureSttInitialized() async {
+    if (_isSttInitialized) {
+      return true;
+    }
+
+    try {
+      _isSttInitialized = await _stt.initialize(
+        onStatus: (status) {
+          _logEvent('STT_STATUS', data: {'status': status});
+          final normalized = status.trim().toLowerCase();
+          if ((normalized == 'done' || normalized == 'notlistening') &&
+              _state == AiState.listening &&
+              !_isPipelineLocked) {
+            _isSessionActive = false;
+            _transitionTo(AiState.idle, reason: 'stt_done_status');
+            _syncVisibilityAfterSession();
+          }
+        },
+        onError: (error) {
+          _logEvent(
+            'STT_ERROR',
+            level: 'ERROR',
+            data: {'error': error.toString()},
+          );
+          if (_state == AiState.listening && !_isPipelineLocked) {
+            _isSessionActive = false;
+            _transitionTo(AiState.idle, reason: 'stt_error');
+            _syncVisibilityAfterSession();
+          }
+        },
+      );
+
+      _logEvent('STT_INITIALIZED', data: {'available': _isSttInitialized});
+      return _isSttInitialized;
+    } catch (error) {
+      _logEvent(
+        'STT_INIT_ERROR',
+        level: 'ERROR',
+        data: {'error': error.toString()},
+      );
+      return false;
+    }
+  }
+
+  Future<void> _safeSpeak(
+    String text, {
+    required int token,
+    required String traceId,
+  }) async {
+    if (text.trim().isEmpty || !_isCurrentOperation(token)) {
+      return;
+    }
+
+    try {
+      await _tts.stop();
+      final result = await _tts.speak(text);
+      _logEvent(
+        'TTS_SPEAK_DISPATCHED',
+        traceId: traceId,
+        data: {'result': result},
+      );
+    } catch (error) {
+      _logEvent(
+        'TTS_SPEAK_ERROR',
+        traceId: traceId,
+        level: 'ERROR',
+        data: {'error': error.toString()},
+      );
+      if (_isCurrentOperation(token)) {
+        _transitionTo(AiState.idle, reason: 'tts_exception', traceId: traceId);
+      }
+    }
+  }
+
+  Future<void> _handleFailure({
+    required int token,
+    required String traceId,
+    required String event,
+    required String fallbackMessage,
+    Object? error,
+  }) async {
+    _logEvent(
+      event,
+      traceId: traceId,
+      level: 'ERROR',
+      data: {'error': error?.toString()},
+    );
+
+    _aiResponse = fallbackMessage;
+    _currentEmotion = 'neutral';
+    _transitionTo(AiState.speaking, reason: 'fallback_speak', traceId: traceId);
+    notifyListeners();
+    await _safeSpeak(_aiResponse, token: token, traceId: traceId);
+  }
+
+  Future<void> _stopAllInteractions({
+    required String reason,
+    required bool keepResponse,
+  }) async {
+    try {
+      await _stt.stop();
+    } catch (error) {
+      _logEvent(
+        'STT_STOP_ERROR',
+        level: 'WARN',
+        data: {'error': error.toString()},
+      );
+    }
+
+    try {
+      await _tts.stop();
+    } catch (error) {
+      _logEvent(
+        'TTS_STOP_ERROR',
+        level: 'WARN',
+        data: {'error': error.toString()},
+      );
+    }
+
+    _isPipelineLocked = false;
+    _isSessionActive = false;
+    _currentEmotion = 'neutral';
+    _transitionTo(AiState.idle, reason: reason, notify: false);
+
+    if (!keepResponse) {
+      _aiResponse = '';
+    }
+
+    _syncVisibilityAfterSession();
     notifyListeners();
   }
 
-  void _executeSystemAction(String command, dynamic params) {
-     debugPrint('Executing System Action: $command with params: $params');
-     _systemActionController.add(AiCommand(command: command, params: params));
+  void _recordHistory({required String userText, required String aiText}) {
+    _sessionHistory.add({'role': 'User', 'text': userText});
+    _sessionHistory.add({'role': 'AI', 'text': aiText});
+
+    if (_sessionHistory.length > 10) {
+      _sessionHistory.removeRange(0, _sessionHistory.length - 10);
+    }
+  }
+
+  String _buildContextPrompt(String text) {
+    if (_sessionHistory.isEmpty) {
+      return text;
+    }
+
+    final buffer = StringBuffer('Lịch sử trò chuyện gần đây:\n');
+    for (final msg in _sessionHistory) {
+      buffer.writeln('${msg['role']}: ${msg['text']}');
+    }
+    buffer.writeln('---');
+    buffer.write(text);
+    return buffer.toString();
+  }
+
+  bool _isDuplicateFinalResult(String text) {
+    final now = DateTime.now();
+    final normalized = text.trim().toLowerCase();
+    final isDuplicate =
+        normalized == _lastFinalResultText &&
+        _lastFinalResultAt != null &&
+        now.difference(_lastFinalResultAt!) < const Duration(milliseconds: 900);
+
+    _lastFinalResultText = normalized;
+    _lastFinalResultAt = now;
+    return isDuplicate;
+  }
+
+  int _beginOperation({required String traceId}) {
+    _operationToken += 1;
+    _activeTraceId = traceId;
+    return _operationToken;
+  }
+
+  void _cancelActiveOperation({required String reason}) {
+    _operationToken += 1;
+    _isPipelineLocked = false;
+    _logEvent('PIPELINE_CANCELLED', level: 'WARN', data: {'reason': reason});
+  }
+
+  bool _isCurrentOperation(int token) => token == _operationToken;
+
+  void _transitionTo(
+    AiState next, {
+    required String reason,
+    String? traceId,
+    bool notify = true,
+  }) {
+    final previous = _state;
+    _state = next;
+
+    _logEvent(
+      'STATE_CHANGE',
+      traceId: traceId,
+      data: {'from': previous.name, 'to': next.name, 'reason': reason},
+    );
+
+    if (notify) {
+      notifyListeners();
+    }
+  }
+
+  void _setProvisionallyVisible(bool visible, {required String reason}) {
+    if (_provisionallyVisible == visible) {
+      return;
+    }
+
+    _provisionallyVisible = visible;
+    _logEvent(
+      'VISIBILITY_CONTEXTUAL_SET',
+      data: {'visible': visible, 'reason': reason},
+    );
+    notifyListeners();
+  }
+
+  void _syncVisibilityAfterSession() {
+    if (_isSessionActive) {
+      return;
+    }
+    if (!_persistentEnabled && _aiResponse.isEmpty) {
+      _provisionallyVisible = false;
+    }
+  }
+
+  String _newTraceId(String scope) => '${scope}_${_uuid.v4()}';
+
+  void _logEvent(
+    String event, {
+    String level = 'INFO',
+    String? traceId,
+    Map<String, dynamic>? data,
+  }) {
+    final payload = <String, dynamic>{
+      'ts': DateTime.now().toIso8601String(),
+      'scope': 'AI_ASSISTANT',
+      'level': level,
+      'event': event,
+      'traceId': traceId ?? _activeTraceId,
+      'state': _state.name,
+      'persistentEnabled': _persistentEnabled,
+      'provisionallyVisible': _provisionallyVisible,
+      'sessionActive': _isSessionActive,
+      'data': _sanitizeData(data),
+    };
+
+    debugPrint('[AI_FLOW] ${jsonEncode(payload)}');
+  }
+
+  Map<String, dynamic> _sanitizeData(Map<String, dynamic>? data) {
+    if (data == null || data.isEmpty) {
+      return const {};
+    }
+
+    final sanitized = <String, dynamic>{};
+    data.forEach((key, value) {
+      if (value == null || value is num || value is bool || value is String) {
+        sanitized[key] = value;
+      } else {
+        sanitized[key] = value.toString();
+      }
+    });
+    return sanitized;
+  }
+
+  void _executeSystemAction(
+    String command,
+    dynamic params, {
+    required String traceId,
+  }) {
+    final aiCommand = AiCommand(
+      command: command,
+      params: params,
+      traceId: traceId,
+    );
+    _logEvent(
+      'AI_COMMAND_EMIT',
+      traceId: traceId,
+      data: {'command': command, 'commandId': aiCommand.commandId},
+    );
+    _systemActionController.add(aiCommand);
   }
 
   void clearAiResponse() {
     _aiResponse = '';
+    _syncVisibilityAfterSession();
+    _logEvent('AI_RESPONSE_CLEARED');
     notifyListeners();
   }
 }
@@ -302,6 +806,24 @@ class AiAssistantProvider with ChangeNotifier {
 class AiCommand {
   final String command;
   final dynamic params;
+  final String commandId;
+  final String traceId;
+  final DateTime createdAt;
 
-  AiCommand({required this.command, this.params});
+  AiCommand({
+    required this.command,
+    this.params,
+    String? commandId,
+    String? traceId,
+    DateTime? createdAt,
+  }) : commandId = commandId ?? const Uuid().v4(),
+       traceId = traceId ?? const Uuid().v4(),
+       createdAt = createdAt ?? DateTime.now();
+
+  Map<String, dynamic> toLogMap() => {
+    'command': command,
+    'commandId': commandId,
+    'traceId': traceId,
+    'createdAt': createdAt.toIso8601String(),
+  };
 }
