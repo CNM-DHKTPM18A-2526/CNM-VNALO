@@ -222,6 +222,13 @@ export function renderSystemMessage(
         return `${actorName} đã ghim một tin nhắn`
       case 'UNPIN_MESSAGE':
         return `${actorName} đã bỏ ghim một tin nhắn`
+      case 'UPDATE_MESSAGE_REACTIONS':
+        return '' // Hide reaction sync signals completely
+      case 'UPDATE_GROUP_INFO':
+        if (payload.metadata?.newName) {
+          return `${actorName} đã đổi tên nhóm thành "${payload.metadata.newName}"`
+        }
+        return `${actorName} đã cập nhật thông tin nhóm`
       default:
         return content
     }
