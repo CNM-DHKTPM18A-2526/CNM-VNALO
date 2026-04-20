@@ -17,8 +17,18 @@ function getMessageMediaUrl(message: ChatMessage): string | null {
   return message.mediaUrl ?? message.attachments?.[0]?.url ?? null
 }
 
-function isImageAttachment(mimeType?: string | null, type?: string) {
-  return type === 'image' || mimeType?.startsWith('image/')
+function isImageAttachment(mimeType?: string | null, url?: string | null, name?: string | null, type?: string) {
+  if (type === 'image' || mimeType?.startsWith('image/')) {
+    return true
+  }
+
+  const check = (str?: string | null) => {
+    if (!str) return false
+    const pathname = str.toLowerCase().split('?')[0].split('#')[0]
+    return /\.(png|jpe?g|gif|webp|bmp|svg|avif|heic)$/.test(pathname)
+  }
+
+  return check(url) || check(name)
 }
 
 function resolveStickerSrc(message: ChatMessage): string | null {
@@ -97,8 +107,13 @@ export function MessageBubble({
   const { openImageViewerByMessageId } = useImageViewer()
   const stickerSrc = message.type === 'sticker' ? resolveStickerSrc(message) : null
   const attachments = message.attachments ?? []
-  const imageAttachments = attachments.filter((attachment) => isImageAttachment(attachment.mimeType))
-  const fileAttachments = attachments.filter((attachment) => !isImageAttachment(attachment.mimeType))
+  const isImageMsg = message.type === 'image'
+  const imageAttachments = attachments.filter((attachment) => 
+    isImageMsg || isImageAttachment(attachment.mimeType, attachment.url, attachment.name)
+  )
+  const fileAttachments = attachments.filter((attachment) => 
+    !isImageMsg && !isImageAttachment(attachment.mimeType, attachment.url, attachment.name)
+  )
 
   const stackRef = useRef<HTMLDivElement | null>(null)
   const contextMenuTriggerRef = useRef<HTMLButtonElement | null>(null)

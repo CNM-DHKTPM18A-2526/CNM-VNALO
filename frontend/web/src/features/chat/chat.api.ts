@@ -197,14 +197,44 @@ function isImageUrl(url?: string | null): boolean {
     return false
   }
 
+  // Define image pattern once
+  const imagePattern = /\.(png|jpe?g|gif|webp|bmp|svg|avif|heic)(\?|#|$)/i
+
   try {
     const parsed = new URL(url)
     const pathname = parsed.pathname.toLowerCase()
-    return /\.(png|jpe?g|gif|webp|bmp|svg|avif|heic)$/.test(pathname)
+    return imagePattern.test(pathname)
   } catch {
-    const normalized = url.toLowerCase().split('?')[0]
-    return /\.(png|jpe?g|gif|webp|bmp|svg|avif|heic)$/.test(normalized)
+    const normalized = url.toLowerCase()
+    return imagePattern.test(normalized)
   }
+}
+
+/**
+ * Recursive scanner to find any evidence of an image inside a raw message payload.
+ * Crucial for cross-platform compatibility where field names vary wildly.
+ */
+function hasImageEvidence(obj: any, depth = 0): boolean {
+  if (!obj || depth > 3) return false
+  
+  if (typeof obj === 'string') {
+    const s = obj.toLowerCase()
+    // Check for MIME types
+    if (isImageMimeType(s)) return true
+    // Check for common extensions
+    if (isImageUrl(s)) return true
+    return false
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.some(item => hasImageEvidence(item, depth + 1))
+  }
+
+  if (typeof obj === 'object') {
+    return Object.values(obj).some(val => hasImageEvidence(val, depth + 1))
+  }
+
+  return false
 }
 
 function isHttpUrl(value?: string | null): boolean {
@@ -266,16 +296,23 @@ function normalizeInboxPreview(rawPreview?: string | null): string {
 function normalizeMessageType(rawType: any, raw?: RawMessageLike): ChatMessageType {
   const declaredType = String(rawType || '').trim().toLowerCase()
 
-  if (declaredType === 'image' || declaredType === 'file' || declaredType === 'sticker' || declaredType === 'text' || declaredType === 'system' || declaredType === 'call') {
+  // 1. Handle specialized types that should NOT be overridden by guessing
+  if (declaredType === 'sticker' || declaredType === 'system' || declaredType === 'call') {
     return declaredType as ChatMessageType
   }
 
-  // Optional guessing only if explicit type is missing
-  if (raw) {
-    if (isImageMimeType(raw.mediaMimeType ?? raw.media_mime_type)) return 'image'
-    if (isImageUrl(raw.mediaUrl ?? raw.media_url)) return 'image'
-    if (raw.mediaUrl ?? raw.media_url) return 'file'
+  // 2. Universal Detection: Deep scan the raw payload for image evidence
+  if (raw && hasImageEvidence(raw)) {
+    return 'image'
   }
+
+  // 3. Fallback to declared types
+  if (declaredType === 'image' || declaredType === 'file' || declaredType === 'text') {
+    return declaredType as ChatMessageType
+  }
+
+  // 4. Ultimate media fallback
+  if (raw && (raw.mediaUrl ?? raw.media_url ?? (raw as any).mediaPath)) return 'file'
 
   return 'text'
 }
@@ -393,10 +430,20 @@ export function mapRawMessage(raw: RawMessageLike, currentUserId: string): ChatM
   console.log('Mapped type debug:', (raw as any).type, raw.messageType)
   const type = normalizeMessageType((raw as any).type || raw.messageType || (raw as any).message_type, raw)
   const mediaUrl = mediaUrlFromPayload ?? ((type === 'image' || type === 'file' || type === 'sticker') ? mediaUrlFromContent : null)
-  const messageText = mediaUrlFromContent && content.trim() === mediaUrlFromContent ? '' : content
+  let messageText = mediaUrlFromContent && content.trim() === mediaUrlFromContent ? '' : content
+  // Suppression: If it's an image and the text is just the filename/URL, clear it.
+  if (type === 'image' && messageText && isImageUrl(messageText)) {
+    messageText = ''
+  }
   const attachmentName = type === 'file' && messageText && !isHttpUrl(messageText) ? messageText : undefined
 
-  let attachments: ChatAttachment[] | undefined = raw.attachments
+  let attachments: ChatAttachment[] | undefined = raw.attachments?.map((att: any) => ({
+    url: att.url ?? att.mediaUrl ?? att.media_url ?? att.path ?? att.mediaPath ?? att.link ?? att.fullUrl ?? att.url_full ?? '',
+    name: att.name ?? att.fileName ?? att.filename ?? att.file_name ?? att.title ?? att.displayName ?? att.originName ?? att.original_name ?? undefined,
+    mimeType: att.mimeType ?? att.mediaMimeType ?? att.media_mime_type ?? att.contentType ?? null,
+    sizeBytes: att.sizeBytes ?? att.mediaSizeBytes ?? att.media_size_bytes ?? att.fileSize ?? att.size ?? null,
+    thumbnailUrl: att.thumbnailUrl ?? att.mediaThumbnailUrl ?? att.media_thumbnail_url ?? att.thumbUrl ?? null,
+  }))
   if ((!attachments || attachments.length === 0) && mediaUrl) {
     attachments = [
       {
