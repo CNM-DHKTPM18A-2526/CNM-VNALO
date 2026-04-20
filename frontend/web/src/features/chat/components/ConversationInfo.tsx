@@ -214,10 +214,16 @@ export function ConversationInfo({
             <div className="space-y-3">
               {allDisplayMemberIds.map(userId => {
                 const profile = userMap[userId];
+                const member = conversation.members?.find(m => m.userId === userId);
+                const isOwner = member?.role === 'OWNER';
+                
                 return (
                   <div key={userId} className="flex items-center gap-3">
                     <UserAvatar name={profile?.displayName || 'Thành viên'} imageUrl={profile?.avatarUrl} size="sm" />
-                    <span className="text-[15px] text-slate-700">{profile?.displayName || `Người dùng ${userId.slice(0, 6)}`}</span>
+                    <div className="flex flex-col">
+                      <span className="text-[15px] text-slate-700">{profile?.displayName || `Người dùng ${userId.slice(0, 6)}`}</span>
+                      {isOwner && <span className="text-[12px] text-slate-400 font-medium">Trưởng nhóm</span>}
+                    </div>
                   </div>
                 );
               })}

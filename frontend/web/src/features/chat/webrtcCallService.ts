@@ -81,7 +81,16 @@ export class WebRtcCallService {
     try {
       // 1. Setup PeerConnection
       const configuration: RTCConfiguration = {
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun3.l.google.com:19302' },
+          { urls: 'stun:stun4.l.google.com:19302' },
+          // Note: For full reliability on all cellular networks (Symmetric NAT), 
+          // a TURN relay server is highly recommended.
+        ],
+        iceCandidatePoolSize: 10,
       }
       this.resetInternalState()
       this.state.pc = new RTCPeerConnection(configuration)
@@ -149,16 +158,25 @@ export class WebRtcCallService {
 
     pc.onconnectionstatechange = () => {
       console.log('[WebRTC] Connection state changed:', pc.connectionState)
+      this.updateState({ isConnected: pc.connectionState === 'connected' })
+      
       if (pc.connectionState === 'connected') {
         this.stopRingTimeout()
-        this.updateState({ isConnected: true, startedAt: Date.now(), error: null })
+        this.updateState({ startedAt: Date.now(), error: null })
       } else if (pc.connectionState === 'failed') {
-        console.error('[WebRTC] Connection failed')
-        this.updateState({ isConnected: false, error: 'Kết nối mạng thất bại' })
+        console.error('[WebRTC] Connection failed. Signaling state:', pc.signalingState, 'ICE Gathering:', pc.iceGatheringState)
+        this.updateState({ error: 'Kết nối mạng thất bại' })
       } else if (pc.connectionState === 'disconnected') {
         console.warn('[WebRTC] Connection disconnected')
-        this.updateState({ isConnected: false })
       }
+    }
+
+    pc.onsignalingstatechange = () => {
+      console.log('[WebRTC] Signaling state changed:', pc.signalingState)
+    }
+
+    pc.onicegatheringstatechange = () => {
+      console.log('[WebRTC] ICE gathering state changed:', pc.iceGatheringState)
     }
   }
 
@@ -317,29 +335,43 @@ export class WebRtcCallService {
 
   async handleAnswer(answerSdp: any) {
     const pc = this.state.pc
-    if (!pc || pc.signalingState === 'stable') return
+    if (!pc) return
+
+    if (pc.signalingState === 'stable') {
+      console.warn('[WebRTC] Ignoring handleAnswer: peer connection is already stable')
+      return
+    }
 
     try {
+      console.log('[WebRTC] Setting remote answer description...')
       await pc.setRemoteDescription(new RTCSessionDescription(answerSdp))
       this.updateState({ hasRemoteDescription: true })
+      console.log('[WebRTC] Remote answer set. Flushing', this.state.pendingCandidates.length, 'candidates')
       await this.flushPendingCandidates()
     } catch (error) {
       console.error('[WebRTC] Failed to handle answer', error)
+      this.updateState({ error: 'Không thể xử lý phản hồi cuộc gọi' })
     }
   }
 
   async handleIceCandidate(candidateData: any) {
-    if (!this.state.pc) return
+    if (!this.state.pc || !candidateData) return
 
-    const candidate = new RTCIceCandidate(candidateData)
-    if (!this.state.hasRemoteDescription) {
-      this.updateState({ pendingCandidates: [...this.state.pendingCandidates, candidate] })
-    } else {
-      try {
+    try {
+      // Support both structured candidate objects and raw candidate strings
+      const candidate = new RTCIceCandidate(
+        typeof candidateData === 'string' ? { candidate: candidateData } : candidateData
+      )
+
+      if (!this.state.hasRemoteDescription) {
+        console.log('[WebRTC] Queueing ICE candidate (remote description not ready)')
+        this.updateState({ pendingCandidates: [...this.state.pendingCandidates, candidate] })
+      } else {
         await this.state.pc.addIceCandidate(candidate)
-      } catch (error) {
-        console.error('[WebRTC] Failed to add ICE candidate', error)
+        console.log('[WebRTC] ICE candidate added successfully')
       }
+    } catch (error) {
+      console.warn('[WebRTC] Failed to add ICE candidate', error)
     }
   }
 

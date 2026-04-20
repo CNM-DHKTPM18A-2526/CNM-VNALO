@@ -17,8 +17,32 @@ function getMessageMediaUrl(message: ChatMessage): string | null {
   return message.mediaUrl ?? message.attachments?.[0]?.url ?? null
 }
 
-function isImageAttachment(mimeType?: string | null, type?: string) {
-  return type === 'image' || mimeType?.startsWith('image/')
+function isImageAttachment(mimeType?: string | null, url?: string | null, name?: string | null, type?: string) {
+  if (type === 'image' || mimeType?.startsWith('image/')) {
+    return true
+  }
+
+  const check = (str?: string | null) => {
+    if (!str) return false
+    const pathname = str.toLowerCase().split('?')[0].split('#')[0]
+    return /\.(png|jpe?g|gif|webp|bmp|svg|avif|heic)$/.test(pathname)
+  }
+
+  return check(url) || check(name)
+}
+
+function isVideoAttachment(mimeType?: string | null, url?: string | null, name?: string | null, type?: string) {
+  if (type === 'video' || mimeType?.startsWith('video/')) {
+    return true
+  }
+
+  const check = (str?: string | null) => {
+    if (!str) return false
+    const pathname = str.toLowerCase().split('?')[0].split('#')[0]
+    return /\.(mp4|webm|ogv|mov|m4v|3gp|mkv)$/.test(pathname)
+  }
+
+  return check(url) || check(name)
 }
 
 function resolveStickerSrc(message: ChatMessage): string | null {
@@ -97,8 +121,19 @@ export function MessageBubble({
   const { openImageViewerByMessageId } = useImageViewer()
   const stickerSrc = message.type === 'sticker' ? resolveStickerSrc(message) : null
   const attachments = message.attachments ?? []
-  const imageAttachments = attachments.filter((attachment) => isImageAttachment(attachment.mimeType))
-  const fileAttachments = attachments.filter((attachment) => !isImageAttachment(attachment.mimeType))
+  const isImageMsg = message.type === 'image'
+  const imageAttachments = attachments.filter((attachment) => 
+    isImageMsg || isImageAttachment(attachment.mimeType, attachment.url, attachment.name)
+  )
+  const isVideoMsg = message.type === 'video'
+  const videoAttachments = attachments.filter((attachment) => 
+    isVideoMsg || isVideoAttachment(attachment.mimeType, attachment.url, attachment.name)
+  )
+  const fileAttachments = attachments.filter((attachment) => 
+    !isImageMsg && !isVideoMsg &&
+    !isImageAttachment(attachment.mimeType, attachment.url, attachment.name) &&
+    !isVideoAttachment(attachment.mimeType, attachment.url, attachment.name)
+  )
 
   const stackRef = useRef<HTMLDivElement | null>(null)
   const contextMenuTriggerRef = useRef<HTMLButtonElement | null>(null)
@@ -593,6 +628,23 @@ export function MessageBubble({
             </div>
           )}
 
+          {!isRecalled && (videoAttachments.length > 0) && (
+            <div className='message-bubble-video flex flex-col gap-2 mt-1'>
+               {videoAttachments.map((att, idx) => {
+                 return (
+                   <video 
+                     key={att.url + idx}
+                     src={att.url} 
+                     controls 
+                     preload="metadata"
+                     className='max-w-full rounded-lg border border-slate-200 shadow-sm transition-all hover:shadow-md'
+                     style={{ maxHeight: '300px', background: '#000' }}
+                   />
+                 );
+               })}
+            </div>
+          )}
+
           {!isRecalled && (fileAttachments.length > 0) && (
             <div className='message-bubble-attachments message-bubble-files flex flex-col gap-2 mt-1'>
               {fileAttachments.map((att, idx) => {
@@ -630,9 +682,12 @@ export function MessageBubble({
                 onInitiateCall={onInitiateCall} 
               />
             ) : message.text ? (
-              <div className={`${message.type === 'text' ? '' : 'mt-2'} whitespace-pre-wrap break-words overflow-hidden flex items-center gap-2`}>
-                <span>{formatMessageContent(message.text)}</span>
-              </div>
+              // Suppress redundant text block if it is identical to the filename (common for files to preserve meta)
+              (message.type === 'file' && message.attachments && message.attachments[0] && message.text === message.attachments[0].name) ? null : (
+                <div className={`${message.type === 'text' ? '' : 'mt-2'} whitespace-pre-wrap break-words overflow-hidden flex items-center gap-2`}>
+                  <span>{formatMessageContent(message.text)}</span>
+                </div>
+              )
             ) : null
           )}
 

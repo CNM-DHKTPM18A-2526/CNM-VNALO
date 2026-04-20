@@ -481,8 +481,10 @@ function ChatPageContent() {
 
   // SYNC CALL STATE TO REF FOR LISTENERS
   const callStateRef = useRef(callState)
+  const currentCallIdRef = useRef<string | null>(null) // Immediate sync ref for signal routing
   useEffect(() => {
     callStateRef.current = callState
+    currentCallIdRef.current = callState.callId || null
   }, [callState])
 
   // Initialize call service with state syncing
@@ -924,6 +926,10 @@ function ChatPageContent() {
                   unreadCount: 0,
                   participantUserIds: participantIds,
                   memberCount: members.length,
+                  members: members.map((m: any) => ({
+                    userId: String(m.userId ?? '').trim(),
+                    role: String(m.role ?? 'MEMBER').toUpperCase(),
+                  })),
                   lastMessageAt: inner.updatedAt || c.updatedAt || new Date().toISOString(),
                   updatedAt: inner.updatedAt || c.updatedAt || new Date().toISOString(),
                 }
@@ -1312,6 +1318,16 @@ function ChatPageContent() {
 
       const currentPins = pinnedMessageIds[conversationId] || []
       const isPinned = currentPins.includes(messageId)
+
+      // Permission check for group pinning
+      const currentConv = conversations.find(c => c.id === conversationId)
+      if (currentConv?.isGroup) {
+        const myMember = currentConv.members?.find(m => m.userId === user.id)
+        if (myMember?.role !== 'OWNER') {
+          toast.error('Chỉ có trưởng nhóm mới có quyền ghim tin nhắn')
+          return
+        }
+      }
 
       try {
         if (isPinned) {
@@ -1803,9 +1819,12 @@ function ChatPageContent() {
     if (processedSignalsRef.current.has(sigKey)) return;
     processedSignalsRef.current.add(sigKey);
 
-    console.log('[CALL][RECEIVE ICE]', signalData);
-    if (callId === callStateRef.current.callId) {
+    console.log('[CALL][RECEIVE ICE]', { callId, candidate: Boolean(candidate) });
+    // Use currentCallIdRef for immediate matching to avoid state sync race conditions
+    if (callId === currentCallIdRef.current) {
       await callServiceRef.current?.handleIceCandidate(signalData.candidate);
+    } else {
+      console.warn('[CALL][ICE IGNORED] Call ID mismatch or call not initialized yet', { incoming: callId, current: currentCallIdRef.current });
     }
   };
 
@@ -1835,6 +1854,9 @@ function ChatPageContent() {
     // Support aliased keys from mobile clients at root or in nested object
     const peerUserId = signalData.senderUserId || signalData.callerId || signalData.fromUserId;
     const conversationId = signalData.conversationId || signalData.roomId;
+
+    // Atomic Lock: Update currentCallIdRef immediately before any async work
+    currentCallIdRef.current = callId;
 
     if (callStateRef.current.isOpen) {
       console.warn('[ChatPage] Already in a call, ignoring offer');
@@ -2251,6 +2273,10 @@ function ChatPageContent() {
           unreadCount: 0,
           participantUserIds: memberIds,
           memberCount: memberIds.length + 1,
+          members: [
+            { userId: user.id, role: 'OWNER' },
+            ...memberIds.map(id => ({ userId: id, role: 'MEMBER' }))
+          ],
           lastMessageAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
@@ -2391,6 +2417,10 @@ function ChatPageContent() {
               return {
                 ...conv,
                 memberCount: members.length || conv.memberCount,
+                members: members.map((m: any) => ({
+                  userId: String(m.userId ?? '').trim(),
+                  role: String(m.role ?? 'MEMBER').toUpperCase(),
+                })),
                 participantUserIds: participantIds,
                 avatarUrl: isGroup ? (inner.avatarUrl || conv.avatarUrl) : (inner.avatarUrl || conv.avatarUrl),
                 name: isGroup ? (inner.title || conv.name) : (inner.title || conv.name),
@@ -2520,6 +2550,10 @@ function ChatPageContent() {
                   return {
                     ...conv,
                     memberCount: members.length || conv.memberCount,
+                    members: members.map((m: any) => ({
+                      userId: String(m.userId ?? '').trim(),
+                      role: String(m.role ?? 'MEMBER').toUpperCase(),
+                    })),
                     participantUserIds: participantIds,
                     avatarUrl: isGroup ? (inner.avatarUrl || conv.avatarUrl) : (inner.avatarUrl || conv.avatarUrl),
                     name: isGroup ? (inner.title || conv.name) : (inner.title || conv.name),
@@ -2882,6 +2916,11 @@ function ChatPageContent() {
         }
       } catch (uploadError) {
         console.error('[ChatPage.send] Multi-upload failed', uploadError);
+        // Mark the optimistic message as failed so it doesn't hang in "Sending..."
+        setMessagesByConversation(prev => ({
+          ...prev,
+          [targetConversationId]: markLocalMessageFailed(prev[targetConversationId] ?? [], clientMessageId)
+        }));
         return;
       }
 
@@ -2909,10 +2948,7 @@ function ChatPageContent() {
         };
 
         if (replyTo) {
-          payload.replyTo = replyTo;
           payload.replyToMessageId = replyTo.id;
-          payload.replyToSenderId = replyTo.senderId;
-          payload.replyToContent = replyTo.preview;
         }
 
         const optimisticTextMessage: ChatMessage = {
@@ -2963,26 +2999,28 @@ function ChatPageContent() {
         const res = uploadResults[i];
         const resClientMessageId = i === 0 ? clientMessageId : (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
 
-        // No filename content as requested by user
-        const resContent = (i === 0 && content.trim().length > 0) ? content : "";
-        const resTypeStr = res.mimeType?.startsWith('image/') ? 'image' : (res.mimeType === 'application/x-chat-sticker' ? 'sticker' : 'file');
+        const file = allFiles[i];
+        const actualExt = file ? file.name.split('.').pop()?.toLowerCase() || '' : '';
+        const isDoc = ['docx', 'xlsx', 'pptx', 'doc', 'xls', 'ppt', 'pdf'].includes(actualExt);
+        const isVideo = res.mimeType?.startsWith('video/') || ['mp4', 'mov', 'webm', 'm4v', '3gp', 'mkv'].includes(actualExt);
+        const resTypeStr = isDoc ? 'file' : (res.mimeType?.startsWith('image/') ? 'image' : (isVideo ? 'video' : (res.mimeType === 'application/x-chat-sticker' ? 'sticker' : 'file')));
+        
+        // Use original filename as content for 'file' type messages if no other text is provided.
+        const resContent = (i === 0 && content.trim().length > 0) ? content : (resTypeStr === 'file' && file ? file.name : "");
 
-        const payload = {
+        const payload: any = {
           conversationId: targetConversationId,
           content: resContent,
           clientMessageId: resClientMessageId,
           messageType: toSocketMessageType(resTypeStr as any),
           mediaUrl: res.url,
           mediaThumbnailUrl: res.thumbnailUrl,
-          mediaMimeType: res.mimeType,
+          mediaMimeType: isDoc ? (allFiles[i].type || 'application/octet-stream') : res.mimeType,
           mediaSizeBytes: res.sizeBytes,
         };
 
         if (replyTo && i === 0) {
-          (payload as any).replyTo = replyTo;
-          (payload as any).replyToMessageId = replyTo.id;
-          (payload as any).replyToSenderId = replyTo.senderId;
-          (payload as any).replyToContent = replyTo.preview;
+          payload.replyToMessageId = replyTo.id;
         }
 
         const optimisticMessage: ChatMessage = {
@@ -3181,6 +3219,15 @@ function ChatPageContent() {
 
   const handleEditGroupName = async (newName: string) => {
     if (!selectedConversationId || !accessToken) return
+
+    // Permission check for group renaming
+    if (selectedConversation?.isGroup) {
+      const myMember = selectedConversation.members?.find(m => m.userId === user?.id)
+      if (myMember?.role !== 'OWNER') {
+        toast.error('Chỉ có trưởng nhóm mới có quyền thay đổi tên nhóm')
+        return
+      }
+    }
     try {
       await renameGroupConversation(accessToken, selectedConversationId, newName)
       setConversations((prev) =>

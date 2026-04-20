@@ -71,15 +71,22 @@ export function MessageGroupBubble({
   // To follow the goal: "Visually group into ONE bubble"
   // We'll create a synthetic message that contains ALL attachments properly mapped to their original IDs.
 
-  const syntheticAttachments = messages.map(m => ({
-    url: m.mediaUrl || "",
-    name: m.text || "",
-    mimeType: m.mediaMimeType,
-    sizeBytes: m.mediaSizeBytes,
-    thumbnailUrl: m.mediaThumbnailUrl,
-    // Add internal metadata to link back to original message
-    originalMessageId: m.id
-  }));
+  const syntheticAttachments = messages.flatMap(m => {
+    if (m.attachments && m.attachments.length > 0) {
+      return m.attachments.map(att => ({
+        ...att,
+        originalMessageId: m.id
+      }));
+    }
+    return [{
+      url: m.mediaUrl || "",
+      name: m.text || "",
+      mimeType: m.mediaMimeType,
+      sizeBytes: m.mediaSizeBytes,
+      thumbnailUrl: m.mediaThumbnailUrl,
+      originalMessageId: m.id
+    }];
+  });
 
   const syntheticMessage: ChatMessage = {
     ...lastMsg, // Use last message for metadata (timestamp, id for overall key)
