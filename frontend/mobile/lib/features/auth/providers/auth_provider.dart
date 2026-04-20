@@ -165,6 +165,36 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> checkPhone(String phone) async {
+    _error = null;
+    try {
+      return await _authService.checkPhone(phone);
+    } catch (e) {
+      _error = _friendlyAuthError(e);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> verifyRegistrationOtp({
+    required String email,
+    required String otp,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      await _authService.verifyRegistrationOtp(email: email, otp: otp);
+    } catch (e) {
+      _error = _friendlyAuthError(e);
+      notifyListeners();
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<Map<String, dynamic>> getQrLoginSessionPreview(String token) async {
     return _authService.getQrLoginSessionPreview(token);
   }

@@ -80,6 +80,11 @@ public class AuthService {
         return otpService.sendOtp(normalizedEmail, OtpPurpose.REGISTER);
     }
 
+    @Transactional(readOnly = true)
+    public void verifyRegistrationOtp(String email, String otp) {
+        otpService.verifyOtp(normalizeEmail(email), otp, OtpPurpose.REGISTER);
+    }
+
     @Transactional
     public AuthResponse register(RegisterRequest request, HttpServletRequest httpRequest) {
         final String normalizedEmail = normalizeEmail(request.getEmail());

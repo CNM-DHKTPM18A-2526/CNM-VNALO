@@ -211,6 +211,18 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("Password reset successfully"));
     }
 
+    @GetMapping("/check-phone/{phone}")
+    public ResponseEntity<Map<String, Boolean>> checkPhone(@PathVariable String phone) {
+        boolean registered = authService.isPhoneRegistered(phone);
+        return ResponseEntity.ok(Map.of("registered", registered));
+    }
+
+    @PostMapping("/register/verify-otp")
+    public ResponseEntity<Void> verifyOtp(@RequestBody Map<String, String> body) {
+        authService.verifyRegistrationOtp(body.get("email"), body.get("otp"));
+        return ResponseEntity.ok().build();
+    }
+
     /**
      * Response for OTP status check.
      */

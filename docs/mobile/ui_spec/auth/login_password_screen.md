@@ -12,6 +12,7 @@
     - Title Style: `fontSize: 18`, `fontWeight: FontWeight.w600`, `color: #171717`
 - **Body**: 
     - Padding: 16px horizontal
+    - Layout: Synchronized with `login_screen.md`. NO `Spacer()` before the primary action. The button must follow the same vertical rhythm (24px after field) to avoid "dropping" to the bottom.
 - **Background**: Pure White (`#FFFFFF`)
 
 ## 3. Component Details
@@ -20,6 +21,7 @@
     - Underline border.
 - **Primary Action (Log in)**:
     - Standard high-emphasis button style.
+    - Position: Immediately follows the Password Input / Forgot Password link area with a standard `24px` gutter.
 - **Secondary Actions**:
     - "Forgot Password" link (Blue text).
     - "Switch Account" link.
