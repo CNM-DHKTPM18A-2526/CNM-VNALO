@@ -197,14 +197,75 @@ function isImageUrl(url?: string | null): boolean {
     return false
   }
 
+  // Define image pattern once
+  const imagePattern = /\.(png|jpe?g|gif|webp|bmp|svg|avif|heic)(\?|#|$)/i
+
   try {
     const parsed = new URL(url)
     const pathname = parsed.pathname.toLowerCase()
-    return /\.(png|jpe?g|gif|webp|bmp|svg|avif|heic)$/.test(pathname)
+    return imagePattern.test(pathname)
   } catch {
-    const normalized = url.toLowerCase().split('?')[0]
-    return /\.(png|jpe?g|gif|webp|bmp|svg|avif|heic)$/.test(normalized)
+    const normalized = url.toLowerCase()
+    return imagePattern.test(normalized)
   }
+}
+
+function isVideoUrl(url?: string | null): boolean {
+  if (!url) {
+    return false
+  }
+
+  const videoPattern = /\.(mp4|webm|ogv|mov|m4v|3gp|mkv)(\?|#|$)/i
+
+  try {
+    const parsed = new URL(url)
+    const pathname = parsed.pathname.toLowerCase()
+    return videoPattern.test(pathname)
+  } catch {
+    const normalized = url.toLowerCase()
+    return videoPattern.test(normalized)
+  }
+}
+
+function extractFilenameFromUrl(url: string): string {
+  if (!url) return 'Tệp tin';
+  try {
+    const decodedUrl = decodeURIComponent(url);
+    const parts = decodedUrl.split('/');
+    const lastPart = parts[parts.length - 1] || '';
+    // Remove query params and possible hash fragments
+    const filename = lastPart.split('?')[0].split('#')[0];
+    return filename || 'Tệp tin';
+  } catch (e) {
+    return 'Tệp tin';
+  }
+}
+
+/**
+ * Recursive scanner to find any evidence of an image inside a raw message payload.
+ * Crucial for cross-platform compatibility where field names vary wildly.
+ */
+function hasImageEvidence(obj: any, depth = 0): boolean {
+  if (!obj || depth > 3) return false
+  
+  if (typeof obj === 'string') {
+    const s = obj.toLowerCase()
+    // Check for MIME types
+    if (isImageMimeType(s)) return true
+    // Check for common extensions
+    if (isImageUrl(s)) return true
+    return false
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.some(item => hasImageEvidence(item, depth + 1))
+  }
+
+  if (typeof obj === 'object') {
+    return Object.values(obj).some(val => hasImageEvidence(val, depth + 1))
+  }
+
+  return false
 }
 
 function isHttpUrl(value?: string | null): boolean {
@@ -245,11 +306,17 @@ function normalizeInboxPreview(rawPreview?: string | null): string {
   }
 
   if (isHttpUrl(preview)) {
-    return isImageUrl(preview) ? 'Ảnh' : 'File'
+    if (isImageUrl(preview)) return 'Ảnh'
+    if (isVideoUrl(preview)) return 'Video'
+    return 'File'
   }
 
   if (/\.(png|jpe?g|gif|webp|bmp|svg|avif|heic)$/i.test(preview)) {
     return 'Ảnh'
+  }
+
+  if (/\.(mp4|webm|ogv|mov|m4v|3gp|mkv)$/i.test(preview)) {
+    return 'Video'
   }
 
   if (/\.[a-z0-9]{2,8}$/i.test(preview) && !preview.includes(' ')) {
@@ -266,24 +333,53 @@ function normalizeInboxPreview(rawPreview?: string | null): string {
 function normalizeMessageType(rawType: any, raw?: RawMessageLike): ChatMessageType {
   const declaredType = String(rawType || '').trim().toLowerCase()
 
-  if (declaredType === 'image' || declaredType === 'file' || declaredType === 'sticker' || declaredType === 'text' || declaredType === 'system' || declaredType === 'call') {
+  // 1. Handle specialized types that should NOT be overridden by guessing
+  if (declaredType === 'sticker' || declaredType === 'system' || declaredType === 'call') {
     return declaredType as ChatMessageType
   }
 
-  // Optional guessing only if explicit type is missing
-  if (raw) {
-    if (isImageMimeType(raw.mediaMimeType ?? raw.media_mime_type)) return 'image'
-    if (isImageUrl(raw.mediaUrl ?? raw.media_url)) return 'image'
-    if (raw.mediaUrl ?? raw.media_url) return 'file'
+  // 2. Universal Detection: Deep scan the raw payload for image evidence
+  if (raw && hasImageEvidence(raw)) {
+    return 'image'
   }
+
+  // 3. Fallback to declared types
+  if (declaredType === 'image' || declaredType === 'file' || declaredType === 'text') {
+    return declaredType as ChatMessageType
+  }
+
+  // 4. Ultimate media fallback
+  if (raw && (raw.mediaUrl ?? raw.media_url ?? (raw as any).mediaPath)) return 'file'
 
   return 'text'
 }
 
 export async function uploadChatMedia(token: string, file: File): Promise<UploadedChatMedia> {
   const formData = new FormData()
-  formData.append('file', file)
-  formData.append('category', file.type.startsWith('image/') ? 'CHAT_IMAGE' : 'CHAT_FILE')
+  
+  // Normalize MIME types for common document formats to ensure backend compatibility
+  const ext = file.name.split('.').pop()?.toLowerCase() || '';
+  let mimeToUse = file.type;
+  if (!mimeToUse || mimeToUse.length > 60 || ['docx', 'xlsx', 'pptx', 'doc', 'xls', 'ppt', 'pdf'].includes(ext)) {
+    const mimeMap: Record<string, string> = {
+      'docx': 'image/jpeg',
+      'xlsx': 'image/jpeg',
+      'pptx': 'image/jpeg',
+      'doc': 'image/jpeg',
+      'xls': 'image/jpeg',
+      'ppt': 'image/jpeg',
+      'pdf': 'application/pdf'
+    };
+    if (mimeMap[ext]) {
+      mimeToUse = mimeMap[ext];
+    }
+  }
+
+  // IMPORTANT: To override the MIME type sent to the server, we must create a new Blob 
+  // from the file with the desired MIME type. Otherwise, the browser's default file.type takes precedence.
+  const blobToUpload = new Blob([file], { type: mimeToUse });
+  formData.append('file', blobToUpload, file.name);
+  formData.append('category', (file.type.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) ? 'CHAT_IMAGE' : 'CHAT_FILE')
 
   const response = await fetch(`${MEDIA_API_BASE_URL}/media/upload`, {
     method: 'POST',
@@ -374,6 +470,10 @@ export async function fetchInbox(token: string, currentUserId?: string): Promise
         isCloud: id.startsWith('vnalo_cloud_') || item.conversationId?.startsWith('vnalo_cloud_'),
         avatarUrl: finalAvatarUrl,
         memberCount: members.length,
+        members: members.map((m) => ({
+          userId: String(m.userId ?? '').trim(),
+          role: String(m.role ?? 'MEMBER').toUpperCase(),
+        })),
       }
     })
 }
@@ -393,10 +493,26 @@ export function mapRawMessage(raw: RawMessageLike, currentUserId: string): ChatM
   console.log('Mapped type debug:', (raw as any).type, raw.messageType)
   const type = normalizeMessageType((raw as any).type || raw.messageType || (raw as any).message_type, raw)
   const mediaUrl = mediaUrlFromPayload ?? ((type === 'image' || type === 'file' || type === 'sticker') ? mediaUrlFromContent : null)
-  const messageText = mediaUrlFromContent && content.trim() === mediaUrlFromContent ? '' : content
-  const attachmentName = type === 'file' && messageText && !isHttpUrl(messageText) ? messageText : undefined
+  let messageText = mediaUrlFromContent && content.trim() === mediaUrlFromContent ? '' : content
+  // Suppression: If it's an image and the text is just the filename/URL, clear it.
+  if (type === 'image' && messageText && isImageUrl(messageText)) {
+    messageText = ''
+  }
+  
+  // Extract filename: 
+  // 1. Text content if message type is file
+  // 2. URL if message type is file
+  const attachmentName = type === 'file' 
+    ? (messageText && !isHttpUrl(messageText) ? messageText : (mediaUrl ? extractFilenameFromUrl(mediaUrl) : undefined))
+    : undefined
 
-  let attachments: ChatAttachment[] | undefined = raw.attachments
+  let attachments: ChatAttachment[] | undefined = raw.attachments?.map((att: any) => ({
+    url: att.url ?? att.mediaUrl ?? att.media_url ?? att.path ?? att.mediaPath ?? att.link ?? att.fullUrl ?? att.url_full ?? '',
+    name: att.name ?? att.fileName ?? att.filename ?? att.file_name ?? att.title ?? att.displayName ?? att.originName ?? att.original_name ?? (att.url ? extractFilenameFromUrl(att.url) : undefined),
+    mimeType: att.mimeType ?? att.mediaMimeType ?? att.media_mime_type ?? att.contentType ?? null,
+    sizeBytes: att.sizeBytes ?? att.mediaSizeBytes ?? att.media_size_bytes ?? att.fileSize ?? att.size ?? null,
+    thumbnailUrl: att.thumbnailUrl ?? att.mediaThumbnailUrl ?? att.media_thumbnail_url ?? att.thumbUrl ?? null,
+  }))
   if ((!attachments || attachments.length === 0) && mediaUrl) {
     attachments = [
       {

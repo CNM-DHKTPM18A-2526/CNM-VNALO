@@ -19,6 +19,7 @@ export type ConversationSummary = {
   isCloud?: boolean
   memberCount?: number
   isPinned?: boolean
+  members?: Array<{ userId: string; role: string }>
 }
 
 export type ChatMessageType = 'text' | 'image' | 'file' | 'sticker' | 'system' | 'call'
