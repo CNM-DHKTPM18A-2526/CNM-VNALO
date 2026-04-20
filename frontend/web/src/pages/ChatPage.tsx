@@ -481,8 +481,10 @@ function ChatPageContent() {
 
   // SYNC CALL STATE TO REF FOR LISTENERS
   const callStateRef = useRef(callState)
+  const currentCallIdRef = useRef<string | null>(null) // Immediate sync ref for signal routing
   useEffect(() => {
     callStateRef.current = callState
+    currentCallIdRef.current = callState.callId || null
   }, [callState])
 
   // Initialize call service with state syncing
@@ -1803,9 +1805,12 @@ function ChatPageContent() {
     if (processedSignalsRef.current.has(sigKey)) return;
     processedSignalsRef.current.add(sigKey);
 
-    console.log('[CALL][RECEIVE ICE]', signalData);
-    if (callId === callStateRef.current.callId) {
+    console.log('[CALL][RECEIVE ICE]', { callId, candidate: Boolean(candidate) });
+    // Use currentCallIdRef for immediate matching to avoid state sync race conditions
+    if (callId === currentCallIdRef.current) {
       await callServiceRef.current?.handleIceCandidate(signalData.candidate);
+    } else {
+      console.warn('[CALL][ICE IGNORED] Call ID mismatch or call not initialized yet', { incoming: callId, current: currentCallIdRef.current });
     }
   };
 
@@ -1835,6 +1840,9 @@ function ChatPageContent() {
     // Support aliased keys from mobile clients at root or in nested object
     const peerUserId = signalData.senderUserId || signalData.callerId || signalData.fromUserId;
     const conversationId = signalData.conversationId || signalData.roomId;
+
+    // Atomic Lock: Update currentCallIdRef immediately before any async work
+    currentCallIdRef.current = callId;
 
     if (callStateRef.current.isOpen) {
       console.warn('[ChatPage] Already in a call, ignoring offer');
