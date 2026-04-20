@@ -972,7 +972,7 @@ function ChatPageContent() {
           // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           // PIN/UNPIN REAL-TIME SYNC
           // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          const actionPayload = payload as any; 
+          const actionPayload = payload as any;
           if (actionPayload.action === 'PIN_MESSAGE' || actionPayload.action === 'UNPIN_MESSAGE') {
             console.log(`[ChatPage.onMessageReceived] Real-time ${actionPayload.action} signal received for conversation:`, mapped.conversationId);
             void syncPinnedMessages(mapped.conversationId);
@@ -1025,11 +1025,11 @@ function ChatPageContent() {
 
           const next = [...prev]
           const current = next[existingIndex]
-          
+
           // PROTECT CONVERSATION IDENTITY
           const isGroup = current.isGroup;
           const isFromMe = mapped.senderId === user.id;
-          
+
           let updatedAvatarUrl = current.avatarUrl;
           let updatedName = current.name;
 
@@ -1057,11 +1057,11 @@ function ChatPageContent() {
               (id) => userMapRef.current[id]?.displayName || 'Người dùng',
             ),
             lastMessageAt: new Date().toISOString(),
-            isStranger: 
-              senderId && friendIdSetRef.current.has(senderId) 
-                ? false 
+            isStranger:
+              senderId && friendIdSetRef.current.has(senderId)
+                ? false
                 : current.isStranger ?? Boolean(senderId),
-            participantUserIds: 
+            participantUserIds:
               current.participantUserIds && senderId
                 ? Array.from(new Set([...current.participantUserIds, senderId]))
                 : current.participantUserIds ?? (senderId ? [senderId] : undefined),
@@ -1336,15 +1336,15 @@ function ChatPageContent() {
             ...prev,
             [conversationId]: currentPins.filter((id) => id !== messageId),
           }))
-          
+
           // Emit signal to sync other clients
           void emitSendMessage({
             conversationId,
-            content: JSON.stringify({ 
-              action: 'UNPIN_MESSAGE', 
-              messageId, 
+            content: JSON.stringify({
+              action: 'UNPIN_MESSAGE',
+              messageId,
               conversationId,
-              actorId: user.id 
+              actorId: user.id
             }),
             messageType: 'SYSTEM',
             clientMessageId: crypto.randomUUID()
@@ -1366,11 +1366,11 @@ function ChatPageContent() {
         // Emit signal to sync other clients
         void emitSendMessage({
           conversationId,
-          content: JSON.stringify({ 
-            action: 'PIN_MESSAGE', 
-            messageId, 
+          content: JSON.stringify({
+            action: 'PIN_MESSAGE',
+            messageId,
             conversationId,
-            actorId: user.id 
+            actorId: user.id
           }),
           messageType: 'SYSTEM',
           clientMessageId: crypto.randomUUID()
@@ -1520,7 +1520,7 @@ function ChatPageContent() {
             const mediaThumbnailUrl = shareModalMessage.mediaThumbnailUrl ?? attachments[0]?.thumbnailUrl ?? null
             const mediaMimeType = shareModalMessage.mediaMimeType ?? attachments[0]?.mimeType ?? null
             const mediaSizeBytes = shareModalMessage.mediaSizeBytes ?? attachments[0]?.sizeBytes ?? null
-            
+
             const payloadContent = (shareModalMessage.text ?? '').trim().length > 0
               ? shareModalMessage.text
               : ""
@@ -1648,7 +1648,7 @@ function ChatPageContent() {
     if (direction === 'outgoing') {
       // 2. OPTIMISTIC UI: Add to chat immediately for caller
       const clientMessageId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
-      
+
       const optimisticLog: ChatMessage = {
         id: clientMessageId,
         clientMessageId,
@@ -3004,7 +3004,7 @@ function ChatPageContent() {
         const isDoc = ['docx', 'xlsx', 'pptx', 'doc', 'xls', 'ppt', 'pdf'].includes(actualExt);
         const isVideo = res.mimeType?.startsWith('video/') || ['mp4', 'mov', 'webm', 'm4v', '3gp', 'mkv'].includes(actualExt);
         const resTypeStr = isDoc ? 'file' : (res.mimeType?.startsWith('image/') ? 'image' : (isVideo ? 'video' : (res.mimeType === 'application/x-chat-sticker' ? 'sticker' : 'file')));
-        
+
         // Use original filename as content for 'file' type messages if no other text is provided.
         const resContent = (i === 0 && content.trim().length > 0) ? content : (resTypeStr === 'file' && file ? file.name : "");
 
