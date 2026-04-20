@@ -15,6 +15,7 @@ import 'package:vnalo_mobile/services/media_service.dart';
 import 'package:vnalo_mobile/services/notification_service.dart';
 import 'package:vnalo_mobile/core/database/local_database.dart';
 import 'dart:io';
+import 'dart:convert';
 
 class ChatProvider extends ChangeNotifier {
   final ChatService _chatService;
@@ -296,6 +297,18 @@ class ChatProvider extends ChangeNotifier {
             }
           }
           await _sendSystemNotification(sanitized.id, '$userName đã tạo nhóm "$title"');
+
+          // BROADCAST to other platforms/members via Socket 
+          // 1. Join room first
+          _socketService.joinConversation(sanitized.id);
+
+          // 2. Emit identical SYSTEM message as Web does, so Web can 'discover' it
+          final syncPayload = '{"action":"CREATE_GROUP","actorId":"$currentUser"}';
+          _socketService.sendMessage(
+            conversationId: sanitized.id,
+            content: syncPayload,
+            messageType: 'SYSTEM',
+          );
           
           return sanitized;
         }
@@ -830,6 +843,59 @@ class ChatProvider extends ChangeNotifier {
           debugPrint('SIGNAL: I was removed from ${message.conversationId}. Removing...');
           _removeConversationLocally(message.conversationId);
           return;
+        }
+      }
+
+      // Handle JSON-based system signals
+      if (content.contains('"action":')) {
+        try {
+          if (content.contains('"action":"CREATE_GROUP"') || 
+              content.contains('"action":"UPDATE_GROUP_INFO"') ||
+              content.contains('"action":"ADD_MEMBERS"') ||
+              content.contains('"action":"LEAVE_GROUP"')) {
+            debugPrint('SIGNAL: Group update signal received for ${message.conversationId}. Refreshing...');
+            loadInbox();
+          }
+
+          if (content.contains('"action":"UPDATE_MESSAGE_REACTIONS"')) {
+            final data = jsonDecode(content);
+            final msgId = data['messageId'];
+            final actionType = data['type']; // 'ADD' or 'REMOVE'
+            final emoji = data['emoji'];
+            final actorId = data['actorId'];
+
+            if (msgId != null) {
+              debugPrint('SIGNAL: Reaction update signal received for $msgId.');
+              
+              // Optimistic local update if we have enough info
+              if (actionType != null && emoji != null && actorId != null) {
+                final currentReactions = _reactions[msgId] ?? [];
+                if (actionType == 'ADD') {
+                  final newReaction = MessageReaction(
+                    id: 'signal_${DateTime.now().millisecondsSinceEpoch}',
+                    conversationId: message.conversationId,
+                    messageId: msgId,
+                    serverSeq: 0,
+                    userId: actorId,
+                    emoji: emoji,
+                    createdAt: DateTime.now(),
+                  );
+                  // Replace existing if from same user
+                  final filtered = currentReactions.where((r) => r.userId != actorId).toList();
+                  filtered.add(newReaction);
+                  _reactions[msgId] = filtered;
+                } else if (actionType == 'REMOVE') {
+                  _reactions[msgId] = currentReactions.where((r) => r.userId != actorId).toList();
+                }
+                notifyListeners();
+              }
+              
+              // Background sync to ensure data integrity
+              loadReactions(msgId);
+            }
+          }
+        } catch (e) {
+          debugPrint('Error parsing system signal: $e');
         }
       }
     }
@@ -1521,14 +1587,14 @@ class ChatProvider extends ChangeNotifier {
 
       await _chatService.updateGroup(conversationId, body);
       
-      // Send system notification for group name change
-      if (title != null) {
-        await _sendSystemNotification(conversationId, '$userName đã đổi tên nhóm thành "$title"');
-      }
-      
-      // Send system notification for group avatar change
-      if (avatarUrl != null) {
-        await _sendSystemNotification(conversationId, '$userName đã đổi ảnh đại diện nhóm');
+      // Send system actions via socket for real-time sync across platforms
+      if (title != null || avatarUrl != null) {
+        final syncPayload = '{"action":"UPDATE_GROUP_INFO","actorId":"$currentUser"}';
+        _socketService.sendMessage(
+          conversationId: conversationId,
+          content: syncPayload,
+          messageType: 'SYSTEM'
+        );
       }
       
       // No need to update local state again since we did it optimistically.
@@ -2124,6 +2190,23 @@ class ChatProvider extends ChangeNotifier {
       // Only use REST API for now (WebSocket events not implemented on backend)
       await _chatService.addReaction(messageId, emoji);
       // _socketService.addReaction(messageId, emoji); // Disabled until backend implements WebSocket events
+
+      // Broadcast signal for real-time sync with other clients (Web/Mobile)
+      if (_activeConversationId != null) {
+        final signal = {
+          'action': 'UPDATE_MESSAGE_REACTIONS',
+          'messageId': messageId,
+          'conversationId': _activeConversationId,
+          'actorId': _currentUserId,
+          'type': 'ADD',
+          'emoji': emoji,
+        };
+        _socketService.sendMessage(
+          conversationId: _activeConversationId!,
+          content: jsonEncode(signal),
+          messageType: 'SYSTEM',
+        );
+      }
     } catch (e) {
       debugPrint('Error adding reaction: $e');
       // Revert on error - reload reactions
@@ -2133,8 +2216,14 @@ class ChatProvider extends ChangeNotifier {
 
   Future<void> removeReaction(String messageId) async {
     try {
-      // Optimistic update
+      // Find what emoji we are removing for the signal
       final currentReactions = _reactions[messageId] ?? [];
+      final myReaction = currentReactions.firstWhere((r) => r.userId == _currentUserId, 
+        orElse: () => MessageReaction(id: '', conversationId: '', messageId: '', serverSeq: 0, userId: '', emoji: '', createdAt: DateTime.now())
+      );
+      final removedEmoji = myReaction.emoji;
+
+      // Optimistic update
       final updatedReactions = currentReactions.where((r) => r.userId != _currentUserId).toList();
       
       _reactions[messageId] = updatedReactions;
@@ -2143,6 +2232,23 @@ class ChatProvider extends ChangeNotifier {
       // Only use REST API for now (WebSocket events not implemented on backend)
       await _chatService.removeReaction(messageId);
       // _socketService.removeReaction(messageId); // Disabled until backend implements WebSocket events
+
+      // Broadcast signal for real-time sync with other clients (Web/Mobile)
+      if (_activeConversationId != null && removedEmoji.isNotEmpty) {
+        final signal = {
+          'action': 'UPDATE_MESSAGE_REACTIONS',
+          'messageId': messageId,
+          'conversationId': _activeConversationId,
+          'actorId': _currentUserId,
+          'type': 'REMOVE',
+          'emoji': removedEmoji,
+        };
+        _socketService.sendMessage(
+          conversationId: _activeConversationId!,
+          content: jsonEncode(signal),
+          messageType: 'SYSTEM',
+        );
+      }
     } catch (e) {
       debugPrint('Error removing reaction: $e');
       // Revert on error - reload reactions

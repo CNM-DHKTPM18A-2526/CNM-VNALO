@@ -114,7 +114,7 @@ export type ViewerImageItem = {
 }
 
 export interface SystemMessagePayload {
-  action: 'ADD_MEMBERS' | 'LEAVE_GROUP' | 'CREATE_GROUP' | 'RENAME_GROUP' | 'PIN_MESSAGE' | 'UNPIN_MESSAGE';
+  action: 'ADD_MEMBERS' | 'LEAVE_GROUP' | 'CREATE_GROUP' | 'RENAME_GROUP' | 'PIN_MESSAGE' | 'UNPIN_MESSAGE' | 'UPDATE_MESSAGE_REACTIONS' | 'UPDATE_GROUP_INFO';
   actorId: string;
   targetMemberIds?: string[];
   metadata?: Record<string, any>;

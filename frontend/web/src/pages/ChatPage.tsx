@@ -960,12 +960,24 @@ function ChatPageContent() {
           await pendingMetadataFetches.current.get(mapped.conversationId)
         }
       } else if (mapped.type === 'system') {
-        // Refresh: If it's a SYSTEM message (add/leave), refresh metadata to update member count/names
-        void loadInbox(accessToken, mapped.conversationId)
-
-        // Proactively fetch profiles for all users mentioned in the system message
+        // Only refresh full inbox for critical structural changes (membership)
+        // or if we don't recognize the action.
         try {
           const payload = JSON.parse(mapped.text) as SystemMessagePayload;
+          const { action } = payload as any;
+          
+          const silentActions = [
+            'UPDATE_MESSAGE_REACTIONS',
+            'UPDATE_GROUP_INFO',
+            'PIN_MESSAGE',
+            'UNPIN_MESSAGE'
+          ];
+
+          if (!silentActions.includes(action)) {
+             void loadInbox(accessToken, mapped.conversationId);
+          }
+
+          // Proactively fetch profiles for all users mentioned in the system message
           const involvedIds = [payload.actorId, ...(payload.targetMemberIds ?? [])].filter(Boolean)
           involvedIds.forEach((id) => void ensureUser(accessToken, id))
 
@@ -977,8 +989,64 @@ function ChatPageContent() {
             console.log(`[ChatPage.onMessageReceived] Real-time ${actionPayload.action} signal received for conversation:`, mapped.conversationId);
             void syncPinnedMessages(mapped.conversationId);
           }
+          
+          if (actionPayload.action === 'UPDATE_MESSAGE_REACTIONS') {
+            const { messageId, type: actionType, emoji, actorId } = actionPayload;
+            
+            // Optimistic sync if we have the data
+            if (messageId && actionType && emoji) {
+               const reactionKey = EMOJI_TO_REACTION_KEY[emoji];
+               if (reactionKey) {
+                 setReactionStatesByMessage(prev => {
+                   const currentState = prev[messageId] || { reactions: {}, lastUsedReaction: undefined };
+                   const reactions = { ...currentState.reactions };
+                   const currentReaction = reactions[reactionKey] || { count: 0, myCount: 0 };
+                   
+                   if (actionType === 'ADD') {
+                     reactions[reactionKey] = {
+                       count: currentReaction.count + 1,
+                       myCount: currentReaction.myCount + (actorId === user?.id ? 1 : 0)
+                     };
+                   } else if (actionType === 'REMOVE') {
+                     reactions[reactionKey] = {
+                       count: Math.max(0, currentReaction.count - 1),
+                       myCount: Math.max(0, currentReaction.myCount - (actorId === user?.id ? 1 : 0))
+                     };
+                     if (reactions[reactionKey].count <= 0) {
+                       delete reactions[reactionKey];
+                     }
+                   }
+                   
+                   // Resolve lastUsedReaction
+                   const myReaction = (Object.keys(reactions) as ReactionKey[]).find(
+                     (key) => (reactions[key]?.myCount ?? 0) > 0,
+                   );
+
+                   return {
+                     ...prev,
+                     [messageId]: {
+                       reactions,
+                       lastUsedReaction: myReaction
+                     }
+                   };
+                 });
+               }
+            }
+            // Always trigger background sync for reactions to ensure accuracy, 
+            // but this fetch is specific to one message and doesn't flash the whole inbox.
+            void syncMessageReaction(actionPayload.messageId);
+          }
+
+          if (actionPayload.action === 'UPDATE_GROUP_INFO' && actionPayload.metadata?.newName) {
+            const newName = actionPayload.metadata.newName;
+            setConversations(prev => prev.map(c => 
+              c.id === mapped.conversationId ? { ...c, name: newName } : c
+            ));
+          }
         } catch (e) {
-          /* ignore parse errors */
+          // If parse fails, it might be a raw system message format or older signal, 
+          // default to refreshing inbox to be safe.
+          void loadInbox(accessToken, mapped.conversationId);
         }
       }
 
@@ -1222,7 +1290,7 @@ function ChatPageContent() {
 
   const handleAddReaction = useCallback(
     async (messageId: string, reactionKey: ReactionKey) => {
-      if (!accessToken) {
+      if (!accessToken || !selectedConversationId) {
         return
       }
 
@@ -1234,16 +1302,36 @@ function ChatPageContent() {
       try {
         await addMessageReaction(accessToken, messageId, emoji)
         await syncMessageReaction(messageId)
+
+        // Emit signal to sync other clients
+        void emitSendMessage({
+          conversationId: selectedConversationId,
+          content: JSON.stringify({
+            action: 'UPDATE_MESSAGE_REACTIONS',
+            messageId,
+            conversationId: selectedConversationId,
+            actorId: user?.id,
+            type: 'ADD',
+            emoji: emoji
+          }),
+          messageType: 'SYSTEM',
+          clientMessageId: crypto.randomUUID()
+        });
       } catch (error) {
         console.error('[ChatPage.handleAddReaction] Failed to add reaction', { messageId, reactionKey, error })
       }
     },
-    [accessToken, syncMessageReaction],
+    [accessToken, selectedConversationId, user?.id, emitSendMessage, syncMessageReaction],
   )
 
   const handleRemoveReaction = useCallback(
     async (messageId: string, reactionKey: ReactionKey) => {
-      if (!accessToken) {
+      if (!accessToken || !selectedConversationId) {
+        return
+      }
+
+      const emoji = REACTION_OPTIONS.find((item) => item.key === reactionKey)?.emoji
+      if (!emoji) {
         return
       }
 
@@ -1255,11 +1343,26 @@ function ChatPageContent() {
       try {
         await removeMessageReaction(accessToken, messageId)
         await syncMessageReaction(messageId)
+
+        // Emit signal to sync other clients
+        void emitSendMessage({
+          conversationId: selectedConversationId,
+          content: JSON.stringify({
+            action: 'UPDATE_MESSAGE_REACTIONS',
+            messageId,
+            conversationId: selectedConversationId,
+            actorId: user?.id,
+            type: 'REMOVE',
+            emoji: emoji
+          }),
+          messageType: 'SYSTEM',
+          clientMessageId: crypto.randomUUID()
+        });
       } catch (error) {
         console.error('[ChatPage.handleRemoveReaction] Failed to remove reaction', { messageId, reactionKey, error })
       }
     },
-    [accessToken, reactionStatesByMessage, syncMessageReaction],
+    [accessToken, selectedConversationId, user?.id, emitSendMessage, reactionStatesByMessage, syncMessageReaction],
   )
 
   const handleDeleteForMe = useCallback(
@@ -2302,6 +2405,10 @@ function ChatPageContent() {
           actorId: user.id
         });
 
+        // Join the conversation room first to ensuring receiving messages and broadcasts
+        await joinConversation(groupId);
+
+        // Emit structured SYSTEM message via socket
         void emitSendMessage({
           conversationId: groupId,
           content: systemPayload,
@@ -2323,7 +2430,7 @@ function ChatPageContent() {
         setIsCreatingGroup(false);
       }
     },
-    [accessToken, user, navigate, loadInbox, emitSendMessage]
+    [accessToken, user, navigate, loadInbox, emitSendMessage, joinConversation]
   );
 
 
@@ -3237,10 +3344,15 @@ function ChatPageContent() {
       )
       toast.success('Đổi tên nhóm thành công')
 
-      const actorName = user?.name || 'Người dùng'
+      const systemPayload = JSON.stringify({
+        action: 'UPDATE_GROUP_INFO',
+        actorId: user?.id,
+        metadata: { newName }
+      });
+
       void emitSendMessage({
         conversationId: selectedConversationId,
-        content: `${actorName} đã đổi tên nhóm thành "${newName}"`,
+        content: systemPayload,
         messageType: 'SYSTEM',
         clientMessageId: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : String(Date.now()),
       })
