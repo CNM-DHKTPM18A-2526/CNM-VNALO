@@ -4,17 +4,17 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
-import 'package:vnalo_mobile/core/widgets/group_avatar.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
-import 'package:vnalo_mobile/features/chat/screens/wallpaper_selection_screen.dart';
-import 'package:vnalo_mobile/features/chat/screens/group_members_screen.dart';
-import 'package:vnalo_mobile/features/chat/screens/group_join_requests_screen.dart';
-import 'package:vnalo_mobile/features/chat/screens/group_settings_screen.dart';
 import 'package:vnalo_mobile/features/chat/screens/add_group_members_screen.dart';
-import 'package:vnalo_mobile/models/conversation_model.dart';
+import 'package:vnalo_mobile/features/chat/screens/group_join_requests_screen.dart';
+import 'package:vnalo_mobile/features/chat/screens/group_members_screen.dart';
+import 'package:vnalo_mobile/features/chat/screens/group_settings_screen.dart';
+import 'package:vnalo_mobile/features/chat/screens/wallpaper_selection_screen.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/conversation_member_model.dart';
+import 'package:vnalo_mobile/models/conversation_model.dart';
+import 'package:vnalo_mobile/navigation/main_shell.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
@@ -309,13 +309,9 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
                       name: conv.title ?? 'Group',
                       size: 100,
                     )
-                  : GroupAvatar(
-                      members: conv.members
-                          .map((m) => (
-                                imageUrl: m.user?.avatarUrl,
-                                name: m.user?.displayName ?? m.nickname ?? 'User',
-                              ))
-                          .toList(),
+                  : AvatarWidget(
+                      imageUrl: null,
+                      name: conv.title ?? 'Group',
                       size: 100,
                     ),
               Positioned(
@@ -515,13 +511,10 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
         showCupertinoDialog(
           context: context,
           builder: (context) => CupertinoAlertDialog(
-            title: const Text('Không thể rời nhóm'),
-            content: const Text('Bạn đang là Trưởng/Phó nhóm. Để rời nhóm, bạn cần chuyển chức vụ cho thành viên khác trước.'),
+            title: const Text('Rời nhóm?'),
+            content: const Text('Bạn phải chuyển quyền trưởng nhóm cho thành viên khác trước khi rời.'),
             actions: [
-              CupertinoDialogAction(
-                onPressed: () => Navigator.pop(context), 
-                child: const Text('Đóng')
-              ),
+              CupertinoDialogAction(onPressed: () => Navigator.pop(context), child: const Text('Đóng')),
             ],
           ),
         );
@@ -538,12 +531,15 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
               CupertinoDialogAction(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
               CupertinoDialogAction(
                 onPressed: () async {
+                  // Dismiss dialog first
+                  Navigator.pop(context);
+                  
                   final chatProvider = context.read<ChatProvider>();
                   await chatProvider.disbandGroup(conv.id);
-                  await chatProvider.loadInbox();
-                  if (mounted) {
-                    Navigator.popUntil(context, (route) => route.isFirst);
-                  }
+                  
+                  // Navigate to chat tab
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                  MainShellState.globalKey.currentState?.setTabIndex(0);
                 },
                 isDestructiveAction: true,
                 child: const Text('Giải tán & Rời đi'),
@@ -564,12 +560,15 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
           CupertinoDialogAction(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
           CupertinoDialogAction(
             onPressed: () async {
+              // Dismiss dialog first
+              Navigator.pop(context);
+              
               final chatProvider = context.read<ChatProvider>();
               await chatProvider.leaveGroup(conv.id);
-              await chatProvider.loadInbox();
-              if (mounted) {
-                Navigator.popUntil(context, (route) => route.isFirst);
-              }
+              
+              // Navigate to chat tab
+              Navigator.of(context).popUntil((route) => route.isFirst);
+              MainShellState.globalKey.currentState?.setTabIndex(0);
             },
             isDestructiveAction: true,
             child: const Text('Rời nhóm'),
@@ -589,12 +588,15 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
           CupertinoDialogAction(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
           CupertinoDialogAction(
             onPressed: () async {
+              // Dismiss dialog first
+              Navigator.pop(context);
+              
               final chatProvider = context.read<ChatProvider>();
               await chatProvider.disbandGroup(conv.id);
-              await chatProvider.loadInbox(); // Refresh inbox to remove disbanded group
-              if (mounted) {
-                Navigator.popUntil(context, (route) => route.isFirst);
-              }
+              
+              // Navigate to chat tab
+              Navigator.of(context).popUntil((route) => route.isFirst);
+              MainShellState.globalKey.currentState?.setTabIndex(0);
             },
             isDestructiveAction: true,
             child: const Text('Giải tán'),

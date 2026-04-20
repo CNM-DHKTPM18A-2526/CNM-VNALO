@@ -285,6 +285,18 @@ class ChatProvider extends ChangeNotifier {
         if (sanitized != null) {
           _conversations = [sanitized, ..._conversations];
           notifyListeners();
+          
+          // Send system notification for group creation
+          final currentUser = _currentUserId;
+          String userName = 'Một thành viên';
+          if (currentUser != null) {
+            final memberIndex = sanitized.members.indexWhere((m) => m.userId == currentUser);
+            if (memberIndex >= 0) {
+              userName = sanitized.members[memberIndex].user?.displayName ?? userName;
+            }
+          }
+          await _sendSystemNotification(sanitized.id, '$userName đã tạo nhóm "$title"');
+          
           return sanitized;
         }
       }
@@ -1433,6 +1445,34 @@ class ChatProvider extends ChangeNotifier {
 
   // --- Group Management ---
 
+  Future<void> _sendSystemNotification(String conversationId, String content) async {
+    try {
+      debugPrint('Adding system notification to local state for $conversationId: $content');
+      
+      // Create system message locally and add to messages list
+      final systemMessage = Message(
+        id: 'system-${DateTime.now().millisecondsSinceEpoch}',
+        conversationId: conversationId,
+        senderId: _currentUserId ?? '',
+        messageType: MessageType.SYSTEM,
+        content: content,
+        status: MessageStatus.SENT,
+        createdAt: DateTime.now(),
+      );
+      
+      // Add to local messages
+      if (_messages[conversationId] == null) {
+        _messages[conversationId] = [];
+      }
+      _messages[conversationId]!.insert(0, systemMessage);
+      notifyListeners();
+      
+      debugPrint('System notification added to local state successfully');
+    } catch (e) {
+      debugPrint('Failed to add system notification: $e');
+    }
+  }
+
   Future<void> updateGroupInfo(String conversationId, {
     String? title, 
     String? description, 
@@ -1442,6 +1482,18 @@ class ChatProvider extends ChangeNotifier {
     bool? allowMemberPin,
     bool? allowMemberEditInfo,
   }) async {
+    final currentUser = _currentUserId;
+    String userName = 'Một thành viên';
+    if (currentUser != null) {
+      final index = _conversations.indexWhere((c) => c.id == conversationId);
+      if (index >= 0) {
+        final memberIndex = _conversations[index].members.indexWhere((m) => m.userId == currentUser);
+        if (memberIndex >= 0) {
+          userName = _conversations[index].members[memberIndex].user?.displayName ?? userName;
+        }
+      }
+    }
+
     // Step 1: Optimistic UI Update
     final index = _conversations.indexWhere((c) => c.id == conversationId);
     if (index >= 0) {
@@ -1468,6 +1520,17 @@ class ChatProvider extends ChangeNotifier {
       if (allowMemberEditInfo != null) body['allowMemberEditInfo'] = allowMemberEditInfo;
 
       await _chatService.updateGroup(conversationId, body);
+      
+      // Send system notification for group name change
+      if (title != null) {
+        await _sendSystemNotification(conversationId, '$userName đã đổi tên nhóm thành "$title"');
+      }
+      
+      // Send system notification for group avatar change
+      if (avatarUrl != null) {
+        await _sendSystemNotification(conversationId, '$userName đã đổi ảnh đại diện nhóm');
+      }
+      
       // No need to update local state again since we did it optimistically.
     } catch (e) {
       debugPrint('updateGroupInfo error: $e');
@@ -1489,6 +1552,22 @@ class ChatProvider extends ChangeNotifier {
           _conversations[index] = _conversations[index].copyWith(personalWallpaperUrl: imageUrl);
         }
         notifyListeners();
+      }
+      
+      // Send system notification for wallpaper change (only for global wallpaper)
+      if (isGlobal) {
+        final currentUser = _currentUserId;
+        String userName = 'Một thành viên';
+        if (currentUser != null) {
+          final convIndex = _conversations.indexWhere((c) => c.id == conversationId);
+          if (convIndex >= 0) {
+            final memberIndex = _conversations[convIndex].members.indexWhere((m) => m.userId == currentUser);
+            if (memberIndex >= 0) {
+              userName = _conversations[convIndex].members[memberIndex].user?.displayName ?? userName;
+            }
+          }
+        }
+        await _sendSystemNotification(conversationId, '$userName đã đổi hình nền nhóm');
       }
     } catch (e) {
       debugPrint('updateWallpaperUrl error: $e');
@@ -1533,8 +1612,22 @@ class ChatProvider extends ChangeNotifier {
     final myId = _currentUserId;
     if (myId == null) return;
 
-    // Step 1: Surgical Local Update for immediate feedback (Optimistic UI)
+    // Get user names for notification
+    String myName = 'Một thành viên';
+    String targetName = 'Một thành viên';
     final index = _conversations.indexWhere((c) => c.id == conversationId);
+    if (index >= 0) {
+      final myMemberIndex = _conversations[index].members.indexWhere((m) => m.userId == myId);
+      if (myMemberIndex >= 0) {
+        myName = _conversations[index].members[myMemberIndex].user?.displayName ?? myName;
+      }
+      final targetMemberIndex = _conversations[index].members.indexWhere((m) => m.userId == targetUserId);
+      if (targetMemberIndex >= 0) {
+        targetName = _conversations[index].members[targetMemberIndex].user?.displayName ?? targetName;
+      }
+    }
+
+    // Step 1: Surgical Local Update for immediate feedback (Optimistic UI)
     if (index >= 0) {
       final conv = _conversations[index];
       final updatedMembers = conv.members.map((m) {
@@ -1554,6 +1647,9 @@ class ChatProvider extends ChangeNotifier {
       // Step 2: API Update
       await _chatService.updateMemberRole(conversationId, targetUserId, 'OWNER');
       
+      // Send system notification for ownership transfer
+      await _sendSystemNotification(conversationId, '$myName đã chuyển quyền trưởng nhóm cho $targetName');
+      
       // Step 3: Unified Sync
       await refreshConversation(conversationId);
     } catch (e) {
@@ -1565,6 +1661,19 @@ class ChatProvider extends ChangeNotifier {
   }
 
   Future<void> addMembersToGroup(String conversationId, List<User> newUsers) async {
+    // Get current user name for notification
+    final currentUser = _currentUserId;
+    String userName = 'Một thành viên';
+    if (currentUser != null) {
+      final index = _conversations.indexWhere((c) => c.id == conversationId);
+      if (index >= 0) {
+        final memberIndex = _conversations[index].members.indexWhere((m) => m.userId == currentUser);
+        if (memberIndex >= 0) {
+          userName = _conversations[index].members[memberIndex].user?.displayName ?? userName;
+        }
+      }
+    }
+
     // Step 1: Surgical Local Update for immediate visual feedback (TRUE Optimistic UI)
     final index = _conversations.indexWhere((c) => c.id == conversationId);
     if (index >= 0) {
@@ -1602,6 +1711,14 @@ class ChatProvider extends ChangeNotifier {
       final memberIds = newUsers.map((u) => u.id).toList();
       await _chatService.addMembers(conversationId, memberIds);
       
+      // Send system notification for adding members
+      if (newUsers.length == 1) {
+        final memberName = newUsers.first.displayName ?? 'Một thành viên';
+        await _sendSystemNotification(conversationId, '$userName đã thêm $memberName vào nhóm');
+      } else {
+        await _sendSystemNotification(conversationId, '$userName đã thêm ${newUsers.length} thành viên vào nhóm');
+      }
+      
       // Step 2: Synchronization Delay
       // Allow the backend some time to process the addition before we refresh the state.
       await Future.delayed(const Duration(seconds: 2));
@@ -1619,6 +1736,25 @@ class ChatProvider extends ChangeNotifier {
   }
 
   Future<void> removeMember(String conversationId, String userId) async {
+    // Get current user name and removed user name for notification
+    final currentUser = _currentUserId;
+    String userName = 'Một thành viên';
+    String removedUserName = 'Một thành viên';
+    
+    if (currentUser != null) {
+      final index = _conversations.indexWhere((c) => c.id == conversationId);
+      if (index >= 0) {
+        final memberIndex = _conversations[index].members.indexWhere((m) => m.userId == currentUser);
+        if (memberIndex >= 0) {
+          userName = _conversations[index].members[memberIndex].user?.displayName ?? userName;
+        }
+        final removedMemberIndex = _conversations[index].members.indexWhere((m) => m.userId == userId);
+        if (removedMemberIndex >= 0) {
+          removedUserName = _conversations[index].members[removedMemberIndex].user?.displayName ?? removedUserName;
+        }
+      }
+    }
+
     // Step 1: Surgical Local Update for immediate feedback
     final index = _conversations.indexWhere((c) => c.id == conversationId);
     if (index >= 0) {
@@ -1636,6 +1772,9 @@ class ChatProvider extends ChangeNotifier {
       );
       
       await _chatService.removeMember(conversationId, userId);
+      
+      // Send system notification for removing member
+      await _sendSystemNotification(conversationId, '$userName đã loại $removedUserName khỏi nhóm');
     } catch (e) {
       debugPrint('removeMember error: $e');
       rethrow;
@@ -1645,6 +1784,24 @@ class ChatProvider extends ChangeNotifier {
   Future<void> leaveGroup(String conversationId) async {
     final userId = _currentUserId;
     if (userId == null) return;
+    
+    // Check if current user is the owner
+    final index = _conversations.indexWhere((c) => c.id == conversationId);
+    if (index >= 0) {
+      final conv = _conversations[index];
+      final member = conv.members.firstWhere(
+        (m) => m.userId == userId,
+        orElse: () => throw Exception('Member not found'),
+      );
+      
+      // If user is owner, check if there are other members to transfer ownership to
+      if (member.role == MemberRole.OWNER) {
+        final activeMembers = conv.members.where((m) => m.leftAt == null).toList();
+        if (activeMembers.length > 1) {
+          throw Exception('Bạn phải chuyển quyền trưởng nhóm cho thành viên khác trước khi rời nhóm');
+        }
+      }
+    }
     
     // Step 1: Remove conversation immediately from UI
     _conversations.removeWhere((c) => c.id == conversationId);
@@ -1664,9 +1821,14 @@ class ChatProvider extends ChangeNotifier {
       throw StateError('Current user is not available');
     }
 
-    // Step 1: Instant UI Cleanup
+    // Get current user name for notification
+    String userName = 'Một thành viên';
     final convToRemove = _conversations.firstWhere((c) => c.id == conversationId, 
       orElse: () => throw Exception('Conversation not found'));
+    final memberIndex = convToRemove.members.indexWhere((m) => m.userId == currentUserId);
+    if (memberIndex >= 0) {
+      userName = convToRemove.members[memberIndex].user?.displayName ?? userName;
+    }
     
     final memberIdsToNotify = convToRemove.members
         .where((m) => m.leftAt == null)
@@ -1674,6 +1836,9 @@ class ChatProvider extends ChangeNotifier {
         .toList();
 
     try {
+      // Send system notification for disbanding group
+      await _sendSystemNotification(conversationId, '$userName đã giải tán nhóm');
+      
       // NOTIFY: Send signal message so everyone's app knows the group is disbanded in real-time
       await _socketService.sendMessage(
         conversationId: conversationId,
@@ -1734,8 +1899,22 @@ class ChatProvider extends ChangeNotifier {
     final memberRole = enumFromString(MemberRole.values, role);
     final myId = _currentUserId;
 
-    // Step 1: Surgical Local Update for immediate feedback (Optimistic UI)
+    // Get user names for notification
+    String myName = 'Một thành viên';
+    String targetName = 'Một thành viên';
     final index = _conversations.indexWhere((c) => c.id == conversationId);
+    if (index >= 0 && myId != null) {
+      final myMemberIndex = _conversations[index].members.indexWhere((m) => m.userId == myId);
+      if (myMemberIndex >= 0) {
+        myName = _conversations[index].members[myMemberIndex].user?.displayName ?? myName;
+      }
+      final targetMemberIndex = _conversations[index].members.indexWhere((m) => m.userId == userId);
+      if (targetMemberIndex >= 0) {
+        targetName = _conversations[index].members[targetMemberIndex].user?.displayName ?? targetName;
+      }
+    }
+
+    // Step 1: Surgical Local Update for immediate feedback (Optimistic UI)
     if (index >= 0) {
       final conv = _conversations[index];
       
@@ -1758,6 +1937,13 @@ class ChatProvider extends ChangeNotifier {
     try {
       // Step 2: API Update
       await _chatService.updateMemberRole(conversationId, userId, role);
+      
+      // Send system notification for role change
+      if (memberRole == MemberRole.ADMIN) {
+        await _sendSystemNotification(conversationId, '$myName đã bổ nhiệm $targetName làm phó nhóm');
+      } else if (memberRole == MemberRole.MEMBER) {
+        await _sendSystemNotification(conversationId, '$myName đã hạ cấp $targetName thành thành viên');
+      }
       
       // Step 3: Unified Sync
       await refreshConversation(conversationId);

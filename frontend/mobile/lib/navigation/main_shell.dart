@@ -22,13 +22,25 @@ class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
   @override
-  State<MainShell> createState() => _MainShellState();
+  State<MainShell> createState() => MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
+class MainShellState extends State<MainShell> {
   int _currentIndex = 0;
   StreamSubscription<AiCommand>? _actionSub;
   StreamSubscription<Map<String, dynamic>>? _callErrorSub;
+  
+  // Static key to access state from outside
+  static final GlobalKey<MainShellState> globalKey = GlobalKey<MainShellState>();
+
+  // Method to set tab index from outside
+  void setTabIndex(int index) {
+    if (mounted) {
+      setState(() {
+        _currentIndex = index;
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -233,6 +245,7 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
+      key: globalKey,
       body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: Consumer2<ChatProvider, ContactProvider>(
         builder: (context, chatProvider, contactProvider, child) {

@@ -419,6 +419,17 @@ class ChatService {
     return Message.fromJson(response['data']);
   }
 
+  Future<Message> sendSystemMessage({
+    required String conversationId,
+    required String content,
+  }) async {
+    return sendMessage(
+      conversationId: conversationId,
+      content: content,
+      messageType: 'SYSTEM',
+    );
+  }
+
   Future<Map<String, dynamic>> updateInboxSettings(String conversationId, {
     bool? isPinned, 
     bool? isMuted, 
