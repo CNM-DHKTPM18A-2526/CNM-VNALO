@@ -62,6 +62,14 @@ erDiagram
       uuid approved_by_account_id
       timestamp expires_at
     }
+    AUTH_SESSION_AUDIT {
+      uuid audit_id PK
+      uuid account_id
+      uuid token_id
+      string event_type
+      string platform
+      timestamp created_at
+    }
     USER_PROFILE {
       uuid id PK
       string display_name
@@ -238,6 +246,25 @@ erDiagram
       uuid user_id
       string status
     }
+    MODERATION_ADMIN_USER {
+      uuid user_id PK
+      string role
+      boolean is_active
+      timestamp created_at
+    }
+    MODERATION_AUDIT_LOG {
+      uuid audit_log_id PK
+      uuid report_id
+      uuid case_id
+      string action
+      uuid performed_by
+      timestamp created_at
+    }
+    MODERATION_REPORT_EVIDENCE {
+      uuid evidence_id PK
+      uuid report_id
+      timestamp created_at
+    }
 
     NOTIFICATION_DEVICE {
       uuid id PK
@@ -330,10 +357,25 @@ erDiagram
       uuid pack_id PK
       timestamp installed_at
     }
+    USER_MEDIA_LIBRARY_ITEM {
+      uuid user_media_lib_id PK
+      uuid user_id
+      uuid media_id
+      string source_type
+      timestamp saved_at
+    }
+    AI_STICKER {
+      uuid ai_sticker_id PK
+      uuid user_id
+      uuid media_id
+      string status
+      timestamp created_at
+    }
 
     AUTH_ACCOUNT ||--o{ AUTH_REFRESH_TOKEN : has
     AUTH_ACCOUNT ||--o{ AUTH_OTP : verifies
     AUTH_ACCOUNT ||--o{ AUTH_QR_LOGIN_SESSION : approves
+    AUTH_ACCOUNT ||--o{ AUTH_SESSION_AUDIT : audits
     AUTH_ACCOUNT ||--|| USER_PROFILE : owns
     USER_PROFILE ||--|| USER_SETTING : config
     USER_PROFILE ||--|| USER_PRIVACY_SETTING : privacy
@@ -361,6 +403,12 @@ erDiagram
     MODERATION_REPORT ||--|| MODERATION_CASE : escalates_to
     MODERATION_CASE ||--o{ MODERATION_ACTION : actions
     MODERATION_CASE ||--o{ MODERATION_APPEAL : appeals
+    MODERATION_REPORT ||--o{ MODERATION_REPORT_EVIDENCE : evidences
+    MODERATION_REPORT ||--o{ MODERATION_AUDIT_LOG : audit_entries
+    MODERATION_CASE ||--o{ MODERATION_AUDIT_LOG : audit_entries
+    MODERATION_ADMIN_USER ||--o{ MODERATION_CASE : assignee
+    MODERATION_ADMIN_USER ||--o{ MODERATION_ACTION : actor
+    MODERATION_ADMIN_USER ||--o{ MODERATION_AUDIT_LOG : actor
 
     USER_PROFILE ||--o{ NOTIFICATION_DEVICE : owns
     USER_PROFILE ||--o{ NOTIFICATION : receives
@@ -371,9 +419,13 @@ erDiagram
     MEDIA_METADATA ||--o{ MEDIA_ACCESS_SCOPE : scoped_to
     MEDIA_METADATA ||--o{ MEDIA_JOB : processed_by
     MEDIA_METADATA ||--o{ STICKER : material
+    MEDIA_METADATA ||--o{ USER_MEDIA_LIBRARY_ITEM : saved
+    MEDIA_METADATA ||--o{ AI_STICKER : ai_output
     STICKER_PACK ||--o{ STICKER : contains
     STICKER ||--o{ STICKER_USAGE : usage
     STICKER_PACK ||--o{ USER_STICKER_PACK : library
+    USER_PROFILE ||--o{ USER_MEDIA_LIBRARY_ITEM : library_owner
+    USER_PROFILE ||--o{ AI_STICKER : ai_creator
 ```
 
 ## Redis Data Roles

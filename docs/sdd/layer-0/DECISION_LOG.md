@@ -15,6 +15,8 @@
 | D-006 | Notification User Identity from X-User-Id Header | Accepted with Risk | 2026-04-19 |
 | D-007 | Call Signaling Offline Fallback via Redis CALL_OFFLINE Publish | Accepted | 2026-04-19 |
 | D-008 | restrictedWebMode Runtime Override in chat.gateway | Accepted with Risk | 2026-04-19 |
+| D-009 | Content Service Mutating Identity via X-User-Id with permitAll Security | Accepted with Risk | 2026-04-20 |
+| D-010 | Runtime Status in Blueprint Follows Default Compose Activation | Accepted | 2026-04-20 |
 
 ---
 
@@ -103,3 +105,26 @@
   - Security policy enforcement must be reintroduced intentionally with test coverage.
 - Evidence:
   - backend/node-services/apps/message-service/src/gateway/chat.gateway.ts
+
+## D-009 Content Service Mutating Identity via X-User-Id with permitAll Security
+
+- Context: content-service security config permits all requests while mutating endpoints rely on X-User-Id header.
+- Decision: Keep current pattern documented as explicit risk until JWT-backed service boundary is introduced.
+- Consequence:
+  - Simpler interim integration with existing clients.
+  - Weak trust boundary for identity-sensitive write operations.
+- Evidence:
+  - backend/java-services/services/content-service/src/main/java/iuh/cnm/vnalo/content_service/config/SecurityConfig.java
+  - backend/java-services/services/content-service/src/main/java/iuh/cnm/vnalo/content_service/controller/PostController.java
+  - backend/java-services/services/content-service/src/main/java/iuh/cnm/vnalo/content_service/controller/StoryController.java
+
+## D-010 Runtime Status in Blueprint Follows Default Compose Activation
+
+- Context: some services exist in code but are not active by default in docker-compose runtime.
+- Decision: Runtime status in Layer 0 blueprint must reflect default compose activation, not only code presence.
+- Consequence:
+  - More accurate operational expectations for local and CI environments.
+  - Clear distinction between implemented services and default active services.
+- Evidence:
+  - docker/docker-compose.yml
+  - docs/sdd/layer-0/ARCHITECTURE_BLUEPRINT.md

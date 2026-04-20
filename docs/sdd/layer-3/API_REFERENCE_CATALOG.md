@@ -25,14 +25,14 @@
 | message-service | JWT bearer for conversations/messages/inbox controllers |
 | media-service | JWT bearer for protected endpoints, /api/v1/media/public/* is public |
 | moderation-service | JWT bearer with role checks for reports and moderation paths |
-| content-service | Security config currently permits all requests |
+| content-service | Security config permitAll; mutating controllers require X-User-Id header but no JWT validation chain |
 | notification-service | Controller trusts X-User-Id header, no service-local security chain found |
 | ai-service | JWT bearer required for application endpoints |
 | analytics-service | JWT bearer for /api/v1/analytics/* and internal authority for /internal/events |
 | realtime-gateway | WS handshake JWT on /realtime namespace; REST health is open |
 
 > [!WARNING]
-> notification-service and content-service auth posture does not match hardened JWT-only expectations.
+> notification-service and content-service trust controller-level X-User-Id headers for mutating actions and do not enforce JWT at service boundary.
 
 ---
 
@@ -117,6 +117,13 @@
 | GET | /api/v1/qr/generate | JWT | generate QR payload |
 | POST | /api/v1/qr/scan | JWT | scan QR |
 | POST | /api/v1/qr/scan/add-friend | JWT | scan and add friend |
+
+### Core test utility
+
+| Method | Full Path | Auth | Notes |
+| --- | --- | --- | --- |
+| POST | /api/v1/test/fcm/send | JWT | send test push payload |
+| POST | /api/v1/test/fcm/send-otp | JWT | send OTP-style test push payload |
 
 ---
 
@@ -235,24 +242,24 @@
 
 ## content-service Endpoints
 
-| Method | Full Path | Auth |
-| --- | --- | --- |
-| POST | /api/v1/stories | Currently Public by security config |
-| GET | /api/v1/stories | Currently Public by security config |
-| DELETE | /api/v1/stories/{storyId} | Currently Public by security config |
-| POST | /api/v1/stories/{storyId}/view | Currently Public by security config |
-| GET | /api/v1/stories/{storyId}/views | Currently Public by security config |
-| POST | /api/v1/posts | Currently Public by security config |
-| GET | /api/v1/posts/timeline | Currently Public by security config |
-| GET | /api/v1/posts/{postId} | Currently Public by security config |
-| PUT | /api/v1/posts/{postId} | Currently Public by security config |
-| DELETE | /api/v1/posts/{postId} | Currently Public by security config |
-| POST | /api/v1/posts/{postId}/like | Currently Public by security config |
-| DELETE | /api/v1/posts/{postId}/like | Currently Public by security config |
-| POST | /api/v1/posts/{postId}/comments | Currently Public by security config |
-| GET | /api/v1/posts/{postId}/comments | Currently Public by security config |
-| PUT | /api/v1/comments/{commentId} | Currently Public by security config |
-| DELETE | /api/v1/comments/{commentId} | Currently Public by security config |
+| Method | Full Path | Auth | Notes |
+| --- | --- | --- | --- |
+| POST | /api/v1/stories | No JWT guard (permitAll) | requires X-User-Id header |
+| GET | /api/v1/stories | No JWT guard (permitAll) | public read |
+| DELETE | /api/v1/stories/{storyId} | No JWT guard (permitAll) | requires X-User-Id header |
+| POST | /api/v1/stories/{storyId}/view | No JWT guard (permitAll) | requires X-User-Id header |
+| GET | /api/v1/stories/{storyId}/views | No JWT guard (permitAll) | public read |
+| POST | /api/v1/posts | No JWT guard (permitAll) | requires X-User-Id header |
+| GET | /api/v1/posts/timeline | No JWT guard (permitAll) | public read |
+| GET | /api/v1/posts/{postId} | No JWT guard (permitAll) | public read |
+| PUT | /api/v1/posts/{postId} | No JWT guard (permitAll) | requires X-User-Id header |
+| DELETE | /api/v1/posts/{postId} | No JWT guard (permitAll) | requires X-User-Id header |
+| POST | /api/v1/posts/{postId}/like | No JWT guard (permitAll) | requires X-User-Id header |
+| DELETE | /api/v1/posts/{postId}/like | No JWT guard (permitAll) | requires X-User-Id header |
+| POST | /api/v1/posts/{postId}/comments | No JWT guard (permitAll) | requires X-User-Id header |
+| GET | /api/v1/posts/{postId}/comments | No JWT guard (permitAll) | public read |
+| PUT | /api/v1/comments/{commentId} | No JWT guard (permitAll) | requires X-User-Id header |
+| DELETE | /api/v1/comments/{commentId} | No JWT guard (permitAll) | requires X-User-Id header |
 
 ---
 
@@ -318,7 +325,10 @@
 - backend/node-services/apps/message-service/src/inbox/inbox.controller.ts
 - backend/java-services/services/core-service/src/main/resources/application.yml
 - backend/java-services/services/core-service/src/main/java/iuh/cnm/vnalo/core_service/config/SecurityConfig.java
+- backend/java-services/services/core-service/src/main/java/iuh/cnm/vnalo/core_service/controller/FcmTestController.java
 - backend/java-services/services/content-service/src/main/java/iuh/cnm/vnalo/content_service/config/SecurityConfig.java
+- backend/java-services/services/content-service/src/main/java/iuh/cnm/vnalo/content_service/controller/PostController.java
+- backend/java-services/services/content-service/src/main/java/iuh/cnm/vnalo/content_service/controller/StoryController.java
 - backend/java-services/services/media-service/src/main/java/iuh/cnm/vnalo/mediaservice/config/SecurityConfig.java
 - backend/java-services/services/moderation-service/src/main/java/iuh/cnm/vnalo/moderation_service/config/SecurityConfig.java
 - backend/java-services/services/notification-service/src/main/java/iuh/cnm/vnalo/notification_service/controller/NotificationController.java

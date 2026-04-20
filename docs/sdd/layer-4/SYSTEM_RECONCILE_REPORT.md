@@ -7,7 +7,7 @@
 
 | Field | Value |
 |---|---|
-| Cycle ID | `SDD-RECONCILE-2026-04-19` |
+| Cycle ID | `SDD-RECONCILE-2026-04-20` |
 | Method | Code-first scan with spec synchronization |
 | Scope | Flutter mobile, Node services, Java services, docker runtime contracts |
 | Output | Complete Layer 0 to Layer 4 document set under `docs/sdd` |
@@ -80,16 +80,36 @@
 | Risk | Inconsistent status/body and unstable client error handling. |
 | Disposition | Marked for follow-up implementation task. |
 
+### F-006 Content service mutating identity trust boundary
+
+| Item | Detail |
+|---|---|
+| Severity | High |
+| Observation | content-service security config permits all requests while mutating endpoints trust `X-User-Id` header. |
+| Expected target | JWT-authenticated principal at service boundary for write operations. |
+| Risk | Header spoofing allows unauthorized write operations on post, story, comment, and like paths. |
+| Disposition | Accepted with risk in current cycle, documented in decision log and API catalog. |
+
+### F-007 Runtime status drift between code presence and default compose activation
+
+| Item | Detail |
+|---|---|
+| Severity | Medium |
+| Observation | moderation-service is implemented but commented out in default compose; analytics-service runs only in planned profile. |
+| Expected target | Layer 0 runtime status should reflect default compose activation behavior. |
+| Risk | Incorrect operational assumptions during local integration and deployment checks. |
+| Disposition | Corrected in architecture blueprint for this cycle. |
+
 ## 3) REVISE Actions Completed
 
 | Action ID | Description | Status |
 |---|---|---|
-| R-001 | Established SDD hierarchy and governance docs in Layer 0 | Completed |
-| R-002 | Authored navigation, design tokens, and critical screen specs in Layer 1 | Completed |
-| R-003 | Authored module contracts for Chat, Call, Social in Layer 2 | Completed |
-| R-004 | Authored API catalog and socket signaling schema in Layer 3 | Completed |
-| R-005 | Authored global database ERD and error code matrix in Layer 3 | Completed |
-| R-006 | Recorded architecture decisions and accepted risks with traceability | Completed |
+| R-0201 | Verified default docker-compose activation and service runtime status mapping | Completed |
+| R-0202 | Updated Layer 0 topology and runtime matrix for moderation disabled-default and analytics planned profile | Completed |
+| R-0203 | Updated Layer 3 API auth catalog for content-service header trust and core test utility endpoints | Completed |
+| R-0204 | Added explicit chat.gateway restrictedWebMode runtime note in socket schema | Completed |
+| R-0205 | Expanded Layer 3 global ERD with missing core/moderation/media entities and relations | Completed |
+| R-0206 | Added new architectural decisions D-009 and D-010 for trust/runtime governance | Completed |
 
 ## 4) Traceability Matrix
 
@@ -109,6 +129,7 @@
 | Risk | Owner | Target window |
 |---|---|---|
 | Replace notification `X-User-Id` trust with JWT principal | Backend platform team | Next security hardening sprint |
+| Replace content-service `X-User-Id` trust with JWT principal for mutating routes | Backend platform team | Next security hardening sprint |
 | Remove restricted mode override or enforce claim consistently | Messaging team | Next chat gateway policy sprint |
 | Define single canonical realtime contract between `/chat` and `/realtime` | Architecture guild | Before multi-client gateway expansion |
 | Normalize error envelope across services | API governance | Progressive rollout across next two releases |

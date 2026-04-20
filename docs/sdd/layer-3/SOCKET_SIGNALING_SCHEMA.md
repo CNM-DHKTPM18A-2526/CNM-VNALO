@@ -47,6 +47,11 @@
 | message.pinned | pin object and pinnedBy | pin broadcast |
 | message.unpinned | messageId, conversationId, unpinnedBy | unpin broadcast |
 
+### Gateway Runtime Notes
+
+- chat.gateway currently overrides effective `restrictedWebMode` to `false` during socket connection state assignment, regardless of incoming JWT claim.
+- As a result, restricted web policy is not enforced at gateway connection layer and must be handled by downstream guards or service logic.
+
 ### Offline Call Fallback
 
 When target user has no active sockets and event is call.offer:
