@@ -108,13 +108,13 @@ class MessageBubble extends StatelessWidget {
               Row(
                 mainAxisAlignment:
                     isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (!isMine)
                     SizedBox(
                       width: 30,
                       child: Align(
-                        alignment: Alignment.bottomLeft,
+                        alignment: Alignment.topLeft,
                         child:
                             showAvatar
                                 ? AvatarWidget(
@@ -132,12 +132,6 @@ class MessageBubble extends StatelessWidget {
                   Flexible(child: _buildBubbleWrapper(context, isDarkMode)),
                 ],
               ),
-              if (isMine ||
-                  showTime ||
-                  (readByMembers != null && readByMembers!.isNotEmpty)) ...[
-                const SizedBox(height: 4),
-                _buildStatusLabel(context, isDarkMode, common),
-              ],
               if (reactions != null && reactions!.isNotEmpty && currentUserId != null)
                 MessageReactions(
                   reactions: reactions!,
@@ -145,6 +139,12 @@ class MessageBubble extends StatelessWidget {
                   onToggleReaction: onToggleReaction,
                   onShowReactors: onShowReactors,
                 ),
+              if (isMine ||
+                  showTime ||
+                  (readByMembers != null && readByMembers!.isNotEmpty)) ...[
+                const SizedBox(height: 4),
+                _buildStatusLabel(context, isDarkMode, common),
+              ],
             ],
           ),
         ),

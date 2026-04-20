@@ -8,6 +8,7 @@ import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/features/chat/widgets/chat_input_bar.dart';
 import 'package:vnalo_mobile/features/chat/widgets/message_bubble.dart';
+import 'package:vnalo_mobile/features/chat/widgets/system_message.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/conversation_member_model.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
@@ -487,6 +488,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                                   return m.userId != currentUserId &&
                                       m.lastReadSeq >= message.serverSeq!;
                                 }).toList();
+                          }
+
+                          // Display system messages differently
+                          if (message.isSystemMessage) {
+                            return SystemMessage(
+                              content: message.content ?? '',
+                              timestamp: message.createdAt,
+                            );
                           }
 
                           final senderMember = conv.members.firstWhere(
