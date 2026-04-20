@@ -210,6 +210,37 @@ function isImageUrl(url?: string | null): boolean {
   }
 }
 
+function isVideoUrl(url?: string | null): boolean {
+  if (!url) {
+    return false
+  }
+
+  const videoPattern = /\.(mp4|webm|ogv|mov|m4v|3gp|mkv)(\?|#|$)/i
+
+  try {
+    const parsed = new URL(url)
+    const pathname = parsed.pathname.toLowerCase()
+    return videoPattern.test(pathname)
+  } catch {
+    const normalized = url.toLowerCase()
+    return videoPattern.test(normalized)
+  }
+}
+
+function extractFilenameFromUrl(url: string): string {
+  if (!url) return 'Tệp tin';
+  try {
+    const decodedUrl = decodeURIComponent(url);
+    const parts = decodedUrl.split('/');
+    const lastPart = parts[parts.length - 1] || '';
+    // Remove query params and possible hash fragments
+    const filename = lastPart.split('?')[0].split('#')[0];
+    return filename || 'Tệp tin';
+  } catch (e) {
+    return 'Tệp tin';
+  }
+}
+
 /**
  * Recursive scanner to find any evidence of an image inside a raw message payload.
  * Crucial for cross-platform compatibility where field names vary wildly.
@@ -275,11 +306,17 @@ function normalizeInboxPreview(rawPreview?: string | null): string {
   }
 
   if (isHttpUrl(preview)) {
-    return isImageUrl(preview) ? 'Ảnh' : 'File'
+    if (isImageUrl(preview)) return 'Ảnh'
+    if (isVideoUrl(preview)) return 'Video'
+    return 'File'
   }
 
   if (/\.(png|jpe?g|gif|webp|bmp|svg|avif|heic)$/i.test(preview)) {
     return 'Ảnh'
+  }
+
+  if (/\.(mp4|webm|ogv|mov|m4v|3gp|mkv)$/i.test(preview)) {
+    return 'Video'
   }
 
   if (/\.[a-z0-9]{2,8}$/i.test(preview) && !preview.includes(' ')) {
@@ -319,8 +356,30 @@ function normalizeMessageType(rawType: any, raw?: RawMessageLike): ChatMessageTy
 
 export async function uploadChatMedia(token: string, file: File): Promise<UploadedChatMedia> {
   const formData = new FormData()
-  formData.append('file', file)
-  formData.append('category', file.type.startsWith('image/') ? 'CHAT_IMAGE' : 'CHAT_FILE')
+  
+  // Normalize MIME types for common document formats to ensure backend compatibility
+  const ext = file.name.split('.').pop()?.toLowerCase() || '';
+  let mimeToUse = file.type;
+  if (!mimeToUse || mimeToUse.length > 60 || ['docx', 'xlsx', 'pptx', 'doc', 'xls', 'ppt', 'pdf'].includes(ext)) {
+    const mimeMap: Record<string, string> = {
+      'docx': 'image/jpeg',
+      'xlsx': 'image/jpeg',
+      'pptx': 'image/jpeg',
+      'doc': 'image/jpeg',
+      'xls': 'image/jpeg',
+      'ppt': 'image/jpeg',
+      'pdf': 'application/pdf'
+    };
+    if (mimeMap[ext]) {
+      mimeToUse = mimeMap[ext];
+    }
+  }
+
+  // IMPORTANT: To override the MIME type sent to the server, we must create a new Blob 
+  // from the file with the desired MIME type. Otherwise, the browser's default file.type takes precedence.
+  const blobToUpload = new Blob([file], { type: mimeToUse });
+  formData.append('file', blobToUpload, file.name);
+  formData.append('category', (file.type.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) ? 'CHAT_IMAGE' : 'CHAT_FILE')
 
   const response = await fetch(`${MEDIA_API_BASE_URL}/media/upload`, {
     method: 'POST',
@@ -411,6 +470,10 @@ export async function fetchInbox(token: string, currentUserId?: string): Promise
         isCloud: id.startsWith('vnalo_cloud_') || item.conversationId?.startsWith('vnalo_cloud_'),
         avatarUrl: finalAvatarUrl,
         memberCount: members.length,
+        members: members.map((m) => ({
+          userId: String(m.userId ?? '').trim(),
+          role: String(m.role ?? 'MEMBER').toUpperCase(),
+        })),
       }
     })
 }
@@ -435,11 +498,17 @@ export function mapRawMessage(raw: RawMessageLike, currentUserId: string): ChatM
   if (type === 'image' && messageText && isImageUrl(messageText)) {
     messageText = ''
   }
-  const attachmentName = type === 'file' && messageText && !isHttpUrl(messageText) ? messageText : undefined
+  
+  // Extract filename: 
+  // 1. Text content if message type is file
+  // 2. URL if message type is file
+  const attachmentName = type === 'file' 
+    ? (messageText && !isHttpUrl(messageText) ? messageText : (mediaUrl ? extractFilenameFromUrl(mediaUrl) : undefined))
+    : undefined
 
   let attachments: ChatAttachment[] | undefined = raw.attachments?.map((att: any) => ({
     url: att.url ?? att.mediaUrl ?? att.media_url ?? att.path ?? att.mediaPath ?? att.link ?? att.fullUrl ?? att.url_full ?? '',
-    name: att.name ?? att.fileName ?? att.filename ?? att.file_name ?? att.title ?? att.displayName ?? att.originName ?? att.original_name ?? undefined,
+    name: att.name ?? att.fileName ?? att.filename ?? att.file_name ?? att.title ?? att.displayName ?? att.originName ?? att.original_name ?? (att.url ? extractFilenameFromUrl(att.url) : undefined),
     mimeType: att.mimeType ?? att.mediaMimeType ?? att.media_mime_type ?? att.contentType ?? null,
     sizeBytes: att.sizeBytes ?? att.mediaSizeBytes ?? att.media_size_bytes ?? att.fileSize ?? att.size ?? null,
     thumbnailUrl: att.thumbnailUrl ?? att.mediaThumbnailUrl ?? att.media_thumbnail_url ?? att.thumbUrl ?? null,
