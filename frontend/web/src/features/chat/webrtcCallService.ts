@@ -80,6 +80,10 @@ export class WebRtcCallService {
 
     try {
       // 1. Setup PeerConnection
+      const turnUrl = import.meta.env.VITE_TURN_URL;
+      const turnUser = import.meta.env.VITE_TURN_USERNAME;
+      const turnPass = import.meta.env.VITE_TURN_PASSWORD;
+
       const configuration: RTCConfiguration = {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
@@ -87,11 +91,20 @@ export class WebRtcCallService {
           { urls: 'stun:stun2.l.google.com:19302' },
           { urls: 'stun:stun3.l.google.com:19302' },
           { urls: 'stun:stun4.l.google.com:19302' },
-          // Note: For full reliability on all cellular networks (Symmetric NAT), 
-          // a TURN relay server is highly recommended.
         ],
         iceCandidatePoolSize: 10,
+      };
+
+      // Add TURN server if configured
+      if (turnUrl && turnUser && turnPass) {
+        console.log('[WebRTC] Adding TURN server:', turnUrl);
+        configuration.iceServers?.push({
+          urls: turnUrl,
+          username: turnUser,
+          credential: turnPass,
+        });
       }
+
       this.resetInternalState()
       this.state.pc = new RTCPeerConnection(configuration)
 
