@@ -284,6 +284,20 @@ class LocalDatabase extends _$LocalDatabase {
     }
     return map;
   }
+
+  Future<void> deleteConversation(String conversationId, String currentUserId) async {
+    await batch((b) {
+      // 1. Delete messages
+      b.deleteWhere(messages, (t) => t.ownerId.equals(currentUserId) & t.conversationId.equals(conversationId));
+      // 2. Delete the conversation itself
+      b.deleteWhere(conversations, (t) => t.ownerId.equals(currentUserId) & t.id.equals(conversationId));
+    });
+    // 3. Delete read state (custom table, not managed by Drift classes if created manually via customStatement)
+    await customStatement(
+      'DELETE FROM conversation_read_state WHERE conversation_id = ?',
+      [conversationId],
+    );
+  }
 }
 
 class LocalMessageSearchResult {
