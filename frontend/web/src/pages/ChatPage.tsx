@@ -32,6 +32,9 @@ import {
   fetchConversation,
   addMembersToConversation,
   leaveConversation,
+  removeMember,
+  updateMemberRole,
+  updateGroupAvatar,
   renameGroupConversation,
   setConversationNickname,
 } from '../features/chat/chat.api';
@@ -3362,6 +3365,44 @@ function ChatPageContent() {
     }
   }
 
+  const handleUpdateGroupAvatar = async (file: File) => {
+    if (!selectedConversationId || !accessToken) return;
+
+    try {
+      // 1. Upload new avatar
+      const uploadRes = await uploadChatMedia(accessToken, file);
+      const newAvatarUrl = uploadRes.url;
+
+      // 2. Update conversation via API
+      await updateGroupAvatar(accessToken, selectedConversationId, newAvatarUrl);
+
+      // 3. Update local state
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === selectedConversationId ? { ...c, avatarUrl: newAvatarUrl } : c
+        )
+      );
+
+      // 4. Emit SYSTEM notification
+      const systemPayload = JSON.stringify({
+        action: 'CHANGE_GROUP_AVATAR',
+        actorId: user?.id,
+      });
+
+      void emitSendMessage({
+        conversationId: selectedConversationId,
+        content: systemPayload,
+        messageType: 'SYSTEM',
+        clientMessageId: crypto.randomUUID(),
+      });
+
+      toast.success('Cập nhật ảnh đại diện nhóm thành công');
+    } catch (err) {
+      console.error('Failed to update group avatar:', err);
+      toast.error('Cập nhật ảnh đại diện thất bại');
+    }
+  };
+
   const handleEditNickname = async (newNickname: string) => {
     if (!selectedConversationId || !accessToken) return
     const targetUserId = selectedConversation?.userId || selectedConversation?.participantUserIds?.[0]
@@ -3447,6 +3488,121 @@ function ChatPageContent() {
     } catch (error) {
       console.error('Failed to leave group:', error);
       toast.error('Rời nhóm thất bại');
+    }
+  };
+
+  const handleRemoveMember = async (targetUserId: string, _block?: boolean) => {
+    if (!selectedConversationId || !user || !accessToken) return;
+
+    try {
+      const selectedConv = conversations.find(c => c.id === selectedConversationId);
+      if (!selectedConv) return;
+      
+      const targetDisplayName = userMap[targetUserId]?.displayName || 'Thành viên';
+
+      // Emit SYSTEM message for UI
+      const systemPayload = JSON.stringify({
+        action: 'REMOVE_MEMBER',
+        actorId: user.id,
+        targetMemberIds: [targetUserId]
+      });
+
+      void emitSendMessage({
+        conversationId: selectedConversationId,
+        content: systemPayload,
+        messageType: 'SYSTEM',
+        clientMessageId: crypto.randomUUID()
+      });
+
+      // API Call
+      await removeMember(accessToken, selectedConversationId, targetUserId);
+
+      // Local State Update
+      setConversations(prev => prev.map(c => {
+        if (c.id === selectedConversationId) {
+          return {
+            ...c,
+            memberCount: (c.memberCount || 1) - 1,
+            participantUserIds: c.participantUserIds?.filter(id => id !== targetUserId),
+            members: c.members?.filter(m => m.userId !== targetUserId)
+          };
+        }
+        return c;
+      }));
+
+      toast.success(`Đã xóa ${targetDisplayName} khỏi nhóm`);
+    } catch (error) {
+      console.error('Failed to remove member:', error);
+      toast.error('Không thể xóa thành viên');
+    }
+  };
+
+  const handleUpdateMemberRole = async (targetUserId: string, role: string) => {
+    if (!selectedConversationId || !accessToken) return;
+
+    try {
+      await updateMemberRole(accessToken, selectedConversationId, targetUserId, role);
+
+      // Emit SYSTEM message if promoting
+      if (role === 'ADMIN') {
+        const systemPayload = JSON.stringify({
+          action: 'PROMOTE_ADMIN',
+          actorId: user?.id,
+          targetMemberIds: [targetUserId]
+        });
+
+        void emitSendMessage({
+          conversationId: selectedConversationId,
+          content: systemPayload,
+          messageType: 'SYSTEM',
+          clientMessageId: crypto.randomUUID()
+        });
+      }
+
+      setConversations(prev => prev.map(c => {
+        if (c.id === selectedConversationId) {
+          return {
+            ...c,
+            members: c.members?.map(m => m.userId === targetUserId ? { ...m, role } : m)
+          };
+        }
+        return c;
+      }));
+
+      const roleDisplay = role === 'ADMIN' ? 'phó nhóm' : 'thành viên';
+      toast.success(`Đã cập nhật vai trò thành ${roleDisplay}`);
+    } catch (error) {
+      console.error('Failed to update member role:', error);
+      toast.error('Cập nhật vai trò thất bại');
+    }
+  };
+
+  const handleTransferAndLeave = async (newOwnerId: string) => {
+    if (!selectedConversationId || !accessToken || !user) return;
+
+    try {
+      // 1. Promote new owner
+      await updateMemberRole(accessToken, selectedConversationId, newOwnerId, 'OWNER');
+
+      // 2. Emit TRANSFER_OWNERSHIP system message
+      const transferPayload = JSON.stringify({
+        action: 'TRANSFER_OWNERSHIP',
+        actorId: user.id,
+        targetMemberIds: [newOwnerId]
+      });
+
+      void emitSendMessage({
+        conversationId: selectedConversationId,
+        content: transferPayload,
+        messageType: 'SYSTEM',
+        clientMessageId: crypto.randomUUID()
+      });
+
+      // 3. Perform standard leave group logic
+      await doLeaveGroup();
+    } catch (error) {
+      console.error('Failed to transfer ownership and leave:', error);
+      toast.error('Chuyển quyền và rời nhóm thất bại');
     }
   };
 
@@ -3648,6 +3804,11 @@ function ChatPageContent() {
                     setIsEditConversationNameOpen(true)
                   }}
                   onTogglePinConversation={() => handleTogglePinConversation(selectedConversation.id)}
+                  onRemoveMember={handleRemoveMember}
+                  onUpdateMemberRole={handleUpdateMemberRole}
+                  onTransferOwnerAndLeave={handleTransferAndLeave}
+                  onUpdateGroupAvatar={handleUpdateGroupAvatar}
+                  friends={friendsDirectory}
                   currentUserId={user?.id}
                 />
               ) : (
@@ -3833,4 +3994,5 @@ function PinnedLogicHooks({
 
   return null;
 }
+
 

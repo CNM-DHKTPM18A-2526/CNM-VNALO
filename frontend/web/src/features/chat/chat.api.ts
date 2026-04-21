@@ -26,6 +26,7 @@ type InboxItem = {
       userId?: string
       nickname?: string | null
       avatarUrl?: string | null
+      role?: string | null
     }>
   } | null
 }
@@ -667,6 +668,13 @@ export async function searchConversationMessages(
   }
 }
 
+export async function updateGroupAvatar(token: string, conversationId: string, avatarUrl: string): Promise<unknown> {
+  return authorizedFetch<unknown>(token, `/conversations/${conversationId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ avatarUrl }),
+  })
+}
+
 export async function renameGroupConversation(token: string, conversationId: string, name: string): Promise<unknown> {
   return authorizedFetch<unknown>(token, `/conversations/${conversationId}`, {
     method: 'PATCH',
@@ -1052,5 +1060,18 @@ export async function addMembersToConversation(token: string, conversationId: st
 export async function leaveConversation(token: string, conversationId: string, userId: string): Promise<void> {
   await authorizedFetch(token, `/conversations/${conversationId}/members/${userId}`, {
     method: 'DELETE',
+  })
+}
+
+export async function removeMember(token: string, conversationId: string, userId: string): Promise<void> {
+  await authorizedFetch(token, `/conversations/${conversationId}/members/${userId}`, {
+    method: 'DELETE',
+  })
+}
+
+export async function updateMemberRole(token: string, conversationId: string, userId: string, role: string): Promise<void> {
+  await authorizedFetch(token, `/conversations/${conversationId}/member/${userId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ role }),
   })
 }

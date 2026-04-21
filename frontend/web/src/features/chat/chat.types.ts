@@ -22,7 +22,7 @@ export type ConversationSummary = {
   members?: Array<{ userId: string; role: string }>
 }
 
-export type ChatMessageType = 'text' | 'image' | 'file' | 'sticker' | 'system' | 'call'
+export type ChatMessageType = 'text' | 'image' | 'video' | 'file' | 'sticker' | 'system' | 'call'
 
 export type ReplyMetadata = {
   id: string
@@ -114,7 +114,13 @@ export type ViewerImageItem = {
 }
 
 export interface SystemMessagePayload {
-  action: 'ADD_MEMBERS' | 'LEAVE_GROUP' | 'CREATE_GROUP' | 'RENAME_GROUP' | 'PIN_MESSAGE' | 'UNPIN_MESSAGE' | 'UPDATE_MESSAGE_REACTIONS' | 'UPDATE_GROUP_INFO';
+  action: 'ADD_MEMBERS' | 'LEAVE_GROUP' | 'CREATE_GROUP' | 'RENAME_GROUP' | 'CHANGE_GROUP_AVATAR' | 'PIN_MESSAGE'
+  | 'UNPIN_MESSAGE'
+  | 'REMOVE_MEMBER'
+  | 'PROMOTE_ADMIN'
+  | 'TRANSFER_OWNERSHIP'
+  | 'UPDATE_MESSAGE_REACTIONS'
+  | 'UPDATE_GROUP_INFO';
   actorId: string;
   targetMemberIds?: string[];
   metadata?: Record<string, any>;
