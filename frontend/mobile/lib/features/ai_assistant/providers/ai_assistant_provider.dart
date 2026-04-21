@@ -17,6 +17,9 @@ class AiAssistantProvider with ChangeNotifier {
   static const String _mascotPrefKey = 'vnalo_ai_mascot_id';
   static const String _defaultLocaleId = 'vi_VN';
   static const Duration _aiTimeout = Duration(seconds: 25);
+  static const Duration _sttListenFor = Duration(seconds: 16);
+  static const Duration _sttPauseFor = Duration(seconds: 3);
+  static const Duration _idleAutoHideDelay = Duration(seconds: 12);
 
   final AiService _aiService;
   final FlutterTts _tts = FlutterTts();
@@ -25,15 +28,17 @@ class AiAssistantProvider with ChangeNotifier {
 
   AiState _state = AiState.idle;
   String _lastWords = '';
+  String _lastUserPrompt = '';
   String _aiResponse = '';
   String _currentEmotion = 'neutral';
+  double _soundLevel = 0;
 
   bool _persistentEnabled = false;
   bool _provisionallyVisible = false;
   bool _isSessionActive = false;
 
   MascotMetadata _currentMascot = MascotMetadata.defaultMascots.first;
-  bool _enableDeepSummary = false;
+  final bool _enableDeepSummary = false;
 
   final List<Map<String, String>> _sessionHistory = [];
   final StreamController<AiCommand> _systemActionController =
@@ -43,9 +48,14 @@ class AiAssistantProvider with ChangeNotifier {
   bool _isPipelineLocked = false;
   int _operationToken = 0;
   String _activeTraceId = '';
+  String? _resolvedLocaleId;
 
   DateTime? _lastFinalResultAt;
   String _lastFinalResultText = '';
+  DateTime? _lastSoundLevelNotifyAt;
+
+  Timer? _listenGuardTimer;
+  Timer? _idleAutoHideTimer;
 
   AiAssistantProvider(this._aiService) {
     _activeTraceId = _uuid.v4();
@@ -56,8 +66,10 @@ class AiAssistantProvider with ChangeNotifier {
   MascotMetadata get currentMascot => _currentMascot;
   AiState get state => _state;
   String get lastWords => _lastWords;
+  String get lastUserPrompt => _lastUserPrompt;
   String get aiResponse => _aiResponse;
   String get currentEmotion => _currentEmotion;
+  double get soundLevel => _soundLevel;
 
   bool get persistentEnabled => _persistentEnabled;
   bool get provisionallyVisible => _provisionallyVisible;
@@ -136,6 +148,8 @@ class AiAssistantProvider with ChangeNotifier {
 
   @override
   void dispose() {
+    _listenGuardTimer?.cancel();
+    _idleAutoHideTimer?.cancel();
     unawaited(_stt.stop());
     unawaited(_tts.stop());
     _systemActionController.close();
@@ -166,6 +180,7 @@ class AiAssistantProvider with ChangeNotifier {
   }
 
   Future<void> hideMascot({String reason = 'user_hide'}) async {
+    _idleAutoHideTimer?.cancel();
     _cancelActiveOperation(reason: reason);
     await _stopAllInteractions(reason: reason, keepResponse: false);
 
@@ -199,7 +214,10 @@ class AiAssistantProvider with ChangeNotifier {
 
   Future<void> onPrimaryAction({String source = 'bubble'}) async {
     if (_state == AiState.listening) {
-      await stopListening(reason: '$source.toggle_stop');
+      await stopListening(
+        reason: '$source.toggle_stop',
+        keepBubbleVisible: true,
+      );
       return;
     }
 
@@ -232,6 +250,9 @@ class AiAssistantProvider with ChangeNotifier {
     final traceId = _newTraceId('stt');
     final token = _beginOperation(traceId: traceId);
 
+    _idleAutoHideTimer?.cancel();
+    _cancelListenGuard();
+    _soundLevel = 0;
     _setProvisionallyVisible(true, reason: 'stt_start:$source');
     await _tts.stop();
 
@@ -241,9 +262,16 @@ class AiAssistantProvider with ChangeNotifier {
     }
 
     if (!available) {
+      _isSessionActive = false;
       _aiResponse = 'Thiết bị chưa sẵn sàng micro để nghe lệnh.';
-      _transitionTo(AiState.idle, reason: 'stt_unavailable', traceId: traceId);
-      _syncVisibilityAfterSession();
+      _transitionTo(
+        AiState.idle,
+        reason: 'stt_unavailable',
+        traceId: traceId,
+        notify: false,
+      );
+      _setProvisionallyVisible(true, reason: 'stt_unavailable_visible');
+      _scheduleIdleAutoHide(reason: 'stt_unavailable');
       notifyListeners();
       return;
     }
@@ -258,31 +286,113 @@ class AiAssistantProvider with ChangeNotifier {
     );
     notifyListeners();
 
-    await _stt.listen(
-      onResult: (result) {
-        if (!_isCurrentOperation(token)) {
-          return;
-        }
+    try {
+      await _stt.listen(
+        onResult: (result) {
+          if (!_isCurrentOperation(token)) {
+            return;
+          }
 
-        _lastWords = result.recognizedWords.trim();
-        notifyListeners();
+          _lastWords = result.recognizedWords.trim();
+          notifyListeners();
 
-        if (result.finalResult &&
-            _lastWords.isNotEmpty &&
-            !_isDuplicateFinalResult(_lastWords)) {
-          unawaited(_handleCommand(_lastWords, parentTraceId: traceId));
-        }
-      },
-      localeId: _defaultLocaleId,
-    );
+          if (result.finalResult &&
+              _lastWords.isNotEmpty &&
+              !_isDuplicateFinalResult(_lastWords)) {
+            unawaited(_handleCommand(_lastWords, parentTraceId: traceId));
+          }
+        },
+        onSoundLevelChange: _handleSoundLevelChange,
+        listenFor: _sttListenFor,
+        pauseFor: _sttPauseFor,
+        localeId: _resolvedLocaleId ?? _defaultLocaleId,
+        listenOptions: SpeechListenOptions(
+          cancelOnError: true,
+          partialResults: true,
+          listenMode: ListenMode.dictation,
+        ),
+      );
+
+      _startListenGuard(token: token, traceId: traceId);
+      _logEvent(
+        'STT_LISTEN_STARTED',
+        traceId: traceId,
+        data: {
+          'localeId': _resolvedLocaleId ?? _defaultLocaleId,
+          'listenForMs': _sttListenFor.inMilliseconds,
+          'pauseForMs': _sttPauseFor.inMilliseconds,
+        },
+      );
+    } catch (error) {
+      if (!_isCurrentOperation(token)) {
+        return;
+      }
+
+      _logEvent(
+        'STT_LISTEN_ERROR',
+        traceId: traceId,
+        level: 'ERROR',
+        data: {'error': error.toString()},
+      );
+      _isSessionActive = false;
+      _soundLevel = 0;
+      _aiResponse = 'Không thể bắt đầu thu âm. Bạn thử lại hoặc nhập tin nhắn.';
+      _transitionTo(
+        AiState.idle,
+        reason: 'stt_listen_error',
+        traceId: traceId,
+        notify: false,
+      );
+      _setProvisionallyVisible(true, reason: 'stt_listen_error_visible');
+      _scheduleIdleAutoHide(reason: 'stt_listen_error');
+      notifyListeners();
+    }
   }
 
-  Future<void> stopListening({String reason = 'manual'}) async {
+  Future<void> stopListening({
+    String reason = 'manual',
+    bool keepBubbleVisible = true,
+  }) async {
+    _cancelListenGuard();
     await _stt.stop();
     _isSessionActive = false;
-    _transitionTo(AiState.idle, reason: reason);
-    _syncVisibilityAfterSession();
+    _soundLevel = 0;
+    _transitionTo(AiState.idle, reason: reason, notify: false);
+
+    if (keepBubbleVisible) {
+      _setProvisionallyVisible(true, reason: '$reason.keep_visible');
+      _scheduleIdleAutoHide(reason: reason);
+    } else {
+      _syncVisibilityAfterSession();
+    }
+
     notifyListeners();
+  }
+
+  Future<void> submitTextPrompt(
+    String text, {
+    String source = 'chat_board',
+  }) async {
+    final normalized = text.trim();
+    if (normalized.isEmpty) {
+      return;
+    }
+
+    _idleAutoHideTimer?.cancel();
+    _setProvisionallyVisible(true, reason: '$source.visible');
+
+    if (_state == AiState.listening) {
+      await stopListening(
+        reason: '$source.stop_listening',
+        keepBubbleVisible: true,
+      );
+    }
+
+    if (_state == AiState.thinking || _state == AiState.speaking) {
+      await stopCurrentPipeline(reason: '$source.preempt');
+    }
+
+    await _handleCommand(normalized, parentTraceId: _newTraceId(source));
   }
 
   Future<void> stopCurrentPipeline({String reason = 'manual'}) async {
@@ -309,6 +419,10 @@ class AiAssistantProvider with ChangeNotifier {
     final traceId = parentTraceId ?? _newTraceId('voice_command');
     final token = _beginOperation(traceId: traceId);
 
+    _lastUserPrompt = normalized;
+    _soundLevel = 0;
+    _cancelListenGuard();
+    _idleAutoHideTimer?.cancel();
     _isSessionActive = true;
     _transitionTo(
       AiState.thinking,
@@ -374,6 +488,7 @@ class AiAssistantProvider with ChangeNotifier {
       if (_isCurrentOperation(token)) {
         _isPipelineLocked = false;
         _isSessionActive = false;
+        _cancelListenGuard();
         _currentEmotion = 'neutral';
         _transitionTo(
           AiState.idle,
@@ -382,6 +497,9 @@ class AiAssistantProvider with ChangeNotifier {
           notify: false,
         );
         _syncVisibilityAfterSession();
+        if (!_persistentEnabled && _aiResponse.isEmpty) {
+          _scheduleIdleAutoHide(reason: 'pipeline_complete_empty');
+        }
         notifyListeners();
       }
     }
@@ -447,6 +565,8 @@ class AiAssistantProvider with ChangeNotifier {
     final traceId = _newTraceId(source);
     final token = _beginOperation(traceId: traceId);
 
+    _cancelListenGuard();
+    _idleAutoHideTimer?.cancel();
     _setProvisionallyVisible(true, reason: '$source.contextual_visible');
     _isSessionActive = true;
     _transitionTo(
@@ -500,6 +620,7 @@ class AiAssistantProvider with ChangeNotifier {
       if (_isCurrentOperation(token)) {
         _isPipelineLocked = false;
         _isSessionActive = false;
+        _cancelListenGuard();
         _currentEmotion = 'neutral';
         _transitionTo(
           AiState.idle,
@@ -526,9 +647,23 @@ class AiAssistantProvider with ChangeNotifier {
           if ((normalized == 'done' || normalized == 'notlistening') &&
               _state == AiState.listening &&
               !_isPipelineLocked) {
+            _cancelListenGuard();
             _isSessionActive = false;
-            _transitionTo(AiState.idle, reason: 'stt_done_status');
-            _syncVisibilityAfterSession();
+            _soundLevel = 0;
+            _transitionTo(
+              AiState.idle,
+              reason: 'stt_done_status',
+              notify: false,
+            );
+            if (_lastWords.isEmpty) {
+              _aiResponse =
+                  'Mình chưa nghe rõ. Bạn thử nói chậm hơn hoặc nhập trực tiếp nhé.';
+              _setProvisionallyVisible(true, reason: 'stt_done_no_words');
+              _scheduleIdleAutoHide(reason: 'stt_done_no_words');
+            } else {
+              _syncVisibilityAfterSession();
+            }
+            notifyListeners();
           }
         },
         onError: (error) {
@@ -538,14 +673,27 @@ class AiAssistantProvider with ChangeNotifier {
             data: {'error': error.toString()},
           );
           if (_state == AiState.listening && !_isPipelineLocked) {
+            _cancelListenGuard();
             _isSessionActive = false;
-            _transitionTo(AiState.idle, reason: 'stt_error');
-            _syncVisibilityAfterSession();
+            _soundLevel = 0;
+            _transitionTo(AiState.idle, reason: 'stt_error', notify: false);
+            _aiResponse =
+                'Không thể tiếp tục thu âm. Bạn kiểm tra quyền micro và thử lại.';
+            _setProvisionallyVisible(true, reason: 'stt_error_visible');
+            _scheduleIdleAutoHide(reason: 'stt_error');
+            notifyListeners();
           }
         },
       );
 
-      _logEvent('STT_INITIALIZED', data: {'available': _isSttInitialized});
+      if (_isSttInitialized) {
+        await _resolveListeningLocale();
+      }
+
+      _logEvent(
+        'STT_INITIALIZED',
+        data: {'available': _isSttInitialized, 'localeId': _resolvedLocaleId},
+      );
       return _isSttInitialized;
     } catch (error) {
       _logEvent(
@@ -612,6 +760,7 @@ class AiAssistantProvider with ChangeNotifier {
     required String reason,
     required bool keepResponse,
   }) async {
+    _cancelListenGuard();
     try {
       await _stt.stop();
     } catch (error) {
@@ -634,6 +783,7 @@ class AiAssistantProvider with ChangeNotifier {
 
     _isPipelineLocked = false;
     _isSessionActive = false;
+    _soundLevel = 0;
     _currentEmotion = 'neutral';
     _transitionTo(AiState.idle, reason: reason, notify: false);
 
@@ -690,6 +840,7 @@ class AiAssistantProvider with ChangeNotifier {
   void _cancelActiveOperation({required String reason}) {
     _operationToken += 1;
     _isPipelineLocked = false;
+    _cancelListenGuard();
     _logEvent('PIPELINE_CANCELLED', level: 'WARN', data: {'reason': reason});
   }
 
@@ -735,6 +886,141 @@ class AiAssistantProvider with ChangeNotifier {
     if (!_persistentEnabled && _aiResponse.isEmpty) {
       _provisionallyVisible = false;
     }
+  }
+
+  Future<void> _resolveListeningLocale() async {
+    try {
+      final locales = await _stt.locales();
+      if (locales.isEmpty) {
+        _resolvedLocaleId = _defaultLocaleId;
+        return;
+      }
+
+      LocaleName? exact;
+      LocaleName? vietnamese;
+      for (final locale in locales) {
+        final localeId = locale.localeId.toLowerCase();
+        if (exact == null && localeId == _defaultLocaleId.toLowerCase()) {
+          exact = locale;
+        }
+        if (vietnamese == null && localeId.startsWith('vi')) {
+          vietnamese = locale;
+        }
+      }
+
+      _resolvedLocaleId =
+          exact?.localeId ?? vietnamese?.localeId ?? locales.first.localeId;
+      _logEvent('STT_LOCALE_RESOLVED', data: {'localeId': _resolvedLocaleId});
+    } catch (error) {
+      _resolvedLocaleId = _defaultLocaleId;
+      _logEvent(
+        'STT_LOCALE_RESOLVE_ERROR',
+        level: 'WARN',
+        data: {'error': error.toString()},
+      );
+    }
+  }
+
+  void _startListenGuard({required int token, required String traceId}) {
+    _cancelListenGuard();
+    _listenGuardTimer = Timer(
+      _sttListenFor + const Duration(seconds: 1),
+      () =>
+          unawaited(_handleListenGuardTimeout(token: token, traceId: traceId)),
+    );
+  }
+
+  void _cancelListenGuard() {
+    _listenGuardTimer?.cancel();
+    _listenGuardTimer = null;
+  }
+
+  Future<void> _handleListenGuardTimeout({
+    required int token,
+    required String traceId,
+  }) async {
+    if (!_isCurrentOperation(token) || _state != AiState.listening) {
+      return;
+    }
+
+    _logEvent(
+      'STT_GUARD_TIMEOUT',
+      traceId: traceId,
+      level: 'WARN',
+      data: {'lastWordsLength': _lastWords.length},
+    );
+
+    await _stt.stop();
+    if (!_isCurrentOperation(token)) {
+      return;
+    }
+
+    _cancelListenGuard();
+    _isSessionActive = false;
+    _soundLevel = 0;
+    _transitionTo(
+      AiState.idle,
+      reason: 'stt_guard_timeout',
+      traceId: traceId,
+      notify: false,
+    );
+
+    if (_lastWords.isEmpty) {
+      _aiResponse =
+          'Mình chưa nhận được âm thanh rõ ràng. Bạn thử nói lại hoặc chat bằng chữ nhé.';
+      _setProvisionallyVisible(true, reason: 'stt_guard_timeout_visible');
+      _scheduleIdleAutoHide(reason: 'stt_guard_timeout');
+    } else {
+      _syncVisibilityAfterSession();
+    }
+
+    notifyListeners();
+  }
+
+  void _handleSoundLevelChange(double rawLevel) {
+    if (_state != AiState.listening) {
+      return;
+    }
+
+    final normalized = (((rawLevel + 2) / 12).clamp(0.0, 1.0)).toDouble();
+    final smoothed = (_soundLevel * 0.64) + (normalized * 0.36);
+
+    if ((_soundLevel - smoothed).abs() < 0.015) {
+      return;
+    }
+
+    _soundLevel = smoothed;
+    final now = DateTime.now();
+    if (_lastSoundLevelNotifyAt == null ||
+        now.difference(_lastSoundLevelNotifyAt!) >=
+            const Duration(milliseconds: 90)) {
+      _lastSoundLevelNotifyAt = now;
+      notifyListeners();
+    }
+  }
+
+  void _scheduleIdleAutoHide({required String reason}) {
+    _idleAutoHideTimer?.cancel();
+    if (_persistentEnabled) {
+      return;
+    }
+
+    _idleAutoHideTimer = Timer(_idleAutoHideDelay, () {
+      if (_persistentEnabled ||
+          _isSessionActive ||
+          _state != AiState.idle ||
+          _aiResponse.isNotEmpty ||
+          !_provisionallyVisible) {
+        return;
+      }
+
+      _provisionallyVisible = false;
+      _logEvent(
+        'VISIBILITY_AUTO_HIDE',
+        data: {'reason': reason, 'delayMs': _idleAutoHideDelay.inMilliseconds},
+      );
+      notifyListeners();
+    });
   }
 
   String _newTraceId(String scope) => '${scope}_${_uuid.v4()}';
@@ -797,6 +1083,7 @@ class AiAssistantProvider with ChangeNotifier {
 
   void clearAiResponse() {
     _aiResponse = '';
+    _scheduleIdleAutoHide(reason: 'response_cleared');
     _syncVisibilityAfterSession();
     _logEvent('AI_RESPONSE_CLEARED');
     notifyListeners();

@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:o3d/o3d.dart';
@@ -24,15 +25,19 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
   static const double _bubbleSize = 120;
   static const double _bubbleRadius = _bubbleSize / 2;
   static const double _dragHandleThreshold = 38;
-  static const double _trashHoverDistance = 86;
-  static const double _trashAttractionDistance = 165;
+  static const double _trashHoverDistance = 58;
+  static const double _trashAttractionDistance = 104;
+  static const double _trashActivationBandFromBottom = 220;
 
   Offset _position = const Offset(20, 100);
   final O3DController _o3dController = O3DController();
 
   bool _isDragging = false;
   bool _isHoveringTrash = false;
+  bool _isBoardExpanded = false;
   _BubbleInputMode _inputMode = _BubbleInputMode.bubbleControl;
+
+  DateTime? _ignoreTapUntil;
 
   late final AnimationController _snapController;
   Animation<Offset>? _positionAnimation;
@@ -107,15 +112,14 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
   void _onPanStart(DragStartDetails details) {
     _snapController.stop();
     setState(() {
+      _positionAnimation = null;
+      _scaleAnimation = null;
       _inputMode = _BubbleInputMode.bubbleControl;
       _isDragging = true;
       _isHoveringTrash = false;
-      _scaleAnimation = Tween<double>(begin: _currentScale, end: 1.0).animate(
-        CurvedAnimation(parent: _snapController, curve: Curves.easeOut),
-      );
+      _currentScale = 1.0;
     });
     HapticFeedback.selectionClick();
-    _snapController.forward(from: 0);
   }
 
   void _onPanUpdate(DragUpdateDetails details) {
@@ -130,10 +134,13 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
         clamped.dy + _bubbleRadius,
       );
       final distance = (mascotCenter - trashCenter).distance;
+      final inTrashBand =
+          mascotCenter.dy >
+          (screenSize.height - _trashActivationBandFromBottom);
 
       _position = clamped;
 
-      if (distance < _trashAttractionDistance) {
+      if (inTrashBand && distance < _trashAttractionDistance) {
         final target = Offset(
           screenSize.width / 2 - _bubbleRadius,
           screenSize.height - 140,
@@ -141,11 +148,11 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
         final attraction = ((_trashAttractionDistance - distance) /
                 _trashAttractionDistance)
             .clamp(0.0, 1.0);
-        final lerpFactor = 0.14 + attraction * 0.42;
+        final lerpFactor = 0.08 + attraction * 0.18;
         _position = Offset.lerp(_position, target, lerpFactor)!;
       }
 
-      final hovering = distance < _trashHoverDistance;
+      final hovering = inTrashBand && distance < _trashHoverDistance;
       if (hovering && !_isHoveringTrash) {
         HapticFeedback.selectionClick();
       }
@@ -159,6 +166,8 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
   ) async {
     setState(() {
       _isDragging = false;
+      _inputMode = _BubbleInputMode.bubbleControl;
+      _ignoreTapUntil = DateTime.now().add(const Duration(milliseconds: 220));
     });
 
     if (_isHoveringTrash) {
@@ -169,6 +178,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
       }
       setState(() {
         _isHoveringTrash = false;
+        _isBoardExpanded = false;
         _position = const Offset(20, 100);
       });
       return;
@@ -297,21 +307,67 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
       return const SizedBox.shrink();
     }
 
+    final isListening = provider.state == AiState.listening;
     final text =
-        provider.state == AiState.listening ? 'Đang nghe...' : 'Đang xử lý...';
+        isListening ? 'Đang nghe... chạm lại để dừng' : 'Đang xử lý...';
+
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: Colors.black.withOpacity(0.72),
           borderRadius: BorderRadius.circular(20),
         ),
-        child: Text(
-          text,
-          style: const TextStyle(color: Colors.white, fontSize: 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              text,
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+            ),
+            if (isListening) ...[
+              const SizedBox(height: 6),
+              _buildListeningMeter(provider),
+              if (provider.lastWords.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    provider.lastWords,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white70, fontSize: 11),
+                  ),
+                ),
+            ],
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _buildListeningMeter(AiAssistantProvider provider) {
+    final energy = provider.soundLevel.clamp(0.0, 1.0);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(5, (index) {
+        final distanceFromCenter = (index - 2).abs();
+        final weight = (1 - (distanceFromCenter * 0.16)).clamp(0.45, 1.0);
+        final level = (0.18 + (energy * weight)).clamp(0.12, 1.0);
+        final height = 4 + (level * 14);
+
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          margin: const EdgeInsets.symmetric(horizontal: 1.5),
+          width: 3,
+          height: height,
+          decoration: BoxDecoration(
+            color: Colors.cyanAccent.withOpacity(0.92),
+            borderRadius: BorderRadius.circular(999),
+          ),
+        );
+      }),
     );
   }
 
@@ -351,16 +407,30 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
       ignoring: _inputMode == _BubbleInputMode.mascotInteract && !_isDragging,
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
+        dragStartBehavior: DragStartBehavior.down,
         onPanStart: _onPanStart,
         onPanUpdate: _onPanUpdate,
         onPanEnd: (details) {
           _onPanEnd(details, provider);
         },
         onTap: () {
+          if (_ignoreTapUntil != null &&
+              DateTime.now().isBefore(_ignoreTapUntil!)) {
+            return;
+          }
+          setState(() {
+            _isBoardExpanded = true;
+          });
           provider.onPrimaryAction(source: 'bubble_mask');
         },
       ),
     );
+  }
+
+  void _toggleBoard() {
+    setState(() {
+      _isBoardExpanded = !_isBoardExpanded;
+    });
   }
 
   Future<void> _openMascotGallery() async {
@@ -414,6 +484,33 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
                   child: _buildMascotSurface(provider),
                 ),
                 Positioned.fill(child: _buildLayeredGestureMask(provider)),
+                Positioned(
+                  top: -10,
+                  left: -8,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _toggleBoard,
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color:
+                            _isBoardExpanded
+                                ? Colors.blueAccent.withOpacity(0.84)
+                                : Colors.black.withOpacity(0.62),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.35),
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.chat_bubble_outline_rounded,
+                        color: Colors.white,
+                        size: 15,
+                      ),
+                    ),
+                  ),
+                ),
                 Positioned(
                   top: -10,
                   right: -8,
@@ -475,6 +572,12 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
   @override
   Widget build(BuildContext context) {
     final aiProvider = context.watch<AiAssistantProvider>();
+    final showBoard =
+        !_isDragging &&
+        (_isBoardExpanded ||
+            aiProvider.aiResponse.isNotEmpty ||
+            aiProvider.state == AiState.listening ||
+            aiProvider.state == AiState.thinking);
 
     if (!aiProvider.isMascotVisible) {
       return const SizedBox.shrink();
@@ -484,7 +587,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
       child: Stack(
         children: [
           if (_isDragging) _buildTrashZone(),
-          if (aiProvider.aiResponse.isNotEmpty && !_isDragging)
+          if (showBoard)
             Positioned(
               left:
                   _position.dx < MediaQuery.of(context).size.width / 2
@@ -494,8 +597,24 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
                   _position.dx >= MediaQuery.of(context).size.width / 2
                       ? MediaQuery.of(context).size.width - _position.dx + 8
                       : null,
-              top: max(_position.dy - 40, 60),
-              child: AiChatBoard(onClose: aiProvider.clearAiResponse),
+              top: max(_position.dy - 72, 56),
+              child: AiChatBoard(
+                onClose: () {
+                  setState(() {
+                    _isBoardExpanded = false;
+                  });
+                },
+                onClear: aiProvider.clearAiResponse,
+                onSubmitPrompt: (text) async {
+                  setState(() {
+                    _isBoardExpanded = true;
+                  });
+                  await aiProvider.submitTextPrompt(
+                    text,
+                    source: 'bubble_chat_board',
+                  );
+                },
+              ),
             ),
           Positioned(
             left: _position.dx,
