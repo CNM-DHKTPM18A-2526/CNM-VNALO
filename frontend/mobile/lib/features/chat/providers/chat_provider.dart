@@ -849,12 +849,78 @@ class ChatProvider extends ChangeNotifier {
       // Handle JSON-based system signals
       if (content.contains('"action":')) {
         try {
-          if (content.contains('"action":"CREATE_GROUP"') || 
-              content.contains('"action":"UPDATE_GROUP_INFO"') ||
-              content.contains('"action":"ADD_MEMBERS"') ||
-              content.contains('"action":"LEAVE_GROUP"')) {
-            debugPrint('SIGNAL: Group update signal received for ${message.conversationId}. Refreshing...');
+          final data = jsonDecode(content);
+          final action = data['action'];
+          final actorId = data['actorId'];
+
+          if (action == 'CREATE_GROUP') {
+            debugPrint('SIGNAL: New group created. Refreshing inbox...');
             loadInbox();
+          }
+
+          if (action == 'LEAVE_GROUP' || action == 'REMOVE_MEMBER') {
+            final targetIds = List<String>.from(data['targetMemberIds'] ?? [actorId]);
+            debugPrint('SIGNAL: Membership update received for ${message.conversationId}. Targets: $targetIds');
+
+            if (targetIds.contains(_currentUserId)) {
+              debugPrint('SIGNAL: I was removed from or left ${message.conversationId}. Removing locally.');
+              _removeConversationLocally(message.conversationId);
+            } else {
+              // Someone else left/removed
+              bool changed = false;
+              for (int i = 0; i < _conversations.length; i++) {
+                if (_conversations[i].id == message.conversationId) {
+                  final conv = _conversations[i];
+                  final updatedMembers = conv.members.where((m) => !targetIds.contains(m.userId)).toList();
+                  
+                  if (updatedMembers.length != conv.members.length) {
+                    _conversations[i] = conv.copyWith(members: updatedMembers);
+                    changed = true;
+                  }
+                  break;
+                }
+              }
+              if (changed) notifyListeners();
+            }
+          }
+
+          if (action == 'DISBAND_GROUP') {
+            debugPrint('SIGNAL: Group disbanded: ${message.conversationId}. Removing locally.');
+            _removeConversationLocally(message.conversationId);
+          }
+
+          if (action == 'UPDATE_GROUP_INFO' || action == 'CHANGE_GROUP_AVATAR') {
+             final metadata = data['metadata'] ?? {};
+             final newName = metadata['newName'];
+             final newAvatarUrl = metadata['newAvatarUrl'];
+             
+             debugPrint('SIGNAL: Group metadata update received for ${message.conversationId}.');
+             
+             bool changed = false;
+             for (int i = 0; i < _conversations.length; i++) {
+               if (_conversations[i].id == message.conversationId) {
+                 var updated = _conversations[i];
+                 if (newName != null) {
+                   updated = updated.copyWith(title: newName);
+                   changed = true;
+                 }
+                 if (newAvatarUrl != null) {
+                   updated = updated.copyWith(avatarUrl: newAvatarUrl);
+                   changed = true;
+                 }
+                 if (changed) {
+                   _conversations[i] = updated;
+                 }
+                 break;
+               }
+             }
+             if (changed) {
+               notifyListeners();
+             } else {
+               // Fallback to refresh if we didn't find it in local list 
+               // (might be a new conversation for us)
+               loadInbox();
+             }
           }
 
           if (content.contains('"action":"UPDATE_MESSAGE_REACTIONS"')) {
@@ -1007,7 +1073,10 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _removeConversationLocally(String conversationId) {
+  Future<void> _removeConversationLocally(String conversationId) async {
+    debugPrint('[ChatProvider] Removing conversation locally: $conversationId');
+    
+    // 1. In-memory update
     _conversations.removeWhere((c) => c.id == conversationId);
     if (_activeConversationId == conversationId) {
       _activeConversationId = null;
@@ -1015,6 +1084,16 @@ class ChatProvider extends ChangeNotifier {
     _messages.remove(conversationId);
     _pinnedMessages.remove(conversationId);
     notifyListeners();
+
+    // 2. Database cleanup
+    if (_currentUserId != null) {
+      try {
+        await _db.deleteConversation(conversationId, _currentUserId!);
+        debugPrint('[ChatProvider] Database cleanup successful for $conversationId');
+      } catch (e) {
+        debugPrint('[ChatProvider] Database cleanup failed for $conversationId: $e');
+      }
+    }
   }
 
   void _playIncomingMessageSound() {
@@ -1830,10 +1909,16 @@ class ChatProvider extends ChangeNotifier {
     }
 
     try {
-      // NOTIFY: Send signal message so the target user's app knows they were removed in real-time
+      // NOTIFY: Send signal message so others know about the removal
+      final removeSignal = {
+        'action': 'REMOVE_MEMBER',
+        'actorId': _currentUserId,
+        'targetMemberIds': [userId]
+      };
+      
       await _socketService.sendMessage(
         conversationId: conversationId,
-        content: '[ACTION:REMOVE:$userId]',
+        content: jsonEncode(removeSignal),
         messageType: 'SYSTEM',
       );
       
@@ -1869,9 +1954,8 @@ class ChatProvider extends ChangeNotifier {
       }
     }
     
-    // Step 1: Remove conversation immediately from UI
-    _conversations.removeWhere((c) => c.id == conversationId);
-    notifyListeners();
+    // Step 1: Remove conversation immediately from UI and DB
+    await _removeConversationLocally(conversationId);
 
     try {
       await removeMember(conversationId, userId);
@@ -1906,13 +1990,18 @@ class ChatProvider extends ChangeNotifier {
       await _sendSystemNotification(conversationId, '$userName đã giải tán nhóm');
       
       // NOTIFY: Send signal message so everyone's app knows the group is disbanded in real-time
+      final disbandSignal = {
+        'action': 'DISBAND_GROUP',
+        'actorId': _currentUserId
+      };
+      
       await _socketService.sendMessage(
         conversationId: conversationId,
-        content: '[ACTION:DISBAND]',
+        content: jsonEncode(disbandSignal),
         messageType: 'SYSTEM',
       );
       
-      _removeConversationLocally(conversationId);
+      await _removeConversationLocally(conversationId);
       
       await _chatService.disbandGroup(
         conversationId: conversationId,

@@ -535,9 +535,10 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
                   Navigator.pop(context);
                   
                   final chatProvider = context.read<ChatProvider>();
-                  await chatProvider.disbandGroup(conv.id);
+                  // Don't await here to allow immediate navigation
+                  chatProvider.disbandGroup(conv.id);
                   
-                  // Navigate to chat tab
+                  // Navigate to chat tab immediately
                   Navigator.of(context).popUntil((route) => route.isFirst);
                   MainShellState.globalKey.currentState?.setTabIndex(0);
                 },
@@ -559,14 +560,15 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
         actions: [
           CupertinoDialogAction(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
           CupertinoDialogAction(
-            onPressed: () async {
+            onPressed: () {
               // Dismiss dialog first
               Navigator.pop(context);
               
               final chatProvider = context.read<ChatProvider>();
-              await chatProvider.leaveGroup(conv.id);
+              // Don't await here to allow immediate navigation
+              chatProvider.leaveGroup(conv.id);
               
-              // Navigate to chat tab
+              // Navigate to chat tab immediately
               Navigator.of(context).popUntil((route) => route.isFirst);
               MainShellState.globalKey.currentState?.setTabIndex(0);
             },
@@ -587,14 +589,15 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
         actions: [
           CupertinoDialogAction(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
           CupertinoDialogAction(
-            onPressed: () async {
+            onPressed: () {
               // Dismiss dialog first
               Navigator.pop(context);
               
               final chatProvider = context.read<ChatProvider>();
-              await chatProvider.disbandGroup(conv.id);
+              // Don't await here to allow immediate navigation
+              chatProvider.disbandGroup(conv.id);
               
-              // Navigate to chat tab
+              // Navigate to chat tab immediately
               Navigator.of(context).popUntil((route) => route.isFirst);
               MainShellState.globalKey.currentState?.setTabIndex(0);
             },
