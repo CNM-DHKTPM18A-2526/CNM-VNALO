@@ -1,10 +1,17 @@
+import 'dart:math';
+
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:o3d/o3d.dart';
 import 'package:provider/provider.dart';
+import 'package:vnalo_mobile/features/ai_assistant/models/mascot_metadata.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
 import 'package:vnalo_mobile/features/ai_assistant/screens/mascot_gallery_screen.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_chat_board.dart';
-import 'dart:math';
+import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_robot_avatar.dart';
+
+enum _BubbleInputMode { bubbleControl, mascotInteract }
 
 class AiFloatingBubble extends StatefulWidget {
   const AiFloatingBubble({super.key});
@@ -13,25 +20,38 @@ class AiFloatingBubble extends StatefulWidget {
   State<AiFloatingBubble> createState() => _AiFloatingBubbleState();
 }
 
-class _AiFloatingBubbleState extends State<AiFloatingBubble> with TickerProviderStateMixin {
+class _AiFloatingBubbleState extends State<AiFloatingBubble>
+    with TickerProviderStateMixin {
+  static const double _bubbleSize = 120;
+  static const double _bubbleRadius = _bubbleSize / 2;
+  static const double _dragHandleThreshold = 38;
+  static const double _trashHoverDistance = 58;
+  static const double _trashAttractionDistance = 104;
+  static const double _trashActivationBandFromBottom = 220;
+
   Offset _position = const Offset(20, 100);
   final O3DController _o3dController = O3DController();
 
   bool _isDragging = false;
   bool _isHoveringTrash = false;
+  bool _isBoardExpanded = false;
+  _BubbleInputMode _inputMode = _BubbleInputMode.bubbleControl;
 
-  late AnimationController _animationController;
-  late AnimationController _pulseController;
+  DateTime? _ignoreTapUntil;
+
+  late final AnimationController _snapController;
   Animation<Offset>? _positionAnimation;
   Animation<double>? _scaleAnimation;
 
-  double _currentScale = 0.8; // Default compact size at edge
+  double _currentScale = 0.86;
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
-    _animationController.addListener(() {
+    _snapController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+    )..addListener(() {
       final hasPositionUpdate = _positionAnimation != null;
       final hasScaleUpdate = _scaleAnimation != null;
       if (!hasPositionUpdate && !hasScaleUpdate) {
@@ -47,225 +67,202 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble> with TickerProvider
       });
     });
 
-    // Schedule an initial snap to edge so it starts properly
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-         _snapToEdge();
+        _snapToEdge();
       }
     });
-
-    _pulseController = AnimationController(vsync: this, duration: const Duration(milliseconds: 500))..repeat(reverse: true);
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
-    _pulseController.dispose();
+    _snapController.dispose();
     super.dispose();
   }
 
+  void _onPointerDown(PointerDownEvent event, MascotMetadata mascot) {
+    final local = event.localPosition;
+    final center = const Offset(_bubbleRadius, _bubbleRadius);
+    final distance = (local - center).distance;
+
+    final resolvedMode =
+        mascot.uses3dModel && distance < _dragHandleThreshold
+            ? _BubbleInputMode.mascotInteract
+            : _BubbleInputMode.bubbleControl;
+
+    if (_inputMode != resolvedMode) {
+      HapticFeedback.selectionClick();
+      setState(() {
+        _inputMode = resolvedMode;
+      });
+    }
+  }
+
+  void _onPointerExit() {
+    if (_isDragging) {
+      return;
+    }
+    if (_inputMode != _BubbleInputMode.bubbleControl) {
+      setState(() {
+        _inputMode = _BubbleInputMode.bubbleControl;
+      });
+    }
+  }
+
   void _onPanStart(DragStartDetails details) {
-    _animationController.stop();
+    _snapController.stop();
     setState(() {
+      _positionAnimation = null;
+      _scaleAnimation = null;
+      _inputMode = _BubbleInputMode.bubbleControl;
       _isDragging = true;
       _isHoveringTrash = false;
-      // Expand to full size when driving
-      _scaleAnimation = Tween<double>(begin: _currentScale, end: 1.0).animate(
-        CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
-      );
+      _currentScale = 1.0;
     });
-    _animationController.forward(from: 0);
+    HapticFeedback.selectionClick();
   }
 
   void _onPanUpdate(DragUpdateDetails details) {
     setState(() {
-      _position += details.delta;
-
       final screenSize = MediaQuery.of(context).size;
-      final trashCenter = Offset(screenSize.width / 2, screenSize.height - 80);
-      
-      // Center of the 120x120 bubble
-      final mascotCenter = Offset(_position.dx + 60, _position.dy + 60);
+      final rawPosition = _position + details.delta;
+      final clamped = _clampToViewport(rawPosition, screenSize);
 
-      // Hitbox logic (snap to trash)
-      if ((mascotCenter - trashCenter).distance < 80) {
-        _isHoveringTrash = true;
-        // Suction effect towards the trash bin
-        _position = Offset(screenSize.width / 2 - 60, screenSize.height - 140);
-      } else {
-        _isHoveringTrash = false;
+      final trashCenter = Offset(screenSize.width / 2, screenSize.height - 80);
+      final mascotCenter = Offset(
+        clamped.dx + _bubbleRadius,
+        clamped.dy + _bubbleRadius,
+      );
+      final distance = (mascotCenter - trashCenter).distance;
+      final inTrashBand =
+          mascotCenter.dy >
+          (screenSize.height - _trashActivationBandFromBottom);
+
+      _position = clamped;
+
+      if (inTrashBand && distance < _trashAttractionDistance) {
+        final target = Offset(
+          screenSize.width / 2 - _bubbleRadius,
+          screenSize.height - 140,
+        );
+        final attraction = ((_trashAttractionDistance - distance) /
+                _trashAttractionDistance)
+            .clamp(0.0, 1.0);
+        final lerpFactor = 0.08 + attraction * 0.18;
+        _position = Offset.lerp(_position, target, lerpFactor)!;
       }
+
+      final hovering = inTrashBand && distance < _trashHoverDistance;
+      if (hovering && !_isHoveringTrash) {
+        HapticFeedback.selectionClick();
+      }
+      _isHoveringTrash = hovering;
     });
   }
 
-  void _onPanEnd(DragEndDetails details, AiAssistantProvider provider) {
+  Future<void> _onPanEnd(
+    DragEndDetails details,
+    AiAssistantProvider provider,
+  ) async {
     setState(() {
       _isDragging = false;
+      _inputMode = _BubbleInputMode.bubbleControl;
+      _ignoreTapUntil = DateTime.now().add(const Duration(milliseconds: 220));
     });
 
     if (_isHoveringTrash) {
-      provider.hideMascot();
-      _isHoveringTrash = false;
-      _position = const Offset(20, 100); // Reset position
+      await HapticFeedback.mediumImpact();
+      await provider.hideMascot(reason: 'trash_drop');
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isHoveringTrash = false;
+        _isBoardExpanded = false;
+        _position = const Offset(20, 100);
+      });
       return;
     }
 
     _snapToEdge();
   }
 
-  void _snapToEdge() {
-    final screenSize = MediaQuery.of(context).size;
-    final isLeft = _position.dx + 60 < screenSize.width / 2;
-    
-    final targetX = isLeft ? -10.0 : screenSize.width - 110.0; // Slightly off edge
-    double targetY = _position.dy;
-    
-    // Prevent hiding in top/bottom areas
-    if (targetY < 40) targetY = 40;
-    if (targetY > screenSize.height - 160) targetY = screenSize.height - 160;
+  Offset _clampToViewport(Offset candidate, Size screenSize) {
+    final minX = -(_bubbleSize * 0.2);
+    final maxX = screenSize.width - (_bubbleSize * 0.8);
+    final minY = 40.0;
+    final maxY = screenSize.height - 200;
 
-    _positionAnimation = Tween<Offset>(begin: _position, end: Offset(targetX, targetY)).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic),
+    return Offset(
+      candidate.dx.clamp(minX, maxX),
+      candidate.dy.clamp(minY, maxY),
     );
-    
-    _scaleAnimation = Tween<double>(begin: _currentScale, end: 0.8).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic),
-    );
-    
-    _animationController.forward(from: 0);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final aiProvider = context.watch<AiAssistantProvider>();
+  void _snapToEdge() {
+    final screenSize = MediaQuery.of(context).size;
+    final isLeft = _position.dx + _bubbleRadius < screenSize.width / 2;
 
-    if (!aiProvider.isMascotVisible) return const SizedBox.shrink();
+    final targetX =
+        isLeft
+            ? -(_bubbleSize * 0.23)
+            : screenSize.width - (_bubbleSize * 0.77);
+    var targetY = _position.dy;
 
-    return Positioned.fill(
-      child: Stack(
-        children: [
-          if (_isDragging)
-            Positioned(
-              bottom: 40,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: _isHoveringTrash ? 80 : 60,
-                  height: _isHoveringTrash ? 80 : 60,
-                  decoration: BoxDecoration(
-                    color: _isHoveringTrash ? Colors.redAccent.withOpacity(0.9) : Colors.black54,
-                    shape: BoxShape.circle,
-                    boxShadow: _isHoveringTrash
-                        ? [const BoxShadow(color: Colors.red, blurRadius: 20, spreadRadius: 5)]
-                        : [],
-                  ),
-                  child: Icon(
-                    Icons.delete_outline,
-                    color: Colors.white,
-                    size: _isHoveringTrash ? 40 : 30,
-                  ),
-                ),
-              ),
-            ),
-            
-          // Generative UI Chat Board
-          if (aiProvider.aiResponse.isNotEmpty && !_isDragging)
-            Positioned(
-              left: _position.dx < MediaQuery.of(context).size.width / 2 ? _position.dx + 110 : null,
-              right: _position.dx >= MediaQuery.of(context).size.width / 2 ? MediaQuery.of(context).size.width - _position.dx + 10 : null,
-              top: max(_position.dy - 50, 60),
-              child: AiChatBoard(
-                onClose: () => aiProvider.clearAiResponse(),
-              ),
-            ),
+    if (targetY < 40) {
+      targetY = 40;
+    }
+    if (targetY > screenSize.height - 200) {
+      targetY = screenSize.height - 200;
+    }
 
-          Positioned(
-            left: _position.dx,
-            top: _position.dy,
-            child: GestureDetector(
-              onPanStart: _onPanStart,
-              onPanUpdate: _onPanUpdate,
-              onPanEnd: (details) => _onPanEnd(details, aiProvider),
-              onTap: () {
-                if (aiProvider.state == AiState.idle) {
-                  aiProvider.startListening();
-                } else {
-                  aiProvider.stopListening();
-                }
-              },
-              onLongPress: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const MascotGalleryScreen()),
-                );
-              },
-              child: MouseRegion(
-                cursor: SystemMouseCursors.click,
-                child: Transform.scale(
-                  scale: _currentScale,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildBubbleIndicator(aiProvider),
-                      const SizedBox(height: 8),
-                      Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: RadialGradient(
-                            colors: [
-                              aiProvider.state == AiState.speaking
-                                ? Colors.greenAccent.withOpacity(0.3)
-                                : Colors.blue.withOpacity(0.1),
-                              Colors.transparent,
-                            ],
-                            stops: const [0.5, 1.0],
-                          ),
-                        ),
-                        child: ClipOval(
-                          child: O3D(
-                            key: ValueKey(aiProvider.currentMascot.id), // Force rebuild
-                            controller: _o3dController,
-                            src: aiProvider.currentMascot.modelUrl,
-                            autoPlay: true,
-                            cameraTarget: aiProvider.state == AiState.thinking 
-                              ? CameraTarget(0, 0.5, 0) // Look up at head when thinking
-                              : CameraTarget(0, 0, 0),
-                            cameraOrbit: CameraOrbit(0, 75, 105),
-                          ),
-                        ),
+    _positionAnimation = Tween<Offset>(
+      begin: _position,
+      end: Offset(targetX, targetY),
+    ).animate(
+      CurvedAnimation(parent: _snapController, curve: Curves.easeOutCubic),
+    );
+
+    _scaleAnimation = Tween<double>(begin: _currentScale, end: 0.86).animate(
+      CurvedAnimation(parent: _snapController, curve: Curves.easeOutCubic),
+    );
+
+    _snapController.forward(from: 0);
+  }
+
+  Widget _buildTrashZone() {
+    return Positioned(
+      bottom: 40,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          width: _isHoveringTrash ? 84 : 62,
+          height: _isHoveringTrash ? 84 : 62,
+          decoration: BoxDecoration(
+            color:
+                _isHoveringTrash
+                    ? Colors.redAccent.withOpacity(0.9)
+                    : Colors.black54,
+            shape: BoxShape.circle,
+            boxShadow:
+                _isHoveringTrash
+                    ? [
+                      const BoxShadow(
+                        color: Colors.redAccent,
+                        blurRadius: 24,
+                        spreadRadius: 6,
                       ),
-                      // Auto-trigger animations based on provider state
-                      _AnimationListener(
-                        state: aiProvider.state,
-                        emotion: aiProvider.currentEmotion,
-                        controller: _o3dController,
-                      ),
-                      if (aiProvider.state != AiState.idle && aiProvider.state != AiState.speaking)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8.0),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.7),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              aiProvider.state == AiState.listening ? "Đang nghe..." : "...",
-                              style: const TextStyle(color: Colors.white, fontSize: 12),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+                    ]
+                    : [],
           ),
-        ],
+          child: Icon(
+            Icons.delete_outline,
+            color: Colors.white,
+            size: _isHoveringTrash ? 42 : 30,
+          ),
+        ),
       ),
     );
   }
@@ -282,12 +279,13 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble> with TickerProvider
       case AiState.speaking:
         color = Colors.greenAccent;
         break;
-      default:
+      case AiState.idle:
         color = Colors.white.withOpacity(0.5);
+        break;
     }
 
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 250),
       width: 10,
       height: 10,
       decoration: BoxDecoration(
@@ -295,7 +293,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble> with TickerProvider
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.5),
+            color: color.withOpacity(0.48),
             blurRadius: 10,
             spreadRadius: 2,
           ),
@@ -303,56 +301,336 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble> with TickerProvider
       ),
     );
   }
-}
 
-/// Helper widget to bridge Provider state to O3D controller animations
-class _AnimationListener extends StatefulWidget {
-  final AiState state;
-  final String emotion;
-  final O3DController controller;
-
-  const _AnimationListener({
-    required this.state,
-    required this.emotion,
-    required this.controller,
-  });
-
-  @override
-  State<_AnimationListener> createState() => _AnimationListenerState();
-}
-
-class _AnimationListenerState extends State<_AnimationListener> {
-  @override
-  void didUpdateWidget(_AnimationListener oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.state != widget.state || oldWidget.emotion != widget.emotion) {
-      _applyAnimation();
-    }
-  }
-
-  void _applyAnimation() {
-    String? animName;
-    if (widget.state == AiState.speaking) {
-      animName = 'Talking';
-    } else if (widget.state == AiState.thinking) {
-      animName = 'Walking'; // "Pacing" while thinking
-    } else {
-      switch (widget.emotion) {
-        case 'joyful':
-          animName = 'Dance';
-          break;
-        case 'angry':
-          animName = 'Angry';
-          break;
-        default:
-          animName = null; // Let autoPlay handle idle
-      }
+  Widget _buildStateHint(AiAssistantProvider provider) {
+    if (provider.state == AiState.idle || provider.state == AiState.speaking) {
+      return const SizedBox.shrink();
     }
 
-    widget.controller.animationName = animName;
-    widget.controller.play();
+    final isListening = provider.state == AiState.listening;
+    final text =
+        isListening ? 'Đang nghe... chạm lại để dừng' : 'Đang xử lý...';
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.72),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              text,
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+            ),
+            if (isListening) ...[
+              const SizedBox(height: 6),
+              _buildListeningMeter(provider),
+              if (provider.lastWords.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    provider.lastWords,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white70, fontSize: 11),
+                  ),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildListeningMeter(AiAssistantProvider provider) {
+    final energy = provider.soundLevel.clamp(0.0, 1.0);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(5, (index) {
+        final distanceFromCenter = (index - 2).abs();
+        final weight = (1 - (distanceFromCenter * 0.16)).clamp(0.45, 1.0);
+        final level = (0.18 + (energy * weight)).clamp(0.12, 1.0);
+        final height = 4 + (level * 14);
+
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          margin: const EdgeInsets.symmetric(horizontal: 1.5),
+          width: 3,
+          height: height,
+          decoration: BoxDecoration(
+            color: Colors.cyanAccent.withOpacity(0.92),
+            borderRadius: BorderRadius.circular(999),
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildMascotSurface(AiAssistantProvider provider) {
+    final mascot = provider.currentMascot;
+
+    if (mascot.uses3dModel) {
+      return ClipOval(
+        child: O3D(
+          key: ValueKey(mascot.id),
+          controller: _o3dController,
+          src: mascot.modelUrl!,
+          autoPlay: true,
+          disableZoom: true,
+          cameraTarget:
+              provider.state == AiState.thinking
+                  ? CameraTarget(0, 0.45, 0)
+                  : CameraTarget(0, 0, 0),
+          cameraOrbit: CameraOrbit(0, 75, 105),
+        ),
+      );
+    }
+
+    return ClipOval(
+      child: AiRobotAvatar(
+        state: provider.state,
+        emotion: provider.currentEmotion,
+        onTap: () {
+          provider.onPrimaryAction(source: 'robot_avatar');
+        },
+      ),
+    );
+  }
+
+  Widget _buildLayeredGestureMask(AiAssistantProvider provider) {
+    return IgnorePointer(
+      ignoring: _inputMode == _BubbleInputMode.mascotInteract && !_isDragging,
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        dragStartBehavior: DragStartBehavior.down,
+        onPanStart: _onPanStart,
+        onPanUpdate: _onPanUpdate,
+        onPanEnd: (details) {
+          _onPanEnd(details, provider);
+        },
+        onTap: () {
+          if (_ignoreTapUntil != null &&
+              DateTime.now().isBefore(_ignoreTapUntil!)) {
+            return;
+          }
+          setState(() {
+            _isBoardExpanded = true;
+          });
+          provider.onPrimaryAction(source: 'bubble_mask');
+        },
+      ),
+    );
+  }
+
+  void _toggleBoard() {
+    setState(() {
+      _isBoardExpanded = !_isBoardExpanded;
+    });
+  }
+
+  Future<void> _openMascotGallery() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const MascotGalleryScreen()),
+    );
+  }
+
+  Widget _buildMascotContainer(AiAssistantProvider provider) {
+    final use3d = provider.currentMascot.uses3dModel;
+
+    return Transform.scale(
+      scale: _currentScale,
+      child: SizedBox(
+        width: _bubbleSize,
+        height: _bubbleSize,
+        child: Listener(
+          onPointerDown: (event) {
+            _onPointerDown(event, provider.currentMascot);
+          },
+          onPointerCancel: (_) => _onPointerExit(),
+          onPointerUp: (_) => _onPointerExit(),
+          child: MouseRegion(
+            cursor: SystemMouseCursors.click,
+            onExit: (_) => _onPointerExit(),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: _bubbleSize,
+                  height: _bubbleSize,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        provider.state == AiState.speaking
+                            ? Colors.greenAccent.withOpacity(0.24)
+                            : Colors.blueAccent.withOpacity(0.14),
+                        Colors.transparent,
+                      ],
+                      stops: const [0.52, 1.0],
+                    ),
+                    border: Border.all(
+                      color:
+                          _inputMode == _BubbleInputMode.bubbleControl
+                              ? Colors.white.withOpacity(0.45)
+                              : Colors.transparent,
+                    ),
+                  ),
+                  child: _buildMascotSurface(provider),
+                ),
+                Positioned.fill(child: _buildLayeredGestureMask(provider)),
+                Positioned(
+                  top: -10,
+                  left: -8,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _toggleBoard,
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color:
+                            _isBoardExpanded
+                                ? Colors.blueAccent.withOpacity(0.84)
+                                : Colors.black.withOpacity(0.62),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.35),
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.chat_bubble_outline_rounded,
+                        color: Colors.white,
+                        size: 15,
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: -10,
+                  right: -8,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _openMascotGallery,
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.62),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.35),
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.tune,
+                        color: Colors.white,
+                        size: 15,
+                      ),
+                    ),
+                  ),
+                ),
+                if (use3d)
+                  Positioned(
+                    bottom: -8,
+                    left: 12,
+                    right: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.6),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        _inputMode == _BubbleInputMode.mascotInteract
+                            ? 'Xoay mascot 3D'
+                            : 'Kéo bubble',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
-  Widget build(BuildContext context) => const SizedBox.shrink();
+  Widget build(BuildContext context) {
+    final aiProvider = context.watch<AiAssistantProvider>();
+    final showBoard =
+        !_isDragging &&
+        (_isBoardExpanded ||
+            aiProvider.aiResponse.isNotEmpty ||
+            aiProvider.state == AiState.listening ||
+            aiProvider.state == AiState.thinking);
+
+    if (!aiProvider.isMascotVisible) {
+      return const SizedBox.shrink();
+    }
+
+    return Positioned.fill(
+      child: Stack(
+        children: [
+          if (_isDragging) _buildTrashZone(),
+          if (showBoard)
+            Positioned(
+              left:
+                  _position.dx < MediaQuery.of(context).size.width / 2
+                      ? _position.dx + _bubbleSize - 8
+                      : null,
+              right:
+                  _position.dx >= MediaQuery.of(context).size.width / 2
+                      ? MediaQuery.of(context).size.width - _position.dx + 8
+                      : null,
+              top: max(_position.dy - 72, 56),
+              child: AiChatBoard(
+                onClose: () {
+                  setState(() {
+                    _isBoardExpanded = false;
+                  });
+                },
+                onClear: aiProvider.clearAiResponse,
+                onSubmitPrompt: (text) async {
+                  setState(() {
+                    _isBoardExpanded = true;
+                  });
+                  await aiProvider.submitTextPrompt(
+                    text,
+                    source: 'bubble_chat_board',
+                  );
+                },
+              ),
+            ),
+          Positioned(
+            left: _position.dx,
+            top: _position.dy,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildBubbleIndicator(aiProvider),
+                const SizedBox(height: 8),
+                _buildMascotContainer(aiProvider),
+                _buildStateHint(aiProvider),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

@@ -15,6 +15,7 @@ import 'package:vnalo_mobile/features/auth/screens/login_screen.dart';
 import 'package:vnalo_mobile/features/auth/widgets/otp_input.dart';
 import 'package:vnalo_mobile/navigation/main_shell.dart';
 import 'package:vnalo_mobile/features/auth/widgets/phone_input.dart';
+import 'package:vnalo_mobile/services/api_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -209,12 +210,38 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _nextStep();
   }
 
-  void _continueFromPhoneStep() {
+  Future<void> _continueFromPhoneStep() async {
     if (_isAnyRequestInFlight) return;
     if (!_agreeTermsA || !_agreeTermsB) return;
     if (_phoneValidationError() != null) return;
 
-    _goToStep(1);
+    final fullPhone = _buildFullPhone();
+    setState(() => _isSendingOtp = true);
+
+    try {
+      final isRegistered = await context.read<AuthProvider>().checkPhone(fullPhone);
+      if (!mounted) return;
+
+      if (isRegistered) {
+        throw ApiException(
+          statusCode: 400,
+          code: 'AUTH_008',
+          message: 'Số điện thoại này đã được đăng ký',
+        );
+      }
+
+      _goToStep(1);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(ApiErrorMapper.map(e)),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSendingOtp = false);
+    }
   }
 
   Future<void> _continueFromEmailStep() async {
@@ -296,7 +323,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  void _verifyOtpAndContinue() {
+  Future<void> _verifyOtpAndContinue() async {
     if (!RegExp(r'^\d{6}$').hasMatch(_otpCode)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -306,7 +333,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
       return;
     }
-    _nextStep();
+
+    setState(() => _isSendingOtp = true);
+    try {
+      await context.read<AuthProvider>().verifyRegistrationOtp(
+        email: _emailController.text.trim(),
+        otp: _otpCode,
+      );
+      if (!mounted) return;
+      _nextStep();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(ApiErrorMapper.map(e)),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSendingOtp = false);
+    }
   }
 
   Future<void> _completeRegistration({bool isSkipAction = false}) async {
@@ -780,14 +826,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(56),
-                backgroundColor: isDarkMode ? DarkColors.primary : AppColors.primary,
+                backgroundColor: _otpCode.length == 6 
+                    ? (isDarkMode ? DarkColors.primary : AppColors.primary)
+                    : (isDarkMode ? DarkColors.divider : LightColors.divider),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(999),
                 ),
                 elevation: 0,
               ),
-                onPressed: _isAnyRequestInFlight ? null : _verifyOtpAndContinue,
-                child: _isResendingOtp
+                onPressed: _isAnyRequestInFlight || _otpCode.length != 6 ? null : _verifyOtpAndContinue,
+                child: _isSendingOtp || _isResendingOtp
                   ? const SizedBox(
                       height: 16,
                       width: 16,

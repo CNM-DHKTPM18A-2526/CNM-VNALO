@@ -18,11 +18,11 @@ flowchart TB
     subgraph Java
       Core[core-service\nSpring Boot\n:8081\n/api/v1]
       Media[media-service\nSpring Boot\n:8083\n/api/v1/media + /api/v1/stickers]
-      Mod[moderation-service\nSpring Boot\n:8082\n/api/v1]
+      Mod[moderation-service\nSpring Boot\n:8082\n/api/v1\ndisabled by default compose]
       Content[content-service\nSpring Boot\n:8086\n/api/v1]
       Notif[notification-service\nSpring Boot\n:8087\n/api/v1]
       AI[ai-service\nSpring Boot\n:8094\n/api/v1]
-      Ana[analytics-service\nSpring Boot\n:8084\nplanned profile]
+      Ana[analytics-service\nSpring Boot\n:8084\nprofile planned]
     end
 
     PG[(PostgreSQL)]
@@ -52,8 +52,7 @@ flowchart TB
     RT --> Redis
     AI --> Redis
 
-    Notif --> Kafka
-    Mod --> Kafka
+    Kafka --> Notif
     Media --> Rabbit
     RT --> Rabbit
 ```
@@ -66,11 +65,11 @@ flowchart TB
 | message-service | 3000 | /api/v1 and WS namespace /chat | Conversations, messages, inbox, call signaling | Active |
 | realtime-gateway | 8085 | WS namespace /realtime | Presence and typing federation | Active but secondary for mobile |
 | media-service | 8083 | /api/v1/media and /api/v1/stickers | Media upload, sticker pack APIs | Active |
-| moderation-service | 8082 | /api/v1 | Reports, cases, actions, appeals | Active in codebase |
-| content-service | 8086 | /api/v1 | Stories, posts, comments, likes | Active in codebase |
-| notification-service | 8087 | /api/v1 | Device registration and user notifications | Active in codebase |
+| moderation-service | 8082 | /api/v1 | Reports, cases, actions, appeals | Implemented, disabled in default compose |
+| content-service | 8086 | /api/v1 | Stories, posts, comments, likes | Active; security config permitAll with controller header trust |
+| notification-service | 8087 | /api/v1 | Device registration and user notifications | Active; controller trusts X-User-Id header |
 | ai-service | 8094 | /api/v1/ai and /api/v1/chat | Assistant chat and history | Active |
-| analytics-service | 8084 | /api/v1/analytics and /internal/events | Trend dashboards and event ingestion | Planned compose profile |
+| analytics-service | 8084 | /api/v1/analytics and /internal/events | Trend dashboards and event ingestion | Implemented, optional compose profile planned |
 
 ## Trust and Auth Boundaries
 
@@ -79,15 +78,17 @@ flowchart LR
     TokenIssuer[core-service token issuer]
     JWTClients[Mobile and web clients]
     JWTValidators[message-service + realtime-gateway + Java JWT filters]
-    WeakHeader[notification-service X-User-Id header path]
+    WeakHeaderNotif[notification-service X-User-Id header path]
+    WeakHeaderContent[content-service X-User-Id header path plus permitAll]
 
     TokenIssuer --> JWTClients
     JWTClients --> JWTValidators
-    JWTClients --> WeakHeader
+    JWTClients --> WeakHeaderNotif
+    JWTClients --> WeakHeaderContent
 ```
 
 > [!WARNING]
-> notification-service currently identifies users via X-User-Id request header in controller methods and does not show a service-local Spring Security filter chain in source.
+> notification-service and content-service currently rely on controller-level X-User-Id headers for mutating actions, and content-service security config permits all requests.
 
 ## Canonical End-to-End Flows
 
@@ -146,4 +147,6 @@ sequenceDiagram
 - Shared JWT secret must remain synchronized across token issuer and validators.
 - message-service and core-service currently share vnalo_core persistence domain.
 - media-service uses dedicated vnalo_media DB and must integrate via API or events.
+- moderation-service is implemented but commented out in default docker-compose runtime.
+- analytics-service runs only when compose profile planned is selected.
 - Socket event names are part of client contract and must be versioned for breaking changes.

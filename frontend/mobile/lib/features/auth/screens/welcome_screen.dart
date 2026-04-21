@@ -300,12 +300,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                             },
                             style: ElevatedButton.styleFrom(
                               minimumSize: const Size.fromHeight(56),
-                              backgroundColor: isDarkMode ? DarkColors.surface : Colors.white,
-                              foregroundColor: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
+                              backgroundColor: isDarkMode ? DarkColors.divider : AppColors.sectionDivider,
+                              foregroundColor: isDarkMode ? DarkColors.textPrimary : const Color(0xFF111827),
                               elevation: 0,
-                              side: BorderSide(
-                                color: isDarkMode ? DarkColors.divider : LightColors.divider,
-                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(999),
                               ),

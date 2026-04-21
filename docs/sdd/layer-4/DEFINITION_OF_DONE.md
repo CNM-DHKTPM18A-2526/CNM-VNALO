@@ -91,7 +91,7 @@ A release is blocked if any of the following is true:
 
 ## This Cycle Status
 
-For cycle `SDD-RECONCILE-2026-04-19`:
+For cycle `SDD-RECONCILE-2026-04-20`:
 
 - Gate 1: Passed
 - Gate 2: Passed for documented runtime scope
@@ -100,4 +100,4 @@ For cycle `SDD-RECONCILE-2026-04-19`:
 - Gate 5: Passed
 
 > [!NOTE]
-> Runtime hardening debts remain tracked, especially notification identity trust and restricted web mode policy enforcement.
+> Runtime hardening debts remain tracked, especially notification/content identity trust boundaries and restricted web mode policy enforcement.

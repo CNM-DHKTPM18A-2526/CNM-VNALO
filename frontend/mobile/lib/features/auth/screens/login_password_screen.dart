@@ -141,7 +141,7 @@ class _LoginPasswordScreenState extends State<LoginPasswordScreen> {
                     ),
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(height: 24),
                 Consumer<AuthProvider>(
                   builder:
                       (_, auth, __) => ElevatedButton(

@@ -51,6 +51,27 @@ class AuthService {
     return sendRegisterOtp(phone: phone, email: email);
   }
 
+  Future<bool> checkPhone(String phone) async {
+    final normalized = _normalizePhone(phone);
+    final response = await _apiService.get(_base, '/auth/check-phone/$normalized');
+    final data = response['data'] ?? response;
+    return data['registered'] == true;
+  }
+
+  Future<void> verifyRegistrationOtp({
+    required String email,
+    required String otp,
+  }) async {
+    await _apiService.post(
+      _base,
+      '/auth/register/verify-otp',
+      body: {
+        'email': email.trim().toLowerCase(),
+        'otp': otp.trim(),
+      },
+    );
+  }
+
   // Check OTP configuration status from backend.
   // Supports both wrapped ({ "data": { "enabled": true } }) and flat ({ "enabled": true }) responses.
   Future<Map<String, dynamic>> getOtpStatus() async {

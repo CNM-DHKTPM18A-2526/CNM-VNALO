@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/features/contacts/providers/contact_provider.dart';
@@ -16,7 +19,6 @@ import 'package:vnalo_mobile/features/call/screens/video_call_screen.dart';
 import 'package:vnalo_mobile/features/call/utils/call_id_generator.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
-import 'dart:async';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -27,11 +29,14 @@ class MainShell extends StatefulWidget {
 
 class MainShellState extends State<MainShell> {
   int _currentIndex = 0;
+  bool _isCallScreenActive = false;
+  String? _activeAiConversationId;
   StreamSubscription<AiCommand>? _actionSub;
   StreamSubscription<Map<String, dynamic>>? _callErrorSub;
-  
+
   // Static key to access state from outside
-  static final GlobalKey<MainShellState> globalKey = GlobalKey<MainShellState>();
+  static final GlobalKey<MainShellState> globalKey =
+      GlobalKey<MainShellState>();
 
   // Method to set tab index from outside
   void setTabIndex(int index) {
@@ -47,7 +52,9 @@ class MainShellState extends State<MainShell> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final aiProvider = context.read<AiAssistantProvider>();
-      _actionSub = aiProvider.systemActionStream.listen(_handleAiSystemAction);
+      _actionSub = aiProvider.systemActionStream.listen((aiCmd) {
+        unawaited(_handleAiSystemAction(aiCmd));
+      });
 
       final socketService = context.read<SocketService>();
       _callErrorSub = socketService.onCallError.listen(_handleCallErrorSignal);
@@ -112,6 +119,7 @@ class MainShellState extends State<MainShell> {
         payload['error']?.toString().trim().isNotEmpty == true
             ? payload['error'].toString().trim()
             : 'Lỗi signaling cuộc gọi từ server.';
+    _logAiFlow('AI_CALL_ERROR_SIGNAL', extra: {'detail': detail});
     _showErrorSnackBar('Lỗi cuộc gọi: $detail');
   }
 
@@ -127,61 +135,115 @@ class MainShellState extends State<MainShell> {
     }
   }
 
-  void _handleAiSystemAction(AiCommand aiCmd) {
+  Future<void> _handleAiSystemAction(AiCommand aiCmd) async {
     final chatProvider = context.read<ChatProvider>();
     final command = _normalizeAiSystemAction(aiCmd.command);
     final params = aiCmd.params as Map<String, dynamic>?;
 
-    debugPrint('AI System Action Triggered: $command with params: $params');
+    _logAiFlow(
+      'AI_COMMAND_RECEIVED',
+      aiCommand: aiCmd,
+      extra: {'normalizedCommand': command, 'hasParams': params != null},
+    );
 
     switch (command) {
       case 'NAVIGATE_TO':
-        _handleNavigateTo(params);
+        await _handleNavigateTo(params);
         break;
       case 'NAVIGATE_TO_SETTINGS':
-        _handleNavigateTo({'page': 'settings'});
+        await _handleNavigateTo({'page': 'settings'});
         break;
       case 'NAVIGATE_TO_CHAT':
-        _handleNavigateTo({'page': 'chat'});
+        await _handleNavigateTo({'page': 'chat'});
         break;
       case 'NAVIGATE_TO_SCANNER':
-        _handleNavigateTo({'page': 'scanner'});
+        await _handleNavigateTo({'page': 'scanner'});
         break;
       case 'NAVIGATE_TO_TIMELINE':
-        _handleNavigateTo({'page': 'timeline'});
+        await _handleNavigateTo({'page': 'timeline'});
         break;
-        
+
       case 'OPEN_CHAT':
       case 'SEND_MESSAGE':
       case 'START_CALL':
         final targetName =
             (params?['target'] ?? params?['recipient'] ?? '').toString();
         final conversation = chatProvider.findConversationByName(targetName);
-        
+
         if (conversation == null) {
-          debugPrint('AI Resolution Failed: Could not find conversation for "$targetName"');
+          _logAiFlow(
+            'AI_RESOLUTION_FAILED',
+            aiCommand: aiCmd,
+            extra: {'targetName': targetName},
+          );
           _showErrorSnackBar('Không tìm thấy "$targetName" trong danh bạ.');
           return;
         }
 
         final currentUserId = chatProvider.currentUserId ?? '';
         final isDirect = conversation.type.name == 'DIRECT';
-        final peerMember = isDirect
-            ? conversation.members.where((m) => m.userId != currentUserId).firstOrNull
-            : null;
+        final peerMember =
+            isDirect
+                ? conversation.members
+                    .where((m) => m.userId != currentUserId)
+                    .firstOrNull
+                : null;
         final peerUserId = peerMember?.userId ?? '';
         final peerName = conversation.getDisplayName(currentUserId);
 
-        final prefilledText = command == 'SEND_MESSAGE' ? (params?['content'] as String?) : null;
+        final prefilledText =
+            command == 'SEND_MESSAGE' ? (params?['content'] as String?) : null;
 
         if (command == 'OPEN_CHAT' || command == 'SEND_MESSAGE') {
-          Navigator.of(context).push(MaterialPageRoute(
-            builder: (_) => ChatDetailScreen(
-              conversation: conversation,
-              prefilledText: prefilledText,
+          final isAlreadyInConversation =
+              chatProvider.activeConversationId == conversation.id ||
+              _activeAiConversationId == conversation.id;
+
+          if (isAlreadyInConversation) {
+            _logAiFlow(
+              'AI_NAV_GUARD_BLOCKED',
+              aiCommand: aiCmd,
+              extra: {
+                'reason': 'already_in_target_chat',
+                'conversationId': conversation.id,
+              },
+            );
+            setState(() => _currentIndex = 0);
+            return;
+          }
+
+          _activeAiConversationId = conversation.id;
+          _logAiFlow(
+            'AI_NAVIGATE_CHAT',
+            aiCommand: aiCmd,
+            extra: {
+              'conversationId': conversation.id,
+              'prefilled': prefilledText?.isNotEmpty == true,
+            },
+          );
+
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder:
+                  (_) => ChatDetailScreen(
+                    conversation: conversation,
+                    prefilledText: prefilledText,
+                  ),
             ),
-          ));
+          );
+          if (_activeAiConversationId == conversation.id) {
+            _activeAiConversationId = null;
+          }
         } else if (command == 'START_CALL') {
+          if (_isCallScreenActive) {
+            _logAiFlow(
+              'AI_NAV_GUARD_BLOCKED',
+              aiCommand: aiCmd,
+              extra: {'reason': 'call_screen_already_active'},
+            );
+            return;
+          }
+
           if (!isDirect || peerUserId.isEmpty) {
             _showErrorSnackBar(
               'Tính năng gọi điện hiện chỉ hỗ trợ hội thoại 1-1.',
@@ -195,42 +257,113 @@ class MainShellState extends State<MainShell> {
             callerUserId: currentUserId,
             audioOnly: !isVideo,
           );
-          Navigator.of(context).push(MaterialPageRoute(
-            builder: (_) => isVideo
-              ? VideoCallScreen(
-                  conversationId: conversation.id,
-                  callId: callId,
-                  targetUserId: peerUserId,
-                  targetDisplayName: peerName,
-                  isCaller: true,
-                )
-              : VoiceCallScreen(
-                  conversationId: conversation.id,
-                  callId: callId,
-                  targetUserId: peerUserId,
-                  targetDisplayName: peerName,
-                  isCaller: true,
-                ),
-          ));
+
+          _isCallScreenActive = true;
+          _logAiFlow(
+            'AI_NAVIGATE_CALL',
+            aiCommand: aiCmd,
+            extra: {
+              'conversationId': conversation.id,
+              'callId': callId,
+              'callType': isVideo ? 'video' : 'voice',
+            },
+          );
+          try {
+            await Navigator.of(context).push(
+              MaterialPageRoute(
+                builder:
+                    (_) =>
+                        isVideo
+                            ? VideoCallScreen(
+                              conversationId: conversation.id,
+                              callId: callId,
+                              targetUserId: peerUserId,
+                              targetDisplayName: peerName,
+                              isCaller: true,
+                            )
+                            : VoiceCallScreen(
+                              conversationId: conversation.id,
+                              callId: callId,
+                              targetUserId: peerUserId,
+                              targetDisplayName: peerName,
+                              isCaller: true,
+                            ),
+              ),
+            );
+          } finally {
+            _isCallScreenActive = false;
+            _logAiFlow(
+              'AI_CALL_SCREEN_RELEASED',
+              aiCommand: aiCmd,
+              extra: {'conversationId': conversation.id},
+            );
+          }
         }
         break;
 
       case 'RECALL_MESSAGE':
-        if (chatProvider.activeConversationId != null && chatProvider.messages.isNotEmpty) {
+        if (chatProvider.activeConversationId != null &&
+            chatProvider.messages.isNotEmpty) {
           try {
             final lastMsg = chatProvider.messages.firstWhere(
               (m) => m.senderId == chatProvider.currentUserId,
             );
-            chatProvider.recallMessage(lastMsg.id, chatProvider.activeConversationId!);
+            chatProvider.recallMessage(
+              lastMsg.id,
+              chatProvider.activeConversationId!,
+            );
           } catch (_) {
-             debugPrint('AI Recall Failed: No recent message found from self');
+            _logAiFlow(
+              'AI_RECALL_FAILED',
+              aiCommand: aiCmd,
+              extra: {'reason': 'no_self_message'},
+            );
           }
         }
         break;
 
       default:
-        debugPrint('Unknown AI Command: $command');
+        _logAiFlow(
+          'AI_UNKNOWN_COMMAND',
+          aiCommand: aiCmd,
+          extra: {'command': command},
+        );
     }
+  }
+
+  void _logAiFlow(
+    String event, {
+    AiCommand? aiCommand,
+    Map<String, dynamic>? extra,
+  }) {
+    final payload = <String, dynamic>{
+      'ts': DateTime.now().toIso8601String(),
+      'scope': 'AI_NAV',
+      'event': event,
+      'traceId': aiCommand?.traceId ?? 'n/a',
+      'commandId': aiCommand?.commandId ?? 'n/a',
+      'command': aiCommand?.command,
+      'tabIndex': _currentIndex,
+      'callScreenActive': _isCallScreenActive,
+      'activeAiConversationId': _activeAiConversationId,
+      'extra': _sanitize(extra),
+    };
+    debugPrint('[AI_CMD_FLOW] ${jsonEncode(payload)}');
+  }
+
+  Map<String, dynamic> _sanitize(Map<String, dynamic>? input) {
+    if (input == null || input.isEmpty) {
+      return const {};
+    }
+    final output = <String, dynamic>{};
+    input.forEach((key, value) {
+      if (value == null || value is num || value is bool || value is String) {
+        output[key] = value;
+      } else {
+        output[key] = value.toString();
+      }
+    });
+    return output;
   }
 
   final _screens = const [
@@ -262,28 +395,37 @@ class MainShellState extends State<MainShell> {
             onTap: (index) => setState(() => _currentIndex = index),
             type: BottomNavigationBarType.fixed,
             selectedItemColor: AppColors.primary,
-            unselectedItemColor: isDarkMode ? DarkColors.textHint : const Color(0xFF9CA3AF),
+            unselectedItemColor:
+                isDarkMode ? DarkColors.textHint : const Color(0xFF9CA3AF),
             selectedFontSize: 12,
             unselectedFontSize: 12,
             items: [
               BottomNavigationBarItem(
-                icon: unreadCount > 0 
-                  ? Badge(
-                      label: Text(unreadCount > 99 ? '99+' : unreadCount.toString()),
-                      backgroundColor: AppColors.unreadBadge,
-                      child: const Icon(Icons.chat_bubble_rounded),
-                    )
-                  : const Icon(Icons.chat_bubble_rounded),
+                icon:
+                    unreadCount > 0
+                        ? Badge(
+                          label: Text(
+                            unreadCount > 99 ? '99+' : unreadCount.toString(),
+                          ),
+                          backgroundColor: AppColors.unreadBadge,
+                          child: const Icon(Icons.chat_bubble_rounded),
+                        )
+                        : const Icon(Icons.chat_bubble_rounded),
                 label: common.messagesTab,
               ),
               BottomNavigationBarItem(
-                icon: pendingFriendCount > 0
-                  ? Badge(
-                      label: Text(pendingFriendCount > 99 ? '99+' : pendingFriendCount.toString()),
-                      backgroundColor: AppColors.unreadBadge,
-                      child: const Icon(Icons.contacts_outlined),
-                    )
-                  : const Icon(Icons.contacts_outlined),
+                icon:
+                    pendingFriendCount > 0
+                        ? Badge(
+                          label: Text(
+                            pendingFriendCount > 99
+                                ? '99+'
+                                : pendingFriendCount.toString(),
+                          ),
+                          backgroundColor: AppColors.unreadBadge,
+                          child: const Icon(Icons.contacts_outlined),
+                        )
+                        : const Icon(Icons.contacts_outlined),
                 label: common.contactsTab,
               ),
               BottomNavigationBarItem(
