@@ -408,6 +408,8 @@ export function MessageBubble({
     }
     const systemText = formatMessage(message, currentUserId || '', getDisplayName)
 
+    if (!systemText) return null
+
     return (
       <div
         data-message-id={message.id}

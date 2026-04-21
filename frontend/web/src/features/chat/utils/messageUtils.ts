@@ -218,10 +218,37 @@ export function renderSystemMessage(
         return `${actorName} đã tạo nhóm`
       case 'RENAME_GROUP':
         return `${actorName} đã đổi tên nhóm thành "${payload.metadata?.newName || ''}"`
+      case 'CHANGE_GROUP_AVATAR':
+        return `${actorName} đã thay đổi ảnh đại diện nhóm`
       case 'PIN_MESSAGE':
         return `${actorName} đã ghim một tin nhắn`
       case 'UNPIN_MESSAGE':
         return `${actorName} đã bỏ ghim một tin nhắn`
+      case 'UPDATE_MESSAGE_REACTIONS':
+        return '' // Hide reaction sync signals completely
+      case 'UPDATE_GROUP_INFO':
+        if (payload.metadata?.newName) {
+          return `${actorName} đã đổi tên nhóm thành "${payload.metadata.newName}"`
+        }
+        return `${actorName} đã cập nhật thông tin nhóm`
+      case 'REMOVE_MEMBER': {
+        const targetName = (payload.targetMemberIds ?? [])
+          .map((id) => (id === currentUserId ? 'Bạn' : getDisplayName(id)))
+          .join(', ')
+        return `**${targetName}** đã được **${actorName}** xóa khỏi nhóm`
+      }
+      case 'PROMOTE_ADMIN': {
+        const targetName = (payload.targetMemberIds ?? [])
+          .map((id) => (id === currentUserId ? 'Bạn' : getDisplayName(id)))
+          .join(', ')
+        return `**${targetName}** đã được **${actorName}** chỉ định làm phó nhóm`
+      }
+      case 'TRANSFER_OWNERSHIP': {
+        const targetName = (payload.targetMemberIds ?? [])
+          .map((id) => (id === currentUserId ? 'Bạn' : getDisplayName(id)))
+          .join(', ')
+        return `**${targetName}** đã được **${actorName}** chuyển quyền trưởng nhóm`
+      }
       default:
         return content
     }

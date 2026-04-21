@@ -182,6 +182,7 @@ class ChatListItem extends StatelessWidget {
       MessageType.AUDIO => '[${common.audioAction}]',
       MessageType.STICKER => '[Sticker]',
       MessageType.SYSTEM => (() {
+        if (content.startsWith('{')) return ''; // Hide JSON signals from preview
         if (content.startsWith('CALL_LOG::')) {
           final log = CallLogMessage.tryParse(content);
           if (log != null) {
