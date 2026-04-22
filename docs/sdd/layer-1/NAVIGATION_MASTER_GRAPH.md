@@ -25,6 +25,31 @@ flowchart TD
     VideoCall[VideoCallScreen]
     Scanner[QrScannerScreen]
 
+    GroupSettings[GroupSettingsScreen]
+    GroupMembers[GroupMembersScreen]
+    GroupChatOptions[GroupChatOptionsScreen]
+    DirectChatOptions[DirectChatOptionsScreen]
+    AddGroupMembers[AddGroupMembersScreen]
+    GroupJoinRequests[GroupJoinRequestsScreen]
+    JoinGroup[JoinGroupScreen]
+    CreateGroup[CreateGroupScreen]
+    Forward[ForwardScreen]
+    WallpaperSelection[WallpaperSelectionScreen]
+    MyDocuments[MyDocumentsScreen]
+    ReactionDetail[ReactionDetailScreen]
+
+    AiConversation[AiConversationScreen]
+    MascotGallery[MascotGalleryScreen]
+    AiBubble([AI Floating Bubble — global overlay])
+
+    ProfileDetail[ProfileDetailScreen]
+    PersonalInfo[PersonalInfoScreen]
+    EditPersonalInfo[EditPersonalInfoScreen]
+    Settings[SettingsScreen]
+    AppearanceSettings[AppearanceSettingsScreen]
+    AccountSecurity[AccountSecurityScreen]
+    UpdatePassword[UpdatePasswordScreen]
+
     Splash -->|isLoggedIn false| Welcome
     Splash -->|isLoggedIn true| MainShell
 
@@ -40,29 +65,60 @@ flowchart TD
     MainShell --> Discover
     MainShell --> Wall
     MainShell --> Profile
+    MainShell --> AiBubble
 
     ChatList --> ChatDetail
+    ChatList --> CreateGroup
+    ChatList --> JoinGroup
     ChatDetail --> VoiceCall
     ChatDetail --> VideoCall
+    ChatDetail --> GroupChatOptions
+    ChatDetail --> DirectChatOptions
+    ChatDetail --> Forward
+    ChatDetail --> ReactionDetail
+    ChatDetail --> MyDocuments
+    GroupChatOptions --> GroupSettings
+    GroupChatOptions --> GroupMembers
+    GroupChatOptions --> WallpaperSelection
+    GroupMembers --> AddGroupMembers
+    GroupMembers --> GroupJoinRequests
+
+    Profile --> ProfileDetail
+    Profile --> PersonalInfo
+    ProfileDetail --> EditPersonalInfo
+    Profile --> Settings
+    Settings --> AppearanceSettings
+    Settings --> AccountSecurity
+    AccountSecurity --> UpdatePassword
+    Settings --> MascotGallery
+
+    AiBubble -->|long press| AiConversation
+    AiConversation --> MascotGallery
 
     MainShell -->|AI NAVIGATE_TO scanner| Scanner
     MainShell -->|AI OPEN_CHAT| ChatDetail
     MainShell -->|AI START_CALL audio| VoiceCall
     MainShell -->|AI START_CALL video| VideoCall
+    MainShell -->|AI NAVIGATE_TO timeline| Wall
+    MainShell -->|AI NAVIGATE_TO settings| Settings
 ```
 
 ## AI Navigation Contract
 
 | AI Command | Required Params | Navigation Result | Guard Conditions |
 | --- | --- | --- | --- |
-| NAVIGATE_TO | page | switch tab or push scanner | page must be one of chat, timeline, profile, settings, scanner |
-| OPEN_CHAT | target | push ChatDetailScreen | conversation must resolve by display name |
-| SEND_MESSAGE | target, content | push ChatDetailScreen with prefilled text | conversation must resolve |
-| START_CALL | target, callType | push VoiceCallScreen or VideoCallScreen | only DIRECT conversations with resolved peerUserId |
+| NAVIGATE_TO | page | switch tab (chat/contacts/discover/timeline/profile/settings/scanner) | page must be resolvable |
+| NAVIGATE_TO_SETTINGS | none | switch to settings | none |
+| NAVIGATE_TO_CHAT | none | switch to chat tab | none |
 | NAVIGATE_TO_SCANNER | none | push QrScannerScreen | none |
+| NAVIGATE_TO_TIMELINE | none | switch to timeline/wall tab | none |
+| OPEN_CHAT | target: string | push ChatDetailScreen | conversation must resolve by display name |
+| SEND_MESSAGE | target: string, content: string | push ChatDetailScreen with prefilled text | conversation must resolve |
+| START_CALL | target: string, callType: 'audio'\|'video' | push VoiceCallScreen or VideoCallScreen | only DIRECT conversations; `_isCallScreenActive` must be false |
 
 > [!WARNING]
 > START_CALL is explicitly blocked for non-1:1 conversations in MainShell action handler.
+> Concurrent call screens are prevented by `_isCallScreenActive` flag.
 
 ## Tab Index Contract
 
@@ -80,6 +136,26 @@ flowchart TD
 - It listens to SocketService onCallSignal stream and handles type offer.
 - It deduplicates by conversationId:callId before presenting UI.
 - If another call is already being presented, it sends endCall reason busy.
+
+## Web App Navigation
+
+The web app (React + React Router v6) uses path-based navigation, not tab-based:
+
+```
+/login              → LoginPage (unauthenticated only)
+/login/qr           → QrLoginPage (unauthenticated only)
+/register           → RegisterPage (unauthenticated only)
+/forgot-password    → ForgotPasswordPage (unauthenticated only)
+/                   → redirect to /chat
+/chat               → ChatPage (inbox, no conversation selected)
+/chat/:id           → ChatPage (conversation open)
+/contacts           → ContactsPage
+/documents          → DocumentsPage
+/profile            → ProfilePage
+* (fallback)        → redirect to /chat
+```
+
+All authenticated routes are wrapped in `ProtectedRoute` + `MainLayout`.
 
 ## Evidence
 

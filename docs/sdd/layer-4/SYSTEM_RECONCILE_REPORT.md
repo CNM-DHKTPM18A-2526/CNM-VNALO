@@ -7,10 +7,11 @@
 
 | Field | Value |
 |---|---|
-| Cycle ID | `SDD-RECONCILE-2026-04-20` |
+| Cycle ID | `SDD-RECONCILE-2026-04-22` |
+| Previous Cycle | `SDD-RECONCILE-2026-04-20` |
 | Method | Code-first scan with spec synchronization |
-| Scope | Flutter mobile, Node services, Java services, docker runtime contracts |
-| Output | Complete Layer 0 to Layer 4 document set under `docs/sdd` |
+| Scope | Flutter mobile, React web, Node services, Java services, docker runtime contracts |
+| Output | Layer 0 to Layer 4 document refresh under `docs/sdd` |
 
 ## 1) SCAN Summary
 
@@ -110,6 +111,16 @@
 | R-0204 | Added explicit chat.gateway restrictedWebMode runtime note in socket schema | Completed |
 | R-0205 | Expanded Layer 3 global ERD with missing core/moderation/media entities and relations | Completed |
 | R-0206 | Added new architectural decisions D-009 and D-010 for trust/runtime governance | Completed |
+| R-0207 | Rewrote MODULE_SPEC_CHAT with group lifecycle, role taxonomy (ADMIN/DEPUTY/MEMBER), disbandment cascade | Completed |
+| R-0208 | Rewrote MODULE_SPEC_CALL with 1:1 voice/video, multi-device ring, cross-platform matrix, ICE queuing | Completed |
+| R-0209 | Rewrote MODULE_SPEC_SOCIAL with block semantics, friend state machine, privacy rules | Completed |
+| R-0210 | Created MODULE_SPEC_REALTIME_SYNC with dual-delivery, multi-device sync, presence, known gaps | Completed |
+| R-0211 | Created MODULE_SPEC_WEB_APP with React/Vite stack, route map, ChatPage feature set, restrictedWebMode | Completed |
+| R-0212 | Created MODULE_SPEC_AI_ASSISTANT with state machine, mascot, STT/TTS, system actions | Completed |
+| R-0213 | Rewrote SOCKET_SIGNALING_SCHEMA with all events, payload contracts, Flutter listener status | Completed |
+| R-0214 | Updated GLOBAL_DATABASE_ERD: added only_admin_can_post, allow_member_* to CONVERSATION; block_and_hide_logs to BLOCK_LIST; Pending Schema Changes section | Completed |
+| R-0215 | Updated NAVIGATION_MASTER_GRAPH with group sub-navigation, AI flows, profile tree, web routing | Completed |
+| R-0216 | Added D-011 to D-014 to DECISION_LOG: role rename, hard-delete disbandment, group-wide block, group.disbanded event | Completed |
 
 ## 4) Traceability Matrix
 
@@ -118,8 +129,13 @@
 | Service topology and trust boundaries | `layer-0/ARCHITECTURE_BLUEPRINT.md` |
 | Governance and source-of-truth rules | `layer-0/CLAUDE.md` |
 | Decision rationale and accepted risks | `layer-0/DECISION_LOG.md` |
-| Mobile flow contracts | `layer-1/NAVIGATION_MASTER_GRAPH.md` and `SCREEN_SPEC_*` |
-| Chat/call/social behavior | `layer-2/MODULE_SPEC_CHAT.md`, `MODULE_SPEC_CALL.md`, `MODULE_SPEC_SOCIAL.md` |
+| Mobile navigation and screen contracts | `layer-1/NAVIGATION_MASTER_GRAPH.md` and `SCREEN_SPEC_*` |
+| Chat/group behavior | `layer-2/MODULE_SPEC_CHAT.md` |
+| Call behavior (voice/video) | `layer-2/MODULE_SPEC_CALL.md` |
+| Social/friend/block behavior | `layer-2/MODULE_SPEC_SOCIAL.md` |
+| Real-time sync rules | `layer-2/MODULE_SPEC_REALTIME_SYNC.md` |
+| Web app platform spec | `layer-2/MODULE_SPEC_WEB_APP.md` |
+| AI assistant behavior | `layer-2/MODULE_SPEC_AI_ASSISTANT.md` |
 | Endpoint and event contracts | `layer-3/API_REFERENCE_CATALOG.md`, `SOCKET_SIGNALING_SCHEMA.md` |
 | Persistence and referential model | `layer-3/GLOBAL_DATABASE_ERD.md` |
 | Error behavior and drift | `layer-3/ERROR_CODE_MATRIX.md` |
@@ -137,11 +153,16 @@
 ## 6) Reconcile Verdict
 
 > [!NOTE]
-> Spec coverage for the defined 5-layer Digital Twin is complete for this cycle.
+> Spec coverage for the VNALO Digital Twin is significantly expanded in this cycle.
 
-- Documentation now reflects observed runtime behavior with explicit accepted risks.
-- Remaining deltas are implementation debts, not documentation gaps.
-- Next cycle should prioritize security and error-contract normalization tasks above new feature additions.
+- 10 new module spec sections added or rewritten across Layer 1, 2, 3.
+- Web app (React/Vite) documented for the first time.
+- AI Assistant formally documented for the first time.
+- Navigation graph expanded from 12 to 50+ nodes.
+- All major business rules (group lifecycle, role taxonomy, block semantics) are now in spec.
+- ERD updated with pending schema changes for upcoming code sprint.
+- Remaining deltas are implementation tasks (P0 code gaps), not documentation gaps.
+- Next cycle should prioritize: P0 code implementation of `MemberRole` rename and `disbandGroup()` service.
 
 ## Evidence
 
