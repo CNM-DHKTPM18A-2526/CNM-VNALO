@@ -110,6 +110,7 @@ erDiagram
       uuid blocked_id
       boolean block_messages
       boolean block_calls
+      boolean block_and_hide_logs
     }
     CONTACT_SYNC {
       uuid sync_id PK
@@ -126,6 +127,10 @@ erDiagram
       uuid created_by
       string status
       string join_mode
+      boolean only_admin_can_post
+      boolean allow_member_invite
+      boolean allow_member_pin
+      boolean allow_member_edit_info
     }
     CONVERSATION_MEMBER {
       uuid conversation_id PK
@@ -433,6 +438,21 @@ erDiagram
 - Message sequence generation using INCR per conversation.
 - Socket presence cache and heartbeat state.
 - CALL_OFFLINE pubsub fallback channel for call offers.
+
+## Pending Schema Changes
+
+> [!IMPORTANT]
+> The following changes are SPEC_ONLY — documented but not yet applied to code or DB migrations.
+
+| Change | Decision | Priority |
+|---|---|---|
+| Rename `MemberRole.OWNER → ADMIN`, `ADMIN → DEPUTY` in enum | D-011 | P0 |
+| Add `only_admin_can_post` to CONVERSATION | Business audit 2026-04-22 | P1 |
+| Add `allow_member_invite / pin / edit_info` to CONVERSATION | Business audit 2026-04-22 | P1 |
+| Add `block_and_hide_logs` to BLOCK_LIST | Business audit 2026-04-22 | P1 |
+| Hard delete cascade on group disband (no soft-delete) | D-012 | P0 |
+
+---
 
 ## Notes on FK Semantics
 

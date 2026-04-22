@@ -34,6 +34,12 @@ class _StubApiService extends ApiService {
       return {'data': response};
     }
 
+    if (endpoint == '/ai/history/backup') {
+      return {
+        'data': {'ok': true},
+      };
+    }
+
     return {};
   }
 }
@@ -180,6 +186,46 @@ void main() {
     expect(provider.state, AiState.idle);
     expect(provider.aiResponse, contains('Không thể bắt đầu thu âm'));
     expect(provider.isMascotVisible, isTrue);
+
+    provider.dispose();
+  });
+
+  test('first interaction lazily creates AI conversation thread', () async {
+    final provider = _buildProvider();
+
+    expect(provider.hasConversation, isFalse);
+    await provider.startListening(source: 'lazy_create_test');
+
+    expect(provider.hasConversation, isTrue);
+
+    provider.dispose();
+  });
+
+  test('submitTextPrompt stores local-first conversation history', () async {
+    final provider = _buildProvider(
+      responses: {
+        'ban la ai': {
+          'textReply': 'Toi la tro ly AI cua ban.',
+          'emotion': 'neutral',
+        },
+      },
+    );
+
+    await provider.submitTextPrompt('ban la ai', source: 'history_test');
+
+    expect(provider.conversationHistory.length, greaterThanOrEqualTo(2));
+    expect(provider.lastConversationPreview, contains('AI:'));
+
+    provider.dispose();
+  });
+
+  test('cloud backup option can be toggled', () async {
+    final provider = _buildProvider();
+
+    expect(provider.cloudBackupEnabled, isFalse);
+    await provider.setCloudBackupEnabled(true, reason: 'unit_test');
+
+    expect(provider.cloudBackupEnabled, isTrue);
 
     provider.dispose();
   });

@@ -74,7 +74,7 @@ class _MascotGalleryScreenState extends State<MascotGalleryScreen> {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.18),
+                        color: Colors.black.withValues(alpha: 0.18),
                         blurRadius: 20,
                         offset: const Offset(0, 8),
                       ),
@@ -108,10 +108,10 @@ class _MascotGalleryScreenState extends State<MascotGalleryScreen> {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.green.withOpacity(0.16),
+                              color: Colors.green.withValues(alpha: 0.16),
                               borderRadius: BorderRadius.circular(999),
                               border: Border.all(
-                                color: Colors.green.withOpacity(0.45),
+                                color: Colors.green.withValues(alpha: 0.45),
                               ),
                             ),
                             child: const Text(

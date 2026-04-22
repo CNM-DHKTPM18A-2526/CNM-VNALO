@@ -38,6 +38,12 @@ flowchart TB
     Mobile -. WS /chat .-> Msg
     Mobile -. WS /realtime optional .-> RT
 
+    Web --> Core
+    Web --> Msg
+    Web --> Media
+    Web --> Content
+    Web -. WS /chat .-> Msg
+
     Msg --> PG
     Core --> PG
     Media --> PG

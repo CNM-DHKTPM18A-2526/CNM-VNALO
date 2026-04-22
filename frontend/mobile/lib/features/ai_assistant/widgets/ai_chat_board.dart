@@ -10,13 +10,19 @@ import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provid
 class AiChatBoard extends StatefulWidget {
   final VoidCallback onClose;
   final VoidCallback onClear;
+  final VoidCallback? onOpenConversation;
   final Future<void> Function(String text) onSubmitPrompt;
+  final double? maxWidth;
+  final double? maxHeight;
 
   const AiChatBoard({
     super.key,
     required this.onClose,
     required this.onClear,
     required this.onSubmitPrompt,
+    this.onOpenConversation,
+    this.maxWidth,
+    this.maxHeight,
   });
 
   @override
@@ -26,7 +32,6 @@ class AiChatBoard extends StatefulWidget {
 class _AiChatBoardState extends State<AiChatBoard> {
   final TextEditingController _inputController = TextEditingController();
   final FocusNode _inputFocusNode = FocusNode();
-
   bool _isSending = false;
 
   @override
@@ -76,32 +81,31 @@ class _AiChatBoardState extends State<AiChatBoard> {
   Widget build(BuildContext context) {
     final aiProvider = context.watch<AiAssistantProvider>();
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final viewSize = MediaQuery.of(context).size;
+
+    final boardMaxWidth =
+        widget.maxWidth ?? (viewSize.width > 360 ? 340.0 : viewSize.width - 20);
+    final boardMaxHeight =
+        widget.maxHeight ??
+        (viewSize.height > 760 ? 420.0 : viewSize.height * 0.56);
 
     final hasResponse = aiProvider.aiResponse.trim().isNotEmpty;
     final hasPrompt = aiProvider.lastUserPrompt.trim().isNotEmpty;
 
-    String statusLabel;
-    switch (aiProvider.state) {
-      case AiState.listening:
-        statusLabel = 'Đang nghe';
-        break;
-      case AiState.thinking:
-        statusLabel = 'Đang xử lý';
-        break;
-      case AiState.speaking:
-        statusLabel = 'Đang phản hồi';
-        break;
-      case AiState.idle:
-        statusLabel = 'Sẵn sàng';
-        break;
-    }
+    final statusLabel = switch (aiProvider.state) {
+      AiState.listening => 'Dang nghe',
+      AiState.thinking => 'Dang xu ly',
+      AiState.speaking => 'Dang phan hoi',
+      AiState.idle => 'San sang',
+    };
 
     final borderColor =
         isDarkMode
-            ? const Color(0xFF5DA6FF).withOpacity(0.35)
-            : const Color(0xFF2B6CF6).withOpacity(0.32);
+            ? const Color(0xFF5DA6FF).withValues(alpha: 0.35)
+            : const Color(0xFF2B6CF6).withValues(alpha: 0.32);
 
     return Material(
+      key: const ValueKey('ai_chat_board'),
       color: Colors.transparent,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
@@ -109,21 +113,21 @@ class _AiChatBoardState extends State<AiChatBoard> {
           filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
           child: Container(
             constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * 0.58,
-              maxWidth: 340,
-              minWidth: 280,
+              maxHeight: boardMaxHeight,
+              maxWidth: boardMaxWidth,
+              minWidth: boardMaxWidth < 280 ? boardMaxWidth : 280,
             ),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors:
                     isDarkMode
                         ? [
-                          const Color(0xFF101A2D).withOpacity(0.86),
-                          const Color(0xFF0E223E).withOpacity(0.82),
+                          const Color(0xFF101A2D).withValues(alpha: 0.86),
+                          const Color(0xFF0E223E).withValues(alpha: 0.82),
                         ]
                         : [
-                          Colors.white.withOpacity(0.9),
-                          const Color(0xFFEAF3FF).withOpacity(0.88),
+                          Colors.white.withValues(alpha: 0.9),
+                          const Color(0xFFEAF3FF).withValues(alpha: 0.88),
                         ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -131,7 +135,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.16),
+                  color: Colors.black.withValues(alpha: 0.16),
                   blurRadius: 18,
                   spreadRadius: 1,
                   offset: const Offset(0, 8),
@@ -145,64 +149,74 @@ class _AiChatBoardState extends State<AiChatBoard> {
               children: [
                 Container(
                   padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
-                  decoration: BoxDecoration(
-                    gradient: AppColors.appBarGradient.withOpacity(0.86),
+                  decoration: const BoxDecoration(
+                    gradient: AppColors.appBarGradient,
                   ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.smart_toy_outlined,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'VNALO AI',
-                            style: TextStyle(
+                      Expanded(
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.smart_toy_outlined,
                               color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
+                              size: 16,
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.16),
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.28),
-                              ),
-                            ),
-                            child: Text(
-                              statusLabel,
-                              style: const TextStyle(
+                            const SizedBox(width: 8),
+                            const Text(
+                              'VNALO AI',
+                              style: TextStyle(
                                 color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
                               ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.16),
+                                  borderRadius: BorderRadius.circular(999),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.28),
+                                  ),
+                                ),
+                                child: Text(
+                                  statusLabel,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                       Row(
                         children: [
+                          if (widget.onOpenConversation != null)
+                            IconButton(
+                              key: const ValueKey('ai_chat_open_conversation'),
+                              icon: const Icon(Icons.open_in_full, size: 18),
+                              color: Colors.white,
+                              onPressed: widget.onOpenConversation,
+                            ),
                           IconButton(
                             icon: const Icon(Icons.clear_all, size: 18),
                             color: Colors.white,
-                            tooltip: 'Xóa phản hồi',
                             onPressed: widget.onClear,
                           ),
                           IconButton(
                             icon: const Icon(Icons.close, size: 18),
                             color: Colors.white,
-                            tooltip: 'Thu gọn',
                             onPressed: widget.onClose,
                           ),
                         ],
@@ -257,14 +271,14 @@ class _AiChatBoardState extends State<AiChatBoard> {
                             decoration: BoxDecoration(
                               color:
                                   isDarkMode
-                                      ? Colors.white.withOpacity(0.06)
-                                      : Colors.white.withOpacity(0.8),
+                                      ? Colors.white.withValues(alpha: 0.06)
+                                      : Colors.white.withValues(alpha: 0.8),
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
                                 color:
                                     isDarkMode
-                                        ? Colors.white.withOpacity(0.08)
-                                        : Colors.black.withOpacity(0.06),
+                                        ? Colors.white.withValues(alpha: 0.08)
+                                        : Colors.black.withValues(alpha: 0.06),
                               ),
                             ),
                             child:
@@ -272,6 +286,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
                                     ? MarkdownBody(
                                       data: aiProvider.aiResponse,
                                       selectable: true,
+                                      softLineBreak: true,
                                       styleSheet: MarkdownStyleSheet(
                                         p: TextStyle(
                                           color:
@@ -281,22 +296,14 @@ class _AiChatBoardState extends State<AiChatBoard> {
                                           fontSize: 14,
                                           height: 1.5,
                                         ),
-                                        h1: const TextStyle(
-                                          fontSize: 17,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                        h2: const TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.bold,
-                                        ),
                                       ),
                                     )
                                     : Text(
                                       aiProvider.state == AiState.listening
-                                          ? 'Đang nghe giọng nói. Bạn cũng có thể nhập câu hỏi bên dưới.'
+                                          ? 'Dang nghe giong noi. Ban cung co the nhap cau hoi ben duoi.'
                                           : aiProvider.state == AiState.thinking
-                                          ? 'Đang xử lý yêu cầu của bạn...'
-                                          : 'Nhập câu hỏi để bắt đầu chat với trợ lý.',
+                                          ? 'Dang xu ly yeu cau cua ban...'
+                                          : 'Nhap cau hoi de bat dau chat voi tro ly.',
                                       style: TextStyle(
                                         color:
                                             isDarkMode
@@ -333,8 +340,8 @@ class _AiChatBoardState extends State<AiChatBoard> {
                       top: BorderSide(
                         color:
                             isDarkMode
-                                ? Colors.white.withOpacity(0.08)
-                                : Colors.black.withOpacity(0.08),
+                                ? Colors.white.withValues(alpha: 0.08)
+                                : Colors.black.withValues(alpha: 0.08),
                       ),
                     ),
                   ),
@@ -342,6 +349,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
                     children: [
                       Expanded(
                         child: TextField(
+                          key: const ValueKey('ai_chat_input'),
                           controller: _inputController,
                           focusNode: _inputFocusNode,
                           textInputAction: TextInputAction.send,
@@ -350,7 +358,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
                           maxLines: 3,
                           decoration: InputDecoration(
                             isDense: true,
-                            hintText: 'Nhập để chat với trợ lý...',
+                            hintText: 'Nhap de chat voi tro ly...',
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 12,
                               vertical: 10,
@@ -360,8 +368,8 @@ class _AiChatBoardState extends State<AiChatBoard> {
                               borderSide: BorderSide(
                                 color:
                                     isDarkMode
-                                        ? Colors.white.withOpacity(0.16)
-                                        : Colors.black.withOpacity(0.12),
+                                        ? Colors.white.withValues(alpha: 0.16)
+                                        : Colors.black.withValues(alpha: 0.12),
                               ),
                             ),
                             enabledBorder: OutlineInputBorder(
@@ -369,8 +377,8 @@ class _AiChatBoardState extends State<AiChatBoard> {
                               borderSide: BorderSide(
                                 color:
                                     isDarkMode
-                                        ? Colors.white.withOpacity(0.16)
-                                        : Colors.black.withOpacity(0.12),
+                                        ? Colors.white.withValues(alpha: 0.16)
+                                        : Colors.black.withValues(alpha: 0.12),
                               ),
                             ),
                           ),
@@ -381,6 +389,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
                         width: 42,
                         height: 42,
                         child: ElevatedButton(
+                          key: const ValueKey('ai_chat_send'),
                           style: ElevatedButton.styleFrom(
                             padding: EdgeInsets.zero,
                             shape: RoundedRectangleBorder(

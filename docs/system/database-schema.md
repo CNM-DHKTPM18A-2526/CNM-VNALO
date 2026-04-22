@@ -1,5 +1,16 @@
 # Complete Database Schema - VNALO
 
+> [!WARNING]
+> **Source of Truth Notice**: This file is a legacy design artifact. The canonical, up-to-date database schema is maintained in:
+> - **`docs/sdd/layer-3/GLOBAL_DATABASE_ERD.md`** (entity relationships and pending schema changes)
+>
+> This file may be out of date with the current codebase, particularly:
+> - `MemberRole` enum (`OWNER` is being renamed to `ADMIN`, `ADMIN` → `DEPUTY`) — see D-011
+> - `only_admin_can_post` and group permission fields not yet reflected here
+> - Hard-delete cascade on group disband — see D-012
+>
+> Cross-reference with the SDD ERD before implementing any schema changes.
+
 > **Version**: 1.1 - Reconciled with current runtime  
 > **Last Updated**: March 20, 2026  
 > **Database (current runtime)**: PostgreSQL + Redis  
