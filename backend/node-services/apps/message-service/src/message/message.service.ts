@@ -678,4 +678,60 @@ export class MessageService {
       MessageType.AUDIO,
     ].includes(messageType);
   }
+
+  /**
+   * G-009: Create a system-generated message (join/leave/kick/rename events).
+   * Uses senderId = 'system' (a virtual sender ID) so UI can style it differently.
+   * The message is persisted with MessageType.SYSTEM and assigned a server_seq.
+   *
+   * @param conversationId - the group conversation
+   * @param content - human-readable system event text (e.g. "User X joined the group")
+   * @returns the persisted system Message entity
+   */
+  async createSystemMessage(
+    conversationId: string,
+    content: string,
+  ): Promise<Message> {
+    const serverSeq = await this.getNextSeq(conversationId);
+
+    const saved = await this.dataSource.transaction(async (manager) => {
+      const msg = manager.create(Message, {
+        conversationId,
+        serverSeq,
+        senderId: 'system',
+        clientMessageId: null,
+        messageType: MessageType.SYSTEM,
+        content,
+        status: MessageStatus.SENT,
+      });
+      const persisted = await manager.save(msg);
+
+      // Update inbox for all active members
+      const activeMembers = await manager.find(ConversationMember, {
+        where: { conversationId, leftAt: null as unknown as Date },
+      });
+
+      for (const member of activeMembers) {
+        await manager
+          .createQueryBuilder()
+          .update(ConversationInbox)
+          .set({
+            lastMessageSeq: serverSeq,
+            unreadCount: () => 'unread_count + 1',
+          })
+          .where('user_id = :uid AND conversation_id = :cid', {
+            uid: member.userId,
+            cid: conversationId,
+          })
+          .execute();
+      }
+
+      return persisted;
+    });
+
+    this.logger.log(
+      `[MessageService.systemMsg] Created system message seq=${serverSeq} conv=${conversationId}: "${content}"`,
+    );
+    return saved;
+  }
 }

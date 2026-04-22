@@ -17,6 +17,7 @@ import { ConversationService } from '../conversation/conversation.service';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import type Redis from 'ioredis';
 
+
 const allowedOrigins = (
   process.env.CORS_ALLOWED_ORIGINS ??
   'http://localhost:3000,http://localhost:5173'
@@ -326,6 +327,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       for (const memberId of memberIds) {
         this.emitToUser(memberId, 'group.memberAdded', payload);
       }
+      // G-009: create system message in chat history
+      const sysMsg = await this.messageService.createSystemMessage(
+        conversationId,
+        `${userId} added ${memberIds.length} member(s) to the group`,
+      );
+      this.server.to(room).emit('message.received', sysMsg);
       return { event: 'group.memberAdded', data: payload };
     } catch (err) {
       return { event: 'conversation.error', data: { error: err.message } };
@@ -353,6 +360,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const payload = { conversationId, userId: targetUserId, removedBy: isSelf ? null : userId };
       this.server.to(room).emit(eventName, payload);
       this.emitToUser(targetUserId, eventName, payload);
+      // G-009: create system message in chat history
+      const sysContent = isSelf
+        ? `${targetUserId} left the group`
+        : `${targetUserId} was removed from the group by ${userId}`;
+      const sysMsg = await this.messageService.createSystemMessage(conversationId, sysContent);
+      this.server.to(room).emit('message.received', sysMsg);
       return { event: eventName, data: payload };
     } catch (err) {
       return { event: 'conversation.error', data: { error: err.message } };
