@@ -15,11 +15,17 @@ enum AiState { idle, listening, thinking, speaking }
 class AiAssistantProvider with ChangeNotifier {
   static const String _visibilityPrefKey = 'vnalo_ai_is_visible';
   static const String _mascotPrefKey = 'vnalo_ai_mascot_id';
+  static const String _historyPrefKey = 'vnalo_ai_history_v1';
+  static const String _conversationCreatedPrefKey =
+      'vnalo_ai_conversation_created';
+  static const String _cloudBackupPrefKey = 'vnalo_ai_cloud_backup_enabled';
   static const String _defaultLocaleId = 'vi_VN';
   static const Duration _aiTimeout = Duration(seconds: 25);
-  static const Duration _sttListenFor = Duration(seconds: 16);
-  static const Duration _sttPauseFor = Duration(seconds: 3);
+  static const Duration _sttListenFor = Duration(seconds: 8);
+  static const Duration _sttPauseFor = Duration(seconds: 2);
   static const Duration _idleAutoHideDelay = Duration(seconds: 12);
+  static const int _maxConversationEntries = 200;
+  static const String aiConversationId = 'AI_ASSISTANT_LOCAL';
 
   final AiService _aiService;
   final FlutterTts _tts = FlutterTts();
@@ -36,11 +42,14 @@ class AiAssistantProvider with ChangeNotifier {
   bool _persistentEnabled = false;
   bool _provisionallyVisible = false;
   bool _isSessionActive = false;
+  bool _conversationCreated = false;
+  bool _cloudBackupEnabled = false;
 
   MascotMetadata _currentMascot = MascotMetadata.defaultMascots.first;
   final bool _enableDeepSummary = false;
 
   final List<Map<String, String>> _sessionHistory = [];
+  final List<AiConversationEntry> _conversationHistory = [];
   final StreamController<AiCommand> _systemActionController =
       StreamController<AiCommand>.broadcast();
 
@@ -56,6 +65,8 @@ class AiAssistantProvider with ChangeNotifier {
 
   Timer? _listenGuardTimer;
   Timer? _idleAutoHideTimer;
+  Timer? _cloudBackupDebounceTimer;
+  bool _isDisposed = false;
 
   AiAssistantProvider(this._aiService) {
     _activeTraceId = _uuid.v4();
@@ -74,6 +85,29 @@ class AiAssistantProvider with ChangeNotifier {
   bool get persistentEnabled => _persistentEnabled;
   bool get provisionallyVisible => _provisionallyVisible;
   bool get isSessionActive => _isSessionActive;
+  bool get cloudBackupEnabled => _cloudBackupEnabled;
+  bool get hasConversation =>
+      _conversationCreated || _conversationHistory.isNotEmpty;
+  List<AiConversationEntry> get conversationHistory =>
+      List.unmodifiable(_conversationHistory);
+  AiConversationEntry? get lastConversationEntry =>
+      _conversationHistory.isEmpty ? null : _conversationHistory.last;
+  DateTime? get lastConversationAt => lastConversationEntry?.createdAt;
+  String get lastConversationPreview {
+    final entry = lastConversationEntry;
+    if (entry == null) {
+      return 'Bắt đầu hội thoại với trợ lý AI';
+    }
+
+    final prefix =
+        entry.role == AiConversationRole.user
+            ? 'Bạn: '
+            : entry.role == AiConversationRole.assistant
+            ? 'AI: '
+            : '';
+    return '$prefix${entry.text.replaceAll('\n', ' ')}'.trim();
+  }
+
   bool get isBusy => _state != AiState.idle || _isPipelineLocked;
   bool get isMascotVisible =>
       _persistentEnabled || _provisionallyVisible || _isSessionActive;
@@ -84,15 +118,51 @@ class AiAssistantProvider with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await _loadMascot(prefs: prefs);
     _persistentEnabled = prefs.getBool(_visibilityPrefKey) ?? false;
+    _cloudBackupEnabled = prefs.getBool(_cloudBackupPrefKey) ?? false;
+    _conversationCreated = prefs.getBool(_conversationCreatedPrefKey) ?? false;
+    await _loadConversationHistory(prefs: prefs);
 
     _logEvent(
       'PERSISTENCE_LOADED',
       data: {
         'persistentEnabled': _persistentEnabled,
         'mascotId': _currentMascot.id,
+        'cloudBackupEnabled': _cloudBackupEnabled,
+        'hasConversation': hasConversation,
+        'historySize': _conversationHistory.length,
       },
     );
     notifyListeners();
+  }
+
+  Future<void> _loadConversationHistory({SharedPreferences? prefs}) async {
+    final store = prefs ?? await SharedPreferences.getInstance();
+    final raw = store.getString(_historyPrefKey);
+    if (raw == null || raw.trim().isEmpty) {
+      return;
+    }
+
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        _conversationHistory
+          ..clear()
+          ..addAll(
+            decoded.whereType<Map>().map((item) {
+              final casted = item.map(
+                (key, value) => MapEntry(key.toString(), value),
+              );
+              return AiConversationEntry.fromJson(casted);
+            }).toList(),
+          );
+      }
+    } catch (error) {
+      _logEvent(
+        'CONVERSATION_HISTORY_LOAD_ERROR',
+        level: 'WARN',
+        data: {'error': error.toString()},
+      );
+    }
   }
 
   Future<void> _loadMascot({SharedPreferences? prefs}) async {
@@ -148,12 +218,22 @@ class AiAssistantProvider with ChangeNotifier {
 
   @override
   void dispose() {
+    _isDisposed = true;
     _listenGuardTimer?.cancel();
     _idleAutoHideTimer?.cancel();
+    _cloudBackupDebounceTimer?.cancel();
     unawaited(_stt.stop());
     unawaited(_tts.stop());
     _systemActionController.close();
     super.dispose();
+  }
+
+  @override
+  void notifyListeners() {
+    if (_isDisposed) {
+      return;
+    }
+    super.notifyListeners();
   }
 
   Future<void> toggleMascot() async {
@@ -175,6 +255,50 @@ class AiAssistantProvider with ChangeNotifier {
     _logEvent(
       'VISIBILITY_PERSISTENT_SET',
       data: {'enabled': enabled, 'reason': reason},
+    );
+    notifyListeners();
+  }
+
+  Future<void> setCloudBackupEnabled(
+    bool enabled, {
+    String reason = 'settings',
+  }) async {
+    _cloudBackupEnabled = enabled;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_cloudBackupPrefKey, enabled);
+
+    _logEvent('CLOUD_BACKUP_SET', data: {'enabled': enabled, 'reason': reason});
+
+    if (enabled) {
+      _scheduleCloudBackup();
+    }
+
+    notifyListeners();
+  }
+
+  Future<void> clearConversationHistory({
+    bool clearCurrentResponse = false,
+    String reason = 'manual',
+  }) async {
+    _conversationHistory.clear();
+    _conversationCreated = false;
+    _sessionHistory.clear();
+    _lastUserPrompt = '';
+
+    if (clearCurrentResponse) {
+      _aiResponse = '';
+      _scheduleIdleAutoHide(reason: 'conversation_history_cleared');
+      _syncVisibilityAfterSession();
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_historyPrefKey);
+    await prefs.setBool(_conversationCreatedPrefKey, false);
+
+    _logEvent(
+      'CONVERSATION_HISTORY_CLEARED',
+      data: {'reason': reason, 'clearCurrentResponse': clearCurrentResponse},
     );
     notifyListeners();
   }
@@ -249,6 +373,7 @@ class AiAssistantProvider with ChangeNotifier {
 
     final traceId = _newTraceId('stt');
     final token = _beginOperation(traceId: traceId);
+    await _ensureConversationCreated(source: '$source.voice_interaction');
 
     _idleAutoHideTimer?.cancel();
     _cancelListenGuard();
@@ -378,6 +503,8 @@ class AiAssistantProvider with ChangeNotifier {
       return;
     }
 
+    await _ensureConversationCreated(source: '$source.text_interaction');
+
     _idleAutoHideTimer?.cancel();
     _setProvisionallyVisible(true, reason: '$source.visible');
 
@@ -472,6 +599,8 @@ class AiAssistantProvider with ChangeNotifier {
           traceId: traceId,
           event: 'AI_TIMEOUT',
           fallbackMessage: 'AI đang phản hồi chậm, vui lòng thử lại sau.',
+          userText: normalized,
+          source: 'assistant_chat',
         );
       }
     } catch (error) {
@@ -482,6 +611,8 @@ class AiAssistantProvider with ChangeNotifier {
           event: 'AI_ERROR',
           fallbackMessage: 'Xin lỗi, tôi đang gặp chút trục trặc mạng.',
           error: error,
+          userText: normalized,
+          source: 'assistant_chat',
         );
       }
     } finally {
@@ -590,6 +721,12 @@ class AiAssistantProvider with ChangeNotifier {
         _aiResponse = fallbackMessage;
       }
 
+      _recordHistory(
+        userText: _contextPromptLabel(source),
+        aiText: _aiResponse,
+        source: source,
+      );
+
       _transitionTo(
         AiState.speaking,
         reason: '$source.speaking',
@@ -604,6 +741,8 @@ class AiAssistantProvider with ChangeNotifier {
           traceId: traceId,
           event: 'CONTEXT_TIMEOUT',
           fallbackMessage: fallbackMessage,
+          userText: _contextPromptLabel(source),
+          source: source,
         );
       }
     } catch (error) {
@@ -614,6 +753,8 @@ class AiAssistantProvider with ChangeNotifier {
           event: 'CONTEXT_ERROR',
           fallbackMessage: fallbackMessage,
           error: error,
+          userText: _contextPromptLabel(source),
+          source: source,
         );
       }
     } finally {
@@ -656,13 +797,10 @@ class AiAssistantProvider with ChangeNotifier {
               notify: false,
             );
             if (_lastWords.isEmpty) {
-              _aiResponse =
-                  'Mình chưa nghe rõ. Bạn thử nói chậm hơn hoặc nhập trực tiếp nhé.';
-              _setProvisionallyVisible(true, reason: 'stt_done_no_words');
+              _aiResponse = '';
               _scheduleIdleAutoHide(reason: 'stt_done_no_words');
-            } else {
-              _syncVisibilityAfterSession();
             }
+            _syncVisibilityAfterSession();
             notifyListeners();
           }
         },
@@ -741,6 +879,8 @@ class AiAssistantProvider with ChangeNotifier {
     required String event,
     required String fallbackMessage,
     Object? error,
+    String? userText,
+    String source = 'assistant_chat',
   }) async {
     _logEvent(
       event,
@@ -751,6 +891,9 @@ class AiAssistantProvider with ChangeNotifier {
 
     _aiResponse = fallbackMessage;
     _currentEmotion = 'neutral';
+    if (userText != null && userText.trim().isNotEmpty) {
+      _recordHistory(userText: userText, aiText: _aiResponse, source: source);
+    }
     _transitionTo(AiState.speaking, reason: 'fallback_speak', traceId: traceId);
     notifyListeners();
     await _safeSpeak(_aiResponse, token: token, traceId: traceId);
@@ -795,12 +938,131 @@ class AiAssistantProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void _recordHistory({required String userText, required String aiText}) {
-    _sessionHistory.add({'role': 'User', 'text': userText});
-    _sessionHistory.add({'role': 'AI', 'text': aiText});
+  void _recordHistory({
+    required String userText,
+    required String aiText,
+    String source = 'assistant_chat',
+  }) {
+    final normalizedUser = userText.trim();
+    final normalizedAi = aiText.trim();
+
+    if (normalizedUser.isNotEmpty) {
+      _sessionHistory.add({'role': 'User', 'text': normalizedUser});
+      _addConversationEntry(
+        role: AiConversationRole.user,
+        text: normalizedUser,
+        source: source,
+      );
+    }
+
+    if (normalizedAi.isNotEmpty) {
+      _sessionHistory.add({'role': 'AI', 'text': normalizedAi});
+      _addConversationEntry(
+        role: AiConversationRole.assistant,
+        text: normalizedAi,
+        source: source,
+      );
+    }
 
     if (_sessionHistory.length > 10) {
       _sessionHistory.removeRange(0, _sessionHistory.length - 10);
+    }
+  }
+
+  Future<void> _ensureConversationCreated({required String source}) async {
+    if (_conversationCreated) {
+      return;
+    }
+
+    _conversationCreated = true;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_conversationCreatedPrefKey, true);
+    _logEvent('CONVERSATION_CREATED', data: {'source': source});
+    notifyListeners();
+  }
+
+  void _addConversationEntry({
+    required AiConversationRole role,
+    required String text,
+    required String source,
+  }) {
+    final normalized = text.trim();
+    if (normalized.isEmpty) {
+      return;
+    }
+
+    _conversationCreated = true;
+    _conversationHistory.add(
+      AiConversationEntry(
+        role: role,
+        text: normalized,
+        source: source,
+        createdAt: DateTime.now(),
+      ),
+    );
+
+    if (_conversationHistory.length > _maxConversationEntries) {
+      _conversationHistory.removeRange(
+        0,
+        _conversationHistory.length - _maxConversationEntries,
+      );
+    }
+
+    unawaited(_persistConversationHistory());
+    _scheduleCloudBackup();
+    notifyListeners();
+  }
+
+  Future<void> _persistConversationHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_conversationCreatedPrefKey, _conversationCreated);
+      await prefs.setString(
+        _historyPrefKey,
+        jsonEncode(
+          _conversationHistory.map((entry) => entry.toJson()).toList(),
+        ),
+      );
+    } catch (error) {
+      _logEvent(
+        'CONVERSATION_HISTORY_PERSIST_ERROR',
+        level: 'WARN',
+        data: {'error': error.toString()},
+      );
+    }
+  }
+
+  void _scheduleCloudBackup() {
+    _cloudBackupDebounceTimer?.cancel();
+
+    if (!_cloudBackupEnabled || _conversationHistory.isEmpty) {
+      return;
+    }
+
+    _cloudBackupDebounceTimer = Timer(const Duration(seconds: 2), () {
+      unawaited(_syncConversationHistoryToCloud());
+    });
+  }
+
+  Future<void> _syncConversationHistoryToCloud() async {
+    if (!_cloudBackupEnabled || _conversationHistory.isEmpty) {
+      return;
+    }
+
+    final payload =
+        _conversationHistory.map((entry) => entry.toJson()).toList();
+    try {
+      await _aiService.backupConversationHistory(
+        conversationId: aiConversationId,
+        entries: payload,
+      );
+      _logEvent('CLOUD_BACKUP_SYNCED', data: {'entries': payload.length});
+    } catch (error) {
+      _logEvent(
+        'CLOUD_BACKUP_SYNC_ERROR',
+        level: 'WARN',
+        data: {'error': error.toString()},
+      );
     }
   }
 
@@ -816,6 +1078,15 @@ class AiAssistantProvider with ChangeNotifier {
     buffer.writeln('---');
     buffer.write(text);
     return buffer.toString();
+  }
+
+  String _contextPromptLabel(String source) {
+    return switch (source) {
+      'analyze_message' => '[Phân tích tin nhắn]',
+      'translate_message' => '[Dịch tin nhắn]',
+      'summarize_video' => '[Tóm tắt video]',
+      _ => '[Yêu cầu AI]',
+    };
   }
 
   bool _isDuplicateFinalResult(String text) {
@@ -966,13 +1237,11 @@ class AiAssistantProvider with ChangeNotifier {
     );
 
     if (_lastWords.isEmpty) {
-      _aiResponse =
-          'Mình chưa nhận được âm thanh rõ ràng. Bạn thử nói lại hoặc chat bằng chữ nhé.';
-      _setProvisionallyVisible(true, reason: 'stt_guard_timeout_visible');
+      _aiResponse = '';
       _scheduleIdleAutoHide(reason: 'stt_guard_timeout');
-    } else {
-      _syncVisibilityAfterSession();
     }
+
+    _syncVisibilityAfterSession();
 
     notifyListeners();
   }
@@ -1087,6 +1356,47 @@ class AiAssistantProvider with ChangeNotifier {
     _syncVisibilityAfterSession();
     _logEvent('AI_RESPONSE_CLEARED');
     notifyListeners();
+  }
+}
+
+enum AiConversationRole { user, assistant, system }
+
+class AiConversationEntry {
+  final AiConversationRole role;
+  final String text;
+  final String source;
+  final DateTime createdAt;
+
+  const AiConversationEntry({
+    required this.role,
+    required this.text,
+    required this.source,
+    required this.createdAt,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'role': role.name,
+    'text': text,
+    'source': source,
+    'createdAt': createdAt.toIso8601String(),
+  };
+
+  factory AiConversationEntry.fromJson(Map<String, dynamic> json) {
+    final roleName = (json['role'] ?? 'assistant').toString();
+    final resolvedRole = AiConversationRole.values.firstWhere(
+      (role) => role.name == roleName,
+      orElse: () => AiConversationRole.assistant,
+    );
+
+    final rawCreatedAt = (json['createdAt'] ?? '').toString();
+    final parsedCreatedAt = DateTime.tryParse(rawCreatedAt) ?? DateTime.now();
+
+    return AiConversationEntry(
+      role: resolvedRole,
+      text: (json['text'] ?? '').toString(),
+      source: (json['source'] ?? 'assistant_chat').toString(),
+      createdAt: parsedCreatedAt,
+    );
   }
 }
 

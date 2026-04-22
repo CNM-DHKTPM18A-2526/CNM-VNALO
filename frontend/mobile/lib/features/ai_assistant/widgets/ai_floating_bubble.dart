@@ -7,6 +7,7 @@ import 'package:o3d/o3d.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/features/ai_assistant/models/mascot_metadata.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
+import 'package:vnalo_mobile/features/ai_assistant/screens/ai_conversation_screen.dart';
 import 'package:vnalo_mobile/features/ai_assistant/screens/mascot_gallery_screen.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_chat_board.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_robot_avatar.dart';
@@ -25,9 +26,9 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
   static const double _bubbleSize = 120;
   static const double _bubbleRadius = _bubbleSize / 2;
   static const double _dragHandleThreshold = 38;
-  static const double _trashHoverDistance = 58;
-  static const double _trashAttractionDistance = 104;
-  static const double _trashActivationBandFromBottom = 220;
+  static const double _trashHoverDistance = 72;
+  static const double _trashAttractionDistance = 126;
+  static const double _trashActivationBandFromBottom = 260;
 
   Offset _position = const Offset(20, 100);
   final O3DController _o3dController = O3DController();
@@ -128,15 +129,8 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
       final rawPosition = _position + details.delta;
       final clamped = _clampToViewport(rawPosition, screenSize);
 
-      final trashCenter = Offset(screenSize.width / 2, screenSize.height - 80);
-      final mascotCenter = Offset(
-        clamped.dx + _bubbleRadius,
-        clamped.dy + _bubbleRadius,
-      );
-      final distance = (mascotCenter - trashCenter).distance;
-      final inTrashBand =
-          mascotCenter.dy >
-          (screenSize.height - _trashActivationBandFromBottom);
+      final distance = _distanceToTrashZone(clamped, screenSize);
+      final inTrashBand = _isInTrashBand(clamped, screenSize);
 
       _position = clamped;
 
@@ -170,7 +164,12 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
       _ignoreTapUntil = DateTime.now().add(const Duration(milliseconds: 220));
     });
 
-    if (_isHoveringTrash) {
+    final screenSize = MediaQuery.of(context).size;
+    final shouldDrop =
+        _isHoveringTrash ||
+        _isWithinTrashDropZone(_position, screenSize, hoverPadding: 10);
+
+    if (shouldDrop) {
       await HapticFeedback.mediumImpact();
       await provider.hideMascot(reason: 'trash_drop');
       if (!mounted) {
@@ -185,6 +184,33 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
     }
 
     _snapToEdge();
+  }
+
+  bool _isInTrashBand(Offset position, Size screenSize) {
+    final mascotCenterY = position.dy + _bubbleRadius;
+    return mascotCenterY > (screenSize.height - _trashActivationBandFromBottom);
+  }
+
+  double _distanceToTrashZone(Offset position, Size screenSize) {
+    final trashCenter = Offset(screenSize.width / 2, screenSize.height - 80);
+    final mascotCenter = Offset(
+      position.dx + _bubbleRadius,
+      position.dy + _bubbleRadius,
+    );
+    return (mascotCenter - trashCenter).distance;
+  }
+
+  bool _isWithinTrashDropZone(
+    Offset position,
+    Size screenSize, {
+    double hoverPadding = 0,
+  }) {
+    if (!_isInTrashBand(position, screenSize)) {
+      return false;
+    }
+
+    return _distanceToTrashZone(position, screenSize) <=
+        (_trashHoverDistance + hoverPadding);
   }
 
   Offset _clampToViewport(Offset candidate, Size screenSize) {
@@ -237,13 +263,14 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
       right: 0,
       child: Center(
         child: AnimatedContainer(
+          key: const ValueKey('ai_bubble_trash_zone'),
           duration: const Duration(milliseconds: 180),
           width: _isHoveringTrash ? 84 : 62,
           height: _isHoveringTrash ? 84 : 62,
           decoration: BoxDecoration(
             color:
                 _isHoveringTrash
-                    ? Colors.redAccent.withOpacity(0.9)
+                    ? Colors.redAccent.withValues(alpha: 0.9)
                     : Colors.black54,
             shape: BoxShape.circle,
             boxShadow:
@@ -280,7 +307,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
         color = Colors.greenAccent;
         break;
       case AiState.idle:
-        color = Colors.white.withOpacity(0.5);
+        color = Colors.white.withValues(alpha: 0.5);
         break;
     }
 
@@ -293,7 +320,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.48),
+            color: color.withValues(alpha: 0.48),
             blurRadius: 10,
             spreadRadius: 2,
           ),
@@ -314,9 +341,10 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: Container(
+        key: const ValueKey('ai_bubble_state_hint'),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.72),
+          color: Colors.black.withValues(alpha: 0.72),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Column(
@@ -363,7 +391,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
           width: 3,
           height: height,
           decoration: BoxDecoration(
-            color: Colors.cyanAccent.withOpacity(0.92),
+            color: Colors.cyanAccent.withValues(alpha: 0.92),
             borderRadius: BorderRadius.circular(999),
           ),
         );
@@ -418,9 +446,6 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
               DateTime.now().isBefore(_ignoreTapUntil!)) {
             return;
           }
-          setState(() {
-            _isBoardExpanded = true;
-          });
           provider.onPrimaryAction(source: 'bubble_mask');
         },
       ),
@@ -437,6 +462,13 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const MascotGalleryScreen()),
+    );
+  }
+
+  Future<void> _openAiConversation() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AiConversationScreen()),
     );
   }
 
@@ -468,8 +500,8 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
                     gradient: RadialGradient(
                       colors: [
                         provider.state == AiState.speaking
-                            ? Colors.greenAccent.withOpacity(0.24)
-                            : Colors.blueAccent.withOpacity(0.14),
+                            ? Colors.greenAccent.withValues(alpha: 0.24)
+                            : Colors.blueAccent.withValues(alpha: 0.14),
                         Colors.transparent,
                       ],
                       stops: const [0.52, 1.0],
@@ -477,7 +509,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
                     border: Border.all(
                       color:
                           _inputMode == _BubbleInputMode.bubbleControl
-                              ? Colors.white.withOpacity(0.45)
+                              ? Colors.white.withValues(alpha: 0.45)
                               : Colors.transparent,
                     ),
                   ),
@@ -488,19 +520,21 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
                   top: -10,
                   left: -8,
                   child: GestureDetector(
+                    key: const ValueKey('ai_bubble_toggle_board'),
                     behavior: HitTestBehavior.opaque,
                     onTap: _toggleBoard,
+                    onLongPress: _openAiConversation,
                     child: Container(
                       width: 28,
                       height: 28,
                       decoration: BoxDecoration(
                         color:
                             _isBoardExpanded
-                                ? Colors.blueAccent.withOpacity(0.84)
-                                : Colors.black.withOpacity(0.62),
+                                ? Colors.blueAccent.withValues(alpha: 0.84)
+                                : Colors.black.withValues(alpha: 0.62),
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: Colors.white.withOpacity(0.35),
+                          color: Colors.white.withValues(alpha: 0.35),
                         ),
                       ),
                       child: const Icon(
@@ -521,10 +555,10 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
                       width: 28,
                       height: 28,
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.62),
+                        color: Colors.black.withValues(alpha: 0.62),
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: Colors.white.withOpacity(0.35),
+                          color: Colors.white.withValues(alpha: 0.35),
                         ),
                       ),
                       child: const Icon(
@@ -546,7 +580,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.6),
+                        color: Colors.black.withValues(alpha: 0.6),
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
@@ -572,12 +606,32 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
   @override
   Widget build(BuildContext context) {
     final aiProvider = context.watch<AiAssistantProvider>();
+    final screenSize = MediaQuery.of(context).size;
+    final viewInsets = MediaQuery.of(context).viewInsets;
+    final availableHeight = max(240.0, screenSize.height - viewInsets.bottom);
+
+    const boardPadding = 12.0;
+    final boardWidth = min(340.0, screenSize.width - (boardPadding * 2));
+    final boardHeight = min(420.0, availableHeight * 0.56);
+
+    final prefersRightDock = _position.dx < screenSize.width / 2;
+    final desiredLeft =
+        prefersRightDock
+            ? _position.dx + _bubbleSize - 8
+            : _position.dx - boardWidth + 8;
+    final boardLeft =
+        desiredLeft
+            .clamp(boardPadding, screenSize.width - boardWidth - boardPadding)
+            .toDouble();
+
+    final desiredTop = _position.dy - (boardHeight * 0.34);
+    final boardTop =
+        desiredTop
+            .clamp(56.0, max(56.0, availableHeight - boardHeight - 16.0))
+            .toDouble();
+
     final showBoard =
-        !_isDragging &&
-        (_isBoardExpanded ||
-            aiProvider.aiResponse.isNotEmpty ||
-            aiProvider.state == AiState.listening ||
-            aiProvider.state == AiState.thinking);
+        !_isDragging && (_isBoardExpanded || aiProvider.aiResponse.isNotEmpty);
 
     if (!aiProvider.isMascotVisible) {
       return const SizedBox.shrink();
@@ -589,22 +643,19 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
           if (_isDragging) _buildTrashZone(),
           if (showBoard)
             Positioned(
-              left:
-                  _position.dx < MediaQuery.of(context).size.width / 2
-                      ? _position.dx + _bubbleSize - 8
-                      : null,
-              right:
-                  _position.dx >= MediaQuery.of(context).size.width / 2
-                      ? MediaQuery.of(context).size.width - _position.dx + 8
-                      : null,
-              top: max(_position.dy - 72, 56),
+              left: boardLeft,
+              top: boardTop,
               child: AiChatBoard(
                 onClose: () {
+                  aiProvider.clearAiResponse();
                   setState(() {
                     _isBoardExpanded = false;
                   });
                 },
                 onClear: aiProvider.clearAiResponse,
+                onOpenConversation: _openAiConversation,
+                maxWidth: boardWidth,
+                maxHeight: boardHeight,
                 onSubmitPrompt: (text) async {
                   setState(() {
                     _isBoardExpanded = true;
@@ -620,6 +671,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
             left: _position.dx,
             top: _position.dy,
             child: Column(
+              key: const ValueKey('ai_bubble_root'),
               mainAxisSize: MainAxisSize.min,
               children: [
                 _buildBubbleIndicator(aiProvider),

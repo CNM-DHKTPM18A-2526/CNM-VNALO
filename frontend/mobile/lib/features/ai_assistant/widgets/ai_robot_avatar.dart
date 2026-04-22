@@ -99,8 +99,8 @@ class _AiRobotAvatarState extends State<AiRobotAvatar>
                         shape: BoxShape.circle,
                         gradient: RadialGradient(
                           colors: [
-                            auraColor.withOpacity(0.35),
-                            auraColor.withOpacity(0.12),
+                            auraColor.withValues(alpha: 0.35),
+                            auraColor.withValues(alpha: 0.12),
                             Colors.transparent,
                           ],
                           stops: const [0.42, 0.72, 1],
@@ -185,7 +185,7 @@ class _RobotHead extends StatelessWidget {
           height: size * 0.1,
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [eyeColor.withOpacity(0.4), eyeColor],
+              colors: [eyeColor.withValues(alpha: 0.4), eyeColor],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
@@ -198,14 +198,17 @@ class _RobotHead extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(size * 0.22),
             gradient: LinearGradient(
-              colors: [faceColor, faceColor.withOpacity(0.84)],
+              colors: [faceColor, faceColor.withValues(alpha: 0.84)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            border: Border.all(color: eyeColor.withOpacity(0.45), width: 1.6),
+            border: Border.all(
+              color: eyeColor.withValues(alpha: 0.45),
+              width: 1.6,
+            ),
             boxShadow: [
               BoxShadow(
-                color: eyeColor.withOpacity(0.28),
+                color: eyeColor.withValues(alpha: 0.28),
                 blurRadius: 16,
                 spreadRadius: 1,
               ),
@@ -280,7 +283,7 @@ class _RobotEye extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.5),
+            color: color.withValues(alpha: 0.5),
             blurRadius: 8,
             spreadRadius: 1,
           ),
@@ -313,7 +316,7 @@ class _RobotMouth extends StatelessWidget {
           width: 32,
           height: 8,
           decoration: BoxDecoration(
-            color: color.withOpacity(0.9),
+            color: color.withValues(alpha: 0.9),
             borderRadius: BorderRadius.circular(999),
           ),
         );
@@ -330,7 +333,7 @@ class _RobotMouth extends StatelessWidget {
                 width: 6,
                 height: 6,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.9),
+                  color: color.withValues(alpha: 0.9),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -343,7 +346,10 @@ class _RobotMouth extends StatelessWidget {
           height: 7 + (anim * 8),
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [color.withOpacity(0.95), color.withOpacity(0.65)],
+              colors: [
+                color.withValues(alpha: 0.95),
+                color.withValues(alpha: 0.65),
+              ],
             ),
             borderRadius: BorderRadius.circular(999),
           ),
@@ -354,7 +360,7 @@ class _RobotMouth extends StatelessWidget {
           width: isJoy ? 28 : 20,
           height: 6,
           decoration: BoxDecoration(
-            color: color.withOpacity(0.78),
+            color: color.withValues(alpha: 0.78),
             borderRadius: BorderRadius.circular(999),
           ),
         );

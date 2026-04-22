@@ -7,6 +7,8 @@ import 'package:vnalo_mobile/core/utils/date_formatter.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
+import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
+import 'package:vnalo_mobile/features/ai_assistant/screens/ai_conversation_screen.dart';
 import 'package:vnalo_mobile/features/chat/screens/chat_detail_screen.dart';
 import 'package:vnalo_mobile/features/chat/screens/my_documents_screen.dart';
 import 'package:vnalo_mobile/features/chat/widgets/chat_list_item.dart';
@@ -17,7 +19,6 @@ import 'package:vnalo_mobile/features/chat/screens/create_group_screen.dart';
 import 'package:vnalo_mobile/features/chat/screens/join_group_screen.dart';
 import 'package:vnalo_mobile/features/search/screens/unified_search_screen.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
-import 'package:vnalo_mobile/models/message_model.dart';
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
@@ -42,9 +43,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   void _openQrScanner() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const QrScannerScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const QrScannerScreen()));
   }
 
   void _openQuickActions() {
@@ -56,9 +57,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
           icon: Icons.person_add_alt_1_outlined,
           title: common.addFriendAction,
           onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const AddFriendScreen()),
-            );
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const AddFriendScreen()));
           },
         ),
         QuickActionItem(
@@ -74,9 +75,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
           icon: Icons.link,
           title: common.joinGroupAction,
           onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => JoinGroupScreen()),
-            );
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => JoinGroupScreen()));
           },
         ),
         QuickActionItem(
@@ -115,32 +116,33 @@ class _ChatListScreenState extends State<ChatListScreen> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final common = CommonTexts.of(context);
     final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
-    final searchHint = isDarkMode
-        ? DarkColors.textSecondary
-        : Colors.white.withValues(alpha: 0.8);
-    final dividerColor = isDarkMode
-      ? DarkColors.divider
-      : const Color(0xFFE9EDF3);
+    final dividerColor =
+        isDarkMode ? DarkColors.divider : const Color(0xFFE9EDF3);
 
     return Scaffold(
-      backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
+      backgroundColor:
+          isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
       appBar: AppBar(
         backgroundColor: isDarkMode ? appBarBg : Colors.transparent,
         elevation: 0,
-        forceMaterialTransparency: !isDarkMode, // Only transparent in light mode to show gradient
-        flexibleSpace: isDarkMode
-            ? null
-            : Container(
-                decoration: const BoxDecoration(
-                  gradient: AppColors.appBarGradient,
+        forceMaterialTransparency:
+            !isDarkMode, // Only transparent in light mode to show gradient
+        flexibleSpace:
+            isDarkMode
+                ? null
+                : Container(
+                  decoration: const BoxDecoration(
+                    gradient: AppColors.appBarGradient,
+                  ),
                 ),
-              ),
         title: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => const UnifiedSearchScreen(searchTag: 'search_bar_chat'),
+                builder:
+                    (_) =>
+                        const UnifiedSearchScreen(searchTag: 'search_bar_chat'),
               ),
             );
           },
@@ -167,30 +169,40 @@ class _ChatListScreenState extends State<ChatListScreen> {
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.qr_code_scanner, color: isDarkMode ? DarkColors.textPrimary : Colors.white),
+            icon: Icon(
+              Icons.qr_code_scanner,
+              color: isDarkMode ? DarkColors.textPrimary : Colors.white,
+            ),
             onPressed: _openQrScanner,
           ),
           IconButton(
-            icon: Icon(Icons.add, color: isDarkMode ? DarkColors.textPrimary : Colors.white),
+            icon: Icon(
+              Icons.add,
+              color: isDarkMode ? DarkColors.textPrimary : Colors.white,
+            ),
             onPressed: _openQuickActions,
           ),
         ],
       ),
-      body: Consumer<ChatProvider>(
-        builder: (context, chatProvider, _) {
+      body: Consumer2<ChatProvider, AiAssistantProvider>(
+        builder: (context, chatProvider, aiProvider, _) {
           if (chatProvider.isLoading && chatProvider.conversations.isEmpty) {
             return const Center(
               child: CircularProgressIndicator(color: AppColors.primary),
             );
           }
 
+          final hasAiConversation = aiProvider.hasConversation;
+          final fixedItemCount = hasAiConversation ? 2 : 1;
+
           return RefreshIndicator(
             onRefresh: () => chatProvider.loadInbox(),
             color: AppColors.primary,
             child: ColoredBox(
-              color: isDarkMode ? DarkColors.surface : AppColors.sectionBackground,
+              color:
+                  isDarkMode ? DarkColors.surface : AppColors.sectionBackground,
               child: ListView.separated(
-                itemCount: chatProvider.conversations.length + 1,
+                itemCount: chatProvider.conversations.length + fixedItemCount,
                 separatorBuilder: (context, index) {
                   return Container(
                     color: isDarkMode ? DarkColors.surface : Colors.white,
@@ -198,10 +210,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                       children: [
                         const SizedBox(width: 80),
                         Expanded(
-                          child: Container(
-                            height: 0.6,
-                            color: dividerColor,
-                          ),
+                          child: Container(height: 0.6, color: dividerColor),
                         ),
                       ],
                     ),
@@ -213,21 +222,23 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     final lastCloud = chatProvider.lastCloudMessage;
                     String cloudSubtitle = common.myDocumentsSubtitle;
                     String? cloudTime;
-                    
+
                     if (lastCloud != null) {
                       cloudTime = DateFormatter.relative(lastCloud.createdAt);
                       final prefix = 'Bạn: ';
-                      
+
                       if (lastCloud.messageType == MessageType.TEXT) {
                         cloudSubtitle = '$prefix${lastCloud.content ?? ''}';
                       } else {
                         final label = switch (lastCloud.messageType) {
                           MessageType.IMAGE => '[${common.photoAction}]',
                           MessageType.VIDEO => '[${common.videoAction}]',
-                          MessageType.FILE => '[${common.documentLabel}] ${lastCloud.content ?? ''}'.trim(),
+                          MessageType.FILE =>
+                            '[${common.documentLabel}] ${lastCloud.content ?? ''}'
+                                .trim(),
                           MessageType.AUDIO => '[${common.audioAction}]',
                           MessageType.STICKER => '[Sticker]',
-                          _ => common.msgSent
+                          _ => common.msgSent,
                         };
                         cloudSubtitle = '$prefix$label';
                       }
@@ -241,86 +252,209 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           vertical: 10,
                         ),
 
-                      leading: Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: isDarkMode ? DarkColors.primary : Colors.blue,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            const Icon(Icons.cloud_upload_rounded, color: Colors.white, size: 28),
-                            Positioned(
-                              bottom: 0,
-                              right: 0,
-                              child: Container(
-
-                                decoration: const BoxDecoration(
-                                  color: Colors.orange,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.check, color: Colors.white, size: 12),
-
+                        leading: Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color:
+                                isDarkMode ? DarkColors.primary : Colors.blue,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              const Icon(
+                                Icons.cloud_upload_rounded,
+                                color: Colors.white,
+                                size: 28,
                               ),
-                            )
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: Container(
+                                  decoration: const BoxDecoration(
+                                    color: Colors.orange,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.check,
+                                    color: Colors.white,
+                                    size: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        title: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                common.myDocumentsHeader,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                  color:
+                                      isDarkMode
+                                          ? DarkColors.textPrimary
+                                          : LightColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                            if (cloudTime != null)
+                              Text(
+                                cloudTime,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color:
+                                      isDarkMode
+                                          ? DarkColors.textSecondary
+                                          : Colors.grey,
+                                ),
+                              ),
                           ],
                         ),
+                        subtitle: Text(
+                          cloudSubtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color:
+                                isDarkMode
+                                    ? DarkColors.textSecondary
+                                    : Colors.grey,
+                          ),
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const MyDocumentsScreen(),
+                            ),
+                          );
+                        },
                       ),
+                    );
+                  }
 
-                      title: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              common.myDocumentsHeader,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 16,
-                                color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
+                  if (hasAiConversation && index == 1) {
+                    final lastAt = aiProvider.lastConversationAt;
+                    final lastAtLabel =
+                        lastAt != null ? DateFormatter.relative(lastAt) : null;
+
+                    return ColoredBox(
+                      color: isDarkMode ? DarkColors.surface : Colors.white,
+                      child: ListTile(
+                        key: const ValueKey('chat_list_ai_assistant_tile'),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                        leading: Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF2B6CF6), Color(0xFF0F8BFF)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Icon(
+                            Icons.smart_toy_outlined,
+                            color: Colors.white,
+                            size: 28,
+                          ),
+                        ),
+                        title: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Trợ lý AI VNALO',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                  color:
+                                      isDarkMode
+                                          ? DarkColors.textPrimary
+                                          : LightColors.textPrimary,
+                                ),
                               ),
+                            ),
+                            if (lastAtLabel != null)
+                              Text(
+                                lastAtLabel,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color:
+                                      isDarkMode
+                                          ? DarkColors.textSecondary
+                                          : Colors.grey,
+                                ),
+                              ),
+                          ],
+                        ),
+                        subtitle: Text(
+                          aiProvider.lastConversationPreview,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color:
+                                isDarkMode
+                                    ? DarkColors.textSecondary
+                                    : Colors.grey,
+                          ),
+                        ),
+                        trailing: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color:
+                                isDarkMode
+                                    ? Colors.white.withValues(alpha: 0.08)
+                                    : const Color(0xFFEAF3FF),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            'AI',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                          if (cloudTime != null)
-                            Text(
-                              cloudTime,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: isDarkMode ? DarkColors.textSecondary : Colors.grey,
-                              ),
-                            ),
-                        ],
-                      ),
-                      subtitle: Text(
-                        cloudSubtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: isDarkMode ? DarkColors.textSecondary : Colors.grey,
                         ),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const AiConversationScreen(),
+                            ),
+                          );
+                        },
                       ),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const MyDocumentsScreen()),
-                        );
-                      },
-                    ),
-                  );
+                    );
                   }
 
                   // 2. Conversations
-                  final conversation = chatProvider.conversations[index - 1];
+                  final conversationStartIndex = fixedItemCount;
+                  final conversation =
+                      chatProvider.conversations[index -
+                          conversationStartIndex];
                   return ChatListItem(
                     key: ValueKey(conversation.id),
                     conversation: conversation,
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => ChatDetailScreen(
-                            conversation: conversation,
-                          ),
+                          builder:
+                              (_) =>
+                                  ChatDetailScreen(conversation: conversation),
                         ),
                       );
                     },
