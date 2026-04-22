@@ -303,6 +303,91 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  /**
+   * G-010: Emit group.memberAdded after adding members via WS.
+   * Wraps conversationService.addMembers and broadcasts to the room.
+   */
+  @SubscribeMessage('group.addMembers')
+  async handleGroupAddMembers(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { conversationId: string; memberIds: string[] },
+  ) {
+    const userId = client.data.user.userId;
+    const { conversationId, memberIds } = data ?? {};
+    if (!conversationId || !memberIds?.length) {
+      return { event: 'conversation.error', data: { error: 'Missing conversationId or memberIds' } };
+    }
+    try {
+      const result = await this.conversationService.addMembers(conversationId, userId, memberIds);
+      const room = this.getConversationRoom(conversationId);
+      const payload = { conversationId, addedBy: userId, memberIds, members: result.members };
+      this.server.to(room).emit('group.memberAdded', payload);
+      // Notify newly added members individually in case they're not in the room yet
+      for (const memberId of memberIds) {
+        this.emitToUser(memberId, 'group.memberAdded', payload);
+      }
+      return { event: 'group.memberAdded', data: payload };
+    } catch (err) {
+      return { event: 'conversation.error', data: { error: err.message } };
+    }
+  }
+
+  /**
+   * G-011: Emit group.memberRemoved or group.memberLeft after removing a member via WS.
+   */
+  @SubscribeMessage('group.removeMember')
+  async handleGroupRemoveMember(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { conversationId: string; targetUserId: string },
+  ) {
+    const userId = client.data.user.userId;
+    const { conversationId, targetUserId } = data ?? {};
+    if (!conversationId || !targetUserId) {
+      return { event: 'conversation.error', data: { error: 'Missing conversationId or targetUserId' } };
+    }
+    try {
+      await this.conversationService.removeMember(conversationId, userId, targetUserId);
+      const isSelf = userId === targetUserId;
+      const eventName = isSelf ? 'group.memberLeft' : 'group.memberRemoved';
+      const room = this.getConversationRoom(conversationId);
+      const payload = { conversationId, userId: targetUserId, removedBy: isSelf ? null : userId };
+      this.server.to(room).emit(eventName, payload);
+      this.emitToUser(targetUserId, eventName, payload);
+      return { event: eventName, data: payload };
+    } catch (err) {
+      return { event: 'conversation.error', data: { error: err.message } };
+    }
+  }
+
+  /**
+   * G-012: Emit group.roleChanged or group.adminTransferred after updating member role via WS.
+   */
+  @SubscribeMessage('group.updateMember')
+  async handleGroupUpdateMember(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { conversationId: string; targetUserId: string; role?: string; nickname?: string },
+  ) {
+    const userId = client.data.user.userId;
+    const { conversationId, targetUserId, role, nickname } = data ?? {};
+    if (!conversationId || !targetUserId) {
+      return { event: 'conversation.error', data: { error: 'Missing conversationId or targetUserId' } };
+    }
+    try {
+      const updated = await this.conversationService.updateMember(conversationId, userId, targetUserId, { role, nickname });
+      const room = this.getConversationRoom(conversationId);
+      if (role) {
+        const eventName = role === 'ADMIN' ? 'group.adminTransferred' : 'group.roleChanged';
+        const payload = { conversationId, targetUserId, newRole: role, changedBy: userId, member: updated };
+        this.server.to(room).emit(eventName, payload);
+        return { event: eventName, data: payload };
+      }
+      // Nickname-only change — no event broadcast needed (local UI update)
+      return { event: 'group.memberUpdated', data: { conversationId, targetUserId, member: updated } };
+    } catch (err) {
+      return { event: 'conversation.error', data: { error: err.message } };
+    }
+  }
+
   private async forwardCallSignal(
     client: Socket,
     type: 'offer' | 'answer' | 'ice-candidate' | 'end',
@@ -421,6 +506,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     try {
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      // STEP 1.5: G-008 — ENFORCE onlyAdminCanPost GUARD
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      await this.conversationService.assertCanSendMessage(dto.conversationId, userId);
+
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
       // STEP 2: SAVE TO DATABASE
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

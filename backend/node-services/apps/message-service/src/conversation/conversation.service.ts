@@ -303,7 +303,9 @@ export class ConversationService {
     return { members, pendingApprovals, status: 'ADDED' };
   }
 
-  /** Remove a member or leave conversation. OWNER cannot leave without transfer. */
+  /** Remove a member or leave conversation.
+   * G-007: ADMIN cannot leave while other members exist — must transfer or disband first.
+   */
   async removeMember(
     conversationId: string,
     requesterId: string,
@@ -313,6 +315,21 @@ export class ConversationService {
     const target = await this.assertMember(conversationId, targetUserId);
 
     const isSelf = requesterId === targetUserId;
+
+    // G-007: ADMIN cannot leave while there are still other members in the group
+    if (isSelf && requester.role === MemberRole.ADMIN) {
+      const conversation = await this.getConversationOrFail(conversationId);
+      if (conversation.type === ConversationType.GROUP) {
+        const memberCount = await this.memberRepo.count({
+          where: { conversationId, leftAt: IsNull() },
+        });
+        if (memberCount > 1) {
+          throw new ForbiddenException(
+            'Group admin cannot leave while other members exist. Transfer admin role or disband the group first.',
+          );
+        }
+      }
+    }
 
     // MEMBER cannot remove others. DEPUTY cannot remove ADMIN.
     if (!isSelf) {
@@ -490,6 +507,40 @@ export class ConversationService {
     if (member.role === MemberRole.MEMBER && !conversation.allowMemberPin) {
       throw new ForbiddenException('Only admin/deputy can pin in this group');
     }
+  }
+
+  /**
+   * G-008: Verify that user is allowed to send messages in a conversation.
+   * If onlyAdminCanPost is enabled, only ADMIN and DEPUTY can send.
+   * Both frontend (input bar disabled) and backend must enforce this.
+   */
+  async assertCanSendMessage(
+    conversationId: string,
+    userId: string,
+  ): Promise<void> {
+    const conversation = await this.getConversationOrFail(conversationId);
+    if (conversation.type === ConversationType.DIRECT) return;
+
+    if (conversation.onlyAdminCanPost) {
+      const member = await this.assertMember(conversationId, userId);
+      if (member.role === MemberRole.MEMBER) {
+        throw new ForbiddenException(
+          'Only admin and deputy can send messages in announcement mode',
+        );
+      }
+    }
+  }
+
+  /**
+   * G-013: Convenience method for a member leaving a group.
+   * Delegates to removeMember (self-removal) and returns the memberCount.
+   */
+  async leaveGroup(
+    conversationId: string,
+    userId: string,
+  ): Promise<{ status: string; conversationId: string }> {
+    await this.removeMember(conversationId, userId, userId);
+    return { status: 'LEFT', conversationId };
   }
 
   /** Verify user is an active member. Throws if not. */

@@ -139,6 +139,12 @@ export class ConversationController {
     );
   }
 
+  /** Leave a group conversation. G-013. Delegates to removeMember (self-removal). */
+  @Post(':id/leave')
+  leaveGroup(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.conversationService.leaveGroup(id, user.userId);
+  }
+
   /** Disband (permanently delete) a group. Only group ADMIN. D-012. */
   @Delete(':id')
   disbandGroup(@CurrentUser() user: AuthUser, @Param('id') id: string) {
