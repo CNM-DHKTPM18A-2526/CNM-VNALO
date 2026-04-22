@@ -146,6 +146,10 @@
 | DELETE | /api/v1/conversations/{id}/join-requests/{userId} | JWT |
 | PATCH | /api/v1/conversations/{id}/member/{targetUserId} | JWT |
 | PATCH | /api/v1/conversations/{id}/wallpaper | JWT |
+| PATCH | /api/v1/conversations/{id}/members/{userId}/nickname | JWT |
+| POST | /api/v1/conversations/{id}/leave | JWT |
+| DELETE | /api/v1/conversations/{id} | JWT | disband group [SPEC_ONLY — not yet implemented] |
+| GET | /api/v1/users/me/settings/sync | JWT | getSyncPolicy — sync settings for restrictedWebMode |
 
 ### Message
 
