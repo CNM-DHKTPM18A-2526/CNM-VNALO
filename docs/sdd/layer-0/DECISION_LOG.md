@@ -17,6 +17,10 @@
 | D-008 | restrictedWebMode Runtime Override in chat.gateway | Accepted with Risk | 2026-04-19 |
 | D-009 | Content Service Mutating Identity via X-User-Id with permitAll Security | Accepted with Risk | 2026-04-20 |
 | D-010 | Runtime Status in Blueprint Follows Default Compose Activation | Accepted | 2026-04-20 |
+| D-011 | MemberRole Enum Rename: OWNER→ADMIN, ADMIN→DEPUTY | Accepted | 2026-04-22 |
+| D-012 | Group Disband Performs Immediate Hard Delete of Messages and S3 Media | Accepted | 2026-04-22 |
+| D-013 | Block Applies to Group Messages Cross-Conversation | Accepted | 2026-04-22 |
+| D-014 | group.disbanded is a New First-Class WS Event | Accepted | 2026-04-22 |
 
 ---
 
@@ -128,3 +132,50 @@
 - Evidence:
   - docker/docker-compose.yml
   - docs/sdd/layer-0/ARCHITECTURE_BLUEPRINT.md
+
+## D-011 MemberRole Enum Rename: OWNER→ADMIN, ADMIN→DEPUTY
+
+- Context: Domain audit 2026-04-22 confirmed that business terminology for group roles does not match code enum names. OWNER in code represents the active group leader (Trưởng nhóm), not just the creator. ADMIN in code represents deputies (Phó nhóm).
+- Decision: Rename `MemberRole.OWNER → ADMIN` and `MemberRole.ADMIN → DEPUTY` across all message-service entities, services, gateways, and Flutter models. The `createdBy` field in Conversation is preserved as an audit reference only and confers no runtime privilege.
+- Consequence:
+  - DB migration required: ALTER TYPE member_role RENAME VALUE.
+  - All role checks in conversation.service, message.service, and chat.gateway must use new names.
+  - Flutter MemberRole enum must be updated in sync.
+- Evidence:
+  - docs/sdd/layer-2/MODULE_SPEC_CHAT.md §1
+  - backend/node-services/apps/message-service/src/entities/conversation-member.entity.ts
+
+## D-012 Group Disband Performs Immediate Hard Delete of Messages and S3 Media
+
+- Context: When the last remaining member (ADMIN) leaves a group or explicitly calls disband, there is no reversibility requirement. Data should not persist.
+- Decision: Disband triggers immediate, atomic hard delete of all Message, ConversationMember, ConversationInbox, and Conversation rows. Media files referenced by deleted messages must also be deleted from S3 via media-service.
+- Consequence:
+  - Disband is irreversible. No grace period.
+  - Requires cross-service call from message-service to media-service for S3 cleanup.
+  - Frontend must clear local SQLite cache immediately on receiving `group.disbanded` event.
+- Evidence:
+  - docs/sdd/layer-2/MODULE_SPEC_CHAT.md §2.4
+
+## D-013 Block Applies to Group Messages Cross-Conversation
+
+- Context: Standard platform expectation (aligned with major messaging apps) is that a block relationship silences both parties everywhere, not only in direct messages.
+- Decision: When user A blocks user B, message queries (`getMessages`) for any conversation where both A and B are members must exclude messages from the blocked party. This applies to both 1:1 and group conversations.
+- Consequence:
+  - `getMessages` in message-service requires awareness of core-service block_list.
+  - Recommended implementation: Redis-cached block set per user, refreshed on block/unblock events.
+  - Cross-service coordination required between message-service (Node) and core-service (Java).
+- Evidence:
+  - docs/sdd/layer-2/MODULE_SPEC_SOCIAL.md §2.3
+  - backend/node-services/apps/message-service/src/message/message.service.ts getMessages
+
+## D-014 group.disbanded is a New First-Class WS Event
+
+- Context: No WS event currently signals group disbandment to connected clients, leaving clients with stale local caches.
+- Decision: Add `group.disbanded` as a new Socket.IO event emitted by chat.gateway to the conversation room immediately after the disband cascade completes. Payload: `{ conversationId: string, disbandedAt: ISO8601 }`.
+- Consequence:
+  - chat.gateway must emit this event after successful `disbandGroup()` call.
+  - SOCKET_SIGNALING_SCHEMA.md (Layer 3) must document this event.
+  - Flutter ChatProvider must subscribe and trigger immediate local SQLite cache purge.
+- Evidence:
+  - docs/sdd/layer-2/MODULE_SPEC_CHAT.md §2.4
+  - docs/sdd/layer-3/SOCKET_SIGNALING_SCHEMA.md (update required)
