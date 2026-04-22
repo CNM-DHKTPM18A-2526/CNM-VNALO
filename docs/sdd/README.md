@@ -32,6 +32,7 @@ This SDD tree makes the repository AI-actionable and auditable:
   - MODULE_SPEC_CHAT.md
   - MODULE_SPEC_CALL.md
   - MODULE_SPEC_SOCIAL.md
+  - MODULE_SPEC_REALTIME_SYNC.md
 - layer-3
   - API_REFERENCE_CATALOG.md
   - SOCKET_SIGNALING_SCHEMA.md
