@@ -1,11 +1,19 @@
 import {
-  Entity, Column, CreateDateColumn, ManyToOne, JoinColumn, PrimaryColumn, Index,
+  Entity,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  PrimaryColumn,
+  Index,
 } from 'typeorm';
 import { Conversation } from './conversation.entity';
 
 export enum MemberRole {
-  OWNER = 'OWNER',
+  /** Trưởng nhóm — exactly 1 per group. Previously called OWNER (D-011). */
   ADMIN = 'ADMIN',
+  /** Phó nhóm — 0..N per group. Previously called ADMIN (D-011). */
+  DEPUTY = 'DEPUTY',
   MEMBER = 'MEMBER',
 }
 
@@ -16,8 +24,12 @@ export enum NotificationSetting {
 }
 
 @Entity('conversation_member')
-@Index('idx_conv_member_user', ['userId', 'isPinned'], { where: '"left_at" IS NULL' })
-@Index('idx_conv_member_conv', ['conversationId'], { where: '"left_at" IS NULL' })
+@Index('idx_conv_member_user', ['userId', 'isPinned'], {
+  where: '"left_at" IS NULL',
+})
+@Index('idx_conv_member_conv', ['conversationId'], {
+  where: '"left_at" IS NULL',
+})
 export class ConversationMember {
   @PrimaryColumn({ name: 'conversation_id', type: 'uuid' })
   conversationId: string;
@@ -25,7 +37,12 @@ export class ConversationMember {
   @PrimaryColumn({ name: 'user_id', type: 'uuid' })
   userId: string;
 
-  @Column({ type: 'varchar', length: 20, enum: MemberRole, default: MemberRole.MEMBER })
+  @Column({
+    type: 'varchar',
+    length: 20,
+    enum: MemberRole,
+    default: MemberRole.MEMBER,
+  })
   role: MemberRole;
 
   @Column({ type: 'varchar', length: 50, nullable: true })
@@ -62,8 +79,11 @@ export class ConversationMember {
   lastReadAt: Date | null;
 
   @Column({
-    name: 'notification_setting', type: 'varchar', length: 20,
-    enum: NotificationSetting, default: NotificationSetting.ALL,
+    name: 'notification_setting',
+    type: 'varchar',
+    length: 20,
+    enum: NotificationSetting,
+    default: NotificationSetting.ALL,
   })
   notificationSetting: NotificationSetting;
 

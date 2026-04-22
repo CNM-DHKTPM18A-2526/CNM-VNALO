@@ -1,6 +1,11 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn,
-  OneToMany, Index,
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  OneToMany,
+  Index,
 } from 'typeorm';
 import { ConversationMember } from './conversation-member.entity';
 
@@ -23,7 +28,9 @@ export enum JoinMode {
 
 @Entity('conversation')
 @Index('idx_conv_type', ['type'])
-@Index('idx_conv_invite_link', ['inviteLink'], { where: '"invite_link" IS NOT NULL' })
+@Index('idx_conv_invite_link', ['inviteLink'], {
+  where: '"invite_link" IS NOT NULL',
+})
 export class Conversation {
   @PrimaryGeneratedColumn('uuid', { name: 'conversation_id' })
   id: string;
@@ -46,19 +53,40 @@ export class Conversation {
   @Column({ name: 'created_by', type: 'uuid' })
   createdBy: string;
 
-  @Column({ type: 'varchar', length: 20, enum: ConversationStatus, default: ConversationStatus.ACTIVE })
+  @Column({
+    type: 'varchar',
+    length: 20,
+    enum: ConversationStatus,
+    default: ConversationStatus.ACTIVE,
+  })
   status: ConversationStatus;
 
-  @Column({ name: 'join_mode', type: 'varchar', length: 20, enum: JoinMode, default: JoinMode.OPEN })
+  @Column({
+    name: 'join_mode',
+    type: 'varchar',
+    length: 20,
+    enum: JoinMode,
+    default: JoinMode.OPEN,
+  })
   joinMode: JoinMode;
 
   @Column({ name: 'member_limit', type: 'int', default: 100 })
   memberLimit: number;
 
-  @Column({ name: 'invite_link', type: 'varchar', length: 100, nullable: true, unique: true })
+  @Column({
+    name: 'invite_link',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+    unique: true,
+  })
   inviteLink: string | null;
 
-  @Column({ name: 'invite_link_expires_at', type: 'timestamptz', nullable: true })
+  @Column({
+    name: 'invite_link_expires_at',
+    type: 'timestamptz',
+    nullable: true,
+  })
   inviteLinkExpiresAt: Date | null;
 
   @Column({ name: 'is_encrypted', type: 'boolean', default: false })
@@ -73,6 +101,10 @@ export class Conversation {
   @Column({ name: 'allow_member_edit_info', type: 'boolean', default: false })
   allowMemberEditInfo: boolean;
 
+  /** When true, only ADMIN and DEPUTY can send messages (announcement/broadcast mode). */
+  @Column({ name: 'only_admin_can_post', type: 'boolean', default: false })
+  onlyAdminCanPost: boolean;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
@@ -80,6 +112,9 @@ export class Conversation {
   updatedAt: Date;
 
   // Relations
-  @OneToMany(() => ConversationMember, (m: ConversationMember) => m.conversation)
+  @OneToMany(
+    () => ConversationMember,
+    (m: ConversationMember) => m.conversation,
+  )
   members: ConversationMember[];
 }
