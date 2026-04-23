@@ -1,4 +1,10 @@
-import { Entity, Column, CreateDateColumn, PrimaryColumn, Index } from 'typeorm';
+import {
+  Entity,
+  Column,
+  CreateDateColumn,
+  PrimaryColumn,
+  Index,
+} from 'typeorm';
 
 @Entity('conversation_join_request')
 @Index('idx_conv_join_request_conversation', ['conversationId'])

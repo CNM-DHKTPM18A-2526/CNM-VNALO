@@ -1,4 +1,13 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index, Unique, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  Index,
+  Unique,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { Message } from './message.entity';
 
 @Entity('pinned_message')

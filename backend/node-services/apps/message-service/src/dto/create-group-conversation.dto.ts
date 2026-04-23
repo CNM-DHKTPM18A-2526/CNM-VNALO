@@ -1,4 +1,13 @@
-import { IsString, IsOptional, IsArray, IsUUID, IsEnum, MaxLength, ArrayMinSize, ArrayMaxSize } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsArray,
+  IsUUID,
+  IsEnum,
+  MaxLength,
+  ArrayMinSize,
+  ArrayMaxSize,
+} from 'class-validator';
 import { JoinMode } from '../entities/conversation.entity';
 
 export class CreateGroupConversationDto {

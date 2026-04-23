@@ -74,4 +74,4 @@ import { RedisModule } from '@nestjs-modules/ioredis';
   ],
   controllers: [HealthController],
 })
-export class AppModule { }
+export class AppModule {}

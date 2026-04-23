@@ -1,9 +1,17 @@
-import { Entity, Column, PrimaryColumn, UpdateDateColumn, Index } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryColumn,
+  UpdateDateColumn,
+  Index,
+} from 'typeorm';
 
 /** CQRS read model: denormalized inbox for fast conversation list queries. */
 @Entity('conversation_inbox')
 @Index('idx_inbox_user_sort', ['userId', 'isPinned', 'lastMessageSeq'])
-@Index('idx_inbox_unread', ['userId', 'unreadCount'], { where: '"unread_count" > 0' })
+@Index('idx_inbox_unread', ['userId', 'unreadCount'], {
+  where: '"unread_count" > 0',
+})
 export class ConversationInbox {
   @PrimaryColumn({ name: 'user_id', type: 'uuid' })
   userId: string;
@@ -17,13 +25,23 @@ export class ConversationInbox {
   @Column({ name: 'last_message_at', type: 'timestamptz', nullable: true })
   lastMessageAt: Date | null;
 
-  @Column({ name: 'last_message_preview', type: 'varchar', length: 200, nullable: true })
+  @Column({
+    name: 'last_message_preview',
+    type: 'varchar',
+    length: 200,
+    nullable: true,
+  })
   lastMessagePreview: string | null;
 
   @Column({ name: 'last_message_sender_id', type: 'uuid', nullable: true })
   lastMessageSenderId: string | null;
 
-  @Column({ name: 'last_message_type', type: 'varchar', length: 30, nullable: true })
+  @Column({
+    name: 'last_message_type',
+    type: 'varchar',
+    length: 30,
+    nullable: true,
+  })
   lastMessageType: string | null;
 
   @Column({ name: 'unread_count', type: 'int', default: 0 })
@@ -41,7 +59,12 @@ export class ConversationInbox {
   @Column({ name: 'history_cleared_at', type: 'timestamptz', nullable: true })
   historyClearedAt: Date | null;
 
-  @Column({ name: 'wallpaper_url', type: 'varchar', length: 500, nullable: true })
+  @Column({
+    name: 'wallpaper_url',
+    type: 'varchar',
+    length: 500,
+    nullable: true,
+  })
   wallpaperUrl: string | null;
 
   @Column({ name: 'is_favorite', type: 'boolean', default: false })

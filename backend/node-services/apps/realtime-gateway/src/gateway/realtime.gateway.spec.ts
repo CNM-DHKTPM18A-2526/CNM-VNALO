@@ -46,6 +46,9 @@ describe('RealtimeGateway', () => {
 
     expect(client.disconnect).not.toHaveBeenCalled();
     expect(client.data.user.userId).toBe('user-1');
-    expect(presenceService.setOnline).toHaveBeenCalledWith('user-1', 'socket-2');
+    expect(presenceService.setOnline).toHaveBeenCalledWith(
+      'user-1',
+      'socket-2',
+    );
   });
 });

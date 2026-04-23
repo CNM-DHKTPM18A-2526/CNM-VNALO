@@ -1,5 +1,10 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index, Unique,
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  Index,
+  Unique,
 } from 'typeorm';
 
 @Entity('message_reaction')

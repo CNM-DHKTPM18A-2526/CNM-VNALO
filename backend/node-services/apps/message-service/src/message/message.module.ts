@@ -13,8 +13,12 @@ import { ConversationModule } from '../conversation/conversation.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
-      Message, MessageReaction, MessageReceipt, PinnedMessage,
-      ConversationInbox, ConversationMember,
+      Message,
+      MessageReaction,
+      MessageReceipt,
+      PinnedMessage,
+      ConversationInbox,
+      ConversationMember,
     ]),
     ConversationModule,
   ],

@@ -1,4 +1,9 @@
-import { CanActivate, ExecutionContext, Injectable, Logger } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Socket } from 'socket.io';
 
@@ -14,16 +19,19 @@ export class WsJwtGuard implements CanActivate {
 
     try {
       const token =
-        client.handshake?.auth?.token ||
-        client.handshake?.query?.token;
+        client.handshake?.auth?.token || client.handshake?.query?.token;
 
       if (!token) {
-        this.logger.warn(`[WsJwtGuard] Connection rejected: no token found in auth or query`);
+        this.logger.warn(
+          `[WsJwtGuard] Connection rejected: no token found in auth or query`,
+        );
         client.disconnect();
         return false;
       }
 
-      this.logger.debug(`[WsJwtGuard] Token received, length: ${(token as string).length}`);
+      this.logger.debug(
+        `[WsJwtGuard] Token received, length: ${(token as string).length}`,
+      );
       const payload = this.jwtService.verify(token as string);
       // Attach user info to socket data for downstream access
       client.data.user = {
@@ -36,7 +44,9 @@ export class WsJwtGuard implements CanActivate {
         restrictedWebMode: Boolean(payload.restrictedWebMode),
         deviceId: payload.deviceId ?? null,
       };
-      this.logger.log(`[WsJwtGuard] Auth success, user: ${payload.sub}, restrictedWebMode: ${payload.restrictedWebMode}`);
+      this.logger.log(
+        `[WsJwtGuard] Auth success, user: ${payload.sub}, restrictedWebMode: ${payload.restrictedWebMode}`,
+      );
       return true;
     } catch (err) {
       this.logger.warn(`[WsJwtGuard] Auth failed: ${err.message}`);

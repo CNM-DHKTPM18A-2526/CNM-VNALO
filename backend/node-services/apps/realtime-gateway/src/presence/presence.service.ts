@@ -4,7 +4,8 @@ import Redis from 'ioredis';
 
 const PRESENCE_KEY = (userId: string) => `presence:${userId}`;
 const ONLINE_SET = 'presence:online';
-const TYPING_SET_KEY = (conversationId: string) => `typing:${conversationId}:users`;
+const TYPING_SET_KEY = (conversationId: string) =>
+  `typing:${conversationId}:users`;
 const TTL_SECONDS = 60; // heartbeat, auto-expire if no ping
 
 @Injectable()
@@ -60,9 +61,9 @@ export class PresenceService {
   }
 
   /** Lấy bulk presence của nhiều user */
-  async getBulkPresence(userIds: string[]): Promise<
-    { userId: string; status: string; lastSeen: string | null }[]
-  > {
+  async getBulkPresence(
+    userIds: string[],
+  ): Promise<{ userId: string; status: string; lastSeen: string | null }[]> {
     return Promise.all(userIds.map((id) => this.getPresence(id)));
   }
 
@@ -72,7 +73,11 @@ export class PresenceService {
   }
 
   /** Cập nhật typing indicator (expire nhanh 5 giây) */
-  async setTyping(userId: string, conversationId: string, isTyping: boolean): Promise<void> {
+  async setTyping(
+    userId: string,
+    conversationId: string,
+    isTyping: boolean,
+  ): Promise<void> {
     const typingSetKey = TYPING_SET_KEY(conversationId);
     if (isTyping) {
       await this.redis.sadd(typingSetKey, userId);

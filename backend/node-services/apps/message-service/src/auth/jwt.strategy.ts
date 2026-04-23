@@ -5,7 +5,7 @@ import { Strategy, ExtractJwt } from 'passport-jwt';
 
 /** JWT payload structure matching core-service token format */
 export interface JwtPayload {
-  sub: string;      // account UUID
+  sub: string; // account UUID
   phone: string;
   iat: number;
   exp: number;
