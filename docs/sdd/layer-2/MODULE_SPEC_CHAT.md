@@ -287,7 +287,7 @@ All group state transitions auto-emit a `MessageType.SYSTEM` message to the conv
 
 | Task | Status | Priority | Notes |
 |---|---|---|---|
-| Rename `MemberRole.OWNER → ADMIN`, `ADMIN → DEPUTY` | Open | P0 | DB migration required |
+| Rename `MemberRole.OWNER → ADMIN`, `ADMIN → DEPUTY` | Done | P0 | DB migration required |
 | Guard ADMIN self-leave (must transfer first) | Open | P0 | Add check in removeMember |
 | Implement `disbandGroup()` service method | Open | P0 | Atomic cascade: DB + S3 |
 | Add `group.disbanded` WS event to chat.gateway | Open | P0 | New event |

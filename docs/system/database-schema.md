@@ -308,7 +308,7 @@ CREATE INDEX idx_conv_invite_link ON conversation(invite_link) WHERE invite_link
 CREATE TABLE conversation_member (
     conversation_id UUID NOT NULL,
     user_id UUID NOT NULL,
-    role VARCHAR(20) DEFAULT 'MEMBER' CHECK (role IN ('OWNER', 'ADMIN', 'MEMBER')),
+    role VARCHAR(20) DEFAULT 'MEMBER' CHECK (role IN ('ADMIN', 'DEPUTY', 'MEMBER')),
     nickname VARCHAR(50),
     joined_at TIMESTAMPTZ DEFAULT NOW(),
     joined_by UUID,
@@ -406,7 +406,7 @@ CREATE TABLE messages_by_conversation (
     conversation_id UUID,
     server_seq BIGINT,
     message_id UUID,
-    sender_id UUID,
+    sender_id UUID, -- Nullable for SYSTEM messages
     client_message_id UUID,
     message_type TEXT,
     content TEXT,
@@ -443,7 +443,7 @@ CREATE TABLE messages_by_conversation (
 ### 5.2 `message_idempotency_by_sender`
 ```cql
 CREATE TABLE message_idempotency_by_sender (
-    sender_id UUID,
+    sender_id UUID, -- Nullable for SYSTEM messages
     client_message_id UUID,
     conversation_id UUID,
     server_seq BIGINT,

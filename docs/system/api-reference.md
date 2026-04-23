@@ -94,10 +94,13 @@ Base path: `/api/v1`
 | GET | `/conversations/{id}` | Get conversation details | Yes |
 | PATCH | `/conversations/{id}` | Update group settings | Yes |
 | POST | `/conversations/{id}/members` | Add members to group | Yes |
-| DELETE | `/conversations/{id}/members/{uid}` | Remove/leave group | Yes |
+| DELETE | `/conversations/{id}/members/{uid}` | Remove group member (Admin/Deputy) | Yes |
+| POST | `/conversations/{id}/leave` | Self-leave group (Admin must transfer first) | Yes |
+| POST | `/conversations/{id}/auto-transfer` | Auto-transfer admin role or disband group | Yes |
+| DELETE | `/conversations/{id}` | Disband (permanently delete) group (Admin only) | Yes |
 | GET | `/conversations/{id}/members` | Get group members (member-only) | Yes |
 | POST | `/conversations/{id}/join` | Join by QR/invite id (OPEN) or create approval request (APPROVAL) | Yes |
-| GET | `/conversations/{id}/join-requests` | List pending join requests (admin/owner only) | Yes |
+| GET | `/conversations/{id}/join-requests` | List pending join requests (admin/deputy only) | Yes |
 | POST | `/conversations/{id}/join-requests/{uid}/approve` | Approve pending user into group | Yes |
 | DELETE | `/conversations/{id}/join-requests/{uid}` | Reject pending join request | Yes |
 
@@ -157,6 +160,7 @@ Namespace: `/chat` — Transports: `websocket`, `polling`
 | `message.send` | `{ conversationId, content, messageType, clientMessageId }` | `message.sent` / `message.error` | Send message (persisted + broadcast) |
 | `message.typing` | `{ conversationId, isTyping }` | — | Typing indicator (ignored if sender is not a member) |
 | `message.read` | `{ conversationId, lastReadSeq }` | — | Mark messages as read |
+| `group.updateSettings` | `{ conversationId, title, avatarUrl, ... }` | `group.settingsChanged` / `conversation.error` | Update group settings |
 
 ### Server → Client Events
 
@@ -166,6 +170,13 @@ Namespace: `/chat` — Transports: `websocket`, `polling`
 | `message.typing` | `{ userId, conversationId, isTyping }` | Someone is typing |
 | `message.read` | `{ userId, conversationId, lastReadSeq }` | Read receipt from another user |
 | `presence.changed` | `{ userId, status: 'online'/'offline' }` | User presence change |
+| `group.memberAdded` | `{ conversationId, addedBy, newMembers, conversation }` | Emitted when members join/are added |
+| `group.memberRemoved` | `{ conversationId, removedBy, removedUserId }` | Emitted when a member is kicked |
+| `group.memberLeft` | `{ conversationId, userId }` | Emitted when a member leaves |
+| `group.roleChanged` | `{ conversationId, updatedBy, targetUserId, newRole }` | Emitted when a member's role changes |
+| `group.adminTransferred` | `{ conversationId, oldAdminId, newAdminId }` | Emitted when group ownership changes |
+| `group.settingsChanged` | `{ conversationId, updatedBy, changes, conversation }` | Emitted when group settings change |
+| `group.disbanded` | `{ conversationId, disbandedBy }` | Emitted when the group is permanently deleted |
 
 ### Connection Flow
 
