@@ -20,9 +20,15 @@ describe('InboxService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         InboxService,
-        { provide: getRepositoryToken(ConversationInbox), useFactory: mockRepo },
+        {
+          provide: getRepositoryToken(ConversationInbox),
+          useFactory: mockRepo,
+        },
         { provide: getRepositoryToken(Conversation), useFactory: mockRepo },
-        { provide: getRepositoryToken(ConversationMember), useFactory: mockRepo },
+        {
+          provide: getRepositoryToken(ConversationMember),
+          useFactory: mockRepo,
+        },
       ],
     }).compile();
 
@@ -42,4 +48,3 @@ describe('InboxService', () => {
     });
   });
 });
-

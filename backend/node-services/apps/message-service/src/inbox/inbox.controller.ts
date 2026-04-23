@@ -21,7 +21,7 @@ export class InboxController {
   private buildAccessContext(user: AuthUser) {
     return {
       clientPlatform: user.clientPlatform ?? 'WEB',
-      restrictedWebMode: false,
+      restrictedWebMode: Boolean(user.restrictedWebMode),
       loginAtEpochSec: user.loginAtEpochSec,
     };
   }

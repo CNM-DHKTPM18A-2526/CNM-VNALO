@@ -2,8 +2,15 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { ConversationService } from '../src/conversation/conversation.service';
-import { Conversation, ConversationType, JoinMode } from '../src/entities/conversation.entity';
-import { ConversationMember, MemberRole } from '../src/entities/conversation-member.entity';
+import {
+  Conversation,
+  ConversationType,
+  JoinMode,
+} from '../src/entities/conversation.entity';
+import {
+  ConversationMember,
+  MemberRole,
+} from '../src/entities/conversation-member.entity';
 import { ConversationDirectMap } from '../src/entities/conversation-direct-map.entity';
 import { ConversationJoinRequest } from '../src/entities/conversation-join-request.entity';
 import { ConversationInbox } from '../src/entities/conversation-inbox.entity';
@@ -43,16 +50,31 @@ describe('ConversationService', () => {
       providers: [
         ConversationService,
         { provide: getRepositoryToken(Conversation), useFactory: mockRepo },
-        { provide: getRepositoryToken(ConversationMember), useFactory: mockRepo },
-        { provide: getRepositoryToken(ConversationDirectMap), useFactory: mockRepo },
-        { provide: getRepositoryToken(ConversationJoinRequest), useFactory: mockRepo },
-        { provide: getRepositoryToken(ConversationInbox), useFactory: mockRepo },
+        {
+          provide: getRepositoryToken(ConversationMember),
+          useFactory: mockRepo,
+        },
+        {
+          provide: getRepositoryToken(ConversationDirectMap),
+          useFactory: mockRepo,
+        },
+        {
+          provide: getRepositoryToken(ConversationJoinRequest),
+          useFactory: mockRepo,
+        },
+        {
+          provide: getRepositoryToken(ConversationInbox),
+          useFactory: mockRepo,
+        },
         {
           provide: DataSource,
           useValue: {
             transaction: jest.fn((cb) =>
               cb({
-                create: jest.fn().mockImplementation((_, data) => ({ id: mockConvId, ...data })),
+                create: jest.fn().mockImplementation((_, data) => ({
+                  id: mockConvId,
+                  ...data,
+                })),
                 save: jest.fn().mockImplementation((_, data) => {
                   if (Array.isArray(data)) return data;
                   return { id: mockConvId, ...data };
@@ -77,16 +99,26 @@ describe('ConversationService', () => {
 
   describe('createDirect', () => {
     it('should throw if creating conversation with yourself', async () => {
-      await expect(service.createDirect(mockUserId, mockUserId)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.createDirect(mockUserId, mockUserId),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('should return existing conversation if direct map exists', async () => {
-      const existingMap = { userId1: mockUserId, userId2: mockTargetId, conversationId: mockConvId };
+      const existingMap = {
+        userId1: mockUserId,
+        userId2: mockTargetId,
+        conversationId: mockConvId,
+      };
       directMapRepo.findOne.mockResolvedValue(existingMap as any);
-      conversationRepo.findOne.mockResolvedValue({ id: mockConvId, type: ConversationType.DIRECT } as any);
-      memberRepo.findOne.mockResolvedValue({ conversationId: mockConvId, userId: mockUserId } as any);
+      conversationRepo.findOne.mockResolvedValue({
+        id: mockConvId,
+        type: ConversationType.DIRECT,
+      } as any);
+      memberRepo.findOne.mockResolvedValue({
+        conversationId: mockConvId,
+        userId: mockUserId,
+      } as any);
       memberRepo.find.mockResolvedValue([]);
 
       const result = await service.createDirect(mockUserId, mockTargetId);
@@ -97,8 +129,14 @@ describe('ConversationService', () => {
     it('should create new conversation if no direct map exists', async () => {
       directMapRepo.findOne.mockResolvedValue(null);
       // After transaction, getConversation will be called
-      conversationRepo.findOne.mockResolvedValue({ id: mockConvId, type: ConversationType.DIRECT } as any);
-      memberRepo.findOne.mockResolvedValue({ conversationId: mockConvId, userId: mockUserId } as any);
+      conversationRepo.findOne.mockResolvedValue({
+        id: mockConvId,
+        type: ConversationType.DIRECT,
+      } as any);
+      memberRepo.findOne.mockResolvedValue({
+        conversationId: mockConvId,
+        userId: mockUserId,
+      } as any);
       memberRepo.find.mockResolvedValue([]);
 
       const result = await service.createDirect(mockUserId, mockTargetId);
@@ -109,13 +147,18 @@ describe('ConversationService', () => {
   describe('assertMember', () => {
     it('should throw ForbiddenException if user is not a member', async () => {
       memberRepo.findOne.mockResolvedValue(null);
-      await expect(service.assertMember(mockConvId, mockUserId)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.assertMember(mockConvId, mockUserId),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('should return member if active', async () => {
-      const member = { conversationId: mockConvId, userId: mockUserId, role: MemberRole.MEMBER, leftAt: null };
+      const member = {
+        conversationId: mockConvId,
+        userId: mockUserId,
+        role: MemberRole.MEMBER,
+        leftAt: null,
+      };
       memberRepo.findOne.mockResolvedValue(member as any);
       const result = await service.assertMember(mockConvId, mockUserId);
       expect(result.userId).toBe(mockUserId);
@@ -124,18 +167,24 @@ describe('ConversationService', () => {
 
   describe('updateGroup', () => {
     it('should throw if conversation is DIRECT', async () => {
-      conversationRepo.findOne.mockResolvedValue({ id: mockConvId, type: ConversationType.DIRECT } as any);
-      await expect(service.updateGroup(mockConvId, mockUserId, { title: 'test' })).rejects.toThrow(
-        BadRequestException,
-      );
+      conversationRepo.findOne.mockResolvedValue({
+        id: mockConvId,
+        type: ConversationType.DIRECT,
+      } as any);
+      await expect(
+        service.updateGroup(mockConvId, mockUserId, { title: 'test' }),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw if user is not admin/owner', async () => {
-      conversationRepo.findOne.mockResolvedValue({ id: mockConvId, type: ConversationType.GROUP } as any);
+      conversationRepo.findOne.mockResolvedValue({
+        id: mockConvId,
+        type: ConversationType.GROUP,
+      } as any);
       memberRepo.findOne.mockResolvedValue({ role: MemberRole.MEMBER } as any);
-      await expect(service.updateGroup(mockConvId, mockUserId, { title: 'test' })).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.updateGroup(mockConvId, mockUserId, { title: 'test' }),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -150,13 +199,23 @@ describe('ConversationService', () => {
       } as any);
 
       memberRepo.findOne
-        .mockResolvedValueOnce({ userId: mockUserId, role: MemberRole.MEMBER, leftAt: null } as any)
+        .mockResolvedValueOnce({
+          userId: mockUserId,
+          role: MemberRole.MEMBER,
+          leftAt: null,
+        } as any)
         .mockResolvedValueOnce(null as any)
-        .mockResolvedValueOnce({ userId: mockUserId, role: MemberRole.MEMBER, leftAt: null } as any);
+        .mockResolvedValueOnce({
+          userId: mockUserId,
+          role: MemberRole.MEMBER,
+          leftAt: null,
+        } as any);
 
       memberRepo.find.mockResolvedValue([] as any);
 
-      const result = await service.addMembers(mockConvId, mockUserId, [mockTargetId]);
+      const result = await service.addMembers(mockConvId, mockUserId, [
+        mockTargetId,
+      ]);
 
       expect(result.status).toBe('PENDING_APPROVAL');
       expect(result.pendingApprovals).toContain(mockTargetId);
@@ -183,19 +242,29 @@ describe('ConversationService', () => {
   describe('getMembers', () => {
     it('should require requester to be a member', async () => {
       memberRepo.findOne.mockResolvedValue(null as any);
-      await expect(service.getMembers(mockConvId, mockUserId)).rejects.toThrow(ForbiddenException);
+      await expect(service.getMembers(mockConvId, mockUserId)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
   });
 
   describe('removeMember', () => {
     it('should throw if non-admin tries to remove another member', async () => {
       memberRepo.findOne
-        .mockResolvedValueOnce({ userId: mockUserId, role: MemberRole.MEMBER, leftAt: null } as any)
-        .mockResolvedValueOnce({ userId: mockTargetId, role: MemberRole.MEMBER, leftAt: null } as any);
+        .mockResolvedValueOnce({
+          userId: mockUserId,
+          role: MemberRole.MEMBER,
+          leftAt: null,
+        } as any)
+        .mockResolvedValueOnce({
+          userId: mockTargetId,
+          role: MemberRole.MEMBER,
+          leftAt: null,
+        } as any);
 
-      await expect(service.removeMember(mockConvId, mockUserId, mockTargetId)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.removeMember(mockConvId, mockUserId, mockTargetId),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 });

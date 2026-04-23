@@ -74,6 +74,7 @@ export class MessageService {
 
     // Verify sender is a member
     await this.conversationService.assertMember(dto.conversationId, userId);
+    await this.assertNotBlockedForSend(dto.conversationId, userId);
 
     // Validate content based on message type
     this.validateMessageContent(dto);
@@ -168,6 +169,15 @@ export class MessageService {
       .createQueryBuilder('m')
       .where('m.conversation_id = :cid', { cid: conversationId })
       .andWhere(
+        `NOT EXISTS (
+          SELECT 1
+          FROM block_list b
+          WHERE (b.blocker_id = :userId::uuid AND b.blocked_id = m.sender_id)
+             OR (b.blocker_id = m.sender_id AND b.blocked_id = :userId::uuid)
+        )`,
+        { userId },
+      )
+      .andWhere(
         `NOT (:userId::uuid = ANY(COALESCE(m.hidden_by_users, ARRAY[]::uuid[])))`,
         { userId },
       )
@@ -223,6 +233,15 @@ export class MessageService {
     const qb = this.messageRepo
       .createQueryBuilder('m')
       .where('m.conversation_id = :cid', { cid: conversationId })
+      .andWhere(
+        `NOT EXISTS (
+          SELECT 1
+          FROM block_list b
+          WHERE (b.blocker_id = :userId::uuid AND b.blocked_id = m.sender_id)
+             OR (b.blocker_id = m.sender_id AND b.blocked_id = :userId::uuid)
+        )`,
+        { userId },
+      )
       .andWhere('m.status != :recalled', { recalled: MessageStatus.RECALLED })
       .andWhere(
         `NOT (:userId::uuid = ANY(COALESCE(m.hidden_by_users, ARRAY[]::uuid[])))`,
@@ -677,6 +696,40 @@ export class MessageService {
       MessageType.VIDEO,
       MessageType.AUDIO,
     ].includes(messageType);
+  }
+
+  private async assertNotBlockedForSend(
+    conversationId: string,
+    userId: string,
+  ): Promise<void> {
+    const members = await this.memberRepo.find({
+      where: { conversationId, leftAt: IsNull() },
+      select: ['userId'],
+    });
+    const counterpartIds = (members ?? [])
+      .map((member) => member.userId)
+      .filter((memberId) => memberId !== userId);
+
+    // Block semantics currently apply strictly to direct conversations.
+    if (counterpartIds.length !== 1) {
+      return;
+    }
+
+    const [counterpartId] = counterpartIds;
+    const result = await this.dataSource.query(
+      `SELECT EXISTS (
+         SELECT 1
+         FROM block_list b
+         WHERE (b.blocker_id = $1::uuid AND b.blocked_id = $2::uuid)
+            OR (b.blocker_id = $2::uuid AND b.blocked_id = $1::uuid)
+       ) AS blocked`,
+      [userId, counterpartId],
+    );
+    if (Boolean(result?.[0]?.blocked)) {
+      throw new ForbiddenException(
+        'Cannot send message because one side has blocked the other.',
+      );
+    }
   }
 
   /**

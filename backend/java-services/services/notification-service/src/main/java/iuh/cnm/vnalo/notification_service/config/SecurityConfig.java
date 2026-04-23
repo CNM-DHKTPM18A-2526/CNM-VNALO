@@ -1,6 +1,6 @@
-package iuh.cnm.vnalo.content_service.config;
+package iuh.cnm.vnalo.notification_service.config;
 
-import iuh.cnm.vnalo.content_service.security.JwtAuthenticationFilter;
+import iuh.cnm.vnalo.notification_service.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -26,7 +26,8 @@ public class SecurityConfig {
                                 "/actuator/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
-                                "/v3/api-docs/**"
+                                "/v3/api-docs/**",
+                                "/api/v1/notifications/public/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
