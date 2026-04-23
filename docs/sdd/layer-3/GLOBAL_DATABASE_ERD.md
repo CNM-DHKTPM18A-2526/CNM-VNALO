@@ -164,7 +164,7 @@ erDiagram
       uuid message_id PK
       uuid conversation_id
       bigint server_seq
-      uuid sender_id
+      uuid sender_id "Nullable for SYSTEM messages"
       string message_type
       string status
       uuid reply_to_message_id
@@ -446,7 +446,7 @@ erDiagram
 
 | Change | Decision | Priority |
 |---|---|---|
-| Rename `MemberRole.OWNER → ADMIN`, `ADMIN → DEPUTY` in enum | D-011 | P0 |
+| Rename `MemberRole.OWNER → ADMIN`, `ADMIN → DEPUTY` in enum | D-011 | Done |
 | Add `only_admin_can_post` to CONVERSATION | Business audit 2026-04-22 | P1 |
 | Add `allow_member_invite / pin / edit_info` to CONVERSATION | Business audit 2026-04-22 | P1 |
 | Add `block_and_hide_logs` to BLOCK_LIST | Business audit 2026-04-22 | P1 |

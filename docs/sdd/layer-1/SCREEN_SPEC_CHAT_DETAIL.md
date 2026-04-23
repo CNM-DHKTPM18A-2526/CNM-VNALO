@@ -25,7 +25,7 @@ Render real-time conversation state with stable pagination, reactions, pinning, 
 
 ## Input Contract
 
-- If group is read-only for members and current role is not OWNER or ADMIN, hide ChatInputBar and show read-only banner.
+- If group is read-only for members and current role is not ADMIN or DEPUTY, hide ChatInputBar and show read-only banner.
 - Otherwise show ChatInputBar with send callback.
 - Supports prefilledText for AI SEND_MESSAGE flow.
 

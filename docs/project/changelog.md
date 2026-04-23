@@ -130,7 +130,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ### Historical Notes (already shipped in earlier milestones)
 - **V12 Migration**: Added `hidden_by_users` array (UUID[]) to `message` table.
 - **Delete For Me Feature** (Xóa ở máy tôi): Endpoint `DELETE /messages/:id/for-me` implemented.
-- **Admin Recall** (Xóa cho cả nhóm): Group `OWNER` and `ADMIN` can recall member messages in-group.
+- **Admin Recall** (Xóa cho cả nhóm): Group `ADMIN` and `DEPUTY` can recall member messages in-group.
 
 ## [2026-03-04] — V11 Migration & Performance Tune
 
