@@ -279,6 +279,9 @@ export class ConversationService {
           userId: memberId,
           role: MemberRole.MEMBER,
           joinedBy: userId,
+          leftAt: null,
+          removedBy: null,
+          joinedAt: new Date(),
         });
       }
     }
@@ -398,6 +401,9 @@ export class ConversationService {
         userId,
         role: MemberRole.MEMBER,
         joinedBy: null,
+        leftAt: null,
+        removedBy: null,
+        joinedAt: new Date(),
       });
       return { status: 'JOINED', conversationId, userId };
     }
@@ -465,6 +471,9 @@ export class ConversationService {
         userId: targetUserId,
         role: MemberRole.MEMBER,
         joinedBy: approverId,
+        leftAt: null,
+        removedBy: null,
+        joinedAt: new Date(),
       });
       await manager.delete(ConversationJoinRequest, {
         conversationId,
