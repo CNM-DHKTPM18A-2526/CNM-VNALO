@@ -543,6 +543,55 @@ export class ConversationService {
     return { status: 'LEFT', conversationId };
   }
 
+  /**
+   * G-017: Auto-transfer admin role or disband group if no eligible successor.
+   * Called when the current ADMIN needs to be removed forcefully (e.g. account deletion,
+   * inactive-admin cleanup job, or admin self-forced exit).
+   *
+   * Priority: DEPUTY (oldest joinedAt first) → MEMBER (oldest joinedAt) → disband
+   *
+   * @param conversationId - the group to process
+   * @param currentAdminId - the admin being removed/stepping down
+   * @returns { action: 'TRANSFERRED' | 'DISBANDED', newAdminId?: string }
+   */
+  async autoTransferOrDisbandGroup(
+    conversationId: string,
+    currentAdminId: string,
+  ): Promise<{ action: 'TRANSFERRED' | 'DISBANDED'; newAdminId?: string }> {
+    const conversation = await this.getConversationOrFail(conversationId);
+    if (conversation.type !== ConversationType.GROUP) {
+      throw new BadRequestException('Not a group conversation');
+    }
+
+    // Find active members excluding the current admin, ordered by seniority
+    const candidates = await this.memberRepo.find({
+      where: { conversationId, leftAt: IsNull() },
+      order: { joinedAt: 'ASC' },
+    });
+
+    const others = candidates.filter((m) => m.userId !== currentAdminId);
+
+    if (others.length === 0) {
+      // No other members — disband the group
+      await this.disbandGroup(conversationId, currentAdminId);
+      return { action: 'DISBANDED' };
+    }
+
+    // Prefer existing DEPUTY, else promote oldest MEMBER
+    const successor =
+      others.find((m) => m.role === MemberRole.DEPUTY) ?? others[0];
+
+    // Promote successor to ADMIN
+    await this.updateMember(conversationId, currentAdminId, successor.userId, {
+      role: MemberRole.ADMIN,
+    });
+
+    this.logger.log(
+      `[autoTransfer] Group ${conversationId}: admin transferred from ${currentAdminId} to ${successor.userId}`,
+    );
+    return { action: 'TRANSFERRED', newAdminId: successor.userId };
+  }
+
   /** Verify user is an active member. Throws if not. */
   async assertMember(
     conversationId: string,
@@ -617,15 +666,17 @@ export class ConversationService {
     if (!member) throw new NotFoundException('Member not found');
 
     const isSelf = requesterId === targetUserId;
-    if (!isSelf) {
+
+    if (dto.role !== undefined && !isSelf) {
+      // B-7: Only check assertIsAdmin for role changes — avoids double DB assertMember
+      await this.assertIsAdmin(conversationId, requesterId);
+    } else if (!isSelf) {
+      // For nickname-only changes by others, admin/deputy is sufficient
       await this.assertAdminOrDeputy(conversationId, requesterId);
     }
 
     if (dto.nickname !== undefined) member.nickname = dto.nickname;
     if (dto.role !== undefined && !isSelf) {
-      // Only ADMIN can change roles; DEPUTYs cannot promote/demote others
-      await this.assertIsAdmin(conversationId, requesterId);
-
       if (dto.role === MemberRole.ADMIN) {
         // Admin transfer: demote current admin to MEMBER first
         const currentAdmin = await this.memberRepo.findOne({
@@ -688,8 +739,10 @@ export class ConversationService {
     // Only ADMIN (group owner) can disband — D-012
     await this.assertIsAdmin(conversationId, userId);
 
-    // Get all member IDs before deletion for inbox cleanup
-    const members = await this.memberRepo.find({ where: { conversationId } });
+    // Collect ACTIVE member IDs before deletion (B-5: filter leftAt IS NULL)
+    const members = await this.memberRepo.find({
+      where: { conversationId, leftAt: IsNull() },
+    });
     const memberUserIds = members.map((m) => m.userId);
 
     await this.dataSource.transaction(async (manager) => {

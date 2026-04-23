@@ -401,6 +401,68 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  /**
+   * G-016: Update group settings and emit group.settingsChanged to all room members.
+   * Allows ADMIN/DEPUTY to update: title, avatar, joinMode, memberLimit,
+   * allowMemberInvite, allowMemberPin, allowMemberEditInfo.
+   * Only ADMIN can update: onlyAdminCanPost (handled inside updateGroup).
+   */
+  @SubscribeMessage('group.updateSettings')
+  async handleGroupUpdateSettings(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: {
+      conversationId: string;
+      title?: string;
+      avatarUrl?: string;
+      description?: string;
+      joinMode?: string;
+      memberLimit?: number;
+      allowMemberInvite?: boolean;
+      allowMemberPin?: boolean;
+      allowMemberEditInfo?: boolean;
+      onlyAdminCanPost?: boolean;
+    },
+  ) {
+    const userId = client.data.user.userId;
+    const { conversationId, ...dto } = data ?? {};
+
+    if (!conversationId) {
+      return {
+        event: 'conversation.error',
+        data: { error: 'Missing conversationId' },
+      };
+    }
+
+    try {
+      const updated = await this.conversationService.updateGroup(
+        conversationId,
+        userId,
+        dto as any,
+      );
+
+      const room = this.getConversationRoom(conversationId);
+      const payload = {
+        conversationId,
+        updatedBy: userId,
+        changes: dto,
+        conversation: updated,
+      };
+
+      this.server.to(room).emit('group.settingsChanged', payload);
+      this.logger.log(
+        `[Gateway.updateSettings] Group ${conversationId} settings updated by ${userId}`,
+      );
+
+      return { event: 'group.settingsChanged', data: payload };
+    } catch (err) {
+      this.logger.error(
+        `[Gateway.updateSettings] Failed: ${err.message}`,
+      );
+      return { event: 'conversation.error', data: { error: err.message } };
+    }
+  }
+
   private async forwardCallSignal(
     client: Socket,
     type: 'offer' | 'answer' | 'ice-candidate' | 'end',

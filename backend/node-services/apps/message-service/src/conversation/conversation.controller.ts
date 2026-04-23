@@ -145,6 +145,19 @@ export class ConversationController {
     return this.conversationService.leaveGroup(id, user.userId);
   }
 
+  /**
+   * G-017: Auto-transfer admin role or disband group if no eligible successor.
+   * Useful when an admin wants to step down without choosing a specific target,
+   * or when called by a background cleanup job for inactive admins.
+   */
+  @Post(':id/auto-transfer')
+  autoTransferOrDisbandGroup(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ) {
+    return this.conversationService.autoTransferOrDisbandGroup(id, user.userId);
+  }
+
   /** Disband (permanently delete) a group. Only group ADMIN. D-012. */
   @Delete(':id')
   disbandGroup(@CurrentUser() user: AuthUser, @Param('id') id: string) {

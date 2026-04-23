@@ -698,17 +698,19 @@ export class MessageService {
       const msg = manager.create(Message, {
         conversationId,
         serverSeq,
-        senderId: 'system',
+        // B-1: SYSTEM messages have no real sender (sender_id is nullable for type=SYSTEM)
+        senderId: null,
         clientMessageId: null,
         messageType: MessageType.SYSTEM,
         content,
         status: MessageStatus.SENT,
       });
+
       const persisted = await manager.save(msg);
 
-      // Update inbox for all active members
+      // Update inbox for all active members (B-4: use IsNull() not null-cast)
       const activeMembers = await manager.find(ConversationMember, {
-        where: { conversationId, leftAt: null as unknown as Date },
+        where: { conversationId, leftAt: IsNull() },
       });
 
       for (const member of activeMembers) {
