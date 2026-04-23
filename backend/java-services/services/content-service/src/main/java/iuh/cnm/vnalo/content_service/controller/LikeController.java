@@ -3,6 +3,7 @@ package iuh.cnm.vnalo.content_service.controller;
 import iuh.cnm.vnalo.content_service.service.LikeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -13,22 +14,26 @@ import java.util.UUID;
 public class LikeController {
 
     private final LikeService likeService;
+    
+    private UUID currentUserId(Authentication authentication) {
+        return UUID.fromString(authentication.getName());
+    }
 
     @PostMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void likePost(
             @PathVariable UUID postId,
-            @RequestHeader("X-User-Id") UUID userId
+            Authentication authentication
     ) {
-        likeService.likePost(postId, userId);
+        likeService.likePost(postId, currentUserId(authentication));
     }
 
     @DeleteMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void unlikePost(
             @PathVariable UUID postId,
-            @RequestHeader("X-User-Id") UUID userId
+            Authentication authentication
     ) {
-        likeService.unlikePost(postId, userId);
+        likeService.unlikePost(postId, currentUserId(authentication));
     }
 }

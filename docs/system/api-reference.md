@@ -19,11 +19,27 @@ Base path: `/api/v1`
 |--------|------|-------------|------|
 | POST | `/auth/register/send-otp` | Send OTP for registration | No |
 | POST | `/auth/register` | Register with OTP + password | No |
+| POST | `/auth/register/verify-otp` | Verify registration OTP before final submit | No |
 | POST | `/auth/login` | Login (phone + password → JWT) | No |
 | POST | `/auth/refresh` | Refresh access token | No |
 | POST | `/auth/logout` | Revoke refresh token | Yes |
 | POST | `/auth/logout-all` | Revoke all refresh tokens | Yes |
+| GET | `/auth/login-devices` | Get login device history | Yes |
+| GET | `/auth/session-audit` | Get session transition audit log | Yes |
 | GET | `/auth/otp/status` | Check OTP config status | No |
+| POST | `/auth/change-password` | Change password for authenticated user | Yes |
+| POST | `/auth/forgot-password` | Send password reset OTP | No |
+| POST | `/auth/reset-password` | Reset password via OTP | No |
+| GET | `/auth/check-phone/{phone}` | Check whether phone is registered | No |
+
+### Auth QR — `/auth/qr`
+
+| Method | Path | Description | Auth |
+|--------|------|-------------|------|
+| POST | `/auth/qr/sessions` | Create QR login session | No |
+| GET | `/auth/qr/sessions/{token}` | Poll QR login session | No |
+| GET | `/auth/qr/sessions/{token}/preview` | Get mobile approval preview | No |
+| POST | `/auth/qr/sessions/{token}/approve` | Approve QR login from mobile | Yes |
 
 ### Users — `/users`
 
@@ -33,8 +49,12 @@ Base path: `/api/v1`
 | GET | `/users/{userId}` | Get user by ID | Yes |
 | PATCH | `/users/me` | Update profile | Yes |
 | GET | `/users/search?keyword=` | Search users (paginated) | Yes |
+| GET | `/users/phone/{phoneNumber}` | Exact phone lookup (path form) | Yes |
+| GET | `/users/search-by-phone?phone=` | Exact phone lookup (query form) | Yes |
 | GET | `/users/me/privacy` | Get privacy settings | Yes |
 | PUT | `/users/me/privacy` | Update privacy settings | Yes |
+| GET | `/users/me/settings/sync` | Get sync control policy | Yes |
+| PUT | `/users/me/settings/sync` | Update sync control policy | Yes |
 
 ### Friends — `/friends`
 

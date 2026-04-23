@@ -149,16 +149,12 @@ Web sessions initiated via QR login carry `restrictedWebMode=true` in the JWT.
 > **Client-side**: `isRestrictedWebToken(accessToken)` parses JWT and sets `isRestrictedMode` flag.
 > **Backend enforcement**: Additional guard in `message.service` checks `access.restrictedWebMode`.
 
-### 4.4 Delete for Me (localStorage Persistence)
+### 4.4 Delete for Me (Backend + localStorage)
 
-Unlike mobile (SQLite + `hiddenByUsers` DB array), web stores delete-for-me locally:
-- Key: `vnalo:chat:deleted-for-me:{userId}` in localStorage.
-- Stores array of messageIds.
-- Persists across browser sessions.
-- NOT synced with backend or across devices.
-
-> [!IMPORTANT]
-> **Platform divergence**: Mobile "delete for me" writes `hiddenByUsers` to DB (synced across devices). Web "delete for me" is localStorage-only (device-local). This inconsistency should be aligned in a future milestone.
+Web now calls backend hide endpoint and keeps a local fallback cache:
+- API: `DELETE /messages/{id}/for-me` to persist `hiddenByUsers` on server.
+- localStorage key `vnalo:chat:deleted-for-me:{userId}` still exists for optimistic/offline UI behavior.
+- Primary source of truth is backend history filtering; localStorage is no longer the only mechanism.
 
 ### 4.5 Message Deduplication
 
@@ -202,9 +198,9 @@ LoginPage → POST /auth/login {phone, password}
 ### 6.2 QR Login
 
 ```
-QrLoginPage → GET /auth/qr/session → {qrToken}
-           → Display QR code embedding qrToken
-           → Poll /auth/qr/session/{token} until status=APPROVED
+QrLoginPage → POST /auth/qr/sessions → {token, expiresAt, status}
+           → Display QR code embedding token
+           → Poll /auth/qr/sessions/{token} until status=APPROVED
            → On APPROVED: receive {accessToken, refreshToken}
            → Parse JWT: if restrictedWebMode=true → setIsRestrictedMode(true)
            → Navigate to /chat (restricted mode active)
@@ -213,18 +209,17 @@ QrLoginPage → GET /auth/qr/session → {qrToken}
 ### 6.3 Registration
 
 ```
-RegisterPage → POST /auth/register/initiate {phone}
-            → POST /auth/register/verify-otp {phone, otp}
-            → POST /auth/register/complete {phone, password, displayName, avatarUrl?}
+RegisterPage → POST /auth/register/send-otp {phone, email}
+            → POST /auth/register/verify-otp {email, otp}
+            → POST /auth/register {phone, email, password, displayName, otp?}
             → Auto-login → Navigate to /chat
 ```
 
 ### 6.4 Forgot Password
 
 ```
-ForgotPasswordPage → POST /auth/forgot-password/initiate {phone}
-                  → POST /auth/forgot-password/verify-otp {phone, otp}
-                  → POST /auth/forgot-password/reset {phone, newPassword}
+ForgotPasswordPage → POST /auth/forgot-password {email}
+                  → POST /auth/reset-password {email, otp, newPassword}
                   → Navigate to /login
 ```
 
