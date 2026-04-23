@@ -1,7 +1,11 @@
 import {
-  WebSocketGateway, WebSocketServer,
-  SubscribeMessage, OnGatewayConnection, OnGatewayDisconnect,
-  MessageBody, ConnectedSocket,
+  WebSocketGateway,
+  WebSocketServer,
+  SubscribeMessage,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  MessageBody,
+  ConnectedSocket,
 } from '@nestjs/websockets';
 import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
@@ -30,7 +34,9 @@ import { PresenceService } from '../presence/presence.service';
   namespace: '/realtime',
   transports: ['websocket', 'polling'],
 })
-export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class RealtimeGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server: Server;
 
@@ -119,9 +125,14 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   ) {
     // Giới hạn số rooms để tránh memory leak
     const MAX_ROOMS = 50;
-    const currentRooms = [...client.rooms].filter(r => r.startsWith('conversation:'));
+    const currentRooms = [...client.rooms].filter((r) =>
+      r.startsWith('conversation:'),
+    );
     if (currentRooms.length >= MAX_ROOMS) {
-      return { event: 'error', data: { message: 'Exceeded max conversation limit' } };
+      return {
+        event: 'error',
+        data: { message: 'Exceeded max conversation limit' },
+      };
     }
 
     const room = `conversation:${data.conversationId}`;
@@ -135,7 +146,10 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       lastSeen: new Date().toISOString(),
     });
 
-    return { event: 'conversation.joined', data: { conversationId: data.conversationId } };
+    return {
+      event: 'conversation.joined',
+      data: { conversationId: data.conversationId },
+    };
   }
 
   @SubscribeMessage('conversation.leave')
@@ -145,16 +159,19 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   ) {
     const room = `conversation:${data.conversationId}`;
     await client.leave(room);
-    return { event: 'conversation.left', data: { conversationId: data.conversationId } };
+    return {
+      event: 'conversation.left',
+      data: { conversationId: data.conversationId },
+    };
   }
 
   // ─── Presence ─────────────────────────────────────────────────────────
 
   @SubscribeMessage('presence.get')
-  async handleGetPresence(
-    @MessageBody() data: { userIds: string[] },
-  ) {
-    const presenceList = await this.presenceService.getBulkPresence(data.userIds);
+  async handleGetPresence(@MessageBody() data: { userIds: string[] }) {
+    const presenceList = await this.presenceService.getBulkPresence(
+      data.userIds,
+    );
     return { event: 'presence.list', data: presenceList };
   }
 
@@ -217,6 +234,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   isUserOnline(userId: string): boolean {
-    return this.userSockets.has(userId) && this.userSockets.get(userId)!.size > 0;
+    return (
+      this.userSockets.has(userId) && this.userSockets.get(userId)!.size > 0
+    );
   }
 }

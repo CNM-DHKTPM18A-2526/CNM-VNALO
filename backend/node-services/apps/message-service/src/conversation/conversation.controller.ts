@@ -1,5 +1,12 @@
 import {
-  Controller, Post, Get, Patch, Delete, Param, Body, UseGuards,
+  Controller,
+  Post,
+  Get,
+  Patch,
+  Delete,
+  Param,
+  Body,
+  UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../auth/user.decorator';
@@ -15,12 +22,18 @@ export class ConversationController {
   constructor(private readonly conversationService: ConversationService) {}
 
   @Post('direct')
-  createDirect(@CurrentUser() user: AuthUser, @Body() dto: CreateDirectConversationDto) {
+  createDirect(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: CreateDirectConversationDto,
+  ) {
     return this.conversationService.createDirect(user.userId, dto.targetUserId);
   }
 
   @Post('group')
-  createGroup(@CurrentUser() user: AuthUser, @Body() dto: CreateGroupConversationDto) {
+  createGroup(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: CreateGroupConversationDto,
+  ) {
     return this.conversationService.createGroup(user.userId, dto);
   }
 
@@ -77,7 +90,11 @@ export class ConversationController {
     @Param('id') id: string,
     @Param('userId') targetUserId: string,
   ) {
-    return this.conversationService.approveJoinRequest(id, user.userId, targetUserId);
+    return this.conversationService.approveJoinRequest(
+      id,
+      user.userId,
+      targetUserId,
+    );
   }
 
   @Delete(':id/join-requests/:userId')
@@ -86,7 +103,11 @@ export class ConversationController {
     @Param('id') id: string,
     @Param('userId') targetUserId: string,
   ) {
-    return this.conversationService.rejectJoinRequest(id, user.userId, targetUserId);
+    return this.conversationService.rejectJoinRequest(
+      id,
+      user.userId,
+      targetUserId,
+    );
   }
 
   @Patch(':id/member/:targetUserId')
@@ -96,7 +117,12 @@ export class ConversationController {
     @Param('targetUserId') targetUserId: string,
     @Body() dto: { nickname?: string; role?: string },
   ) {
-    return this.conversationService.updateMember(id, user.userId, targetUserId, dto);
+    return this.conversationService.updateMember(
+      id,
+      user.userId,
+      targetUserId,
+      dto,
+    );
   }
 
   @Patch(':id/wallpaper')
@@ -105,6 +131,36 @@ export class ConversationController {
     @Param('id') id: string,
     @Body() dto: { wallpaperUrl: string; isGlobal?: boolean },
   ) {
-    return this.conversationService.updateWallpaper(id, user.userId, dto.wallpaperUrl, dto.isGlobal ?? true);
+    return this.conversationService.updateWallpaper(
+      id,
+      user.userId,
+      dto.wallpaperUrl,
+      dto.isGlobal ?? true,
+    );
+  }
+
+  /** Leave a group conversation. G-013. Delegates to removeMember (self-removal). */
+  @Post(':id/leave')
+  leaveGroup(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.conversationService.leaveGroup(id, user.userId);
+  }
+
+  /**
+   * G-017: Auto-transfer admin role or disband group if no eligible successor.
+   * Useful when an admin wants to step down without choosing a specific target,
+   * or when called by a background cleanup job for inactive admins.
+   */
+  @Post(':id/auto-transfer')
+  autoTransferOrDisbandGroup(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ) {
+    return this.conversationService.autoTransferOrDisbandGroup(id, user.userId);
+  }
+
+  /** Disband (permanently delete) a group. Only group ADMIN. D-012. */
+  @Delete(':id')
+  disbandGroup(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.conversationService.disbandGroup(id, user.userId);
   }
 }

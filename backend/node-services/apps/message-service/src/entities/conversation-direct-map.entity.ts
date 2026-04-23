@@ -1,4 +1,10 @@
-import { Entity, PrimaryColumn, Column, CreateDateColumn, Index } from 'typeorm';
+import {
+  Entity,
+  PrimaryColumn,
+  Column,
+  CreateDateColumn,
+  Index,
+} from 'typeorm';
 
 /** Maps a pair of users to their direct (1:1) conversation. user_id_1 < user_id_2 enforced at service layer. */
 @Entity('conversation_direct_map')

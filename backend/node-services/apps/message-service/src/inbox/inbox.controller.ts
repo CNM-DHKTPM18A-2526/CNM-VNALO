@@ -1,4 +1,13 @@
-import { Controller, Get, Query, Patch, Delete, Param, Body, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Query,
+  Patch,
+  Delete,
+  Param,
+  Body,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../auth/user.decorator';
 import { InboxService } from './inbox.service';
@@ -24,13 +33,21 @@ export class InboxController {
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
   ) {
-    return this.inboxService.getInbox(user.userId, limit, offset, this.buildAccessContext(user));
+    return this.inboxService.getInbox(
+      user.userId,
+      limit,
+      offset,
+      this.buildAccessContext(user),
+    );
   }
 
   /** Get total unread count badge number. */
   @Get('unread-count')
   getUnreadCount(@CurrentUser() user: AuthUser) {
-    return this.inboxService.getTotalUnreadCount(user.userId, this.buildAccessContext(user));
+    return this.inboxService.getTotalUnreadCount(
+      user.userId,
+      this.buildAccessContext(user),
+    );
   }
 
   /** Update personal settings for a conversation (Pin/Mute/Hide). */

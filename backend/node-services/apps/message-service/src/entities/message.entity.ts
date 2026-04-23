@@ -1,5 +1,9 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index,
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  Index,
   Unique,
 } from 'typeorm';
 
@@ -10,7 +14,7 @@ export enum MessageType {
   FILE = 'FILE',
   AUDIO = 'AUDIO',
   STICKER = 'STICKER',
-  SYSTEM = 'SYSTEM',       // join/leave/rename events
+  SYSTEM = 'SYSTEM', // join/leave/rename events
   REPLY = 'REPLY',
   FORWARD = 'FORWARD',
 }
@@ -18,7 +22,7 @@ export enum MessageType {
 export enum MessageStatus {
   SENT = 'SENT',
   DELIVERED = 'DELIVERED',
-  RECALLED = 'RECALLED',   // soft-deleted by sender
+  RECALLED = 'RECALLED', // soft-deleted by sender
 }
 
 @Entity('message')
@@ -37,14 +41,20 @@ export class Message {
   @Column({ name: 'server_seq', type: 'bigint' })
   serverSeq: number;
 
-  @Column({ name: 'sender_id', type: 'uuid' })
-  senderId: string;
+  @Column({ name: 'sender_id', type: 'uuid', nullable: true })
+  senderId: string | null;
 
   /** Client-generated UUID for idempotency */
   @Column({ name: 'client_message_id', type: 'uuid', nullable: true })
   clientMessageId: string | null;
 
-  @Column({ name: 'message_type', type: 'varchar', length: 20, enum: MessageType, default: MessageType.TEXT })
+  @Column({
+    name: 'message_type',
+    type: 'varchar',
+    length: 20,
+    enum: MessageType,
+    default: MessageType.TEXT,
+  })
   messageType: MessageType;
 
   @Column({ type: 'text', nullable: true })
@@ -54,16 +64,30 @@ export class Message {
   @Column({ name: 'media_url', type: 'varchar', length: 500, nullable: true })
   mediaUrl: string | null;
 
-  @Column({ name: 'media_thumbnail_url', type: 'varchar', length: 500, nullable: true })
+  @Column({
+    name: 'media_thumbnail_url',
+    type: 'varchar',
+    length: 500,
+    nullable: true,
+  })
   mediaThumbnailUrl: string | null;
 
-  @Column({ name: 'media_mime_type', type: 'varchar', length: 100, nullable: true })
+  @Column({
+    name: 'media_mime_type',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
   mediaMimeType: string | null;
 
   @Column({ name: 'media_size_bytes', type: 'bigint', nullable: true })
   mediaSizeBytes: number | null;
 
-  @Column('uuid', { name: 'hidden_by_users', array: true, default: () => "'{}'" })
+  @Column('uuid', {
+    name: 'hidden_by_users',
+    array: true,
+    default: () => "'{}'",
+  })
   hiddenByUsers: string[];
 
   // Reply fields
@@ -73,17 +97,31 @@ export class Message {
   @Column({ name: 'reply_to_sender_id', type: 'uuid', nullable: true })
   replyToSenderId: string | null;
 
-  @Column({ name: 'reply_to_content', type: 'varchar', length: 200, nullable: true })
+  @Column({
+    name: 'reply_to_content',
+    type: 'varchar',
+    length: 200,
+    nullable: true,
+  })
   replyToContent: string | null;
 
   // Forward fields
   @Column({ name: 'forward_from_message_id', type: 'uuid', nullable: true })
   forwardFromMessageId: string | null;
 
-  @Column({ name: 'forward_from_conversation_id', type: 'uuid', nullable: true })
+  @Column({
+    name: 'forward_from_conversation_id',
+    type: 'uuid',
+    nullable: true,
+  })
   forwardFromConversationId: string | null;
 
-  @Column({ type: 'varchar', length: 20, enum: MessageStatus, default: MessageStatus.SENT })
+  @Column({
+    type: 'varchar',
+    length: 20,
+    enum: MessageStatus,
+    default: MessageStatus.SENT,
+  })
   status: MessageStatus;
 
   @Column({ name: 'is_edited', type: 'boolean', default: false })

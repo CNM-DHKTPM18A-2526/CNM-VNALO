@@ -1,4 +1,10 @@
-import { IsString, IsOptional, IsEnum, MaxLength, IsBoolean } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsEnum,
+  MaxLength,
+  IsBoolean,
+} from 'class-validator';
 import { JoinMode } from '../entities/conversation.entity';
 
 export class UpdateConversationDto {
@@ -31,4 +37,8 @@ export class UpdateConversationDto {
   @IsOptional()
   @IsBoolean()
   allowMemberEditInfo?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  onlyAdminCanPost?: boolean;
 }

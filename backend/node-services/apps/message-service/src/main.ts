@@ -6,7 +6,10 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);
-  const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? 'http://localhost:3000,http://localhost:5173')
+  const allowedOrigins = (
+    process.env.CORS_ALLOWED_ORIGINS ??
+    'http://localhost:3000,http://localhost:5173'
+  )
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);

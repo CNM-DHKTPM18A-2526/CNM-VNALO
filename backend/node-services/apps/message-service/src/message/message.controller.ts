@@ -1,5 +1,13 @@
 import {
-  Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards,
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Param,
+  Body,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../auth/user.decorator';
@@ -14,7 +22,7 @@ import { SearchMessagesDto } from '../dto/search-messages.dto';
 @Controller()
 @UseGuards(JwtAuthGuard)
 export class MessageController {
-  constructor(private readonly messageService: MessageService) { }
+  constructor(private readonly messageService: MessageService) {}
 
   private buildAccessContext(user: AuthUser) {
     return {
@@ -27,7 +35,11 @@ export class MessageController {
   /** Send a message via REST (alternative to WebSocket). */
   @Post('messages')
   sendMessage(@CurrentUser() user: AuthUser, @Body() dto: SendMessageDto) {
-    return this.messageService.sendMessage(user.userId, dto, this.buildAccessContext(user));
+    return this.messageService.sendMessage(
+      user.userId,
+      dto,
+      this.buildAccessContext(user),
+    );
   }
 
   /** Get paginated message history for a conversation. */
@@ -55,7 +67,12 @@ export class MessageController {
     @Query() search: SearchMessagesDto,
   ) {
     return this.messageService.searchMessages(
-      id, user.userId, search.keyword, search.messageType, search.limit, search.offset,
+      id,
+      user.userId,
+      search.keyword,
+      search.messageType,
+      search.limit,
+      search.offset,
       this.buildAccessContext(user),
     );
   }

@@ -7,7 +7,13 @@ import { InboxService } from './inbox.service';
 import { InboxController } from './inbox.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ConversationInbox, Conversation, ConversationMember])],
+  imports: [
+    TypeOrmModule.forFeature([
+      ConversationInbox,
+      Conversation,
+      ConversationMember,
+    ]),
+  ],
   controllers: [InboxController],
   providers: [InboxService],
   exports: [InboxService],

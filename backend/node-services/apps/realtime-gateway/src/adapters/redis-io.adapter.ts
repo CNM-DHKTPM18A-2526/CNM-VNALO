@@ -8,7 +8,11 @@ export class RedisIoAdapter extends IoAdapter {
   private adapterConstructor: ReturnType<typeof createAdapter>;
   private readonly logger = new Logger(RedisIoAdapter.name);
 
-  async connectToRedis(redisHost: string, redisPort: number, redisPassword?: string): Promise<void> {
+  async connectToRedis(
+    redisHost: string,
+    redisPort: number,
+    redisPassword?: string,
+  ): Promise<void> {
     const redisOptions: any = { host: redisHost, port: redisPort };
     if (redisPassword) {
       redisOptions.password = redisPassword;
@@ -24,7 +28,7 @@ export class RedisIoAdapter extends IoAdapter {
       new Promise<void>((resolve, reject) => {
         subClient.once('ready', resolve);
         subClient.once('error', reject);
-      })
+      }),
     ]);
 
     this.adapterConstructor = createAdapter(pubClient, subClient);

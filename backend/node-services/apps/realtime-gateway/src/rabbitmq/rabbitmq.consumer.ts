@@ -31,7 +31,7 @@ export class RabbitMQConsumer {
   constructor(
     private readonly configService: ConfigService,
     private readonly gateway: RealtimeGateway,
-  ) { }
+  ) {}
 
   async connect(): Promise<void> {
     if (this.isConnected || this.isConnecting) {
@@ -42,7 +42,9 @@ export class RabbitMQConsumer {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
-    const url = (this.configService.get<string>('rabbit.url') ?? 'amqp://guest:guest@localhost:5672');
+    const url =
+      this.configService.get<string>('rabbit.url') ??
+      'amqp://guest:guest@localhost:5672';
     try {
       const connection = await amqplib.connect(url);
       const channel = await connection.createChannel();
@@ -67,7 +69,11 @@ export class RabbitMQConsumer {
         this.isConnecting = false;
         this.logger.warn('RabbitMQ connection closed. Reconnecting in 5s...');
         // Đóng channel cũ trước khi reconnect để tránh duplicate consumer
-        try { await this.channel?.close(); } catch { /* ignore */ }
+        try {
+          await this.channel?.close();
+        } catch {
+          /* ignore */
+        }
         this.channel = null;
         this.connection = null;
         this.reconnectTimer = setTimeout(() => this.connect(), 5000);
@@ -78,7 +84,9 @@ export class RabbitMQConsumer {
       });
     } catch (err) {
       this.isConnecting = false;
-      this.logger.error(`Failed to connect to RabbitMQ: ${err.message}. Retry in 10s...`);
+      this.logger.error(
+        `Failed to connect to RabbitMQ: ${err.message}. Retry in 10s...`,
+      );
       this.reconnectTimer = setTimeout(() => this.connect(), 10000);
     }
   }
@@ -100,7 +108,12 @@ export class RabbitMQConsumer {
     });
   }
 
-  private handleEvent(event: { type: string; room?: string; userId?: string; payload: any }): void {
+  private handleEvent(event: {
+    type: string;
+    room?: string;
+    userId?: string;
+    payload: any;
+  }): void {
     this.logger.debug(`Event received: ${event.type}`);
 
     if (event.room) {

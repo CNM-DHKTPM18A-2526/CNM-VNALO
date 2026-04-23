@@ -1,14 +1,24 @@
 import {
-  Injectable, NotFoundException, ForbiddenException,
-  BadRequestException, Logger,
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, IsNull, type EntityManager } from 'typeorm';
-import { Message, MessageType, MessageStatus } from '../entities/message.entity';
+import {
+  Message,
+  MessageType,
+  MessageStatus,
+} from '../entities/message.entity';
 import { MessageReaction } from '../entities/message-reaction.entity';
 import { PinnedMessage } from '../entities/pinned-message.entity';
 import { ConversationInbox } from '../entities/conversation-inbox.entity';
-import { ConversationMember, MemberRole } from '../entities/conversation-member.entity';
+import {
+  ConversationMember,
+  MemberRole,
+} from '../entities/conversation-member.entity';
 import { ConversationService } from '../conversation/conversation.service';
 import { SendMessageDto } from '../dto/send-message.dto';
 import { InjectRedis } from '@nestjs-modules/ioredis';
@@ -42,7 +52,7 @@ export class MessageService {
     private readonly dataSource: DataSource,
     @InjectRedis()
     private readonly redis: Redis,
-  ) { }
+  ) {}
 
   /**
    * Send a message to a conversation.
@@ -51,9 +61,15 @@ export class MessageService {
    * - Handles reply/forward denormalization
    * - Updates inbox for all active members within a transaction (CQRS)
    */
-  async sendMessage(userId: string, dto: SendMessageDto, access?: AccessPolicyContext): Promise<Message> {
+  async sendMessage(
+    userId: string,
+    dto: SendMessageDto,
+    access?: AccessPolicyContext,
+  ): Promise<Message> {
     if (this.isRestrictedWeb(access)) {
-      throw new ForbiddenException('Restricted web session cannot send messages.');
+      throw new ForbiddenException(
+        'Restricted web session cannot send messages.',
+      );
     }
 
     // Verify sender is a member
@@ -72,7 +88,10 @@ export class MessageService {
 
     // Cross-conversation auth check for forwarded messages
     if (dto.forwardFromMessageId && dto.forwardFromConversationId) {
-      await this.conversationService.assertMember(dto.forwardFromConversationId, userId);
+      await this.conversationService.assertMember(
+        dto.forwardFromConversationId,
+        userId,
+      );
     }
 
     const serverSeq = await this.getNextSeq(dto.conversationId);
@@ -96,7 +115,9 @@ export class MessageService {
 
       // Denormalize reply info for fast rendering
       if (dto.replyToMessageId) {
-        const original = await manager.findOne(Message, { where: { id: dto.replyToMessageId } });
+        const original = await manager.findOne(Message, {
+          where: { id: dto.replyToMessageId },
+        });
         if (original) {
           message.replyToMessageId = original.id;
           message.replyToSenderId = original.senderId;
@@ -108,19 +129,27 @@ export class MessageService {
       // Handle forward
       if (dto.forwardFromMessageId) {
         message.forwardFromMessageId = dto.forwardFromMessageId;
-        message.forwardFromConversationId = dto.forwardFromConversationId ?? null;
+        message.forwardFromConversationId =
+          dto.forwardFromConversationId ?? null;
         message.messageType = MessageType.FORWARD;
       }
 
       const savedMsg = await manager.save(message);
 
       // Update inbox for all active members (batch, within transaction)
-      await this.updateInboxForMembersWithManager(manager, dto.conversationId, savedMsg, userId);
+      await this.updateInboxForMembersWithManager(
+        manager,
+        dto.conversationId,
+        savedMsg,
+        userId,
+      );
 
       return savedMsg;
     });
 
-    this.logger.log(`Message sent: ${saved.id} in ${dto.conversationId} seq=${serverSeq}`);
+    this.logger.log(
+      `Message sent: ${saved.id} in ${dto.conversationId} seq=${serverSeq}`,
+    );
     return saved;
   }
 
@@ -138,14 +167,21 @@ export class MessageService {
     const qb = this.messageRepo
       .createQueryBuilder('m')
       .where('m.conversation_id = :cid', { cid: conversationId })
-      .andWhere(`NOT (:userId::uuid = ANY(COALESCE(m.hidden_by_users, ARRAY[]::uuid[])))`, { userId })
+      .andWhere(
+        `NOT (:userId::uuid = ANY(COALESCE(m.hidden_by_users, ARRAY[]::uuid[])))`,
+        { userId },
+      )
       .orderBy('m.server_seq', 'DESC')
       .take(Math.min(limit, 100));
 
     // Filter by history cleared threshold
-    const inboxEntry = await this.inboxRepo.findOne({ where: { userId, conversationId } });
+    const inboxEntry = await this.inboxRepo.findOne({
+      where: { userId, conversationId },
+    });
     if (inboxEntry?.historyClearedAt) {
-      qb.andWhere('m.created_at > :clearedAt', { clearedAt: inboxEntry.historyClearedAt });
+      qb.andWhere('m.created_at > :clearedAt', {
+        clearedAt: inboxEntry.historyClearedAt,
+      });
     }
 
     if (before !== undefined) {
@@ -157,7 +193,7 @@ export class MessageService {
       const loginAt = this.resolveLoginTime(access?.loginAtEpochSec);
       qb.andWhere('m.created_at >= :loginAt', { loginAt });
     }
- 
+
     return qb.getMany();
   }
 
@@ -178,7 +214,9 @@ export class MessageService {
 
     if (this.isRestrictedWeb(access)) {
       if (!messageType || !this.isDocumentMessageType(messageType)) {
-        throw new ForbiddenException('Restricted web session can only search My Documents.');
+        throw new ForbiddenException(
+          'Restricted web session can only search My Documents.',
+        );
       }
     }
 
@@ -186,12 +224,17 @@ export class MessageService {
       .createQueryBuilder('m')
       .where('m.conversation_id = :cid', { cid: conversationId })
       .andWhere('m.status != :recalled', { recalled: MessageStatus.RECALLED })
-      .andWhere(`NOT (:userId::uuid = ANY(COALESCE(m.hidden_by_users, ARRAY[]::uuid[])))`, { userId });
+      .andWhere(
+        `NOT (:userId::uuid = ANY(COALESCE(m.hidden_by_users, ARRAY[]::uuid[])))`,
+        { userId },
+      );
 
     if (this.isRestrictedWeb(access)) {
       const loginAt = this.resolveLoginTime(access?.loginAtEpochSec);
-      qb.andWhere('m.created_at >= :loginAt', { loginAt })
-        .andWhere('m.sender_id = :uid', { uid: userId });
+      qb.andWhere('m.created_at >= :loginAt', { loginAt }).andWhere(
+        'm.sender_id = :uid',
+        { uid: userId },
+      );
     }
 
     if (keyword) {
@@ -202,16 +245,18 @@ export class MessageService {
       qb.andWhere('m.message_type = :type', { type: messageType });
     }
 
-    qb.orderBy('m.server_seq', 'DESC')
-      .skip(offset)
-      .take(Math.min(limit, 100));
+    qb.orderBy('m.server_seq', 'DESC').skip(offset).take(Math.min(limit, 100));
 
     const [items, total] = await qb.getManyAndCount();
     return { items, total, limit, offset };
   }
 
   /** Edit a message. Only the sender can edit, and only text content. */
-  async editMessage(userId: string, messageId: string, content: string): Promise<Message> {
+  async editMessage(
+    userId: string,
+    messageId: string,
+    content: string,
+  ): Promise<Message> {
     const message = await this.findMessageOrFail(messageId);
 
     if (message.senderId !== userId) {
@@ -240,10 +285,16 @@ export class MessageService {
 
     if (message.senderId !== userId) {
       const member = await this.memberRepo.findOne({
-        where: { conversationId: message.conversationId, userId }
+        where: { conversationId: message.conversationId, userId },
       });
-      if (!member || (member.role !== MemberRole.OWNER && member.role !== MemberRole.ADMIN)) {
-        throw new ForbiddenException('You can only recall your own messages or you must be an Admin');
+      // ADMIN (group owner) and DEPUTY can recall any message in the group
+      if (
+        !member ||
+        (member.role !== MemberRole.ADMIN && member.role !== MemberRole.DEPUTY)
+      ) {
+        throw new ForbiddenException(
+          'You can only recall your own messages or you must be an Admin',
+        );
       }
     }
 
@@ -254,7 +305,9 @@ export class MessageService {
     // Enforce 24-hour recall time limit
     const timeSinceSent = Date.now() - message.createdAt.getTime();
     if (timeSinceSent > MessageService.RECALL_TIME_LIMIT_MS) {
-      throw new BadRequestException('Cannot recall messages older than 24 hours');
+      throw new BadRequestException(
+        'Cannot recall messages older than 24 hours',
+      );
     }
 
     message.status = MessageStatus.RECALLED;
@@ -284,7 +337,9 @@ export class MessageService {
     const message = await this.findMessageOrFail(messageId);
 
     if (message.conversationId !== conversationId) {
-      throw new BadRequestException('Message does not belong to this conversation');
+      throw new BadRequestException(
+        'Message does not belong to this conversation',
+      );
     }
 
     if (message.status === MessageStatus.RECALLED) {
@@ -292,7 +347,9 @@ export class MessageService {
     }
 
     // Check if already pinned
-    const existing = await this.pinRepo.findOne({ where: { conversationId, messageId } });
+    const existing = await this.pinRepo.findOne({
+      where: { conversationId, messageId },
+    });
     if (existing) throw new BadRequestException('Message is already pinned');
 
     const saved = await this.pinRepo.save({
@@ -309,10 +366,16 @@ export class MessageService {
   }
 
   /** Unpin a message from a conversation. */
-  async unpinMessage(userId: string, conversationId: string, messageId: string) {
+  async unpinMessage(
+    userId: string,
+    conversationId: string,
+    messageId: string,
+  ) {
     await this.conversationService.assertCanPinMessage(conversationId, userId);
 
-    const pin = await this.pinRepo.findOne({ where: { conversationId, messageId } });
+    const pin = await this.pinRepo.findOne({
+      where: { conversationId, messageId },
+    });
     if (!pin) throw new NotFoundException('Pin not found');
 
     await this.pinRepo.remove(pin);
@@ -355,7 +418,8 @@ export class MessageService {
   /** Remove user's reaction from a message. */
   async removeReaction(userId: string, messageId: string) {
     const result = await this.reactionRepo.delete({ messageId, userId });
-    if (result.affected === 0) throw new NotFoundException('Reaction not found');
+    if (result.affected === 0)
+      throw new NotFoundException('Reaction not found');
   }
 
   /** Get reactions for a message. */
@@ -370,8 +434,15 @@ export class MessageService {
    * Mark messages as read up to a given sequence number.
    * Updates the member's last_read_seq and computes accurate unread count.
    */
-  async markAsRead(userId: string, conversationId: string, lastReadSeq: number) {
-    const member = await this.conversationService.assertMember(conversationId, userId);
+  async markAsRead(
+    userId: string,
+    conversationId: string,
+    lastReadSeq: number,
+  ) {
+    const member = await this.conversationService.assertMember(
+      conversationId,
+      userId,
+    );
 
     // Only update if we're advancing the read cursor
     if (lastReadSeq <= member.lastReadSeq) return;
@@ -389,16 +460,15 @@ export class MessageService {
       .andWhere('m.status != :recalled', { recalled: MessageStatus.RECALLED })
       .getCount();
 
-    await this.inboxRepo.update(
-      { userId, conversationId },
-      { unreadCount },
-    );
+    await this.inboxRepo.update({ userId, conversationId }, { unreadCount });
   }
 
   // ─── Private Helpers ────────────────────────────────────────
 
   private async findMessageOrFail(messageId: string): Promise<Message> {
-    const message = await this.messageRepo.findOne({ where: { id: messageId } });
+    const message = await this.messageRepo.findOne({
+      where: { id: messageId },
+    });
     if (!message) throw new NotFoundException('Message not found');
     return message;
   }
@@ -411,9 +481,16 @@ export class MessageService {
       throw new BadRequestException('Text messages must have content');
     }
 
-    const mediaTypes = [MessageType.IMAGE, MessageType.VIDEO, MessageType.FILE, MessageType.AUDIO];
+    const mediaTypes = [
+      MessageType.IMAGE,
+      MessageType.VIDEO,
+      MessageType.FILE,
+      MessageType.AUDIO,
+    ];
     if (mediaTypes.includes(effectiveType) && !dto.mediaUrl) {
-      throw new BadRequestException(`${effectiveType} messages must have a mediaUrl`);
+      throw new BadRequestException(
+        `${effectiveType} messages must have a mediaUrl`,
+      );
     }
   }
 
@@ -433,7 +510,7 @@ export class MessageService {
         .createQueryBuilder('m')
         .select('COALESCE(MAX(m.server_seq), 0)', 'maxSeq')
         .where('m.conversation_id = :cid', { cid: conversationId })
-        .getRawOne();
+        .getRawOne<{ maxSeq: string }>();
 
       const currentMax = parseInt(result?.maxSeq ?? '0', 10);
 
@@ -464,7 +541,8 @@ export class MessageService {
 
     if (!members.length) return;
 
-    const preview = message.content?.substring(0, 200) ?? `[${message.messageType}]`;
+    const preview =
+      message.content?.substring(0, 200) ?? `[${message.messageType}]`;
 
     // Build values and parameters for raw SQL batch upsert
     const params: any[] = [];
@@ -533,7 +611,8 @@ export class MessageService {
     });
 
     const newPreview = prevMessage
-      ? prevMessage.content?.substring(0, 200) ?? `[${prevMessage.messageType}]`
+      ? (prevMessage.content?.substring(0, 200) ??
+        `[${prevMessage.messageType}]`)
       : null;
 
     const newSeq = prevMessage?.serverSeq ?? 0;
@@ -566,14 +645,14 @@ export class MessageService {
   async deleteForMe(userId: string, messageId: string): Promise<void> {
     const message = await this.findMessageOrFail(messageId);
     await this.conversationService.assertMember(message.conversationId, userId);
-    
+
     // Use raw query for efficiently appending to the array without fetching it
     await this.dataSource.query(
       `UPDATE message
        SET hidden_by_users = array_append(COALESCE(hidden_by_users, ARRAY[]::uuid[]), $1::uuid)
        WHERE message_id = $2::uuid
          AND NOT ($1::uuid = ANY(COALESCE(hidden_by_users, ARRAY[]::uuid[])))`,
-      [userId, messageId]
+      [userId, messageId],
     );
 
     this.logger.log(`Message ${messageId} deleted for me by user ${userId}`);
@@ -592,6 +671,69 @@ export class MessageService {
   }
 
   private isDocumentMessageType(messageType: MessageType): boolean {
-    return [MessageType.FILE, MessageType.IMAGE, MessageType.VIDEO, MessageType.AUDIO].includes(messageType);
+    return [
+      MessageType.FILE,
+      MessageType.IMAGE,
+      MessageType.VIDEO,
+      MessageType.AUDIO,
+    ].includes(messageType);
+  }
+
+  /**
+   * G-009: Create a system-generated message (join/leave/kick/rename events).
+   * Uses senderId = 'system' (a virtual sender ID) so UI can style it differently.
+   * The message is persisted with MessageType.SYSTEM and assigned a server_seq.
+   *
+   * @param conversationId - the group conversation
+   * @param content - human-readable system event text (e.g. "User X joined the group")
+   * @returns the persisted system Message entity
+   */
+  async createSystemMessage(
+    conversationId: string,
+    content: string,
+  ): Promise<Message> {
+    const serverSeq = await this.getNextSeq(conversationId);
+
+    const saved = await this.dataSource.transaction(async (manager) => {
+      const msg = manager.create(Message, {
+        conversationId,
+        serverSeq,
+        // B-1: SYSTEM messages have no real sender (sender_id is nullable for type=SYSTEM)
+        senderId: null,
+        clientMessageId: null,
+        messageType: MessageType.SYSTEM,
+        content,
+        status: MessageStatus.SENT,
+      });
+
+      const persisted = await manager.save(msg);
+
+      // Update inbox for all active members (B-4: use IsNull() not null-cast)
+      const activeMembers = await manager.find(ConversationMember, {
+        where: { conversationId, leftAt: IsNull() },
+      });
+
+      for (const member of activeMembers) {
+        await manager
+          .createQueryBuilder()
+          .update(ConversationInbox)
+          .set({
+            lastMessageSeq: serverSeq,
+            unreadCount: () => 'unread_count + 1',
+          })
+          .where('user_id = :uid AND conversation_id = :cid', {
+            uid: member.userId,
+            cid: conversationId,
+          })
+          .execute();
+      }
+
+      return persisted;
+    });
+
+    this.logger.log(
+      `[MessageService.systemMsg] Created system message seq=${serverSeq} conv=${conversationId}: "${content}"`,
+    );
+    return saved;
   }
 }
