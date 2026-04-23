@@ -7,6 +7,7 @@ import iuh.cnm.vnalo.content_service.service.StoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,14 +19,18 @@ import java.util.UUID;
 public class StoryController {
 
     private final StoryService storyService;
+    
+    private UUID currentUserId(Authentication authentication) {
+        return UUID.fromString(authentication.getName());
+    }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public StoryResponse createStory(
-            @RequestHeader("X-User-Id") UUID userId,
+            Authentication authentication,
             @Valid @RequestBody CreateStoryRequest request
     ) {
-        return storyService.createStory(userId, request);
+        return storyService.createStory(currentUserId(authentication), request);
     }
 
     @GetMapping
@@ -37,18 +42,18 @@ public class StoryController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteStory(
             @PathVariable UUID storyId,
-            @RequestHeader("X-User-Id") UUID userId
+            Authentication authentication
     ) {
-        storyService.deleteStory(storyId, userId);
+        storyService.deleteStory(storyId, currentUserId(authentication));
     }
 
     @PostMapping("/{storyId}/view")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void markViewed(
             @PathVariable UUID storyId,
-            @RequestHeader("X-User-Id") UUID userId
+            Authentication authentication
     ) {
-        storyService.markViewed(storyId, userId);
+        storyService.markViewed(storyId, currentUserId(authentication));
     }
 
     @GetMapping("/{storyId}/views")

@@ -8,6 +8,7 @@ import iuh.cnm.vnalo.content_service.service.CommentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -17,15 +18,19 @@ import java.util.UUID;
 public class CommentController {
 
     private final CommentService commentService;
+    
+    private UUID currentUserId(Authentication authentication) {
+        return UUID.fromString(authentication.getName());
+    }
 
     @PostMapping("/posts/{postId}/comments")
     @ResponseStatus(HttpStatus.CREATED)
     public CommentResponse createComment(
             @PathVariable UUID postId,
-            @RequestHeader("X-User-Id") UUID userId,
+            Authentication authentication,
             @Valid @RequestBody CreateCommentRequest request
     ) {
-        return commentService.createComment(postId, userId, request);
+        return commentService.createComment(postId, currentUserId(authentication), request);
     }
 
     @GetMapping("/posts/{postId}/comments")
@@ -40,18 +45,18 @@ public class CommentController {
     @PutMapping("/comments/{commentId}")
     public CommentResponse updateComment(
             @PathVariable UUID commentId,
-            @RequestHeader("X-User-Id") UUID userId,
+            Authentication authentication,
             @Valid @RequestBody UpdateCommentRequest request
     ) {
-        return commentService.updateComment(commentId, userId, request);
+        return commentService.updateComment(commentId, currentUserId(authentication), request);
     }
 
     @DeleteMapping("/comments/{commentId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteComment(
             @PathVariable UUID commentId,
-            @RequestHeader("X-User-Id") UUID userId
+            Authentication authentication
     ) {
-        commentService.deleteComment(commentId, userId);
+        commentService.deleteComment(commentId, currentUserId(authentication));
     }
 }

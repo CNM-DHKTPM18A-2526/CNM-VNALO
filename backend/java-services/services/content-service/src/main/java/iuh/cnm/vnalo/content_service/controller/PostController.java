@@ -8,6 +8,7 @@ import iuh.cnm.vnalo.content_service.service.PostService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -18,14 +19,18 @@ import java.util.UUID;
 public class PostController {
 
     private final PostService postService;
+    
+    private UUID currentUserId(Authentication authentication) {
+        return UUID.fromString(authentication.getName());
+    }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public PostResponse createPost(
-            @RequestHeader("X-User-Id") UUID userId,
+            Authentication authentication,
             @Valid @RequestBody CreatePostRequest request
     ) {
-        return postService.createPost(userId, request);
+        return postService.createPost(currentUserId(authentication), request);
     }
 
     @GetMapping("/timeline")
@@ -44,18 +49,18 @@ public class PostController {
     @PutMapping("/{postId}")
     public PostResponse updatePost(
             @PathVariable UUID postId,
-            @RequestHeader("X-User-Id") UUID userId,
+            Authentication authentication,
             @Valid @RequestBody UpdatePostRequest request
     ) {
-        return postService.updatePost(postId, userId, request);
+        return postService.updatePost(postId, currentUserId(authentication), request);
     }
 
     @DeleteMapping("/{postId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deletePost(
             @PathVariable UUID postId,
-            @RequestHeader("X-User-Id") UUID userId
+            Authentication authentication
     ) {
-        postService.deletePost(postId, userId);
+        postService.deletePost(postId, currentUserId(authentication));
     }
 }
