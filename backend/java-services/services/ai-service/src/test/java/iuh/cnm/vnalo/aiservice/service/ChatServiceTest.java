@@ -2,7 +2,7 @@ package iuh.cnm.vnalo.aiservice.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import iuh.cnm.vnalo.aiservice.dto.ChatMessage;
+import iuh.cnm.vnalo.aiservice.dto.Message;
 import iuh.cnm.vnalo.aiservice.dto.ChatResponse;
 import iuh.cnm.vnalo.aiservice.exception.RateLimitExceededException;
 import org.junit.jupiter.api.BeforeEach;
@@ -79,10 +79,10 @@ class ChatServiceTest {
     void ask_shouldTrimAndPersistHistoryByMaxHistory() throws Exception {
         ReflectionTestUtils.setField(chatService, "maxHistory", 3);
 
-        List<ChatMessage> existing = List.of(
-                new ChatMessage("user", "m1"),
-                new ChatMessage("assistant", "m2"),
-                new ChatMessage("user", "m3")
+        List<Message> existing = List.of(
+                new Message("user", "m1"),
+                new Message("assistant", "m2"),
+                new Message("user", "m3")
         );
         ObjectMapper mapper = new ObjectMapper();
 
@@ -98,7 +98,7 @@ class ChatServiceTest {
         ArgumentCaptor<String> rawCaptor = ArgumentCaptor.forClass(String.class);
         verify(valueOperations).set(eq("ai:history:u1:c1"), rawCaptor.capture(), eq(86400L), eq(TimeUnit.SECONDS));
 
-        List<ChatMessage> saved = mapper.readValue(rawCaptor.getValue(), new TypeReference<>() {});
+        List<Message> saved = mapper.readValue(rawCaptor.getValue(), new TypeReference<>() {});
         assertEquals(3, saved.size());
         assertEquals("m3", saved.get(0).getContent());
         assertEquals("new", saved.get(1).getContent());

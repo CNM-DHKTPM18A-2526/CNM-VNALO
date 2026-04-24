@@ -2,6 +2,7 @@ package iuh.cnm.vnalo.aiservice.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import iuh.cnm.vnalo.aiservice.dto.Message;
 import iuh.cnm.vnalo.aiservice.dto.request.AiChatRequest;
 import iuh.cnm.vnalo.aiservice.dto.response.AiChatResponse;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,28 +58,49 @@ public class GeminiAiService {
     }
 
     private Map<String, Object> buildGeminiPayload(AiChatRequest request) {
-        StringBuilder promptBuilder = new StringBuilder();
+        List<Map<String, Object>> contents = new ArrayList<>();
+
+        // 1. Unified System Instruction (as a system-style user message for Gemini 1.5 Flash REST)
+        StringBuilder systemMsgBuilder = new StringBuilder();
+        systemMsgBuilder.append("SYSTEM INSTRUCTION:\n")
+                        .append(iuh.cnm.vnalo.aiservice.knowledge.SystemPrompt.VNALO_SYSTEM_PROMPT);
         
-        // 1. Inject Unified System Instruction first
-        promptBuilder.append("SYSTEM INSTRUCTION:\n")
-                     .append(iuh.cnm.vnalo.aiservice.knowledge.SystemPrompt.VNALO_SYSTEM_PROMPT)
-                     .append("\n---\n");
+        if (request.isEnableDeepSummary()) {
+            systemMsgBuilder.append("\n\nLƯU Ý: Người dùng đã yêu cầu phản hồi sâu (Deep Summary). Hãy phân tích kỹ và trả lời chi tiết hơn bình thường.");
+        }
         
-        // 2. Add context if any (Reserved for future RAG/History expansion)
-        
+        if (request.getMascotId() != null && !request.getMascotId().isEmpty()) {
+            systemMsgBuilder.append("\n\nBối cảnh Mascot: Bạn đang hiển thị dưới dạng mascot ID: ").append(request.getMascotId());
+        }
+
+        contents.add(createContent("user", systemMsgBuilder.toString()));
+
+        // 2. Structured History Alignment
+        if (request.getHistory() != null && !request.getHistory().isEmpty()) {
+            for (Message msg : request.getHistory()) {
+                // Map mobile roles to Gemini roles (user -> user, assistant -> model)
+                String role = "assistant".equalsIgnoreCase(msg.getRole()) ? "model" : "user";
+                contents.add(createContent(role, msg.getContent()));
+            }
+        }
+
         // 3. Current User Input
-        promptBuilder.append("USER INPUT: ").append(request.getPrompt());
-
-        Map<String, Object> part = new HashMap<>();
-        part.put("text", promptBuilder.toString());
-
-        Map<String, Object> content = new HashMap<>();
-        content.put("parts", List.of(part));
+        contents.add(createContent("user", request.getPrompt()));
 
         Map<String, Object> payload = new HashMap<>();
-        payload.put("contents", List.of(content));
+        payload.put("contents", contents);
 
         return payload;
+    }
+
+    private Map<String, Object> createContent(String role, String text) {
+        Map<String, Object> part = new HashMap<>();
+        part.put("text", text);
+
+        Map<String, Object> content = new HashMap<>();
+        content.put("role", role);
+        content.put("parts", List.of(part));
+        return content;
     }
 
     private AiChatResponse parseGeminiResponse(String jsonBody, boolean isAnalyzingIntent) throws Exception {

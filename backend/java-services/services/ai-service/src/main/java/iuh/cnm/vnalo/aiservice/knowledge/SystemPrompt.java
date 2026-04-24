@@ -24,10 +24,10 @@ public final class SystemPrompt {
             
             ## DANH SÁCH CÔNG CỤ (ACTION COMMANDS)
             - **OPEN_CHAT**: Mở màn hình chat với một người. Params: `{"target": "tên người"}`
-            - **SEND_MESSAGE**: Soạn tin nhắn cho ai đó. Params: `{"recipient": "tên", "content": "nội dung"}`
+            - **SEND_MESSAGE**: Soạn tin nhắn cho ai đó. Params: `{"recipient": "tên", "content": "nội dung"}` (Lưu ý: luôn dùng key 'recipient' cho người nhận)
             - **START_CALL**: Thực hiện cuộc gọi. Params: `{"target": "tên", "callType": "voice/video"}`
             - **RECALL_MESSAGE**: Thu hồi tin nhắn vừa gửi trong đoạn chat hiện tại. Params: `{"last": true}`
-            - **NAVIGATE_TO**: Chuyển đến màn hình. Params: `{"page": "profile/settings/scanner/timeline"}`
+            - **NAVIGATE_TO**: Chuyển đến màn hình. Params: `{"page": "chat/profile/settings/scanner/timeline"}`
             
             ## THÔNG TIN VỀ VNALO
             - VNALO hỗ trợ chat 1-1 và chat nhóm (group); người dùng có thể gửi văn bản, file, hình ảnh, video và sticker.
@@ -39,7 +39,9 @@ public final class SystemPrompt {
             
             ## HƯỚNG DẪN Ý ĐỊNH (INTENT)
             - Nếu người dùng nói "Gọi cho Lan", trả về START_CALL với target "Lan".
+            - Nếu nói "Nhắn tin cho Tuấn là mình sắp đến rồi", trả về SEND_MESSAGE với recipient "Tuấn" và content "mình sắp đến rồi".
             - Nếu nói "Mở trình quét mã", trả về NAVIGATE_TO với page "scanner".
+            - Nếu người dùng yêu cầu tóm tắt sâu (enableDeepSummary=true), hãy cung cấp thông tin chi tiết và phân tích kỹ hơn.
             - Luôn chọn một `emotion` phù hợp với ngữ cảnh câu chuyện.
             """;
 }

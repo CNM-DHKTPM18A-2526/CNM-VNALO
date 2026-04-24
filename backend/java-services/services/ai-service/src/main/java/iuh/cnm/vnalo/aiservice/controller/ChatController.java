@@ -2,7 +2,7 @@ package iuh.cnm.vnalo.aiservice.controller;
 
 import iuh.cnm.vnalo.aiservice.dto.ApiResponse;
 import iuh.cnm.vnalo.aiservice.dto.AskRequest;
-import iuh.cnm.vnalo.aiservice.dto.ChatMessage;
+import iuh.cnm.vnalo.aiservice.dto.Message;
 import iuh.cnm.vnalo.aiservice.dto.ChatResponse;
 import iuh.cnm.vnalo.aiservice.service.ChatService;
 import jakarta.validation.Valid;
@@ -38,7 +38,7 @@ public class ChatController {
         String userId = getCurrentUserId();
         
         if (conversationId != null && !conversationId.isBlank()) {
-            List<ChatMessage> messages = chatService.getHistory(userId, conversationId);
+            List<Message> messages = chatService.getHistory(userId, conversationId);
             return ResponseEntity.ok(ApiResponse.ok(Map.of("conversationId", conversationId, "messages", messages)));
         } else {
             List<String> conversations = chatService.getUserConversations(userId);

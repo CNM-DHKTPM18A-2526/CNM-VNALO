@@ -3,7 +3,7 @@ package iuh.cnm.vnalo.aiservice.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import iuh.cnm.vnalo.aiservice.dto.ChatMessage;
+import iuh.cnm.vnalo.aiservice.dto.Message;
 import iuh.cnm.vnalo.aiservice.dto.ChatResponse;
 import iuh.cnm.vnalo.aiservice.exception.AiUnavailableException;
 import iuh.cnm.vnalo.aiservice.exception.RateLimitExceededException;
@@ -63,13 +63,13 @@ public class ChatService {
         String convId = (conversationId != null && !conversationId.isBlank()) ? conversationId : UUID.randomUUID().toString();
 
         // 3. Load history
-        List<ChatMessage> history = loadHistory(userId, convId);
+        List<Message> history = loadHistory(userId, convId);
         
         // 4. Add user message
-        history.add(new ChatMessage("user", message));
+        history.add(new Message("user", message));
 
         // Keep last N messages
-        List<ChatMessage> trimmedHistory = trimHistory(history);
+        List<Message> trimmedHistory = trimHistory(history);
 
         // 5. Generate Answer (Gemini -> Ollama fallback)
         String answer;
@@ -99,7 +99,7 @@ public class ChatService {
         }
 
         // 6. Save answer to history
-        trimmedHistory.add(new ChatMessage("assistant", answer));
+        trimmedHistory.add(new Message("assistant", answer));
         saveHistory(userId, convId, trimHistory(trimmedHistory));
 
 
@@ -112,7 +112,12 @@ public class ChatService {
                 .build();
     }
 
-    public List<ChatMessage> getHistory(String userId, String conversationId) {
+    public void backupHistory(String userId, String conversationId, List<Message> entries) {
+        if (entries == null || entries.isEmpty()) return;
+        saveHistory(userId, conversationId, entries);
+    }
+
+    public List<Message> getHistory(String userId, String conversationId) {
         if (conversationId == null || conversationId.isBlank()) {
             return new ArrayList<>();
         }
@@ -197,21 +202,21 @@ public class ChatService {
         return keys != null ? keys : new LinkedHashSet<>();
     }
 
-    private List<ChatMessage> loadHistory(String userId, String conversationId) {
+    private List<Message> loadHistory(String userId, String conversationId) {
         String key = historyKey(userId, conversationId);
         String raw = redisTemplate.opsForValue().get(key);
         if (raw == null || raw.isBlank()) {
             return new ArrayList<>();
         }
         try {
-            return objectMapper.readValue(raw, new TypeReference<List<ChatMessage>>() {});
+            return objectMapper.readValue(raw, new TypeReference<List<Message>>() {});
         } catch (JsonProcessingException e) {
             log.warn("Failed to parse history JSON: {}", e.getMessage());
             return new ArrayList<>();
         }
     }
 
-    private void saveHistory(String userId, String conversationId, List<ChatMessage> messages) {
+    private void saveHistory(String userId, String conversationId, List<Message> messages) {
         String key = historyKey(userId, conversationId);
         try {
             String raw = objectMapper.writeValueAsString(messages);
@@ -221,7 +226,7 @@ public class ChatService {
         }
     }
 
-    private List<ChatMessage> trimHistory(List<ChatMessage> history) {
+    private List<Message> trimHistory(List<Message> history) {
         if (history.size() <= maxHistory) {
             return history;
         }
