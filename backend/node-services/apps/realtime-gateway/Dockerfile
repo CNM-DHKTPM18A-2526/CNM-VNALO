@@ -2,24 +2,24 @@
 # Realtime Gateway Service — Multi-stage Dockerfile
 # Base: Node 20 Alpine
 # Build: NestJS monorepo compiler
-# Port: 8085
+# Output: dist/apps/realtime-gateway/main.js
 # =============================================================================
 
 # --- Stage 1: Build ---
 FROM node:20-alpine AS builder
 WORKDIR /build
 
-# Copy package files first (cache dependencies layer)
+# Copy package files
 COPY package*.json ./
 RUN npm install --legacy-peer-deps --ignore-scripts
 
 # Copy shared configs and source
 COPY nest-cli.json ./
 COPY tsconfig*.json ./
-# Phải copy toàn bộ codebase hoặc ít nhất apps để build đúng tsconfig path
-COPY apps ./apps
+COPY apps/ ./apps/
 
-RUN npm run build:realtime
+# Build specifically for realtime-gateway
+RUN npm run build realtime-gateway
 
 # --- Stage 2: Production dependencies ---
 FROM node:20-alpine AS deps
@@ -31,17 +31,20 @@ RUN npm install --omit=dev --legacy-peer-deps --ignore-scripts
 FROM node:20-alpine
 WORKDIR /app
 
-# Security: use built-in node user (non-root)
+# Install wget for health check
 RUN apk add --no-cache wget
 
-# Copy bundle from builder
+# Copy bundle and dependencies
 COPY --from=builder /build/dist/ ./dist/
-
-# Copy production node_modules
 COPY --from=deps /deps/node_modules/ ./node_modules/
 COPY package.json ./
 
+# Health check — Custom port 8085
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8085/health || exit 1
+
 EXPOSE 8085
+
 USER node
 
 CMD ["node", "dist/apps/realtime-gateway/main"]
