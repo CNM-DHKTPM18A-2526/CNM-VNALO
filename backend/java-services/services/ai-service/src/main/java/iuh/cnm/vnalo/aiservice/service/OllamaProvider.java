@@ -2,7 +2,7 @@ package iuh.cnm.vnalo.aiservice.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import iuh.cnm.vnalo.aiservice.dto.ChatMessage;
+import iuh.cnm.vnalo.aiservice.dto.Message;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -53,7 +53,7 @@ public class OllamaProvider {
         }
     }
 
-    public String generate(String systemPrompt, List<ChatMessage> messages) {
+    public String generate(String systemPrompt, List<Message> messages) {
         try {
             // Build Ollama message format
             List<Map<String, String>> ollamaMessages = new ArrayList<>();
@@ -62,7 +62,7 @@ public class OllamaProvider {
             ollamaMessages.add(Map.of("role", "system", "content", systemPrompt));
 
             // Conversation history
-            for (ChatMessage msg : messages) {
+            for (Message msg : messages) {
                 ollamaMessages.add(Map.of("role", msg.getRole(), "content", msg.getContent()));
             }
 

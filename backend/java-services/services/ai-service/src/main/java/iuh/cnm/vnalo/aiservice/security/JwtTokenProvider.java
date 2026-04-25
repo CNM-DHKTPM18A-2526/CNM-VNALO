@@ -3,15 +3,16 @@ package iuh.cnm.vnalo.aiservice.security;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.SignatureException;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.security.Key;
+import javax.crypto.SecretKey;
 
 /**
- * Validates JWT tokens issued by core-service.
+ * Validates JWT tokens issued by core-service (Modern 0.12.x).
  * ai-service only validates — it never issues tokens.
  */
 @Component
@@ -21,7 +22,7 @@ public class JwtTokenProvider {
     @Value("${jwt.secret}")
     private String jwtSecret;
 
-    private Key secretKey;
+    private SecretKey secretKey;
 
     @PostConstruct
     public void init() {
@@ -31,23 +32,27 @@ public class JwtTokenProvider {
 
     public boolean validateToken(String token) {
         try {
-            Jwts.parserBuilder()
-                    .setSigningKey(secretKey)
+            Jwts.parser()
+                    .verifyWith(secretKey)
                     .build()
-                    .parseClaimsJws(token);
+                    .parseSignedClaims(token);
             return true;
-        } catch (JwtException | IllegalArgumentException ex) {
-            log.warn("Invalid JWT token: {}", ex.getMessage());
+        } catch (ExpiredJwtException e) {
+            log.warn("JWT token is expired: {}", e.getMessage());
+        } catch (SignatureException e) {
+            log.warn("JWT signature validation failed: {}", e.getMessage());
+        } catch (MalformedJwtException | UnsupportedJwtException | IllegalArgumentException e) {
+            log.warn("Invalid JWT token: {}", e.getMessage());
         }
         return false;
     }
 
     public String getUserIdFromToken(String token) {
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(secretKey)
+        Claims claims = Jwts.parser()
+                .verifyWith(secretKey)
                 .build()
-                .parseClaimsJws(token)
-                .getBody();
+                .parseSignedClaims(token)
+                .getPayload();
         return claims.getSubject();
     }
 }

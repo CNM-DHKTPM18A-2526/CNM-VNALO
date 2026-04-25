@@ -97,6 +97,9 @@ class MainShellState extends State<MainShell> {
       case 'chat':
         setState(() => _currentIndex = 0);
         break;
+      case 'contacts':
+        setState(() => _currentIndex = 1);
+        break;
       case 'timeline':
         setState(() => _currentIndex = 3);
         break;
@@ -128,6 +131,8 @@ class MainShellState extends State<MainShell> {
       case 'MỞ SETTINGS':
       case 'CÀI ĐẶT':
         return 'NAVIGATE_TO_SETTINGS';
+      case 'MỞ DANH BẠ':
+        return 'NAVIGATE_TO_CONTACTS';
       case 'MỞ CHAT':
         return 'NAVIGATE_TO_CHAT';
       default:
@@ -155,6 +160,9 @@ class MainShellState extends State<MainShell> {
         break;
       case 'NAVIGATE_TO_CHAT':
         await _handleNavigateTo({'page': 'chat'});
+        break;
+      case 'NAVIGATE_TO_CONTACTS':
+        await _handleNavigateTo({'page': 'contacts'});
         break;
       case 'NAVIGATE_TO_SCANNER':
         await _handleNavigateTo({'page': 'scanner'});

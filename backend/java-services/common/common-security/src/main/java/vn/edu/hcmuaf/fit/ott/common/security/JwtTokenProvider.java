@@ -1,18 +1,23 @@
 package vn.edu.hcmuaf.fit.ott.common.security;
 
 import io.jsonwebtoken.*;
+import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.SignatureException;
+import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.security.Key;
-import java.util.Date;
+import javax.crypto.SecretKey;
+import java.time.Instant;
 import java.util.UUID;
 
 /**
- * JWT Token Provider for generating and validating JWT tokens
+ * JWT Token Provider for generating and validating JWT tokens (Modern 0.12.x)
  */
 @Component
+@Slf4j
 public class JwtTokenProvider {
 
     @Value("${jwt.secret:your-very-long-secret-key-at-least-512-bits-for-hs512-algorithm}")
@@ -21,20 +26,31 @@ public class JwtTokenProvider {
     @Value("${jwt.expiration:86400000}") // 1 day
     private long jwtExpiration;
 
+    private SecretKey secretKey;
+
+    @PostConstruct
+    public void init() {
+        try {
+            byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
+            this.secretKey = Keys.hmacShaKeyFor(keyBytes);
+        } catch (Exception e) {
+            log.warn("JWT secret is not Base64 encoded, using plain bytes. Recommendation: Use Base64 for HS512.");
+            this.secretKey = Keys.hmacShaKeyFor(jwtSecret.getBytes());
+        }
+    }
+
     /**
      * Generate JWT access token
      */
     public String generateAccessToken(UUID userId) {
-        Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + jwtExpiration);
-
-        Key key = Keys.hmacShaKeyFor(jwtSecret.getBytes());
+        Instant now = Instant.now();
+        Instant expiry = now.plusMillis(jwtExpiration);
 
         return Jwts.builder()
-                .setSubject(userId.toString())
-                .setIssuedAt(now)
-                .setExpiration(expiryDate)
-                .signWith(key, SignatureAlgorithm.HS512)
+                .subject(userId.toString())
+                .issuedAt(now)
+                .expiration(expiry)
+                .signWith(secretKey, Jwts.SIG.HS512)
                 .compact();
     }
 
@@ -42,13 +58,11 @@ public class JwtTokenProvider {
      * Get user ID from JWT token
      */
     public UUID getUserIdFromToken(String token) {
-        Key key = Keys.hmacShaKeyFor(jwtSecret.getBytes());
-
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(key)
+        Claims claims = Jwts.parser()
+                .verifyWith(secretKey)
                 .build()
-                .parseClaimsJws(token)
-                .getBody();
+                .parseSignedClaims(token)
+                .getPayload();
 
         return UUID.fromString(claims.getSubject());
     }
@@ -58,14 +72,18 @@ public class JwtTokenProvider {
      */
     public boolean validateToken(String token) {
         try {
-            Key key = Keys.hmacShaKeyFor(jwtSecret.getBytes());
-            Jwts.parserBuilder()
-                    .setSigningKey(key)
+            Jwts.parser()
+                    .verifyWith(secretKey)
                     .build()
-                    .parseClaimsJws(token);
+                    .parseSignedClaims(token);
             return true;
-        } catch (JwtException | IllegalArgumentException e) {
-            return false;
+        } catch (ExpiredJwtException e) {
+            log.warn("JWT token is expired: {}", e.getMessage());
+        } catch (SignatureException e) {
+            log.warn("JWT signature validation failed: {}", e.getMessage());
+        } catch (MalformedJwtException | UnsupportedJwtException | IllegalArgumentException e) {
+            log.warn("Invalid JWT token: {}", e.getMessage());
         }
+        return false;
     }
 }

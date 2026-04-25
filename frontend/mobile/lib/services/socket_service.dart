@@ -33,6 +33,8 @@ class SocketService {
       StreamController<Map<String, dynamic>>.broadcast();
   final _reactionRemovedController =
       StreamController<Map<String, dynamic>>.broadcast();
+  final _groupDisbandedController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<Message> get onMessage =>
       _messageController.stream; // Stream for incoming messages
@@ -49,6 +51,7 @@ class SocketService {
   Stream<Map<String, dynamic>> get onCallError => _callErrorController.stream;
   Stream<Map<String, dynamic>> get onReactionAdded => _reactionAddedController.stream;
   Stream<Map<String, dynamic>> get onReactionRemoved => _reactionRemovedController.stream;
+  Stream<Map<String, dynamic>> get onGroupDisbanded => _groupDisbandedController.stream;
 
   void _emitCallSignal(String type, dynamic data) {
     if (data is! Map) return;
@@ -161,6 +164,9 @@ class SocketService {
 
     _socket!.on('message.reaction.removed', (data) {
       _reactionRemovedController.add(Map<String, dynamic>.from(data));
+    });
+    _socket!.on('group.disbanded', (data) {
+      _groupDisbandedController.add(Map<String, dynamic>.from(data));
     });
     _socket!.on('auth.logout.force', (data) {
       final reason = data is Map ? data['reason']?.toString() : null;
@@ -381,5 +387,6 @@ class SocketService {
     _callErrorController.close();
     _reactionAddedController.close();
     _reactionRemovedController.close();
+    _groupDisbandedController.close();
   }
 }

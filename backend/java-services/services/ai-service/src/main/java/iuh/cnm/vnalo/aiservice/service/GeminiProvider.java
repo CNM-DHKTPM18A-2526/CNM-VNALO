@@ -5,7 +5,7 @@ import com.google.genai.types.Content;
 import com.google.genai.types.GenerateContentConfig;
 import com.google.genai.types.GenerateContentResponse;
 import com.google.genai.types.Part;
-import iuh.cnm.vnalo.aiservice.dto.ChatMessage;
+import iuh.cnm.vnalo.aiservice.dto.Message;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -51,7 +51,7 @@ public class GeminiProvider {
         return available;
     }
 
-    public String generate(String systemPrompt, List<ChatMessage> messages) {
+    public String generate(String systemPrompt, List<Message> messages) {
         if (!available) {
             throw new RuntimeException("Gemini not configured");
         }
@@ -59,7 +59,7 @@ public class GeminiProvider {
         try {
             // Build conversation content
             List<Content> contents = new ArrayList<>();
-            for (ChatMessage msg : messages) {
+            for (Message msg : messages) {
                 String role = "user".equals(msg.getRole()) ? "user" : "model";
                 contents.add(Content.builder()
                         .role(role)

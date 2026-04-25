@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:o3d/o3d.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/features/ai_assistant/models/mascot_metadata.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
@@ -83,21 +82,13 @@ class _MascotGalleryScreenState extends State<MascotGalleryScreen> {
                   child: Column(
                     children: [
                       Expanded(
-                        child:
-                            mascot.uses3dModel
-                                ? O3D(
-                                  src: mascot.modelUrl!,
-                                  autoPlay: true,
-                                  cameraOrbit: CameraOrbit(0, 75, 105),
-                                  disableZoom: true,
-                                )
-                                : const Center(
-                                  child: AiRobotAvatar(
-                                    state: AiState.idle,
-                                    emotion: 'joyful',
-                                    size: 190,
-                                  ),
-                                ),
+                        child: const Center(
+                          child: AiRobotAvatar(
+                            state: AiState.idle,
+                            emotion: 'joyful',
+                            size: 190,
+                          ),
+                        ),
                       ),
                       if (mascot.recommended)
                         Padding(
@@ -168,8 +159,6 @@ class _MascotGalleryScreenState extends State<MascotGalleryScreen> {
                               child: Text(
                                 isSelected
                                     ? 'Đang chọn'
-                                    : mascot.uses3dModel
-                                    ? 'Dùng bản 3D'
                                     : 'Dùng bản 2D',
                               ),
                             ),

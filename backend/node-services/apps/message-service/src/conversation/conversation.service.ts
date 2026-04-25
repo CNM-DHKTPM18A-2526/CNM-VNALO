@@ -192,7 +192,7 @@ export class ConversationService {
     return { ...conversation, members };
   }
 
-  /** Update group conversation settings. Only OWNER/ADMIN can update. */
+  /** Update group conversation settings. ADMIN/DEPUTY always allowed. MEMBER allowed if allowMemberEditInfo is true. */
   async updateGroup(
     conversationId: string,
     userId: string,
@@ -206,8 +206,30 @@ export class ConversationService {
       throw new BadRequestException('Can only update group conversations');
     }
 
-    await this.assertAdminOrDeputy(conversationId, userId);
-    Object.assign(conversation, dto);
+    // Check permissions: ADMIN/DEPUTY always allowed, MEMBER only if allowMemberEditInfo is true
+    const member = await this.assertMember(conversationId, userId);
+    if (
+      member.role === MemberRole.MEMBER &&
+      !conversation.allowMemberEditInfo
+    ) {
+      throw new ForbiddenException(
+        'You do not have permission to edit group settings',
+      );
+    }
+
+    // Security Fix: Whitelist fields to prevent Elevation of Privilege
+    if (member.role === MemberRole.MEMBER) {
+      const { title, description, avatarUrl } = dto;
+      Object.assign(conversation, {
+        ...(title && { title }),
+        ...(description && { description }),
+        ...(avatarUrl && { avatarUrl }),
+      });
+    } else {
+      // ADMIN/DEPUTY can update all fields in DTO
+      Object.assign(conversation, dto);
+    }
+
     return this.conversationRepo.save(conversation);
   }
 
@@ -526,18 +548,18 @@ export class ConversationService {
   async assertCanSendMessage(
     conversationId: string,
     userId: string,
-  ): Promise<void> {
+  ): Promise<ConversationMember> {
     const conversation = await this.getConversationOrFail(conversationId);
-    if (conversation.type === ConversationType.DIRECT) return;
+    const member = await this.assertMember(conversationId, userId);
 
-    if (conversation.onlyAdminCanPost) {
-      const member = await this.assertMember(conversationId, userId);
+    if (conversation.type === ConversationType.GROUP && conversation.onlyAdminCanPost) {
       if (member.role === MemberRole.MEMBER) {
         throw new ForbiddenException(
           'Only admin and deputy can send messages in announcement mode',
         );
       }
     }
+    return member;
   }
 
   /**
