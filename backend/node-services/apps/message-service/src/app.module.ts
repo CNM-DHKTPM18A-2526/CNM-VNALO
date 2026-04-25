@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
-import { databaseConfig, redisConfig, jwtConfig } from './config/app.config';
+import { databaseConfig, redisConfig, jwtConfig, kafkaConfig } from './config/app.config';
 import { AuthModule } from './auth/auth.module';
 import { ConversationModule } from './conversation/conversation.module';
 import { MessageModule } from './message/message.module';
@@ -11,12 +11,15 @@ import { GatewayModule } from './gateway/gateway.module';
 import { HealthController } from './health.controller';
 import { RedisModule } from '@nestjs-modules/ioredis';
 
+import { KafkaProducerModule } from './kafka/kafka-producer.module';
+
 @Module({
   imports: [
-    // Load .env
+    // Kafka Producer for notification events
+    KafkaProducerModule,
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [databaseConfig, redisConfig, jwtConfig],
+      load: [databaseConfig, redisConfig, jwtConfig, kafkaConfig],
       envFilePath: ['.env'],
     }),
 

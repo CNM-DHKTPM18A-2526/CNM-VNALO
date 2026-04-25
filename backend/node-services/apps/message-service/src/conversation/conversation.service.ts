@@ -192,7 +192,7 @@ export class ConversationService {
     return { ...conversation, members };
   }
 
-  /** Update group conversation settings. Only OWNER/ADMIN can update. */
+  /** Update group conversation settings. ADMIN/DEPUTY always allowed. MEMBER allowed if allowMemberEditInfo is true. */
   async updateGroup(
     conversationId: string,
     userId: string,
@@ -206,7 +206,14 @@ export class ConversationService {
       throw new BadRequestException('Can only update group conversations');
     }
 
-    await this.assertAdminOrDeputy(conversationId, userId);
+    // Check permissions: ADMIN/DEPUTY always allowed, MEMBER only if allowMemberEditInfo is true
+    const member = await this.assertMember(conversationId, userId);
+    if (member.role === MemberRole.MEMBER && !conversation.allowMemberEditInfo) {
+      throw new ForbiddenException(
+        'You do not have permission to edit group settings',
+      );
+    }
+
     Object.assign(conversation, dto);
     return this.conversationRepo.save(conversation);
   }

@@ -23,6 +23,8 @@ import { ConversationService } from '../conversation/conversation.service';
 import { SendMessageDto } from '../dto/send-message.dto';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import type Redis from 'ioredis';
+import { KafkaProducerService, NotificationEventPayload } from '../kafka/kafka-producer.service';
+import { v4 as uuidv4 } from 'uuid';
 
 type AccessPolicyContext = {
   clientPlatform?: string;
@@ -52,6 +54,7 @@ export class MessageService {
     private readonly dataSource: DataSource,
     @InjectRedis()
     private readonly redis: Redis,
+    private readonly kafkaProducer: KafkaProducerService,
   ) {}
 
   /**
@@ -151,7 +154,122 @@ export class MessageService {
     this.logger.log(
       `Message sent: ${saved.id} in ${dto.conversationId} seq=${serverSeq}`,
     );
+
+    // Publish notification events asynchronously to Kafka
+    // This does NOT block the message send response
+    this.publishNotificationEvents(saved, userId).catch((err) => {
+      this.logger.error(`Failed to publish notification events: ${err.message}`);
+    });
+
     return saved;
+  }
+
+  /**
+   * Publish notification events to Kafka for all message recipients (except sender).
+   * Notifications are sent asynchronously and do not block the message flow.
+   */
+  private async publishNotificationEvents(
+    message: Message,
+    senderId: string,
+  ): Promise<void> {
+    try {
+      // Get all conversation members to notify
+      const members = await this.memberRepo.find({
+        where: { conversationId: message.conversationId, leftAt: IsNull() },
+        select: ['userId'],
+      });
+
+      // Get sender info for notification title
+      const senderName = await this.getSenderDisplayName(senderId, message.conversationId);
+
+      // Build notification title and body
+      const title = senderName;
+      const body = this.buildNotificationBody(message);
+
+      // Get conversation info
+      const conversation = await this.conversationService.getConversation(
+        message.conversationId,
+        senderId,
+      );
+      const conversationTitle = conversation?.title ?? 'Nhắn tin';
+
+      // Send notification to each member (except sender)
+      for (const member of members) {
+        if (member.userId === senderId) {
+          continue; // Don't notify sender
+        }
+
+        const event: NotificationEventPayload = {
+          eventId: uuidv4(),
+          eventType: 'CHAT_MESSAGE',
+          userId: member.userId,
+          title: title,
+          body: body,
+          data: {
+            conversationId: message.conversationId,
+            conversationTitle: conversationTitle,
+            messageId: message.id,
+            senderId: senderId,
+            senderName: senderName,
+            messageType: message.messageType,
+            mediaUrl: message.mediaUrl,
+          },
+          createdAt: new Date().toISOString(),
+        };
+
+        await this.kafkaProducer.publishNotification(event);
+      }
+    } catch (error) {
+      this.logger.error(`Error publishing notification events: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get sender's display name from conversation members.
+   */
+  private async getSenderDisplayName(
+    senderId: string,
+    conversationId: string,
+  ): Promise<string> {
+    try {
+      const member = await this.memberRepo.findOne({
+        where: { conversationId, userId: senderId },
+      });
+      if (member) {
+        return (member as any).nickname ?? (member as any).user?.displayName ?? 'Someone';
+      }
+    } catch {
+      // Fallback
+    }
+    return 'Someone';
+  }
+
+  /**
+   * Build notification body based on message type.
+   */
+  private buildNotificationBody(message: Message): string {
+    const textContent = message.content?.trim();
+
+    switch (message.messageType) {
+      case MessageType.IMAGE:
+        return 'Đã gửi một hình ảnh';
+      case MessageType.VIDEO:
+        return 'Đã gửi một video';
+      case MessageType.AUDIO:
+        return 'Đã gửi một tin nhắn thoại';
+      case MessageType.FILE:
+        return 'Đã gửi một tệp tin';
+      case MessageType.STICKER:
+        return 'Đã gửi một nhãn dán';
+      case MessageType.REPLY:
+        return textContent ? `Trả lời: ${textContent}` : 'Đã gửi một tin nhắn';
+      case MessageType.FORWARD:
+        return textContent ?? 'Đã chuyển tiếp một tin nhắn';
+      case MessageType.SYSTEM:
+        return textContent ?? '';
+      default:
+        return textContent ?? 'Đã gửi một tin nhắn';
+    }
   }
 
   /** Get paginated message history for a conversation (cursor-based on server_seq). */
@@ -172,8 +290,9 @@ export class MessageService {
         `NOT EXISTS (
           SELECT 1
           FROM block_list b
-          WHERE (b.blocker_id = :userId::uuid AND b.blocked_id = m.sender_id)
-             OR (b.blocker_id = m.sender_id AND b.blocked_id = :userId::uuid)
+          WHERE ((b.blocker_id = :userId::uuid AND b.blocked_id = m.sender_id)
+             OR (b.blocker_id = m.sender_id AND b.blocked_id = :userId::uuid))
+            AND b.block_and_hide_logs = true
         )`,
         { userId },
       )
@@ -237,8 +356,9 @@ export class MessageService {
         `NOT EXISTS (
           SELECT 1
           FROM block_list b
-          WHERE (b.blocker_id = :userId::uuid AND b.blocked_id = m.sender_id)
-             OR (b.blocker_id = m.sender_id AND b.blocked_id = :userId::uuid)
+          WHERE ((b.blocker_id = :userId::uuid AND b.blocked_id = m.sender_id)
+             OR (b.blocker_id = m.sender_id AND b.blocked_id = :userId::uuid))
+            AND b.block_and_hide_logs = true
         )`,
         { userId },
       )
@@ -720,8 +840,9 @@ export class MessageService {
       `SELECT EXISTS (
          SELECT 1
          FROM block_list b
-         WHERE (b.blocker_id = $1::uuid AND b.blocked_id = $2::uuid)
-            OR (b.blocker_id = $2::uuid AND b.blocked_id = $1::uuid)
+         WHERE ((b.blocker_id = $1::uuid AND b.blocked_id = $2::uuid)
+            OR (b.blocker_id = $2::uuid AND b.blocked_id = $1::uuid))
+           AND b.block_messages = true
        ) AS blocked`,
       [userId, counterpartId],
     );

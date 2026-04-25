@@ -17,3 +17,9 @@ export const jwtConfig = registerAs('jwt', () => ({
   secret: process.env.JWT_SECRET || '',
   issuer: process.env.JWT_ISSUER || 'vnalo',
 }));
+
+export const kafkaConfig = registerAs('kafka', () => ({
+  brokers: (process.env.KAFKA_BROKERS || 'localhost:9092').split(','),
+  clientId: process.env.KAFKA_CLIENT_ID || 'vnalo-message-service',
+  notificationsTopic: process.env.KAFKA_NOTIFICATIONS_TOPIC || 'vnalo.notifications',
+}));
