@@ -4,6 +4,7 @@ import iuh.cnm.vnalo.core_service.config.JwtConfig;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.SignatureException;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -55,8 +56,8 @@ public class JwtTokenProvider {
                 .claims(claims)
                 .subject(userPrincipal.getId().toString())
                 .issuer(jwtConfig.getIssuer())
-                .issuedAt(Date.from(now))
-                .expiration(Date.from(expiry))
+                .issuedAt(now)
+                .expiration(expiry)
                 .signWith(secretKey, Jwts.SIG.HS512)
                 .compact();
     }
@@ -71,8 +72,12 @@ public class JwtTokenProvider {
         try {
             Jwts.parser().verifyWith(secretKey).build().parseSignedClaims(token);
             return true;
-        } catch (JwtException | IllegalArgumentException ex) {
-            log.warn("Invalid JWT token: {}", ex.getMessage());
+        } catch (ExpiredJwtException e) {
+            log.warn("JWT token is expired: {}", e.getMessage());
+        } catch (SignatureException e) {
+            log.warn("JWT signature validation failed: {}", e.getMessage());
+        } catch (MalformedJwtException | UnsupportedJwtException | IllegalArgumentException e) {
+            log.warn("Invalid JWT token: {}", e.getMessage());
         }
         return false;
     }
