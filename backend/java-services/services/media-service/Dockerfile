@@ -1,37 +1,43 @@
-# ====== BUILD STAGE ======
-FROM maven:3.9.9-eclipse-temurin-21-alpine AS builder
+# =============================================================================
+# Media Service — Multi-stage Dockerfile
+# Base: Eclipse Temurin 21 (Alpine)
+# Build: Maven wrapper (./mvnw)
+# Runtime: JRE only
+# =============================================================================
 
-WORKDIR /app
+# --- Stage 1: Build ---
+FROM eclipse-temurin:21-jdk-alpine AS builder
+WORKDIR /build
 
-# Copy POM first to cache dependencies
-COPY pom.xml .
-RUN mvn dependency:go-offline -B
+# Copy Maven wrapper and config
+COPY .mvn/ .mvn/
+COPY mvnw pom.xml ./
+RUN chmod +x mvnw && ./mvnw dependency:go-offline -B
 
-# Copy source code and build
-COPY src ./src
-RUN mvn clean package -DskipTests -B
+# Copy source and build
+COPY src/ src/
+RUN ./mvnw clean package -DskipTests -B
 
-# ====== RUNTIME STAGE ======
+# --- Stage 2: Runtime ---
 FROM eclipse-temurin:21-jre-alpine
-
 WORKDIR /app
 
-# Create non-root user
+# Security: run as non-root user
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-# Copy jar from build stage
-COPY --from=builder /app/target/*.jar app.jar
-
-# Own the working directory
-RUN chown -R appuser:appgroup /app
-USER appuser
-
-# Expose port
-EXPOSE 8083
+# Copy JAR from builder
+COPY --from=builder /build/target/*.jar app.jar
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD wget -qO- http://localhost:8083/actuator/health || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8083/api/v1/actuator/health || exit 1
 
-# Run — shell form so $JAVA_OPTS from docker-compose is expanded
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+EXPOSE 8083
+
+USER appuser
+
+ENTRYPOINT ["java", \
+  "-XX:+UseContainerSupport", \
+  "-XX:MaxRAMPercentage=75.0", \
+  "-Djava.security.egd=file:/dev/./urandom", \
+  "-jar", "app.jar"]
