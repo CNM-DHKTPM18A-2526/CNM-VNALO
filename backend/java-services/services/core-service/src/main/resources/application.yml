@@ -137,9 +137,8 @@ otp:
     mock-otp: "123456"
     log-otp: ${OTP_LOG_OTP:false}
 
-# Dev: Default JWT secret (only for development!)
-jwt:
-  secret: ZGV2ZWxvcG1lbnQtb25seS1zZWNyZXQta2V5LWRvLW5vdC11c2UtaW4tcHJvZHVjdGlvbi10aGlzLWlzLWF0LWxlYXN0LTUxMi1iaXRzLWxvbmc=
+# jwt:
+#   secret: ZGV2ZWxvcG1lbnQtb25seS1zZWNyZXQta2V5LWRvLW5vdC11c2UtaW4tcHJvZHVjdGlvbi10aGlzLWlzLWF0LWxlYXN0LTUxMi1iaXRzLWxvbmc=
 
 logging:
   level:
