@@ -74,7 +74,7 @@ application:
 jwt:
   # Key này chỉ dùng để dev local. Khi deploy: set biến môi trường JWT_SECRET thật (≥ 512 bit, base64)
   # Tạo key mới: openssl rand -base64 64
-  secret: ${JWT_SECRET:ZGV2ZWxvcG1lbnQtb25seS1zZWNyZXQta2V5LWRvLW5vdC11c2UtaW4tcHJvZHVjdGlvbi10aGlzLWlzLWF0LWxlYXN0LTUxMi1iaXRzLWxvbmc=}
+  secret: ${JWT_SECRET}
 
 # Actuator
 management:
