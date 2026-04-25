@@ -526,18 +526,18 @@ export class ConversationService {
   async assertCanSendMessage(
     conversationId: string,
     userId: string,
-  ): Promise<void> {
+  ): Promise<ConversationMember> {
     const conversation = await this.getConversationOrFail(conversationId);
-    if (conversation.type === ConversationType.DIRECT) return;
+    const member = await this.assertMember(conversationId, userId);
 
-    if (conversation.onlyAdminCanPost) {
-      const member = await this.assertMember(conversationId, userId);
+    if (conversation.type === ConversationType.GROUP && conversation.onlyAdminCanPost) {
       if (member.role === MemberRole.MEMBER) {
         throw new ForbiddenException(
           'Only admin and deputy can send messages in announcement mode',
         );
       }
     }
+    return member;
   }
 
   /**

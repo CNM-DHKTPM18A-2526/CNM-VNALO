@@ -25,14 +25,13 @@
 | message-service | JWT bearer for conversations/messages/inbox controllers |
 | media-service | JWT bearer for protected endpoints, /api/v1/media/public/* is public |
 | moderation-service | JWT bearer with role checks for reports and moderation paths |
-| content-service | Security config permitAll; mutating controllers require X-User-Id header but no JWT validation chain |
-| notification-service | Controller trusts X-User-Id header, no service-local security chain found |
+| content-service | JWT bearer (JwtAuthenticationFilter enforced) |
+| notification-service | JWT bearer (JwtAuthenticationFilter enforced) |
 | ai-service | JWT bearer required for application endpoints |
 | analytics-service | JWT bearer for /api/v1/analytics/* and internal authority for /internal/events |
 | realtime-gateway | WS handshake JWT on /realtime namespace; REST health is open |
 
-> [!WARNING]
-> notification-service and content-service trust controller-level X-User-Id headers for mutating actions and do not enforce JWT at service boundary.
+
 
 ---
 
@@ -284,10 +283,13 @@
 
 | Method | Full Path | Auth |
 | --- | --- | --- |
-| POST | /api/v1/ai/chat | JWT |
-| POST | /api/v1/chat/ask | JWT |
-| GET | /api/v1/chat/history | JWT |
-| DELETE | /api/v1/chat/history | JWT |
+| Method | Full Path | Auth | Notes |
+| --- | --- | --- | --- |
+| POST | /api/v1/ai/chat | JWT | mascot interaction |
+| POST | /api/v1/ai/history/backup | JWT | cloud history sync |
+| POST | /api/v1/chat/ask | JWT | legacy/direct prompt |
+| GET | /api/v1/chat/history | JWT | fetch history |
+| DELETE | /api/v1/chat/history | JWT | clear history |
 
 ---
 

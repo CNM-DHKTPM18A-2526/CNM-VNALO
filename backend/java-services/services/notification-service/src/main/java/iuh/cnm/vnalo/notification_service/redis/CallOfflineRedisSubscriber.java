@@ -58,10 +58,10 @@ public class CallOfflineRedisSubscriber implements MessageListener {
             CreateNotificationRequest request = new CreateNotificationRequest();
             request.setUserId(targetUserId);
             request.setType("CALL_OFFLINE");
-            request.setTitle("Incoming call");
-            request.setBody(callerId + " is calling you");
+            request.setTitle("Cuộc gọi đến");
+            request.setBody("Bạn có cuộc gọi đến trên VNALO");
             request.setData(objectMapper.createObjectNode()
-                    .put("event", EVENT_CALL_OFFER)
+                    .put("type", "call_offer")
                     .put("callId", callId)
                     .put("conversationId", conversationId)
                     .put("senderUserId", callerId));

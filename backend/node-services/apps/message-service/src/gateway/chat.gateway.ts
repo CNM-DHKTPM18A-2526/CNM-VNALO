@@ -168,7 +168,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.userSockets.get(userId)!.add(client.id);
 
       this.logger.log(
-        `[Gateway.conn] ✅ Connected: client=${client.id} user=${userId} restrictedWebMode=${payload.restrictedWebMode} (effective=false override)`,
+        `[Gateway.conn] ✅ Connected: client=${client.id} user=${userId} restrictedWebMode=${client.data.user.restrictedWebMode}`,
       );
 
       // Broadcast presence

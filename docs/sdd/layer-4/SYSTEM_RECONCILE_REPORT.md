@@ -121,6 +121,10 @@
 | R-0214 | Updated GLOBAL_DATABASE_ERD: added only_admin_can_post, allow_member_* to CONVERSATION; block_and_hide_logs to BLOCK_LIST; Pending Schema Changes section | Completed |
 | R-0215 | Updated NAVIGATION_MASTER_GRAPH with group sub-navigation, AI flows, profile tree, web routing | Completed |
 | R-0216 | Added D-011 to D-014 to DECISION_LOG: role rename, hard-delete disbandment, group-wide block, group.disbanded event | Completed |
+| R-0217 | Hardened `content-service` and `notification-service` with JWT auth (Closed Trust Boundary gaps F-001, F-006) | Completed |
+| R-0218 | Enforced `restrictedWebMode` in `WsJwtGuard` and `MessageService` (Closed gap F-002) | Completed |
+| R-0219 | Implemented `disbandGroup()` and `MemberRole` (ADMIN/DEPUTY/MEMBER) taxonomy in backend | Completed |
+| R-0220 | Enforced `onlyAdminCanPost` logic and optimized membership checks in `MessageService` | Completed |
 
 ## 4) Traceability Matrix
 
@@ -144,11 +148,9 @@
 
 | Risk | Owner | Target window |
 |---|---|---|
-| Replace notification `X-User-Id` trust with JWT principal | Backend platform team | Next security hardening sprint |
-| Replace content-service `X-User-Id` trust with JWT principal for mutating routes | Backend platform team | Next security hardening sprint |
-| Remove restricted mode override or enforce claim consistently | Messaging team | Next chat gateway policy sprint |
 | Define single canonical realtime contract between `/chat` and `/realtime` | Architecture guild | Before multi-client gateway expansion |
 | Normalize error envelope across services | API governance | Progressive rollout across next two releases |
+| Implement S3 bulk deletion for disbanded groups | Messaging team | Phase 3 optimization |
 
 ## 6) Reconcile Verdict
 
@@ -161,8 +163,9 @@
 - Navigation graph expanded from 12 to 50+ nodes.
 - All major business rules (group lifecycle, role taxonomy, block semantics) are now in spec.
 - ERD updated with pending schema changes for upcoming code sprint.
-- Remaining deltas are implementation tasks (P0 code gaps), not documentation gaps.
-- Next cycle should prioritize: P0 code implementation of `MemberRole` rename and `disbandGroup()` service.
+- **P0 Code Implementation**: `MemberRole` rename and `disbandGroup()` are now fully implemented and verified.
+- **Security**: Major trust boundary and policy bypass gaps (F-001, F-002, F-006) are resolved.
+- Next cycle should prioritize: Phase 3 optimizations (S3 cleanup, error normalization).
 
 ## Evidence
 

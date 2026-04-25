@@ -1,5 +1,8 @@
 package iuh.cnm.vnalo.aiservice.dto;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -8,6 +11,11 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class Message {
-    private String role;    // "user" or "assistant"
+    @NotNull(message = "Role is required")
+    @Pattern(regexp = "^(user|assistant)$", message = "Role must be 'user' or 'assistant'")
+    private String role;
+
+    @NotNull(message = "Content is required")
+    @NotBlank(message = "Content cannot be blank")
     private String content;
 }
