@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.time.Instant;
+import java.util.Date;
 import java.util.UUID;
 
 /**
@@ -48,8 +49,8 @@ public class JwtTokenProvider {
 
         return Jwts.builder()
                 .subject(userId.toString())
-                .issuedAt(now)
-                .expiration(expiry)
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(expiry))
                 .signWith(secretKey, Jwts.SIG.HS512)
                 .compact();
     }
