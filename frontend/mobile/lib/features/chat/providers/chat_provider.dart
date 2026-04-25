@@ -37,6 +37,7 @@ class ChatProvider extends ChangeNotifier {
   final StreamSubscription<Map<String, dynamic>> _unpinnedSub;
   final StreamSubscription<Map<String, dynamic>> _reactionAddedSub;
   final StreamSubscription<Map<String, dynamic>> _reactionRemovedSub;
+  final StreamSubscription<Map<String, dynamic>> _groupDisbandedSub;
   final Random _random = Random.secure();
 
   List<Conversation> _conversations = [];
@@ -93,7 +94,8 @@ class ChatProvider extends ChangeNotifier {
         _pinnedSub = socketService.onPinned.listen((_) {}),
         _unpinnedSub = socketService.onUnpinned.listen((_) {}),
         _reactionAddedSub = socketService.onReactionAdded.listen((_) {}),
-        _reactionRemovedSub = socketService.onReactionRemoved.listen((_) {}) {
+        _reactionRemovedSub = socketService.onReactionRemoved.listen((_) {}),
+        _groupDisbandedSub = socketService.onGroupDisbanded.listen((_) {}) {
     _notificationService.ensureInitialized();
     _messageSub.onData(_handleIncomingMessage);
     _readSub.onData(_handleReadEvent);
@@ -103,6 +105,7 @@ class ChatProvider extends ChangeNotifier {
     _unpinnedSub.onData(_handleUnpinnedEvent);
     _reactionAddedSub.onData(_handleReactionAddedEvent);
     _reactionRemovedSub.onData(_handleReactionRemovedEvent);
+    _groupDisbandedSub.onData(_handleGroupDisbandedEvent);
   }
 
   List<Message> getMessages(String conversationId) =>
@@ -1093,6 +1096,14 @@ class ChatProvider extends ChangeNotifier {
       } catch (e) {
         debugPrint('[ChatProvider] Database cleanup failed for $conversationId: $e');
       }
+    }
+  }
+
+  void _handleGroupDisbandedEvent(Map<String, dynamic> data) {
+    final String? conversationId = data['conversationId'];
+    if (conversationId != null) {
+      debugPrint('EVENT: Group disbanded received: $conversationId. Purging cache...');
+      _removeConversationLocally(conversationId);
     }
   }
 

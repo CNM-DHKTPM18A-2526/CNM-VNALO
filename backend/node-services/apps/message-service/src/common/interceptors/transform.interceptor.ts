@@ -25,7 +25,7 @@ export class TransformInterceptor<T> implements NestInterceptor<
     return next.handle().pipe(
       map((data) => {
         if (
-          data &&
+          data !== null &&
           typeof data === 'object' &&
           'data' in data &&
           'success' in data &&

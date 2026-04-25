@@ -208,13 +208,28 @@ export class ConversationService {
 
     // Check permissions: ADMIN/DEPUTY always allowed, MEMBER only if allowMemberEditInfo is true
     const member = await this.assertMember(conversationId, userId);
-    if (member.role === MemberRole.MEMBER && !conversation.allowMemberEditInfo) {
+    if (
+      member.role === MemberRole.MEMBER &&
+      !conversation.allowMemberEditInfo
+    ) {
       throw new ForbiddenException(
         'You do not have permission to edit group settings',
       );
     }
 
-    Object.assign(conversation, dto);
+    // Security Fix: Whitelist fields to prevent Elevation of Privilege
+    if (member.role === MemberRole.MEMBER) {
+      const { title, description, avatarUrl } = dto;
+      Object.assign(conversation, {
+        ...(title && { title }),
+        ...(description && { description }),
+        ...(avatarUrl && { avatarUrl }),
+      });
+    } else {
+      // ADMIN/DEPUTY can update all fields in DTO
+      Object.assign(conversation, dto);
+    }
+
     return this.conversationRepo.save(conversation);
   }
 
