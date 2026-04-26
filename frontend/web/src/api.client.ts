@@ -2,43 +2,49 @@ import axios from 'axios';
 
 export function extractMessage(payload: unknown): string | null {
   if (!payload || typeof payload !== 'object') {
-    return null
+    return null;
   }
 
-  const obj = payload as Record<string, unknown>
+  const obj = payload as Record<string, unknown>;
 
   if (typeof obj.message === 'string' && obj.message.trim()) {
-    return obj.message
+    return obj.message;
   }
 
   if (typeof obj.error === 'string' && obj.error.trim()) {
-    return obj.error
+    return obj.error;
   }
 
   if (obj.data && typeof obj.data === 'object') {
-    const nested = obj.data as Record<string, unknown>
+    const nested = obj.data as Record<string, unknown>;
 
     if (typeof nested.message === 'string' && nested.message.trim()) {
-      return nested.message
+      return nested.message;
     }
   }
 
-  return null
+  return null;
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// All services route through Nginx gateway at 13.250.2.132
+// Override with environment variables:
+//   VITE_API_BASE_URL     → Core API (auth, users, friends)
+//   VITE_MESSAGE_API_URL  → Message API (chat, conversations)
+//   VITE_MEDIA_API_URL    → Media API (uploads, stickers)
+//   VITE_WS_BASE_URL      → WebSocket base (defaults to same origin)
+// ──────────────────────────────────────────────────────────────────────────────
+const FALLBACK_HOST = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (
   typeof window !== 'undefined'
     ? `${window.location.origin}/api/v1`
-    : '/api/v1'
+    : `http://${FALLBACK_HOST}/api/v1`
 );
 
 export const MESSAGE_API_URL = import.meta.env.VITE_MESSAGE_API_URL ?? API_BASE_URL;
 
-export const MEDIA_API_URL = import.meta.env.VITE_MEDIA_API_URL ?? (
-  typeof window !== 'undefined' && window.location.port !== '80'
-    ? `http://${window.location.hostname}:8083/api/v1`
-    : API_BASE_URL
-);
+export const MEDIA_API_URL = import.meta.env.VITE_MEDIA_API_URL ?? API_BASE_URL;
 
 export const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL ?? (
   typeof window !== 'undefined'
