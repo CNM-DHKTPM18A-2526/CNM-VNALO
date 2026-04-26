@@ -1,6 +1,6 @@
 import type { ChatAttachment, ChatMessage, ChatMessageType, ConversationSummary, ReplyMetadata } from './chat.types'
 import { formatMessageContent } from './utils/messageUtils'
-import { API_BASE_URL, extractMessage, MEDIA_API_URL, messageApi } from '../../api.client'
+import { API_BASE_URL, extractMessage, MEDIA_API_URL, messageApi, mediaApi } from '../../api.client'
 import { resolveMediaUrl } from '../../utils/mediaUtils'
 
 type InboxItem = {
@@ -63,7 +63,7 @@ type RawMessageLike = RawMessage & {
   recalled_at?: string | null
 }
 
-type UploadResponse = {
+type MediaUploadResponse = {
   url?: string
   mediaId?: string
   mimeType?: string | null
@@ -353,17 +353,14 @@ export async function uploadChatMedia(token: string, file: File): Promise<MediaU
   formData.append('category', isImage ? 'AVATAR' : 'CHAT_FILE');
 
   try {
-    // We use MEDIA_API_URL (port 8083) because that is where the media service lives on local.
-    // VITE_MEDIA_API_URL is http://localhost:8083/api/v1/media, so we append /upload
-    const response = await fetch(`${MEDIA_API_URL}/upload`, {
-      method: 'POST',
+    // We use mediaApi (Axios instance for port 8083)
+    const response = await mediaApi.post('/upload', formData, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
-      body: formData,
     });
 
-    const json = await response.json().catch(() => null);
+    const json = response.data;
 
     if (!response.ok) {
       throw new Error(extractMessage(json) ?? 'Unable to upload media.');

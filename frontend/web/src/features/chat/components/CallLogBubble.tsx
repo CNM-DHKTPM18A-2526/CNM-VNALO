@@ -1,6 +1,6 @@
 import { Phone, Video, ArrowUpRight } from 'lucide-react'
 import type { ChatMessage } from '../chat.types'
-import { parseCallLog, formatDurationZalo, formatMessageTimestamp } from '../utils/messageUtils'
+import { parseCallLog, formatDurationZalo } from '../utils/messageUtils'
 
 type CallLogBubbleProps = {
   message: ChatMessage
