@@ -18,6 +18,11 @@ type UseChatSocketOptions = {
   onMessageRecalled?: (payload: { messageId: string; conversationId: string; recalledBy: string }) => void
   onMessageRead?: (payload: { userId: string; conversationId: string; lastReadSeq: number }) => void
   onPresenceChanged?: (payload: PresenceChangedPayload) => void
+  onGroupMemberAdded?: (payload: { conversationId: string; targetMemberIds: string[]; actorId: string }) => void
+  onGroupMemberRemoved?: (payload: { conversationId: string; targetMemberIds: string[]; actorId: string }) => void
+  onGroupMemberLeft?: (payload: { conversationId: string; actorId: string }) => void
+  onGroupRoleChanged?: (payload: { conversationId: string; targetUserId: string; role: string; actorId: string }) => void
+  onGroupDisbanded?: (payload: { conversationId: string }) => void
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -33,15 +38,8 @@ function getOrCreateChatService(): ChatSocketService {
   return globalChatService
 }
 
-export function useChatSocket({
-  token,
-  onConnected,
-  onDisconnected,
-  onMessageReceived,
-  onMessageRecalled,
-  onMessageRead,
-  onPresenceChanged,
-}: UseChatSocketOptions) {
+export function useChatSocket(options: UseChatSocketOptions) {
+  const { token, onConnected, onDisconnected, onMessageReceived, onMessageRecalled, onMessageRead, onPresenceChanged } = options;
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // SINGLE INITIALIZATION (prevents React Strict Mode double-connect)
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -53,15 +51,25 @@ export function useChatSocket({
   const onMessageRecalledRef = useRef<UseChatSocketOptions['onMessageRecalled']>(onMessageRecalled)
   const onMessageReadRef = useRef<UseChatSocketOptions['onMessageRead']>(onMessageRead)
   const onPresenceChangedRef = useRef<UseChatSocketOptions['onPresenceChanged']>(onPresenceChanged)
+  const onGroupMemberAddedRef = useRef<UseChatSocketOptions['onGroupMemberAdded']>(options.onGroupMemberAdded)
+  const onGroupMemberRemovedRef = useRef<UseChatSocketOptions['onGroupMemberRemoved']>(options.onGroupMemberRemoved)
+  const onGroupMemberLeftRef = useRef<UseChatSocketOptions['onGroupMemberLeft']>(options.onGroupMemberLeft)
+  const onGroupRoleChangedRef = useRef<UseChatSocketOptions['onGroupRoleChanged']>(options.onGroupRoleChanged)
+  const onGroupDisbandedRef = useRef<UseChatSocketOptions['onGroupDisbanded']>(options.onGroupDisbanded)
 
   useEffect(() => {
-    onConnectedRef.current = onConnected
-    onDisconnectedRef.current = onDisconnected
-    onMessageReceivedRef.current = onMessageReceived
-    onMessageRecalledRef.current = onMessageRecalled
-    onMessageReadRef.current = onMessageRead
-    onPresenceChangedRef.current = onPresenceChanged
-  }, [onConnected, onDisconnected, onMessageRead, onMessageReceived, onMessageRecalled, onPresenceChanged])
+    onConnectedRef.current = options.onConnected
+    onDisconnectedRef.current = options.onDisconnected
+    onMessageReceivedRef.current = options.onMessageReceived
+    onMessageRecalledRef.current = options.onMessageRecalled
+    onMessageReadRef.current = options.onMessageRead
+    onPresenceChangedRef.current = options.onPresenceChanged
+    onGroupMemberAddedRef.current = options.onGroupMemberAdded
+    onGroupMemberRemovedRef.current = options.onGroupMemberRemoved
+    onGroupMemberLeftRef.current = options.onGroupMemberLeft
+    onGroupRoleChangedRef.current = options.onGroupRoleChanged
+    onGroupDisbandedRef.current = options.onGroupDisbanded
+  }, [options]) // Trigger Vite HMR
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // CONNECT ONLY ONCE (even with Strict Mode)
@@ -132,6 +140,12 @@ export function useChatSocket({
       onPresenceChangedRef.current?.(payload)
     }
 
+    const handleGroupMemberAdded = (payload: any) => onGroupMemberAddedRef.current?.(payload)
+    const handleGroupMemberRemoved = (payload: any) => onGroupMemberRemovedRef.current?.(payload)
+    const handleGroupMemberLeft = (payload: any) => onGroupMemberLeftRef.current?.(payload)
+    const handleGroupRoleChanged = (payload: any) => onGroupRoleChangedRef.current?.(payload)
+    const handleGroupDisbanded = (payload: any) => onGroupDisbandedRef.current?.(payload)
+
     // Remove old listeners first to prevent duplicates in Strict Mode
     socket.off('connect', handleConnect)
     socket.off('disconnect', handleDisconnect)
@@ -139,6 +153,11 @@ export function useChatSocket({
     socket.off('message.recalled', handleMessageRecalled)
     socket.off('message.read', handleMessageRead)
     socket.off('presence.changed', handlePresenceChanged)
+    socket.off('group.memberAdded', handleGroupMemberAdded)
+    socket.off('group.memberRemoved', handleGroupMemberRemoved)
+    socket.off('group.memberLeft', handleGroupMemberLeft)
+    socket.off('group.roleChanged', handleGroupRoleChanged)
+    socket.off('group.disbanded', handleGroupDisbanded)
 
     // Add listeners
     socket.on('connect', handleConnect)
@@ -147,6 +166,11 @@ export function useChatSocket({
     socket.on('message.recalled', handleMessageRecalled)
     socket.on('message.read', handleMessageRead)
     socket.on('presence.changed', handlePresenceChanged)
+    socket.on('group.memberAdded', handleGroupMemberAdded)
+    socket.on('group.memberRemoved', handleGroupMemberRemoved)
+    socket.on('group.memberLeft', handleGroupMemberLeft)
+    socket.on('group.roleChanged', handleGroupRoleChanged)
+    socket.on('group.disbanded', handleGroupDisbanded)
 
     socket.onAny((event, ...args) => {
       // Log all events to help debug WebRTC signaling
@@ -171,6 +195,11 @@ export function useChatSocket({
       socket.off('message.recalled', handleMessageRecalled)
       socket.off('message.read', handleMessageRead)
       socket.off('presence.changed', handlePresenceChanged)
+      socket.off('group.memberAdded', handleGroupMemberAdded)
+      socket.off('group.memberRemoved', handleGroupMemberRemoved)
+      socket.off('group.memberLeft', handleGroupMemberLeft)
+      socket.off('group.roleChanged', handleGroupRoleChanged)
+      socket.off('group.disbanded', handleGroupDisbanded)
       socket.offAny()
     }
   }, [token])
