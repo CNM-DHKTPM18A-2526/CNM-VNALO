@@ -7,8 +7,7 @@ import type {
   UserLookupResult,
 } from './friends.types'
 
-// All services route through Nginx gateway at 13.250.2.132
-const API_BASE_URL = import.meta.env.VITE_CORE_API_URL ?? 'http://13.250.2.132/api/v1'
+import { API_BASE_URL } from '../../api.client'
 
 type ApiResponse<T> = {
   success?: boolean

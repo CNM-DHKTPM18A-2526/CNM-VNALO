@@ -35,7 +35,7 @@ export const UserStoreProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [userMap])
 
   const ensureUser = useCallback(async (token: string, userId: string): Promise<CachedUserProfile> => {
-    if (userMap[userId]) return userMap[userId]
+    if (userMap[userId] && userMap[userId].displayName !== 'Người dùng') return userMap[userId]
 
     const pending = pendingRequests.current.get(userId)
     if (pending) return pending
