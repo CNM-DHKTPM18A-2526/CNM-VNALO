@@ -22,7 +22,6 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.http.HttpMethod;
 
 import java.nio.charset.StandardCharsets;
@@ -86,8 +85,8 @@ public class SecurityConfig {
 
     .requestMatchers("/moderation/**").authenticated()
     .requestMatchers("/api/v1/moderation/**").authenticated()
-    .requestMatchers("/admin/**").authenticated()
-    .requestMatchers("/api/v1/admin/**").authenticated()
+    .requestMatchers("/admin/**").hasRole("ADMIN")
+    .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
 
     .anyRequest().authenticated()
 )
