@@ -21,6 +21,10 @@ export type ConversationSummary = {
   isPinned?: boolean
   members?: Array<{ userId: string; role: string }>
   onlyAdminCanPost?: boolean
+  inviteLink?: string | null
+  allowMemberEditInfo?: boolean
+  allowMemberPin?: boolean
+  joinMode?: 'OPEN' | 'APPROVAL' | string
 }
 
 export type ChatMessageType = 'text' | 'image' | 'video' | 'file' | 'sticker' | 'system' | 'call'

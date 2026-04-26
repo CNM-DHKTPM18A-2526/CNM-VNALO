@@ -27,7 +27,6 @@ import {
   Copy,
   Share2,
   RotateCw,
-  UserX,
   ChevronRight,
   ShieldCheck
 } from 'lucide-react';

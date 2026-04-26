@@ -3736,7 +3736,7 @@ function ChatPageContent() {
       
       // Update local state
       setConversations(prev => prev.filter(conv => conv.id !== selectedConversationId));
-      setSelectedConversationId(null);
+      setSelectedConversationId('');
       setRightSidebarContent(null);
       navigate('/chat');
     } catch (error) {
