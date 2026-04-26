@@ -22,7 +22,14 @@ import {
   Users,
   Search,
   MoreHorizontal,
-  Camera
+  Camera,
+  HelpCircle,
+  Copy,
+  Share2,
+  RotateCw,
+  UserX,
+  ChevronRight,
+  ShieldCheck
 } from 'lucide-react';
 
 import { useAuth } from '../../auth/useAuth';
@@ -45,6 +52,8 @@ type ConversationInfoProps = {
   onUpdateMemberRole?: (userId: string, role: string) => void;
   onTransferOwnerAndLeave?: (newOwnerId: string) => void;
   onUpdateGroupAvatar?: (file: File) => void;
+  onUpdateGroupSettings?: (settings: Partial<any>) => void;
+  onDisbandGroup?: () => void;
   friends?: Friend[];
 };
 
@@ -64,6 +73,8 @@ export function ConversationInfo({
   onUpdateMemberRole,
   onTransferOwnerAndLeave,
   onUpdateGroupAvatar,
+  onUpdateGroupSettings,
+  onDisbandGroup,
   friends,
   currentUserId
 }: ConversationInfoProps & {
@@ -90,7 +101,7 @@ export function ConversationInfo({
 
   const isOwner = useMemo(() => {
     if (!currentUserId || !conversation.members) return false;
-    return conversation.members.some(m => m.userId === currentUserId && m.role === 'OWNER');
+    return conversation.members.some(m => m.userId === currentUserId && String(m.role || '').toUpperCase() === 'ADMIN');
   }, [currentUserId, conversation.members]);
 
   const allDisplayMemberIds = useMemo(() => {
@@ -189,6 +200,9 @@ export function ConversationInfo({
       ) : showGroupManagement ? (
         <GroupManagementView
           isOwner={isOwner}
+          conversation={conversation}
+          onUpdateSettings={onUpdateGroupSettings}
+          onDisband={onDisbandGroup}
         />
       ) : (
         <>
@@ -213,7 +227,7 @@ export function ConversationInfo({
                       extraCount={collageData.extraCount}
                     />
                     
-                    {conversation.isGroup && (
+                    {conversation.isGroup && isOwner && (
                       <label className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full cursor-pointer opacity-0 group-hover/avatar:opacity-100 transition-opacity">
                         <Camera className="text-white" size={24} />
                         <input
@@ -491,23 +505,233 @@ export function ConversationInfo({
   );
 }
 
-function GroupManagementView({ isOwner }: { isOwner: boolean }) {
+function GroupManagementView({ 
+  isOwner, 
+  conversation, 
+  onUpdateSettings,
+  onDisband 
+}: { 
+  isOwner: boolean; 
+  conversation: ConversationSummary;
+  onUpdateSettings?: (s: any) => void;
+  onDisband?: () => void;
+}) {
+  const [showDisbandConfirm, setShowDisbandConfirm] = useState(false);
+
+  const handleToggle = (key: string, value: any) => {
+    if (!isOwner) return;
+    onUpdateSettings?.({ [key]: value });
+  };
+
+  const inviteLink = conversation.inviteLink ? `vnalo.me/g/${conversation.inviteLink}` : 'Đang tải...';
+
   return (
-    <div className="flex flex-col gap-3 pb-10">
+    <div className="flex flex-col bg-[#F1F1F4] h-full overflow-y-auto">
       {!isOwner && (
-        <div className="bg-[#EBEBEF] px-4 py-2 flex items-center justify-center gap-2 border-b border-gray-200">
-          <Lock size={14} className="text-slate-800" />
-          <span className="text-[13px] font-medium text-slate-800">Tính năng chỉ dành cho quản trị viên</span>
+        <div className="bg-[#FFF9EA] px-4 py-2.5 flex items-center justify-center gap-2 border-b border-orange-100 sticky top-0 z-10">
+          <Lock size={14} className="text-orange-600" />
+          <span className="text-[13px] font-medium text-orange-700">Tính năng chỉ dành cho quản trị viên</span>
         </div>
       )}
-      <div className="bg-white">
-        <button className="w-full px-5 py-4 flex items-center justify-between border-0 bg-white hover:bg-gray-50 transition-colors">
-          <div className="flex items-center gap-3">
-            <Settings size={20} className="text-slate-600" />
-            <span className="text-[16px] text-slate-700">Cài đặt nhóm</span>
-          </div>
-        </button>
+
+      {/* Section 1: Member Permissions */}
+      <div className="bg-white px-5 py-5 mt-2">
+        <h4 className={`text-[14px] font-bold mb-5 ${!isOwner ? 'text-gray-400' : 'text-[#001A33]'}`}>
+          Cho phép các thành viên trong nhóm:
+        </h4>
+        <div className="space-y-6">
+          <PermissionCheckbox 
+            label="Thay đổi tên & ảnh đại diện của nhóm" 
+            checked={conversation.allowMemberEditInfo ?? false} 
+            disabled={!isOwner}
+            onChange={(val) => handleToggle('allowMemberEditInfo', val)}
+          />
+          <PermissionCheckbox 
+            label="Ghim tin nhắn, ghi chú, bình chọn lên đầu hội thoại" 
+            checked={conversation.allowMemberPin ?? false} 
+            disabled={!isOwner}
+            onChange={(val) => handleToggle('allowMemberPin', val)}
+          />
+          <PermissionCheckbox 
+            label="Tạo mới ghi chú, nhắc hẹn" 
+            checked={true}
+            disabled={!isOwner}
+          />
+          <PermissionCheckbox 
+            label="Tạo mới bình chọn" 
+            checked={true} 
+            disabled={!isOwner}
+          />
+          <PermissionCheckbox 
+            label="Gửi tin nhắn" 
+            checked={!conversation.onlyAdminCanPost} 
+            disabled={!isOwner}
+            onChange={(val) => handleToggle('onlyAdminCanPost', !val)}
+          />
+        </div>
       </div>
+
+      {/* Section 2: Advanced Settings */}
+      <div className="mt-2 bg-white divide-y divide-gray-100">
+        <SettingToggleRow 
+          label="Chế độ phê duyệt thành viên mới" 
+          description={true}
+          checked={conversation.joinMode === 'APPROVAL'} 
+          disabled={!isOwner}
+          onChange={(val) => handleToggle('joinMode', val ? 'APPROVAL' : 'OPEN')}
+        />
+        <SettingToggleRow 
+          label="Đánh dấu tin nhắn từ trưởng/phó nhóm" 
+          description={true}
+          checked={true} 
+          disabled={!isOwner}
+        />
+        <SettingToggleRow 
+          label="Cho phép thành viên mới đọc tin nhắn gần nhất" 
+          description={true}
+          checked={true}
+          disabled={!isOwner}
+        />
+        <div className="px-5 py-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 flex-1 pr-4">
+              <span className={`text-[15px] font-medium leading-normal ${!isOwner ? 'text-gray-400' : 'text-slate-700'}`}>
+                Cho phép dùng link tham gia nhóm
+              </span>
+              <HelpCircle size={16} className="text-gray-400 flex-shrink-0" />
+            </div>
+            <ToggleSwitch 
+              checked={!!conversation.inviteLink} 
+              disabled={!isOwner}
+            />
+          </div>
+          
+          <div className="bg-[#F3F5F7] rounded-lg p-4 flex items-center justify-between gap-3 border border-gray-100">
+            <span className="text-[#0068FF] text-[14px] font-medium truncate flex-1">
+              {inviteLink}
+            </span>
+            <div className="flex items-center gap-4 text-[#0068FF]">
+              <Copy size={18} className="cursor-pointer hover:opacity-70 transition-opacity" />
+              <Share2 size={18} className="cursor-pointer hover:opacity-70 transition-opacity" />
+              <RotateCw size={18} className="cursor-pointer hover:opacity-70 transition-opacity" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Section 3: Management Links */}
+      {isOwner && (
+        <div className="mt-2 bg-white divide-y divide-gray-100">
+           <button className="w-full px-5 py-[18px] flex items-center justify-between hover:bg-gray-50 border-0 bg-transparent transition-colors group">
+              <div className="flex items-center gap-3">
+                <UserPlus size={20} className="text-slate-600" />
+                <span className="text-[15px] font-medium text-[#334155]">Chặn khỏi nhóm</span>
+              </div>
+              <ChevronRight size={18} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+           </button>
+           <button className="w-full px-5 py-[18px] flex items-center justify-between hover:bg-gray-50 border-0 bg-transparent transition-colors group">
+              <div className="flex items-center gap-3">
+                <ShieldCheck size={20} className="text-slate-600" />
+                <span className="text-[15px] font-medium text-[#334155]">Trưởng & phó nhóm</span>
+              </div>
+              <ChevronRight size={18} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+           </button>
+        </div>
+      )}
+
+      {/* Footer: Disband */}
+      {isOwner && (
+        <div className="mt-8 px-5 pb-10">
+          <button 
+            className="w-full py-3.5 rounded-xl bg-[#FFEDED] text-[#D83A3A] font-bold text-[15px] hover:bg-[#FFD9D9] transition-all border-0 shadow-sm outline-none cursor-pointer"
+            onClick={() => setShowDisbandConfirm(true)}
+          >
+            Giải tán nhóm
+          </button>
+        </div>
+      )}
+
+      {/* Disband Confirmation Modal */}
+      <Modal
+        isOpen={showDisbandConfirm}
+        onClose={() => setShowDisbandConfirm(false)}
+        title="Giải tán nhóm"
+        variant="confirm"
+        footer={
+          <div className="flex gap-3 justify-end w-full">
+            <button 
+              className="px-6 py-2 rounded-lg bg-[#EBEBEF] text-slate-700 font-bold hover:bg-gray-200 border-0 outline-none cursor-pointer"
+              onClick={() => setShowDisbandConfirm(false)}
+            >
+              Không
+            </button>
+            <button 
+              className="px-6 py-2 rounded-lg bg-[#FFE9E9] text-[#E02424] font-bold hover:bg-red-100 border-0 outline-none cursor-pointer" 
+              onClick={() => {
+                onDisband?.();
+                setShowDisbandConfirm(false);
+              }}
+            >
+              Giải tán nhóm
+            </button>
+          </div>
+        }
+      >
+        <p className="py-2 text-[15px] text-slate-600 leading-relaxed">
+          Mời tất cả mọi người rời nhóm và xóa tin nhắn? Nhóm đã giải tán sẽ KHÔNG THỂ khôi phục.
+        </p>
+      </Modal>
+    </div>
+  );
+}
+
+function PermissionCheckbox({ 
+  label, 
+  checked, 
+  onChange, 
+  disabled 
+}: { 
+  label: string; 
+  checked: boolean; 
+  onChange?: (val: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <label className={`flex items-center justify-between gap-4 py-0.5 ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}>
+      <span className={`text-[15px] leading-[1.3] flex-1 font-medium ${disabled ? 'text-gray-400' : 'text-[#334155]'}`}>{label}</span>
+      <input 
+        type="checkbox" 
+        checked={checked} 
+        disabled={disabled}
+        onChange={(e) => onChange?.(e.target.checked)}
+        className="h-[22px] w-[22px] rounded border-gray-300 text-[#0091FF] focus:ring-[#0091FF] transition-all cursor-pointer flex-shrink-0"
+      />
+    </label>
+  );
+}
+
+function SettingToggleRow({ 
+  label, 
+  description, 
+  checked, 
+  onChange, 
+  disabled 
+}: { 
+  label: string; 
+  description?: boolean; 
+  checked: boolean; 
+  onChange?: (val: boolean) => void; 
+  disabled?: boolean;
+}) {
+  return (
+    <div className="px-5 py-[18px] flex items-center justify-between hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => !disabled && onChange?.(!checked)}>
+      <div className="flex items-center gap-1.5 flex-1 pr-6">
+        <span className={`text-[15px] font-medium leading-normal ${disabled ? 'text-gray-400' : 'text-[#334155]'}`}>
+          {label}
+        </span>
+        {description && <HelpCircle size={16} className="text-gray-400 flex-shrink-0" />}
+      </div>
+      <ToggleSwitch checked={checked} onChange={onChange} disabled={disabled} />
     </div>
   );
 }
@@ -533,8 +757,10 @@ function MemberListView({
   const members = useMemo(() => {
     const list = [...(conversation.members || [])];
     return list.sort((a, b) => {
-      const roles = { OWNER: 0, ADMIN: 1, MEMBER: 2 };
-      return (roles[a.role as keyof typeof roles] ?? 3) - (roles[b.role as keyof typeof roles] ?? 3);
+      const roles = { ADMIN: 0, DEPUTY: 1, MEMBER: 2 };
+      const roleA = String(a.role || '').toUpperCase() as keyof typeof roles;
+      const roleB = String(b.role || '').toUpperCase() as keyof typeof roles;
+      return (roles[roleA] ?? 3) - (roles[roleB] ?? 3);
     }).filter(m => {
       const profile = userMap[m.userId];
       if (!searchTerm) return true;
@@ -542,7 +768,7 @@ function MemberListView({
     });
   }, [conversation.members, userMap, searchTerm]);
 
-  const isCurrentUserOwner = !!conversation.members?.some(m => m.userId === currentUserId && m.role === 'OWNER');
+  const isCurrentUserOwner = !!conversation.members?.some(m => m.userId === currentUserId && m.role === 'ADMIN');
 
   return (
     <div className="flex flex-col bg-[#F4F5F7] h-full overflow-hidden">
@@ -608,8 +834,9 @@ function MemberRow({
   const [showMenu, setShowMenu] = useState(false);
   const { userMap } = useUserStore();
   const profile = userMap[member.userId];
-  const isOwner = member.role === 'OWNER';
-  const isAdmin = member.role === 'ADMIN';
+  const role = String(member.role || '').toUpperCase();
+  const isOwner = role === 'ADMIN';
+  const isAdmin = role === 'DEPUTY';
 
   return (
     <div className="flex items-center gap-3 py-2 group">
@@ -882,15 +1109,28 @@ function FooterAction({ icon: Icon, label, color, onClick }: { icon: React.Eleme
   );
 }
 
-function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function ToggleSwitch({ 
+  checked, 
+  onChange, 
+  disabled 
+}: { 
+  checked: boolean; 
+  onChange?: (v: boolean) => void;
+  disabled?: boolean;
+}) {
   return (
     <button
       type="button"
-      onClick={() => onChange(!checked)}
-      className={`relative h-7 w-12 rounded-full border-0 shadow-none outline-none ring-0 transition-colors focus:outline-none ${checked ? 'bg-[#0091FF]' : 'bg-gray-300'}`}
+      onClick={() => !disabled && onChange?.(!checked)}
+      disabled={disabled}
+      className={`relative h-7 w-12 rounded-full border-0 shadow-none outline-none ring-0 transition-all focus:outline-none ${
+        disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
+      } ${checked ? 'bg-[#0091FF]' : 'bg-gray-300'}`}
     >
       <div
-        className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${checked ? 'translate-x-6' : 'translate-x-0.5'}`}
+        className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${
+          checked ? 'translate-x-6' : 'translate-x-0.5'
+        }`}
       />
     </button>
   );

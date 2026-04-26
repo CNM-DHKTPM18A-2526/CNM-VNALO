@@ -35,6 +35,8 @@ import {
   removeMember,
   updateMemberRole,
   updateGroupAvatar,
+  updateConversation,
+  disbandConversation,
   renameGroupConversation,
   setConversationNickname,
 } from '../features/chat/chat.api';
@@ -884,19 +886,111 @@ function ChatPageContent() {
         return
       }
 
-      // 1. Deduplication
-      if (raw.id && processedMessageIds.current.has(raw.id)) {
-        console.log('[ChatPage.onMessageReceived] Skipping duplicate message:', raw.id)
-        return
-      }
-      if (raw.id) processedMessageIds.current.add(raw.id)
-
       const senderId = raw.senderId || raw.from || ''
       const mapped = applyRestrictedMessage(normalizeMessage(mapRawMessage(raw, user.id)), isRestrictedMode)
 
       if (!mapped.conversationId) {
         return
       }
+
+      // 1. FAST PATH: Handle DISBAND_GROUP immediately before any async work or state updates
+      if (mapped.type === 'system') {
+        try {
+          const systemPayload = JSON.parse(mapped.text);
+          if (systemPayload.action === 'DISBAND_GROUP') {
+            console.log('[ChatPage.onMessageReceived] CRITICAL: Handling DISBAND_GROUP signal for:', mapped.conversationId);
+            
+            // Remove from list and navigate away
+            setConversations(prev => prev.filter(c => c.id !== mapped.conversationId));
+            if (selectedConversationIdRef.current === mapped.conversationId) {
+              navigate('/chat');
+            }
+            return; // EXIT IMMEDIATELY - Do not fetch users, do not update preview, do not deduplicate
+          }
+
+          if (systemPayload.action === 'LEAVE_GROUP') {
+            const leaverId = systemPayload.actorId;
+            console.log('[ChatPage.onMessageReceived] Handling LEAVE_GROUP for:', leaverId, 'in:', mapped.conversationId);
+            
+            if (leaverId === user.id) {
+              setConversations(prev => prev.filter(c => c.id !== mapped.conversationId));
+              if (selectedConversationIdRef.current === mapped.conversationId) {
+                navigate('/chat');
+              }
+              return;
+            }
+
+            // Update list for others
+            setConversations(prev => prev.map(c => {
+              if (c.id === mapped.conversationId) {
+                const updatedMembers = c.members?.filter(m => m.userId !== leaverId) || [];
+                const updatedIds = c.participantUserIds?.filter(id => id !== leaverId) || [];
+                return {
+                  ...c,
+                  members: updatedMembers,
+                  participantUserIds: updatedIds,
+                  memberCount: Math.max(1, (c.memberCount || 1) - 1)
+                };
+              }
+              return c;
+            }));
+            // Continue to normal flow to show the system message preview "X left the group"
+          }
+
+          if (systemPayload.action === 'ADD_MEMBERS') {
+             const newMemberIds = systemPayload.targetMemberIds || [];
+             console.log('[ChatPage.onMessageReceived] Handling ADD_MEMBERS for:', newMemberIds, 'in:', mapped.conversationId);
+             
+             setConversations(prev => prev.map(c => {
+               if (c.id === mapped.conversationId) {
+                 const currentIds = c.participantUserIds || [];
+                 const addedIds = newMemberIds.filter((id: string) => !currentIds.includes(id));
+                 return {
+                   ...c,
+                   participantUserIds: [...currentIds, ...addedIds],
+                   members: [...(c.members || []), ...addedIds.map((id: string) => ({ userId: id, role: 'MEMBER' }))],
+                   memberCount: (c.memberCount || 1) + addedIds.length
+                 };
+               }
+               return c;
+             }));
+          }
+
+          if (systemPayload.action === 'REMOVE_MEMBER') {
+             const targetIds = systemPayload.targetMemberIds || [];
+             console.log('[ChatPage.onMessageReceived] Handling REMOVE_MEMBER for:', targetIds, 'in:', mapped.conversationId);
+             
+             if (user.id && targetIds.includes(user.id)) {
+               setConversations(prev => prev.filter(c => c.id !== mapped.conversationId));
+               if (selectedConversationIdRef.current === mapped.conversationId) {
+                 navigate('/chat');
+               }
+               return;
+             }
+
+             setConversations(prev => prev.map(c => {
+               if (c.id === mapped.conversationId) {
+                 return {
+                   ...c,
+                   participantUserIds: c.participantUserIds?.filter(id => !targetIds.includes(id)),
+                   members: c.members?.filter(m => !targetIds.includes(m.userId)),
+                   memberCount: Math.max(1, (c.memberCount || 1) - targetIds.length)
+                 };
+               }
+               return c;
+             }));
+          }
+        } catch (e) {
+          // Not a JSON system message, continue to normal flow
+        }
+      }
+
+      // 2. Deduplication
+      if (raw.id && processedMessageIds.current.has(raw.id)) {
+        console.log('[ChatPage.onMessageReceived] Skipping duplicate message:', raw.id)
+        return
+      }
+      if (raw.id) processedMessageIds.current.add(raw.id)
 
       if (deletedMessageIds[mapped.id]) {
         return
@@ -937,14 +1031,18 @@ function ChatPageContent() {
                   updatedAt: inner.updatedAt || c.updatedAt || new Date().toISOString(),
                 }
 
-                // Seed cache with members of the newly discovered conversation
+                // Seed cache with members only if they have real display names
                 members.forEach((m: any) => {
                   const mid = String(m.userId ?? '').trim()
-                  if (mid) {
+                  const realName = (m.nickname || m.displayName || '').trim();
+                  if (mid && realName && realName !== 'Người dùng') {
                     upsertUser(mid, {
-                      displayName: m.nickname || m.displayName || fallbackUserDisplayName(mid),
+                      displayName: realName,
                       avatarUrl: m.avatarUrl || null
                     })
+                  } else if (mid) {
+                    // Force a proper profile fetch later
+                    void ensureUser(accessToken, mid);
                   }
                 })
 
@@ -1289,6 +1387,72 @@ function ChatPageContent() {
         return changed ? next : prev
       })
     },
+    onGroupDisbanded: (payload) => {
+      console.log('Group disbanded', payload.conversationId)
+      setConversations((prev) => prev.filter((c) => c.id !== payload.conversationId))
+      if (selectedConversationIdRef.current === payload.conversationId) {
+        navigate('/chat')
+      }
+    },
+    onGroupMemberAdded: (payload) => {
+      setConversations(prev => prev.map(c => {
+        if (c.id === payload.conversationId) {
+          const newMemberIds = payload.targetMemberIds.filter(id => !c.participantUserIds?.includes(id));
+          return {
+            ...c,
+            participantUserIds: [...(c.participantUserIds || []), ...newMemberIds],
+            memberCount: (c.memberCount || 0) + newMemberIds.length,
+            members: [
+              ...(c.members || []),
+              ...newMemberIds.map(id => ({ userId: id, role: 'MEMBER' }))
+            ]
+          }
+        }
+        return c;
+      }))
+    },
+    onGroupMemberRemoved: (payload) => {
+      setConversations(prev => prev.map(c => {
+        if (c.id === payload.conversationId) {
+          return {
+            ...c,
+            participantUserIds: c.participantUserIds?.filter(id => !payload.targetMemberIds.includes(id)),
+            memberCount: Math.max(0, (c.memberCount || 1) - payload.targetMemberIds.length),
+            members: c.members?.filter(m => !payload.targetMemberIds.includes(m.userId))
+          }
+        }
+        return c;
+      }))
+      
+      // If we are removed
+      if (user?.id && payload.targetMemberIds.includes(user.id) && selectedConversationIdRef.current === payload.conversationId) {
+        navigate('/chat');
+      }
+    },
+    onGroupMemberLeft: (payload) => {
+      setConversations(prev => prev.map(c => {
+        if (c.id === payload.conversationId) {
+          return {
+            ...c,
+            participantUserIds: c.participantUserIds?.filter(id => id !== payload.actorId),
+            memberCount: Math.max(0, (c.memberCount || 1) - 1),
+            members: c.members?.filter(m => m.userId !== payload.actorId)
+          }
+        }
+        return c;
+      }))
+    },
+    onGroupRoleChanged: (payload) => {
+      setConversations(prev => prev.map(c => {
+        if (c.id === payload.conversationId) {
+          return {
+            ...c,
+            members: c.members?.map(m => m.userId === payload.targetUserId ? { ...m, role: payload.role } : m)
+          }
+        }
+        return c;
+      }))
+    }
   })
 
   const handleAddReaction = useCallback(
@@ -1429,7 +1593,7 @@ function ChatPageContent() {
       const currentConv = conversations.find(c => c.id === conversationId)
       if (currentConv?.isGroup) {
         const myMember = currentConv.members?.find(m => m.userId === user.id)
-        if (myMember?.role !== 'OWNER') {
+        if (String(myMember?.role || '').toUpperCase() !== 'ADMIN') {
           toast.error('Chỉ có trưởng nhóm mới có quyền ghim tin nhắn')
           return
         }
@@ -2221,16 +2385,20 @@ function ChatPageContent() {
           }
         }
 
-        // Seed cache with members of all group conversations in inbox
+        // Seed cache with members of all group conversations in inbox only if real name exists
         items.forEach((it: any) => {
           if (it.conversation?.members) {
             it.conversation.members.forEach((m: any) => {
               const mid = String(m.userId ?? '').trim()
-              if (mid) {
+              const realName = (m.nickname || m.displayName || m.name || '').trim();
+              if (mid && realName && realName !== 'Người dùng' && realName !== (mid === user?.id ? 'Bạn' : 'Người dùng')) {
                 upsertUser(mid, {
-                  displayName: m.nickname || m.displayName || m.name || (mid === user?.id ? 'Bạn' : 'Người dùng'),
+                  displayName: realName,
                   avatarUrl: m.avatarUrl || null
                 })
+              } else if (mid) {
+                // Background fetch for missing names
+                void ensureUser(token, mid);
               }
             })
           }
@@ -2369,6 +2537,9 @@ function ChatPageContent() {
 
         console.log("🚀 [DEBUG] Created Group ID:", groupId);
 
+        // 2. Local Sync: Proactively fetch profiles for all selected members
+        memberIds.forEach(id => void ensureUser(accessToken, id));
+
         // Manually construct and append the new group to local state for immediate UI update
         const newGroupEntry: ConversationSummary = {
           id: groupId,
@@ -2380,7 +2551,7 @@ function ChatPageContent() {
           participantUserIds: memberIds,
           memberCount: memberIds.length + 1,
           members: [
-            { userId: user.id, role: 'OWNER' },
+            { userId: user.id, role: 'ADMIN' },
             ...memberIds.map(id => ({ userId: id, role: 'MEMBER' }))
           ],
           lastMessageAt: new Date().toISOString(),
@@ -2389,6 +2560,26 @@ function ChatPageContent() {
 
         setConversations(prev => [newGroupEntry, ...prev.filter(c => c.id !== groupId)]);
         setSelectedConversationId(groupId);
+
+        // Seed cache for myself too
+        upsertUser(user.id, {
+          displayName: user.name || "Bạn",
+          avatarUrl: user.avatarUrl || null
+        });
+
+        // Seed cache for others (best effort using what we might already know from friendsDirectory)
+        memberIds.forEach(id => {
+           const friend = friendsDirectory.find(f => f.friendId === id);
+           if (friend) {
+              upsertUser(id, {
+                displayName: friend.nickname || friend.displayName || fallbackUserDisplayName(id),
+                avatarUrl: friend.avatarUrl || null
+              });
+           } else {
+              // Force fetch if unknown
+              void ensureUser(accessToken, id);
+           }
+        });
 
         // Remember this group ID locally to ensure it shows up even if it has no messages
         try {
@@ -3333,7 +3524,7 @@ function ChatPageContent() {
     // Permission check for group renaming
     if (selectedConversation?.isGroup) {
       const myMember = selectedConversation.members?.find(m => m.userId === user?.id)
-      if (myMember?.role !== 'OWNER') {
+      if (myMember?.role !== 'ADMIN') {
         toast.error('Chỉ có trưởng nhóm mới có quyền thay đổi tên nhóm')
         return
       }
@@ -3369,6 +3560,16 @@ function ChatPageContent() {
     if (!selectedConversationId || !accessToken) return;
 
     try {
+      // 0. Permission check (Case-insensitive)
+      const currentConv = conversations.find(c => c.id === selectedConversationId)
+      if (currentConv?.isGroup) {
+         const myMember = currentConv.members?.find(m => m.userId === user?.id)
+         if (String(myMember?.role || '').toUpperCase() !== 'ADMIN') {
+            toast.error('Chỉ có nhóm trưởng mới có quyền thay đổi ảnh nhóm')
+            return
+         }
+      }
+
       // 1. Upload new avatar
       const uploadRes = await uploadChatMedia(accessToken, file);
       const newAvatarUrl = uploadRes.url;
@@ -3396,10 +3597,10 @@ function ChatPageContent() {
         clientMessageId: crypto.randomUUID(),
       });
 
-      toast.success('Cập nhật ảnh đại diện nhóm thành công');
-    } catch (err) {
+      // 5. Success - Silent per user request
+    } catch (err: any) {
       console.error('Failed to update group avatar:', err);
-      toast.error('Cập nhật ảnh đại diện thất bại');
+      toast.error(err.message || 'Cập nhật ảnh đại diện thất bại');
     }
   };
 
@@ -3481,13 +3682,66 @@ function ChatPageContent() {
       });
 
       // Then actually leave via API
-      await leaveConversation(accessToken, selectedConversationId, user.id);
+      await leaveConversation(accessToken, selectedConversationId);
 
       setConversations((prev) => prev.filter(c => c.id !== selectedConversationId));
       navigate('/chat');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to leave group:', error);
-      toast.error('Rời nhóm thất bại');
+      if (error.message === 'Bạn cần chuyển quyền trước khi rời nhóm') {
+        toast.error('Bạn cần chuyển quyền trước khi rời nhóm');
+      } else {
+        toast.error('Rời nhóm thất bại');
+      }
+    }
+  };
+
+  const handleUpdateGroupSettings = async (settings: Partial<any>) => {
+    if (!selectedConversationId || !accessToken) return;
+    try {
+      await updateConversation(accessToken, selectedConversationId, settings);
+      
+      // Update local state
+      setConversations(prev => prev.map(conv => {
+        if (conv.id !== selectedConversationId) return conv;
+        return { ...conv, ...settings };
+      }));
+    } catch (error) {
+      console.error('Failed to update group settings', error);
+      alert('Không thể cập nhật cài đặt nhóm');
+    }
+  };
+
+  const handleDisbandGroup = async () => {
+    if (!selectedConversationId || !accessToken || !user) return;
+    try {
+      // Emit real-time signal via socket to all members
+      const systemPayload = JSON.stringify({
+        action: 'DISBAND_GROUP',
+        actorId: user.id
+      });
+
+      void emitSendMessage({
+        conversationId: selectedConversationId,
+        content: systemPayload,
+        messageType: 'SYSTEM',
+        clientMessageId: crypto.randomUUID()
+      });
+
+      // Add a small delay to ensure socket broadcast finishes before backend deletes the group
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      // Then call API
+      await disbandConversation(accessToken, selectedConversationId);
+      
+      // Update local state
+      setConversations(prev => prev.filter(conv => conv.id !== selectedConversationId));
+      setSelectedConversationId(null);
+      setRightSidebarContent(null);
+      navigate('/chat');
+    } catch (error) {
+      console.error('Failed to disband group', error);
+      alert('Không thể giải tán nhóm');
     }
   };
 
@@ -3544,7 +3798,7 @@ function ChatPageContent() {
       await updateMemberRole(accessToken, selectedConversationId, targetUserId, role);
 
       // Emit SYSTEM message if promoting
-      if (role === 'ADMIN') {
+      if (role === 'DEPUTY') {
         const systemPayload = JSON.stringify({
           action: 'PROMOTE_ADMIN',
           actorId: user?.id,
@@ -3569,7 +3823,7 @@ function ChatPageContent() {
         return c;
       }));
 
-      const roleDisplay = role === 'ADMIN' ? 'phó nhóm' : 'thành viên';
+      const roleDisplay = role === 'DEPUTY' ? 'phó nhóm' : 'thành viên';
       toast.success(`Đã cập nhật vai trò thành ${roleDisplay}`);
     } catch (error) {
       console.error('Failed to update member role:', error);
@@ -3582,7 +3836,7 @@ function ChatPageContent() {
 
     try {
       // 1. Promote new owner
-      await updateMemberRole(accessToken, selectedConversationId, newOwnerId, 'OWNER');
+      await updateMemberRole(accessToken, selectedConversationId, newOwnerId, 'ADMIN');
 
       // 2. Emit TRANSFER_OWNERSHIP system message
       const transferPayload = JSON.stringify({
@@ -3808,6 +4062,8 @@ function ChatPageContent() {
                   onUpdateMemberRole={handleUpdateMemberRole}
                   onTransferOwnerAndLeave={handleTransferAndLeave}
                   onUpdateGroupAvatar={handleUpdateGroupAvatar}
+                  onUpdateGroupSettings={handleUpdateGroupSettings}
+                  onDisbandGroup={handleDisbandGroup}
                   friends={friendsDirectory}
                   currentUserId={user?.id}
                 />

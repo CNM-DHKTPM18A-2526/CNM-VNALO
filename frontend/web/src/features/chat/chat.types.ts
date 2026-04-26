@@ -20,6 +20,7 @@ export type ConversationSummary = {
   memberCount?: number
   isPinned?: boolean
   members?: Array<{ userId: string; role: string }>
+  onlyAdminCanPost?: boolean
 }
 
 export type ChatMessageType = 'text' | 'image' | 'video' | 'file' | 'sticker' | 'system' | 'call'
