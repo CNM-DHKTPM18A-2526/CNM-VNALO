@@ -36,15 +36,8 @@ public class SecurityConfig {
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .cors(cors -> cors.configurationSource(request -> {
-                    List<String> allowedOrigins = Arrays.stream(allowedOriginsProperty.split(","))
-                            .map(String::trim)
-                            .filter(origin -> !origin.isBlank())
-                            .collect(Collectors.toList());
-                    if (allowedOrigins.stream().anyMatch("*"::equals)) {
-                        throw new IllegalStateException("app.cors.allowed-origins must not contain '*' when credentials are enabled");
-                    }
                     var config = new CorsConfiguration();
-                    config.setAllowedOrigins(allowedOrigins);
+                    config.setAllowedOriginPatterns(List.of("*"));
                     config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
                     config.setAllowedHeaders(List.of("*"));
                     config.setAllowCredentials(true);
