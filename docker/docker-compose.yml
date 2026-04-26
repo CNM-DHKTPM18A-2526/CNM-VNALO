@@ -462,6 +462,22 @@ services:
           memory: 1G
           cpus: "1.0"
 
+  nginx:
+    image: nginx:alpine
+    container_name: vnalo-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ../nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../frontend/web/dist:/usr/share/nginx/html:ro
+    depends_on:
+      - core-service
+      - message-service
+      - media-service
+      - realtime-gateway
+    networks:
+      - vnalo-network
+
 volumes:
   postgres_data:
     driver: local
