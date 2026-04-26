@@ -2,12 +2,7 @@ import { io, type Socket } from 'socket.io-client'
 import type { RawMessage } from './chat.api'
 import type { ChatMessageType, ReplyMetadata } from './chat.types'
 
-const fallbackProtocol = typeof window !== 'undefined' ? window.location.protocol.replace(':', '') : 'http'
-const fallbackHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
-const MESSAGE_API_URL = import.meta.env.VITE_MESSAGE_API_URL ?? `${fallbackProtocol}://${fallbackHost}:3000/api/v1`
-// All services route through Nginx gateway at 13.250.2.132; Socket.io connects via /socket.io/ path
-const SOCKET_URL =
-  import.meta.env.VITE_SOCKET_URL ?? MESSAGE_API_URL.replace(/\/api\/v1\/?$/, '')
+import { WS_BASE_URL as SOCKET_URL } from '../../api.client'
 
 export type SocketMessagePayload = {
   conversationId: string
