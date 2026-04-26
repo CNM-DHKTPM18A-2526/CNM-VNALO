@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
  * Docs: Readme.md § 5-6
  */
 @RestController
-@RequestMapping("/api/v1/media")
+@RequestMapping("")
 @RequiredArgsConstructor
 @Slf4j
 public class MediaController {

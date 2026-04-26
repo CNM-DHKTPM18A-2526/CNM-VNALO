@@ -1,5 +1,7 @@
 server:
   port: ${SERVER_PORT:8094}
+  servlet:
+    context-path: /api/v1/ai
 
 spring:
   application:
