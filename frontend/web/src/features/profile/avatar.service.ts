@@ -1,7 +1,8 @@
 import { updateProfile } from '../auth/auth.api'
 import type { AuthUser } from '../auth/auth.types'
 
-const MEDIA_API_BASE_URL = import.meta.env.VITE_MEDIA_API_URL ?? 'http://localhost:8083/api/v1'
+// All services route through Nginx gateway at 13.250.2.132
+const MEDIA_API_BASE_URL = import.meta.env.VITE_MEDIA_API_URL ?? 'http://13.250.2.132/api/v1'
 
 type ApiResponse<T> = {
   data?: T

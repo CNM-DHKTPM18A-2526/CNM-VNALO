@@ -3,8 +3,9 @@ import { formatMessageContent } from './utils/messageUtils'
 
 const fallbackProtocol = typeof window !== 'undefined' ? window.location.protocol.replace(':', '') : 'http'
 const fallbackHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
+// All services route through Nginx gateway at 13.250.2.132
 const MESSAGE_API_URL = import.meta.env.VITE_MESSAGE_API_URL ?? `${fallbackProtocol}://${fallbackHost}:3000/api/v1`
-const MEDIA_API_BASE_URL = import.meta.env.VITE_MEDIA_API_URL ?? 'http://localhost:8083/api/v1'
+const MEDIA_API_BASE_URL = import.meta.env.VITE_MEDIA_API_URL ?? 'http://13.250.2.132/api/v1'
 
 console.log('[chat.api] MESSAGE_API_URL:', MESSAGE_API_URL)
 console.log('[chat.api] MEDIA_API_BASE_URL:', MEDIA_API_BASE_URL)
