@@ -1,4 +1,5 @@
 import { Users, Cloud } from 'lucide-react'
+import { resolveMediaUrl } from '../../utils/mediaUtils'
 
 type UserAvatarProps = {
   name: string
@@ -39,6 +40,7 @@ export function UserAvatar({
   extraCount = 0
 }: UserAvatarProps) {
   const mergedClassName = `user-avatar ${sizeClass[size]}${className ? ` ${className}` : ''}`
+  const resolvedImageUrl = resolveMediaUrl(imageUrl);
 
   if (isCloud) {
     const iconSize = size === 'sm' ? 16 : size === 'lg' ? 40 : size === 'xl' ? 64 : 24
@@ -50,17 +52,17 @@ export function UserAvatar({
   }
 
   // Use provided group image if available
-  if (imageUrl) {
+  if (resolvedImageUrl) {
     return (
       <span className={mergedClassName}>
-        <img alt={name} className='user-avatar-image object-cover w-full h-full' src={imageUrl} />
+        <img alt={name} className='user-avatar-image object-cover w-full h-full' src={resolvedImageUrl} />
       </span>
     )
   }
 
   // COLLAGE LOGIC FOR GROUPS
   if (isGroup && memberAvatars && memberAvatars.length >= 2) {
-    const avatars = memberAvatars.filter(Boolean).slice(0, 3);
+    const avatars = memberAvatars.filter(Boolean).map(a => resolveMediaUrl(a)).slice(0, 3);
     const count = avatars.length;
 
     return (

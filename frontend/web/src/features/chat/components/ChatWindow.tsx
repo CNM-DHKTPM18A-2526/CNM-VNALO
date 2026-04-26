@@ -460,9 +460,18 @@ export function ChatWindow({
               const lastMsg = group.items[group.items.length - 1];
               const isIncoming = firstMsg.sender !== 'me';
               const profile = userMap[firstMsg.senderId];
+              const isSystem = firstMsg.type === 'system';
 
-              const isFirstInCluster = firstMsg.senderId !== lastProcessedSenderId;
-              lastProcessedSenderId = firstMsg.senderId;
+              // Only calculate clustering for non-system messages
+              const isFirstInCluster = isSystem || (firstMsg.senderId !== lastProcessedSenderId);
+              
+              // Only update lastProcessedSenderId for real chat messages so that 
+              // the first real message after a system message always shows an avatar.
+              if (!isSystem) {
+                lastProcessedSenderId = firstMsg.senderId;
+              } else {
+                lastProcessedSenderId = null; // Reset cluster after system message
+              }
 
               if (group.type === 'group') {
                 renderedElements.push(
@@ -548,17 +557,32 @@ export function ChatWindow({
           </button>
         </div>
       )}
-      <MessageInput
-        onSend={(payload) => {
-          onSend(payload);
-          setReplyMessage(null);
-        }}
-        replyMessage={replyMessage}
-        onCancelReply={() => setReplyMessage(null)}
-        recipientName={conversation.name}
-        placeholder={isRestrictedMode ? 'Tin nhắn bị khóa khi ở chế độ giới hạn' : undefined}
-        disabled={isRestrictedMode}
-      />
+      {(() => {
+        const currentUserRole = conversation.members?.find(m => m.userId === currentUserId)?.role;
+        const isBlocked = conversation.onlyAdminCanPost && currentUserRole === 'MEMBER';
+
+        if (isBlocked) {
+          return (
+            <div className="text-center text-sm text-gray-500 py-3 bg-white border-t border-gray-200">
+              Chỉ Trưởng/Phó nhóm mới có thể gửi tin nhắn
+            </div>
+          );
+        }
+
+        return (
+          <MessageInput
+            onSend={(payload) => {
+              onSend(payload);
+              setReplyMessage(null);
+            }}
+            replyMessage={replyMessage}
+            onCancelReply={() => setReplyMessage(null)}
+            recipientName={conversation.name}
+            placeholder={isRestrictedMode ? 'Tin nhắn bị khóa khi ở chế độ giới hạn' : undefined}
+            disabled={isRestrictedMode}
+          />
+        );
+      })()}
     </section>
   )
 }
