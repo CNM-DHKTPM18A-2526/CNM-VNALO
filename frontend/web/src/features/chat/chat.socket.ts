@@ -92,6 +92,9 @@ export function getOrCreateSocketManager(token: string): { chat: Socket; root: S
       transports: ['websocket'],
       auth: { token },
       reconnection: true,
+      // Required when connecting through Nginx reverse proxy (EC2 port 80).
+      // Socket.io client defaults to /<namespace>/socket.io/ which breaks Nginx routing.
+      path: '/socket.io/',
     }
 
     // Use only the /chat namespace as the primary connection, matching Mobile.
