@@ -109,12 +109,6 @@ export function CallLogBubble({ message, currentUserId, onInitiateCall }: CallLo
         </button>
       </div>
 
-      {/* Timestamp */}
-      <div className="px-3 pb-1 flex justify-end">
-        <time className="text-[10px] text-slate-400 font-normal">
-          {message.timestamp || formatMessageTimestamp()}
-        </time>
-      </div>
     </div>
   )
 }

@@ -1,10 +1,8 @@
 import { normalizeVietnamPhone } from './phone.util'
 import type { AuthUser, Gender, LoginPayload, RegisterPayload, SendRegisterOtpPayload } from './auth.types'
 
-const fallbackProtocol = typeof window !== 'undefined' ? window.location.protocol.replace(':', '') : 'http'
-const fallbackHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
-// All services route through Nginx gateway at 13.250.2.132
-const API_BASE_URL = import.meta.env.VITE_CORE_API_URL ?? `${fallbackProtocol}://${fallbackHost}:8081/api/v1`
+import { API_BASE_URL } from '../../api.client'
+import { resolveMediaUrl } from '../../utils/mediaUtils'
 
 export type UpdateProfilePayload = {
   displayName?: string
@@ -199,8 +197,8 @@ function extractUser(payload: unknown): AuthUser | null {
     name: displayName || 'VNALO User',
     email,
     phone: typeof raw.phone === 'string' ? raw.phone : null,
-    avatarUrl: typeof raw.avatarUrl === 'string' ? raw.avatarUrl : null,
-    coverUrl: typeof raw.coverUrl === 'string' ? raw.coverUrl : null,
+    avatarUrl: typeof raw.avatarUrl === 'string' ? resolveMediaUrl(raw.avatarUrl) : null,
+    coverUrl: typeof raw.coverUrl === 'string' ? resolveMediaUrl(raw.coverUrl) : null,
     bio: typeof raw.bio === 'string' ? raw.bio : null,
     dob: typeof raw.dob === 'string' ? raw.dob : null,
     gender: isGender(raw.gender) ? raw.gender : null,

@@ -1,14 +1,7 @@
 import type { ChatAttachment, ChatMessage, ChatMessageType, ConversationSummary, ReplyMetadata } from './chat.types'
 import { formatMessageContent } from './utils/messageUtils'
-
-const fallbackProtocol = typeof window !== 'undefined' ? window.location.protocol.replace(':', '') : 'http'
-const fallbackHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
-// All services route through Nginx gateway at 13.250.2.132
-const MESSAGE_API_URL = import.meta.env.VITE_MESSAGE_API_URL ?? `${fallbackProtocol}://${fallbackHost}:3000/api/v1`
-const MEDIA_API_BASE_URL = import.meta.env.VITE_MEDIA_API_URL ?? 'http://13.250.2.132/api/v1'
-
-console.log('[chat.api] MESSAGE_API_URL:', MESSAGE_API_URL)
-console.log('[chat.api] MEDIA_API_BASE_URL:', MEDIA_API_BASE_URL)
+import { API_BASE_URL, extractMessage, MEDIA_API_URL, messageApi } from '../../api.client'
+import { resolveMediaUrl } from '../../utils/mediaUtils'
 
 type InboxItem = {
   conversationId: string
@@ -162,32 +155,27 @@ function formatTime(value?: string): string {
 }
 
 async function authorizedFetch<T>(token: string, endpoint: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${MESSAGE_API_URL}${endpoint}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
-  })
+  try {
+    const response = await messageApi.request({
+      url: endpoint,
+      method: init?.method ?? 'GET',
+      data: init?.body ? JSON.parse(init.body as string) : undefined,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(init?.headers as any ?? {}),
+      },
+    });
 
-  const body = (await response.json().catch(() => null)) as
-    | { data?: T; message?: string }
-    | T
-    | null
-  if (!response.ok) {
-    const message =
-      body && typeof body === 'object' && !Array.isArray(body) && typeof (body as { message?: string }).message === 'string'
-        ? (body as { message: string }).message
-        : null
-    throw new Error(message ?? 'Message API request failed')
+    const body = response.data;
+    if (body && typeof body === 'object' && !Array.isArray(body) && 'data' in body) {
+      return ((body as { data?: T }).data ?? ([] as unknown)) as T;
+    }
+    return body as T;
+  } catch (error: any) {
+    const errorData = error.response?.data;
+    const message = errorData && typeof errorData === 'object' ? errorData.message : error.message;
+    throw new Error(message ?? 'Message API request failed');
   }
-
-  if (body && typeof body === 'object' && !Array.isArray(body) && 'data' in body) {
-    return ((body as { data?: T }).data ?? ([] as unknown)) as T
-  }
-
-  return (body ?? ([] as unknown)) as T
 }
 
 function isImageMimeType(mimeType?: string | null): boolean {
@@ -249,7 +237,7 @@ function extractFilenameFromUrl(url: string): string {
  */
 function hasImageEvidence(obj: any, depth = 0): boolean {
   if (!obj || depth > 3) return false
-  
+
   if (typeof obj === 'string') {
     const s = obj.toLowerCase()
     // Check for MIME types
@@ -356,66 +344,51 @@ function normalizeMessageType(rawType: any, raw?: RawMessageLike): ChatMessageTy
   return 'text'
 }
 
-export async function uploadChatMedia(token: string, file: File): Promise<UploadedChatMedia> {
+export async function uploadChatMedia(token: string, file: File): Promise<MediaUploadResponse> {
   const formData = new FormData()
+  formData.append('file', file)
   
-  // Normalize MIME types for common document formats to ensure backend compatibility
   const ext = file.name.split('.').pop()?.toLowerCase() || '';
-  let mimeToUse = file.type;
-  if (!mimeToUse || mimeToUse.length > 60 || ['docx', 'xlsx', 'pptx', 'doc', 'xls', 'ppt', 'pdf'].includes(ext)) {
-    const mimeMap: Record<string, string> = {
-      'docx': 'image/jpeg',
-      'xlsx': 'image/jpeg',
-      'pptx': 'image/jpeg',
-      'doc': 'image/jpeg',
-      'xls': 'image/jpeg',
-      'ppt': 'image/jpeg',
-      'pdf': 'application/pdf'
-    };
-    if (mimeMap[ext]) {
-      mimeToUse = mimeMap[ext];
+  const isImage = file.type.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
+  formData.append('category', isImage ? 'AVATAR' : 'CHAT_FILE');
+
+  try {
+    // We use MEDIA_API_URL (port 8083) because that is where the media service lives on local.
+    // VITE_MEDIA_API_URL is http://localhost:8083/api/v1/media, so we append /upload
+    const response = await fetch(`${MEDIA_API_URL}/upload`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    const json = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      throw new Error(extractMessage(json) ?? 'Unable to upload media.');
     }
-  }
 
-  // IMPORTANT: To override the MIME type sent to the server, we must create a new Blob 
-  // from the file with the desired MIME type. Otherwise, the browser's default file.type takes precedence.
-  const blobToUpload = new Blob([file], { type: mimeToUse });
-  formData.append('file', blobToUpload, file.name);
-  formData.append('category', (file.type.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) ? 'CHAT_IMAGE' : 'CHAT_FILE')
+    const payload = json && typeof json === 'object' && !Array.isArray(json) && 'data' in json 
+      ? (json.data as Record<string, unknown>) 
+      : (json as Record<string, unknown>);
 
-  const response = await fetch(`${MEDIA_API_BASE_URL}/media/upload`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: formData,
-  })
+    const url = typeof payload?.url === 'string' ? payload.url : null;
+    if (!url) {
+      throw new Error('Upload response did not include a media URL.');
+    }
 
-  const body = (await response.json().catch(() => null)) as { data?: UploadResponse; message?: string } | UploadResponse | null
-
-  if (!response.ok) {
-    const message =
-      body && typeof body === 'object' && !Array.isArray(body) && typeof (body as { message?: string }).message === 'string'
-        ? (body as { message: string }).message
-        : null
-    throw new Error(message ?? 'Unable to upload chat media.')
-  }
-
-  const responsePayload = body && typeof body === 'object' && !Array.isArray(body) && 'data' in body ? body.data : body
-  const payload = responsePayload && typeof responsePayload === 'object' && !Array.isArray(responsePayload)
-    ? (responsePayload as Record<string, unknown>)
-    : null
-  const url = typeof payload?.url === 'string' ? payload.url : null
-
-  if (!url) {
-    throw new Error('Upload response did not include a media URL.')
-  }
-
-  return {
-    url,
-    mimeType: typeof payload?.mimeType === 'string' ? payload.mimeType : file.type || null,
-    sizeBytes: typeof payload?.sizeBytes === 'number' ? payload.sizeBytes : file.size,
-    thumbnailUrl: typeof payload?.thumbnailUrl === 'string' ? payload.thumbnailUrl : null,
+    return {
+      url,
+      mimeType: typeof payload?.mimeType === 'string' ? payload.mimeType : file.type || null,
+      sizeBytes: typeof payload?.sizeBytes === 'number' ? payload.sizeBytes : file.size,
+      thumbnailUrl: typeof payload?.thumbnailUrl === 'string' ? payload.thumbnailUrl : null,
+    };
+  } catch (error: any) {
+    if (error.message.includes('fetch')) {
+       throw new Error('Connection failed to media service. Please check if backend is running.');
+    }
+    throw error;
   }
 }
 
@@ -476,6 +449,7 @@ export async function fetchInbox(token: string, currentUserId?: string): Promise
           userId: String(m.userId ?? '').trim(),
           role: String(m.role ?? 'MEMBER').toUpperCase(),
         })),
+        onlyAdminCanPost: Boolean((item.conversation as any)?.onlyAdminCanPost ?? (item as any).onlyAdminCanPost),
       }
     })
 }
@@ -500,11 +474,11 @@ export function mapRawMessage(raw: RawMessageLike, currentUserId: string): ChatM
   if (type === 'image' && messageText && isImageUrl(messageText)) {
     messageText = ''
   }
-  
+
   // Extract filename: 
   // 1. Text content if message type is file
   // 2. URL if message type is file
-  const attachmentName = type === 'file' 
+  const attachmentName = type === 'file'
     ? (messageText && !isHttpUrl(messageText) ? messageText : (mediaUrl ? extractFilenameFromUrl(mediaUrl) : undefined))
     : undefined
 
@@ -534,11 +508,11 @@ export function mapRawMessage(raw: RawMessageLike, currentUserId: string): ChatM
     sender: type === 'system' ? 'system' : (senderId === currentUserId ? 'me' : 'other'),
     type: type as ChatMessageType,
     text: messageText,
-    mediaUrl,
-    mediaThumbnailUrl,
+    mediaUrl: mediaUrl ? resolveMediaUrl(mediaUrl) : mediaUrl,
+    mediaThumbnailUrl: mediaThumbnailUrl ? resolveMediaUrl(mediaThumbnailUrl) : mediaThumbnailUrl,
     mediaMimeType,
     mediaSizeBytes,
-    attachments,
+    attachments: attachments?.map(att => ({ ...att, url: resolveMediaUrl(att.url), thumbnailUrl: att.thumbnailUrl ? resolveMediaUrl(att.thumbnailUrl) : null })),
     createdAt: createdAt ?? null,
     timestamp: formatTime(createdAt),
     serverSeq,
@@ -798,35 +772,28 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export async function getOrCreateDirectConversation(token: string, targetUserId: string): Promise<string> {
-  const response = await fetch(`${MESSAGE_API_URL}/conversations/direct`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ targetUserId }),
-  })
+  try {
+    const response = await messageApi.post('/conversations/direct', { targetUserId }, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const json = response.data;
 
-  const json = await response.json().catch(() => null)
+    const payload = isRecord(json) && isRecord(json.data) ? json.data : json
+    const conversationId =
+      isRecord(payload) && typeof payload.id === 'string'
+        ? payload.id
+        : isRecord(payload) && typeof payload.conversationId === 'string'
+          ? payload.conversationId
+          : null
 
-  if (!response.ok) {
-    const message = isRecord(json) && typeof json.message === 'string' ? json.message : null
-    throw new Error(message ?? 'Cannot open direct conversation.')
+    if (!conversationId) {
+      throw new Error('Invalid direct conversation response payload.');
+    }
+
+    return conversationId;
+  } catch (error: any) {
+    throw new Error(extractMessage(error.response?.data) ?? 'Cannot open direct conversation.');
   }
-
-  const payload = isRecord(json) && isRecord(json.data) ? json.data : json
-  const conversationId =
-    isRecord(payload) && typeof payload.id === 'string'
-      ? payload.id
-      : isRecord(payload) && typeof payload.conversationId === 'string'
-        ? payload.conversationId
-        : null
-
-  if (!conversationId) {
-    throw new Error('Invalid direct conversation response payload.')
-  }
-
-  return conversationId
 }
 
 export type CreateGroupConversationPayload = {
@@ -874,72 +841,69 @@ export async function createGroupConversation(
   throw new Error('Malformed response from group creation API');
 }
 export async function fetchStickerPacks(token: string): Promise<any[]> {
-  const url = `${MEDIA_API_BASE_URL}/stickers/my-packs`
-  const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-
-  if (!response.ok) throw new Error(`Failed to fetch sticker packs: ${response.status}`)
-
-  const json = await response.json();
-  const items = json.data?.content || json.data || json || [];
-
-  if (Array.isArray(items)) {
-    items.forEach((item: any) => {
-      if (item.coverUrl) item.coverUrl = normalizeMediaUrl(item.coverUrl);
+  try {
+    const response = await mediaApi.get('/stickers/my-packs', {
+      headers: { Authorization: `Bearer ${token}` }
     });
-  }
+    const json = response.data;
+    const items = json.data?.content || json.data || json || [];
 
-  return items;
+    if (Array.isArray(items)) {
+      items.forEach((item: any) => {
+        if (item.coverUrl) item.coverUrl = normalizeMediaUrl(item.coverUrl);
+      });
+    }
+
+    return items;
+  } catch (error: any) {
+    throw new Error(`Failed to fetch sticker packs: ${error.message}`);
+  }
 }
 
 export async function fetchStickerPackDetails(token: string, packId: string): Promise<any> {
-  const url = `${MEDIA_API_BASE_URL}/stickers/packs/${packId}`
-  const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-
-  if (!response.ok) throw new Error(`Failed to fetch pack details: ${response.status}`)
-  const json = await response.json();
-  const data = json.data || json;
-
-  if (data && Array.isArray(data.stickers)) {
-    data.stickers.forEach((s: any) => {
-      if (s.url) s.url = normalizeMediaUrl(s.url);
+  try {
+    const response = await mediaApi.get(`/stickers/packs/${packId}`, {
+      headers: { Authorization: `Bearer ${token}` }
     });
-  }
-  if (data && data.coverUrl) {
-    data.coverUrl = normalizeMediaUrl(data.coverUrl);
-  }
+    const json = response.data;
+    const data = json.data || json;
 
-  return data;
+    if (data && Array.isArray(data.stickers)) {
+      data.stickers.forEach((s: any) => {
+        if (s.url) s.url = normalizeMediaUrl(s.url);
+      });
+    }
+    if (data && data.coverUrl) {
+      data.coverUrl = normalizeMediaUrl(data.coverUrl);
+    }
+
+    return data;
+  } catch (error: any) {
+    throw new Error(`Failed to fetch pack details: ${error.message}`);
+  }
 }
 
 export async function fetchMediaByCategory(token: string, category: 'EMOJI' | 'GIF'): Promise<any[]> {
-  const url = `${MEDIA_API_BASE_URL}/media?category=${category}&size=100`
-
   try {
-    const response = await fetch(url, {
+    const response = await mediaApi.get(`/media?category=${category}&size=100`, {
       headers: { Authorization: `Bearer ${token}` }
     });
 
-    if (!response.ok) throw new Error(`Media API error: ${response.status}`)
-
-    const json = await response.json();
+    const json = response.data;
     let items = json.data?.content || json.data || json || []
     if (!Array.isArray(items)) items = []
 
     // Fallback: Deep discovery from SYSTEM assets
     if (items.length === 0) {
       console.log(`[chat.api.fetchMediaByCategory] ${category} list empty, performing MASSIVE discovery (limit 3000)...`)
-      const fallbackUrl = `${MEDIA_API_BASE_URL}/media?size=3000`
-      const fbResponse = await fetch(fallbackUrl, {
+      const fbResponse = await mediaApi.get('/media?size=3000', {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      if (fbResponse.ok) {
-        const fbJson = await fbResponse.json();
+      if (fbResponse.status === 200) {
+        const fbJson = fbResponse.data;
         const fbItems = fbJson.data?.content || fbJson.data || fbJson || []
+        // ... rest of the filtering logic ...
 
         if (Array.isArray(fbItems) && fbItems.length > 0) {
           console.log(`[chat.api.discovery] Total system assets found: ${fbItems.length}`);
@@ -1044,7 +1008,7 @@ function normalizeMediaUrl(url: string | null | undefined): string {
   }
 
   // Handle relative paths from backend local-storage
-  const backendHost = MEDIA_API_BASE_URL.split('/api/v1')[0];
+  const backendHost = API_BASE_URL.split('/api/v1')[0];
   const result = `${backendHost}${normalized.startsWith('/') ? '' : '/'}${normalized}`;
   console.log(`[chat.api.normalize] Relative to Absolute: ${url} -> ${result}`);
   return result;
@@ -1058,8 +1022,21 @@ export async function addMembersToConversation(token: string, conversationId: st
   })
 }
 
-export async function leaveConversation(token: string, conversationId: string, userId: string): Promise<void> {
-  await authorizedFetch(token, `/conversations/${conversationId}/members/${userId}`, {
+export async function leaveConversation(token: string, conversationId: string): Promise<void> {
+  try {
+    await messageApi.post(`/conversations/${conversationId}/leave`, {}, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch (error: any) {
+    if (error.response?.status === 403) {
+      throw new Error('Bạn cần chuyển quyền trước khi rời nhóm');
+    }
+    throw new Error(extractMessage(error.response?.data) ?? 'Unable to leave conversation');
+  }
+}
+
+export async function disbandConversation(token: string, conversationId: string): Promise<void> {
+  await authorizedFetch(token, `/conversations/${conversationId}`, {
     method: 'DELETE',
   })
 }
@@ -1076,3 +1053,11 @@ export async function updateMemberRole(token: string, conversationId: string, us
     body: JSON.stringify({ role }),
   })
 }
+
+export async function updateConversation(token: string, conversationId: string, settings: Partial<any>): Promise<void> {
+  await authorizedFetch(token, `/conversations/${conversationId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(settings),
+  })
+}
+
