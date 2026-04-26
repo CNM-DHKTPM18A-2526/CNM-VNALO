@@ -3,6 +3,7 @@ import type { AuthUser, Gender, LoginPayload, RegisterPayload, SendRegisterOtpPa
 
 const fallbackProtocol = typeof window !== 'undefined' ? window.location.protocol.replace(':', '') : 'http'
 const fallbackHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
+// All services route through Nginx gateway at 13.250.2.132
 const API_BASE_URL = import.meta.env.VITE_CORE_API_URL ?? `${fallbackProtocol}://${fallbackHost}:8081/api/v1`
 
 export type UpdateProfilePayload = {
