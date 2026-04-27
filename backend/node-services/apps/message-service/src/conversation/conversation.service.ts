@@ -4,6 +4,8 @@ import {
   ForbiddenException,
   BadRequestException,
   Logger,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
@@ -28,6 +30,7 @@ import { PinnedMessage } from '../entities/pinned-message.entity';
 import { CreateGroupConversationDto } from '../dto/create-group-conversation.dto';
 import { UpdateConversationDto } from '../dto/update-conversation.dto';
 import { KafkaProducerService } from '../kafka/kafka-producer.service';
+import { MessageService } from '../message/message.service';
 
 @Injectable()
 export class ConversationService {
@@ -46,6 +49,8 @@ export class ConversationService {
     private readonly inboxRepo: Repository<ConversationInbox>,
     private readonly dataSource: DataSource,
     private readonly kafkaProducer: KafkaProducerService,
+    @Inject(forwardRef(() => MessageService))
+    private readonly messageService: MessageService,
   ) {}
 
   /**
@@ -824,7 +829,7 @@ export class ConversationService {
   async disbandGroup(
     conversationId: string,
     userId: string,
-  ): Promise<{ conversationId: string; disbandedBy: string }> {
+  ): Promise<{ conversationId: string; disbandedBy: string; disbandedAt: Date }> {
     const conversation = await this.getConversationOrFail(conversationId);
 
     if (conversation.type !== ConversationType.GROUP) {

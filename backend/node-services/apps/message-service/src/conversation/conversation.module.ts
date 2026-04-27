@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Conversation } from '../entities/conversation.entity';
 import { ConversationMember } from '../entities/conversation-member.entity';
@@ -8,6 +8,7 @@ import { ConversationInbox } from '../entities/conversation-inbox.entity';
 import { ConversationService } from './conversation.service';
 import { ConversationController } from './conversation.controller';
 import { KafkaProducerModule } from '../kafka/kafka-producer.module';
+import { MessageModule } from '../message/message.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { KafkaProducerModule } from '../kafka/kafka-producer.module';
       ConversationInbox,
     ]),
     KafkaProducerModule,
+    forwardRef(() => MessageModule),
   ],
   controllers: [ConversationController],
   providers: [ConversationService],
