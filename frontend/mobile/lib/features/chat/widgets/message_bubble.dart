@@ -48,6 +48,8 @@ class MessageBubble extends StatelessWidget {
   final String? currentUserId;
   final Function(String emoji)? onToggleReaction;
   final Function(String emoji)? onShowReactors;
+  final bool canPin;
+  final bool canRecall;
 
   const MessageBubble({
     super.key,
@@ -70,6 +72,8 @@ class MessageBubble extends StatelessWidget {
     this.currentUserId,
     this.onToggleReaction,
     this.onShowReactors,
+    this.canPin = true,
+    this.canRecall = true,
   });
 
   @override
@@ -301,6 +305,8 @@ class MessageBubble extends StatelessWidget {
       isCloud: isCloud,
       isPinned: chatProvider.isMessagePinned(message.conversationId, message.id),
       isAiAssistant: isAiAssistant,
+      canPin: canPin,
+      canRecall: isMine && canRecall,
       position: position,
       size: size,
       child: _buildBubbleContent(context, isDarkMode),

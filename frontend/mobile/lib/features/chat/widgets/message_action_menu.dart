@@ -10,6 +10,8 @@ class MessageActionMenu extends StatelessWidget {
   final bool isCloud;
   final bool isPinned;
   final bool isAiAssistant;
+  final bool canPin;
+  final bool canRecall;
   final Function(String action) onAction;
 
   const MessageActionMenu({
@@ -20,6 +22,8 @@ class MessageActionMenu extends StatelessWidget {
     this.isCloud = false,
     this.isPinned = false,
     this.isAiAssistant = false,
+    this.canPin = true,
+    this.canRecall = true,
   });
 
   @override
@@ -37,10 +41,10 @@ class MessageActionMenu extends StatelessWidget {
       actionItems.add(_buildActionItem(context, 'reply', common.replyAction, Icons.reply_rounded, const Color(0xFF9C27B0)));
       actionItems.add(_buildActionItem(context, 'forward', common.forwardAction, Icons.forward_rounded, const Color(0xFF2196F3)));
       if (!isCloud && !isAiAssistant) actionItems.add(_buildActionItem(context, 'save', common.saveToDocsAction, Icons.folder_open_outlined, const Color(0xFF03A9F4)));
-      if (!isCloud && !isAiAssistant) actionItems.add(_buildActionItem(context, 'recall', common.recallAction, Icons.settings_backup_restore_rounded, Colors.orange));
+      if (!isCloud && !isAiAssistant && canRecall) actionItems.add(_buildActionItem(context, 'recall', common.recallAction, Icons.settings_backup_restore_rounded, Colors.orange));
       
       actionItems.add(_buildActionItem(context, 'copy', common.copyAction, Icons.copy_rounded, const Color(0xFF1E88E5)));
-      if (!isAiAssistant) {
+      if (!isAiAssistant && canPin) {
         actionItems.add(_buildActionItem(
           context, 
           isPinned ? 'unpin' : 'pin', 
@@ -69,7 +73,7 @@ class MessageActionMenu extends StatelessWidget {
       if (!isCloud && !isAiAssistant) actionItems.add(_buildActionItem(context, 'save', common.saveToDocsAction, Icons.folder_open_outlined, const Color(0xFF03A9F4)));
       actionItems.add(_buildActionItem(context, 'copy', common.copyAction, Icons.copy_rounded, const Color(0xFF1E88E5)));
       
-      if (!isAiAssistant) {
+      if (!isAiAssistant && canPin) {
         actionItems.add(_buildActionItem(
           context, 
           isPinned ? 'unpin' : 'pin', 

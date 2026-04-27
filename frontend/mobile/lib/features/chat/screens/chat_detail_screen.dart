@@ -508,6 +508,18 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                                 ),
                           );
 
+                          final isGroup = conv.type == ConversationType.GROUP;
+                          final myRole = myMember.role;
+                          final isAdmin = myRole == MemberRole.OWNER || myRole == MemberRole.ADMIN || myRole == MemberRole.DEPUTY;
+                          
+                          // Members can pin only if allowed
+                          final canPin = !isGroup || conv.allowMemberPin || isAdmin;
+                          
+                          // Recall: normally members can recall their own messages. 
+                          // If we wanted to restrict this, we'd use conv.allowMemberRecall (not yet in DTO).
+                          // For now, let's just pass canPin logic as a proxy if needed, or keep it true for own messages.
+                          const canRecall = true;
+
                           return MessageBubble(
                             message: message,
                             isMine: isMine,
@@ -523,6 +535,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                             milestoneText: milestoneText,
                             groupedMessages: groupedMessages,
                             readByMembers: readByMembers,
+                            canPin: canPin,
+                            canRecall: canRecall,
                             onReplyTap: (msgId) => _jumpToMessage(msgId, items),
                             onRetry:
                                 message.status == MessageStatus.FAILED

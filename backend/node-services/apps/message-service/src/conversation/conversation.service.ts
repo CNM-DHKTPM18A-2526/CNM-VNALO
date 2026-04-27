@@ -21,8 +21,13 @@ import {
 import { ConversationDirectMap } from '../entities/conversation-direct-map.entity';
 import { ConversationJoinRequest } from '../entities/conversation-join-request.entity';
 import { ConversationInbox } from '../entities/conversation-inbox.entity';
+import { Message } from '../entities/message.entity';
+import { MessageReaction } from '../entities/message-reaction.entity';
+import { MessageReceipt } from '../entities/message-receipt.entity';
+import { PinnedMessage } from '../entities/pinned-message.entity';
 import { CreateGroupConversationDto } from '../dto/create-group-conversation.dto';
 import { UpdateConversationDto } from '../dto/update-conversation.dto';
+import { KafkaProducerService } from '../kafka/kafka-producer.service';
 
 @Injectable()
 export class ConversationService {
@@ -40,6 +45,7 @@ export class ConversationService {
     @InjectRepository(ConversationInbox)
     private readonly inboxRepo: Repository<ConversationInbox>,
     private readonly dataSource: DataSource,
+    private readonly kafkaProducer: KafkaProducerService,
   ) {}
 
   /**
@@ -777,53 +783,38 @@ export class ConversationService {
     const memberUserIds = members.map((m) => m.userId);
 
     await this.dataSource.transaction(async (manager) => {
-      // 1. Delete all messages in the conversation
-      await manager.query(`DELETE FROM message WHERE conversation_id = $1`, [
-        conversationId,
-      ]);
+      // 1. Delete all message reactions, receipts, and pins first (satisfy FK constraints)
+      await manager.delete(MessageReaction, { conversationId });
+      await manager.delete(MessageReceipt, { conversationId });
+      await manager.delete(PinnedMessage, { conversationId });
 
-      // 2. Delete all message receipts and reactions (cascaded via FK in most setups, explicit for safety)
-      await manager.query(
-        `DELETE FROM message_reaction WHERE conversation_id = $1`,
-        [conversationId],
-      );
-      await manager.query(
-        `DELETE FROM message_receipt WHERE conversation_id = $1`,
-        [conversationId],
-      );
-      await manager.query(
-        `DELETE FROM pinned_message WHERE conversation_id = $1`,
-        [conversationId],
-      );
+      // 2. Delete all messages in the conversation
+      await manager.delete(Message, { conversationId });
 
       // 3. Delete all join requests
-      await manager.query(
-        `DELETE FROM conversation_join_request WHERE conversation_id = $1`,
-        [conversationId],
-      );
+      await manager.delete(ConversationJoinRequest, { conversationId });
 
       // 4. Delete all inbox entries for this conversation
-      await manager.query(
-        `DELETE FROM conversation_inbox WHERE conversation_id = $1`,
-        [conversationId],
-      );
+      await manager.delete(ConversationInbox, { conversationId });
 
       // 5. Delete all members (including soft-deleted ones)
-      await manager.query(
-        `DELETE FROM conversation_member WHERE conversation_id = $1`,
-        [conversationId],
-      );
+      await manager.delete(ConversationMember, { conversationId });
 
       // 6. Delete conversation itself
-      await manager.query(
-        `DELETE FROM conversation WHERE conversation_id = $1`,
-        [conversationId],
-      );
+      await manager.delete(Conversation, { id: conversationId });
     });
 
     this.logger.log(
       `Group ${conversationId} disbanded by ${userId}. ${memberUserIds.length} members affected.`,
     );
+
+    // Notify all members via Kafka
+    for (const memberId of memberUserIds) {
+      await this.kafkaProducer.sendRealtimeEvent(memberId, 'group.disbanded', {
+        conversationId,
+        disbandedBy: userId,
+      });
+    }
 
     return { conversationId, disbandedBy: userId };
   }

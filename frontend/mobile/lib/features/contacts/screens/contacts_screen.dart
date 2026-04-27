@@ -23,35 +23,16 @@ class ContactsScreen extends StatefulWidget {
 }
 
 class _ContactsScreenState extends State<ContactsScreen> {
-  List<User> _friends = [];
-  bool _isLoading = true;
-
   @override
   void initState() {
     super.initState();
-    _loadFriends();
-    // Fetch via provider
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        context.read<ContactProvider>().fetchPendingRequestCount();
+        final provider = context.read<ContactProvider>();
+        provider.fetchFriends();
+        provider.fetchPendingRequestCount();
       }
     });
-  }
-
-  Future<void> _loadPendingCount() async {
-    await context.read<ContactProvider>().fetchPendingRequestCount();
-  }
-
-  Future<void> _loadFriends() async {
-    try {
-      _friends = await context.read<FriendService>().getFriends();
-    } catch (_) {
-      _friends = [];
-    }
-
-    if (mounted) {
-      setState(() => _isLoading = false);
-    }
   }
 
   Future<void> _openChat(User user) async {
@@ -80,7 +61,6 @@ class _ContactsScreenState extends State<ContactsScreen> {
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
-    final searchHint = isDarkMode ? DarkColors.textHint : Colors.white.withValues(alpha: 0.8);
 
     return DefaultTabController(
       length: 3,
@@ -157,142 +137,144 @@ class _ContactsScreenState extends State<ContactsScreen> {
   }
 
   Widget _buildFriendsTab() {
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
+    return Consumer<ContactProvider>(
+      builder: (context, provider, child) {
+        if (provider.isLoading && provider.friends.isEmpty) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-    _friends.sort((a, b) => a.displayName.compareTo(b.displayName));
+        final friends = provider.friends;
+        final Map<String, List<User>> grouped = {};
+        for (var user in friends) {
+          final String firstLetter = user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : '#';
+          final letter = RegExp(r'[A-Z]').hasMatch(firstLetter) ? firstLetter : '#';
+          if (!grouped.containsKey(letter)) {
+            grouped[letter] = [];
+          }
+          grouped[letter]!.add(user);
+        }
 
-    final Map<String, List<User>> grouped = {};
-    for (var user in _friends) {
-      final String firstLetter = user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : '#';
-      final letter = RegExp(r'[A-Z]').hasMatch(firstLetter) ? firstLetter : '#';
-      if (!grouped.containsKey(letter)) {
-        grouped[letter] = [];
-      }
-      grouped[letter]!.add(user);
-    }
+        final sortedKeys = grouped.keys.toList()..sort();
+        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+        final bgColor = isDarkMode ? DarkColors.scaffold : LightColors.scaffold;
+        final sectionColor = isDarkMode ? DarkColors.surface : Colors.white;
 
-    final sortedKeys = grouped.keys.toList()..sort();
-
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDarkMode ? DarkColors.scaffold : LightColors.scaffold;
-    final sectionColor = isDarkMode ? DarkColors.surface : Colors.white;
-
-    return Container(
-      color: bgColor,
-      child: ListView(
-        children: [
-          Container(
-            color: sectionColor,
-            child: Column(
+        return RefreshIndicator(
+          onRefresh: () => provider.fetchFriends(),
+          child: Container(
+            color: bgColor,
+            child: ListView(
               children: [
-                ListTile(
-                  leading: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: (isDarkMode ? DarkColors.primary : AppColors.primary).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(Icons.person_add_outlined, color: isDarkMode ? DarkColors.primary : AppColors.primary),
-                  ),
-                  title: Text(
-                    CommonTexts.of(context).friendRequests,
-                    style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
-                  ),
-                  trailing: Consumer<ContactProvider>(
-                    builder: (context, provider, child) {
-                      final count = provider.pendingRequestCount;
-                      if (count <= 0) return const SizedBox.shrink();
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.red,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '$count',
-                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-                        ),
-                      );
-                    },
-                  ),
-                  onTap: () async {
-                    await Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const FriendRequestsScreen()),
-                    );
-                    _loadPendingCount();
-                    _loadFriends();
-                  },
-                ),
-                ListTile(
-                  leading: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: (isDarkMode ? DarkColors.primary : AppColors.primary).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(Icons.cake, color: isDarkMode ? DarkColors.primary : AppColors.primary),
-                  ),
-                  title: Text(
-                    CommonTexts.of(context).birthday,
-                    style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
-                  ),
-                  onTap: () {},
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            color: sectionColor,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Row(
+                Container(
+                  color: sectionColor,
+                  child: Column(
                     children: [
-                      _buildFilterChip('${CommonTexts.of(context).filterAll} ${_friends.length}', true),
-                      const SizedBox(width: 8),
-                      _buildFilterChip(CommonTexts.of(context).recentlyActive, false),
+                      ListTile(
+                        leading: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: (isDarkMode ? DarkColors.primary : AppColors.primary).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(Icons.person_add_outlined, color: isDarkMode ? DarkColors.primary : AppColors.primary),
+                        ),
+                        title: Text(
+                          CommonTexts.of(context).friendRequests,
+                          style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
+                        ),
+                        trailing: provider.pendingRequestCount > 0
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  '${provider.pendingRequestCount}',
+                                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                                ),
+                              )
+                            : null,
+                        onTap: () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const FriendRequestsScreen()),
+                          );
+                          provider.onFriendshipUpdated();
+                        },
+                      ),
+                      ListTile(
+                        leading: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: (isDarkMode ? DarkColors.primary : AppColors.primary).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(Icons.cake, color: isDarkMode ? DarkColors.primary : AppColors.primary),
+                        ),
+                        title: Text(
+                          CommonTexts.of(context).birthday,
+                          style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
+                        ),
+                        onTap: () {},
+                      ),
                     ],
                   ),
                 ),
-                ...sortedKeys.map((letter) {
-                  return Column(
+                const SizedBox(height: 8),
+                Container(
+                  color: sectionColor,
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        child: Text(letter, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        padding: const EdgeInsets.all(16.0),
+                        child: Row(
+                          children: [
+                            _buildFilterChip('${CommonTexts.of(context).filterAll} ${friends.length}', true),
+                            const SizedBox(width: 8),
+                            _buildFilterChip(CommonTexts.of(context).recentlyActive, false),
+                          ],
+                        ),
                       ),
-                      ...grouped[letter]!.map((user) => ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            leading: AvatarWidget(
-                              imageUrl: user.avatarUrl,
-                              name: user.displayName,
-                              size: 44,
-                              showOnline: user.isOnline,
+                      ...sortedKeys.map((letter) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              child: Text(letter, style: const TextStyle(fontWeight: FontWeight.bold)),
                             ),
-                            title: Text(user.displayName),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(icon: const Icon(Icons.call_outlined), onPressed: () {}),
-                                IconButton(icon: const Icon(Icons.videocam_outlined), onPressed: () {}),
-                              ],
-                            ),
-                            onTap: () => _openChat(user),
-                          )),
+                            ...grouped[letter]!.map((user) => ListTile(
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  leading: AvatarWidget(
+                                    imageUrl: user.avatarUrl,
+                                    name: user.displayName,
+                                    size: 44,
+                                    showOnline: user.isOnline,
+                                  ),
+                                  title: Text(user.displayName),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(icon: const Icon(Icons.call_outlined), onPressed: () {}),
+                                      IconButton(icon: const Icon(Icons.videocam_outlined), onPressed: () {}),
+                                    ],
+                                  ),
+                                  onTap: () => _openChat(user),
+                                )),
+                          ],
+                        );
+                      }),
                     ],
-                  );
-                }),
+                  ),
+                ),
               ],
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 

@@ -7,6 +7,7 @@ import { ConversationJoinRequest } from '../entities/conversation-join-request.e
 import { ConversationInbox } from '../entities/conversation-inbox.entity';
 import { ConversationService } from './conversation.service';
 import { ConversationController } from './conversation.controller';
+import { KafkaProducerModule } from '../kafka/kafka-producer.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { ConversationController } from './conversation.controller';
       ConversationJoinRequest,
       ConversationInbox,
     ]),
+    KafkaProducerModule,
   ],
   controllers: [ConversationController],
   providers: [ConversationService],

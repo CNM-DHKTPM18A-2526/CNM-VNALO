@@ -35,6 +35,10 @@ class SocketService {
       StreamController<Map<String, dynamic>>.broadcast();
   final _groupDisbandedController =
       StreamController<Map<String, dynamic>>.broadcast();
+  final _friendshipUpdatedController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final _friendRequestReceivedController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<Message> get onMessage =>
       _messageController.stream; // Stream for incoming messages
@@ -52,6 +56,8 @@ class SocketService {
   Stream<Map<String, dynamic>> get onReactionAdded => _reactionAddedController.stream;
   Stream<Map<String, dynamic>> get onReactionRemoved => _reactionRemovedController.stream;
   Stream<Map<String, dynamic>> get onGroupDisbanded => _groupDisbandedController.stream;
+  Stream<Map<String, dynamic>> get onFriendshipUpdated => _friendshipUpdatedController.stream;
+  Stream<Map<String, dynamic>> get onFriendRequestReceived => _friendRequestReceivedController.stream;
 
   void _emitCallSignal(String type, dynamic data) {
     if (data is! Map) return;
@@ -168,6 +174,12 @@ class SocketService {
     });
     _socket!.on('group.disbanded', (data) {
       _groupDisbandedController.add(Map<String, dynamic>.from(data));
+    });
+    _socket!.on('friendship.updated', (data) {
+      _friendshipUpdatedController.add(Map<String, dynamic>.from(data));
+    });
+    _socket!.on('friend.request.received', (data) {
+      _friendRequestReceivedController.add(Map<String, dynamic>.from(data));
     });
     _socket!.on('auth.logout.force', (data) {
       final reason = data is Map ? data['reason']?.toString() : null;
@@ -389,5 +401,7 @@ class SocketService {
     _reactionAddedController.close();
     _reactionRemovedController.close();
     _groupDisbandedController.close();
+    _friendshipUpdatedController.close();
+    _friendRequestReceivedController.close();
   }
 }

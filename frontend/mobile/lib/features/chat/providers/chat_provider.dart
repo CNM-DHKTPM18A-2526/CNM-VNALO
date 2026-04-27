@@ -1653,6 +1653,7 @@ class ChatProvider extends ChangeNotifier {
     bool? allowMemberInvite,
     bool? allowMemberPin,
     bool? allowMemberEditInfo,
+    bool? onlyAdminCanPost,
   }) async {
     final currentUser = _currentUserId;
     String userName = 'Một thành viên';
@@ -1677,6 +1678,7 @@ class ChatProvider extends ChangeNotifier {
         allowMemberInvite: allowMemberInvite ?? _conversations[index].allowMemberInvite,
         allowMemberPin: allowMemberPin ?? _conversations[index].allowMemberPin,
         allowMemberEditInfo: allowMemberEditInfo ?? _conversations[index].allowMemberEditInfo,
+        onlyAdminCanPost: onlyAdminCanPost ?? _conversations[index].onlyAdminCanPost,
       );
       notifyListeners();
     }
@@ -1690,6 +1692,7 @@ class ChatProvider extends ChangeNotifier {
       if (allowMemberInvite != null) body['allowMemberInvite'] = allowMemberInvite;
       if (allowMemberPin != null) body['allowMemberPin'] = allowMemberPin;
       if (allowMemberEditInfo != null) body['allowMemberEditInfo'] = allowMemberEditInfo;
+      if (onlyAdminCanPost != null) body['onlyAdminCanPost'] = onlyAdminCanPost;
 
       await _chatService.updateGroup(conversationId, body);
       

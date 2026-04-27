@@ -18,6 +18,7 @@ class GroupSettingsScreen extends StatefulWidget {
 }
 
 class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
+  // Local UI state for non-persisted toggles (if any)
   bool _highlightLeaderMessages = true;
   bool _newMemberCanSeeHistory = true;
 
@@ -30,11 +31,16 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
     );
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final userId = context.read<AuthProvider>().user?.id;
+    
     final myMember = conv.members.firstWhere(
       (m) => m.userId == userId,
       orElse: () => conv.members.first,
     );
-    final isOwner = myMember.role == MemberRole.OWNER;
+    
+    // Group Admin (Trưởng nhóm) has full control. 
+    // Deputy (Phó nhóm) has partial control in some features.
+    final isAdmin = myMember.role == MemberRole.ADMIN;
+    final isLeader = myMember.role == MemberRole.ADMIN || myMember.role == MemberRole.DEPUTY;
 
     final sectionTitleColor = isDarkMode 
         ? AppColors.primary.withValues(alpha: 0.9) 
@@ -93,8 +99,9 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
               children: [
                 _buildNavTile(
                   'Quản lý thành viên',
-                  null,
+                  '${conv.members.length} thành viên',
                   textColor,
+                  trailingColor: subtitleColor,
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => GroupMembersScreen(conversation: conv)),
@@ -103,13 +110,13 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
                 Divider(height: 1, color: dividerColor, indent: 16),
                 _buildNavTile(
                   'Duyệt thành viên',
-                  'Đã tắt',
+                  conv.joinMode == JoinMode.APPROVAL ? 'Đang bật' : 'Đang tắt',
                   textColor,
                   trailingColor: subtitleColor,
-                  onTap: () {},
+                  onTap: () => _showJoinModeSheet(conv.id, provider, isDarkMode, isAdmin),
                 ),
                 Divider(height: 1, color: dividerColor, indent: 16),
-                if (isOwner)
+                if (isAdmin)
                   _buildNavTile(
                     'Chuyển quyền trưởng nhóm',
                     null,
@@ -135,27 +142,57 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildPermissionTile('Quyền sửa thông tin nhóm', 'Tất cả mọi người', textColor, subtitleColor),
+                _buildPermissionTile(
+                  'Quyền sửa thông tin nhóm', 
+                  conv.allowMemberEditInfo ? 'Tất cả mọi người' : 'Chỉ trưởng và phó nhóm', 
+                  textColor, 
+                  subtitleColor,
+                  onTap: () => _showSimplePermissionSheet(
+                    context: context,
+                    title: 'Quyền sửa thông tin nhóm',
+                    currentValue: conv.allowMemberEditInfo,
+                    onChanged: (val) => provider.updateGroupInfo(conv.id, allowMemberEditInfo: val),
+                    isDarkMode: isDarkMode,
+                    isAdmin: isAdmin,
+                  ),
+                ),
                 Divider(height: 1, color: dividerColor, indent: 16),
-                _buildPermissionTile('Quyền tạo ghi chú, nhắc hẹn', 'Tất cả mọi người', textColor, subtitleColor),
-                Divider(height: 1, color: dividerColor, indent: 16),
-                _buildPermissionTile('Quyền tạo bình chọn', 'Tất cả mọi người', textColor, subtitleColor),
-                Divider(height: 1, color: dividerColor, indent: 16),
-                _buildPermissionTile('Quyền ghim tin nhắn', 'Tất cả mọi người', textColor, subtitleColor),
+                _buildPermissionTile(
+                  'Quyền ghim tin nhắn', 
+                  conv.allowMemberPin ? 'Tất cả mọi người' : 'Chỉ trưởng và phó nhóm', 
+                  textColor, 
+                  subtitleColor,
+                  onTap: () => _showSimplePermissionSheet(
+                    context: context,
+                    title: 'Quyền ghim tin nhắn',
+                    currentValue: conv.allowMemberPin,
+                    onChanged: (val) => provider.updateGroupInfo(conv.id, allowMemberPin: val),
+                    isDarkMode: isDarkMode,
+                    isAdmin: isAdmin,
+                  ),
+                ),
                 Divider(height: 1, color: dividerColor, indent: 16),
                 _buildPermissionTile(
                   'Quyền gửi tin nhắn', 
-                  provider.isReadOnlyForMembers(conv.id) ? 'Chỉ trưởng và phó nhóm' : 'Tất cả mọi người', 
+                  conv.onlyAdminCanPost ? 'Chỉ trưởng và phó nhóm' : 'Tất cả mọi người', 
                   textColor, 
                   subtitleColor,
-                  onTap: () => _showSendPermissionSheet(conv.id, provider, isDarkMode, isOwner),
+                  onTap: () => _showSimplePermissionSheet(
+                    context: context,
+                    title: 'Quyền gửi tin nhắn',
+                    currentValue: !conv.onlyAdminCanPost, // Note: onlyAdminCanPost=true means MemberPost=false
+                    reverseLogic: true,
+                    onChanged: (val) => provider.updateGroupInfo(conv.id, onlyAdminCanPost: !val),
+                    isDarkMode: isDarkMode,
+                    isAdmin: isAdmin,
+                  ),
                 ),
               ],
             ),
           ),
 
-          // === Giải tán nhóm (Owner only, no section header - just a red tile) ===
-          if (isOwner) ...[
+          // === Giải tán nhóm (Admin only) ===
+          if (isAdmin) ...[
             const SizedBox(height: 12),
             Container(
               color: bgColor,
@@ -231,6 +268,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
                 trailing,
                 style: TextStyle(fontSize: 14, color: trailingColor ?? Colors.grey),
               ),
+            const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
           ],
         ),
       ),
@@ -239,24 +277,92 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
 
   Widget _buildPermissionTile(String title, String subtitle, Color textColor, Color subtitleColor, {VoidCallback? onTap}) {
     return InkWell(
-      onTap: onTap ?? () {},
+      onTap: onTap,
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: TextStyle(fontSize: 15, color: textColor)),
-            const SizedBox(height: 2),
-            Text(subtitle, style: TextStyle(fontSize: 13, color: subtitleColor)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: TextStyle(fontSize: 15, color: textColor)),
+                      const SizedBox(height: 2),
+                      Text(subtitle, style: TextStyle(fontSize: 13, color: subtitleColor)),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right, size: 18, color: Colors.grey),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  void _showSendPermissionSheet(String convId, ChatProvider provider, bool isDarkMode, bool isOwner) {
-    if (!isOwner) {
+  void _showSimplePermissionSheet({
+    required BuildContext context,
+    required String title,
+    required bool currentValue,
+    required Function(bool) onChanged,
+    required bool isDarkMode,
+    required bool isAdmin,
+    bool reverseLogic = false,
+  }) {
+    if (!isAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Chỉ trưởng nhóm mới có thể thay đổi quyền này')),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDarkMode ? DarkColors.surface : Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) {
+        final textColor = isDarkMode ? Colors.white : Colors.black;
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                title: Text('Tất cả mọi người', style: TextStyle(color: textColor, fontSize: 16)),
+                trailing: currentValue ? const Icon(Icons.check, color: AppColors.primary) : null,
+                onTap: () {
+                  onChanged(true);
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                title: Text('Chỉ trưởng và phó nhóm', style: TextStyle(color: textColor, fontSize: 16)),
+                trailing: !currentValue ? const Icon(Icons.check, color: AppColors.primary) : null,
+                onTap: () {
+                  onChanged(false);
+                  Navigator.pop(context);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showJoinModeSheet(String convId, ChatProvider provider, bool isDarkMode, bool isAdmin) {
+    if (!isAdmin) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Chỉ trưởng nhóm mới có thể thay đổi quyền này')),
       );
@@ -275,25 +381,23 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
-                'Quyền gửi tin nhắn',
+                'Chế độ phê duyệt thành viên',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
               ListTile(
-                title: Text('Tất cả mọi người', style: TextStyle(color: textColor, fontSize: 16)),
-                trailing: !provider.isReadOnlyForMembers(convId) 
-                  ? const Icon(Icons.check, color: AppColors.primary) : null,
+                title: Text('Duyệt thành viên mới', style: TextStyle(color: textColor, fontSize: 16)),
+                subtitle: const Text('Thành viên mới cần được Admin phê duyệt để tham gia'),
                 onTap: () {
-                  provider.setReadOnlyForMembers(convId, false);
+                  provider.updateGroupInfo(convId, joinMode: 'APPROVAL');
                   Navigator.pop(context);
                 },
               ),
               ListTile(
-                title: Text('Chỉ trưởng và phó nhóm', style: TextStyle(color: textColor, fontSize: 16)),
-                trailing: provider.isReadOnlyForMembers(convId) 
-                  ? const Icon(Icons.check, color: AppColors.primary) : null,
+                title: Text('Mở tự do', style: TextStyle(color: textColor, fontSize: 16)),
+                subtitle: const Text('Bất kỳ ai có link đều có thể tham gia ngay'),
                 onTap: () {
-                  provider.setReadOnlyForMembers(convId, true);
+                  provider.updateGroupInfo(convId, joinMode: 'OPEN');
                   Navigator.pop(context);
                 },
               ),

@@ -12,6 +12,8 @@ class FocusedMessageDialog extends StatelessWidget {
   final bool isCloud;
   final bool isPinned;
   final bool isAiAssistant;
+  final bool canPin;
+  final bool canRecall;
   final Function(String action) onAction;
 
   const FocusedMessageDialog({
@@ -25,6 +27,8 @@ class FocusedMessageDialog extends StatelessWidget {
     this.isCloud = false,
     this.isPinned = false,
     this.isAiAssistant = false,
+    this.canPin = true,
+    this.canRecall = true,
   });
 
   @override
@@ -124,6 +128,8 @@ class FocusedMessageDialog extends StatelessWidget {
                           isCloud: isCloud,
                           isPinned: isPinned,
                           isAiAssistant: isAiAssistant,
+                          canPin: canPin,
+                          canRecall: canRecall,
                           onAction: onAction,
                         ),
                       ],
@@ -149,6 +155,8 @@ class FocusedMessageDialog extends StatelessWidget {
     bool isCloud = false,
     bool isPinned = false,
     bool isAiAssistant = false,
+    bool canPin = true,
+    bool canRecall = true,
   }) {
     Navigator.push(
       context,
@@ -161,6 +169,8 @@ class FocusedMessageDialog extends StatelessWidget {
           isCloud: isCloud,
           isPinned: isPinned,
           isAiAssistant: isAiAssistant,
+          canPin: canPin,
+          canRecall: canRecall,
           position: position,
           size: size,
           onAction: onAction,

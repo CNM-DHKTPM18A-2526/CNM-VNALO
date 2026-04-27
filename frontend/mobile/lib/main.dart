@@ -184,7 +184,10 @@ class VnaloApp extends StatelessWidget {
         ),
         Provider<NotificationService>(create: (_) => NotificationService()),
         ChangeNotifierProvider(
-          create: (ctx) => ContactProvider(ctx.read<FriendService>()),
+          create: (ctx) => ContactProvider(
+            ctx.read<FriendService>(),
+            ctx.read<SocketService>(),
+          ),
         ),
         Provider<AiService>(
           create: (context) => AiService(context.read<ApiService>()),

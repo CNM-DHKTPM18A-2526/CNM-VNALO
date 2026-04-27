@@ -6,14 +6,15 @@ import { HealthController } from './health.controller';
 import { GatewayModule } from './gateway/gateway.module';
 import { PresenceModule } from './presence/presence.module';
 import { RabbitMQModule } from './rabbitmq/rabbitmq.module';
-import { redisConfig, jwtConfig, rabbitConfig } from './config/app.config';
+import { KafkaModule } from './kafka/kafka.module';
+import { redisConfig, jwtConfig, rabbitConfig, kafkaConfig } from './config/app.config';
 
 @Module({
   imports: [
     // Load env vars
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [redisConfig, jwtConfig, rabbitConfig],
+      load: [redisConfig, jwtConfig, rabbitConfig, kafkaConfig],
       envFilePath: ['.env'],
     }),
 
@@ -48,6 +49,7 @@ import { redisConfig, jwtConfig, rabbitConfig } from './config/app.config';
     PresenceModule,
     GatewayModule,
     RabbitMQModule,
+    KafkaModule,
   ],
   controllers: [HealthController],
 })
