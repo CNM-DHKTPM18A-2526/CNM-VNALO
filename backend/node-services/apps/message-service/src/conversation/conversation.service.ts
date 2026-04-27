@@ -129,7 +129,7 @@ export class ConversationService {
     return this.getConversation(conversationId, userId);
   }
 
-  /** Create a group conversation with initial members. Creator becomes OWNER. */
+  /** Create a group conversation with initial members. Creator becomes ADMIN. */
   async createGroup(userId: string, dto: CreateGroupConversationDto) {
     const conversationId = await this.dataSource.transaction(
       async (manager) => {
@@ -224,22 +224,51 @@ export class ConversationService {
     }
 
     // Security Fix: Whitelist fields to prevent Elevation of Privilege
+    const { title, description, avatarUrl, ...rest } = dto;
+    
     if (member.role === MemberRole.MEMBER) {
-      const { title, description, avatarUrl } = dto;
+      // MEMBER can only update basic info (if allowMemberEditInfo is true)
       Object.assign(conversation, {
         ...(title && { title }),
         ...(description && { description }),
         ...(avatarUrl && { avatarUrl }),
       });
+    } else if (member.role === MemberRole.DEPUTY) {
+      // DEPUTY can update basic info but NOT admin-only settings
+      const adminOnlyFields = [
+        'onlyAdminCanPost',
+        'allowMemberInvite',
+        'allowMemberPin',
+        'allowMemberEditInfo',
+        'highlightAdminMessages',
+        'showHistoryToNewMembers',
+        'allowMemberCreateNote',
+        'allowMemberCreatePoll',
+      ];
+      
+      const safeUpdate: any = {
+        ...(title && { title }),
+        ...(description && { description }),
+        ...(avatarUrl && { avatarUrl }),
+      };
+      
+      // Filter out admin-only fields from the deputy update
+      for (const key of Object.keys(rest)) {
+        if (!adminOnlyFields.includes(key)) {
+          safeUpdate[key] = rest[key];
+        }
+      }
+      
+      Object.assign(conversation, safeUpdate);
     } else {
-      // ADMIN/DEPUTY can update all fields in DTO
+      // ADMIN can update everything
       Object.assign(conversation, dto);
     }
 
     return this.conversationRepo.save(conversation);
   }
 
-  /** Add members to a group. Requires ADMIN/OWNER or allowed member invite. */
+  /** Add members to a group. Requires ADMIN or allowed member invite. */
   async addMembers(
     conversationId: string,
     userId: string,
@@ -385,6 +414,12 @@ export class ConversationService {
     target.leftAt = new Date();
     target.removedBy = isSelf ? null : requesterId;
     await this.memberRepo.save(target);
+
+    // G-013 Fix: Delete inbox entry when leaving/removed to avoid orphaned data
+    await this.inboxRepo.delete({
+      conversationId: conversationId,
+      userId: targetUserId,
+    });
 
     this.logger.log(
       `Member ${targetUserId} removed from ${conversationId} by ${requesterId}`,
@@ -538,7 +573,7 @@ export class ConversationService {
     const conversation = await this.getConversationOrFail(conversationId);
     const member = await this.assertMember(conversationId, userId);
 
-    // Always allow pinning in 1:1 chats. For groups, check allowMemberPin or admin/owner role.
+    // Always allow pinning in 1:1 chats. For groups, check allowMemberPin or admin role.
     if (conversation.type === ConversationType.DIRECT) return;
 
     if (member.role === MemberRole.MEMBER && !conversation.allowMemberPin) {

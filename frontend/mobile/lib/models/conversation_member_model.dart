@@ -4,7 +4,7 @@ import 'package:vnalo_mobile/models/user_model.dart';
 class ConversationMember {
   final String conversationId;
   final String userId;
-  final MemberRole role; // OWNER, ADMIN, MEMBER
+  final MemberRole role; // ADMIN (=trưởng nhóm), DEPUTY (=phó nhóm), MEMBER
   final String? nickname;
   final DateTime joinedAt;
   final String? joinedBy;

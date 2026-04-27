@@ -453,8 +453,7 @@ erDiagram
 > [!IMPORTANT]
 > The following changes are SPEC_ONLY — documented but not yet applied to code or DB migrations.
 
-| Block user cascades to stories/timeline | Decision D-015 | P1 |
-| Add `auto_translate` flag to USER_SETTING | Feature request V6 | P2 |
+---
 
 ---
 

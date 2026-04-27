@@ -177,6 +177,7 @@ class CommonTexts {
   String get collapseAction => _isVi ? 'Thu gọn' : 'Collapse';
   String get editAction => _isVi ? 'Chỉnh sửa' : 'Edit';
   String get muteAction => _isVi ? 'Tắt' : 'Mute';
+  String get unmuteAction => _isVi ? 'Bật thông báo' : 'Unmute';
   String sayHelloTo(String name) =>
       _isVi ? 'Gửi lời chào $name' : 'Say hello to $name';
 

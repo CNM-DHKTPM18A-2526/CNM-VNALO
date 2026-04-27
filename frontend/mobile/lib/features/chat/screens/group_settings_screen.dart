@@ -37,8 +37,8 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
     
     // Group Admin (Trưởng nhóm) has full control. 
     // Deputy (Phó nhóm) has partial control in some features.
-    final isAdmin = myMember.role == MemberRole.DEPUTY;
-    final isLeader = myMember.role == MemberRole.DEPUTY || myMember.role == MemberRole.DEPUTY;
+    final isAdmin = myMember.role == MemberRole.ADMIN || myMember.role == MemberRole.DEPUTY;
+    final isOwner = myMember.role == MemberRole.ADMIN;
 
     final sectionTitleColor = isDarkMode 
         ? AppColors.primary.withValues(alpha: 0.9) 

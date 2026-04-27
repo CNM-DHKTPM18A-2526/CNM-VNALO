@@ -296,10 +296,12 @@ All group state transitions auto-emit a `MessageType.SYSTEM` message to the conv
 | Flutter: subscribe to `group.disbanded`, clear SQLite | Done | P0 | ChatProvider subscription |
 | Add `onlyAdminCanPost` field to Conversation entity | Done | P1 | Implemented |
 | Enforce `onlyAdminCanPost` in `sendMessage` | Done | P1 | Backend guard |
+| Enforce ADMIN-only settings in `updateGroup` | Done | P0 | Whitelist implemented |
 | Filter blocked-user messages in `getMessages` | Open | P1 | Core-service coordination |
 | Implement silent leave broadcast filter | Open | P1 | Gateway role check |
 | Admin inactivity transfer cron job (14-day) | Open | P2 | `[SPEC_ONLY]` |
 | S3 bulk delete on disband | Open | P1 | Requires cross-service cleanup |
+| Cleanup orphaned INBOX on leave/remove | Done | P0 | Implemented in removeMember |
 | Harden conversation membership checks | Done | — | assertMember used in gateway |
 | Enforce group role checks for pin/update | Done | — | service-level guards |
 
