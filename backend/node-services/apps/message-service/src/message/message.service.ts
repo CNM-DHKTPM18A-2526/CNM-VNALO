@@ -884,8 +884,8 @@ export class MessageService {
 
       // Update inbox for members. If targetRoles is set, filter by role.
       const query = manager.createQueryBuilder(ConversationMember, 'member')
-        .where('member.conversationId = :cid AND member.leftAt IS NULL', { cid: conversationId });
-      
+        .where('member.conversation_id = :cid AND member.left_at IS NULL', { cid: conversationId });
+
       if (targetRoles && targetRoles.length > 0) {
         query.andWhere('member.role IN (:...roles)', { roles: targetRoles });
       }
@@ -900,7 +900,7 @@ export class MessageService {
             lastMessageSeq: serverSeq,
             unreadCount: () => 'unread_count + 1',
           })
-          .where('userId = :uid AND conversationId = :cid', {
+          .where('user_id = :uid AND conversation_id = :cid', {
             uid: member.userId,
             cid: conversationId,
           })
