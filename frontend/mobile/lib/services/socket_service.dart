@@ -79,6 +79,7 @@ class SocketService {
             'polling',
           ]) // Use the same transports as gateway
           .setAuth({'token': token}) // Set the authentication token
+          .setPath('/socket.io/') // Required for Nginx reverse proxy
           .enableAutoConnect() // Enable auto-connect
           .enableReconnection() // Enable reconnection
           .setReconnectionDelay(1000) // Set reconnection delay to 1 second
