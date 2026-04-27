@@ -16,7 +16,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/stickers")
+@RequestMapping("/stickers")
 @RequiredArgsConstructor
 @Slf4j
 public class StickerController {
