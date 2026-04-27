@@ -95,8 +95,8 @@
 Creator → ADMIN role assigned automatically.
 createdBy field set to creator userId (audit only, no runtime privilege).
 Default settings: joinMode=OPEN, memberLimit=100, onlyAdminCanPost=false,
-  allowMemberInvite=true, allowMemberPin=false, allowMemberEditInfo=false,
-  highlightAdminMessages=false, showHistoryToNewMembers=true,
+  allowMemberInvite=true, allowMemberPin=true, allowMemberEditInfo=true,
+  highlightAdminMessages=true, showHistoryToNewMembers=true,
   allowMemberCreateNote=true, allowMemberCreatePoll=true.
 ```
 

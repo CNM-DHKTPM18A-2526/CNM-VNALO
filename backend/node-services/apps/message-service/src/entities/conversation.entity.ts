@@ -95,17 +95,17 @@ export class Conversation {
   @Column({ name: 'allow_member_invite', type: 'boolean', default: true })
   allowMemberInvite: boolean;
 
-  @Column({ name: 'allow_member_pin', type: 'boolean', default: false })
+  @Column({ name: 'allow_member_pin', type: 'boolean', default: true })
   allowMemberPin: boolean;
 
-  @Column({ name: 'allow_member_edit_info', type: 'boolean', default: false })
+  @Column({ name: 'allow_member_edit_info', type: 'boolean', default: true })
   allowMemberEditInfo: boolean;
 
   /** When true, only ADMIN and DEPUTY can send messages (announcement/broadcast mode). */
   @Column({ name: 'only_admin_can_post', type: 'boolean', default: false })
   onlyAdminCanPost: boolean;
 
-  @Column({ name: 'highlight_admin_messages', type: 'boolean', default: false })
+  @Column({ name: 'highlight_admin_messages', type: 'boolean', default: true })
   highlightAdminMessages: boolean;
 
   @Column({ name: 'show_history_to_new_members', type: 'boolean', default: true })
