@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   Key,
   Lock,
+  Plus,
   Users,
   Search,
   MoreHorizontal,
@@ -38,6 +39,7 @@ import { Modal } from '../../../shared/components/ui/Modal';
 import { useUserStore } from '../context/UserStoreContext';
 import { getGroupCollageData } from '../../../shared/utils/avatarUtils';
 import type { Friend } from '../../friends/friends.types';
+import { GroupBulletin } from './GroupBulletin';
 
 type ConversationInfoProps = {
   conversation: ConversationSummary;
@@ -53,10 +55,11 @@ type ConversationInfoProps = {
   onUpdateGroupAvatar?: (file: File) => void;
   onUpdateGroupSettings?: (settings: Partial<any>) => void;
   onDisbandGroup?: () => void;
+  onJumpToMessage?: (messageId: string) => void;
   friends?: Friend[];
 };
 
-type SectionKey = 'media' | 'files' | 'links' | 'security';
+type SectionKey = 'media' | 'files' | 'links' | 'security' | 'bulletin';
 
 export function ConversationInfo({
   conversation,
@@ -74,12 +77,14 @@ export function ConversationInfo({
   onUpdateGroupAvatar,
   onUpdateGroupSettings,
   onDisbandGroup,
+  onJumpToMessage,
   friends,
   currentUserId
 }: ConversationInfoProps & {
   currentUserId?: string;
   onCreateGroupClick?: () => void;
   onTogglePinConversation?: () => void;
+  onJumpToMessage?: (messageId: string) => void;
 }) {
   const { userMap, ensureUser } = useUserStore();
   const { accessToken } = useAuth();
@@ -87,12 +92,14 @@ export function ConversationInfo({
     media: true,
     files: true,
     links: true,
-    security: true,
+    security: false,
+    bulletin: true,
   });
   const [isHidden, setIsHidden] = useState(false);
   const [membersExpanded, setMembersExpanded] = useState(true);
   const [showGroupManagement, setShowGroupManagement] = useState(false);
   const [showMembersView, setShowMembersView] = useState(false);
+  const [showBulletinView, setShowBulletinView] = useState(false);
   const [showKickModal, setShowKickModal] = useState(false);
   const [targetKickUserId, setTargetKickUserId] = useState<string | null>(null);
   const [blockOnKick, setBlockOnKick] = useState(false);
@@ -168,23 +175,37 @@ export function ConversationInfo({
     <div className="h-full overflow-y-auto bg-[#F1F1F4] pb-20">
       {/* Header */}
       <header className="sticky top-0 z-10 border-b border-gray-200 bg-white px-5 py-4 flex items-center gap-3">
-        {(showGroupManagement || showMembersView) && (
+        {(showGroupManagement || showMembersView || showBulletinView) && (
           <button
-            className="mr-2 bg-white border-0 outline-none ring-0 hover:bg-gray-50 rounded-full transition-colors cursor-pointer flex items-center justify-center h-8 w-8 shadow-none"
+            className="mr-2 bg-white border-0 outline-none ring-0 hover:bg-gray-100 rounded-full transition-colors cursor-pointer flex items-center justify-center h-8 w-8 shadow-none"
             onClick={() => {
               setShowGroupManagement(false);
               setShowMembersView(false);
+              setShowBulletinView(false);
             }}
           >
             <ChevronLeft size={24} strokeWidth={2} className="text-slate-700" />
           </button>
         )}
         <h3 className="text-[18px] font-semibold text-slate-800 flex-1">
-          {showGroupManagement ? 'Quản lý nhóm' : showMembersView ? 'Thành viên' : 'Thông tin hội thoại'}
+          {showBulletinView ? 'Bảng tin nhóm' : showGroupManagement ? 'Quản lý nhóm' : showMembersView ? 'Thành viên' : 'Thông tin hội thoại'}
         </h3>
+        {showBulletinView && (
+          <button className="bg-transparent border-none outline-none cursor-pointer flex items-center justify-center h-8 w-8 hover:bg-gray-100 rounded-full transition-colors" title="Thêm">
+            <Plus size={24} className="text-slate-600" />
+          </button>
+        )}
       </header>
 
-      {showMembersView ? (
+      {showBulletinView ? (
+        <GroupBulletin 
+          conversationId={conversation.id}
+          token={accessToken || ''}
+          messages={messages}
+          onClose={() => setShowBulletinView(false)}
+          onJumpToMessage={onJumpToMessage}
+        />
+      ) : showMembersView ? (
         <MemberListView 
           conversation={conversation} 
           currentUserId={currentUserId}
@@ -304,9 +325,8 @@ export function ConversationInfo({
             )}
           </section>
 
-          {/* Common Info */}
-          <section className="mt-3 bg-white px-5 py-2">
-            <InfoRow icon={AlarmClock} text="Danh sách nhắc hẹn" />
+          {/* Group Management Sections */}
+          <section className="mt-3 space-y-3">
             {conversation.isGroup && (
               <Section title="Thành viên nhóm" expanded={membersExpanded} onToggle={() => setMembersExpanded(!membersExpanded)}>
                 <div 
@@ -319,6 +339,27 @@ export function ConversationInfo({
                   <span className="text-[15px] font-medium text-slate-700">
                     {conversation.memberCount || allDisplayMemberIds.length} thành viên
                   </span>
+                </div>
+              </Section>
+            )}
+
+            {conversation.isGroup && (
+              <Section 
+                title="Bảng tin nhóm" 
+                expanded={expanded.bulletin}
+                onToggle={() => toggleSection('bulletin')}
+              >
+                <div className="-mx-2 space-y-1">
+                  <InfoRow 
+                    icon={AlarmClock} 
+                    text="Danh sách nhắc hẹn" 
+                    onClick={() => {}} 
+                  />
+                  <InfoRow 
+                    icon={FileText} 
+                    text="Ghi chú, ghim, bình chọn" 
+                    onClick={() => setShowBulletinView(true)} 
+                  />
                 </div>
               </Section>
             )}
@@ -434,8 +475,14 @@ export function ConversationInfo({
                 label="Rời nhóm" 
                 color="text-red-500" 
                 onClick={() => {
+                  const activeMembers = (conversation.members || []).filter(m => !m.leftAt);
                   if (isOwner) {
-                    setShowTransferModal(true);
+                    if (activeMembers.length <= 1) {
+                      // Only admin left, suggest disbanding instead
+                      onDisbandGroup?.();
+                    } else {
+                      setShowTransferModal(true);
+                    }
                   } else {
                     onLeaveGroupClick?.();
                   }
@@ -888,6 +935,12 @@ function MemberRow({
                     Thêm phó nhóm
                   </button>
                   <button 
+                    onClick={() => { onUpdateMemberRole?.(member.userId, 'ADMIN'); setShowMenu(false); }}
+                    className="w-full px-4 py-3 text-left text-[14px] text-slate-700 bg-white hover:bg-gray-50 flex items-center gap-2 border-0 outline-none transition-colors"
+                  >
+                    Chuyển trưởng nhóm
+                  </button>
+                  <button 
                     onClick={() => { onKick(); setShowMenu(false); }}
                     className="w-full px-4 py-3 text-left text-[14px] text-red-600 bg-white hover:bg-red-50 flex items-center gap-2 border-0 outline-none transition-colors"
                   >
@@ -999,11 +1052,23 @@ function TransferOwnerModal({
               );
             })
           ) : (
-            <div className="py-10 text-center text-slate-500 text-[14px]">
-              Không tìm thấy thành viên
+            <div className="py-6 text-center">
+              <p className="text-slate-500 text-[14px] mb-4">Không tìm thấy thành viên khác để chuyển quyền</p>
             </div>
           )}
         </div>
+
+        {otherMembers.length > 0 && (
+          <button 
+            className="w-full py-2.5 rounded-lg border border-dashed border-[#0091FF] text-[#0091FF] text-[14px] font-medium hover:bg-blue-50 transition-colors"
+            onClick={() => {
+              const randomMember = otherMembers[Math.floor(Math.random() * otherMembers.length)];
+              onConfirm(randomMember.userId);
+            }}
+          >
+            Chuyển quyền ngẫu nhiên và rời nhóm
+          </button>
+        )}
       </div>
     </Modal>
   );
@@ -1038,10 +1103,11 @@ function ActionButton({
   );
 }
 
-function InfoRow({ icon: Icon, text }: { icon: React.ElementType; text: string }) {
+function InfoRow({ icon: Icon, text, onClick }: { icon: React.ElementType; text: string; onClick?: () => void }) {
   return (
     <button
       type="button"
+      onClick={onClick}
       className="flex w-full items-center gap-4 rounded-xl border-0 bg-transparent px-3 py-[13px] text-left shadow-none outline-none ring-0 hover:bg-gray-50 focus:outline-none active:bg-gray-100"
     >
       <Icon size={20} className="text-slate-700" />
