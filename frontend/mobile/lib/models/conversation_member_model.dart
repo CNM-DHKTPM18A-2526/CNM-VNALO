@@ -41,8 +41,8 @@ class ConversationMember {
   });
 
   bool get isActive => leftAt == null;
-  bool get isOwner => role == MemberRole.OWNER;
-  bool get isAdmin => role == MemberRole.ADMIN || role == MemberRole.OWNER;
+  bool get isOwner => role == MemberRole.ADMIN;
+  bool get isAdmin => role == MemberRole.DEPUTY || role == MemberRole.ADMIN;
 
   ConversationMember copyWith({
     String? conversationId,

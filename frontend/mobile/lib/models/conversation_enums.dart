@@ -4,7 +4,7 @@ enum ConversationStatus { ACTIVE, ARCHIVED, DISABLED }
 
 enum JoinMode { OPEN, APPROVAL, INVITE_ONLY }
 
-enum MemberRole { OWNER, ADMIN, DEPUTY, MEMBER }
+enum MemberRole { ADMIN, DEPUTY, MEMBER }
 
 enum NotificationSetting { ALL, MENTIONS, NONE }
 

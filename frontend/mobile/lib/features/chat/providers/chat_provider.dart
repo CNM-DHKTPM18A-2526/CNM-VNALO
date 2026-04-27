@@ -241,7 +241,7 @@ class ChatProvider extends ChangeNotifier {
     }
 
     // 2. Enforce exactly 1 Owner (Fix Two Owners display bug)
-    final owners = conv.members.where((m) => m.role == MemberRole.OWNER).toList();
+    final owners = conv.members.where((m) => m.role == MemberRole.ADMIN).toList();
     if (owners.length > 1) {
       // Logic: If there are multiple owners and I am one of them, prefer the OTHER person
       // as the primary owner to support smooth self-demotion during transfer.
@@ -259,7 +259,7 @@ class ChatProvider extends ChangeNotifier {
       }
 
       final sanitizedMembers = conv.members.map((m) {
-        if (m.role == MemberRole.OWNER && m.userId != primaryOwnerId) {
+        if (m.role == MemberRole.ADMIN && m.userId != primaryOwnerId) {
           // Locally demote secondary owners to MEMBER
           return m.copyWith(role: MemberRole.MEMBER);
         }
@@ -1819,7 +1819,7 @@ class ChatProvider extends ChangeNotifier {
       final conv = _conversations[index];
       final updatedMembers = conv.members.map((m) {
         if (m.userId == targetUserId) {
-          return m.copyWith(role: MemberRole.OWNER);
+          return m.copyWith(role: MemberRole.ADMIN);
         } else if (m.userId == myId) {
           return m.copyWith(role: MemberRole.MEMBER);
         }
@@ -1988,7 +1988,7 @@ class ChatProvider extends ChangeNotifier {
       );
       
       // If user is owner, check if there are other members to transfer ownership to
-      if (member.role == MemberRole.OWNER) {
+      if (member.role == MemberRole.ADMIN) {
         final activeMembers = conv.members.where((m) => m.leftAt == null).toList();
         if (activeMembers.length > 1) {
           throw Exception('Bạn phải chuyển quyền trưởng nhóm cho thành viên khác trước khi rời nhóm');
@@ -2120,7 +2120,7 @@ class ChatProvider extends ChangeNotifier {
           return m.copyWith(role: memberRole);
         }
         // Enforce exactly 1 owner if someone is being promoted to OWNER
-        if (memberRole == MemberRole.OWNER && m.role == MemberRole.OWNER) {
+        if (memberRole == MemberRole.ADMIN && m.role == MemberRole.ADMIN) {
           return m.copyWith(role: MemberRole.MEMBER);
         }
         return m;
@@ -2136,7 +2136,7 @@ class ChatProvider extends ChangeNotifier {
       await _chatService.updateMemberRole(conversationId, userId, role);
       
       // Send system notification for role change
-      if (memberRole == MemberRole.ADMIN) {
+      if (memberRole == MemberRole.DEPUTY) {
         await _sendSystemNotification(conversationId, '$myName đã bổ nhiệm $targetName làm phó nhóm');
       } else if (memberRole == MemberRole.MEMBER) {
         await _sendSystemNotification(conversationId, '$myName đã hạ cấp $targetName thành thành viên');

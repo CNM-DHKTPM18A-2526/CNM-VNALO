@@ -135,19 +135,19 @@
 | POST | /api/v1/conversations/direct | JWT |
 | POST | /api/v1/conversations/group | JWT |
 | GET | /api/v1/conversations/{id} | JWT |
-| PATCH | /api/v1/conversations/{id} | JWT |
-| POST | /api/v1/conversations/{id}/members | JWT |
-| DELETE | /api/v1/conversations/{id}/members/{userId} | JWT |
-| GET | /api/v1/conversations/{id}/members | JWT |
-| POST | /api/v1/conversations/{id}/join | JWT |
-| GET | /api/v1/conversations/{id}/join-requests | JWT |
-| POST | /api/v1/conversations/{id}/join-requests/{userId}/approve | JWT |
-| DELETE | /api/v1/conversations/{id}/join-requests/{userId} | JWT |
-| PATCH | /api/v1/conversations/{id}/member/{targetUserId} | JWT |
-| PATCH | /api/v1/conversations/{id}/wallpaper | JWT |
-| PATCH | /api/v1/conversations/{id}/members/{userId}/nickname | JWT |
-| POST | /api/v1/conversations/{id}/leave | JWT |
-| DELETE | /api/v1/conversations/{id} | JWT | disband group [SPEC_ONLY — not yet implemented] |
+| PATCH | /api/v1/conversations/{id} | JWT | Body: {title, description, avatarUrl, joinMode, onlyAdminCanPost, allowMemberInvite, allowMemberPin, allowMemberEditInfo, highlightAdminMessages, showHistoryToNewMembers, allowMemberCreateNote, allowMemberCreatePoll} |
+| POST | /api/v1/conversations/{id}/members | JWT | |
+| DELETE | /api/v1/conversations/{id}/members/{userId} | JWT | |
+| GET | /api/v1/conversations/{id}/members | JWT | |
+| POST | /api/v1/conversations/{id}/join | JWT | |
+| GET | /api/v1/conversations/{id}/join-requests | JWT | |
+| POST | /api/v1/conversations/{id}/join-requests/{userId}/approve | JWT | |
+| DELETE | /api/v1/conversations/{id}/join-requests/{userId} | JWT | |
+| PATCH | /api/v1/conversations/{id}/member/{targetUserId} | JWT | |
+| PATCH | /api/v1/conversations/{id}/wallpaper | JWT | |
+| PATCH | /api/v1/conversations/{id}/members/{userId}/nickname | JWT | |
+| POST | /api/v1/conversations/{id}/leave | JWT | |
+| DELETE | /api/v1/conversations/{id} | JWT | disband group |
 | GET | /api/v1/users/me/settings/sync | JWT | getSyncPolicy — sync settings for restrictedWebMode |
 
 ### Message

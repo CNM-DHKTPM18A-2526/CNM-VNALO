@@ -221,7 +221,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         final myMember = conv.members.isEmpty 
             ? ConversationMember(conversationId: conv.id, userId: 'none', joinedAt: DateTime.now())
             : conv.members.firstWhere((m) => m.userId == currentUserId, orElse: () => conv.members.first);
-        final canSend = !isRestrictedSending || myMember.role == MemberRole.OWNER || myMember.role == MemberRole.ADMIN;
+        final canSend = !isRestrictedSending || myMember.role == MemberRole.ADMIN || myMember.role == MemberRole.DEPUTY;
 
         return Scaffold(
           backgroundColor:
@@ -510,7 +510,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
                           final isGroup = conv.type == ConversationType.GROUP;
                           final myRole = myMember.role;
-                          final isAdmin = myRole == MemberRole.OWNER || myRole == MemberRole.ADMIN || myRole == MemberRole.DEPUTY;
+                          final isAdmin = myRole == MemberRole.ADMIN || myRole == MemberRole.DEPUTY || myRole == MemberRole.DEPUTY;
                           
                           // Members can pin only if allowed
                           final canPin = !isGroup || conv.allowMemberPin || isAdmin;

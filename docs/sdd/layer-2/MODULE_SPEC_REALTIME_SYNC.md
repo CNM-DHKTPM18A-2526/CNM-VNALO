@@ -24,6 +24,7 @@
 - Per-event broadcast strategy (room vs. per-user socket vs. sender-only).
 - Platform access control (`clientPlatform`, `restrictedWebMode`).
 - Offline fallback for call signaling (Redis CALL_OFFLINE).
+- Real-time Friendship and Contact synchronization (Kafka-to-Socket bridge).
 - New `group.disbanded` event delivery.
 
 ### Out of Scope
@@ -313,7 +314,39 @@ Redis PUBLISH 'CALL_OFFLINE' {
 
 ---
 
-## 9. Platform Access Control (restrictedWebMode)
+## 9. Friendship and Contact Synchronization
+
+**Source**: `core-service` (Java) publishes to Kafka topic `vnalo.realtime.events`.
+**Bridge**: `realtime-gateway` (Node) consumes Kafka and emits to Socket.IO.
+
+| Kafka Event | Socket Event | Logic |
+|---|---|---|
+| `friend.request.received` | `friend.request.received` | Delivered via `emitToUser(targetUserId)` |
+| `friendship.updated` | `friendship.updated` | Delivered via `emitToUser(targetUserId)` |
+
+### 9.1 Mobile Refresh Flow
+
+1. Flutter `SocketService` listens for `friend.request.received` and `friendship.updated`.
+2. On receipt, `ContactProvider` is notified to call `loadFriends()` and `loadFriendRequests()` via REST.
+3. UI updates instantly without user pull-to-refresh.
+
+```mermaid
+sequenceDiagram
+  participant Core as core-service (Java)
+  participant K as Kafka
+  participant GW as realtime-gateway (Node)
+  participant App as Flutter Mobile
+
+  Core->>K: Publish {type: friendship.updated, userId: B, data: {friendId: A}}
+  K->>GW: Consume event
+  GW->>App: socket.emit('friendship.updated', data)
+  App->>App: provider.loadFriends()
+  Note over App: UI refreshed
+```
+
+---
+
+## 10. Platform Access Control (restrictedWebMode)
 
 | Platform | `clientPlatform` value | `restrictedWebMode` (current) | `restrictedWebMode` (target) |
 |---|---|---|---|
@@ -335,7 +368,7 @@ Service-level guards check `access.restrictedWebMode` for:
 
 ---
 
-## 10. Event Delivery Matrix (Complete)
+## 11. Event Delivery Matrix (Complete)
 
 | Event | Direction | Broadcast Strategy | Sender Receives? | Offline Delivery |
 |---|---|---|---|---|
@@ -355,12 +388,14 @@ Service-level guards check `access.restrictedWebMode` for:
 | `group.member_added` | S→C | `server.to(room)` `[SPEC_ONLY]` | ✅ | ❌ |
 | `group.member_removed` | S→C | `server.to(room)` `[SPEC_ONLY]` | ✅ | ❌ |
 | `group.member_left` | S→C | `server.to(room)` `[SPEC_ONLY]` | ✅ | ❌ |
-| `group.admin_transferred` | S→C | `server.to(room)` `[SPEC_ONLY]` | ✅ | ❌ |
-| `group.updated` | S→C | `server.to(room)` `[SPEC_ONLY]` | ✅ | ❌ |
+| `group.admin_transferred` | S→C | `server.to(room)` | ✅ | ❌ |
+| `group.updated` | S→C | `server.to(room)` | ✅ | ❌ |
+| `friend.request.received` | S→C | `emitToUser(target)` | ❌ | ❌ |
+| `friendship.updated` | S→C | `emitToUser(target)` | ❌ | ❌ |
 
 ---
 
-## 11. Client Reconnection Protocol
+## 12. Client Reconnection Protocol
 
 On every reconnect (socket re-established after disconnect):
 
@@ -375,7 +410,7 @@ On every reconnect (socket re-established after disconnect):
 
 ---
 
-## 12. Decisions
+## 13. Decisions
 
 1. Dual delivery (room + per-user) for `message.received` is intentional — ensures inbox refresh even when chat view is not open. Client deduplication by `message.id` is required.
 2. `presence.changed` global broadcast is a known performance risk for large user counts (see D-008 area). Scoping to contact graph is the target improvement.
@@ -384,11 +419,12 @@ On every reconnect (socket re-established after disconnect):
 
 ---
 
-## 13. Task Breakdown
+## 14. Task Breakdown
 
 | Task | Status | Priority | Notes |
 |---|---|---|---|
-| Implement `group.disbanded` emit in chat.gateway | Open | P0 | After `disbandGroup()` call |
+| Implement `group.disbanded` emit in chat.gateway | Done | P0 | Verified |
+| Implement Kafka-to-Socket friendship bridge | Done | P0 | core-service -> gateway |
 | Add own-socket read sync via `emitToUser(reader)` | Open | P1 | Cross-device unread badge accuracy |
 | Scope `presence.changed` to contact graph | Open | P2 | Performance — current global emit |
 | Implement `group.member_added/removed/left` events | Open | P1 | `[SPEC_ONLY]` |
