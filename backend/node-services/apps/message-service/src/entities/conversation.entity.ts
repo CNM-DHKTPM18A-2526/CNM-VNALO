@@ -105,6 +105,18 @@ export class Conversation {
   @Column({ name: 'only_admin_can_post', type: 'boolean', default: false })
   onlyAdminCanPost: boolean;
 
+  @Column({ name: 'highlight_admin_messages', type: 'boolean', default: false })
+  highlightAdminMessages: boolean;
+
+  @Column({ name: 'show_history_to_new_members', type: 'boolean', default: true })
+  showHistoryToNewMembers: boolean;
+
+  @Column({ name: 'allow_member_create_note', type: 'boolean', default: true })
+  allowMemberCreateNote: boolean;
+
+  @Column({ name: 'allow_member_create_poll', type: 'boolean', default: true })
+  allowMemberCreatePoll: boolean;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 

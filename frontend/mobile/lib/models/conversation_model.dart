@@ -18,6 +18,11 @@ class Conversation {
   final bool allowMemberInvite;
   final bool allowMemberPin;
   final bool allowMemberEditInfo;
+  final bool onlyAdminCanPost;
+  final bool highlightAdminMessages;
+  final bool showHistoryToNewMembers;
+  final bool allowMemberCreateNote;
+  final bool allowMemberCreatePoll;
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final String? wallpaperUrl;
@@ -51,6 +56,11 @@ class Conversation {
     this.allowMemberInvite = true,
     this.allowMemberPin = false,
     this.allowMemberEditInfo = false,
+    this.onlyAdminCanPost = false,
+    this.highlightAdminMessages = false,
+    this.showHistoryToNewMembers = true,
+    this.allowMemberCreateNote = true,
+    this.allowMemberCreatePoll = true,
     this.createdAt,
     this.updatedAt,
     this.wallpaperUrl,
@@ -83,6 +93,11 @@ class Conversation {
     bool? allowMemberInvite,
     bool? allowMemberPin,
     bool? allowMemberEditInfo,
+    bool? onlyAdminCanPost,
+    bool? highlightAdminMessages,
+    bool? showHistoryToNewMembers,
+    bool? allowMemberCreateNote,
+    bool? allowMemberCreatePoll,
     DateTime? createdAt,
     DateTime? updatedAt,
     List<ConversationMember>? members,
@@ -114,6 +129,11 @@ class Conversation {
       allowMemberInvite: allowMemberInvite ?? this.allowMemberInvite,
       allowMemberPin: allowMemberPin ?? this.allowMemberPin,
       allowMemberEditInfo: allowMemberEditInfo ?? this.allowMemberEditInfo,
+      onlyAdminCanPost: onlyAdminCanPost ?? this.onlyAdminCanPost,
+      highlightAdminMessages: highlightAdminMessages ?? this.highlightAdminMessages,
+      showHistoryToNewMembers: showHistoryToNewMembers ?? this.showHistoryToNewMembers,
+      allowMemberCreateNote: allowMemberCreateNote ?? this.allowMemberCreateNote,
+      allowMemberCreatePoll: allowMemberCreatePoll ?? this.allowMemberCreatePoll,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       members: members ?? this.members,
@@ -232,6 +252,11 @@ class Conversation {
     allowMemberInvite: json['allowMemberInvite'] ?? true,
     allowMemberPin: json['allowMemberPin'] ?? false,
     allowMemberEditInfo: json['allowMemberEditInfo'] ?? false,
+    onlyAdminCanPost: json['onlyAdminCanPost'] ?? false,
+    highlightAdminMessages: json['highlightAdminMessages'] ?? false,
+    showHistoryToNewMembers: json['showHistoryToNewMembers'] ?? true,
+    allowMemberCreateNote: json['allowMemberCreateNote'] ?? true,
+    allowMemberCreatePoll: json['allowMemberCreatePoll'] ?? true,
     createdAt:
         json['createdAt'] != null ? DateTime.parse(json['createdAt']) : null,
     updatedAt:

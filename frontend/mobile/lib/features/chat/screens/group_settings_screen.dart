@@ -18,9 +18,7 @@ class GroupSettingsScreen extends StatefulWidget {
 }
 
 class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
-  // Local UI state for non-persisted toggles (if any)
-  bool _highlightLeaderMessages = true;
-  bool _newMemberCanSeeHistory = true;
+  // Local UI state removed as we now use real persistence
 
   @override
   Widget build(BuildContext context) {
@@ -76,15 +74,15 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
               children: [
                 _buildSwitchTile(
                   'Làm nổi tin nhắn từ trưởng và phó nhóm',
-                  _highlightLeaderMessages,
-                  (val) => setState(() => _highlightLeaderMessages = val),
+                  conv.highlightAdminMessages,
+                  (val) => provider.updateGroupInfo(conv.id, highlightAdminMessages: val),
                   textColor,
                 ),
                 Divider(height: 1, color: dividerColor, indent: 16),
                 _buildSwitchTile(
                   'Thành viên mới xem được tin gửi gần đây',
-                  _newMemberCanSeeHistory,
-                  (val) => setState(() => _newMemberCanSeeHistory = val),
+                  conv.showHistoryToNewMembers,
+                  (val) => provider.updateGroupInfo(conv.id, showHistoryToNewMembers: val),
                   textColor,
                 ),
               ],
@@ -142,6 +140,36 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                _buildPermissionTile(
+                  'Quyền tạo ghi chú, nhắc hẹn', 
+                  conv.allowMemberCreateNote ? 'Tất cả mọi người' : 'Chỉ trưởng và phó nhóm', 
+                  textColor, 
+                  subtitleColor,
+                  onTap: () => _showSimplePermissionSheet(
+                    context: context,
+                    title: 'Quyền tạo ghi chú, nhắc hẹn',
+                    currentValue: conv.allowMemberCreateNote,
+                    onChanged: (val) => provider.updateGroupInfo(conv.id, allowMemberCreateNote: val),
+                    isDarkMode: isDarkMode,
+                    isAdmin: isAdmin,
+                  ),
+                ),
+                Divider(height: 1, color: dividerColor, indent: 16),
+                _buildPermissionTile(
+                  'Quyền tạo bình chọn', 
+                  conv.allowMemberCreatePoll ? 'Tất cả mọi người' : 'Chỉ trưởng và phó nhóm', 
+                  textColor, 
+                  subtitleColor,
+                  onTap: () => _showSimplePermissionSheet(
+                    context: context,
+                    title: 'Quyền tạo bình chọn',
+                    currentValue: conv.allowMemberCreatePoll,
+                    onChanged: (val) => provider.updateGroupInfo(conv.id, allowMemberCreatePoll: val),
+                    isDarkMode: isDarkMode,
+                    isAdmin: isAdmin,
+                  ),
+                ),
+                Divider(height: 1, color: dividerColor, indent: 16),
                 _buildPermissionTile(
                   'Quyền sửa thông tin nhóm', 
                   conv.allowMemberEditInfo ? 'Tất cả mọi người' : 'Chỉ trưởng và phó nhóm', 

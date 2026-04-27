@@ -1654,6 +1654,10 @@ class ChatProvider extends ChangeNotifier {
     bool? allowMemberPin,
     bool? allowMemberEditInfo,
     bool? onlyAdminCanPost,
+    bool? highlightAdminMessages,
+    bool? showHistoryToNewMembers,
+    bool? allowMemberCreateNote,
+    bool? allowMemberCreatePoll,
   }) async {
     final currentUser = _currentUserId;
     String userName = 'Một thành viên';
@@ -1679,6 +1683,10 @@ class ChatProvider extends ChangeNotifier {
         allowMemberPin: allowMemberPin ?? _conversations[index].allowMemberPin,
         allowMemberEditInfo: allowMemberEditInfo ?? _conversations[index].allowMemberEditInfo,
         onlyAdminCanPost: onlyAdminCanPost ?? _conversations[index].onlyAdminCanPost,
+        highlightAdminMessages: highlightAdminMessages ?? _conversations[index].highlightAdminMessages,
+        showHistoryToNewMembers: showHistoryToNewMembers ?? _conversations[index].showHistoryToNewMembers,
+        allowMemberCreateNote: allowMemberCreateNote ?? _conversations[index].allowMemberCreateNote,
+        allowMemberCreatePoll: allowMemberCreatePoll ?? _conversations[index].allowMemberCreatePoll,
       );
       notifyListeners();
     }
@@ -1693,6 +1701,10 @@ class ChatProvider extends ChangeNotifier {
       if (allowMemberPin != null) body['allowMemberPin'] = allowMemberPin;
       if (allowMemberEditInfo != null) body['allowMemberEditInfo'] = allowMemberEditInfo;
       if (onlyAdminCanPost != null) body['onlyAdminCanPost'] = onlyAdminCanPost;
+      if (highlightAdminMessages != null) body['highlightAdminMessages'] = highlightAdminMessages;
+      if (showHistoryToNewMembers != null) body['showHistoryToNewMembers'] = showHistoryToNewMembers;
+      if (allowMemberCreateNote != null) body['allowMemberCreateNote'] = allowMemberCreateNote;
+      if (allowMemberCreatePoll != null) body['allowMemberCreatePoll'] = allowMemberCreatePoll;
 
       await _chatService.updateGroup(conversationId, body);
       
