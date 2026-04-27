@@ -130,6 +130,7 @@ services:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       APP_SYNC_POLICY_ENFORCE_WEB_RESTRICTION: ${APP_SYNC_POLICY_ENFORCE_WEB_RESTRICTION:-false}
       FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:-iuh-cnm-vnalo-firebase-adminsdk-fbsvc-5008b7c5eb.json}
+      KAFKA_SERVERS: kafka:9092
     depends_on:
       postgres:
         condition: service_healthy
@@ -169,6 +170,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       JWT_ISSUER: ${JWT_ISSUER:-vnalo}
       NODE_ENV: ${NODE_ENV:-development}
+      KAFKA_BROKERS: kafka:9092
     depends_on:
       postgres:
         condition: service_healthy
@@ -254,6 +256,7 @@ services:
       JWT_ISSUER: ${JWT_ISSUER:-vnalo}
       RABBITMQ_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672
       NODE_ENV: ${NODE_ENV:-development}
+      KAFKA_BROKERS: kafka:9092
     depends_on:
       redis:
         condition: service_healthy
