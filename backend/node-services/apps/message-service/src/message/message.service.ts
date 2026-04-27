@@ -4,6 +4,8 @@ import {
   ForbiddenException,
   BadRequestException,
   Logger,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, IsNull, type EntityManager } from 'typeorm';
@@ -50,6 +52,7 @@ export class MessageService {
     private readonly inboxRepo: Repository<ConversationInbox>,
     @InjectRepository(ConversationMember)
     private readonly memberRepo: Repository<ConversationMember>,
+    @Inject(forwardRef(() => ConversationService))
     private readonly conversationService: ConversationService,
     private readonly dataSource: DataSource,
     @InjectRedis()
