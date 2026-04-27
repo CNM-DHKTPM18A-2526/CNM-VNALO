@@ -6,7 +6,7 @@ import 'package:vnalo_mobile/config/env.dart';
 class AppConfig {
   static EnvConfig? _config;
 
-  static const _defaultDevCore = 'http://10.0.2.2:8081/api/v1';
+  static const _defaultDevCore = 'http://54.251.229.20/api/v1';
 
   /// Returns the current configuration.
   /// Throws [StateError] if [initialize] has not been called yet.
@@ -49,64 +49,34 @@ class AppConfig {
           coreServiceUrl: resolvedCore,
           messageServiceUrl:
               _normalizeApiBaseUrl(
-                messageServiceUrl ?? _buildServiceUrl(coreUri, 3000, '/api/v1'),
+                messageServiceUrl ?? resolvedCore, // All routed via Nginx on IP
               ),
           mediaServiceUrl:
               _normalizeApiBaseUrl(
-                mediaServiceUrl ?? _buildServiceUrl(coreUri, 8083, '/api/v1'),
+                mediaServiceUrl ?? resolvedCore,
               ),
           socketUrl: _normalizeSocketUrl(
-            socketUrl ?? _buildServiceUrl(coreUri, 3000, ''),
+            socketUrl ?? resolvedCore.replaceAll('/api/v1', ''),
           ),
           aiServiceUrl: _normalizeApiBaseUrl(
-            aiServiceUrl ?? _buildServiceUrl(coreUri, 8094, '/api/v1'),
+            aiServiceUrl ?? resolvedCore,
           ),
           enableLogging: true,
         );
         break;
 
       case Environment.staging:
-        _config = EnvConfig(
-          environment: Environment.staging,
-          coreServiceUrl: _normalizeApiBaseUrl(
-            coreServiceUrl ?? 'https://staging-api.vnalo.com/api/v1',
-          ),
-          messageServiceUrl:
-              _normalizeApiBaseUrl(
-                messageServiceUrl ?? 'https://staging-msg.vnalo.com/api/v1',
-              ),
-          mediaServiceUrl:
-            _normalizeApiBaseUrl(
-              mediaServiceUrl ?? 'https://staging-media.vnalo.com/api/v1',
-            ),
-          socketUrl: _normalizeSocketUrl(
-            socketUrl ?? 'https://staging-msg.vnalo.com',
-          ),
-          aiServiceUrl: _normalizeApiBaseUrl(
-            aiServiceUrl ?? 'https://staging-ai.vnalo.com/api/v1',
-          ),
-          enableLogging: true,
-          enableCrashlytics: true,
-        );
-        break;
-
       case Environment.production:
+        final base = 'http://54.251.229.20/api/v1';
+        final socketBase = 'http://54.251.229.20';
         _config = EnvConfig(
-          environment: Environment.production,
-          coreServiceUrl: _normalizeApiBaseUrl(
-            coreServiceUrl ?? 'https://api.vnalo.com/api/v1',
-          ),
-          messageServiceUrl:
-              _normalizeApiBaseUrl(
-                messageServiceUrl ?? 'https://msg.vnalo.com/api/v1',
-              ),
-          mediaServiceUrl: _normalizeApiBaseUrl(
-            mediaServiceUrl ?? 'https://media.vnalo.com/api/v1',
-          ),
-          socketUrl: _normalizeSocketUrl(socketUrl ?? 'https://msg.vnalo.com'),
-          aiServiceUrl: _normalizeApiBaseUrl(
-            aiServiceUrl ?? 'https://ai.vnalo.com/api/v1',
-          ),
+          environment: env,
+          coreServiceUrl: _normalizeApiBaseUrl(coreServiceUrl ?? base),
+          messageServiceUrl: _normalizeApiBaseUrl(messageServiceUrl ?? base),
+          mediaServiceUrl: _normalizeApiBaseUrl(mediaServiceUrl ?? base),
+          socketUrl: _normalizeSocketUrl(socketUrl ?? socketBase),
+          aiServiceUrl: _normalizeApiBaseUrl(aiServiceUrl ?? base),
+          enableLogging: env == Environment.staging,
           enableCrashlytics: true,
         );
         break;
