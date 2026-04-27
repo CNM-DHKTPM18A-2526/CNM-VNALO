@@ -3,6 +3,10 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/utils/date_formatter.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
+import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
+import 'package:vnalo_mobile/features/chat/widgets/message_bubble.dart';
+import 'package:vnalo_mobile/models/conversation_enums.dart';
+import 'package:vnalo_mobile/models/message_model.dart';
 
 class AiConversationScreen extends StatefulWidget {
   const AiConversationScreen({super.key});
@@ -14,28 +18,36 @@ class AiConversationScreen extends StatefulWidget {
 class _AiConversationScreenState extends State<AiConversationScreen> {
   final TextEditingController _inputController = TextEditingController();
   final FocusNode _inputFocusNode = FocusNode();
+  final ScrollController _scrollController = ScrollController();
   bool _isSending = false;
+  bool _hasText = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _inputController.addListener(() {
+      final hasText = _inputController.text.trim().isNotEmpty;
+      if (hasText != _hasText) {
+        setState(() => _hasText = hasText);
+      }
+    });
+  }
 
   @override
   void dispose() {
     _inputController.dispose();
     _inputFocusNode.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
   Future<void> _sendPrompt(AiAssistantProvider provider) async {
-    if (_isSending) {
-      return;
-    }
+    if (_isSending) return;
 
     final text = _inputController.text.trim();
-    if (text.isEmpty) {
-      return;
-    }
+    if (text.isEmpty) return;
 
-    setState(() {
-      _isSending = true;
-    });
+    setState(() => _isSending = true);
 
     try {
       await provider.submitTextPrompt(text, source: 'ai_conversation_screen');
@@ -45,285 +57,225 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
       }
     } finally {
       if (mounted) {
-        setState(() {
-          _isSending = false;
-        });
+        setState(() => _isSending = false);
       }
     }
   }
 
   String _statusLabel(AiState state) {
     return switch (state) {
-      AiState.listening => 'Đang lắng nghe',
-      AiState.thinking => 'Đang xử lý',
-      AiState.speaking => 'Đang phản hồi',
-      AiState.idle => 'Sẵn sàng',
+      AiState.listening => 'Đang lắng nghe...',
+      AiState.thinking => 'Đang xử lý...',
+      AiState.speaking => 'Đang phản hồi...',
+      AiState.idle => 'Đang hoạt động',
     };
   }
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<AiAssistantProvider>();
+    final authProvider = context.watch<AuthProvider>();
+    final currentUserId = authProvider.user?.id ?? '';
+    final userAvatarUrl = authProvider.user?.avatarUrl;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final history = provider.conversationHistory;
+    
+    // Convert AI history to standard Message models
+    final messages = provider.getHistoryAsMessages(currentUserId, userAvatarUrl: userAvatarUrl).reversed.toList();
 
     return Scaffold(
+      backgroundColor: isDarkMode ? Colors.black : const Color(0xFFE2E9F1),
       appBar: AppBar(
-        title: const Text('Hội thoại AI'),
+        titleSpacing: 0,
+        elevation: 0,
+        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
+        flexibleSpace: isDarkMode 
+          ? null 
+          : Container(decoration: const BoxDecoration(gradient: AppColors.appBarGradient)),
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Trợ lý AI VNALO',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+            Text(
+              _statusLabel(provider.state),
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.white.withValues(alpha: 0.8),
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
-            onPressed: () async {
-              await provider.setCloudBackupEnabled(
-                !provider.cloudBackupEnabled,
-                reason: 'conversation_screen_toggle',
-              );
-            },
+            onPressed: () => provider.setCloudBackupEnabled(!provider.cloudBackupEnabled),
             icon: Icon(
-              provider.cloudBackupEnabled
-                  ? Icons.cloud_done_outlined
-                  : Icons.cloud_off_outlined,
+              provider.cloudBackupEnabled ? Icons.cloud_done : Icons.cloud_off,
+              color: Colors.white,
+              size: 20,
             ),
+            tooltip: 'Sao lưu Cloud',
           ),
           IconButton(
-            onPressed:
-                history.isEmpty
-                    ? null
-                    : () async {
-                      await provider.clearConversationHistory(
-                        clearCurrentResponse: true,
-                        reason: 'conversation_screen_clear',
-                      );
-                    },
-            icon: const Icon(Icons.delete_outline),
+            onPressed: messages.isEmpty ? null : () => provider.clearConversationHistory(clearCurrentResponse: true),
+            icon: const Icon(Icons.delete_sweep_outlined, color: Colors.white),
+            tooltip: 'Xóa lịch sử',
           ),
         ],
       ),
       body: Column(
         children: [
-          Container(
-            width: double.infinity,
-            margin: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color:
-                  isDarkMode
-                      ? Colors.white.withValues(alpha: 0.06)
-                      : const Color(0xFFEAF3FF),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color:
-                    isDarkMode
-                        ? Colors.white.withValues(alpha: 0.09)
-                        : const Color(0xFFD5E5FF),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  provider.cloudBackupEnabled
-                      ? Icons.lock_clock_outlined
-                      : Icons.shield_outlined,
-                  size: 16,
-                  color: AppColors.primary,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    provider.cloudBackupEnabled
-                        ? 'Lưu local + cloud backup (theo quyền riêng tư).'
-                        : 'Local-first: chỉ lưu trên thiết bị. Cloud backup đang tắt.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isDarkMode ? Colors.white70 : Colors.black87,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          // Security/Backup Banner
+          _buildInfoBanner(provider, isDarkMode),
+          
           Expanded(
-            child:
-                history.isEmpty
-                    ? _EmptyAiConversation(
-                      statusLabel: _statusLabel(provider.state),
-                      isDarkMode: isDarkMode,
-                    )
-                    : ListView.builder(
-                      key: const ValueKey('ai_conversation_list'),
-                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                      itemCount: history.length,
-                      itemBuilder: (context, index) {
-                        final entry = history[index];
-                        final isUser = entry.role == AiConversationRole.user;
-                        final isSystem =
-                            entry.role == AiConversationRole.system;
+            child: messages.isEmpty
+                ? _EmptyAiConversation(
+                    statusLabel: _statusLabel(provider.state),
+                    isDarkMode: isDarkMode,
+                  )
+                : ListView.builder(
+                    controller: _scrollController,
+                    reverse: true,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                    itemCount: messages.length,
+                    itemBuilder: (context, index) {
+                      final message = messages[index];
+                      final isMine = message.isMine(currentUserId);
+                      
+                      // Calculate milestones and time visibility
+                      bool showTime = true;
+                      String? milestoneText;
+                      
+                      if (index < messages.length - 1) {
+                        final olderMsg = messages[index + 1];
+                        final gap = message.createdAt.difference(olderMsg.createdAt).inMinutes.abs();
+                        if (gap < 5 && olderMsg.senderId == message.senderId) {
+                          showTime = false;
+                        }
+                        if (gap > 20) {
+                          milestoneText = DateFormatter.formatTimelineDate(message.createdAt);
+                        }
+                      } else {
+                        // Very first message
+                        milestoneText = DateFormatter.formatTimelineDate(message.createdAt);
+                      }
 
-                        final bubbleColor =
-                            isUser
-                                ? AppColors.primary.withValues(alpha: 0.92)
-                                : isSystem
-                                ? (isDarkMode
-                                    ? const Color(0xFF3A404A)
-                                    : const Color(0xFFE9EEF8))
-                                : (isDarkMode
-                                    ? const Color(0xFF1E2A3B)
-                                    : Colors.white);
-                        final textColor =
-                            isUser
-                                ? Colors.white
-                                : (isDarkMode
-                                    ? Colors.white70
-                                    : Colors.black87);
-
-                        return Align(
-                          alignment:
-                              isUser
-                                  ? Alignment.centerRight
-                                  : Alignment.centerLeft,
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            constraints: const BoxConstraints(maxWidth: 320),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 9,
-                            ),
-                            decoration: BoxDecoration(
-                              color: bubbleColor,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color:
-                                    isDarkMode
-                                        ? Colors.white.withValues(alpha: 0.08)
-                                        : Colors.black.withValues(alpha: 0.06),
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  entry.text,
-                                  style: TextStyle(
-                                    color: textColor,
-                                    fontSize: 13,
-                                    height: 1.42,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  DateFormatter.relative(entry.createdAt),
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color:
-                                        isUser
-                                            ? Colors.white70
-                                            : (isDarkMode
-                                                ? Colors.white54
-                                                : Colors.black54),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-          ),
-          SafeArea(
-            top: false,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-              decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(
-                    color:
-                        isDarkMode
-                            ? Colors.white.withValues(alpha: 0.08)
-                            : Colors.black.withValues(alpha: 0.08),
-                  ),
-                ),
-              ),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () {
-                      provider.onPrimaryAction(
-                        source: 'conversation_screen_mic',
+                      return MessageBubble(
+                        message: message,
+                        isMine: isMine,
+                        showTime: showTime,
+                        showAvatar: !isMine,
+                        senderAvatarUrl: message.senderAvatarUrl,
+                        senderDisplayName: message.senderName,
+                        milestoneText: milestoneText,
                       );
                     },
-                    icon: Icon(
-                      provider.state == AiState.listening
-                          ? Icons.mic_off
-                          : Icons.mic,
-                      color:
-                          provider.state == AiState.listening
-                              ? Colors.redAccent
-                              : AppColors.primary,
-                    ),
                   ),
-                  Expanded(
-                    child: TextField(
-                      key: const ValueKey('ai_conversation_input'),
-                      controller: _inputController,
-                      focusNode: _inputFocusNode,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _sendPrompt(provider),
-                      minLines: 1,
-                      maxLines: 3,
-                      decoration: InputDecoration(
-                        isDense: true,
-                        hintText: 'Nhập câu hỏi cho trợ lý AI...',
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    width: 42,
-                    height: 42,
-                    child: ElevatedButton(
-                      key: const ValueKey('ai_conversation_send'),
-                      style: ElevatedButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        backgroundColor:
-                            _isSending || provider.isBusy
-                                ? Colors.grey
-                                : AppColors.primary,
-                      ),
-                      onPressed:
-                          _isSending || provider.isBusy
-                              ? null
-                              : () => _sendPrompt(provider),
-                      child:
-                          _isSending
-                              ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                              : const Icon(
-                                Icons.send_rounded,
-                                size: 18,
-                                color: Colors.white,
-                              ),
-                    ),
-                  ),
-                ],
+          ),
+          
+          // Zalo-style Input Bar
+          _buildInputBar(provider, isDarkMode),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoBanner(AiAssistantProvider provider, bool isDarkMode) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.7),
+      child: Row(
+        children: [
+          Icon(
+            provider.cloudBackupEnabled ? Icons.lock_outline : Icons.shield_outlined,
+            size: 14,
+            color: AppColors.primary,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              provider.cloudBackupEnabled
+                  ? 'Cuộc trò chuyện được mã hóa và sao lưu trên Cloud.'
+                  : 'Chế độ Local-first: Dữ liệu chỉ lưu trên thiết bị này.',
+              style: TextStyle(
+                fontSize: 11,
+                color: isDarkMode ? Colors.white54 : Colors.black54,
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildInputBar(AiAssistantProvider provider, bool isDarkMode) {
+    final bgColor = isDarkMode ? DarkColors.surface : Colors.white;
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+      decoration: BoxDecoration(
+        color: bgColor,
+        border: Border(
+          top: BorderSide(
+            color: isDarkMode ? DarkColors.divider : Colors.black12,
+            width: 0.5,
+          ),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          children: [
+            IconButton(
+              icon: Icon(
+                provider.state == AiState.listening ? Icons.mic_off : Icons.mic_none_outlined,
+                color: provider.state == AiState.listening ? Colors.red : (isDarkMode ? Colors.white70 : const Color(0xFF5D6470)),
+              ),
+              onPressed: () => provider.onPrimaryAction(source: 'conversation_screen_mic'),
+            ),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: TextField(
+                  controller: _inputController,
+                  focusNode: _inputFocusNode,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) => _sendPrompt(provider),
+                  minLines: 1,
+                  maxLines: 4,
+                  style: const TextStyle(fontSize: 16),
+                  decoration: const InputDecoration(
+                    hintText: 'Hỏi trợ lý VNALO AI...',
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(vertical: 10),
+                  ),
+                ),
+              ),
+            ),
+            if (_hasText)
+              IconButton(
+                icon: const Icon(Icons.send, color: AppColors.primary),
+                onPressed: () => _sendPrompt(provider),
+              )
+            else
+              IconButton(
+                icon: Icon(Icons.image_outlined, color: isDarkMode ? Colors.white70 : const Color(0xFF5D6470)),
+                onPressed: () {
+                  // Placeholder for future AI vision features
+                },
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -341,44 +293,64 @@ class _EmptyAiConversation extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 28),
+      child: SingleChildScrollView(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.forum_outlined,
-              size: 48,
-              color: isDarkMode ? Colors.white70 : Colors.black54,
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.smart_toy_outlined,
+                size: 64,
+                color: AppColors.primary,
+              ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 24),
             Text(
-              'Chưa có hội thoại AI',
+              'Tôi có thể giúp gì cho bạn?',
               style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
                 color: isDarkMode ? Colors.white : Colors.black87,
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Nhấn micro hoặc gửi câu hỏi để tạo hội thoại AI local-first.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 13,
-                color: isDarkMode ? Colors.white70 : Colors.black54,
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: Text(
+                'Hãy đặt câu hỏi về công việc, dịch thuật hoặc tóm tắt video cho tôi.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDarkMode ? Colors.white60 : Colors.black54,
+                ),
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Trạng thái hiện tại: $statusLabel',
-              style: TextStyle(
-                fontSize: 12,
-                color: isDarkMode ? Colors.white54 : Colors.black45,
-              ),
-            ),
+            const SizedBox(height: 32),
+            _buildQuickAction('Dịch tin nhắn này sang tiếng Anh'),
+            _buildQuickAction('Tóm tắt nội dung cuộc họp'),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildQuickAction(String text) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.8),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(color: AppColors.primary, fontSize: 13),
       ),
     );
   }

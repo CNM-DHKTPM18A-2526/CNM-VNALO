@@ -8,6 +8,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 import 'package:uuid/uuid.dart';
 import 'package:vnalo_mobile/features/ai_assistant/models/mascot_metadata.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
+import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/services/ai_service.dart';
 
 enum AiState { idle, listening, thinking, speaking }
@@ -113,6 +114,23 @@ class AiAssistantProvider with ChangeNotifier {
       _persistentEnabled || _provisionallyVisible || _isSessionActive;
 
   Stream<AiCommand> get systemActionStream => _systemActionController.stream;
+
+  List<Message> getHistoryAsMessages(String currentUserId, {String? userAvatarUrl}) {
+    return _conversationHistory.map((entry) {
+      final isUser = entry.role == AiConversationRole.user;
+      return Message(
+        id: 'ai_msg_${entry.createdAt.millisecondsSinceEpoch}',
+        conversationId: aiConversationId,
+        senderId: isUser ? currentUserId : 'ai_assistant',
+        senderName: isUser ? 'Bạn' : currentMascot.name,
+        senderAvatarUrl: isUser ? userAvatarUrl : currentMascot.previewImageUrl,
+        content: entry.text,
+        messageType: MessageType.TEXT,
+        status: MessageStatus.SENT,
+        createdAt: entry.createdAt,
+      );
+    }).toList();
+  }
 
   Future<void> _initPersistence() async {
     final prefs = await SharedPreferences.getInstance();
@@ -300,6 +318,23 @@ class AiAssistantProvider with ChangeNotifier {
       'CONVERSATION_HISTORY_CLEARED',
       data: {'reason': reason, 'clearCurrentResponse': clearCurrentResponse},
     );
+    notifyListeners();
+  }
+
+  Future<void> deleteMessage(String messageId) async {
+    // messageId is formatted as 'ai_msg_{timestamp}' in getHistoryAsMessages
+    final timestampStr = messageId.replaceFirst('ai_msg_', '');
+    final timestamp = int.tryParse(timestampStr);
+    if (timestamp == null) return;
+
+    final targetTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    
+    // Find and remove the entry with the matching timestamp (approximate to 1ms)
+    _conversationHistory.removeWhere((entry) => 
+      entry.createdAt.millisecondsSinceEpoch == targetTime.millisecondsSinceEpoch);
+    
+    await _persistConversationHistory();
+    _logEvent('AI_MESSAGE_DELETED', data: {'messageId': messageId});
     notifyListeners();
   }
 

@@ -248,7 +248,12 @@ class _AiChatBoardState extends State<AiChatBoard> {
                                       isDarkMode
                                           ? const Color(0xFF1C355A)
                                           : const Color(0xFFDCEBFF),
-                                  borderRadius: BorderRadius.circular(14),
+                                  borderRadius: const BorderRadius.only(
+                                    topLeft: Radius.circular(16),
+                                    topRight: Radius.circular(16),
+                                    bottomLeft: Radius.circular(16),
+                                    bottomRight: Radius.circular(4),
+                                  ),
                                 ),
                                 child: Text(
                                   aiProvider.lastUserPrompt,
@@ -273,7 +278,12 @@ class _AiChatBoardState extends State<AiChatBoard> {
                                   isDarkMode
                                       ? Colors.white.withValues(alpha: 0.06)
                                       : Colors.white.withValues(alpha: 0.8),
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(16),
+                                topRight: Radius.circular(16),
+                                bottomLeft: Radius.circular(4),
+                                bottomRight: Radius.circular(16),
+                              ),
                               border: Border.all(
                                 color:
                                     isDarkMode
@@ -358,29 +368,16 @@ class _AiChatBoardState extends State<AiChatBoard> {
                           maxLines: 3,
                           decoration: InputDecoration(
                             isDense: true,
-                            hintText: 'Nhap de chat voi tro ly...',
+                            hintText: 'Nhập để chat với trợ lý...',
+                            hintStyle: TextStyle(
+                              color: isDarkMode ? Colors.white38 : Colors.black38,
+                              fontSize: 14,
+                            ),
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 12,
                               vertical: 10,
                             ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                color:
-                                    isDarkMode
-                                        ? Colors.white.withValues(alpha: 0.16)
-                                        : Colors.black.withValues(alpha: 0.12),
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                color:
-                                    isDarkMode
-                                        ? Colors.white.withValues(alpha: 0.16)
-                                        : Colors.black.withValues(alpha: 0.12),
-                              ),
-                            ),
+                            border: InputBorder.none,
                           ),
                         ),
                       ),

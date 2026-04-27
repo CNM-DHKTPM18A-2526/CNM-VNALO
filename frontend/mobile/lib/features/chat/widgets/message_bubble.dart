@@ -292,6 +292,7 @@ class MessageBubble extends StatelessWidget {
     if (message.isRecalled) return;
 
     final isCloud = message.conversationId == 'MY_DOCUMENTS' || message.conversationId == 'my_documents_conversation';
+    final isAiAssistant = message.conversationId == 'AI_ASSISTANT_LOCAL';
 
     FocusedMessageDialog.show(
       context,
@@ -299,6 +300,7 @@ class MessageBubble extends StatelessWidget {
       isMine: isMine,
       isCloud: isCloud,
       isPinned: chatProvider.isMessagePinned(message.conversationId, message.id),
+      isAiAssistant: isAiAssistant,
       position: position,
       size: size,
       child: _buildBubbleContent(context, isDarkMode),
@@ -395,10 +397,14 @@ class MessageBubble extends StatelessWidget {
               ),
             );
             if (confirmed == true && context.mounted) {
-              await chatProvider.deleteForMe(
-                message.id,
-                message.conversationId,
-              );
+              if (message.conversationId == 'AI_ASSISTANT_LOCAL') {
+                await context.read<AiAssistantProvider>().deleteMessage(message.id);
+              } else {
+                await chatProvider.deleteForMe(
+                  message.id,
+                  message.conversationId,
+                );
+              }
             }
           }
         } else if (action == 'pin') {
