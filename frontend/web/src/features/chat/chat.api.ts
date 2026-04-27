@@ -1,6 +1,6 @@
 import type { ChatAttachment, ChatMessage, ChatMessageType, ConversationSummary, ReplyMetadata } from './chat.types'
 import { formatMessageContent } from './utils/messageUtils'
-import { API_BASE_URL, extractMessage, MEDIA_API_URL, messageApi, mediaApi } from '../../api.client'
+import { API_BASE_URL, extractMessage, messageApi, mediaApi } from '../../api.client'
 import { resolveMediaUrl } from '../../utils/mediaUtils'
 
 type InboxItem = {
@@ -64,11 +64,11 @@ type RawMessageLike = RawMessage & {
 }
 
 type MediaUploadResponse = {
-  url?: string
+  url: string
   mediaId?: string
-  mimeType?: string | null
-  sizeBytes?: number | null
-  thumbnailUrl?: string | null
+  mimeType: string | null
+  sizeBytes: number | null
+  thumbnailUrl: string | null
 }
 
 export type UploadedChatMedia = {
@@ -361,10 +361,6 @@ export async function uploadChatMedia(token: string, file: File): Promise<MediaU
     });
 
     const json = response.data;
-
-    if (!response.ok) {
-      throw new Error(extractMessage(json) ?? 'Unable to upload media.');
-    }
 
     const payload = json && typeof json === 'object' && !Array.isArray(json) && 'data' in json 
       ? (json.data as Record<string, unknown>) 

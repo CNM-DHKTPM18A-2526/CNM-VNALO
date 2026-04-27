@@ -2524,7 +2524,7 @@ function ChatPageContent() {
             const blob = await fetch(avatarUrl).then(r => r.blob());
             const file = new File([blob], 'avatar.png', { type: blob.type });
             const uploadRes = await uploadChatMedia(accessToken, file);
-            finalAvatarUrl = uploadRes.url;
+            finalAvatarUrl = uploadRes.url ?? null;
           } catch (e) {
             console.warn("Failed to upload avatar:", e);
           }
@@ -3208,7 +3208,13 @@ function ChatPageContent() {
       try {
         if (isMultiFile) {
           const uploadPromises = allFiles.map(file => uploadChatMedia(accessToken, file));
-          uploadResults = await Promise.all(uploadPromises);
+          const rawResults = await Promise.all(uploadPromises);
+          uploadResults = rawResults.map(res => ({
+            url: res.url ?? '',
+            mimeType: res.mimeType ?? null,
+            sizeBytes: res.sizeBytes ?? null,
+            thumbnailUrl: res.thumbnailUrl ?? null
+          }));
 
           // Cleanup blob URLs
           queueMicrotask(() => {
@@ -3575,7 +3581,7 @@ function ChatPageContent() {
       const newAvatarUrl = uploadRes.url;
 
       // 2. Update conversation via API
-      await updateGroupAvatar(accessToken, selectedConversationId, newAvatarUrl);
+      await updateGroupAvatar(accessToken, selectedConversationId, newAvatarUrl ?? '');
 
       // 3. Update local state
       setConversations((prev) =>
