@@ -885,7 +885,7 @@ export class MessageService {
       // Update inbox for members. If targetRoles is set, filter by role.
       const query = manager.createQueryBuilder(ConversationMember, 'member')
         .where('member.conversation_id = :cid AND member.left_at IS NULL', { cid: conversationId });
-      
+
       if (targetRoles && targetRoles.length > 0) {
         query.andWhere('member.role IN (:...roles)', { roles: targetRoles });
       }
