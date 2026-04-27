@@ -138,7 +138,7 @@ services:
     networks:
       - vnalo-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/api/v1/actuator/health"]
+      test: ["CMD-SHELL", "nc -z localhost 8081 || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -228,7 +228,7 @@ services:
     networks:
       - vnalo-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8083/actuator/health"]
+      test: ["CMD-SHELL", "nc -z localhost 8083 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -375,7 +375,7 @@ services:
     networks:
       - vnalo-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8094/actuator/health"]
+      test: ["CMD-SHELL", "nc -z localhost 8094 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -410,7 +410,7 @@ services:
     networks:
       - vnalo-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8086/api/v1/actuator/health"]
+      test: ["CMD-SHELL", "nc -z localhost 8086 || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
