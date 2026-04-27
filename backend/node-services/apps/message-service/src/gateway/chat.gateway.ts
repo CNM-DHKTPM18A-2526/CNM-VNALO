@@ -923,4 +923,164 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       `[Gateway.emitToUser] ✅ Emission to user=${userId} completed`,
     );
   }
+  // ─── Group Call Signaling ────────────────────────────────────────────
+  // Hoàn toàn tách biệt với 1-1 call (call.offer / call.answer / call.end).
+  // Frontend kết nối tới namespace /chat → handlers phải ở đây.
+
+  /**
+   * Caller phát tín hiệu bắt đầu cuộc gọi nhóm.
+   * Relay tới TẤT CẢ thành viên trong conversation room (trừ chính caller).
+   */
+  @SubscribeMessage('group-call:started')
+  async handleGroupCallStarted(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: {
+      conversationId: string;
+      conversationName: string;
+      callId: string;
+      callerUserId: string;
+      callerName: string;
+      callerAvatar?: string;
+      audioOnly: boolean;
+    },
+  ) {
+    const userId = client.data?.user?.userId;
+    const room = `conversation:${data.conversationId}`;
+    this.logger.log(
+      `[GroupCall] group-call:started from user=${userId} in room=${room} callId=${data.callId}`,
+    );
+    // Broadcast tới tất cả NGOẠI TRỪ người gửi
+    client.to(room).emit('group-call:started', data);
+  }
+
+  /**
+   * Thành viên tham gia cuộc gọi nhóm.
+   * Relay group-call:user-joined tới tất cả người trong room để họ tạo offer.
+   */
+  @SubscribeMessage('group-call:join')
+  async handleGroupCallJoin(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: {
+      conversationId: string;
+      callId: string;
+      senderUserId: string;
+      displayName: string;
+      avatarUrl?: string;
+      audioOnly: boolean;
+    },
+  ) {
+    const room = `conversation:${data.conversationId}`;
+    this.logger.log(
+      `[GroupCall] group-call:join from user=${data.senderUserId} in room=${room}`,
+    );
+    // Thông báo tới mọi người khác trong room (trừ joiner)
+    client.to(room).emit('group-call:user-joined', data);
+  }
+
+  /**
+   * Relay WebRTC offer từ A → B (point-to-point).
+   */
+  @SubscribeMessage('group-call:offer')
+  handleGroupCallOffer(
+    @ConnectedSocket() _client: Socket,
+    @MessageBody()
+    data: {
+      conversationId: string;
+      callId: string;
+      senderUserId: string;
+      targetUserId: string;
+      displayName?: string;
+      avatarUrl?: string;
+      sdp: any;
+    },
+  ) {
+    this.logger.debug(
+      `[GroupCall] offer ${data.senderUserId} → ${data.targetUserId}`,
+    );
+    this.emitToUser(data.targetUserId, 'group-call:offer', data);
+  }
+
+  /**
+   * Relay WebRTC answer từ B → A (point-to-point).
+   */
+  @SubscribeMessage('group-call:answer')
+  handleGroupCallAnswer(
+    @ConnectedSocket() _client: Socket,
+    @MessageBody()
+    data: {
+      conversationId: string;
+      callId: string;
+      senderUserId: string;
+      targetUserId: string;
+      sdp: any;
+    },
+  ) {
+    this.logger.debug(
+      `[GroupCall] answer ${data.senderUserId} → ${data.targetUserId}`,
+    );
+    this.emitToUser(data.targetUserId, 'group-call:answer', data);
+  }
+
+  /**
+   * Relay ICE candidate (point-to-point).
+   */
+  @SubscribeMessage('group-call:ice-candidate')
+  handleGroupCallIce(
+    @ConnectedSocket() _client: Socket,
+    @MessageBody()
+    data: {
+      conversationId: string;
+      callId: string;
+      senderUserId: string;
+      targetUserId: string;
+      candidate: any;
+    },
+  ) {
+    this.emitToUser(data.targetUserId, 'group-call:ice-candidate', data);
+  }
+
+  /**
+   * Thành viên rời phòng gọi.
+   * Relay group-call:user-left tới tất cả người trong room.
+   */
+  @SubscribeMessage('group-call:leave')
+  handleGroupCallLeave(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: {
+      conversationId: string;
+      callId: string;
+      senderUserId: string;
+    },
+  ) {
+    const room = `conversation:${data.conversationId}`;
+    this.logger.log(
+      `[GroupCall] group-call:leave from user=${data.senderUserId} in room=${room}`,
+    );
+    client.to(room).emit('group-call:user-left', data);
+  }
+
+  /**
+   * Cuộc gọi đã kết thúc hoàn toàn (người cuối rời).
+   * Relay tới toàn bộ room để dismiss banner cho những người chưa bắt máy.
+   */
+  @SubscribeMessage('group-call:ended')
+  handleGroupCallEnded(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: {
+      conversationId: string;
+      callId: string;
+      endedByUserId: string;
+    },
+  ) {
+    const room = `conversation:${data.conversationId}`;
+    this.logger.log(
+      `[GroupCall] group-call:ended by user=${data.endedByUserId} in room=${room}`,
+    );
+    // Broadcast tới tất cả (kể cả chính người gửi — để đảm bảo không ai còn banner)
+    this.server.to(room).emit('group-call:ended', data);
+  }
 }
