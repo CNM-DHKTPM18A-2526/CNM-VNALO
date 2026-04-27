@@ -6,6 +6,7 @@ import {
   Delete,
   Param,
   Body,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -65,8 +66,14 @@ export class ConversationController {
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Param('userId') targetUserId: string,
+    @Query('silent') silent?: string,
   ) {
-    return this.conversationService.removeMember(id, user.userId, targetUserId);
+    return this.conversationService.removeMember(
+      id,
+      user.userId,
+      targetUserId,
+      silent === 'true',
+    );
   }
 
   @Get(':id/members')
@@ -141,8 +148,12 @@ export class ConversationController {
 
   /** Leave a group conversation. G-013. Delegates to removeMember (self-removal). */
   @Post(':id/leave')
-  leaveGroup(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return this.conversationService.leaveGroup(id, user.userId);
+  leaveGroup(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Query('silent') silent?: string,
+  ) {
+    return this.conversationService.leaveGroup(id, user.userId, silent === 'true');
   }
 
   /**

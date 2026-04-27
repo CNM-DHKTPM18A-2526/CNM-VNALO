@@ -234,7 +234,8 @@ export class ConversationService {
         ...(avatarUrl && { avatarUrl }),
       });
     } else if (member.role === MemberRole.DEPUTY) {
-      // DEPUTY can update basic info but NOT admin-only settings
+      // DEPUTY can update basic info but NOT admin-only settings.
+      // SECURITY: MUST update this whitelist when adding new admin-only fields to Conversation entity!
       const adminOnlyFields = [
         'onlyAdminCanPost',
         'allowMemberInvite',
@@ -370,6 +371,7 @@ export class ConversationService {
     conversationId: string,
     requesterId: string,
     targetUserId: string,
+    silent = false,
   ) {
     const requester = await this.assertMember(conversationId, requesterId);
     const target = await this.assertMember(conversationId, targetUserId);
@@ -414,6 +416,26 @@ export class ConversationService {
     target.leftAt = new Date();
     target.removedBy = isSelf ? null : requesterId;
     await this.memberRepo.save(target);
+
+    // G-014: Send system message about member leaving/removal
+    try {
+      const targetName = target.nickname || 'Một thành viên';
+      const requesterName = isSelf ? null : requester.nickname || 'Quản trị viên';
+      
+      let systemContent = '';
+      if (isSelf) {
+        systemContent = `${targetName} đã rời khỏi nhóm.`;
+      } else {
+        systemContent = `${targetName} đã bị ${requesterName} mời ra khỏi nhóm.`;
+      }
+
+      // Use the internal createSystemMessage to handle sequence and inbox updates.
+      // If silent, only notify ADMIN and DEPUTY.
+      const targetRoles = silent ? [MemberRole.ADMIN, MemberRole.DEPUTY] : undefined;
+      await this.messageService.createSystemMessage(conversationId, systemContent, targetRoles);
+    } catch (err) {
+      this.logger.error(`Failed to send system message for member removal: ${err.message}`);
+    }
 
     // G-013 Fix: Delete inbox entry when leaving/removed to avoid orphaned data
     await this.inboxRepo.delete({
@@ -610,8 +632,9 @@ export class ConversationService {
   async leaveGroup(
     conversationId: string,
     userId: string,
+    silent = false,
   ): Promise<{ status: string; conversationId: string }> {
-    await this.removeMember(conversationId, userId, userId);
+    await this.removeMember(conversationId, userId, userId, silent);
     return { status: 'LEFT', conversationId };
   }
 
@@ -851,6 +874,15 @@ export class ConversationService {
       });
     }
 
-    return { conversationId, disbandedBy: userId };
+    const disbandedAt = new Date();
+
+    // G-015: Notify media-service to clean up all media files (Async)
+    await this.kafkaProducer.sendRealtimeEvent(userId, 'GROUP_DISBANDED_MEDIA_CLEANUP', {
+      conversationId,
+      disbandedBy: userId,
+      disbandedAt,
+    });
+
+    return { conversationId, disbandedBy: userId, disbandedAt };
   }
 }

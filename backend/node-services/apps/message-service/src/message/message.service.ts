@@ -865,6 +865,7 @@ export class MessageService {
   async createSystemMessage(
     conversationId: string,
     content: string,
+    targetRoles?: MemberRole[],
   ): Promise<Message> {
     const serverSeq = await this.getNextSeq(conversationId);
 
@@ -872,7 +873,6 @@ export class MessageService {
       const msg = manager.create(Message, {
         conversationId,
         serverSeq,
-        // B-1: SYSTEM messages have no real sender (sender_id is nullable for type=SYSTEM)
         senderId: null,
         clientMessageId: null,
         messageType: MessageType.SYSTEM,
@@ -882,10 +882,15 @@ export class MessageService {
 
       const persisted = await manager.save(msg);
 
-      // Update inbox for all active members (B-4: use IsNull() not null-cast)
-      const activeMembers = await manager.find(ConversationMember, {
-        where: { conversationId, leftAt: IsNull() },
-      });
+      // Update inbox for members. If targetRoles is set, filter by role.
+      const query = manager.createQueryBuilder(ConversationMember, 'member')
+        .where('member.conversation_id = :cid AND member.left_at IS NULL', { cid: conversationId });
+      
+      if (targetRoles && targetRoles.length > 0) {
+        query.andWhere('member.role IN (:...roles)', { roles: targetRoles });
+      }
+
+      const activeMembers = await query.getMany();
 
       for (const member of activeMembers) {
         await manager

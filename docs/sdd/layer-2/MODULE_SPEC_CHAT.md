@@ -120,6 +120,7 @@ sequenceDiagram
   CS->>DB: UPDATE member SET left_at=NOW()
   GW-->>Room: message.received [SYSTEM, silent flag]
   GW-->>C: conversation.left
+  Note over CS: System message generated: "[Name] đã rời khỏi nhóm"
 ```
 
 ### 2.3 Leave Group (ADMIN — Trưởng nhóm)
@@ -137,8 +138,8 @@ Step 2: System calls transferAdmin(conversationId, adminId, targetUserId).
 Step 3: After successful transfer, ADMIN (now MEMBER) can call leave normally (§2.2).
 ```
 
-> [!IMPORTANT]
-> **Code gap**: `removeMember` currently has no guard blocking ADMIN self-removal when other members exist. Must add pre-check: if `requester.role === ADMIN && isSelf && activeCount > 1 → throw ForbiddenException('Transfer admin role before leaving')`.
+> [!NOTE]
+> **Implementation Status**: Guard blocking ADMIN self-removal is fully implemented (G-007).
 
 ### 2.4 Disband Group (Last Member Leaves)
 
@@ -159,7 +160,8 @@ Condition: caller.role === ADMIN.
 5. Delete all media files (S3 / media-service) referenced by deleted messages.
 6. Hard-delete Conversation row.
 7. Emit WS event `group.disbanded` to all sockets in room conversation:{id}.
-8. Frontend on receiving `group.disbanded`: delete local SQLite cache immediately.
+8. **NEW**: Publish Kafka event `GROUP_DISBANDED_MEDIA_CLEANUP` to trigger asynchronous file deletion in media-service.
+9. Frontend on receiving `group.disbanded`: delete local SQLite cache immediately.
 ```
 
 > [!NOTE]
