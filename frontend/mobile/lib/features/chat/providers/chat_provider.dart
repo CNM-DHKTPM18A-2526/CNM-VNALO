@@ -1475,6 +1475,22 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> deleteConversation(String conversationId) async {
+    try {
+      // 1. Call API to delete for everyone/self on server
+      await _chatService.deleteChatHistory(conversationId);
+      
+      // 2. Remove locally (Memory + DB)
+      await _removeConversationLocally(conversationId);
+      
+      debugPrint('deleteConversation success: $conversationId');
+    } catch (e) {
+      debugPrint('deleteConversation error: $e');
+      // Fallback: still remove locally even if API fails to ensure UI responsiveness
+      await _removeConversationLocally(conversationId);
+    }
+  }
+
   Future<void> updateMemberNickname(String conversationId, String userId, String nickname) async {
     try {
       await _chatService.updateMemberNickname(conversationId, userId, nickname);

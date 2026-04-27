@@ -13,6 +13,7 @@ import 'package:vnalo_mobile/features/profile/screens/settings_screen.dart';
 import 'package:vnalo_mobile/features/search/screens/unified_search_screen.dart';
 import 'package:vnalo_mobile/core/models/menu_item_model.dart';
 import 'package:vnalo_mobile/features/chat/screens/my_documents_screen.dart';
+import 'package:vnalo_mobile/features/notifications/providers/notification_provider.dart';
 
 /// Profile tab ("Cá nhân") — shows user avatar + name + quick links.
 /// Tapping the avatar/name area navigates to the full ProfileDetailScreen.
@@ -33,6 +34,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<AuthProvider>().refreshCurrentUser();
+      context.read<NotificationProvider>().loadNotifications();
     });
   }
 
@@ -229,6 +231,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
               );
             },
           ),
+          MenuItem(
+            key: 'notifications',
+            icon: Icons.notifications_none_outlined,
+            title: 'Thông báo',
+            trailing: Consumer<NotificationProvider>(
+              builder: (context, provider, child) {
+                if (provider.unreadCount == 0) return const Icon(Icons.chevron_right, color: Colors.grey);
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.error,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${provider.unreadCount > 99 ? '99+' : provider.unreadCount}',
+                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                );
+              },
+            ),
+            onTap: () {
+              // TODO: Navigate to NotificationListScreen
+            },
+          ),
         ],
       ),
       MenuSection(
@@ -303,6 +329,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     iconColor: item.iconColor ?? (isDarkMode ? DarkColors.primary : AppColors.primary),
                     title: item.title,
                     subtitle: item.subtitle,
+                    trailing: item.trailing,
                     onTap: item.onTap,
                   ),
                   if (index < section.items.length - 1)
@@ -329,6 +356,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required Color iconColor,
     required String title,
     String? subtitle,
+    Widget? trailing,
     VoidCallback? onTap,
   }) {
     final subtitleColor = Theme.of(context).brightness == Brightness.dark
@@ -352,7 +380,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   style: TextStyle(fontSize: 13, color: subtitleColor),
                 )
               : null,
-          trailing: Icon(
+          trailing: trailing ?? Icon(
             Icons.chevron_right,
             size: 20,
             color: Theme.of(context).brightness == Brightness.dark
