@@ -31,12 +31,11 @@ import { PresenceService } from '../presence/presence.service';
  */
 @WebSocketGateway({
   cors: { origin: '*' },
-  namespace: '/realtime',
+  namespace: '/chat',
   transports: ['websocket', 'polling'],
 })
 export class RealtimeGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
-{
+  implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
@@ -48,7 +47,7 @@ export class RealtimeGateway
   constructor(
     private readonly jwtService: JwtService,
     private readonly presenceService: PresenceService,
-  ) {}
+  ) { }
 
   // ─── Connection Lifecycle ────────────────────────────────────────────
 
@@ -377,5 +376,48 @@ export class RealtimeGateway
       `[GroupCall] group-call:leave from ${data.senderUserId} in ${room}`,
     );
     client.to(room).emit('group-call:user-left', data);
+  }
+
+  /**
+   * Cuộc gọi kết thúc hoàn toàn (người cuối rời).
+   * Broadcast tới toàn bộ room để dismiss banner cho người chưa bắt máy.
+   */
+  @SubscribeMessage('group-call:ended')
+  handleGroupCallEnded(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: {
+      conversationId: string;
+      callId: string;
+      endedByUserId: string;
+    },
+  ) {
+    const room = `conversation:${data.conversationId}`;
+    this.logger.log(
+      `[GroupCall] group-call:ended by ${data.endedByUserId} in ${room}`,
+    );
+    // Broadcast tới TẤT CẢ (kể cả người gửi) để đảm bảo không ai còn banner
+    this.server.to(room).emit('group-call:ended', data);
+  }
+
+  // ─── Minimal 1-1 Call Relay ────────────────────────────────────────
+  @SubscribeMessage('call.offer')
+  handleCallOffer(@ConnectedSocket() _c: Socket, @MessageBody() data: any) {
+    this.emitToUser(data.targetUserId, 'call.offer', data);
+  }
+
+  @SubscribeMessage('call.answer')
+  handleCallAnswer(@ConnectedSocket() _c: Socket, @MessageBody() data: any) {
+    this.emitToUser(data.targetUserId, 'call.answer', data);
+  }
+
+  @SubscribeMessage('call.ice-candidate')
+  handleIceCandidate(@ConnectedSocket() _c: Socket, @MessageBody() data: any) {
+    this.emitToUser(data.targetUserId, 'call.ice-candidate', data);
+  }
+
+  @SubscribeMessage('call.end')
+  handleCallEnd(@ConnectedSocket() _c: Socket, @MessageBody() data: any) {
+    this.emitToUser(data.targetUserId, 'call.end', data);
   }
 }
