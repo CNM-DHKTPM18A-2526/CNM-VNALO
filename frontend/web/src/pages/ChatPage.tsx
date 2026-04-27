@@ -10,6 +10,7 @@ import { MessageShareModal } from '../features/chat/components/MessageShareModal
 import { ChatWindow } from '../features/chat/components/ChatWindow'
 import { UserProfileModal } from '../features/chat/components/UserProfileModal'
 import { CallModal } from '../features/chat/components/CallModal'
+import { GroupCallModal, IncomingGroupCallBanner, useGroupCall } from '../features/chat/components/GroupCallModal'
 import type { MessageContextMenuAction } from '../features/chat/components/MessageContextMenu'
 import {
   addMessageReaction,
@@ -519,6 +520,7 @@ function ChatPageContent() {
       }
     })
   }
+
 
   const routedConversationIdRef = useRef('')
   const selectedConversationIdRef = useRef('')
@@ -1455,6 +1457,177 @@ function ChatPageContent() {
     }
   })
 
+  // ─── GROUP CALL (SEPARATE LAYER - does not touch single call) ────
+  const {
+    snapshot: groupCallSnapshot,
+    incomingCall: incomingGroupCall,
+    elapsedSeconds: groupCallElapsed,
+    startGroupCall,
+    joinGroupCall,
+    declineGroupCall,
+    leaveGroupCall,
+    toggleMic: groupToggleMic,
+    toggleCamera: groupToggleCamera,
+    isInGroupCall,
+  } = useGroupCall({
+    socket: getSocket(),
+    currentUserId,
+    currentUserName: user?.name ?? 'Bạn',
+    currentUserAvatar: user?.avatarUrl ?? '',
+  })
+
+  // Caller: bắt đầu cuộc gọi nhóm (chỉ broadcast, không tạo peer trước)
+  const handleStartGroupCall = useCallback(
+    async (audioOnly = false) => {
+      if (!selectedConversationId) return
+      const callId = `gc-${Date.now()}`
+      const conv = conversations.find((c) => c.id === selectedConversationId)
+      await startGroupCall({
+        conversationId: selectedConversationId,
+        conversationName: conv?.name ?? 'Cuộc gọi nhóm',
+        callId,
+        audioOnly,
+      })
+    },
+    [selectedConversationId, conversations, startGroupCall]
+  )
+
+  // Rời cuộc gọi nhóm + tạo call log message
+  const handleLeaveGroupCall = useCallback(async () => {
+    const snap = groupCallSnapshot
+    const convId = selectedConversationId ?? snap?.conversationId
+    if (!convId) {
+      leaveGroupCall()
+      return
+    }
+
+    const callId = snap?.callId ?? ''
+    const duration = groupCallElapsed
+    // Số peers còn lại trước khi rời (không tính bản thân)
+    const remainingPeers = snap?.peers.length ?? 0
+
+    // 1. Stop WebRTC (luôn làm, bất kể có phải người cuối không)
+    leaveGroupCall()
+
+    // ⚠️ CHỈ tạo call log nếu không còn ai khác trong cuộc gọi.
+    // Nếu vẫn còn người khác → họ sẽ là người tạo log khi rời sau cùng.
+    if (remainingPeers > 0) {
+      console.log(`[GROUP_CALL_LOG] Skipping log — ${remainingPeers} peer(s) still in call`)
+      return
+    }
+
+    // 2. Broadcast group-call:ended để dismiss banner của những người chưa bắt máy
+    console.log(`[GROUP_CALL_LOG] Last person leaving — broadcasting group-call:ended`)
+    getSocket()?.emit('group-call:ended', {
+      conversationId: convId,
+      callId,
+      endedByUserId: currentUserId,
+    })
+
+    // 3. Tạo CALL_LOG message (chỉ người cuối cùng rời)
+    console.log(`[GROUP_CALL_LOG] Creating call log. duration=${duration}s`)
+    const logData = {
+      v: 1,
+      callId,
+      conversationId: convId,
+      callerId: currentUserId,
+      calleeId: 'group',
+      mediaType: snap?.audioOnly ? 'voice' : 'video',
+      outcome: duration > 0 ? 'completed' : 'canceled',
+      durationSeconds: duration,
+      participantCount: (snap?.peers.length ?? 0) + 1,
+      isGroup: true,
+      createdAt: new Date().toISOString(),
+    }
+    const logText = `CALL_LOG::${JSON.stringify(logData)}`
+    const clientMessageId = crypto.randomUUID()
+
+    // 3. Optimistic UI
+    const optimisticLog: ChatMessage = {
+      id: clientMessageId,
+      clientMessageId,
+      conversationId: convId,
+      sender: 'me',
+      senderId: currentUserId,
+      type: 'call',
+      text: logText,
+      timestamp: formatMessageTimestamp(),
+      createdAt: new Date().toISOString(),
+      deliveryState: 'sending',
+      isLocal: true,
+    }
+    setMessagesByConversation((prev) => ({
+      ...prev,
+      [convId]: upsertMessage(prev[convId] ?? [], optimisticLog),
+    }))
+    updateConversationAfterMessage(convId, optimisticLog, true)
+
+    // 4. Lưu qua Socket với fallback REST
+    ;(async () => {
+      let success = false
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const ack = await Promise.race([
+            emitSendMessage({ conversationId: convId, content: logText, messageType: 'TEXT', clientMessageId }),
+            new Promise<null>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 4000)),
+          ])
+          if (ack?.event === 'message.sent' && ack?.data) {
+            const serverMsg = {
+              ...normalizeMessage(mapRawMessage(ack.data, currentUserId)),
+              clientMessageId,
+              deliveryState: 'sent' as const,
+            }
+            setMessagesByConversation((prev) => ({
+              ...prev,
+              [convId]: upsertMessage(prev[convId] ?? [], serverMsg),
+            }))
+            updateConversationAfterMessage(convId, serverMsg, true)
+            success = true
+            break
+          }
+        } catch {}
+      }
+      if (!success) {
+        try {
+          const restRes = await sendMessageViaRest(accessToken || '', {
+            conversationId: convId,
+            content: logText,
+            messageType: 'TEXT',
+            clientMessageId,
+          })
+          if (restRes?.id) {
+            const serverMsg = {
+              ...normalizeMessage(mapRawMessage(restRes, currentUserId)),
+              clientMessageId,
+              deliveryState: 'sent' as const,
+            }
+            setMessagesByConversation((prev) => ({
+              ...prev,
+              [convId]: upsertMessage(prev[convId] ?? [], serverMsg),
+            }))
+            updateConversationAfterMessage(convId, serverMsg, true)
+            success = true
+          }
+        } catch {}
+      }
+      if (!success) {
+        setMessagesByConversation((prev) => ({
+          ...prev,
+          [convId]: markLocalMessageFailed(prev[convId] ?? [], clientMessageId),
+        }))
+      }
+    })()
+  }, [
+    groupCallSnapshot,
+    groupCallElapsed,
+    selectedConversationId,
+    currentUserId,
+    leaveGroupCall,
+    emitSendMessage,
+    accessToken,
+    updateConversationAfterMessage,
+  ])
+
   const handleAddReaction = useCallback(
     async (messageId: string, reactionKey: ReactionKey) => {
       if (!accessToken || !selectedConversationId) {
@@ -1834,6 +2007,13 @@ function ChatPageContent() {
   const handleInitiateCall = useCallback(async (type: 'audio' | 'video') => {
     if (!selectedConversationId) return;
 
+    // ✅ GROUP CALL routing — delegate to separate group call layer
+    if (selectedConversation?.isGroup) {
+      await handleStartGroupCall(type === 'audio')
+      return;
+    }
+
+    // ─── Single call (1-1) — DO NOT MODIFY ────────────────────────
     const callId = `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const socket = getSocket();
     if (!socket) return;
@@ -1861,7 +2041,7 @@ function ChatPageContent() {
       audioOnly: type === 'audio',
       isCaller: true,
     });
-  }, [selectedConversationId, selectedConversation, currentUserId, getSocket]);
+  }, [selectedConversationId, selectedConversation, currentUserId, getSocket, handleStartGroupCall]);
 
 
   const handleEndCall = useCallback(async (reasonArg: any = 'hangup') => {
@@ -4070,6 +4250,7 @@ function ChatPageContent() {
                   onUpdateGroupAvatar={handleUpdateGroupAvatar}
                   onUpdateGroupSettings={handleUpdateGroupSettings}
                   onDisbandGroup={handleDisbandGroup}
+                  onJumpToMessage={setJumpToMessageId}
                   friends={friendsDirectory}
                   currentUserId={user?.id}
                 />
@@ -4167,6 +4348,29 @@ function ChatPageContent() {
         onToggleMic={handleToggleMic}
         onToggleCamera={handleToggleCamera}
       />
+
+      {/* INCOMING GROUP CALL NOTIFICATION — shown to non-callers */}
+      {incomingGroupCall && !isInGroupCall && (
+        <IncomingGroupCallBanner
+          info={incomingGroupCall}
+          onJoin={() => joinGroupCall(incomingGroupCall)}
+          onDecline={declineGroupCall}
+        />
+      )}
+
+      {/* GROUP CALL MODAL — independent of 1-1 CallModal */}
+      {isInGroupCall && groupCallSnapshot && (
+        <GroupCallModal
+          isOpen={isInGroupCall}
+          snapshot={groupCallSnapshot}
+          localUserName={user?.name ?? 'Bạn'}
+          localUserAvatar={user?.avatarUrl ?? undefined}
+          onLeave={handleLeaveGroupCall}
+          onToggleMic={groupToggleMic}
+          onToggleCamera={groupToggleCamera}
+          elapsedSeconds={groupCallElapsed}
+        />
+      )}
 
       {/* Pinned Messages Logic Hooks */}
       <PinnedLogicHooks
