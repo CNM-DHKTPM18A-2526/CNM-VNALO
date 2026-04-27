@@ -39,6 +39,9 @@ export interface CallLogData {
   outcome: 'completed' | 'canceled' | 'missed' | 'rejected' | 'busy'
   durationSeconds: number
   createdAt: string
+  /** Group call extra fields */
+  isGroup?: boolean
+  participantCount?: number
 }
 
 export function formatMessageTimestamp(): string {

@@ -378,7 +378,7 @@ export function MessageInput({
       {isPickerOpen && (
         <div
           ref={pickerPanelRef}
-          className='absolute bottom-full mb-2 left-0 w-[350px] animate-in fade-in slide-in-from-bottom-2 duration-200 shadow-2xl border border-slate-200 rounded-xl overflow-hidden flex flex-col'
+          className='absolute bottom-full mb-2 left-0 w-[350px] h-[450px] animate-in fade-in slide-in-from-bottom-2 duration-200 shadow-2xl border border-slate-200 rounded-xl overflow-hidden flex flex-col'
           style={{ backgroundColor: '#ffffff', zIndex: 100 }}
         >
           {/* Zalo Tabs */}
@@ -419,7 +419,7 @@ export function MessageInput({
 
           {/* Content Area */}
           <div
-            className='flex-1 zalo-picker-content'
+            className='flex-1 zalo-picker-content overflow-y-auto [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-slate-400'
             style={{
               backgroundColor: '#ffffff'
             }}

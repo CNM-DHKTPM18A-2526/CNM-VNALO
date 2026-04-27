@@ -1,4 +1,4 @@
-import { Phone, Video, ArrowUpRight } from 'lucide-react'
+import { Phone, Video, ArrowUpRight, Users } from 'lucide-react'
 import type { ChatMessage } from '../chat.types'
 import { parseCallLog, formatDurationZalo } from '../utils/messageUtils'
 
@@ -32,13 +32,19 @@ export function CallLogBubble({ message, currentUserId, onInitiateCall }: CallLo
   }
 
   const isVideo = logData.mediaType === 'video'
+  const isGroup = logData.isGroup === true || logData.calleeId === 'group'
   const isOutgoing = logData.callerId === currentUserId || isMyMessage
   const durationText = formatDurationZalo(logData.durationSeconds)
   
-  // Zalo labels
-  const label = isVideo 
-    ? (isOutgoing ? 'Cuộc gọi video đi' : 'Cuộc gọi video đến')
-    : (isOutgoing ? 'Cuộc gọi thoại đi' : 'Cuộc gọi thoại đến')
+  // Labels
+  let label: string
+  if (isGroup) {
+    label = isVideo ? 'Cuộc gọi video nhóm' : 'Cuộc gọi thoại nhóm'
+  } else if (isVideo) {
+    label = isOutgoing ? 'Cuộc gọi video đi' : 'Cuộc gọi video đến'
+  } else {
+    label = isOutgoing ? 'Cuộc gọi thoại đi' : 'Cuộc gọi thoại đến'
+  }
 
   const handleCallBack = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -70,13 +76,15 @@ export function CallLogBubble({ message, currentUserId, onInitiateCall }: CallLo
         {/* Icon & Duration Row */}
         <div className="flex items-center gap-2 mb-3">
           <div className="relative">
-            {isVideo ? (
+            {isGroup ? (
+              <Users size={18} className="text-slate-500 fill-slate-500/10" />
+            ) : isVideo ? (
               <Video size={18} className="text-slate-500 fill-slate-500/10" />
             ) : (
               <Phone size={18} className="text-slate-500 fill-slate-500/10" />
             )}
             
-            {isOutgoing && (
+            {isOutgoing && !isGroup && (
               <div className="absolute -top-1 -right-2 bg-transparent">
                 <ArrowUpRight size={12} className="text-green-500 stroke-[3px]" />
               </div>
@@ -96,7 +104,8 @@ export function CallLogBubble({ message, currentUserId, onInitiateCall }: CallLo
         {/* Separator Line */}
         <div className="w-full h-[1px] bg-black/[0.06] mb-0.5" />
 
-        {/* Action Button */}
+        {/* Action Button - hide for group calls */}
+        {!isGroup && (
         <button
           type="button"
           onMouseDown={(e) => {
@@ -107,6 +116,12 @@ export function CallLogBubble({ message, currentUserId, onInitiateCall }: CallLo
         >
           Gọi lại
         </button>
+        )}
+        {isGroup && (
+          <div className="w-full py-2 text-slate-400 text-[13px] text-center">
+            {(logData.participantCount ?? 0) > 1 ? `${logData.participantCount} người tham gia` : 'Cuộc gọi nhóm'}
+          </div>
+        )}
       </div>
 
     </div>

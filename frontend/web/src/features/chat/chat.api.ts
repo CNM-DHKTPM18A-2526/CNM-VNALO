@@ -347,7 +347,7 @@ function normalizeMessageType(rawType: any, raw?: RawMessageLike): ChatMessageTy
 export async function uploadChatMedia(token: string, file: File): Promise<MediaUploadResponse> {
   const formData = new FormData()
   formData.append('file', file)
-  
+
   const ext = file.name.split('.').pop()?.toLowerCase() || '';
   const isImage = file.type.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
   formData.append('category', isImage ? 'AVATAR' : 'CHAT_FILE');
@@ -362,8 +362,8 @@ export async function uploadChatMedia(token: string, file: File): Promise<MediaU
 
     const json = response.data;
 
-    const payload = json && typeof json === 'object' && !Array.isArray(json) && 'data' in json 
-      ? (json.data as Record<string, unknown>) 
+    const payload = json && typeof json === 'object' && !Array.isArray(json) && 'data' in json
+      ? (json.data as Record<string, unknown>)
       : (json as Record<string, unknown>);
 
     const url = typeof payload?.url === 'string' ? payload.url : null;
@@ -379,7 +379,7 @@ export async function uploadChatMedia(token: string, file: File): Promise<MediaU
     };
   } catch (error: any) {
     if (error.message.includes('fetch')) {
-       throw new Error('Connection failed to media service. Please check if backend is running.');
+      throw new Error('Connection failed to media service. Please check if backend is running.');
     }
     throw error;
   }
@@ -878,7 +878,7 @@ export async function fetchStickerPackDetails(token: string, packId: string): Pr
 
 export async function fetchMediaByCategory(token: string, category: 'EMOJI' | 'GIF'): Promise<any[]> {
   try {
-    const response = await mediaApi.get(`/media?category=${category}&size=100`, {
+    const response = await mediaApi.get(`/?category=${category}&size=20`, {
       headers: { Authorization: `Bearer ${token}` }
     });
 
@@ -889,7 +889,7 @@ export async function fetchMediaByCategory(token: string, category: 'EMOJI' | 'G
     // Fallback: Deep discovery from SYSTEM assets
     if (items.length === 0) {
       console.log(`[chat.api.fetchMediaByCategory] ${category} list empty, performing MASSIVE discovery (limit 3000)...`)
-      const fbResponse = await mediaApi.get('/media?size=3000', {
+      const fbResponse = await mediaApi.get('/?size=30', {
         headers: { Authorization: `Bearer ${token}` }
       });
 
