@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
+import java.util.Map;
 
 /**
  * Service for managing friend requests and friendships.
@@ -37,6 +38,7 @@ public class FriendService {
     private final BlockListRepository blockListRepository;
     private final UserProfileRepository userProfileRepository;
     private final UserPrivacySettingRepository userPrivacySettingRepository;
+    private final iuh.cnm.vnalo.core_service.kafka.producer.KafkaProducerService kafkaProducerService;
 
     /**
      * Send a friend request to another user.
@@ -87,7 +89,12 @@ public class FriendService {
                 .status(FriendRequestStatus.PENDING)
                 .build();
 
-        return friendRequestRepository.save(request);
+        FriendRequest saved = friendRequestRepository.save(request);
+        
+        // Notify recipient about the new friend request
+        kafkaProducerService.sendRealtimeEvent(toUserId.toString(), "friend.request.received", Map.of("fromUserId", fromUserId.toString()));
+        
+        return saved;
     }
 
     /**
@@ -126,7 +133,13 @@ public class FriendService {
         friendRequestRepository.save(request);
 
         Friendship friendship = Friendship.create(request.getUserIdFrom(), request.getUserIdTo(), request.getSource());
-        return friendshipRepository.save(friendship);
+        Friendship saved = friendshipRepository.save(friendship);
+        
+        // Notify both users about the new friendship
+        kafkaProducerService.sendRealtimeEvent(request.getUserIdFrom().toString(), "friendship.updated", Map.of("friendId", request.getUserIdTo().toString()));
+        kafkaProducerService.sendRealtimeEvent(request.getUserIdTo().toString(), "friendship.updated", Map.of("friendId", request.getUserIdFrom().toString()));
+        
+        return saved;
     }
 
     /**

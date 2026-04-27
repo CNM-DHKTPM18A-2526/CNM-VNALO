@@ -131,6 +131,10 @@ erDiagram
       boolean allow_member_invite
       boolean allow_member_pin
       boolean allow_member_edit_info
+      boolean highlight_admin_messages
+      boolean show_history_to_new_members
+      boolean allow_member_create_note
+      boolean allow_member_create_poll
     }
     CONVERSATION_MEMBER {
       uuid conversation_id PK
@@ -138,6 +142,7 @@ erDiagram
       string role
       timestamp joined_at
       timestamp left_at
+      string nickname
       bigint last_read_seq
     }
     CONVERSATION_DIRECT_MAP {
@@ -159,6 +164,10 @@ erDiagram
       int unread_count
       boolean is_pinned
       boolean is_muted
+      boolean is_favorite
+      int auto_delete_seconds
+      boolean notify_call
+      string personal_wallpaper_url
     }
     MESSAGE {
       uuid message_id PK
@@ -444,13 +453,7 @@ erDiagram
 > [!IMPORTANT]
 > The following changes are SPEC_ONLY — documented but not yet applied to code or DB migrations.
 
-| Change | Decision | Priority |
-|---|---|---|
-| Rename `MemberRole.OWNER → ADMIN`, `ADMIN → DEPUTY` in enum | D-011 | Done |
-| Add `only_admin_can_post` to CONVERSATION | Business audit 2026-04-22 | P1 |
-| Add `allow_member_invite / pin / edit_info` to CONVERSATION | Business audit 2026-04-22 | P1 |
-| Add `block_and_hide_logs` to BLOCK_LIST | Business audit 2026-04-22 | P1 |
-| Hard delete cascade on group disband (no soft-delete) | D-012 | P0 |
+---
 
 ---
 

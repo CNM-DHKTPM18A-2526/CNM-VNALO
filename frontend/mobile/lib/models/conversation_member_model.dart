@@ -4,7 +4,7 @@ import 'package:vnalo_mobile/models/user_model.dart';
 class ConversationMember {
   final String conversationId;
   final String userId;
-  final MemberRole role; // OWNER, ADMIN, MEMBER
+  final MemberRole role; // ADMIN (=trưởng nhóm), DEPUTY (=phó nhóm), MEMBER
   final String? nickname;
   final DateTime joinedAt;
   final String? joinedBy;
@@ -41,8 +41,8 @@ class ConversationMember {
   });
 
   bool get isActive => leftAt == null;
-  bool get isOwner => role == MemberRole.OWNER;
-  bool get isAdmin => role == MemberRole.ADMIN || role == MemberRole.OWNER;
+  bool get isOwner => role == MemberRole.ADMIN;
+  bool get isAdmin => role == MemberRole.DEPUTY || role == MemberRole.ADMIN;
 
   ConversationMember copyWith({
     String? conversationId,

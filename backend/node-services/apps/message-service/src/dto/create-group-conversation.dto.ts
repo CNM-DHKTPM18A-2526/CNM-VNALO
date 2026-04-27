@@ -28,7 +28,7 @@ export class CreateGroupConversationDto {
   @IsEnum(JoinMode)
   joinMode?: JoinMode;
 
-  /** Initial member UUIDs (excluding the creator who is auto-added as OWNER). Min 1 other member required. */
+  /** Initial member UUIDs (excluding the creator who is auto-added as ADMIN). Min 1 other member required. */
   @IsArray()
   @IsUUID('4', { each: true })
   @ArrayMinSize(1)

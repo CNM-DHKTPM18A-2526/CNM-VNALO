@@ -7,6 +7,7 @@ import 'package:vnalo_mobile/core/utils/date_formatter.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/core/widgets/group_avatar.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
+import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/features/profile/providers/avatar_cache_provider.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
@@ -45,19 +46,33 @@ class ChatListItem extends StatelessWidget {
         motion: const DrawerMotion(),
         children: [
           SlidableAction(
-            onPressed: (_) {},
+            onPressed: (context) {
+              final chatProvider = context.read<ChatProvider>();
+              chatProvider.updateConversationSettings(
+                conversationId: conversation.id,
+                isPinned: !conversation.isPinned,
+              );
+            },
             backgroundColor: AppColors.pinIcon,
-            icon: Icons.push_pin,
-            label: common.pinAction,
+            icon: conversation.isPinned ? Icons.push_pin_outlined : Icons.push_pin,
+            label: conversation.isPinned ? common.unpinAction : common.pinAction,
           ),
           SlidableAction(
-            onPressed: (_) {},
+            onPressed: (context) {
+              final chatProvider = context.read<ChatProvider>();
+              chatProvider.updateConversationSettings(
+                conversationId: conversation.id,
+                isMuted: !conversation.isMuted,
+              );
+            },
             backgroundColor: hintColor,
-            icon: Icons.notifications_off,
-            label: common.muteAction,
+            icon: conversation.isMuted ? Icons.notifications_active : Icons.notifications_off,
+            label: conversation.isMuted ? common.unmuteAction : common.muteAction,
           ),
           SlidableAction(
-            onPressed: (_) {},
+            onPressed: (context) {
+              _showDeleteConfirmation(context);
+            },
             backgroundColor: AppColors.error,
             icon: Icons.delete,
             label: common.delete,
@@ -223,5 +238,29 @@ class ChatListItem extends StatelessWidget {
       return '[Link] $content';
     }
     return content;
+  }
+
+  void _showDeleteConfirmation(BuildContext context) {
+    final common = CommonTexts.of(context, listen: false);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(common.delete),
+        content: Text('Bạn có chắc chắn muốn xóa hội thoại này? Hành động này không thể hoàn tác.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(common.cancel, style: const TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () {
+              context.read<ChatProvider>().deleteConversation(conversation.id);
+              Navigator.pop(context);
+            },
+            child: Text(common.delete, style: const TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
   }
 }

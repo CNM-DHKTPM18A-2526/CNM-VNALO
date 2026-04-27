@@ -16,3 +16,9 @@ export const rabbitConfig = registerAs('rabbit', () => ({
   broadcastQueue: 'realtime.broadcast',
   exchange: 'vnalo.realtime',
 }));
+
+export const kafkaConfig = registerAs('kafka', () => ({
+  brokers: (process.env.KAFKA_BROKERS || 'localhost:9092').split(','),
+  clientId: process.env.KAFKA_CLIENT_ID || 'vnalo-realtime-gateway',
+  realtimeTopic: process.env.KAFKA_REALTIME_TOPIC || 'vnalo.realtime.events',
+}));

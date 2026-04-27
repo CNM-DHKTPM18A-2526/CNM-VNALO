@@ -41,4 +41,20 @@ export class UpdateConversationDto {
   @IsOptional()
   @IsBoolean()
   onlyAdminCanPost?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  highlightAdminMessages?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  showHistoryToNewMembers?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  allowMemberCreateNote?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  allowMemberCreatePoll?: boolean;
 }

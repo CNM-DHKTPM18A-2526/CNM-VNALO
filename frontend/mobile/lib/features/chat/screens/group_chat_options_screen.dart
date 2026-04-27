@@ -274,7 +274,7 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
             _buildTile(CupertinoIcons.arrow_right_square, 'Rời nhóm', 
               textColor: Colors.red,
               onTap: () => _confirmLeaveGroup(conv)),
-            if (myMember.role == MemberRole.OWNER) ...[
+            if (myMember.role == MemberRole.ADMIN) ...[
               _buildDivider(),
               _buildTile(CupertinoIcons.delete, 'Giải tán nhóm', 
                 textColor: Colors.red,
@@ -292,7 +292,7 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
     if (conv.createdBy == userId) return true;
     if (conv.members.isEmpty) return false;
     final member = conv.members.firstWhere((m) => m.userId == userId, orElse: () => conv.members.first);
-    return member.role == MemberRole.ADMIN || member.role == MemberRole.OWNER;
+    return member.role == MemberRole.DEPUTY || member.role == MemberRole.ADMIN;
   }
 
   Widget _buildHeader(Conversation conv) {
@@ -505,7 +505,7 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
     if (conv.members.isEmpty) return;
     final member = conv.members.firstWhere((m) => m.userId == userId, orElse: () => conv.members.first);
     
-    if (member.role == MemberRole.OWNER || member.role == MemberRole.ADMIN) {
+    if (member.role == MemberRole.ADMIN || member.role == MemberRole.DEPUTY) {
       // Rule: Leaders must transfer UNLESS they are the last person in the group
       if (conv.members.length > 1) {
         showCupertinoDialog(
@@ -521,7 +521,7 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
         return;
       }
       // If 1 member and is leader (Owner), they can leave (effectively disbanding)
-      if (member.role == MemberRole.OWNER) {
+      if (member.role == MemberRole.ADMIN) {
         showCupertinoDialog(
           context: context,
           builder: (context) => CupertinoAlertDialog(

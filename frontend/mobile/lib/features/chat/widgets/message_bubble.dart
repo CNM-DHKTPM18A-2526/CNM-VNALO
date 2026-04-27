@@ -48,6 +48,8 @@ class MessageBubble extends StatelessWidget {
   final String? currentUserId;
   final Function(String emoji)? onToggleReaction;
   final Function(String emoji)? onShowReactors;
+  final bool canPin;
+  final bool canRecall;
 
   const MessageBubble({
     super.key,
@@ -70,6 +72,8 @@ class MessageBubble extends StatelessWidget {
     this.currentUserId,
     this.onToggleReaction,
     this.onShowReactors,
+    this.canPin = true,
+    this.canRecall = true,
   });
 
   @override
@@ -292,6 +296,7 @@ class MessageBubble extends StatelessWidget {
     if (message.isRecalled) return;
 
     final isCloud = message.conversationId == 'MY_DOCUMENTS' || message.conversationId == 'my_documents_conversation';
+    final isAiAssistant = message.conversationId == 'AI_ASSISTANT_LOCAL';
 
     FocusedMessageDialog.show(
       context,
@@ -299,6 +304,9 @@ class MessageBubble extends StatelessWidget {
       isMine: isMine,
       isCloud: isCloud,
       isPinned: chatProvider.isMessagePinned(message.conversationId, message.id),
+      isAiAssistant: isAiAssistant,
+      canPin: canPin,
+      canRecall: isMine && canRecall,
       position: position,
       size: size,
       child: _buildBubbleContent(context, isDarkMode),
@@ -395,10 +403,14 @@ class MessageBubble extends StatelessWidget {
               ),
             );
             if (confirmed == true && context.mounted) {
-              await chatProvider.deleteForMe(
-                message.id,
-                message.conversationId,
-              );
+              if (message.conversationId == 'AI_ASSISTANT_LOCAL') {
+                await context.read<AiAssistantProvider>().deleteMessage(message.id);
+              } else {
+                await chatProvider.deleteForMe(
+                  message.id,
+                  message.conversationId,
+                );
+              }
             }
           }
         } else if (action == 'pin') {

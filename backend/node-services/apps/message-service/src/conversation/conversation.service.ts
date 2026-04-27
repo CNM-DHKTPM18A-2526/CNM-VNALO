@@ -21,8 +21,13 @@ import {
 import { ConversationDirectMap } from '../entities/conversation-direct-map.entity';
 import { ConversationJoinRequest } from '../entities/conversation-join-request.entity';
 import { ConversationInbox } from '../entities/conversation-inbox.entity';
+import { Message } from '../entities/message.entity';
+import { MessageReaction } from '../entities/message-reaction.entity';
+import { MessageReceipt } from '../entities/message-receipt.entity';
+import { PinnedMessage } from '../entities/pinned-message.entity';
 import { CreateGroupConversationDto } from '../dto/create-group-conversation.dto';
 import { UpdateConversationDto } from '../dto/update-conversation.dto';
+import { KafkaProducerService } from '../kafka/kafka-producer.service';
 
 @Injectable()
 export class ConversationService {
@@ -40,6 +45,7 @@ export class ConversationService {
     @InjectRepository(ConversationInbox)
     private readonly inboxRepo: Repository<ConversationInbox>,
     private readonly dataSource: DataSource,
+    private readonly kafkaProducer: KafkaProducerService,
   ) {}
 
   /**
@@ -123,7 +129,7 @@ export class ConversationService {
     return this.getConversation(conversationId, userId);
   }
 
-  /** Create a group conversation with initial members. Creator becomes OWNER. */
+  /** Create a group conversation with initial members. Creator becomes ADMIN. */
   async createGroup(userId: string, dto: CreateGroupConversationDto) {
     const conversationId = await this.dataSource.transaction(
       async (manager) => {
@@ -218,22 +224,52 @@ export class ConversationService {
     }
 
     // Security Fix: Whitelist fields to prevent Elevation of Privilege
+    const { title, description, avatarUrl, ...rest } = dto;
+    
     if (member.role === MemberRole.MEMBER) {
-      const { title, description, avatarUrl } = dto;
+      // MEMBER can only update basic info (if allowMemberEditInfo is true)
       Object.assign(conversation, {
         ...(title && { title }),
         ...(description && { description }),
         ...(avatarUrl && { avatarUrl }),
       });
+    } else if (member.role === MemberRole.DEPUTY) {
+      // DEPUTY can update basic info but NOT admin-only settings.
+      // SECURITY: MUST update this whitelist when adding new admin-only fields to Conversation entity!
+      const adminOnlyFields = [
+        'onlyAdminCanPost',
+        'allowMemberInvite',
+        'allowMemberPin',
+        'allowMemberEditInfo',
+        'highlightAdminMessages',
+        'showHistoryToNewMembers',
+        'allowMemberCreateNote',
+        'allowMemberCreatePoll',
+      ];
+      
+      const safeUpdate: any = {
+        ...(title && { title }),
+        ...(description && { description }),
+        ...(avatarUrl && { avatarUrl }),
+      };
+      
+      // Filter out admin-only fields from the deputy update
+      for (const key of Object.keys(rest)) {
+        if (!adminOnlyFields.includes(key)) {
+          safeUpdate[key] = rest[key];
+        }
+      }
+      
+      Object.assign(conversation, safeUpdate);
     } else {
-      // ADMIN/DEPUTY can update all fields in DTO
+      // ADMIN can update everything
       Object.assign(conversation, dto);
     }
 
     return this.conversationRepo.save(conversation);
   }
 
-  /** Add members to a group. Requires ADMIN/OWNER or allowed member invite. */
+  /** Add members to a group. Requires ADMIN or allowed member invite. */
   async addMembers(
     conversationId: string,
     userId: string,
@@ -335,6 +371,7 @@ export class ConversationService {
     conversationId: string,
     requesterId: string,
     targetUserId: string,
+    silent = false,
   ) {
     const requester = await this.assertMember(conversationId, requesterId);
     const target = await this.assertMember(conversationId, targetUserId);
@@ -379,6 +416,32 @@ export class ConversationService {
     target.leftAt = new Date();
     target.removedBy = isSelf ? null : requesterId;
     await this.memberRepo.save(target);
+
+    // G-014: Send system message about member leaving/removal
+    try {
+      const targetName = target.nickname || 'Một thành viên';
+      const requesterName = isSelf ? null : requester.nickname || 'Quản trị viên';
+      
+      let systemContent = '';
+      if (isSelf) {
+        systemContent = `${targetName} đã rời khỏi nhóm.`;
+      } else {
+        systemContent = `${targetName} đã bị ${requesterName} mời ra khỏi nhóm.`;
+      }
+
+      // Use the internal createSystemMessage to handle sequence and inbox updates.
+      // If silent, only notify ADMIN and DEPUTY.
+      const targetRoles = silent ? [MemberRole.ADMIN, MemberRole.DEPUTY] : undefined;
+      await this.messageService.createSystemMessage(conversationId, systemContent, targetRoles);
+    } catch (err) {
+      this.logger.error(`Failed to send system message for member removal: ${err.message}`);
+    }
+
+    // G-013 Fix: Delete inbox entry when leaving/removed to avoid orphaned data
+    await this.inboxRepo.delete({
+      conversationId: conversationId,
+      userId: targetUserId,
+    });
 
     this.logger.log(
       `Member ${targetUserId} removed from ${conversationId} by ${requesterId}`,
@@ -532,7 +595,7 @@ export class ConversationService {
     const conversation = await this.getConversationOrFail(conversationId);
     const member = await this.assertMember(conversationId, userId);
 
-    // Always allow pinning in 1:1 chats. For groups, check allowMemberPin or admin/owner role.
+    // Always allow pinning in 1:1 chats. For groups, check allowMemberPin or admin role.
     if (conversation.type === ConversationType.DIRECT) return;
 
     if (member.role === MemberRole.MEMBER && !conversation.allowMemberPin) {
@@ -569,8 +632,9 @@ export class ConversationService {
   async leaveGroup(
     conversationId: string,
     userId: string,
+    silent = false,
   ): Promise<{ status: string; conversationId: string }> {
-    await this.removeMember(conversationId, userId, userId);
+    await this.removeMember(conversationId, userId, userId, silent);
     return { status: 'LEFT', conversationId };
   }
 
@@ -777,54 +841,48 @@ export class ConversationService {
     const memberUserIds = members.map((m) => m.userId);
 
     await this.dataSource.transaction(async (manager) => {
-      // 1. Delete all messages in the conversation
-      await manager.query(`DELETE FROM message WHERE conversation_id = $1`, [
-        conversationId,
-      ]);
+      // 1. Delete all message reactions, receipts, and pins first (satisfy FK constraints)
+      await manager.delete(MessageReaction, { conversationId });
+      await manager.delete(MessageReceipt, { conversationId });
+      await manager.delete(PinnedMessage, { conversationId });
 
-      // 2. Delete all message receipts and reactions (cascaded via FK in most setups, explicit for safety)
-      await manager.query(
-        `DELETE FROM message_reaction WHERE conversation_id = $1`,
-        [conversationId],
-      );
-      await manager.query(
-        `DELETE FROM message_receipt WHERE conversation_id = $1`,
-        [conversationId],
-      );
-      await manager.query(
-        `DELETE FROM pinned_message WHERE conversation_id = $1`,
-        [conversationId],
-      );
+      // 2. Delete all messages in the conversation
+      await manager.delete(Message, { conversationId });
 
       // 3. Delete all join requests
-      await manager.query(
-        `DELETE FROM conversation_join_request WHERE conversation_id = $1`,
-        [conversationId],
-      );
+      await manager.delete(ConversationJoinRequest, { conversationId });
 
       // 4. Delete all inbox entries for this conversation
-      await manager.query(
-        `DELETE FROM conversation_inbox WHERE conversation_id = $1`,
-        [conversationId],
-      );
+      await manager.delete(ConversationInbox, { conversationId });
 
       // 5. Delete all members (including soft-deleted ones)
-      await manager.query(
-        `DELETE FROM conversation_member WHERE conversation_id = $1`,
-        [conversationId],
-      );
+      await manager.delete(ConversationMember, { conversationId });
 
       // 6. Delete conversation itself
-      await manager.query(
-        `DELETE FROM conversation WHERE conversation_id = $1`,
-        [conversationId],
-      );
+      await manager.delete(Conversation, { id: conversationId });
     });
 
     this.logger.log(
       `Group ${conversationId} disbanded by ${userId}. ${memberUserIds.length} members affected.`,
     );
 
-    return { conversationId, disbandedBy: userId };
+    // Notify all members via Kafka
+    for (const memberId of memberUserIds) {
+      await this.kafkaProducer.sendRealtimeEvent(memberId, 'group.disbanded', {
+        conversationId,
+        disbandedBy: userId,
+      });
+    }
+
+    const disbandedAt = new Date();
+
+    // G-015: Notify media-service to clean up all media files (Async)
+    await this.kafkaProducer.sendRealtimeEvent(userId, 'GROUP_DISBANDED_MEDIA_CLEANUP', {
+      conversationId,
+      disbandedBy: userId,
+      disbandedAt,
+    });
+
+    return { conversationId, disbandedBy: userId, disbandedAt };
   }
 }

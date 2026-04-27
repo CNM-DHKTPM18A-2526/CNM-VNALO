@@ -11,11 +11,13 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
   private readonly brokers: string[];
   private readonly clientId: string;
   private readonly notificationsTopic: string;
+  private readonly realtimeTopic: string;
 
   constructor(private readonly configService: ConfigService) {
     this.brokers = this.configService.get('kafka.brokers') ?? ['localhost:9092'];
     this.clientId = this.configService.get('kafka.clientId') ?? 'vnalo-message-service';
     this.notificationsTopic = this.configService.get('kafka.notificationsTopic') ?? 'vnalo.notifications';
+    this.realtimeTopic = this.configService.get('kafka.realtimeTopic') ?? 'vnalo.realtime.events';
 
     this.kafka = new Kafka({
       clientId: this.clientId,
@@ -93,6 +95,37 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
         `Failed to publish notification: ${error.message}`,
         error.stack,
       );
+    }
+  }
+
+  /**
+   * Publish a real-time event to the gateway via Kafka.
+   * Topic: vnalo.realtime.events
+   */
+  async sendRealtimeEvent(userId: string, eventType: string, payload: any): Promise<void> {
+    if (!this.isConnected) {
+      this.logger.warn('Kafka producer not connected. Skipping realtime event publish.');
+      return;
+    }
+
+    try {
+      await this.producer.send({
+        topic: this.realtimeTopic,
+        messages: [
+          {
+            key: userId,
+            value: JSON.stringify({
+              type: eventType,
+              userId: userId,
+              payload: payload,
+            }),
+          },
+        ],
+      });
+
+      this.logger.log(`Realtime event sent: type=${eventType} userId=${userId}`);
+    } catch (error) {
+      this.logger.error(`Failed to send realtime event: ${error.message}`, error.stack);
     }
   }
 }

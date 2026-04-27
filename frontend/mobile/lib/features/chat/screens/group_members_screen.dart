@@ -29,17 +29,17 @@ class GroupMembersScreen extends StatelessWidget {
     final activeMembers = conv.members.where((m) => m.leftAt == null).toList();
     final currentUserId = context.watch<AuthProvider>().user?.id ?? '';
     final isOwnerOrAdmin = activeMembers.any((m) => 
-      m.userId == currentUserId && (m.role == MemberRole.OWNER || m.role == MemberRole.ADMIN)
+      m.userId == currentUserId && (m.role == MemberRole.ADMIN || m.role == MemberRole.DEPUTY)
     );
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     // Sort active members: OWNER first, then ADMIN, then by name
     final sortedMembers = List<ConversationMember>.from(activeMembers)
       ..sort((a, b) {
-        if (a.role == MemberRole.OWNER) return -1;
-        if (b.role == MemberRole.OWNER) return 1;
         if (a.role == MemberRole.ADMIN) return -1;
         if (b.role == MemberRole.ADMIN) return 1;
+        if (a.role == MemberRole.DEPUTY) return -1;
+        if (b.role == MemberRole.DEPUTY) return 1;
         return (a.user?.displayName ?? '').compareTo(b.user?.displayName ?? '');
       });
 
@@ -78,14 +78,14 @@ class GroupMembersScreen extends StatelessWidget {
                   subtitle: Text(_getRoleLabel(member.role), 
                     style: TextStyle(color: _getRoleColor(member.role), fontSize: 12, fontWeight: FontWeight.bold)),
                   trailing: selectionMode
-                    ? (isSelf || member.role == MemberRole.OWNER ? null : const Icon(Icons.chevron_right))
-                    : isOwnerOrAdmin && !isSelf && member.role != MemberRole.OWNER
+                    ? (isSelf || member.role == MemberRole.ADMIN ? null : const Icon(Icons.chevron_right))
+                    : isOwnerOrAdmin && !isSelf && member.role != MemberRole.ADMIN
                       ? IconButton(
                           icon: const Icon(Icons.more_vert),
                           onPressed: () => _showMemberActions(context, conv, member),
                         )
                       : null,
-                  onTap: selectionMode && !isSelf && member.role != MemberRole.OWNER
+                  onTap: selectionMode && !isSelf && member.role != MemberRole.ADMIN
                     ? () => _confirmTransferOwnership(context, conv, member)
                     : null,
                 ),
@@ -101,16 +101,16 @@ class GroupMembersScreen extends StatelessWidget {
 
   String _getRoleLabel(MemberRole role) {
     switch (role) {
-      case MemberRole.OWNER: return 'Trưởng nhóm';
-      case MemberRole.ADMIN: return 'Phó nhóm';
+      case MemberRole.ADMIN: return 'Trưởng nhóm';
+      case MemberRole.DEPUTY: return 'Phó nhóm';
       case MemberRole.MEMBER: return 'Thành viên';
     }
   }
 
   Color _getRoleColor(MemberRole role) {
     switch (role) {
-      case MemberRole.OWNER: return Colors.orange.shade800;
-      case MemberRole.ADMIN: return Colors.blue.shade700;
+      case MemberRole.ADMIN: return Colors.orange.shade800;
+      case MemberRole.DEPUTY: return Colors.blue.shade700;
       case MemberRole.MEMBER: return Colors.grey;
     }
   }
@@ -137,7 +137,7 @@ class GroupMembersScreen extends StatelessWidget {
               },
               child: const Text('Bổ nhiệm làm Phó nhóm'),
             )
-          else if (member.role == MemberRole.ADMIN)
+          else if (member.role == MemberRole.DEPUTY)
             CupertinoActionSheetAction(
               onPressed: () {
                  Navigator.pop(context);

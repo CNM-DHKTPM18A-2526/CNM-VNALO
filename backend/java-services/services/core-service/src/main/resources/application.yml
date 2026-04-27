@@ -124,8 +124,7 @@ spring:
   flyway:
     enabled: true
   autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+    exclude: []
 
 # Dev: Testing mode overrides
 # Dev: OTP email delivery defaults (set SMTP_USER + MAIL_APP_PASSWORD in docker/.env)

@@ -878,7 +878,7 @@ export async function fetchStickerPackDetails(token: string, packId: string): Pr
 
 export async function fetchMediaByCategory(token: string, category: 'EMOJI' | 'GIF'): Promise<any[]> {
   try {
-    const response = await mediaApi.get(`/?category=${category}&size=20`, {
+    const response = await mediaApi.get(`/media?category=${category}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
 
@@ -889,7 +889,7 @@ export async function fetchMediaByCategory(token: string, category: 'EMOJI' | 'G
     // Fallback: Deep discovery from SYSTEM assets
     if (items.length === 0) {
       console.log(`[chat.api.fetchMediaByCategory] ${category} list empty, performing MASSIVE discovery (limit 3000)...`)
-      const fbResponse = await mediaApi.get('/?size=30', {
+      const fbResponse = await mediaApi.get('/media?size=3000', {
         headers: { Authorization: `Bearer ${token}` }
       });
 

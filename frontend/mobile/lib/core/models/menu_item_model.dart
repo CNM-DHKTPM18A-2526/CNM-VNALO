@@ -6,6 +6,7 @@ class MenuItem {
   final String title;
   final String? subtitle;
   final Color? iconColor;
+  final Widget? trailing;
   final VoidCallback? onTap;
 
   const MenuItem({
@@ -14,6 +15,7 @@ class MenuItem {
     required this.title,
     this.subtitle,
     this.iconColor,
+    this.trailing,
     this.onTap,
   });
 }

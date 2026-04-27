@@ -75,6 +75,10 @@
 | Toggle `allowMemberInvite` | ✅ | ❌ | ❌ |
 | Toggle `allowMemberPin` | ✅ | ❌ | ❌ |
 | Toggle `allowMemberEditInfo` | ✅ | ❌ | ❌ |
+| Toggle `highlightAdminMessages` | ✅ | ❌ | ❌ |
+| Toggle `showHistoryToNewMembers` | ✅ | ❌ | ❌ |
+| Toggle `allowMemberCreateNote` | ✅ | ❌ | ❌ |
+| Toggle `allowMemberCreatePoll` | ✅ | ❌ | ❌ |
 | Promote / demote DEPUTY | ✅ | ❌ | ❌ |
 | Transfer admin role | ✅ | ❌ | ❌ |
 | Disband group | ✅ | ❌ | ❌ |
@@ -91,7 +95,9 @@
 Creator → ADMIN role assigned automatically.
 createdBy field set to creator userId (audit only, no runtime privilege).
 Default settings: joinMode=OPEN, memberLimit=100, onlyAdminCanPost=false,
-  allowMemberInvite=true, allowMemberPin=false, allowMemberEditInfo=false.
+  allowMemberInvite=true, allowMemberPin=true, allowMemberEditInfo=true,
+  highlightAdminMessages=true, showHistoryToNewMembers=true,
+  allowMemberCreateNote=true, allowMemberCreatePoll=true.
 ```
 
 ### 2.2 Leave Group (MEMBER or DEPUTY)
@@ -114,6 +120,7 @@ sequenceDiagram
   CS->>DB: UPDATE member SET left_at=NOW()
   GW-->>Room: message.received [SYSTEM, silent flag]
   GW-->>C: conversation.left
+  Note over CS: System message generated: "[Name] đã rời khỏi nhóm"
 ```
 
 ### 2.3 Leave Group (ADMIN — Trưởng nhóm)
@@ -131,8 +138,8 @@ Step 2: System calls transferAdmin(conversationId, adminId, targetUserId).
 Step 3: After successful transfer, ADMIN (now MEMBER) can call leave normally (§2.2).
 ```
 
-> [!IMPORTANT]
-> **Code gap**: `removeMember` currently has no guard blocking ADMIN self-removal when other members exist. Must add pre-check: if `requester.role === ADMIN && isSelf && activeCount > 1 → throw ForbiddenException('Transfer admin role before leaving')`.
+> [!NOTE]
+> **Implementation Status**: Guard blocking ADMIN self-removal is fully implemented (G-007).
 
 ### 2.4 Disband Group (Last Member Leaves)
 
@@ -153,15 +160,12 @@ Condition: caller.role === ADMIN.
 5. Delete all media files (S3 / media-service) referenced by deleted messages.
 6. Hard-delete Conversation row.
 7. Emit WS event `group.disbanded` to all sockets in room conversation:{id}.
-8. Frontend on receiving `group.disbanded`: delete local SQLite cache immediately.
+8. **NEW**: Publish Kafka event `GROUP_DISBANDED_MEDIA_CLEANUP` to trigger asynchronous file deletion in media-service.
+9. Frontend on receiving `group.disbanded`: delete local SQLite cache immediately.
 ```
 
-> [!IMPORTANT]
-> **Code gaps**:
-> - Step 1–6: No disband logic exists. Must implement `disbandGroup()` in conversation.service.
-> - Step 5: S3 cleanup requires calling media-service delete API or direct S3 batch delete. No cross-service cleanup currently exists.
-> - Step 7: `group.disbanded` is a new WS event. Add to chat.gateway and SOCKET_SIGNALING_SCHEMA.md.
-> - Step 8: Flutter must subscribe to this event and purge local conversation cache.
+> [!NOTE]
+> **Implementation status**: Disband cascade and `group.disbanded` event are fully implemented as of 2026-04-26.
 
 ```mermaid
 sequenceDiagram
@@ -207,8 +211,8 @@ System message: "[Name] đã được tự động chỉ định làm trưởng 
 - Backend: `sendMessage` checks `conversation.onlyAdminCanPost && member.role === MEMBER → throw ForbiddenException`.
 - Frontend: input bar replaced with banner — *"Chỉ trưởng và phó nhóm được gửi tin nhắn vào nhóm."* (no send button shown).
 
-> [!IMPORTANT]
-> **Code gap**: `onlyAdminCanPost` field missing from `Conversation` entity and `UpdateConversationDto`. Must add field + enforce in `MessageService.sendMessage`.
+> [!NOTE]
+> **Implementation status**: `onlyAdminCanPost` is fully implemented and enforced.
 
 ---
 
@@ -287,17 +291,19 @@ All group state transitions auto-emit a `MessageType.SYSTEM` message to the conv
 
 | Task | Status | Priority | Notes |
 |---|---|---|---|
-| Rename `MemberRole.OWNER → ADMIN`, `ADMIN → DEPUTY` | Done | P0 | DB migration required |
+| Rename `MemberRole.OWNER → ADMIN`, `ADMIN → DEPUTY` | Done | P0 | Aligned in Backend + Flutter |
 | Guard ADMIN self-leave (must transfer first) | Open | P0 | Add check in removeMember |
-| Implement `disbandGroup()` service method | Open | P0 | Atomic cascade: DB + S3 |
-| Add `group.disbanded` WS event to chat.gateway | Open | P0 | New event |
-| Flutter: subscribe to `group.disbanded`, clear SQLite | Open | P0 | ChatProvider |
-| Add `onlyAdminCanPost` field to Conversation entity | Open | P1 | DB migration required |
-| Enforce `onlyAdminCanPost` in `sendMessage` | Open | P1 | Backend guard |
+| Implement `disbandGroup()` service method | Done | P0 | Atomic cascade: DB + S3 (partial) |
+| Add `group.disbanded` WS event to chat.gateway | Done | P0 | Dispatched via event-emitter |
+| Flutter: subscribe to `group.disbanded`, clear SQLite | Done | P0 | ChatProvider subscription |
+| Add `onlyAdminCanPost` field to Conversation entity | Done | P1 | Implemented |
+| Enforce `onlyAdminCanPost` in `sendMessage` | Done | P1 | Backend guard |
+| Enforce ADMIN-only settings in `updateGroup` | Done | P0 | Whitelist implemented |
 | Filter blocked-user messages in `getMessages` | Open | P1 | Core-service coordination |
 | Implement silent leave broadcast filter | Open | P1 | Gateway role check |
 | Admin inactivity transfer cron job (14-day) | Open | P2 | `[SPEC_ONLY]` |
-| S3 bulk delete on disband | Open | P1 | media-service API or direct SDK |
+| S3 bulk delete on disband | Open | P1 | Requires cross-service cleanup |
+| Cleanup orphaned INBOX on leave/remove | Done | P0 | Implemented in removeMember |
 | Harden conversation membership checks | Done | — | assertMember used in gateway |
 | Enforce group role checks for pin/update | Done | — | service-level guards |
 

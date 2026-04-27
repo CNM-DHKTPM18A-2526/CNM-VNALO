@@ -33,6 +33,7 @@ import 'package:vnalo_mobile/services/ai_service.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_floating_bubble.dart';
 import 'package:vnalo_mobile/features/contacts/providers/contact_provider.dart';
+import 'package:vnalo_mobile/features/notifications/providers/notification_provider.dart';
 
 // Global key to allow navigation from anywhere (e.g. IncomingCallCoordinator)
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -183,7 +184,10 @@ class VnaloApp extends StatelessWidget {
         ),
         Provider<NotificationService>(create: (_) => NotificationService()),
         ChangeNotifierProvider(
-          create: (ctx) => ContactProvider(ctx.read<FriendService>()),
+          create: (ctx) => ContactProvider(
+            ctx.read<FriendService>(),
+            ctx.read<SocketService>(),
+          ),
         ),
         Provider<AiService>(
           create: (context) => AiService(context.read<ApiService>()),
@@ -249,6 +253,9 @@ class VnaloApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<AiAssistantProvider>(
           create: (context) => AiAssistantProvider(context.read<AiService>()),
+        ),
+        ChangeNotifierProvider<NotificationProvider>(
+          create: (context) => NotificationProvider(context.read<ApiService>()),
         ),
       ],
       child: Consumer2<ThemeProvider, LanguageProvider>(
