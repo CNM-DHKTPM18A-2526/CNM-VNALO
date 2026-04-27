@@ -1,165 +1,239 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { QRCodeCanvas } from 'qrcode.react'
 
 import { useAuth } from '../features/auth/useAuth'
-import { AuthPageControls } from '../shared/components/AuthPageControls'
+import { createQrLoginSession, pollQrLoginSession } from '../features/auth/auth.api'
 import { useLanguage } from '../shared/i18n/LanguageContext'
+import { useTheme } from '../shared/contexts/ThemeContext'
 
-function PasswordToggleIcon({ visible }: { visible: boolean }) {
-  if (visible) {
-    return (
-      <svg viewBox='0 0 24 24' aria-hidden='true'>
-        <path
-          d='M3 3l18 18M10.6 10.6a2 2 0 102.8 2.8M9.9 4.2A10.7 10.7 0 0112 4c5.5 0 9.8 4.1 10.9 7.8a1 1 0 010 .4 12 12 0 01-3.6 5.1M6.7 6.7A12.3 12.3 0 001.1 12a1 1 0 000 .4C2.2 16.1 6.5 20.2 12 20.2c1.7 0 3.2-.4 4.6-1.1'
-          fill='none'
-          stroke='currentColor'
-          strokeWidth='1.8'
-          strokeLinecap='round'
-          strokeLinejoin='round'
-        />
-      </svg>
-    )
-  }
-
-  return (
-    <svg viewBox='0 0 24 24' aria-hidden='true'>
-      <path
-        d='M1.1 12.2a1 1 0 010-.4C2.2 8.1 6.5 4 12 4s9.8 4.1 10.9 7.8a1 1 0 010 .4C21.8 15.9 17.5 20 12 20S2.2 15.9 1.1 12.2z'
-        fill='none'
-        stroke='currentColor'
-        strokeWidth='1.8'
-      />
-      <circle cx='12' cy='12' r='3' fill='none' stroke='currentColor' strokeWidth='1.8' />
-    </svg>
-  )
-}
+const POLL_INTERVAL_MS = 2000
 
 export function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { login } = useAuth()
-  const { t } = useLanguage()
+  const { login, loginWithAccessToken } = useAuth()
+  const { setLanguage, language, t } = useLanguage()
+  const { theme, toggleTheme } = useTheme()
 
+  const [loginMode, setLoginMode] = useState<'qr' | 'password'>('qr')
+  const [showMenu, setShowMenu] = useState(false)
+  
+  // Password login states
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [showQrCta, setShowQrCta] = useState(false)
+
+  // QR States
+  const [qrToken, setQrToken] = useState<string | null>(null)
+  const [qrPayload, setQrPayload] = useState<string | null>(null)
+  const [qrLoading, setQrLoading] = useState(false)
+  const [qrExpired, setQrExpired] = useState(false)
 
   const fromPath =
     typeof (location.state as { from?: unknown } | null)?.from === 'string'
       ? ((location.state as { from: string }).from ?? '/chat')
       : '/chat'
 
+  // Initialize QR Session
+  const initializeQr = async () => {
+    setQrLoading(true)
+    setQrExpired(false)
+    setErrorMessage(null)
+    try {
+      const session = await createQrLoginSession()
+      setQrToken(session.token)
+      setQrPayload(session.qrPayload)
+    } catch (err) {
+      setErrorMessage('Không thể khởi tạo QR.')
+    } finally {
+      setQrLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (loginMode === 'qr') {
+        void initializeQr()
+    }
+  }, [loginMode])
+
+  // Poll QR Session
+  useEffect(() => {
+    if (loginMode !== 'qr' || !qrToken || qrExpired) return
+
+    let disposed = false
+    const timer = window.setInterval(async () => {
+      try {
+        const result = await pollQrLoginSession(qrToken)
+        if (disposed) return
+
+        if (result.accessToken) {
+          await loginWithAccessToken(result.accessToken)
+          navigate(fromPath, { replace: true })
+          return
+        }
+
+        if (result.status === 'EXPIRED' || result.status === 'REJECTED') {
+          setQrExpired(true)
+          window.clearInterval(timer)
+        }
+      } catch (err) { }
+    }, POLL_INTERVAL_MS)
+
+    return () => {
+      disposed = true
+      window.clearInterval(timer)
+    }
+  }, [loginMode, qrToken, qrExpired, navigate, fromPath, loginWithAccessToken])
+
+  const handlePasswordLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setErrorMessage(null)
+    setIsSubmitting(true)
+    try {
+      await login({ identifier, password })
+      navigate(fromPath, { replace: true })
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Lỗi đăng nhập')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   return (
     <div className='auth-page'>
-      <AuthPageControls />
       <div className='auth-shell'>
+        <div style={{ position: 'absolute', top: -45, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 15 }}>
+            <button 
+                onClick={toggleTheme} 
+                className='auth-lang-btn'
+                style={{ background: 'var(--auth-card-bg)', border: '1px solid var(--auth-border)', padding: '6px 12px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', color: 'var(--auth-text-main)' }}
+            >
+                {theme === 'light' ? (
+                    <>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                        <span>Tối</span>
+                    </>
+                ) : (
+                    <>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+                        <span>Sáng</span>
+                    </>
+                )}
+            </button>
+        </div>
+
         <header className='auth-branding'>
-          <span className='auth-brand-badge'>{t('common.appName')}</span>
-          <h1 className='auth-brand-title'>{t('auth.loginHeroTitle')}</h1>
-          <p className='auth-brand-subtitle'>{t('auth.loginHeroCopy')}</p>
+          <span className='auth-brand-badge'>Vnalo</span>
+          <p className='auth-brand-subtitle'>
+            {t('auth.loginHeroTitle')}<br/>{t('sidebar.brandSub')}
+          </p>
         </header>
 
         <div className='auth-card'>
-          <section className='auth-content auth-content-login'>
-            <div className='auth-copy-block'>
-              <p className='auth-eyebrow'>{t('auth.loginEyebrow')}</p>
-              <h2>{t('auth.loginWelcome')}</h2>
-              <p>{t('auth.loginSubtitle')}</p>
-            </div>
+          <div className='auth-header-top'>
+            <span className='auth-header-title'>
+                {loginMode === 'qr' ? t('auth.qrLogin') : t('auth.loginEyebrow')}
+            </span>
+            <button className='auth-menu-btn' onClick={() => setShowMenu(!showMenu)}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+            </button>
+            {showMenu && (
+                <div className='auth-dropdown'>
+                    <div className='auth-dropdown-item' onClick={() => {
+                        setLoginMode(loginMode === 'qr' ? 'password' : 'qr');
+                        setShowMenu(false);
+                    }}>
+                        {loginMode === 'qr' ? t('auth.loginEyebrow') : t('auth.qrLogin')}
+                    </div>
+                </div>
+            )}
+          </div>
 
-            <form
-              className='auth-form'
-              onSubmit={async (event) => {
-                event.preventDefault()
-
-                setErrorMessage(null)
-                setShowQrCta(false)
-                setIsSubmitting(true)
-
-                try {
-                  await login({ identifier, password })
-                  navigate(fromPath, { replace: true })
-                } catch (error) {
-                  const message = error instanceof Error ? error.message : ''
-                  const unknownDevice = /unknown web device|approve this login via qr|trusted mobile/i.test(message)
-                  if (unknownDevice) {
-                    setErrorMessage('Thiết bị web này chưa được tin cậy. Hãy dùng đăng nhập bằng QR để mobile xác nhận.')
-                    setShowQrCta(true)
-                  } else {
-                    setErrorMessage(message || t('auth.loginError'))
-                  }
-                } finally {
-                  setIsSubmitting(false)
-                }
-              }}
-            >
-              <label>
-                {t('auth.identifierLabel')}
+          <div className='auth-content'>
+            {loginMode === 'qr' ? (
+              <div className='auth-qr-container'>
+                <div className='auth-qr-canvas-wrapper' style={{ position: 'relative', background: '#fff', padding: '15px', borderRadius: '8px', display: 'inline-block', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
+                  {qrLoading ? (
+                    <div style={{ width: 220, height: 220, display: 'grid', placeItems: 'center', color: '#666' }}>{t('common.loading')}</div>
+                  ) : qrPayload ? (
+                    <>
+                        <QRCodeCanvas value={qrPayload} size={220} level="H" bgColor="#ffffff" fgColor="#000000" />
+                        {qrExpired && (
+                            <div className='auth-qr-expired-overlay' style={{ borderRadius: '8px' }}>
+                                <p style={{ fontSize: 13, marginBottom: 12, fontWeight: 500, color: '#333' }}>Mã QR hết hạn</p>
+                                <button className='auth-refresh-btn' onClick={initializeQr}>Lấy mã mới</button>
+                            </div>
+                        )}
+                    </>
+                  ) : (
+                    <div style={{ color: 'red' }}>Lỗi tạo mã</div>
+                  )}
+                </div>
+                <p style={{ color: '#0068ff', fontSize: 15, marginTop: 15, fontWeight: 500 }}>Chỉ dùng để đăng nhập</p>
+                <p style={{ fontSize: 14, color: 'var(--auth-text-main)' }}>Vnalo {t('auth.loginHeroCopy').includes('Optimized') ? 'on Desktop' : 'trên máy tính'}</p>
+              </div>
+            ) : (
+              <form className='auth-form' onSubmit={handlePasswordLogin}>
                 <input
                   required
                   type='text'
                   placeholder={t('auth.identifierPlaceholder')}
                   value={identifier}
-                  onChange={(event) => setIdentifier(event.target.value)}
-                  autoComplete='username'
+                  onChange={(e) => setIdentifier(e.target.value)}
                 />
-              </label>
-              <label>
-                {t('auth.passwordLabel')}
-                <div className='auth-password-wrap'>
-                  <input
-                    required
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder={t('auth.passwordPlaceholder')}
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    autoComplete='current-password'
-                  />
-                  <button
-                    type='button'
-                    className='auth-password-toggle'
-                    onClick={() => setShowPassword((prev) => !prev)}
-                    aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
-                    title={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
-                  >
-                    <PasswordToggleIcon visible={showPassword} />
-                  </button>
+                <input
+                  required
+                  type='password'
+                  placeholder={t('auth.passwordPlaceholder')}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                {errorMessage && <p style={{ color: 'red', fontSize: 13, textAlign: 'center' }}>{errorMessage}</p>}
+                <button type='submit' disabled={isSubmitting}>
+                  {isSubmitting ? t('auth.processing') : t('auth.loginButton')}
+                </button>
+                <div style={{ textAlign: 'center' }}>
+                  <Link to='/forgot-password' style={{ color: '#0068ff', fontSize: 14, textDecoration: 'none' }}>{t('auth.forgotPassword')}?</Link>
                 </div>
-              </label>
+              </form>
+            )}
+          </div>
 
-              {errorMessage ? <p className='auth-form-error'>{errorMessage}</p> : null}
-              {showQrCta ? (
-                <button
-                  type='button'
-                  className='auth-text-action'
-                  onClick={() => navigate('/login/qr')}
-                >
-                  Mở đăng nhập bằng QR
-                </button>
-              ) : null}
+          <div className='auth-banner-pc'>
+             <div style={{ width: 60, height: 50, background: '#f0f4ff', borderRadius: 4, display: 'grid', placeItems: 'center' }}>
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="#0068ff"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
+             </div>
+             <div className='auth-banner-content'>
+                <div className='auth-banner-title'>Nâng cao hiệu quả công việc với Vnalo PC</div>
+                <div className='auth-banner-copy'>Gửi file lớn lên đến 1 GB, chụp màn hình, gọi video và nhiều tiện ích hơn nữa</div>
+             </div>
+             <button className='auth-banner-btn'>Tải ngay</button>
+          </div>
+        </div>
 
-              <button type='submit' disabled={isSubmitting}>
-                {isSubmitting ? t('auth.processing') : t('auth.loginButton')}
-              </button>
+        <div style={{ textAlign: 'center', marginTop: 20 }}>
+            <p style={{ fontSize: 14 }}>{t('auth.dontHaveAccount')} <Link to='/register' style={{ color: '#0068ff', textDecoration: 'none', fontWeight: 600 }}>{t('auth.createAccountLink')}!</Link></p>
+        </div>
 
-              <div className='auth-inline-actions'>
-                <button type='button' className='auth-text-action' onClick={() => navigate('/forgot-password')}>
-                  {t('auth.forgotPassword')}
-                </button>
-                <button type='button' className='auth-text-action' onClick={() => navigate('/login/qr')}>
-                  {t('auth.qrLogin')}
-                </button>
-              </div>
-
-              <p className='auth-switch-copy'>
-                {t('auth.dontHaveAccount')} <Link to='/register'>{t('auth.createAccountLink')}</Link>
-              </p>
-            </form>
-          </section>
+        <div className='auth-lang-selector'>
+            <button 
+              className={`auth-lang-btn ${language === 'vi' ? 'active' : ''}`}
+              onClick={() => setLanguage('vi')}
+            >
+              Tiếng Việt
+            </button>
+            <button 
+              className={`auth-lang-btn ${language === 'en' ? 'active' : ''}`}
+              onClick={() => setLanguage('en')}
+            >
+              English
+            </button>
         </div>
       </div>
     </div>
