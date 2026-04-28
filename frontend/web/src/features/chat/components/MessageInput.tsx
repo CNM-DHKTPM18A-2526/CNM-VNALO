@@ -24,6 +24,8 @@ import { fetchStickerPacks, fetchStickerPackDetails, fetchMediaByCategory } from
 
 type PickerTab = 'STICKER' | 'EMOJI' | 'GIF'
 
+import { MentionPopover } from './MentionPopover'
+
 type MessageInputProps = {
   onSend: (message: ChatComposePayload) => void
   recipientName?: string
@@ -31,6 +33,7 @@ type MessageInputProps = {
   disabled?: boolean
   replyMessage?: any | null
   onCancelReply?: () => void
+  members?: Array<{ userId: string; displayName: string; avatarUrl?: string | null }>
 }
 
 type FilePreviewItem = {
@@ -49,10 +52,26 @@ export function MessageInput({
   disabled = false,
   replyMessage,
   onCancelReply,
+  members = [],
 }: MessageInputProps) {
   const { accessToken } = useAuth()
   const [messageText, setMessageText] = useState('')
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+
+  // Mention State
+  const [mentionState, setMentionState] = useState<{
+    isOpen: boolean;
+    filter: string;
+    cursorPos: number;
+    left: number;
+  }>({
+    isOpen: false,
+    filter: '',
+    cursorPos: 0,
+    left: 0
+  });
+
+  const messageInputRef = useRef<HTMLInputElement>(null);
 
   // Unified Picker State
   const [isPickerOpen, setIsPickerOpen] = useState(false)
@@ -69,6 +88,48 @@ export function MessageInput({
   const [error, setError] = useState('')
   const [isFocused, setIsFocused] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  
+  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const pos = e.target.selectionStart || 0;
+    setMessageText(value);
+
+    // Mention logic
+    const lastAtIdx = value.lastIndexOf('@', pos - 1);
+    if (lastAtIdx !== -1) {
+      const textAfterAt = value.substring(lastAtIdx + 1, pos);
+      // Only trigger if there's no space between @ and cursor
+      if (!textAfterAt.includes(' ')) {
+        setMentionState({
+          isOpen: true,
+          filter: textAfterAt,
+          cursorPos: lastAtIdx,
+          left: Math.min(pos * 8, 300) 
+        });
+        return;
+      }
+    }
+    
+    if (mentionState.isOpen) {
+      setMentionState(prev => ({ ...prev, isOpen: false }));
+    }
+  };
+
+  const handleSelectMention = (member: { userId: string; displayName: string }) => {
+    const before = messageText.substring(0, mentionState.cursorPos);
+    const after = messageText.substring(messageInputRef.current?.selectionEnd || 0);
+    // Use \u200B (Zero Width Space) as an invisible marker
+    const newText = `${before}\u200B@${member.displayName}\u200B ${after}`;
+    setMessageText(newText);
+    setMentionState(prev => ({ ...prev, isOpen: false }));
+    
+    // Focus back to input
+    setTimeout(() => {
+      messageInputRef.current?.focus();
+      const newPos = before.length + member.displayName.length + 3; // +3 for markers and space
+      messageInputRef.current?.setSelectionRange(newPos, newPos);
+    }, 0);
+  };
   const pickerPanelRef = useRef<HTMLDivElement | null>(null)
   const stickerTriggerRef = useRef<HTMLButtonElement | null>(null)
   const emojiTriggerRef = useRef<HTMLButtonElement | null>(null)
@@ -248,7 +309,16 @@ export function MessageInput({
   }
 
   return (
-    <footer className='message-input'>
+    <footer className='message-input relative'>
+      {mentionState.isOpen && (
+        <MentionPopover 
+          members={members}
+          filter={mentionState.filter}
+          position={{ top: 0, left: mentionState.left }}
+          onSelect={handleSelectMention}
+          onClose={() => setMentionState(prev => ({ ...prev, isOpen: false }))}
+        />
+      )}
       <input
         ref={fileInputRef}
         type='file'
@@ -319,17 +389,54 @@ export function MessageInput({
           <ToolIconButton label='More' disabled={disabled}><Ellipsis size={24} /></ToolIconButton>
         </div>
 
-        <div className={`flex h-[48px] items-center gap-2 rounded-full transition ${isFocused ? 'bg-white ring-1 ring-slate-200 shadow-sm' : 'bg-white border-0 opacity-90'}`}>
+        <div className={`flex h-[48px] items-center gap-2 rounded-full transition relative ${isFocused ? 'bg-white ring-1 ring-slate-200 shadow-sm' : 'bg-white border-0 opacity-90'}`}>
+          <div 
+            className="absolute inset-0 px-3 flex items-center pointer-events-none whitespace-pre overflow-hidden text-[15px]"
+            style={{ 
+              letterSpacing: 'normal',
+              wordSpacing: 'normal',
+              lineHeight: 'normal',
+              fontFamily: 'inherit',
+              paddingTop: '0',
+              paddingBottom: '0'
+            }}
+          >
+            {messageText.split(/(\u200B@.*?\u200B)/g).map((part, i) => {
+              if (part.startsWith('\u200B@')) {
+                return (
+                  <span key={i} className="text-[#0068ff] font-medium">
+                    {part.replace(/\u200B/g, '')}
+                  </span>
+                );
+              }
+              return (
+                <span key={i} className="text-[#1a1a1a]">
+                  {part.replace(/\u200B/g, '')}
+                </span>
+              );
+            })}
+          </div>
           <input
-            className='h-full w-full border-0 bg-white text-[15px] outline-none placeholder:text-slate-400'
+            ref={messageInputRef}
+            className='h-full w-full border-0 bg-transparent text-[15px] outline-none placeholder:text-slate-400 px-3 relative z-10'
+            style={{ 
+              color: 'transparent',
+              caretColor: '#1a1a1a',
+              letterSpacing: 'normal',
+              wordSpacing: 'normal',
+              lineHeight: 'normal',
+              fontFamily: 'inherit',
+              paddingTop: '0',
+              paddingBottom: '0'
+            }}
             placeholder={dynamicPlaceholder}
             value={messageText}
             disabled={disabled}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
-            onChange={(e) => setMessageText(e.target.value)}
+            onChange={handleTextChange}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
+              if (e.key === 'Enter' && !e.shiftKey && !mentionState.isOpen) {
                 e.preventDefault()
                 submitMessage()
               }

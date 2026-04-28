@@ -54,9 +54,14 @@ export function formatMessageTimestamp(): string {
 export function formatMessageContent(text: string, currentUserId?: string): string {
   if (!text) return ''
 
+  // Mention Detection: Use invisible marker \u200B to find exact mention boundaries
+  const withMentions = text.replace(/\u200B(@.*?)\u200B/g, (match, name) => {
+    return `<span class="text-[#0068ff] font-medium cursor-pointer hover:underline">${name}</span>`;
+  }).replace(/\u200B/g, ''); // Clean up any stray markers
+
   const match = text.match(/CALL\s*_?LOG/i)
   if (!match) {
-    return text
+    return withMentions
   }
 
   const prefix = text.slice(0, match.index)
@@ -275,4 +280,22 @@ export function formatMessage(
   }
 
   return formatMessageContent(message.text, currentUserId)
-}
+}
+
+/**
+ * Checks if a mimeType or file extension indicates an image.
+ */
+export function isImageAttachment(mimeType?: string | null, url?: string | null, name?: string | null): boolean {
+  if (mimeType?.startsWith('image/')) return true
+  const path = (url || name || '').toLowerCase()
+  return path.endsWith('.jpg') || path.endsWith('.jpeg') || path.endsWith('.png') || path.endsWith('.gif') || path.endsWith('.webp')
+}
+
+/**
+ * Checks if a mimeType or file extension indicates a video.
+ */
+export function isVideoAttachment(mimeType?: string | null, url?: string | null, name?: string | null): boolean {
+  if (mimeType?.startsWith('video/')) return true
+  const path = (url || name || '').toLowerCase()
+  return path.endsWith('.mp4') || path.endsWith('.mov') || path.endsWith('.avi') || path.endsWith('.mkv') || path.endsWith('.webm')
+}
