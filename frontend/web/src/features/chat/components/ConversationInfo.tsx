@@ -29,7 +29,9 @@ import {
   Share2,
   RotateCw,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  Check,
+  X
 } from 'lucide-react';
 
 import { useAuth } from '../../auth/useAuth';
@@ -56,6 +58,7 @@ type ConversationInfoProps = {
   onUpdateGroupSettings?: (settings: Partial<any>) => void;
   onDisbandGroup?: () => void;
   onJumpToMessage?: (messageId: string) => void;
+  onSendPoll?: (poll: any) => void;
   friends?: Friend[];
 };
 
@@ -78,6 +81,7 @@ export function ConversationInfo({
   onUpdateGroupSettings,
   onDisbandGroup,
   onJumpToMessage,
+  onSendPoll,
   friends,
   currentUserId
 }: ConversationInfoProps & {
@@ -85,6 +89,7 @@ export function ConversationInfo({
   onCreateGroupClick?: () => void;
   onTogglePinConversation?: () => void;
   onJumpToMessage?: (messageId: string) => void;
+  onSendPoll?: (poll: any) => void;
 }) {
   const { userMap, ensureUser } = useUserStore();
   const { accessToken } = useAuth();
@@ -99,6 +104,7 @@ export function ConversationInfo({
   const [membersExpanded, setMembersExpanded] = useState(true);
   const [showGroupManagement, setShowGroupManagement] = useState(false);
   const [showMembersView, setShowMembersView] = useState(false);
+  const [showLeaderDeputyView, setShowLeaderDeputyView] = useState(false);
   const [showBulletinView, setShowBulletinView] = useState(false);
   const [showKickModal, setShowKickModal] = useState(false);
   const [targetKickUserId, setTargetKickUserId] = useState<string | null>(null);
@@ -172,13 +178,17 @@ export function ConversationInfo({
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-[#F1F1F4] pb-20">
+    <div className="h-full overflow-y-auto bg-[#F1F1F4] pb-20 scrollbar-hide">
       {/* Header */}
       <header className="sticky top-0 z-10 border-b border-gray-200 bg-white px-5 py-4 flex items-center gap-3">
-        {(showGroupManagement || showMembersView || showBulletinView) && (
+        {(showGroupManagement || showMembersView || showBulletinView || showLeaderDeputyView) && (
           <button
             className="mr-2 bg-white border-0 outline-none ring-0 hover:bg-gray-100 rounded-full transition-colors cursor-pointer flex items-center justify-center h-8 w-8 shadow-none"
             onClick={() => {
+              if (showLeaderDeputyView) {
+                setShowLeaderDeputyView(false);
+                return;
+              }
               setShowGroupManagement(false);
               setShowMembersView(false);
               setShowBulletinView(false);
@@ -188,7 +198,10 @@ export function ConversationInfo({
           </button>
         )}
         <h3 className="text-[18px] font-semibold text-slate-800 flex-1">
-          {showBulletinView ? 'Bảng tin nhóm' : showGroupManagement ? 'Quản lý nhóm' : showMembersView ? 'Thành viên' : 'Thông tin hội thoại'}
+          {showBulletinView ? 'Bảng tin nhóm' : 
+           showLeaderDeputyView ? 'Trưởng & phó nhóm' :
+           showGroupManagement ? 'Quản lý nhóm' : 
+           showMembersView ? 'Thành viên' : 'Thông tin hội thoại'}
         </h3>
         {showBulletinView && (
           <button className="bg-transparent border-none outline-none cursor-pointer flex items-center justify-center h-8 w-8 hover:bg-gray-100 rounded-full transition-colors" title="Thêm">
@@ -197,13 +210,21 @@ export function ConversationInfo({
         )}
       </header>
 
-      {showBulletinView ? (
+      {showLeaderDeputyView ? (
+        <LeaderDeputyView 
+          conversation={conversation} 
+          onUpdateRole={onUpdateMemberRole}
+          currentUserId={currentUserId}
+          userMap={userMap}
+        />
+      ) : showBulletinView ? (
         <GroupBulletin 
           conversationId={conversation.id}
           token={accessToken || ''}
           messages={messages}
           onClose={() => setShowBulletinView(false)}
           onJumpToMessage={onJumpToMessage}
+          onSendPoll={onSendPoll}
         />
       ) : showMembersView ? (
         <MemberListView 
@@ -223,6 +244,7 @@ export function ConversationInfo({
           conversation={conversation}
           onUpdateSettings={onUpdateGroupSettings}
           onDisband={onDisbandGroup}
+          onShowLeaderDeputy={() => setShowLeaderDeputyView(true)}
         />
       ) : (
         <>
@@ -298,7 +320,7 @@ export function ConversationInfo({
                     <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-400"></span>Ảnh</span>
                     <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400"></span>Video</span>
                   </div>
-                  <button className="w-full mt-4 py-2 border border-gray-200 rounded-lg text-[14px] font-medium hover:bg-gray-50">
+                  <button className="w-full mt-4 py-2 border border-gray-200 rounded-lg text-[14px] font-medium hover:bg-gray-50 transition-colors cursor-pointer">
                     Xem và dọn dẹp My Documents
                   </button>
                 </div>
@@ -478,7 +500,6 @@ export function ConversationInfo({
                   const activeMembers = (conversation.members || []).filter(m => !m.leftAt);
                   if (isOwner) {
                     if (activeMembers.length <= 1) {
-                      // Only admin left, suggest disbanding instead
                       onDisbandGroup?.();
                     } else {
                       setShowTransferModal(true);
@@ -502,13 +523,13 @@ export function ConversationInfo({
         footer={
           <div className="flex gap-3 justify-end w-full">
             <button 
-              className="px-6 py-2 rounded-lg bg-[#EBEBEF] text-slate-700 font-bold text-[15px] hover:bg-gray-200"
+              className="px-6 py-2 rounded-lg bg-[#EBEBEF] text-slate-700 font-bold text-[15px] hover:bg-gray-200 border-0 outline-none cursor-pointer"
               onClick={() => setShowKickModal(false)}
             >
               Đóng
             </button>
             <button 
-              className="px-6 py-2 rounded-lg bg-[#0091FF] text-white font-bold text-[15px] hover:bg-blue-600" 
+              className="px-6 py-2 rounded-lg bg-[#0091FF] text-white font-bold text-[15px] hover:bg-blue-600 border-0 outline-none cursor-pointer" 
               onClick={() => {
                 if (targetKickUserId) {
                   onRemoveMember?.(targetKickUserId, blockOnKick);
@@ -551,16 +572,163 @@ export function ConversationInfo({
   );
 }
 
+function TransferOwnerModal({ 
+  isOpen, 
+  onClose, 
+  members, 
+  currentUserId, 
+  onConfirm 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  members: any[]; 
+  currentUserId?: string; 
+  onConfirm: (newOwnerId: string) => void; 
+}) {
+  const [step, setStep] = useState<1 | 2>(1);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { userMap } = useUserStore();
+
+  const otherMembers = useMemo(() => {
+    return members
+      .filter(m => m.userId !== currentUserId)
+      .filter(m => {
+        const profile = userMap[m.userId];
+        const name = (profile?.displayName || m.displayName || '').toLowerCase();
+        return name.includes(searchTerm.toLowerCase());
+      });
+  }, [members, currentUserId, searchTerm, userMap]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setStep(1);
+      setSearchTerm('');
+      setSelectedId(null);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (step === 2 && otherMembers.length > 0 && !selectedId) {
+      setSelectedId(otherMembers[0].userId);
+    }
+  }, [step, otherMembers, selectedId]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 animate-in fade-in duration-200">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-[440px] overflow-hidden flex flex-col transition-all">
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
+          <h3 className="text-[17px] font-bold text-[#001A33]">
+            {step === 1 ? 'Chuyển quyền trưởng nhóm' : 'Chọn trưởng nhóm mới'}
+          </h3>
+          <button onClick={onClose} className="p-2 hover:bg-slate-50 rounded-full border-0 bg-transparent cursor-pointer">
+            <X size={20} className="text-slate-500" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-5 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+          {step === 1 ? (
+            <div className="space-y-4">
+              <p className="text-[15px] text-slate-700 leading-relaxed">
+                Người được chọn sẽ trở thành trưởng nhóm và có mọi quyền quản lý nhóm. Bạn sẽ mất quyền quản lý nhưng vẫn là một thành viên của nhóm. Hành động này không thể phục hồi.
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              <div className="relative text-slate-400">
+                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2" />
+                <input 
+                  type="text"
+                  placeholder="Tìm kiếm"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-transparent focus:border-blue-400 focus:bg-white rounded-xl outline-none text-[15px] transition-all"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1 min-h-[200px]">
+                {otherMembers.map((member) => {
+                  const profile = userMap[member.userId];
+                  const isSelected = selectedId === member.userId;
+                  
+                  return (
+                    <div 
+                      key={member.userId}
+                      className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors group"
+                      onClick={() => setSelectedId(member.userId)}
+                    >
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                        isSelected ? 'border-[#0091FF]' : 'border-slate-300'
+                      }`}>
+                        {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-[#0091FF]" />}
+                      </div>
+                      <UserAvatar 
+                        name={profile?.displayName || member.displayName || 'Thành viên'} 
+                        imageUrl={profile?.avatarUrl || member.avatarUrl} 
+                        size="md" 
+                      />
+                      <span className="text-[15px] font-medium text-slate-800 truncate flex-1">
+                        {profile?.displayName || member.displayName}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-end gap-3 bg-slate-50/30">
+          <button 
+            className="px-6 py-2.5 rounded-lg text-slate-700 font-bold text-[15px] hover:bg-slate-100 border-0 bg-transparent cursor-pointer transition-colors"
+            onClick={onClose}
+          >
+            Hủy
+          </button>
+          
+          {step === 1 ? (
+            <button 
+              className="px-6 py-2.5 rounded-lg bg-[#FFEDED] text-[#D83A3A] font-bold text-[15px] hover:bg-[#FFD9D9] border-0 cursor-pointer transition-all active:scale-95"
+              onClick={() => setStep(2)}
+            >
+              Tiếp tục
+            </button>
+          ) : (
+            <button 
+              className={`px-6 py-2.5 rounded-lg font-bold text-[15px] shadow-sm border-0 cursor-pointer transition-all active:scale-95 ${
+                selectedId 
+                  ? 'bg-[#0091FF] text-white hover:bg-blue-600' 
+                  : 'bg-blue-300 text-white cursor-not-allowed'
+              }`}
+              disabled={!selectedId}
+              onClick={() => selectedId && onConfirm(selectedId)}
+            >
+              Chọn và tiếp tục
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function GroupManagementView({ 
   isOwner, 
   conversation, 
   onUpdateSettings,
-  onDisband 
+  onDisband,
+  onShowLeaderDeputy
 }: { 
   isOwner: boolean; 
   conversation: ConversationSummary;
-  onUpdateSettings?: (s: any) => void;
+  onUpdateSettings?: (s: any) => void; 
   onDisband?: () => void;
+  onShowLeaderDeputy: () => void;
 }) {
   const [showDisbandConfirm, setShowDisbandConfirm] = useState(false);
 
@@ -572,7 +740,7 @@ function GroupManagementView({
   const inviteLink = conversation.inviteLink ? `vnalo.me/g/${conversation.inviteLink}` : 'Đang tải...';
 
   return (
-    <div className="flex flex-col bg-[#F1F1F4] h-full overflow-y-auto">
+    <div className="flex flex-col bg-[#F3F5F7] h-full overflow-y-auto scrollbar-hide pb-10">
       {!isOwner && (
         <div className="bg-[#FFF9EA] px-4 py-2.5 flex items-center justify-center gap-2 border-b border-orange-100 sticky top-0 z-10">
           <Lock size={14} className="text-orange-600" />
@@ -581,8 +749,8 @@ function GroupManagementView({
       )}
 
       {/* Section 1: Member Permissions */}
-      <div className="bg-white px-5 py-5 mt-2">
-        <h4 className={`text-[14px] font-bold mb-5 ${!isOwner ? 'text-gray-400' : 'text-[#001A33]'}`}>
+      <div className="bg-white px-5 py-5 border-b border-gray-100">
+        <h4 className="text-[15px] font-bold text-[#001A33] mb-5">
           Cho phép các thành viên trong nhóm:
         </h4>
         <div className="space-y-6">
@@ -618,78 +786,69 @@ function GroupManagementView({
       </div>
 
       {/* Section 2: Advanced Settings */}
-      <div className="mt-2 bg-white divide-y divide-gray-100">
+      <div className="mt-2 bg-white divide-y divide-gray-100 border-y border-gray-100">
         <SettingToggleRow 
           label="Chế độ phê duyệt thành viên mới" 
-          description={true}
+          showHelp
           checked={conversation.joinMode === 'APPROVAL'} 
           disabled={!isOwner}
           onChange={(val) => handleToggle('joinMode', val ? 'APPROVAL' : 'OPEN')}
         />
         <SettingToggleRow 
           label="Đánh dấu tin nhắn từ trưởng/phó nhóm" 
-          description={true}
+          showHelp
           checked={true} 
           disabled={!isOwner}
         />
         <SettingToggleRow 
           label="Cho phép thành viên mới đọc tin nhắn gần nhất" 
-          description={true}
+          showHelp
           checked={true}
           disabled={!isOwner}
         />
-        <div className="px-5 py-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 flex-1 pr-4">
-              <span className={`text-[15px] font-medium leading-normal ${!isOwner ? 'text-gray-400' : 'text-slate-700'}`}>
-                Cho phép dùng link tham gia nhóm
-              </span>
-              <HelpCircle size={16} className="text-gray-400 flex-shrink-0" />
-            </div>
-            <ToggleSwitch 
-              checked={!!conversation.inviteLink} 
-              disabled={!isOwner}
-            />
-          </div>
+        <div className="flex flex-col">
+          <SettingToggleRow 
+            label="Cho phép dùng link tham gia nhóm" 
+            showHelp
+            checked={!!conversation.inviteLink} 
+            disabled={!isOwner}
+          />
           
-          <div className="bg-[#F3F5F7] rounded-lg p-4 flex items-center justify-between gap-3 border border-gray-100">
-            <span className="text-[#0068FF] text-[14px] font-medium truncate flex-1">
-              {inviteLink}
-            </span>
-            <div className="flex items-center gap-4 text-[#0068FF]">
-              <Copy size={18} className="cursor-pointer hover:opacity-70 transition-opacity" />
-              <Share2 size={18} className="cursor-pointer hover:opacity-70 transition-opacity" />
-              <RotateCw size={18} className="cursor-pointer hover:opacity-70 transition-opacity" />
+          <div className="px-5 pb-5">
+            <div className="bg-[#F0F7FF] rounded-lg p-3 flex items-center justify-between gap-3">
+              <span className="text-[#0068FF] text-[15px] font-medium truncate flex-1">
+                {inviteLink}
+              </span>
+              <div className="flex items-center gap-4 text-[#0068FF]">
+                <Copy size={20} className="cursor-pointer hover:opacity-70 transition-opacity" />
+                <Share2 size={20} className="cursor-pointer hover:opacity-70 transition-opacity" />
+                <RotateCw size={20} className="cursor-pointer hover:opacity-70 transition-opacity" />
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Section 3: Management Links */}
-      {isOwner && (
-        <div className="mt-2 bg-white divide-y divide-gray-100">
-           <button className="w-full px-5 py-[18px] flex items-center justify-between hover:bg-gray-50 border-0 bg-transparent transition-colors group">
-              <div className="flex items-center gap-3">
-                <UserPlus size={20} className="text-slate-600" />
-                <span className="text-[15px] font-medium text-[#334155]">Chặn khỏi nhóm</span>
-              </div>
-              <ChevronRight size={18} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-           </button>
-           <button className="w-full px-5 py-[18px] flex items-center justify-between hover:bg-gray-50 border-0 bg-transparent transition-colors group">
-              <div className="flex items-center gap-3">
-                <ShieldCheck size={20} className="text-slate-600" />
-                <span className="text-[15px] font-medium text-[#334155]">Trưởng & phó nhóm</span>
-              </div>
-              <ChevronRight size={18} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-           </button>
-        </div>
-      )}
+      {/* Section 3: Bottom Actions */}
+      <div className="mt-2 bg-white divide-y divide-gray-100 border-y border-gray-100">
+         <button className="w-full px-5 py-4 flex items-center gap-4 hover:bg-gray-50 border-0 bg-transparent transition-colors group cursor-pointer outline-none">
+            <Users size={22} className="text-[#4F5E71]" />
+            <span className="text-[16px] font-medium text-[#001A33]">Chặn khỏi nhóm</span>
+         </button>
+         <button 
+           className="w-full px-5 py-4 flex items-center gap-4 hover:bg-gray-50 border-0 bg-transparent transition-colors group cursor-pointer outline-none"
+           onClick={onShowLeaderDeputy}
+         >
+            <Key size={22} className="text-[#4F5E71]" />
+            <span className="text-[16px] font-medium text-[#001A33]">Trưởng & phó nhóm</span>
+         </button>
+      </div>
 
-      {/* Footer: Disband */}
+      {/* Disband Button */}
       {isOwner && (
-        <div className="mt-8 px-5 pb-10">
+        <div className="mt-6 px-5 mb-10">
           <button 
-            className="w-full py-3.5 rounded-xl bg-[#FFEDED] text-[#D83A3A] font-bold text-[15px] hover:bg-[#FFD9D9] transition-all border-0 shadow-sm outline-none cursor-pointer"
+            className="w-full py-3 rounded-lg bg-[#FFEDED] text-[#D83A3A] font-bold text-[16px] hover:bg-[#FFD9D9] border-0 transition-all cursor-pointer active:scale-[0.98]"
             onClick={() => setShowDisbandConfirm(true)}
           >
             Giải tán nhóm
@@ -709,7 +868,7 @@ function GroupManagementView({
               className="px-6 py-2 rounded-lg bg-[#EBEBEF] text-slate-700 font-bold hover:bg-gray-200 border-0 outline-none cursor-pointer"
               onClick={() => setShowDisbandConfirm(false)}
             >
-              Không
+              Hủy
             </button>
             <button 
               className="px-6 py-2 rounded-lg bg-[#FFE9E9] text-[#E02424] font-bold hover:bg-red-100 border-0 outline-none cursor-pointer" 
@@ -731,351 +890,6 @@ function GroupManagementView({
   );
 }
 
-function PermissionCheckbox({ 
-  label, 
-  checked, 
-  onChange, 
-  disabled 
-}: { 
-  label: string; 
-  checked: boolean; 
-  onChange?: (val: boolean) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <label className={`flex items-center justify-between gap-4 py-0.5 ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}>
-      <span className={`text-[15px] leading-[1.3] flex-1 font-medium ${disabled ? 'text-gray-400' : 'text-[#334155]'}`}>{label}</span>
-      <input 
-        type="checkbox" 
-        checked={checked} 
-        disabled={disabled}
-        onChange={(e) => onChange?.(e.target.checked)}
-        className="h-[22px] w-[22px] rounded border-gray-300 text-[#0091FF] focus:ring-[#0091FF] transition-all cursor-pointer flex-shrink-0"
-      />
-    </label>
-  );
-}
-
-function SettingToggleRow({ 
-  label, 
-  description, 
-  checked, 
-  onChange, 
-  disabled 
-}: { 
-  label: string; 
-  description?: boolean; 
-  checked: boolean; 
-  onChange?: (val: boolean) => void; 
-  disabled?: boolean;
-}) {
-  return (
-    <div className="px-5 py-[18px] flex items-center justify-between hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => !disabled && onChange?.(!checked)}>
-      <div className="flex items-center gap-1.5 flex-1 pr-6">
-        <span className={`text-[15px] font-medium leading-normal ${disabled ? 'text-gray-400' : 'text-[#334155]'}`}>
-          {label}
-        </span>
-        {description && <HelpCircle size={16} className="text-gray-400 flex-shrink-0" />}
-      </div>
-      <ToggleSwitch checked={checked} onChange={onChange} disabled={disabled} />
-    </div>
-  );
-}
-
-function MemberListView({ 
-  conversation, 
-  currentUserId,
-  onAddMembers,
-  onKickMember,
-  onPromoteDeputy,
-  friends
-}: { 
-  conversation: ConversationSummary;
-  currentUserId?: string;
-  onAddMembers?: () => void;
-  onKickMember?: (userId: string) => void;
-  onPromoteDeputy?: (userId: string, role: string) => void;
-  friends?: Friend[];
-}) {
-  const [searchTerm, setSearchTerm] = useState('');
-  const { userMap } = useUserStore();
-
-  const members = useMemo(() => {
-    const list = [...(conversation.members || [])];
-    return list.sort((a, b) => {
-      const roles = { ADMIN: 0, DEPUTY: 1, MEMBER: 2 };
-      const roleA = String(a.role || '').toUpperCase() as keyof typeof roles;
-      const roleB = String(b.role || '').toUpperCase() as keyof typeof roles;
-      return (roles[roleA] ?? 3) - (roles[roleB] ?? 3);
-    }).filter(m => {
-      const profile = userMap[m.userId];
-      if (!searchTerm) return true;
-      return profile?.displayName?.toLowerCase().includes(searchTerm.toLowerCase());
-    });
-  }, [conversation.members, userMap, searchTerm]);
-
-  const isCurrentUserOwner = !!conversation.members?.some(m => m.userId === currentUserId && m.role === 'ADMIN');
-
-  return (
-    <div className="flex flex-col bg-[#F4F5F7] h-full overflow-hidden">
-      <div className="bg-white px-5 py-4 flex-shrink-0">
-        <button 
-          onClick={onAddMembers}
-          className="w-full py-2.5 rounded-lg bg-[#EBEBEF] text-slate-700 font-bold text-[15px] flex items-center justify-center gap-2 hover:bg-gray-200 transition-colors"
-        >
-          <UserPlus size={20} />
-          Thêm thành viên
-        </button>
-      </div>
-
-      <div className="mt-2 flex-1 overflow-y-auto bg-white px-5 py-4">
-        <div className="flex items-center justify-between mb-4">
-          <h4 className="text-[16px] font-bold text-slate-800">Danh sách thành viên ({conversation.members?.length || 0})</h4>
-        </div>
-
-        <div className="relative mb-6">
-          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input 
-            type="text"
-            placeholder="Tìm kiếm thành viên"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-gray-100 border-0 rounded-xl py-2.5 pl-10 pr-4 text-[15px] focus:ring-1 focus:ring-blue-400 outline-none"
-          />
-        </div>
-
-        <div className="space-y-1">
-          {members.map((member) => (
-            <MemberRow 
-              key={member.userId} 
-              member={member} 
-              isOwnerView={isCurrentUserOwner && member.userId !== currentUserId}
-              onKick={() => onKickMember?.(member.userId)}
-              onPromote={() => onPromoteDeputy?.(member.userId, 'ADMIN')}
-              isFriend={!!friends?.some(f => f.friendId === member.userId)}
-              currentUserId={currentUserId}
-            />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MemberRow({ 
-  member, 
-  isOwnerView, 
-  onKick,
-  onPromote,
-  isFriend,
-  currentUserId 
-}: { 
-  member: { userId: string; role: string }; 
-  isOwnerView: boolean;
-  onKick: () => void;
-  onPromote: () => void;
-  isFriend: boolean;
-  currentUserId?: string;
-}) {
-  const [showMenu, setShowMenu] = useState(false);
-  const { userMap } = useUserStore();
-  const profile = userMap[member.userId];
-  const role = String(member.role || '').toUpperCase();
-  const isOwner = role === 'ADMIN';
-  const isAdmin = role === 'DEPUTY';
-
-  return (
-    <div className="flex items-center gap-3 py-2 group">
-      <div className="relative">
-        <UserAvatar 
-          name={profile?.displayName || 'Thành viên'} 
-          imageUrl={profile?.avatarUrl} 
-          size="md" 
-        />
-        {isOwner && (
-          <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm border border-gray-100">
-            <Key size={12} className="text-yellow-600 fill-yellow-500" />
-          </div>
-        )}
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <p className="text-[16px] font-medium text-slate-900 truncate">
-          {profile?.displayName || 'Đang tải...'}
-        </p>
-        {(isOwner || isAdmin) && (
-          <p className="text-[13px] text-slate-500">{isOwner ? 'Trưởng nhóm' : 'Phó nhóm'}</p>
-        )}
-      </div>
-
-      <div className="flex items-center gap-2">
-        {!isFriend && member.userId !== currentUserId && (
-          <button className="px-4 py-1.5 rounded-lg bg-[#E6F3FF] text-[#0091FF] text-[14px] font-bold border-0 hover:bg-blue-100 transition-colors shadow-none outline-none">
-            Kết bạn
-          </button>
-        )}
-        
-        {isOwnerView && (
-          <div className="relative">
-            <button 
-              onClick={() => setShowMenu(!showMenu)}
-              className="p-2 rounded-lg bg-white hover:bg-gray-100 text-slate-500 border-0 transition-colors shadow-none outline-none"
-            >
-              <MoreHorizontal size={20} />
-            </button>
-
-            {showMenu && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-                <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-lg border-0 z-20 py-1 animate-in fade-in zoom-in duration-100 overflow-hidden">
-                  <button 
-                    onClick={() => { onPromote(); setShowMenu(false); }}
-                    className="w-full px-4 py-3 text-left text-[14px] text-slate-700 bg-white hover:bg-gray-50 flex items-center gap-2 border-0 outline-none transition-colors"
-                  >
-                    Thêm phó nhóm
-                  </button>
-                  <button 
-                    onClick={() => { onUpdateMemberRole?.(member.userId, 'ADMIN'); setShowMenu(false); }}
-                    className="w-full px-4 py-3 text-left text-[14px] text-slate-700 bg-white hover:bg-gray-50 flex items-center gap-2 border-0 outline-none transition-colors"
-                  >
-                    Chuyển trưởng nhóm
-                  </button>
-                  <button 
-                    onClick={() => { onKick(); setShowMenu(false); }}
-                    className="w-full px-4 py-3 text-left text-[14px] text-red-600 bg-white hover:bg-red-50 flex items-center gap-2 border-0 outline-none transition-colors"
-                  >
-                    Xóa khỏi nhóm
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function TransferOwnerModal({ 
-  isOpen, 
-  onClose, 
-  members, 
-  currentUserId,
-  onConfirm 
-}: { 
-  isOpen: boolean; 
-  onClose: () => void; 
-  members: { userId: string; role: string }[];
-  currentUserId?: string;
-  onConfirm: (newOwnerId: string) => void;
-}) {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const { userMap } = useUserStore();
-
-  const otherMembers = useMemo(() => {
-    return members
-      .filter(m => m.userId !== currentUserId)
-      .filter(m => {
-        const profile = userMap[m.userId];
-        if (!searchTerm) return true;
-        return profile?.displayName?.toLowerCase().includes(searchTerm.toLowerCase());
-      });
-  }, [members, currentUserId, searchTerm, userMap]);
-
-  return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Chọn trưởng nhóm mới trước khi rời"
-      variant="confirm"
-      footer={
-        <div className="flex gap-3 justify-end w-full">
-          <button 
-            className="px-6 py-2 rounded-lg bg-gray-100 text-slate-700 font-semibold hover:bg-gray-200 transition-colors border-0 outline-none"
-            onClick={onClose}
-          >
-            Hủy
-          </button>
-          <button 
-            className={`px-6 py-2 rounded-lg font-semibold transition-colors border-0 outline-none ${
-              selectedId 
-                ? 'bg-[#0091FF] text-white hover:bg-blue-600' 
-                : 'bg-blue-300 text-white cursor-not-allowed'
-            }`}
-            onClick={() => selectedId && onConfirm(selectedId)}
-            disabled={!selectedId}
-          >
-            Chọn và tiếp tục
-          </button>
-        </div>
-      }
-    >
-      <div className="flex flex-col gap-4 max-h-[60vh]">
-        <div className="relative">
-          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input 
-            type="text"
-            placeholder="Tìm kiếm"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-gray-100 border border-gray-200 rounded-xl py-2.5 pl-10 pr-4 text-[15px] focus:ring-1 focus:ring-blue-400 outline-none"
-          />
-        </div>
-
-        <div className="overflow-y-auto space-y-1 min-h-[200px]">
-          {otherMembers.length > 0 ? (
-            otherMembers.map((member) => {
-              const profile = userMap[member.userId];
-              const isSelected = selectedId === member.userId;
-              
-              return (
-                <div 
-                  key={member.userId}
-                  className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors"
-                  onClick={() => setSelectedId(member.userId)}
-                >
-                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-                    isSelected ? 'border-[#0091FF]' : 'border-gray-300'
-                  }`}>
-                    {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-[#0091FF]" />}
-                  </div>
-                  <UserAvatar 
-                    name={profile?.displayName || 'Thành viên'} 
-                    imageUrl={profile?.avatarUrl} 
-                    size="md" 
-                  />
-                  <span className="text-[15px] font-medium text-slate-800 truncate">
-                    {profile?.displayName || 'Đang tải...'}
-                  </span>
-                </div>
-              );
-            })
-          ) : (
-            <div className="py-6 text-center">
-              <p className="text-slate-500 text-[14px] mb-4">Không tìm thấy thành viên khác để chuyển quyền</p>
-            </div>
-          )}
-        </div>
-
-        {otherMembers.length > 0 && (
-          <button 
-            className="w-full py-2.5 rounded-lg border border-dashed border-[#0091FF] text-[#0091FF] text-[14px] font-medium hover:bg-blue-50 transition-colors"
-            onClick={() => {
-              const randomMember = otherMembers[Math.floor(Math.random() * otherMembers.length)];
-              onConfirm(randomMember.userId);
-            }}
-          >
-            Chuyển quyền ngẫu nhiên và rời nhóm
-          </button>
-        )}
-      </div>
-    </Modal>
-  );
-}
-
-/* ====================== Helper Components ====================== */
-
 function ActionButton({ 
   icon: Icon, 
   label, 
@@ -1091,7 +905,7 @@ function ActionButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex flex-col items-center rounded-xl border-0 bg-transparent px-1 py-2 shadow-none outline-none ring-0 hover:bg-gray-50 focus:outline-none group"
+      className="flex flex-col items-center rounded-xl border-0 bg-transparent px-1 py-2 shadow-none outline-none ring-0 hover:bg-gray-50 focus:outline-none group cursor-pointer"
     >
       <div className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors ${isActive ? 'bg-[#E6F3FF]' : 'bg-gray-200 group-hover:bg-gray-300'}`}>
         <Icon size={16} className={isActive ? 'text-[#0091FF]' : 'text-slate-600'} />
@@ -1108,7 +922,7 @@ function InfoRow({ icon: Icon, text, onClick }: { icon: React.ElementType; text:
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-4 rounded-xl border-0 bg-transparent px-3 py-[13px] text-left shadow-none outline-none ring-0 hover:bg-gray-50 focus:outline-none active:bg-gray-100"
+      className="flex w-full items-center gap-4 rounded-xl border-0 bg-transparent px-3 py-[13px] text-left shadow-none outline-none ring-0 hover:bg-gray-50 focus:outline-none active:bg-gray-100 cursor-pointer"
     >
       <Icon size={20} className="text-slate-700" />
       <span className="text-[16px] font-medium text-slate-700">{text}</span>
@@ -1128,11 +942,11 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="mt-3 border-y border-gray-200 bg-white px-5 py-4">
+    <div className="mt-3 border-y border-gray-200 bg-white px-5 py-4">
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center justify-between border-0 bg-transparent text-left shadow-none outline-none ring-0 focus:outline-none"
+        className="flex w-full items-center justify-between border-0 bg-transparent text-left shadow-none outline-none ring-0 focus:outline-none cursor-pointer"
       >
         <span className="text-[16px] font-semibold text-slate-800">{title}</span>
         <ChevronDown
@@ -1142,7 +956,7 @@ function Section({
       </button>
 
       {expanded && <div className="mt-4">{children}</div>}
-    </section>
+    </div>
   );
 }
 
@@ -1150,7 +964,7 @@ function ViewAllButton() {
   return (
     <button
       type="button"
-      className="mt-4 w-full rounded-xl border-0 bg-gray-200 py-3 text-[15px] font-semibold text-slate-700 shadow-none outline-none ring-0 hover:bg-gray-300 focus:outline-none active:bg-gray-300"
+      className="mt-4 w-full rounded-xl border-0 bg-gray-200 py-3 text-[15px] font-semibold text-slate-700 shadow-none outline-none ring-0 hover:bg-gray-300 focus:outline-none active:bg-gray-300 cursor-pointer shadow-none ring-0 outline-none"
     >
       Xem tất cả
     </button>
@@ -1166,7 +980,7 @@ function FooterAction({ icon: Icon, label, color, onClick }: { icon: React.Eleme
     <button
       type="button"
       onClick={onClick}
-      className={`flex w-full items-center gap-3 rounded-xl border-0 bg-transparent px-3 py-[13px] text-left shadow-none outline-none ring-0 ${color} hover:bg-red-50 focus:outline-none active:bg-red-100`}
+      className={`flex w-full items-center gap-3 rounded-xl border-0 bg-transparent px-3 py-[13px] text-left shadow-none outline-none ring-0 ${color} hover:bg-red-50 focus:outline-none active:bg-red-100 cursor-pointer`}
     >
       <Icon size={20} />
       <span className="text-[15px] font-medium">{label}</span>
@@ -1184,24 +998,77 @@ function ToggleSwitch({
   disabled?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      onClick={() => !disabled && onChange?.(!checked)}
-      disabled={disabled}
-      className={`relative h-7 w-12 rounded-full border-0 shadow-none outline-none ring-0 transition-all focus:outline-none ${
-        disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
-      } ${checked ? 'bg-[#0091FF]' : 'bg-gray-300'}`}
+    <div 
+      className={`relative h-6 w-11 rounded-full transition-all duration-200 ${
+        checked ? 'bg-[#0091FF]' : 'bg-gray-300 shadow-inner'
+      } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        !disabled && onChange?.(!checked);
+      }}
     >
       <div
-        className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${
-          checked ? 'translate-x-6' : 'translate-x-0.5'
+        className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-all duration-200 transform ${
+          checked ? 'translate-x-5' : 'translate-x-0'
         }`}
       />
-    </button>
+    </div>
   );
 }
 
-/* ====================== Utils ====================== */
+function PermissionCheckbox({ 
+  label, 
+  checked, 
+  onChange, 
+  disabled 
+}: { 
+  label: string; 
+  checked: boolean; 
+  onChange?: (val: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div 
+      className={`flex items-center justify-between gap-4 group ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+      onClick={() => !disabled && onChange?.(!checked)}
+    >
+      <span className="text-[15px] font-medium text-[#001A33] leading-relaxed flex-1">{label}</span>
+      <div className={`w-[22px] h-[22px] rounded border-2 flex items-center justify-center transition-all ${
+        checked ? 'bg-[#0068FF] border-[#0068FF]' : 'border-gray-300'
+      }`}>
+        {checked && <Check size={14} strokeWidth={4} className="text-white" />}
+      </div>
+    </div>
+  );
+}
+
+function SettingToggleRow({ 
+  label, 
+  showHelp, 
+  checked, 
+  onChange, 
+  disabled 
+}: { 
+  label: string; 
+  showHelp?: boolean; 
+  checked: boolean; 
+  onChange?: (val: boolean) => void; 
+  disabled?: boolean;
+}) {
+  return (
+    <div 
+      className={`px-5 py-[18px] flex items-center justify-between hover:bg-gray-50 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+      onClick={() => !disabled && onChange?.(!checked)}
+    >
+      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+        <span className="text-[15px] font-medium text-[#001A33] truncate">{label}</span>
+        {showHelp && <HelpCircle size={16} className="text-gray-400 flex-shrink-0" />}
+      </div>
+      <ToggleSwitch checked={checked} disabled={disabled} />
+    </div>
+  );
+}
+
 function isHttpUrl(value?: string | null): boolean {
   if (!value) return false;
   try {
@@ -1232,4 +1099,395 @@ function getFileName(url?: string | null): string {
   } catch {
     return 'Tệp đính kèm';
   }
+}
+
+/* ====================== Leader & Deputy Components ====================== */
+
+function LeaderDeputyView({ 
+  conversation, 
+  onUpdateRole,
+  currentUserId,
+  userMap
+}: { 
+  conversation: ConversationSummary;
+  onUpdateRole?: (userId: string, role: string) => void;
+  currentUserId?: string;
+  userMap: any;
+}) {
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+
+  const admin = conversation.members?.find(m => String(m.role || '').toUpperCase() === 'ADMIN');
+  const deputies = conversation.members?.filter(m => String(m.role || '').toUpperCase() === 'DEPUTY') || [];
+
+  return (
+    <div className="flex flex-col bg-white h-full overflow-y-auto pb-10 scrollbar-hide">
+      <div className="p-4 space-y-6">
+        {/* Leader Section */}
+        <div>
+          <div className="flex items-center gap-3 py-2 border-b border-gray-50">
+            <UserAvatar 
+              name={userMap[admin?.userId || '']?.displayName || admin?.displayName || ''} 
+              imageUrl={userMap[admin?.userId || '']?.avatarUrl || admin?.avatarUrl} 
+              size="lg" 
+            />
+            <div className="flex flex-col">
+              <span className="font-semibold text-slate-800 text-[16px]">
+                {userMap[admin?.userId || '']?.displayName || admin?.displayName}
+              </span>
+              <span className="text-[13px] text-slate-500">Trưởng nhóm</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="space-y-3">
+          <button 
+            className="w-full py-3 bg-[#EBEBEF] text-[#001A33] font-bold rounded-lg hover:bg-gray-200 border-0 outline-none cursor-pointer transition-all active:scale-95"
+            onClick={() => setShowAdjustModal(true)}
+          >
+            Thêm phó nhóm
+          </button>
+          <button 
+            className="w-full py-3 bg-[#EBEBEF] text-[#001A33] font-bold rounded-lg hover:bg-gray-200 border-0 outline-none cursor-pointer transition-all active:scale-95"
+            onClick={() => setShowTransferModal(true)}
+          >
+            Chuyển quyền trưởng nhóm
+          </button>
+        </div>
+
+        {/* Deputies List */}
+        {deputies.length > 0 && (
+          <div className="mt-6">
+            <h5 className="text-[14px] font-bold text-slate-400 mb-4 uppercase tracking-wider">Danh sách phó nhóm ({deputies.length}/3)</h5>
+            <div className="space-y-4">
+              {deputies.map(deputy => (
+                <div key={deputy.userId} className="flex items-center justify-between group">
+                  <div className="flex items-center gap-3">
+                    <UserAvatar 
+                      name={userMap[deputy.userId]?.displayName || deputy.displayName || ''} 
+                      imageUrl={userMap[deputy.userId]?.avatarUrl || deputy.avatarUrl} 
+                      size="md" 
+                    />
+                    <div className="flex flex-col">
+                      <span className="font-medium text-slate-800">
+                        {userMap[deputy.userId]?.displayName || deputy.displayName}
+                      </span>
+                      <span className="text-[13px] text-slate-500">Phó nhóm</span>
+                    </div>
+                  </div>
+                  <button 
+                    className="p-2 text-red-500 hover:bg-red-50 rounded-full border-0 outline-none cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => onUpdateRole?.(deputy.userId, 'MEMBER')}
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Adjust Deputy Modal */}
+      <AdjustDeputyModal 
+        isOpen={showAdjustModal}
+        onClose={() => setShowAdjustModal(false)}
+        members={conversation.members?.filter(m => {
+          const role = String(m.role || '').toUpperCase();
+          return (role === 'MEMBER' || role === 'DEPUTY') && !m.leftAt;
+        }) || []}
+        currentDeputies={deputies}
+        userMap={userMap}
+        onConfirm={(selectedIds) => {
+          const currentIds = deputies.map(d => d.userId);
+          
+          currentIds.forEach(id => {
+            if (!selectedIds.includes(id)) {
+              onUpdateRole?.(id, 'MEMBER');
+            }
+          });
+
+          selectedIds.forEach(id => {
+            if (!currentIds.includes(id)) {
+              onUpdateRole?.(id, 'DEPUTY');
+            }
+          });
+          
+          setShowAdjustModal(false);
+        }}
+      />
+
+      <TransferOwnerModal
+        isOpen={showTransferModal}
+        onClose={() => setShowTransferModal(false)}
+        members={conversation.members || []}
+        currentUserId={currentUserId}
+        onConfirm={(newOwnerId) => {
+          setShowTransferModal(false);
+          onUpdateRole?.(newOwnerId, 'ADMIN');
+        }}
+      />
+    </div>
+  );
+}
+
+function AdjustDeputyModal({ 
+  isOpen, 
+  onClose, 
+  members, 
+  currentDeputies,
+  userMap,
+  onConfirm 
+}: { 
+  isOpen: boolean;
+  onClose: () => void;
+  members: any[];
+  currentDeputies: any[];
+  userMap: any;
+  onConfirm: (ids: string[]) => void;
+}) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedIds(currentDeputies.map(d => d.userId));
+      setSearchTerm('');
+    }
+  }, [isOpen, currentDeputies]);
+
+  const filteredMembers = members.filter(m => {
+    const name = (userMap[m.userId]?.displayName || m.displayName || '').toLowerCase();
+    return name.includes(searchTerm.toLowerCase());
+  });
+
+  const toggleSelect = (userId: string) => {
+    if (selectedIds.includes(userId)) {
+      setSelectedIds(prev => prev.filter(id => id !== userId));
+    } else {
+      if (selectedIds.length >= 3) {
+        alert('Chỉ được phép có tối đa 3 phó nhóm. Vui lòng bỏ chọn bớt hoặc xóa phó nhóm cũ.');
+        return;
+      }
+      setSelectedIds(prev => [...prev, userId]);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/50 animate-in fade-in duration-200">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-[700px] h-[600px] flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-[17px] font-bold text-slate-800">Điều chỉnh phó nhóm</h3>
+          <button onClick={onClose} className="p-2 hover:bg-slate-50 rounded-full border-0 bg-transparent cursor-pointer transition-colors shadow-none outline-none">
+            <X size={20} className="text-slate-500" />
+          </button>
+        </div>
+
+        <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 border-r border-gray-100 flex flex-col min-w-0">
+            <div className="p-4">
+              <div className="relative text-slate-400">
+                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2" />
+                <input 
+                  type="text"
+                  placeholder="Tìm kiếm thành viên"
+                  className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-transparent focus:border-blue-400 focus:bg-white rounded-lg outline-none text-[15px] transition-all"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 pb-4 scrollbar-hide">
+              <div className="space-y-1">
+                {filteredMembers.map(m => (
+                  <div 
+                    key={m.userId}
+                    className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg cursor-pointer group transition-colors"
+                    onClick={() => toggleSelect(m.userId)}
+                  >
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                      selectedIds.includes(m.userId) ? 'bg-blue-500 border-blue-500' : 'border-slate-300'
+                    }`}>
+                      {selectedIds.includes(m.userId) && <Check size={12} className="text-white" />}
+                    </div>
+                    <UserAvatar 
+                      name={userMap[m.userId]?.displayName || m.displayName || ''} 
+                      imageUrl={userMap[m.userId]?.avatarUrl || m.avatarUrl} 
+                      size="md" 
+                    />
+                    <span className="text-[15px] font-medium text-slate-700 truncate flex-1">
+                      {userMap[m.userId]?.displayName || m.displayName}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="w-[240px] bg-white flex flex-col min-w-0">
+            <div className="p-4 border-b border-gray-50">
+              <div className="flex items-center justify-between">
+                <span className="text-[14px] font-bold text-slate-800">Đã chọn</span>
+                <span className="bg-blue-50 text-blue-600 text-[12px] px-2 py-0.5 rounded-full font-bold">
+                  {selectedIds.length}/3
+                </span>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-hide">
+              {selectedIds.map(id => {
+                const name = userMap[id]?.displayName || members.find(m => m.userId === id)?.displayName || 'Thành viên';
+                const avatar = userMap[id]?.avatarUrl || members.find(m => m.userId === id)?.avatarUrl;
+                return (
+                  <div key={id} className="flex items-center gap-2 bg-blue-50/50 p-2 rounded-lg border border-blue-100/50 group transition-all">
+                    <UserAvatar name={name} imageUrl={avatar} size="xs" />
+                    <span className="text-[13px] font-medium text-blue-800 truncate flex-1">{name}</span>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSelect(id);
+                      }}
+                      className="p-1 hover:bg-blue-100 rounded-full border-0 bg-transparent cursor-pointer transition-colors shadow-none outline-none"
+                    >
+                      <X size={14} className="text-blue-600" />
+                    </button>
+                  </div>
+                );
+              })}
+              {selectedIds.length === 0 && (
+                <div className="h-full flex flex-col items-center justify-center opacity-40 py-10">
+                  <Users size={32} className="mb-2" />
+                  <p className="text-[13px]">Chưa chọn ai</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3 bg-slate-50/50">
+          <button 
+            className="px-6 py-2 rounded-lg text-slate-600 font-bold text-[14px] hover:bg-slate-100 border-0 bg-transparent cursor-pointer transition-colors shadow-none outline-none"
+            onClick={onClose}
+          >
+            Hủy
+          </button>
+          <button 
+            className={`px-8 py-2 rounded-lg font-bold text-[14px] shadow-sm border-0 outline-none cursor-pointer transition-all active:scale-95 ${
+              selectedIds.length > 0
+                ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                : 'bg-blue-300 text-white cursor-not-allowed'
+            }`}
+            disabled={selectedIds.length === 0}
+            onClick={() => onConfirm(selectedIds)}
+          >
+            Xác nhận
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MemberListView({ conversation, currentUserId, onAddMembers, onKickMember, onPromoteDeputy, friends }: { 
+  conversation: ConversationSummary; 
+  currentUserId?: string; 
+  onAddMembers?: () => void;
+  onKickMember?: (userId: string) => void;
+  onPromoteDeputy?: (userId: string, role: string) => void;
+  friends?: Friend[];
+}) {
+  const { userMap } = useUserStore();
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const members = useMemo(() => {
+    return (conversation.members || []).filter(m => !m.leftAt);
+  }, [conversation.members]);
+
+  const filteredMembers = useMemo(() => {
+    if (!searchTerm) return members;
+    return members.filter(m => {
+      const name = (userMap[m.userId]?.displayName || m.displayName || '').toLowerCase();
+      return name.includes(searchTerm.toLowerCase());
+    });
+  }, [members, searchTerm, userMap]);
+
+  return (
+    <div className="flex flex-col bg-white h-full overflow-hidden">
+      <div className="p-4 border-b border-gray-100">
+        <div className="relative text-slate-400">
+          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2" />
+          <input 
+            type="text"
+            placeholder="Tìm kiếm thành viên"
+            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-transparent focus:border-blue-400 focus:bg-white rounded-xl outline-none text-[15px] transition-all"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-2 pb-10 scrollbar-hide">
+        <div className="p-2">
+          {filteredMembers.map((member) => {
+             const role = String(member.role || '').toUpperCase();
+             const isMe = member.userId === currentUserId;
+             const profile = userMap[member.userId];
+             
+             return (
+               <div key={member.userId} className="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 group transition-colors">
+                  <div className="flex items-center gap-3">
+                    <UserAvatar 
+                      name={profile?.displayName || member.displayName || 'Thành viên'} 
+                      imageUrl={profile?.avatarUrl || member.avatarUrl} 
+                      size="md" 
+                    />
+                    <div className="flex flex-col">
+                      <span className="font-medium text-slate-800">
+                        {profile?.displayName || member.displayName} {isMe && '(Bạn)'}
+                      </span>
+                      {role !== 'MEMBER' && (
+                        <span className="text-[12px] text-[#0068FF] font-medium">
+                          {role === 'ADMIN' ? 'Trưởng nhóm' : 'Phó nhóm'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {!isMe && role === 'MEMBER' && (
+                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          className="p-2 text-slate-500 hover:bg-white hover:shadow-sm rounded-full transition-all border-0 bg-transparent cursor-pointer"
+                          onClick={() => onKickMember?.(member.userId)}
+                          title="Xóa khỏi nhóm"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                        <button 
+                          className="p-2 text-[#0068FF] hover:bg-blue-50 rounded-full transition-all border-0 bg-transparent cursor-pointer"
+                          onClick={() => onPromoteDeputy?.(member.userId, 'DEPUTY')}
+                          title="Bổ nhiệm phó nhóm"
+                        >
+                          <ShieldCheck size={18} />
+                        </button>
+                     </div>
+                  )}
+               </div>
+             );
+          })}
+        </div>
+      </div>
+
+      <div className="p-4 mt-auto">
+         <button 
+            className="w-full py-3 bg-[#0091FF] text-white font-bold rounded-xl hover:bg-blue-600 transition-all flex items-center justify-center gap-2 border-0 shadow-md outline-none cursor-pointer active:scale-95"
+            onClick={onAddMembers}
+          >
+            <UserPlus size={18} />
+            Thêm thành viên
+         </button>
+      </div>
+    </div>
+  );
 }

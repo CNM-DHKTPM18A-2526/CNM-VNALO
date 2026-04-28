@@ -27,7 +27,22 @@ export type ConversationSummary = {
   joinMode?: 'OPEN' | 'APPROVAL' | string
 }
 
-export type ChatMessageType = 'text' | 'image' | 'video' | 'file' | 'sticker' | 'system' | 'call'
+export type ChatMessageType = 'text' | 'image' | 'video' | 'file' | 'sticker' | 'system' | 'call' | 'poll'
+
+export interface PollOption {
+  id: string;
+  label: string;
+  votes?: string[]; // user IDs
+}
+
+export interface PollMetadata {
+  id: string;
+  question: string;
+  options: PollOption[];
+  allowMulti?: boolean;
+  totalVotes?: number;
+  isClosed?: boolean;
+}
 
 export type ReplyMetadata = {
   id: string
@@ -80,6 +95,7 @@ export type ChatComposePayload = {
   files?: File[] | null
   sticker?: ChatSticker | null
   replyTo?: ReplyMetadata | null
+  poll?: PollMetadata | null
 }
 
 export type ChatMessage = {
@@ -103,6 +119,7 @@ export type ChatMessage = {
   replyTo?: ReplyMetadata | null
   isRecalled?: boolean
   isPlaceholder?: boolean
+  pollData?: PollMetadata | null
 }
 
 export type MessageReadEvent = {

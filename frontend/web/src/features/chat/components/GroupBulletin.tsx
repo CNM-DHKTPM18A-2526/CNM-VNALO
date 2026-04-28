@@ -3,6 +3,8 @@ import { ArrowLeft, Plus, MessageCircle, Link, AlarmClock, FileText, ChevronRigh
 import { UserAvatar } from '../../../shared/components/UserAvatar';
 import { useUserStore } from '../context/UserStoreContext';
 import { fetchPinnedMessages, type RawPinnedMessage, type ChatMessage } from '../chat.api';
+import { CreatePollModal } from './CreatePollModal';
+import type { PollMetadata } from '../chat.types';
 
 type TabType = 'all' | 'pin' | 'note' | 'poll';
 
@@ -12,13 +14,15 @@ interface GroupBulletinProps {
   messages: ChatMessage[]; // Pass current messages to resolve content for pins
   onClose: () => void;
   onJumpToMessage: (messageId: string) => void;
+  onSendPoll?: (poll: PollMetadata) => void;
 }
 
-export function GroupBulletin({ conversationId, token, messages, onClose, onJumpToMessage }: GroupBulletinProps) {
+export function GroupBulletin({ conversationId, token, messages, onClose, onJumpToMessage, onSendPoll }: GroupBulletinProps) {
   const { userMap } = useUserStore();
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [pinnedItems, setPinnedItems] = useState<RawPinnedMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showCreatePoll, setShowCreatePoll] = useState(false);
 
   useEffect(() => {
     const loadPinned = async () => {
@@ -265,12 +269,24 @@ export function GroupBulletin({ conversationId, token, messages, onClose, onJump
           <button className="w-full h-11 bg-[#e5efff] text-[#005ae0] font-semibold rounded-md hover:bg-[#d0e3ff] transition-colors text-[14px] border-none cursor-pointer">
             Tạo ghi chú
           </button>
-          <button className="w-full h-11 bg-[#e5efff] text-[#005ae0] font-semibold rounded-md hover:bg-[#d0e3ff] transition-colors text-[14px] border-none cursor-pointer">
+          <button 
+            onClick={() => setShowCreatePoll(true)}
+            className="w-full h-11 bg-[#e5efff] text-[#005ae0] font-semibold rounded-md hover:bg-[#d0e3ff] transition-colors text-[14px] border-none cursor-pointer"
+          >
             Tạo bình chọn
           </button>
         </div>
       </main>
 
+      {showCreatePoll && (
+        <CreatePollModal 
+          onClose={() => setShowCreatePoll(false)}
+          onCreate={(poll) => {
+            onSendPoll?.(poll);
+            setShowCreatePoll(false);
+          }}
+        />
+      )}
     </div>
   );
 }
