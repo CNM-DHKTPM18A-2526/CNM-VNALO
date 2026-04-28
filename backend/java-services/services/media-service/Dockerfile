@@ -30,7 +30,7 @@ COPY --from=builder /build/target/*.jar app.jar
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8083/api/v1/actuator/health || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8083/api/v1/media/actuator/health || exit 1
 
 EXPOSE 8083
 
