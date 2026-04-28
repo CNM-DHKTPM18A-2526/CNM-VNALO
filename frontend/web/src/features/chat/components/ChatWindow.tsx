@@ -60,6 +60,7 @@ type ChatWindowProps = {
   onUnpinMessage?: (messageId: string) => void
   onTogglePin?: (message: ChatMessage) => void
   onInitiateCall?: (type: 'audio' | 'video') => void
+  members?: Array<{ userId: string; displayName: string; avatarUrl?: string | null }>
 }
 
 export function ChatWindow({
@@ -92,6 +93,7 @@ export function ChatWindow({
   pinnedMessages = [],
   onUnpinMessage,
   onInitiateCall,
+  members = [],
 }: ChatWindowProps) {
   const { userMap } = useUserStore()
   const { t } = useLanguage()
@@ -580,6 +582,11 @@ export function ChatWindow({
             recipientName={conversation.name}
             placeholder={isRestrictedMode ? 'Tin nhắn bị khóa khi ở chế độ giới hạn' : undefined}
             disabled={isRestrictedMode}
+            members={conversation.members?.map(m => ({
+              userId: m.userId,
+              displayName: userMap[m.userId]?.displayName || m.displayName || 'Người dùng',
+              avatarUrl: userMap[m.userId]?.avatarUrl || m.avatarUrl
+            })) || []}
           />
         );
       })()}
