@@ -103,7 +103,7 @@ Send a text, media, reply, or forward message. Persists to DB then broadcasts.
 - TEXT requires non-empty `content`.
 - Media types require `mediaUrl`.
 - `restrictedWebMode` sessions are blocked (service-level guard).
-- `onlyAdminCanPost=true` blocks MEMBER role `[SPEC_ONLY]`.
+- `onlyAdminCanPost=true` blocks MEMBER role.
 
 ---
 
@@ -611,7 +611,7 @@ Group has been disbanded. All data deleted. Client must purge local cache.
 | `onCallError` | `call.error` | ✅ Implemented |
 | `onReactionAdded` | `message.reaction.added` | ⚠️ Listened but NOT emitted by gateway |
 | `onReactionRemoved` | `message.reaction.removed` | ⚠️ Listened but NOT emitted by gateway |
-| `onGroupDisbanded` | `group.disbanded` | ❌ `[SPEC_ONLY]` — not yet subscribed |
+| `onGroupDisbanded` | `group.disbanded` | ✅ Subscribed |
 | `onGroupMemberAdded` | `group.member_added` | ❌ `[SPEC_ONLY]` |
 | `onGroupMemberRemoved` | `group.member_removed` | ❌ `[SPEC_ONLY]` |
 | `onGroupMemberLeft` | `group.member_left` | ❌ `[SPEC_ONLY]` |
