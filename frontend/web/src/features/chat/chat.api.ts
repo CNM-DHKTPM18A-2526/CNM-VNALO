@@ -344,22 +344,23 @@ function normalizeMessageType(rawType: any, raw?: RawMessageLike): ChatMessageTy
   return 'text'
 }
 
-export async function uploadChatMedia(token: string, file: File): Promise<MediaUploadResponse> {
+export async function uploadChatMedia(token: string, file: File): Promise<any> {
   const formData = new FormData()
   formData.append('file', file)
-
-  const ext = file.name.split('.').pop()?.toLowerCase() || '';
-  const isImage = file.type.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
-  formData.append('category', isImage ? 'AVATAR' : 'CHAT_FILE');
+  
+  let category = 'CHAT_FILE';
+  if (file.type.startsWith('image/')) category = 'CHAT_IMAGE';
+  else if (file.type.startsWith('video/')) category = 'CHAT_VIDEO';
+  
+  formData.append('category', category)
 
   try {
-    // We use mediaApi (Axios instance for port 8083)
     const response = await mediaApi.post('/upload', formData, {
       headers: {
         Authorization: `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data',
       },
-    });
-
+    })
     const json = response.data;
 
     const payload = json && typeof json === 'object' && !Array.isArray(json) && 'data' in json
@@ -510,6 +511,9 @@ export function mapRawMessage(raw: RawMessageLike, currentUserId: string): ChatM
     ]
   }
 
+  const finalMediaUrl = mediaUrl || (attachments && attachments.length > 0 ? attachments[0].url : null)
+  const finalThumbnailUrl = mediaThumbnailUrl || (attachments && attachments.length > 0 ? attachments[0].thumbnailUrl : null)
+
   return {
     id: raw.id,
     conversationId,
@@ -517,8 +521,8 @@ export function mapRawMessage(raw: RawMessageLike, currentUserId: string): ChatM
     sender: type === 'system' ? 'system' : (senderId === currentUserId ? 'me' : 'other'),
     type: type as ChatMessageType,
     text: type === 'poll' ? '' : messageText,
-    mediaUrl: mediaUrl ? resolveMediaUrl(mediaUrl) : mediaUrl,
-    mediaThumbnailUrl: mediaThumbnailUrl ? resolveMediaUrl(mediaThumbnailUrl) : mediaThumbnailUrl,
+    mediaUrl: finalMediaUrl ? resolveMediaUrl(finalMediaUrl) : null,
+    mediaThumbnailUrl: finalThumbnailUrl ? resolveMediaUrl(finalThumbnailUrl) : null,
     mediaMimeType,
     mediaSizeBytes,
     attachments: attachments?.map(att => ({ ...att, url: resolveMediaUrl(att.url), thumbnailUrl: att.thumbnailUrl ? resolveMediaUrl(att.thumbnailUrl) : null })),
@@ -902,7 +906,7 @@ export async function fetchStickerPackDetails(token: string, packId: string): Pr
 
 export async function fetchMediaByCategory(token: string, category: 'EMOJI' | 'GIF'): Promise<any[]> {
   try {
-    const response = await mediaApi.get(`/media?category=${category}`, {
+    const response = await mediaApi.get(`/?category=${category}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
 
@@ -913,7 +917,7 @@ export async function fetchMediaByCategory(token: string, category: 'EMOJI' | 'G
     // Fallback: Deep discovery from SYSTEM assets
     if (items.length === 0) {
       console.log(`[chat.api.fetchMediaByCategory] ${category} list empty, performing MASSIVE discovery (limit 3000)...`)
-      const fbResponse = await mediaApi.get('/media?size=3000', {
+      const fbResponse = await mediaApi.get('/?size=3000', {
         headers: { Authorization: `Bearer ${token}` }
       });
 

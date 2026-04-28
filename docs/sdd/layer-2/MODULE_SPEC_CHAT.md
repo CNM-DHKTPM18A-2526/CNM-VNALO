@@ -30,6 +30,16 @@
 - Timeline and story feed behavior.
 - Analytics aggregation consumers.
 
+### Media Category Enums (Cross-service sync)
+
+To ensure compatibility with the Java Media Service, the following categories MUST be used:
+- `CHAT_IMAGE`: Images sent in chat.
+- `CHAT_VIDEO`: Videos sent in chat.
+- `CHAT_FILE`: Documents/other files.
+- `AVATAR`: User profile pictures.
+- `STICKER`: Chat stickers.
+
+
 ---
 
 ## Constraints
@@ -218,7 +228,17 @@ System message: "[Name] đã được tự động chỉ định làm trưởng 
 
 ## 4. Message Rules
 
-### 4.1 Recall
+### 4.1 Media Upload Workflow
+
+1.  **Client** uploads file to Nginx `/api/v1/media/upload`.
+2.  **Nginx** proxies to `media-service` (Java) at port 8083.
+3.  **Media-Service** returns `{url, thumbnailUrl, sizeBytes, mimeType}`.
+4.  **Client** sends Socket event `message.send` with:
+    - `messageType`: `IMAGE` | `VIDEO` | `FILE` | `STICKER`.
+    - `mediaUrl`: The URL returned from step 3.
+    - `content`: Original filename (mandatory fallback).
+    - `attachments`: Array containing media metadata (preferred).
+
 
 - **Who**: Sender can always recall own messages. ADMIN and DEPUTY can recall any member's message.
 - **Window**: 24 hours from `createdAt` (hardcoded: `RECALL_TIME_LIMIT_MS = 86_400_000`).

@@ -10,7 +10,7 @@ import { useLanguage } from '../../shared/i18n/LanguageContext'
 import { useNotifications } from '../../shared/contexts/NotificationsContext'
 import type { Language } from '../../shared/i18n/translations'
 
-function PasswordToggleIcon({ visible }: { visible: boolean }) {
+export function PasswordToggleIcon({ visible }: { visible: boolean }) {
   if (visible) {
     return (
       <svg viewBox='0 0 24 24' aria-hidden='true'>

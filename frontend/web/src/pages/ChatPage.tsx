@@ -3298,8 +3298,8 @@ function ChatPageContent() {
         const isVideo = res.mimeType?.startsWith('video/') || ['mp4', 'mov', 'webm', 'm4v', '3gp', 'mkv'].includes(actualExt);
         const resTypeStr = isDoc ? 'file' : (res.mimeType?.startsWith('image/') ? 'image' : (isVideo ? 'video' : (res.mimeType === 'application/x-chat-sticker' ? 'sticker' : 'file')));
 
-        // Use original filename as content for 'file' type messages if no other text is provided.
-        const resContent = (i === 0 && content.trim().length > 0) ? content : (resTypeStr === 'file' && file ? file.name : "");
+        // Use original filename as content for 'file' or 'image' type messages if no other text is provided.
+        const resContent = (i === 0 && content.trim().length > 0) ? content : (file ? file.name : "");
 
         const payload: any = {
           conversationId: targetConversationId,

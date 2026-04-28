@@ -6,6 +6,7 @@ import type { Gender } from '../features/auth/auth.types'
 import { OtpCodeInput } from '../features/auth/components/OtpCodeInput'
 import { isNormalizedVietnamPhone, normalizeVietnamPhone } from '../features/auth/phone.util'
 import { validatePassword } from '../features/auth/password.util'
+import { PasswordToggleIcon } from '../features/settings/SettingsModalContent'
 import { useLanguage } from '../shared/i18n/LanguageContext'
 
 type RegisterStep = 'form' | 'otp'
