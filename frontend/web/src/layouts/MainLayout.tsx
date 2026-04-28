@@ -13,7 +13,8 @@ export function MainLayout() {
   const { t } = useLanguage()
   const isChatWorkspace = location.pathname === '/' || location.pathname.startsWith('/chat')
   const isContactsPage = location.pathname.startsWith('/contacts')
-  const shouldShowTopbar = !isChatWorkspace && !isContactsPage
+  const isDocumentsPage = location.pathname.startsWith('/documents')
+  const shouldShowTopbar = !isChatWorkspace && !isContactsPage && !isDocumentsPage
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
 
   const title = useMemo(() => {
@@ -60,7 +61,15 @@ export function MainLayout() {
             onOpenSettingsModal={handleOpenSettings}
           />
         ) : null}
-        <main className={isChatWorkspace ? 'workspace-main workspace-main-chat page-enter' : 'workspace-main page-enter'}>
+        <main className={
+          isChatWorkspace 
+            ? 'workspace-main workspace-main-chat page-enter' 
+            : isContactsPage 
+              ? 'workspace-main workspace-main-contacts page-enter'
+              : isDocumentsPage
+                ? 'workspace-main workspace-main-documents page-enter'
+                : 'workspace-main page-enter'
+        }>
           <Outlet />
         </main>
       </section>
