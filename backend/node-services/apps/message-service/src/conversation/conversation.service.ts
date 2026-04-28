@@ -250,7 +250,10 @@ export class ConversationService {
         'showHistoryToNewMembers',
         'allowMemberCreateNote',
         'allowMemberCreatePoll',
+        'joinMode',       // structural: controls how members join the group
+        'memberLimit',    // structural: controls max group capacity
       ];
+
       
       const safeUpdate: any = {
         ...(title && { title }),
@@ -871,15 +874,20 @@ export class ConversationService {
       `Group ${conversationId} disbanded by ${userId}. ${memberUserIds.length} members affected.`,
     );
 
+    // Single timestamp for all events — ensures idempotent correlation
+    const disbandedAt = new Date();
+
     // Notify all members via Kafka
-    for (const memberId of memberUserIds) {
-      await this.kafkaProducer.sendRealtimeEvent(memberId, 'group.disbanded', {
+    const promises = memberUserIds.map((memberId) =>
+      this.kafkaProducer.sendRealtimeEvent(memberId, 'group.disbanded', {
         conversationId,
         disbandedBy: userId,
-      });
-    }
-
-    const disbandedAt = new Date();
+        disbandedAt,
+      }).catch((err) => {
+        this.logger.error(`Failed to send group.disbanded event to ${memberId}: ${err.message}`);
+      })
+    );
+    await Promise.all(promises);
 
     // G-015: Notify media-service to clean up all media files (Async)
     await this.kafkaProducer.sendRealtimeEvent(userId, 'GROUP_DISBANDED_MEDIA_CLEANUP', {

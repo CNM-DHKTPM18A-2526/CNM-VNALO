@@ -14,8 +14,17 @@ public class CorsConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
+        String allowedOriginsStr = System.getenv("CORS_ALLOWED_ORIGINS");
+        if (allowedOriginsStr == null || allowedOriginsStr.isBlank()) {
+            allowedOriginsStr = "http://localhost:3000,http://localhost:5173";
+        }
+        List<String> allowedOrigins = Arrays.stream(allowedOriginsStr.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isBlank())
+                .toList();
+
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of("*"));
+        configuration.setAllowedOrigins(allowedOrigins);
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(Arrays.asList("Authorization", "X-Total-Count"));

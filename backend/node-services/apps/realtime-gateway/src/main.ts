@@ -6,7 +6,19 @@ import { RedisIoAdapter } from './adapters/redis-io.adapter';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  app.enableCors({ origin: '*' });
+  const allowedOrigins = (
+    process.env.CORS_ALLOWED_ORIGINS ??
+    'http://localhost:3000,http://localhost:5173'
+  )
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  app.enableCors({
+    origin: allowedOrigins,
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    credentials: true,
+  });
 
   const redisHost = process.env.REDIS_HOST || 'localhost';
   const redisPort = parseInt(process.env.REDIS_PORT || '6379', 10);
