@@ -37,7 +37,11 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .cors(cors -> cors.configurationSource(request -> {
                     var config = new CorsConfiguration();
-                    config.setAllowedOriginPatterns(List.of("*"));
+                    List<String> allowedOrigins = Arrays.stream(allowedOriginsProperty.split(","))
+                            .map(String::trim)
+                            .filter(origin -> !origin.isBlank())
+                            .collect(Collectors.toList());
+                    config.setAllowedOrigins(allowedOrigins);
                     config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
                     config.setAllowedHeaders(List.of("*"));
                     config.setAllowCredentials(true);

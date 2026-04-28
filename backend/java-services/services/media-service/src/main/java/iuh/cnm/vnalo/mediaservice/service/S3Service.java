@@ -200,7 +200,12 @@ public class S3Service {
     }
 
     private Path resolveLocalPath(String objectKey) {
-        return Paths.get(localDir).resolve(objectKey).normalize();
+        Path base = Paths.get(localDir).toAbsolutePath().normalize();
+        Path resolvedPath = base.resolve(objectKey).normalize();
+        if (!resolvedPath.startsWith(base)) {
+            throw new SecurityException("Path traversal attempt detected");
+        }
+        return resolvedPath;
     }
 
     private void writeStreamToLocal(InputStream inputStream, String objectKey) {

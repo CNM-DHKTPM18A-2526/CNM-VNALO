@@ -9,7 +9,7 @@ services:
   # ---------------------------------------------------------------------------
   postgres:
     image: postgres:16-alpine
-    container_name: vnalo-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_NAME:-vnalo_core}
       POSTGRES_USER: ${DB_USER:-postgres}
@@ -29,7 +29,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: vnalo-redis
+    restart: unless-stopped
     ports:
       - "${REDIS_PORT:-6379}:6379"
     command: redis-server --appendonly yes ${REDIS_PASSWORD:+--requirepass $REDIS_PASSWORD}
@@ -45,7 +45,7 @@ services:
 
   ollama:
     image: ollama/ollama:latest
-    container_name: vnalo-ollama
+    restart: unless-stopped
     profiles:
       - ai-local
     ports:
@@ -57,7 +57,7 @@ services:
 
   rabbitmq:
     image: rabbitmq:4-management-alpine
-    container_name: vnalo-rabbitmq
+    restart: unless-stopped
     ports:
       - "${RABBITMQ_PORT:-5672}:5672"
       - "${RABBITMQ_MGMT_PORT:-15672}:15672"
@@ -76,7 +76,7 @@ services:
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
-    container_name: vnalo-zookeeper
+    restart: unless-stopped
     hostname: zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
@@ -86,7 +86,7 @@ services:
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
-    container_name: vnalo-kafka
+    restart: unless-stopped
     hostname: kafka
     depends_on:
       - zookeeper
@@ -111,7 +111,7 @@ services:
     build:
       context: ../backend/java-services/services/core-service
       dockerfile: Dockerfile
-    container_name: vnalo-core-service
+    restart: unless-stopped
     ports:
       - "8081:8081"
     env_file:
@@ -154,7 +154,7 @@ services:
     build:
       context: ../backend/node-services
       dockerfile: Dockerfile
-    container_name: vnalo-message-service
+    restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
@@ -194,7 +194,7 @@ services:
     build:
       context: ../backend/java-services/services/media-service
       dockerfile: Dockerfile
-    container_name: vnalo-media-service
+    restart: unless-stopped
     ports:
       - "8083:8083"
     environment:
@@ -245,7 +245,7 @@ services:
     build:
       context: ../backend/node-services
       dockerfile: apps/realtime-gateway/Dockerfile
-    container_name: vnalo-realtime-gateway
+    restart: unless-stopped
     ports:
       - "8085:8085"
     environment:
@@ -280,7 +280,7 @@ services:
   #   build:
   #     context: ../backend/java-services/services/moderation-service
   #     dockerfile: Dockerfile
-  #   container_name: vnalo-moderation-service
+  #       restart: unless-stopped
   #   ports:
   #     - "8082:8082"
   #   environment:
@@ -317,7 +317,7 @@ services:
     build:
       context: ../backend/java-services/services/analytics-service
       dockerfile: Dockerfile
-    container_name: vnalo-analytics-service
+    restart: unless-stopped
     profiles:
       - planned
     ports:
@@ -356,7 +356,7 @@ services:
     build:
       context: ../backend/java-services/services/ai-service
       dockerfile: Dockerfile
-    container_name: vnalo-ai-service
+    restart: unless-stopped
     ports:
       - "8094:8094"
     environment:
@@ -393,7 +393,7 @@ services:
     build:
       context: ../backend/java-services/services/content-service
       dockerfile: Dockerfile
-    container_name: vnalo-content-service
+    restart: unless-stopped
     ports:
       - "8086:8086"
     environment:
@@ -428,7 +428,7 @@ services:
     build:
       context: ../backend/java-services/services/notification-service
       dockerfile: Dockerfile
-    container_name: vnalo-notification-service
+    restart: unless-stopped
     ports:
       - "8087:8087"
     environment:
@@ -467,7 +467,7 @@ services:
 
   nginx:
     image: nginx:alpine
-    container_name: vnalo-nginx
+    restart: unless-stopped
     ports:
       - "80:80"
     volumes:

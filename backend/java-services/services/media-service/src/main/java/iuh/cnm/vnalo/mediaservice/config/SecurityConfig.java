@@ -38,7 +38,11 @@ public class SecurityConfig {
                 // CORS for frontend dev
                 .cors(cors -> cors.configurationSource(request -> {
                     var config = new CorsConfiguration();
-                    config.setAllowedOriginPatterns(List.of("*"));
+                    String allowedOriginsStr = System.getenv("CORS_ALLOWED_ORIGINS");
+                    if (allowedOriginsStr == null || allowedOriginsStr.isBlank()) {
+                        allowedOriginsStr = "http://localhost:3000,http://localhost:5173";
+                    }
+                    config.setAllowedOrigins(java.util.Arrays.asList(allowedOriginsStr.split(",")));
                     config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
                     config.setAllowedHeaders(List.of("*"));
                     config.setAllowCredentials(true);
