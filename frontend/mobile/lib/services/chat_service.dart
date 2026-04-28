@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:vnalo_mobile/config/app_config.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/conversation_member_model.dart';
@@ -405,6 +406,15 @@ class ChatService {
     required String conversationId,
     required String content,
     String messageType = 'TEXT', // Default to 'TEXT' if not specified
+    String? mediaUrl,
+    String? mediaThumbnailUrl,
+    String? mediaMimeType,
+    int? mediaSizeBytes,
+    String? replyToMessageId,
+    String? replyToSenderName,
+    String? replyToContent,
+    String? forwardFromMessageId,
+    String? forwardFromConversationId,
   }) async {
     final response = await _apiService.post(
       _base,
@@ -413,6 +423,15 @@ class ChatService {
         'conversationId': conversationId,
         'content': content,
         'messageType': messageType,
+        if (mediaUrl != null) 'mediaUrl': mediaUrl,
+        if (mediaThumbnailUrl != null) 'mediaThumbnailUrl': mediaThumbnailUrl,
+        if (mediaMimeType != null) 'mediaMimeType': mediaMimeType,
+        if (mediaSizeBytes != null) 'mediaSizeBytes': mediaSizeBytes,
+        if (replyToMessageId != null) 'replyToMessageId': replyToMessageId,
+        if (replyToSenderName != null) 'replyToSenderName': replyToSenderName,
+        if (replyToContent != null) 'replyToContent': replyToContent,
+        if (forwardFromMessageId != null) 'forwardFromMessageId': forwardFromMessageId,
+        if (forwardFromConversationId != null) 'forwardFromConversationId': forwardFromConversationId,
       },
     );
 
@@ -488,8 +507,48 @@ class ChatService {
   }
 
   Future<List<dynamic>> getPinnedMessages(String conversationId) async {
-    final response = await _apiService.get(_base, '/conversations/$conversationId/pins');
-    return response['data'] ?? response as List;
+    try {
+      final response = await _apiService.get(_base, '/conversations/$conversationId/pins');
+      debugPrint('[ChatService] getPinnedMessages full response: $response');
+      final data = response['data'];
+      debugPrint('[ChatService] response[data] type: ${data?.runtimeType}, content: $data');
+      if (data == null) return [];
+      if (data is List) return data;
+      return [];
+    } catch (e) {
+      debugPrint('[ChatService] getPinnedMessages error: $e');
+      return [];
+    }
+  }
+
+  /// Pin a message via REST API (fallback when socket fails)
+  Future<Map<String, dynamic>> pinMessage(String conversationId, String messageId) async {
+    try {
+      final response = await _apiService.post(
+        _base,
+        '/conversations/$conversationId/pin/$messageId',
+        body: {},
+      );
+      debugPrint('[ChatService] pinMessage success: $response');
+      return response['data'] ?? response;
+    } catch (e, st) {
+      debugPrint('[ChatService] pinMessage error: $e\n$st');
+      rethrow;
+    }
+  }
+
+  /// Unpin a message via REST API (fallback when socket fails)
+  Future<void> unpinMessage(String conversationId, String messageId) async {
+    try {
+      await _apiService.delete(
+        _base,
+        '/conversations/$conversationId/pin/$messageId',
+      );
+      debugPrint('[ChatService] unpinMessage success');
+    } catch (e, st) {
+      debugPrint('[ChatService] unpinMessage error: $e\n$st');
+      rethrow;
+    }
   }
 
   // ─── Reactions ───────────────────────────────────────
@@ -514,5 +573,23 @@ class ChatService {
     final response = await _apiService.get(_base, '/messages/$messageId/reactions');
     final list = response['data'] as List? ?? [];
     return list.map((r) => MessageReaction.fromJson(r)).toList();
+  }
+
+  // ─── Poll Voting ─────────────────────────────────────────────────────────
+
+  /// Submit a poll vote for a message (poll data is embedded in message content).
+  Future<Map<String, dynamic>> votePoll(String messageId, int optionIndex) async {
+    try {
+      final response = await _apiService.post(
+        _base,
+        '/messages/$messageId/poll',
+        body: {'optionIndex': optionIndex},
+      );
+      debugPrint('[ChatService] votePoll success: $response');
+      return response['data'] ?? response;
+    } catch (e, st) {
+      debugPrint('[ChatService] votePoll error: $e\n$st');
+      rethrow;
+    }
   }
 }

@@ -116,28 +116,37 @@ class GroupMembersScreen extends StatelessWidget {
   }
 
   void _showMemberActions(BuildContext context, Conversation conv, ConversationMember member) {
+    final currentUserId = context.read<AuthProvider>().user?.id ?? '';
+    final myMember = conv.members.firstWhere(
+      (m) => m.userId == currentUserId,
+      orElse: () => ConversationMember(conversationId: conv.id, userId: currentUserId, joinedAt: DateTime.now()),
+    );
+    final isOwner = myMember.role == MemberRole.ADMIN;
+    final isOwnerOrAdmin = myMember.role == MemberRole.ADMIN || myMember.role == MemberRole.DEPUTY;
+
     showCupertinoModalPopup(
       context: context,
       builder: (context) => CupertinoActionSheet(
         title: Text('Quản lý ${member.user?.displayName ?? 'thành viên'}'),
         actions: [
-          CupertinoActionSheetAction(
-            onPressed: () {
-              Navigator.pop(context);
-              _confirmRemoveMember(context, conv, member);
-            },
-            isDestructiveAction: true,
-            child: const Text('Mời ra khỏi nhóm'),
-          ),
-          if (member.role == MemberRole.MEMBER)
+          if (isOwnerOrAdmin && member.role != MemberRole.ADMIN)
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.pop(context);
+                _confirmRemoveMember(context, conv, member);
+              },
+              isDestructiveAction: true,
+              child: const Text('Mời ra khỏi nhóm'),
+            ),
+          if (isOwnerOrAdmin && member.role == MemberRole.MEMBER)
             CupertinoActionSheetAction(
               onPressed: () {
                  Navigator.pop(context);
-                 context.read<ChatProvider>().updateMemberRole(conv.id, member.userId, 'ADMIN');
+                 context.read<ChatProvider>().updateMemberRole(conv.id, member.userId, 'DEPUTY');
               },
               child: const Text('Bổ nhiệm làm Phó nhóm'),
             )
-          else if (member.role == MemberRole.DEPUTY)
+          else if (isOwnerOrAdmin && member.role == MemberRole.DEPUTY)
             CupertinoActionSheetAction(
               onPressed: () {
                  Navigator.pop(context);
@@ -145,13 +154,14 @@ class GroupMembersScreen extends StatelessWidget {
               },
               child: const Text('Gỡ vai trò Phó nhóm'),
             ),
-          CupertinoActionSheetAction(
-            onPressed: () {
-               Navigator.pop(context);
-               context.read<ChatProvider>().transferOwnership(conv.id, member.userId);
-            },
-            child: const Text('Chuyển quyền Trưởng nhóm'),
-          ),
+          if (isOwner && member.role != MemberRole.ADMIN)
+            CupertinoActionSheetAction(
+              onPressed: () {
+                 Navigator.pop(context);
+                 context.read<ChatProvider>().transferOwnership(conv.id, member.userId);
+              },
+              child: const Text('Chuyển quyền Trưởng nhóm'),
+            ),
         ],
         cancelButton: CupertinoActionSheetAction(
           onPressed: () => Navigator.pop(context),

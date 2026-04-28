@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
+import 'package:vnalo_mobile/core/widgets/skeleton_loading.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/features/chat/screens/chat_detail_screen.dart';
 import 'package:vnalo_mobile/features/contacts/screens/add_friend_screen.dart';
@@ -140,7 +141,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
     return Consumer<ContactProvider>(
       builder: (context, provider, child) {
         if (provider.isLoading && provider.friends.isEmpty) {
-          return const Center(child: CircularProgressIndicator());
+          return const ContactsSkeleton();
         }
 
         final friends = provider.friends;

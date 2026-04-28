@@ -59,23 +59,29 @@ class _PinnedMessageBarState extends State<PinnedMessageBar> with SingleTickerPr
   }
 
   String _getMessagePreview(Message message, CommonTexts common) {
+    debugPrint('[PinnedMessageBar] _getMessagePreview: msgId=${message.id} content="${message.content}" type=${message.messageType}');
     if (message.status == MessageStatus.RECALLED) {
       return common.msgRecalled;
     }
-    
+
     switch (message.messageType) {
       case MessageType.IMAGE:
         return '[${common.imageLabel}]';
       case MessageType.VIDEO:
         return '[${common.videoAction}]';
       case MessageType.FILE:
-        return '[${common.documentLabel}] ${message.content ?? ""}';
+        final fileContent = message.content;
+        return '[${common.documentLabel}] ${fileContent ?? ""}'.trim();
       case MessageType.AUDIO:
         return '[${common.audioAction}]';
       case MessageType.STICKER:
         return '[Sticker]';
       default:
-        return message.content ?? '';
+        final text = message.content ?? '';
+        if (text.isEmpty) {
+          return common.imageLabel ?? 'Tin nhắn';
+        }
+        return text;
     }
   }
 
@@ -83,10 +89,11 @@ class _PinnedMessageBarState extends State<PinnedMessageBar> with SingleTickerPr
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final common = CommonTexts.of(context);
-    
+
     return Consumer<ChatProvider>(
       builder: (context, chat, child) {
         final pins = chat.getPinnedMessagesForConversation(widget.conversationId);
+        debugPrint('[PinnedMessageBar] Build: conversationId=${widget.conversationId}, pins.length=${pins.length}');
         if (pins.isEmpty) return const SizedBox.shrink();
 
         // Clamp _currentPage to valid range

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:vnalo_mobile/config/app_config.dart';
 import 'package:vnalo_mobile/services/auth_events.dart';
@@ -163,6 +164,7 @@ class ApiService {
       switch (method) {
         case 'GET':
           response = await http.get(url, headers: headers).timeout(_timeout);
+          debugPrint('[ApiService] GET $url status=${response.statusCode} body="$response.body"');
           break;
         case 'POST':
           response = await http
@@ -294,7 +296,7 @@ class ApiService {
   // Handle HTTP response, throwing exceptions for error status codes and parsing JSON body
   Map<String, dynamic> _handleResponse(http.Response response) {
     final body = _parseResponseBody(response.body);
-
+    debugPrint('[ApiService] _handleResponse status=${response.statusCode} body=$body');
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return body;
     }
@@ -318,6 +320,7 @@ class ApiService {
 
   // Parse response body, handling empty responses and non-JSON content gracefully
   Map<String, dynamic> _parseResponseBody(String rawBody) {
+    debugPrint('[ApiService] _parseResponseBody rawBody=$rawBody');
     if (rawBody.trim().isEmpty) {
       return <String, dynamic>{};
     }

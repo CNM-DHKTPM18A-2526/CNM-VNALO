@@ -67,6 +67,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       final chatProvider = context.read<ChatProvider>();
       chatProvider.setCurrentUserId(currentUserId);
       chatProvider.openConversation(widget.conversation.id);
+      chatProvider.loadPinnedMessages(widget.conversation.id);
 
       // Auto-switch to group member subtitle after a short delay.
       if (widget.conversation.type == ConversationType.GROUP) {
@@ -447,6 +448,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                                     .difference(message.createdAt)
                                     .inMinutes
                                     .abs();
+                            // Show time only on the newest message of each consecutive group
+                            // Hide if same sender AND within 5-minute window
                             if (sameSender && timeGap < 5) showTime = false;
                           }
 
@@ -562,7 +565,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   ChatInputBar(
                     conversationId: conv.id,
                     onSend: (text) => chat.sendMessage(conversationId: conv.id, content: text),
+                    onSendWithType: (content, messageType) => chat.sendMessage(
+                      conversationId: conv.id,
+                      content: content,
+                      messageType: messageType,
+                    ),
                     initialText: widget.prefilledText,
+                    members: conv.members,
+                    isGroup: conv.type == ConversationType.GROUP,
                   )
                 else
                   _buildReadOnlyBanner(),

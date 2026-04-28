@@ -93,17 +93,30 @@ class SocketService {
           .build(),
     );
 
-    _socket!.onConnect((_) => debugPrint('Connected to socket server'));
-    _socket!.onDisconnect((_) => debugPrint('Disconnected from socket server'));
+    _setupListeners();
+  }
+
+  void _setupListeners() {
+    if (_socket == null) return;
+
+    // Re-register all event listeners (called on connect and reconnect)
+    _socket!.onConnect((_) {
+      debugPrint('Connected to socket server');
+    });
+    _socket!.onDisconnect((_) {
+      debugPrint('Disconnected from socket server');
+    });
 
     // Listen for incoming messages, typing indicators, and presence updates
     _socket!.on('message.received', (data) {
+      debugPrint('[Socket] message.received: $data');
       _messageController.add(
         Message.fromJson(data),
       ); // Add incoming message to the stream
     });
 
     _socket!.on('message.sent', (data) {
+      debugPrint('[Socket] message.sent: $data');
       _messageController.add(
         Message.fromJson(data),
       ); // Add sent message to the stream (for optimistic UI updates)
@@ -134,10 +147,12 @@ class SocketService {
     });
 
     _socket!.on('message.pinned', (data) {
+      debugPrint('[SocketService] RECEIVED message.pinned raw: ${data.runtimeType} = $data');
       _pinnedController.add(Map<String, dynamic>.from(data));
     });
 
     _socket!.on('message.unpinned', (data) {
+      debugPrint('[SocketService] RECEIVED message.unpinned raw: ${data.runtimeType} = $data');
       _unpinnedController.add(Map<String, dynamic>.from(data));
     });
 
@@ -181,6 +196,35 @@ class SocketService {
     _socket!.on('friend.request.received', (data) {
       _friendRequestReceivedController.add(Map<String, dynamic>.from(data));
     });
+
+    // ─── Group Call Signal Listeners ────────────────────────────────────────
+    _socket!.on('group-call:started', (data) {
+      debugPrint('[SocketService] group-call:started received: $data');
+      _groupCallSignalController.add(Map<String, dynamic>.from(data));
+    });
+    _socket!.on('group-call:join', (data) {
+      _groupCallSignalController.add(Map<String, dynamic>.from(data));
+    });
+    _socket!.on('group-call:offer', (data) {
+      _groupCallSignalController.add(Map<String, dynamic>.from(data));
+    });
+    _socket!.on('group-call:answer', (data) {
+      _groupCallSignalController.add(Map<String, dynamic>.from(data));
+    });
+    _socket!.on('group-call:ice-candidate', (data) {
+      _groupCallSignalController.add(Map<String, dynamic>.from(data));
+    });
+    _socket!.on('group-call:leave', (data) {
+      _groupCallSignalController.add(Map<String, dynamic>.from(data));
+    });
+    _socket!.on('group-call:ended', (data) {
+      debugPrint('[SocketService] group-call:ended received: $data');
+      _groupCallSignalController.add(Map<String, dynamic>.from(data));
+    });
+    _socket!.on('group-call:mute-state', (data) {
+      _groupCallSignalController.add(Map<String, dynamic>.from(data));
+    });
+
     _socket!.on('auth.logout.force', (data) {
       final reason = data is Map ? data['reason']?.toString() : null;
       AuthEvents.onForceLogout?.call(reason ?? 'Tài khoản đã đăng nhập từ thiết bị khác');
@@ -198,8 +242,9 @@ class SocketService {
   }
 
   // Send a message by emitting a 'message.send' event with the conversation ID,
-  //message content, and optional message type and client message ID
-  Future<Map<String, dynamic>?> sendMessage({
+  //message content, and optional message type and client message ID.
+  // Uses fire-and-forget: message.sent event will update UI when server confirms.
+  void sendMessage({
     required String conversationId,
     required String content,
     String messageType = 'TEXT',
@@ -211,13 +256,18 @@ class SocketService {
     String? replyToMessageId,
     String? replyToSenderName,
     String? replyToContent,
-  }) async {
+  }) {
     if (_socket == null) {
-      return null;
+      debugPrint('[SocketService] sendMessage FAILED: socket is null');
+      return;
+    }
+    if (!_socket!.connected) {
+      debugPrint('[SocketService] sendMessage FAILED: socket not connected');
+      return;
     }
 
-    final completer = Completer<Map<String, dynamic>?>();
-    _socket?.emitWithAck(
+    debugPrint('[SocketService] sendMessage: conv=$conversationId type=$messageType clientId=$clientMessageId mediaUrl=$mediaUrl');
+    _socket?.emit(
       'message.send',
       {
         'conversationId': conversationId,
@@ -232,18 +282,6 @@ class SocketService {
         if (replyToSenderName != null) 'replyToSenderName': replyToSenderName,
         if (replyToContent != null) 'replyToContent': replyToContent,
       },
-      ack: (data) {
-        if (data is Map) {
-          completer.complete(Map<String, dynamic>.from(data));
-          return;
-        }
-        completer.complete(null);
-      },
-    );
-
-    return completer.future.timeout(
-      const Duration(seconds: 12),
-      onTimeout: () => null,
     );
   }
 
@@ -276,6 +314,10 @@ class SocketService {
   }
 
   void pinMessage(String messageId, String conversationId) {
+    debugPrint('[SocketService] EMIT message.pin: messageId=$messageId conversationId=$conversationId isConnected=$isConnected()');
+    if (!isConnected()) {
+      debugPrint('[SocketService] ERROR: socket not connected, cannot pin!');
+    }
     _socket?.emit('message.pin', {
       'messageId': messageId,
       'conversationId': conversationId,
@@ -283,6 +325,10 @@ class SocketService {
   }
 
   void unpinMessage(String messageId, String conversationId) {
+    debugPrint('[SocketService] EMIT message.unpin: messageId=$messageId conversationId=$conversationId isConnected=$isConnected()');
+    if (!isConnected()) {
+      debugPrint('[SocketService] ERROR: socket not connected, cannot unpin!');
+    }
     _socket?.emit('message.unpin', {
       'messageId': messageId,
       'conversationId': conversationId,
@@ -380,6 +426,119 @@ class SocketService {
     });
   }
 
+  // ─── Group Call Signaling ─────────────────────────────────────────────────
+
+  void emitGroupCallStarted({
+    required String conversationId,
+    required String callId,
+    required bool audioOnly,
+  }) {
+    debugPrint('[SocketService][GROUP_CALL][SEND] started callId=$callId conv=$conversationId');
+    _socket?.emit('group-call:started', {
+      'conversationId': conversationId,
+      'callId': callId,
+      'audioOnly': audioOnly,
+    });
+  }
+
+  void emitGroupCallJoin({
+    required String conversationId,
+    required String callId,
+  }) {
+    _socket?.emit('group-call:join', {
+      'conversationId': conversationId,
+      'callId': callId,
+    });
+  }
+
+  void emitGroupCallOffer({
+    required String conversationId,
+    required String callId,
+    required String targetUserId,
+    required Map<String, dynamic> sdp,
+  }) {
+    debugPrint('[SocketService][GROUP_CALL][SEND] offer callId=$callId target=$targetUserId');
+    _socket?.emit('group-call:offer', {
+      'conversationId': conversationId,
+      'callId': callId,
+      'targetUserId': targetUserId,
+      'sdp': sdp,
+    });
+  }
+
+  void emitGroupCallAnswer({
+    required String conversationId,
+    required String callId,
+    required String targetUserId,
+    required Map<String, dynamic> sdp,
+  }) {
+    _socket?.emit('group-call:answer', {
+      'conversationId': conversationId,
+      'callId': callId,
+      'targetUserId': targetUserId,
+      'sdp': sdp,
+    });
+  }
+
+  void emitGroupCallIceCandidate({
+    required String conversationId,
+    required String callId,
+    required String targetUserId,
+    required Map<String, dynamic> candidate,
+  }) {
+    _socket?.emit('group-call:ice-candidate', {
+      'conversationId': conversationId,
+      'callId': callId,
+      'targetUserId': targetUserId,
+      'candidate': candidate,
+    });
+  }
+
+  void emitGroupCallLeave({
+    required String conversationId,
+    required String callId,
+  }) {
+    _socket?.emit('group-call:leave', {
+      'conversationId': conversationId,
+      'callId': callId,
+    });
+  }
+
+  void emitGroupCallEnded({
+    required String conversationId,
+    required String callId,
+  }) {
+    debugPrint('[SocketService][GROUP_CALL][SEND] ended callId=$callId');
+    _socket?.emit('group-call:ended', {
+      'conversationId': conversationId,
+      'callId': callId,
+    });
+  }
+
+  void emitGroupCallMuteState({
+    required String conversationId,
+    required String callId,
+    bool? isMuted,
+    bool? isCameraOff,
+  }) {
+    _socket?.emit('group-call:mute-state', {
+      'conversationId': conversationId,
+      'callId': callId,
+      if (isMuted != null) 'isMuted': isMuted,
+      if (isCameraOff != null) 'isCameraOff': isCameraOff,
+    });
+  }
+
+  // ─── Stream for group call signals ────────────────────────────────────────
+
+  final _groupCallSignalController = StreamController<Map<String, dynamic>>.broadcast();
+
+  Stream<Map<String, dynamic>> get onGroupCallSignal => _groupCallSignalController.stream;
+
+  bool isConnected() {
+    return _socket != null && _socket!.connected;
+  }
+
   void disconnect() {
     _socket?.disconnect(); // Disconnect from the socket server
     _socket?.dispose(); // Dispose the socket instance to free up resources
@@ -403,5 +562,6 @@ class SocketService {
     _groupDisbandedController.close();
     _friendshipUpdatedController.close();
     _friendRequestReceivedController.close();
+    _groupCallSignalController.close();
   }
 }

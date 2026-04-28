@@ -802,6 +802,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() data: { messageId: string; conversationId: string },
   ) {
     const userId = client.data.user.userId;
+    this.logger.log(`[Gateway.pin] START: userId=${userId} messageId=${data.messageId} conversationId=${data.conversationId}`);
 
     try {
       const pin = await this.messageService.pinMessage(
@@ -809,6 +810,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         data.conversationId,
         data.messageId,
       );
+      this.logger.log(`[Gateway.pin] SUCCESS: pin=${JSON.stringify(pin)}`);
 
       // Broadcast pinned event
       const room = this.getConversationRoom(data.conversationId);
@@ -819,7 +821,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       return { event: 'message.pinned', data: pin };
     } catch (err) {
-      this.logger.error(`Pin message failed: ${err.message}`);
+      this.logger.error(`[Gateway.pin] FAILED: ${err.message}`);
       return { event: 'message.error', data: { error: err.message } };
     }
   }
@@ -831,6 +833,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() data: { messageId: string; conversationId: string },
   ) {
     const userId = client.data.user.userId;
+    this.logger.log(`[Gateway.unpin] START: userId=${userId} messageId=${data.messageId} conversationId=${data.conversationId}`);
 
     try {
       await this.messageService.unpinMessage(
@@ -838,6 +841,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         data.conversationId,
         data.messageId,
       );
+      this.logger.log(`[Gateway.unpin] SUCCESS`);
 
       // Broadcast unpinned event
       const room = this.getConversationRoom(data.conversationId);
@@ -849,7 +853,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       return { event: 'message.unpinned', data: { messageId: data.messageId } };
     } catch (err) {
-      this.logger.error(`Unpin message failed: ${err.message}`);
+      this.logger.error(`[Gateway.unpin] FAILED: ${err.message}`);
       return { event: 'message.error', data: { error: err.message } };
     }
   }

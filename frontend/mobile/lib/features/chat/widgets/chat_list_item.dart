@@ -34,6 +34,15 @@ class ChatListItem extends StatelessWidget {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final common = CommonTexts.of(context);
 
+    final isOnline = _getOtherMember(conversation, currentUserId)?.user?.isOnline ?? false;
+    final lastSeen = _getOtherMember(conversation, currentUserId)?.user?.lastSeen;
+    String? statusText;
+    if (conversation.type == ConversationType.DIRECT && !isOnline && lastSeen != null) {
+      statusText = DateFormatter.relative(lastSeen);
+    } else if (conversation.type == ConversationType.DIRECT && isOnline) {
+      statusText = 'Đang hoạt động';
+    }
+
     final regularTileColor = isDarkMode ? DarkColors.surface : const Color(0xFFFFFFFF);
     final pinnedTileColor = isDarkMode ? const Color(0xFF1E2633) : const Color(0xFFEFF2F7);
     final secondaryTextColor = isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary;
@@ -98,6 +107,8 @@ class ChatListItem extends StatelessWidget {
                   name: displayName,
                   size: 48,
                   showOnline: conversation.type == ConversationType.DIRECT,
+                  isOnline: _getOtherMember(conversation, currentUserId)?.user?.isOnline ?? false,
+                  lastSeen: _getOtherMember(conversation, currentUserId)?.user?.lastSeen,
                   cacheVersion: avatarVersion,
                 ),
           title: Row(
@@ -121,6 +132,20 @@ class ChatListItem extends StatelessWidget {
           ),
           subtitle: Row(
             children: [
+              if (statusText != null) ...[
+                Text(
+                  statusText,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isOnline
+                        ? const Color(0xFF22C55E)
+                        : (isDarkMode ? DarkColors.textHint : Colors.grey.shade500),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text('·', style: TextStyle(color: isDarkMode ? DarkColors.textHint : Colors.grey.shade500)),
+                const SizedBox(width: 6),
+              ],
               Expanded(
                 child: Text(
                   lastPreview ??
@@ -168,6 +193,14 @@ class ChatListItem extends StatelessWidget {
     return other.userId;
   }
 
+  ConversationMember? _getOtherMember(Conversation conv, String currentUserId) {
+    if (conv.members.isEmpty) return null;
+    return conv.members.firstWhere(
+      (m) => m.userId != currentUserId,
+      orElse: () => conv.members.first,
+    );
+  }
+
   String? _buildLastMessagePreview(String currentUserId, CommonTexts common) {
     final message = conversation.lastMessage;
     if (message == null) return null;
@@ -210,6 +243,7 @@ class ChatListItem extends StatelessWidget {
       })(),
       MessageType.REPLY => content.isNotEmpty ? '[Trả lời] $content' : '[Trả lời]',
       MessageType.FORWARD => content.isNotEmpty ? '[Chuyển tiếp] $content' : '[Chuyển tiếp]',
+      MessageType.POLL => '[Bình chọn]',
     };
 
     if (typePreview == null && mediaUrl.isNotEmpty) {
