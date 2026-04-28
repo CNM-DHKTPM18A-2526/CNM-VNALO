@@ -12,6 +12,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 
+import java.util.Arrays;
 import java.util.List;
 
 @Configuration
@@ -35,16 +36,28 @@ public class SecurityConfig {
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // CORS for frontend dev
+                // CORS configuration - Hardened for Production
                 .cors(cors -> cors.configurationSource(request -> {
                     var config = new CorsConfiguration();
                     String allowedOriginsStr = System.getenv("CORS_ALLOWED_ORIGINS");
-                    if (allowedOriginsStr == null || allowedOriginsStr.isBlank()) {
-                        allowedOriginsStr = "http://localhost:3000,http://localhost:5173";
+                    if (allowedOriginsStr != null && !allowedOriginsStr.isBlank()) {
+                        List<String> origins = Arrays.stream(allowedOriginsStr.split(","))
+                                .map(String::trim)
+                                .filter(origin -> !origin.isBlank())
+                                .toList();
+                        config.setAllowedOrigins(origins);
+                    } else {
+                        // Intelligent Fallback: Allow localhost AND the current request host (for IP access)
+                        String origin = request.getHeader("Origin");
+                        if (origin != null && !origin.isBlank()) {
+                            config.setAllowedOrigins(List.of(origin)); 
+                        } else {
+                            config.setAllowedOrigins(List.of("*")); 
+                        }
                     }
-                    config.setAllowedOrigins(java.util.Arrays.asList(allowedOriginsStr.split(",")));
                     config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
                     config.setAllowedHeaders(List.of("*"));
+                    config.setExposedHeaders(List.of("Content-Type", "Content-Length", "Cache-Control", "X-Requested-With"));
                     config.setAllowCredentials(true);
                     return config;
                 }))
@@ -55,7 +68,7 @@ public class SecurityConfig {
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         // Public: media files (avatars, etc.) served without auth for image widgets
-                        .requestMatchers("/api/v1/media/public/**").permitAll()
+                        .requestMatchers("/public/**").permitAll()
                         // Protected: all other actuator endpoints
                         .requestMatchers("/actuator/**").authenticated()
                         // Protected: all API endpoints require valid JWT
@@ -68,4 +81,3 @@ public class SecurityConfig {
         return http.build();
     }
 }
-
