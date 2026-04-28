@@ -11,6 +11,8 @@ class AvatarWidget extends StatefulWidget {
   final String name;
   final double size;
   final bool showOnline;
+  final bool isOnline;
+  final DateTime? lastSeen;
   final int cacheVersion;
   final double? borderWidth;
 
@@ -20,6 +22,8 @@ class AvatarWidget extends StatefulWidget {
     required this.name,
     this.size = 48,
     this.showOnline = false,
+    this.isOnline = false,
+    this.lastSeen,
     this.cacheVersion = 0,
     this.borderWidth,
   });
@@ -104,7 +108,7 @@ class _AvatarWidgetState extends State<AvatarWidget> {
               width: widget.size * 0.28,
               height: widget.size * 0.28,
               decoration: BoxDecoration(
-                color: AppColors.online,
+                color: widget.isOnline ? AppColors.online : Colors.grey.shade500,
                 shape: BoxShape.circle,
                 border: Border.all(color: scheme.surface, width: widget.borderWidth ?? 2),
               ),

@@ -12,6 +12,7 @@ import 'package:vnalo_mobile/features/ai_assistant/screens/ai_conversation_scree
 import 'package:vnalo_mobile/features/chat/screens/chat_detail_screen.dart';
 import 'package:vnalo_mobile/features/chat/screens/my_documents_screen.dart';
 import 'package:vnalo_mobile/features/chat/widgets/chat_list_item.dart';
+import 'package:vnalo_mobile/core/widgets/skeleton_loading.dart';
 import 'package:vnalo_mobile/features/common/widgets/quick_actions_sheet.dart';
 import 'package:vnalo_mobile/features/contacts/screens/add_friend_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/account_security_screen.dart';
@@ -187,8 +188,18 @@ class _ChatListScreenState extends State<ChatListScreen> {
       body: Consumer2<ChatProvider, AiAssistantProvider>(
         builder: (context, chatProvider, aiProvider, _) {
           if (chatProvider.isLoading && chatProvider.conversations.isEmpty) {
-            return const Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
+            return ListView.separated(
+              itemCount: 8,
+              separatorBuilder: (_, __) => Container(
+                color: isDarkMode ? DarkColors.surface : Colors.white,
+                child: Row(
+                  children: [
+                    const SizedBox(width: 80),
+                    Expanded(child: Container(height: 0.6, color: dividerColor)),
+                  ],
+                ),
+              ),
+              itemBuilder: (_, __) => const _SkeletonChatListItem(),
             );
           }
 
@@ -466,5 +477,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
         },
       ),
     );
+  }
+}
+
+class _SkeletonChatListItem extends StatelessWidget {
+  const _SkeletonChatListItem();
+
+  @override
+  Widget build(BuildContext context) {
+    return ChatListSkeletonItem();
   }
 }

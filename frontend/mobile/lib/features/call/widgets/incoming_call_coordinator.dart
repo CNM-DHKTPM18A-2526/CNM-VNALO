@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/call/screens/video_call_screen.dart';
 import 'package:vnalo_mobile/features/call/screens/voice_call_screen.dart';
+import 'package:vnalo_mobile/features/call/screens/group_call_screen.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 import 'package:vnalo_mobile/main.dart';
@@ -20,6 +21,7 @@ class IncomingCallCoordinator extends StatefulWidget {
 class _IncomingCallCoordinatorState extends State<IncomingCallCoordinator> {
   SocketService? _socketService;
   StreamSubscription? _callSignalSub;
+  StreamSubscription? _groupCallSub;
   StreamSubscription? _callKitEventSub;
   final Set<String> _handledOffers = {};
   bool _isPresentingCall = false;
@@ -39,16 +41,85 @@ class _IncomingCallCoordinatorState extends State<IncomingCallCoordinator> {
     }
 
     _callSignalSub?.cancel();
+    _groupCallSub?.cancel();
     _socketService = socketService;
     _callSignalSub = socketService.onCallSignal.listen(_handleSignalEvent);
+    _groupCallSub = socketService.onGroupCallSignal.listen(_handleGroupCallEvent);
     debugPrint('[IncomingCallCoordinator] Subscribed to call signals');
   }
 
   @override
   void dispose() {
     _callSignalSub?.cancel();
+    _groupCallSub?.cancel();
     _callKitEventSub?.cancel();
     super.dispose();
+  }
+
+  Future<void> _handleGroupCallEvent(Map<String, dynamic> signal) async {
+    if (!mounted) return;
+
+    final type = signal['type']?.toString();
+    if (type != 'started') return;
+
+    final callId = signal['callId']?.toString();
+    final conversationId = signal['conversationId']?.toString();
+    final audioOnly = _resolveAudioOnly(signal);
+
+    if (callId == null || conversationId == null) {
+      debugPrint('[IncomingCallCoordinator][GroupCall] Signal missing required IDs: $signal');
+      return;
+    }
+
+    final dedupeKey = 'group:$conversationId:$callId';
+    if (_handledOffers.contains(dedupeKey)) return;
+    _handledOffers.add(dedupeKey);
+
+    final auth = context.read<AuthProvider>();
+    if (!auth.isInitialized || auth.accessToken == null) {
+      var checks = 0;
+      while ((!auth.isInitialized || auth.accessToken == null) && checks < 8) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        checks++;
+      }
+    }
+
+    final chatProvider = context.read<ChatProvider>();
+    final convIndex = chatProvider.conversations.indexWhere(
+      (c) => c.id == conversationId,
+    );
+    final conversation = convIndex == -1 ? null : chatProvider.conversations[convIndex];
+    final convName = conversation?.title ?? 'Cuộc gọi nhóm';
+
+    if (_isPresentingCall) {
+      debugPrint('[IncomingCallCoordinator][GroupCall] Already presenting another call, ignoring.');
+      return;
+    }
+
+    if (!mounted) return;
+
+    debugPrint('[IncomingCallCoordinator][GroupCall] Showing group call banner for $convName');
+
+    _isPresentingCall = true;
+    try {
+      final nav = navigatorKey.currentState;
+      if (nav == null) return;
+
+      await nav.push(
+        MaterialPageRoute(
+          builder: (_) => GroupCallScreen(
+            conversationId: conversationId,
+            callId: callId,
+            conversationName: convName,
+            conversationAvatarUrl: conversation?.avatarUrl,
+            audioOnly: audioOnly,
+            isCaller: false,
+          ),
+        ),
+      );
+    } finally {
+      _isPresentingCall = false;
+    }
   }
 
   void _onCallKitEvent(CallEvent? event) {

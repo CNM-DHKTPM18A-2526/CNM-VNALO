@@ -18,6 +18,7 @@ enum MessageType {
   SYSTEM,
   REPLY,
   FORWARD,
+  POLL,
 }
 
 enum MessageStatus { SENDING, SENT, DELIVERED, READ, FAILED, RECALLED }

@@ -38,7 +38,12 @@ class ChatProvider extends ChangeNotifier {
   final StreamSubscription<Map<String, dynamic>> _reactionAddedSub;
   final StreamSubscription<Map<String, dynamic>> _reactionRemovedSub;
   final StreamSubscription<Map<String, dynamic>> _groupDisbandedSub;
+  final StreamSubscription<Map<String, dynamic>> _typingSub;
+  final StreamSubscription<Map<String, dynamic>> _presenceSub;
   final Random _random = Random.secure();
+
+  // Typing indicator state: conversationId -> { userId -> lastSeen }
+  final Map<String, Map<String, DateTime>> _typingUsers = {};
 
   List<Conversation> _conversations = [];
   String? _activeConversationId;
@@ -48,6 +53,7 @@ class ChatProvider extends ChangeNotifier {
   String? _highlightedMessageId;
   Timer? _highlightTimer;
   Message? _lastCloudMessage;
+  Timer? _openConversationDebounce;
 
   List<Conversation> get conversations => _conversations;
   Message? get lastCloudMessage => _lastCloudMessage;
@@ -76,6 +82,10 @@ class ChatProvider extends ChangeNotifier {
   List<MessageReaction> getReactionsForMessage(String messageId) =>
       _reactions[messageId] ?? [];
 
+  /// Returns a map of userId -> DateTime for users currently typing in [conversationId].
+  Map<String, DateTime> getTypingUsers(String conversationId) =>
+      _typingUsers[conversationId] ?? {};
+
   ChatProvider({
     required ChatService chatService,
     required SocketService socketService,
@@ -95,7 +105,9 @@ class ChatProvider extends ChangeNotifier {
         _unpinnedSub = socketService.onUnpinned.listen((_) {}),
         _reactionAddedSub = socketService.onReactionAdded.listen((_) {}),
         _reactionRemovedSub = socketService.onReactionRemoved.listen((_) {}),
-        _groupDisbandedSub = socketService.onGroupDisbanded.listen((_) {}) {
+        _groupDisbandedSub = socketService.onGroupDisbanded.listen((_) {}),
+        _typingSub = socketService.onTyping.listen((_) {}),
+        _presenceSub = socketService.onPresence.listen((_) {}) {
     _notificationService.ensureInitialized();
     _messageSub.onData(_handleIncomingMessage);
     _readSub.onData(_handleReadEvent);
@@ -106,6 +118,8 @@ class ChatProvider extends ChangeNotifier {
     _reactionAddedSub.onData(_handleReactionAddedEvent);
     _reactionRemovedSub.onData(_handleReactionRemovedEvent);
     _groupDisbandedSub.onData(_handleGroupDisbandedEvent);
+    _typingSub.onData(_handleTypingEvent);
+    _presenceSub.onData(_handlePresenceEvent);
   }
 
   List<Message> getMessages(String conversationId) =>
@@ -340,25 +354,29 @@ class ChatProvider extends ChangeNotifier {
         before: before,
       );
 
+      // Resolve senderName from members for all messages
+      for (int i = 0; i < response.length; i++) {
+        final msg = response[i];
+        if (msg.senderName == null) {
+          final resolvedName = getSenderName(conversationId, msg.senderId);
+          response[i] = msg.copyWith(senderName: resolvedName);
+        }
+        // Also resolve reply sender name
+        if (msg.replyToSenderId != null && msg.replyToSenderName == null) {
+          final replyName = getSenderName(conversationId, msg.replyToSenderId!);
+          response[i] = response[i].copyWith(replyToSenderName: replyName);
+        }
+      }
+
       if (before == null) {
         _messages[conversationId] = response;
-        // Sync API messages to local DB in background
+        // Sync API messages to local DB in background (fire and forget)
         _db.saveMessagesBatch(response.map(_toLocal).toList());
-        
-        // Load reactions for all messages
-        for (final message in response) {
-          loadReactions(message.id);
-        }
       } else {
         _messages[conversationId] = [
           ...(_messages[conversationId] ?? []),
           ...response,
         ];
-        
-        // Load reactions for newly loaded messages
-        for (final message in response) {
-          loadReactions(message.id);
-        }
       }
       notifyListeners();
     } catch (e, stack) {
@@ -409,15 +427,23 @@ class ChatProvider extends ChangeNotifier {
   }
 
   Future<void> openConversation(String conversationId) async {
+    // Debounce: cancel any pending openConversation call
+    _openConversationDebounce?.cancel();
+    _openConversationDebounce = Timer(const Duration(milliseconds: 300), () async {
+      await _openConversationInternal(conversationId);
+    });
+  }
+
+  Future<void> _openConversationInternal(String conversationId) async {
+    // Skip if already in this conversation or if userId not set yet
+    if (_activeConversationId == conversationId || _currentUserId == null) {
+      return;
+    }
+
     _activeConversationId = conversationId;
     _socketService.joinConversation(conversationId);
+    // Load pinned messages in background (non-blocking)
     loadPinnedMessages(conversationId);
-
-    // Load reactions for messages in this conversation
-    final messages = _messages[conversationId] ?? [];
-    for (final message in messages) {
-      loadReactions(message.id);
-    }
 
     // Clear unread count locally
     final index = _conversations.indexWhere((c) => c.id == conversationId);
@@ -425,7 +451,6 @@ class ChatProvider extends ChangeNotifier {
       final conv = _conversations[index];
       if (conv.unreadCount > 0) {
         _conversations[index] = conv.copyWith(unreadCount: 0);
-        // Mark as read on server
         if (conv.lastMessage != null && conv.lastMessage!.serverSeq != null) {
           _socketService.markRead(conversationId, conv.lastMessage!.serverSeq!);
           _db.upsertConversationReadState(
@@ -433,19 +458,16 @@ class ChatProvider extends ChangeNotifier {
             lastReadSeq: conv.lastMessage!.serverSeq!,
           );
         }
-        notifyListeners();
       }
     }
 
-    // 1. Load from Local Cache FIRST (Optimistic UI)
-    if (_currentUserId != null) {
-      final localMsgs = await _db.getMessagesByConversation(conversationId, _currentUserId!);
-      if (_activeConversationId == conversationId) {
-        _messages[conversationId] = localMsgs.map(_fromLocal).toList();
-        notifyListeners();
-      }
+    // Load from Local Cache FIRST (Optimistic UI) — no notifyListeners here
+    final localMsgs = await _db.getMessagesByConversation(conversationId, _currentUserId!);
+    if (_activeConversationId == conversationId) {
+      _messages[conversationId] = localMsgs.map(_fromLocal).toList();
     }
 
+    // Then fetch fresh data from API
     await loadMessages(conversationId);
 
     // Ensure read state is synced after fresh messages are loaded.
@@ -460,6 +482,9 @@ class ChatProvider extends ChangeNotifier {
         lastReadSeq: latestSeq,
       );
     }
+
+    // Single notifyListeners after all data is loaded
+    notifyListeners();
   }
 
   void setCurrentUserId(String userId) {
@@ -538,6 +563,7 @@ class ChatProvider extends ChangeNotifier {
       replyToContent: replyContent,
     );
 
+    debugPrint('[ChatProvider] sendMessage ADDING TO UI: conv=$conversationId id=local-$clientMessageId content="$content"');
     _messages[conversationId] = [optimistic, ...(getMessagesForConversation(conversationId))];
     _replyingTo = null; // Clear reply state after sending
 
@@ -577,7 +603,7 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
 
     if (file == null && mediaUrl != null) {
-      _sendWithRetry(optimistic);
+      _sendWithRetryMedia(optimistic);
       return;
     }
 
@@ -592,7 +618,7 @@ class ChatProvider extends ChangeNotifier {
         mediaSizeBytes: fileSize,
       );
       _replaceMessage(conversationId, optimistic.id, updated);
-      _sendWithRetry(updated);
+      _sendWithRetryMedia(updated);
     } catch (e) {
       debugPrint('sendMediaMessage error: $e');
       _replaceMessage(
@@ -623,7 +649,7 @@ class ChatProvider extends ChangeNotifier {
 
     _messages[conversationId] = [message, ...(getMessagesForConversation(conversationId))];
     notifyListeners();
-    _sendWithRetry(message);
+    _sendWithRetryMedia(message);
   }
 
   void sendGif({
@@ -691,43 +717,79 @@ class ChatProvider extends ChangeNotifier {
   }) async {
     if (conversationIds.isEmpty || sourceMessages.isEmpty) return;
 
+    debugPrint('[ChatProvider] sendForwardBatch: ${sourceMessages.length} msgs to ${conversationIds.length} convs');
+
     final extra = additionalText?.trim();
+
     for (final conversationId in conversationIds) {
+      // Send optional additional text first
       if (extra != null && extra.isNotEmpty) {
-        sendMessage(conversationId: conversationId, content: extra);
+        try {
+          final msg = await _chatService.sendMessage(
+            conversationId: conversationId,
+            content: extra,
+            messageType: 'TEXT',
+          );
+          _addMessageToConversation(conversationId, msg);
+          debugPrint('[ChatProvider] sendForwardBatch: extra text sent to $conversationId');
+        } catch (e) {
+          debugPrint('[ChatProvider] sendForwardBatch: failed to send extra text to $conversationId: $e');
+        }
       }
 
+      // Send each source message
       for (final source in sourceMessages) {
-        if (source.messageType == MessageType.TEXT) {
-          final content = (source.content ?? '').trim();
-          if (content.isEmpty) continue;
-          sendMessage(
-            conversationId: conversationId,
-            content: content,
-            messageType: source.messageType.name,
-          );
-          continue;
-        }
+        try {
+          final hasRemoteMedia = (source.mediaUrl ?? '').trim().isNotEmpty;
 
-        final hasRemoteMedia = (source.mediaUrl ?? '').trim().isNotEmpty;
-        if (hasRemoteMedia) {
-          await sendMediaMessage(
-            conversationId: conversationId,
-            type: source.messageType,
-            mediaUrl: source.mediaUrl,
-          );
-          continue;
-        }
+          if (source.messageType == MessageType.TEXT || !hasRemoteMedia) {
+            final content = (source.content ?? '').trim();
+            if (content.isEmpty) continue;
 
-        final fallback = (source.content ?? '').trim();
-        if (fallback.isNotEmpty) {
-          sendMessage(
-            conversationId: conversationId,
-            content: fallback,
-            messageType: source.messageType.name,
-          );
+            final msg = await _chatService.sendMessage(
+              conversationId: conversationId,
+              content: content,
+              messageType: source.messageType.name,
+              mediaUrl: hasRemoteMedia ? source.mediaUrl : null,
+              mediaThumbnailUrl: source.mediaThumbnailUrl,
+              forwardFromMessageId: source.id,
+              forwardFromConversationId: source.conversationId,
+            );
+            _addMessageToConversation(conversationId, msg);
+            debugPrint('[ChatProvider] sendForwardBatch: TEXT/FILE msg sent to $conversationId');
+          } else {
+            // Media message (IMAGE, VIDEO, AUDIO, STICKER) — forward as media
+            final msg = await _chatService.sendMessage(
+              conversationId: conversationId,
+              content: source.content ?? '',
+              messageType: source.messageType.name,
+              mediaUrl: source.mediaUrl,
+              mediaThumbnailUrl: source.mediaThumbnailUrl,
+              mediaMimeType: source.mediaMimeType,
+              mediaSizeBytes: source.mediaSizeBytes,
+              forwardFromMessageId: source.id,
+              forwardFromConversationId: source.conversationId,
+            );
+            _addMessageToConversation(conversationId, msg);
+            debugPrint('[ChatProvider] sendForwardBatch: MEDIA msg sent to $conversationId');
+          }
+        } catch (e) {
+          debugPrint('[ChatProvider] sendForwardBatch: failed to forward msg ${source.id} to $conversationId: $e');
         }
       }
+    }
+  }
+
+  void _addMessageToConversation(String conversationId, Message message) {
+    final list = _messages[conversationId] ?? [];
+    debugPrint('[ChatProvider] _addMessageToConversation: conv=$conversationId msgId=${message.id} existingCount=${list.length}');
+    if (!list.any((m) => m.id == message.id)) {
+      _messages[conversationId] = [message, ...list];
+      _db.saveMessage(_toLocal(message));
+      notifyListeners();
+      debugPrint('[ChatProvider] _addMessageToConversation: ADDED msgId=${message.id} newCount=${list.length + 1}');
+    } else {
+      debugPrint('[ChatProvider] _addMessageToConversation: SKIPPED (duplicate) msgId=${message.id}');
     }
   }
 
@@ -825,10 +887,26 @@ class ChatProvider extends ChangeNotifier {
       message.id,
       message.copyWith(status: MessageStatus.SENDING),
     );
-    _sendWithRetry(message.copyWith(status: MessageStatus.SENDING));
+
+    // Use HTTP fallback for TEXT, socket retry for media
+    final isMedia = message.mediaUrl != null;
+    if (isMedia) {
+      _sendWithRetryMedia(message.copyWith(status: MessageStatus.SENDING));
+    } else {
+      _sendWithRetry(message.copyWith(status: MessageStatus.SENDING));
+    }
   }
 
   void _handleIncomingMessage(Message message) {
+    debugPrint('[ChatProvider] _handleIncomingMessage: id=${message.id} conv=${message.conversationId} sender=${message.senderId} clientId=${message.clientMessageId} isMine=${message.senderId == _currentUserId} content=${message.content?.substring(0, min(30, message.content?.length ?? 0))}');
+
+    // Early deduplication: skip if a message with the same server ID is already in the list
+    // This prevents double-add from socket + HTTP race conditions
+    final existing = _messages[message.conversationId] ?? [];
+    if (!message.id.startsWith('local-') && existing.any((m) => m.id == message.id)) {
+      debugPrint('[ChatProvider] _handleIncomingMessage: SKIPPED duplicate server id=${message.id}');
+      return;
+    }
     // 1. SIGNAL MESSAGE HANDLING (Real-time Sync for Disband/Remove)
     // Since backend doesn't emit dedicated socket events, we use hidden "Signal Messages"
     // that are broadcasted as normal messages but intercepted here.
@@ -987,15 +1065,16 @@ class ChatProvider extends ChangeNotifier {
       resolvedMessage = resolvedMessage.copyWith(replyToSenderName: resolvedReplyName);
     }
 
-    final existing = _messages[conversationId] ?? [];
+    final msgList = _messages[conversationId] ?? [];
     final clientMessageId = resolvedMessage.clientMessageId;
     if (clientMessageId != null) {
       _clearRetry(clientMessageId);
-      final optimisticIndex = existing.indexWhere(
+      final optimisticIndex = msgList.indexWhere(
         (m) => m.clientMessageId == clientMessageId,
       );
       if (optimisticIndex >= 0) {
-        final updated = List<Message>.from(existing);
+        debugPrint('[ChatProvider] _handleIncomingMessage: REPLACING optimistic msgId=${message.id} clientId=$clientMessageId');
+        final updated = List<Message>.from(msgList);
         final oldMessage = updated[optimisticIndex];
 
         // MERGE metadata: Keep reply info if already present in optimistic but missing in resolved
@@ -1012,18 +1091,36 @@ class ChatProvider extends ChangeNotifier {
            merged = merged.copyWith(replyToSenderName: oldMessage.replyToSenderName);
         }
 
+        // Resolve senderName from optimistic message or member list if missing
+        if (merged.senderName == null) {
+          final resolvedSenderName = oldMessage.senderName ?? getSenderName(conversationId, merged.senderId);
+          merged = merged.copyWith(senderName: resolvedSenderName);
+        }
+
         updated[optimisticIndex] = merged;
         _messages[conversationId] = updated;
       } else {
-        final alreadyPresent = existing.any((m) => m.id == message.id);
+        // Not an optimistic message (from another device) — resolve senderName from members
+        final alreadyPresent = msgList.any((m) => m.id == message.id);
         if (!alreadyPresent) {
-          _messages[conversationId] = [message, ...existing];
+          debugPrint('[ChatProvider] _handleIncomingMessage: ADDING new msg (no clientId) msgId=${message.id}');
+          Message toAdd = message;
+          if (message.senderName == null) {
+            toAdd = message.copyWith(senderName: getSenderName(conversationId, message.senderId));
+          }
+          _messages[conversationId] = [toAdd, ...msgList];
         }
       }
     } else {
-      final alreadyPresent = existing.any((m) => m.id == message.id);
+      // No clientMessageId — resolve senderName from members
+      final alreadyPresent = msgList.any((m) => m.id == message.id);
       if (!alreadyPresent) {
-        _messages[conversationId] = [message, ...existing];
+        debugPrint('[ChatProvider] _handleIncomingMessage: ADDING new msg (no clientId) msgId=${message.id}');
+        Message toAdd = message;
+        if (message.senderName == null) {
+          toAdd = message.copyWith(senderName: getSenderName(conversationId, message.senderId));
+        }
+        _messages[conversationId] = [toAdd, ...msgList];
       }
     }
 
@@ -1272,13 +1369,104 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _handleTypingEvent(Map<String, dynamic> data) {
+    final conversationId = data['conversationId']?.toString();
+    final senderId = data['senderId']?.toString();
+    final isTyping = data['isTyping'] == true;
+
+    if (conversationId == null || senderId == null) return;
+    // Don't show own typing
+    if (senderId == _currentUserId) return;
+
+    _typingUsers[conversationId] ??= {};
+
+    if (isTyping) {
+      _typingUsers[conversationId]![senderId] = DateTime.now();
+      // Auto-expire after 5 seconds if no stop event
+      Future.delayed(const Duration(seconds: 5), () {
+        if (_typingUsers[conversationId]?[senderId] != null) {
+          final elapsed = DateTime.now().difference(
+            _typingUsers[conversationId]![senderId]!,
+          );
+          if (elapsed.inSeconds >= 5) {
+            _typingUsers[conversationId]?.remove(senderId);
+            if (_typingUsers[conversationId]?.isEmpty ?? false) {
+              _typingUsers.remove(conversationId);
+            }
+            notifyListeners();
+          }
+        }
+      });
+    } else {
+      _typingUsers[conversationId]?.remove(senderId);
+      if (_typingUsers[conversationId]?.isEmpty ?? false) {
+        _typingUsers.remove(conversationId);
+      }
+    }
+    notifyListeners();
+  }
+
+  /// Emit typing indicator to socket.
+  void emitTyping(String conversationId) {
+    _socketService.sendTyping(conversationId, true);
+    // Auto-stop after 3 seconds
+    Future.delayed(const Duration(seconds: 3), () {
+      _socketService.sendTyping(conversationId, false);
+    });
+  }
+
+  void _handlePresenceEvent(Map<String, dynamic> data) {
+    final userId = data['userId']?.toString();
+    final isOnline = data['isOnline'] == true;
+    final lastSeen = data['lastSeen'] != null
+        ? DateTime.tryParse(data['lastSeen'].toString())
+        : (isOnline ? DateTime.now() : null);
+
+    if (userId == null) return;
+
+    // Update all conversations where this user is a member
+    bool changed = false;
+    for (int i = 0; i < _conversations.length; i++) {
+      final conv = _conversations[i];
+      final memberIdx = conv.members.indexWhere((m) => m.userId == userId);
+      if (memberIdx < 0) continue;
+
+      final member = conv.members[memberIdx];
+      if (member.user == null) continue;
+
+      final updatedUser = member.user!.copyWith(
+        isOnline: isOnline,
+        lastSeen: lastSeen,
+      );
+
+      if (member.user!.isOnline != isOnline ||
+          member.user!.lastSeen != lastSeen) {
+        final updatedMember = member.copyWith(user: updatedUser);
+        final updatedMembers = List<ConversationMember>.from(conv.members);
+        updatedMembers[memberIdx] = updatedMember;
+        _conversations[i] = conv.copyWith(members: updatedMembers);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      notifyListeners();
+    }
+  }
+
   Future<void> _sendWithRetry(Message message) async {
     final clientMessageId = message.clientMessageId;
-    if (clientMessageId == null) {
+    if (clientMessageId == null) return;
+
+    // Check if socket is connected
+    if (!_socketService.isConnected()) {
+      debugPrint('[ChatProvider] Socket not connected, falling back to HTTP');
+      await _sendViaHttp(message);
       return;
     }
 
-    final ack = await _socketService.sendMessage(
+    // Emit via socket immediately (fire-and-forget)
+    _socketService.sendMessage(
       conversationId: message.conversationId,
       content: message.content ?? '',
       messageType: message.messageType.name,
@@ -1291,34 +1479,68 @@ class ChatProvider extends ChangeNotifier {
       replyToContent: message.replyToContent,
     );
 
-    if (ack != null && ack['event'] == 'message.error') {
-      _scheduleRetry(message);
-      return;
-    }
-
-    if (ack != null && ack['event'] == 'message.sent' && ack['data'] is Map) {
-      final serverMessage = Message.fromJson(Map<String, dynamic>.from(ack['data']));
-      _handleIncomingMessage(serverMessage);
-      return;
-    }
-
-    final delaySeconds = 3 + ((_retryCounts[clientMessageId] ?? 0) * 2);
-    _retryTimers[clientMessageId]?.cancel();
-    _retryTimers[clientMessageId] = Timer(Duration(seconds: delaySeconds), () {
-      final pending = _findByClientMessageId(
-        message.conversationId,
-        clientMessageId,
+    // Check after a short delay if message was confirmed by server
+    Timer(const Duration(milliseconds: 800), () async {
+      final existing = _messages[message.conversationId] ?? [];
+      final wasConfirmed = existing.any(
+        (m) => m.clientMessageId == clientMessageId && !m.id.startsWith('local-'),
       );
-      if (pending == null) {
-        return;
-      }
-      if (pending.status == MessageStatus.SENDING) {
-        _scheduleRetry(pending);
+      if (!wasConfirmed) {
+        debugPrint('[ChatProvider] Socket not confirmed in 800ms, falling back to HTTP');
+        await _sendViaHttp(message);
       }
     });
   }
 
-  void _scheduleRetry(Message message) {
+  Future<void> _sendViaHttp(Message message) async {
+    final clientMessageId = message.clientMessageId;
+    if (clientMessageId == null) return;
+
+    try {
+      final serverMessage = await _chatService.sendMessage(
+        conversationId: message.conversationId,
+        content: message.content ?? '',
+        messageType: message.messageType.name,
+        mediaUrl: message.mediaUrl,
+        mediaThumbnailUrl: message.mediaThumbnailUrl,
+        replyToMessageId: message.replyToMessageId,
+      );
+
+      // Replace optimistic message with server message (match by clientMessageId)
+      final existing = _messages[message.conversationId] ?? [];
+      final idx = existing.indexWhere((m) => m.clientMessageId == clientMessageId);
+      if (idx >= 0) {
+        debugPrint('[ChatProvider] _sendViaHttp: REPLACING optimistic id=local-$clientMessageId with server id=${serverMessage.id}');
+        final updated = List<Message>.from(existing);
+        updated[idx] = serverMessage;
+        _messages[message.conversationId] = updated;
+        notifyListeners();
+      } else {
+        debugPrint('[ChatProvider] _sendViaHttp: optimistic not found for clientId=$clientMessageId, adding directly');
+        final updatedList = [serverMessage, ...existing];
+        _messages[message.conversationId] = updatedList;
+        notifyListeners();
+      }
+      _db.saveMessage(_toLocal(serverMessage));
+
+      // Also notify other devices via socket (fire and forget)
+      _socketService.sendMessage(
+        conversationId: message.conversationId,
+        content: message.content ?? '',
+        messageType: message.messageType.name,
+        clientMessageId: clientMessageId,
+        mediaUrl: message.mediaUrl,
+        mediaThumbnailUrl: message.mediaThumbnailUrl,
+      );
+
+      debugPrint('[ChatProvider] Message sent via HTTP: ${serverMessage.id}');
+    } catch (e) {
+      debugPrint('[ChatProvider] HTTP fallback failed: $e');
+      _scheduleRetry(message, viaHttp: true);
+    }
+  }
+
+  void _scheduleRetry(Message message, {required bool viaHttp}) {
     final clientMessageId = message.clientMessageId;
     if (clientMessageId == null) {
       return;
@@ -1353,7 +1575,114 @@ class ChatProvider extends ChangeNotifier {
         current.id,
         current.copyWith(status: MessageStatus.SENDING),
       );
-      _sendWithRetry(current.copyWith(status: MessageStatus.SENDING));
+      if (viaHttp) {
+        _sendViaHttp(current.copyWith(status: MessageStatus.SENDING));
+      } else {
+        _sendWithRetry(current.copyWith(status: MessageStatus.SENDING));
+      }
+    });
+  }
+
+  /// Media message send — always via socket (needs mediaUrl)
+  Future<void> _sendWithRetryMedia(Message message) async {
+    final clientMessageId = message.clientMessageId;
+    if (clientMessageId == null) return;
+
+    // Check if socket is connected
+    if (!_socketService.isConnected()) {
+      debugPrint('[ChatProvider] Socket not connected, falling back to HTTP for media');
+      await _sendMediaViaHttp(message);
+      return;
+    }
+
+    // Emit via socket immediately (fire-and-forget)
+    _socketService.sendMessage(
+      conversationId: message.conversationId,
+      content: message.content ?? '',
+      messageType: message.messageType.name,
+      clientMessageId: clientMessageId,
+      mediaUrl: message.mediaUrl,
+      mediaThumbnailUrl: message.mediaThumbnailUrl,
+      mediaSizeBytes: message.mediaSizeBytes,
+      replyToMessageId: message.replyToMessageId,
+      replyToSenderName: message.replyToSenderName,
+      replyToContent: message.replyToContent,
+    );
+
+    // Check after a short delay if message was confirmed
+    Timer(const Duration(milliseconds: 800), () {
+      final existing = _messages[message.conversationId] ?? [];
+      final wasConfirmed = existing.any(
+        (m) => m.clientMessageId == clientMessageId && !m.id.startsWith('local-'),
+      );
+      if (!wasConfirmed) {
+        debugPrint('[ChatProvider] Media socket not confirmed in 800ms, falling back to HTTP');
+        _sendMediaViaHttp(message);
+      }
+    });
+  }
+
+  Future<void> _sendMediaViaHttp(Message message) async {
+    final clientMessageId = message.clientMessageId;
+    if (clientMessageId == null) return;
+
+    try {
+      final serverMessage = await _chatService.sendMessage(
+        conversationId: message.conversationId,
+        content: message.content ?? '',
+        messageType: message.messageType.name,
+        mediaUrl: message.mediaUrl,
+        mediaThumbnailUrl: message.mediaThumbnailUrl,
+        replyToMessageId: message.replyToMessageId,
+      );
+
+      final existing = _messages[message.conversationId] ?? [];
+      final idx = existing.indexWhere((m) => m.clientMessageId == clientMessageId);
+      if (idx >= 0) {
+        final updated = List<Message>.from(existing);
+        updated[idx] = serverMessage;
+        _messages[message.conversationId] = updated;
+        notifyListeners();
+      }
+      _db.saveMessage(_toLocal(serverMessage));
+      debugPrint('[ChatProvider] Media sent via HTTP: ${serverMessage.id}');
+    } catch (e) {
+      debugPrint('[ChatProvider] Media HTTP fallback failed: $e');
+      _scheduleRetryMedia(message.copyWith(status: MessageStatus.SENDING));
+    }
+  }
+
+  void _scheduleRetryMedia(Message message) {
+    final clientMessageId = message.clientMessageId;
+    if (clientMessageId == null) return;
+
+    final retryCount = (_retryCounts[clientMessageId] ?? 0) + 1;
+    _retryCounts[clientMessageId] = retryCount;
+    if (retryCount > 3) {
+      _replaceMessage(
+        message.conversationId,
+        message.id,
+        message.copyWith(status: MessageStatus.FAILED),
+      );
+      HapticFeedback.heavyImpact();
+      _clearRetry(clientMessageId, keepCount: true);
+      return;
+    }
+
+    final backoffSeconds = min(2 * retryCount, 6);
+    _retryTimers[clientMessageId]?.cancel();
+    _retryTimers[clientMessageId] = Timer(Duration(seconds: backoffSeconds), () {
+      final current = _findByClientMessageId(message.conversationId, clientMessageId);
+      if (current == null) {
+        _clearRetry(clientMessageId);
+        return;
+      }
+      _replaceMessage(
+        message.conversationId,
+        current.id,
+        current.copyWith(status: MessageStatus.SENDING),
+      );
+      _sendWithRetryMedia(current.copyWith(status: MessageStatus.SENDING));
     });
   }
 
@@ -1408,6 +1737,11 @@ class ChatProvider extends ChangeNotifier {
     _recalledSub.cancel();
     _pinnedSub.cancel();
     _unpinnedSub.cancel();
+    _reactionAddedSub.cancel();
+    _reactionRemovedSub.cancel();
+    _groupDisbandedSub.cancel();
+    _typingSub.cancel();
+    _presenceSub.cancel();
     _highlightTimer?.cancel();
     for (final timer in _retryTimers.values) {
       timer.cancel();
@@ -1958,7 +2292,7 @@ class ChatProvider extends ChangeNotifier {
         'targetMemberIds': [userId]
       };
       
-      await _socketService.sendMessage(
+      _socketService.sendMessage(
         conversationId: conversationId,
         content: jsonEncode(removeSignal),
         messageType: 'SYSTEM',
@@ -2037,7 +2371,7 @@ class ChatProvider extends ChangeNotifier {
         'actorId': _currentUserId
       };
       
-      await _socketService.sendMessage(
+      _socketService.sendMessage(
         conversationId: conversationId,
         content: jsonEncode(disbandSignal),
         messageType: 'SYSTEM',
@@ -2154,17 +2488,38 @@ class ChatProvider extends ChangeNotifier {
 
   Future<void> loadPinnedMessages(String conversationId) async {
     try {
+      debugPrint('[ChatProvider] loadPinnedMessages START conversationId=$conversationId');
       final pins = await _chatService.getPinnedMessages(conversationId);
+      debugPrint('[ChatProvider] loadPinnedMessages raw response: $pins');
       final List<Message> messages = [];
-      for (final p in (pins as List)) {
-        if (p['message'] != null) {
-          messages.add(Message.fromJson(p['message']));
+      for (final p in pins) {
+        debugPrint('[ChatProvider] loadPinnedMessages pin item: $p (type: ${p.runtimeType})');
+        // Handle both Map and object with 'message' property
+        // The API returns PinnedMessage entity: { id, conversationId, messageId, serverSeq, pinnedBy, pinnedAt, message: {...} }
+        Object? messageData;
+        if (p is Map) {
+          messageData = p['message'];
+        } else {
+          messageData = (p as dynamic).message;
+        }
+        if (messageData != null) {
+          final Map<String, dynamic> msgJson = messageData is Map ? Map<String, dynamic>.from(messageData) : (messageData as dynamic);
+          final msg = Message.fromJson(msgJson);
+          // Resolve senderName if missing
+          if (msg.senderName == null) {
+            final resolvedName = getSenderName(conversationId, msg.senderId);
+            messages.add(msg.copyWith(senderName: resolvedName));
+          } else {
+            messages.add(msg);
+          }
+          debugPrint('[ChatProvider] loadPinnedMessages added: ${msg.id}');
         }
       }
       _pinnedMessages[conversationId] = messages;
+      debugPrint('[ChatProvider] loadPinnedMessages total: ${messages.length}');
       notifyListeners();
-    } catch (e) {
-      debugPrint('loadPinnedMessages error: $e');
+    } catch (e, st) {
+      debugPrint('loadPinnedMessages error: $e\n$st');
     }
   }
 
@@ -2213,13 +2568,64 @@ class ChatProvider extends ChangeNotifier {
   }
 
   void pinMessage(String messageId) {
-    if (_activeConversationId == null) return;
-    _socketService.pinMessage(messageId, _activeConversationId!);
+    debugPrint('[ChatProvider] pinMessage CALLED: messageId=$messageId activeConvId=$_activeConversationId');
+    if (_activeConversationId == null) {
+      debugPrint('[ChatProvider] pinMessage SKIP: no active conversation');
+      return;
+    }
+    final convId = _activeConversationId!;
+
+    // Use REST API for pin (more reliable than socket)
+    _chatService.pinMessage(convId, messageId).then((pinData) async {
+      debugPrint('[ChatProvider] pinMessage REST SUCCESS: $pinData');
+      // Parse the pin data to extract message and update state
+      final messageData = pinData['message'];
+      if (messageData != null && messageData is Map) {
+        final msg = Message.fromJson(Map<String, dynamic>.from(messageData));
+        final resolvedName = getSenderName(convId, msg.senderId);
+        final resolvedMsg = msg.copyWith(senderName: resolvedName);
+        final currentPins = _pinnedMessages[convId] ?? [];
+        if (!currentPins.any((m) => m.id == resolvedMsg.id)) {
+          _pinnedMessages[convId] = [resolvedMsg, ...currentPins];
+          debugPrint('[ChatProvider] pinMessage added to state: ${resolvedMsg.id}');
+          notifyListeners();
+        }
+      }
+      // Also try socket for real-time broadcast to other clients
+      _socketService.pinMessage(messageId, convId);
+    }).catchError((e) {
+      debugPrint('[ChatProvider] pinMessage REST FAILED: $e');
+      // Fallback to socket
+      _socketService.pinMessage(messageId, convId);
+    });
   }
 
   void unpinMessage(String messageId) {
-    if (_activeConversationId == null) return;
-    _socketService.unpinMessage(messageId, _activeConversationId!);
+    debugPrint('[ChatProvider] unpinMessage CALLED: messageId=$messageId activeConvId=$_activeConversationId');
+    if (_activeConversationId == null) {
+      debugPrint('[ChatProvider] unpinMessage SKIP: no active conversation');
+      return;
+    }
+    final convId = _activeConversationId!;
+
+    // Use REST API for unpin (more reliable than socket)
+    _chatService.unpinMessage(convId, messageId).then((_) async {
+      debugPrint('[ChatProvider] unpinMessage REST SUCCESS');
+      // Update local state immediately
+      final currentPins = _pinnedMessages[convId] ?? [];
+      final updatedPins = currentPins.where((m) => m.id != messageId).toList();
+      if (updatedPins.length != currentPins.length) {
+        _pinnedMessages[convId] = updatedPins;
+        debugPrint('[ChatProvider] unpinMessage removed from state: $messageId');
+        notifyListeners();
+      }
+      // Also try socket for real-time broadcast
+      _socketService.unpinMessage(messageId, convId);
+    }).catchError((e) {
+      debugPrint('[ChatProvider] unpinMessage REST FAILED: $e');
+      // Fallback to socket
+      _socketService.unpinMessage(messageId, convId);
+    });
   }
 
   bool isMessagePinned(String conversationId, String messageId) {
@@ -2229,24 +2635,64 @@ class ChatProvider extends ChangeNotifier {
   }
 
   void _handlePinnedEvent(Map<String, dynamic> data) {
-    debugPrint('[ChatProvider] 📌 Received message.pinned event: $data');
-    final pin = data['pin'];
-    if (pin != null && pin['message'] != null) {
-      final conversationId = pin['conversationId'] ?? _activeConversationId;
-      if (conversationId == null) {
-        debugPrint('[ChatProvider] ⚠️ Skip pin: No conversationId found');
-        return;
-      }
+    debugPrint('[ChatProvider] Received message.pinned event: $data');
 
-      final message = Message.fromJson(pin['message']);
-      final currentPins = _pinnedMessages[conversationId] ?? [];
-      
-      // Avoid duplicates
-      if (!currentPins.any((m) => m.id == message.id)) {
-        _pinnedMessages[conversationId] = [message, ...currentPins];
-        notifyListeners();
-      }
+    // Backend sends: { pin: { message: {...}, conversationId: "...", pinnedBy: "..." } }
+    Message? message;
+    String? conversationId;
+
+    final pin = data['pin'];
+    if (pin == null) {
+      debugPrint('[ChatProvider] Skip pin: pin data is null');
+      return;
     }
+
+    if (pin is Map) {
+      // pin = { id, message: {...}, conversationId: "...", ... }
+      final messageData = pin['message'];
+      if (messageData != null) {
+        message = Message.fromJson(Map<String, dynamic>.from(messageData));
+      }
+      conversationId = pin['conversationId']?.toString();
+    } else {
+      debugPrint('[ChatProvider] Pin data is not a Map: $pin');
+      return;
+    }
+
+    if (message == null) {
+      debugPrint('[ChatProvider] Skip pin: could not extract message from pin data');
+      return;
+    }
+
+    // Fallback conversationId to active conversation
+    conversationId ??= _activeConversationId;
+    if (conversationId == null) {
+      debugPrint('[ChatProvider] Skip pin: No conversationId');
+      return;
+    }
+
+    // Resolve senderName if missing (backend message only has senderId)
+    if (message.senderName == null) {
+      final resolvedName = getSenderName(conversationId, message.senderId);
+      message = message.copyWith(senderName: resolvedName);
+    }
+
+    final currentPins = _pinnedMessages[conversationId] ?? [];
+
+    // Avoid duplicates - update existing or add new
+    final existingIndex = currentPins.indexWhere((m) => m.id == message!.id);
+    if (existingIndex >= 0) {
+      // Update existing pin
+      final updated = List<Message>.from(currentPins);
+      updated[existingIndex] = message!;
+      _pinnedMessages[conversationId] = updated;
+      debugPrint('[ChatProvider] Updated existing pin: ${message!.id}');
+    } else {
+      // Add new pin at the beginning
+      _pinnedMessages[conversationId] = [message!, ...currentPins];
+      debugPrint('[ChatProvider] Added new pin: ${message!.id}');
+    }
+    notifyListeners();
   }
 
   void _handleUnpinnedEvent(Map<String, dynamic> data) {

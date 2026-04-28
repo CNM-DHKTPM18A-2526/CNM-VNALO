@@ -27,6 +27,8 @@ import 'package:vnalo_mobile/features/chat/widgets/message_reactions.dart';
 import 'package:vnalo_mobile/models/message_reaction_model.dart';
 import 'package:vnalo_mobile/features/call/utils/call_id_generator.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
+import 'package:vnalo_mobile/features/chat/widgets/poll_widget.dart';
+import 'package:vnalo_mobile/services/chat_service.dart';
 
 class MessageBubble extends StatelessWidget {
   final Message message;
@@ -105,50 +107,50 @@ class MessageBubble extends StatelessWidget {
           ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          child: Column(
-            crossAxisAlignment:
-                isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          child: Row(
+            mainAxisAlignment:
+                isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Row(
-                mainAxisAlignment:
-                    isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (!isMine)
-                    SizedBox(
-                      width: 30,
-                      child: Align(
-                        alignment: Alignment.topLeft,
-                        child:
-                            showAvatar
-                                ? AvatarWidget(
-                                  imageUrl: senderAvatarUrl,
-                                  name:
-                                      senderDisplayName ??
-                                      message.senderName ??
-                                      'User',
-                                  size: 24,
-                                )
-                                : const SizedBox(width: 24, height: 24),
-                      ),
-                    ),
-                  if (!isMine) const SizedBox(width: 6),
-                  Flexible(child: _buildBubbleWrapper(context, isDarkMode)),
-                ],
-              ),
-              if (reactions != null && reactions!.isNotEmpty && currentUserId != null)
-                MessageReactions(
-                  reactions: reactions!,
-                  currentUserId: currentUserId!,
-                  onToggleReaction: onToggleReaction,
-                  onShowReactors: onShowReactors,
+              if (!isMine)
+                SizedBox(
+                  width: 30,
+                  child: Align(
+                    alignment: Alignment.topLeft,
+                    child:
+                        showAvatar
+                            ? AvatarWidget(
+                              imageUrl: senderAvatarUrl,
+                              name:
+                                  senderDisplayName ??
+                                  message.senderName ??
+                                  'User',
+                              size: 24,
+                            )
+                            : const SizedBox(width: 24, height: 24),
+                  ),
                 ),
-              if (isMine ||
-                  showTime ||
-                  (readByMembers != null && readByMembers!.isNotEmpty)) ...[
-                const SizedBox(height: 4),
-                _buildStatusLabel(context, isDarkMode, common),
-              ],
+              if (!isMine) const SizedBox(width: 6),
+              Flexible(
+                child: Column(
+                  crossAxisAlignment:
+                      isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                  children: [
+                    _buildBubbleWrapper(context, isDarkMode),
+                    if (reactions != null && reactions!.isNotEmpty && currentUserId != null)
+                      MessageReactions(
+                        reactions: reactions!,
+                        currentUserId: currentUserId!,
+                        onToggleReaction: onToggleReaction,
+                        onShowReactors: onShowReactors,
+                      ),
+                    if (showTime) ...[
+                      const SizedBox(height: 4),
+                      _buildStatusLabel(context, isDarkMode, common),
+                    ],
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -239,17 +241,6 @@ class MessageBubble extends StatelessWidget {
         children: [
           if (message.replyToMessageId != null) _buildReplyQuote(context, isDarkMode),
           _renderTypeSpecificContent(context, isDarkMode),
-          if (showTime && !isMediaOnly)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                DateFormatter.time(message.createdAt),
-                style: TextStyle(
-                  fontSize: 10,
-                  color: isDarkMode ? DarkColors.textHint : Colors.grey.shade500,
-                ),
-              ),
-            ),
         ],
       ),
     );
@@ -500,6 +491,19 @@ class MessageBubble extends StatelessWidget {
         return _buildSticker(context);
       case MessageType.VIDEO:
         return _buildVideoPlayer(context);
+      case MessageType.POLL:
+        return PollWidget(
+          message: message,
+          isDarkMode: isDarkMode,
+          onVote: (optionIndex) async {
+            final chatService = context.read<ChatService>();
+            try {
+              await chatService.votePoll(message.id, optionIndex);
+            } catch (e) {
+              debugPrint('[PollWidget] Vote failed: $e');
+            }
+          },
+        );
       default:
         return Text(
           message.content ?? '',
@@ -536,7 +540,6 @@ class MessageBubble extends StatelessWidget {
         callLog.outcome == CallOutcome.missed ||
         callLog.outcome == CallOutcome.failed;
 
-    // Contrast text colors for Light Mode
     final labelColor =
         isDarkMode
             ? Colors.white60
@@ -570,73 +573,74 @@ class MessageBubble extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 11, 14, 9),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: titleColor,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                    height: 1.15,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const SizedBox(width: 180), // Đảm bảo chiều rộng tối thiểu đẹp như Zalo
-                Row(
-                  children: [
-                    Icon(
-                      subtitleIcon,
-                      size: 15,
-                      color: isMissed ? titleColor.withValues(alpha: 0.8) : labelColor,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 11, 14, 9),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: titleColor,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      height: 1.15,
                     ),
-                    const SizedBox(width: 5),
-                    Flexible(
-                      child: Text(
-                        subtitle,
-                        style: TextStyle(
-                          color: labelColor,
-                          fontSize: 12,
-                          height: 1.1,
+                  ),
+                  const SizedBox(height: 4),
+                  const SizedBox(width: 180),
+                  Row(
+                    children: [
+                      Icon(
+                        subtitleIcon,
+                        size: 15,
+                        color: isMissed ? titleColor.withValues(alpha: 0.8) : labelColor,
+                      ),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          subtitle,
+                          style: TextStyle(
+                            color: labelColor,
+                            fontSize: 12,
+                            height: 1.1,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Container(height: 1, color: dividerColor),
-          SizedBox(
-            width: double.infinity,
-            child: TextButton(
-              onPressed:
-                  canCallAgain
-                      ? () => _handleCallAgain(context, callLog)
-                      : null,
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-              ),
-              child: Text(
-                common.callAgainAction,
-                style: TextStyle(
-                  color:
-                      canCallAgain ? const Color(0xFF1890FF) : (isDarkMode ? Colors.white30 : Colors.black26),
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                ),
+                    ],
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
+            Container(height: 1, color: dividerColor),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed:
+                    canCallAgain
+                        ? () => _handleCallAgain(context, callLog)
+                        : null,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                ),
+                child: Text(
+                  common.callAgainAction,
+                  style: TextStyle(
+                    color:
+                        canCallAgain ? const Color(0xFF1890FF) : (isDarkMode ? Colors.white30 : Colors.black26),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
+
 
   String _callLogTitle(CallLogMessage callLog, bool incoming, bool isVideo) {
     final base = isVideo ? 'Cuộc gọi video' : 'Cuộc gọi thoại';
@@ -1011,24 +1015,25 @@ class MessageBubble extends StatelessWidget {
 
   Widget _buildStatusLabel(BuildContext context, bool isDarkMode, CommonTexts common) {
     final timeStr = DateFormatter.time(message.createdAt);
-    
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
       children: [
-        Text(
-          timeStr,
-          style: TextStyle(
-            fontSize: 11,
-            color: isDarkMode ? DarkColors.textHint : Colors.grey.shade500,
+        if (showTime)
+          Text(
+            timeStr,
+            style: TextStyle(
+              fontSize: 11,
+              color: isDarkMode ? DarkColors.textHint : Colors.grey.shade500,
+            ),
           ),
-        ),
         if (isMine && showStatus) ...[
-          const SizedBox(width: 4),
+          if (showTime) const SizedBox(width: 4),
           _StatusIcon(status: message.status),
         ],
         if (readByMembers != null && readByMembers!.isNotEmpty) ...[
-          const SizedBox(width: 6),
+          if (showTime) const SizedBox(width: 6),
           _buildReadAvatars(),
         ],
       ],

@@ -16,6 +16,7 @@ class User {
   final bool isOfficialAccount;
   final int followerCount;
   final bool isOnline;
+  final DateTime? lastSeen;
   final String? friendshipStatus; // NONE, FRIEND, PENDING_SENT, PENDING_RECEIVED, BLOCKED__BY_ME, etc.
 
   User({
@@ -36,6 +37,7 @@ class User {
     this.isOfficialAccount = false,
     this.followerCount = 0,
     this.isOnline = false,
+    this.lastSeen,
     this.friendshipStatus,
   });
 
@@ -56,6 +58,8 @@ class User {
     isVerified: json['isVerified'] ?? json['is_verified'] ?? false,
     isOfficialAccount: json['isOfficialAccount'] ?? false,
     followerCount: json['followerCount'] ?? 0,
+    isOnline: json['isOnline'] ?? false,
+    lastSeen: json['lastSeen'] != null ? DateTime.tryParse(json['lastSeen'].toString()) : null,
     friendshipStatus: json['friendshipStatus'] ?? json['friendship_status'],
   );
 
@@ -77,6 +81,7 @@ class User {
     bool? isOfficialAccount,
     int? followerCount,
     bool? isOnline,
+    DateTime? lastSeen,
     String? friendshipStatus,
   }) {
     return User(
@@ -97,6 +102,7 @@ class User {
       isOfficialAccount: isOfficialAccount ?? this.isOfficialAccount,
       followerCount: followerCount ?? this.followerCount,
       isOnline: isOnline ?? this.isOnline,
+      lastSeen: lastSeen ?? this.lastSeen,
       friendshipStatus: friendshipStatus ?? this.friendshipStatus,
     );
   }
