@@ -344,22 +344,23 @@ function normalizeMessageType(rawType: any, raw?: RawMessageLike): ChatMessageTy
   return 'text'
 }
 
-export async function uploadChatMedia(token: string, file: File): Promise<MediaUploadResponse> {
+export async function uploadChatMedia(token: string, file: File): Promise<any> {
   const formData = new FormData()
   formData.append('file', file)
-
-  const ext = file.name.split('.').pop()?.toLowerCase() || '';
-  const isImage = file.type.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
-  formData.append('category', isImage ? 'AVATAR' : 'CHAT_FILE');
+  
+  let category = 'CHAT_FILE';
+  if (file.type.startsWith('image/')) category = 'CHAT_IMAGE';
+  else if (file.type.startsWith('video/')) category = 'CHAT_VIDEO';
+  
+  formData.append('category', category)
 
   try {
-    // We use mediaApi (Axios instance for port 8083)
     const response = await mediaApi.post('/upload', formData, {
       headers: {
         Authorization: `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data',
       },
-    });
-
+    })
     const json = response.data;
 
     const payload = json && typeof json === 'object' && !Array.isArray(json) && 'data' in json
