@@ -14,6 +14,7 @@ import { Mic, MicOff, Video, VideoOff, PhoneOff, Users, Phone, PhoneIncoming } f
 import type { GroupCallSnapshot, GroupPeerState, IncomingGroupCallInfo } from '../webrtcGroupCallService'
 import { WebRtcGroupCallService } from '../webrtcGroupCallService'
 import type { Socket } from 'socket.io-client'
+import { resolveMediaUrl } from '../../../utils/mediaUtils'
 
 // ─────────────────────────────────────────────────────────────────
 // HELPERS
@@ -58,19 +59,20 @@ const VideoTile: React.FC<VideoTileProps> = ({
   isMicOn,
   isCameraOn,
   isLocal = false,
+  audioOnly = false,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
 
   useEffect(() => {
-    if (videoRef.current && stream) {
+    if (videoRef.current && stream && isCameraOn && !audioOnly) {
       videoRef.current.srcObject = stream
     }
     if (!isLocal && audioRef.current && stream) {
       audioRef.current.srcObject = stream
       audioRef.current.play().catch(() => {})
     }
-  }, [stream, isLocal])
+  }, [stream, isLocal, isCameraOn, audioOnly])
 
   const initials = displayName
     .split(' ')
@@ -79,32 +81,47 @@ const VideoTile: React.FC<VideoTileProps> = ({
     .slice(0, 2)
     .toUpperCase()
 
+  const resolvedAvatar = resolveMediaUrl(avatarUrl)
+
+  // Logic to determine if we should show active video or avatar
+  const hasVideoTrack = stream && stream.getVideoTracks().length > 0
+  const showVideo = !!(hasVideoTrack && isCameraOn && !audioOnly)
+
   return (
-    <div
-      className={`
-        relative flex items-center justify-center rounded-2xl overflow-hidden bg-slate-800 select-none
-        transition-all duration-300
-        ${isSpeaking ? 'ring-4 ring-green-400 scale-[1.02] shadow-lg shadow-green-400/30' : 'ring-1 ring-white/10'}
-      `}
-      style={{ minHeight: '120px', aspectRatio: '16/10' }}
-    >
+    <div className={`relative w-full h-full bg-slate-800 rounded-2xl overflow-hidden shadow-inner flex items-center justify-center transition-all duration-300 ${isSpeaking ? 'ring-2 ring-green-500' : ''}`} style={{ minHeight: '120px', aspectRatio: '16/10' }}>
       {!isLocal && <audio ref={audioRef} autoPlay className="hidden" />}
 
-      {stream && isCameraOn ? (
+      {/* BACKGROUND AVATAR (BLURRED) - Show when camera is off or it's an audio call */}
+      {!showVideo && (
+        <div className="absolute inset-0 z-0">
+          {avatarUrl ? (
+            <img src={resolvedAvatar!} alt="" className="w-full h-full object-cover blur-2xl opacity-40 scale-110" />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-slate-700 to-slate-900" />
+          )}
+          <div className="absolute inset-0 bg-black/30" />
+        </div>
+      )}
+
+      {/* VIDEO OR AVATAR CENTER */}
+      {showVideo ? (
         <video
           ref={videoRef}
           autoPlay
           playsInline
           muted={isLocal}
-          className={`absolute inset-0 w-full h-full object-cover ${isLocal ? 'scale-x-[-1]' : ''}`}
+          className={`absolute inset-0 w-full h-full object-cover z-10 ${isLocal ? 'scale-x-[-1]' : ''}`}
         />
       ) : (
-        <div className="flex flex-col items-center gap-2 z-10">
+        <div className="relative z-20 flex flex-col items-center">
           {avatarUrl ? (
-            <img src={avatarUrl} alt={displayName}
-              className="w-16 h-16 rounded-full object-cover border-2 border-white/20" />
+            <div className="relative">
+               <img src={resolvedAvatar!} alt={displayName}
+                className="w-20 h-20 rounded-full object-cover border-4 border-white/10 shadow-2xl" />
+               <div className="absolute inset-0 rounded-full border border-white/20" />
+            </div>
           ) : (
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xl font-bold border-2 border-white/20">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-2xl font-bold border-4 border-white/10 shadow-2xl">
               {initials}
             </div>
           )}
@@ -175,7 +192,7 @@ export const IncomingGroupCallBanner: React.FC<IncomingGroupCallBannerProps> = (
         <div className="absolute inset-0 rounded-full bg-green-500 opacity-0"
           style={{ animation: 'pulseRing 1.5s ease-out infinite' }} />
         {info.callerAvatar ? (
-          <img src={info.callerAvatar} alt={info.callerName}
+          <img src={resolveMediaUrl(info.callerAvatar)} alt={info.callerName}
             className="w-12 h-12 rounded-full object-cover border-2 border-green-400" />
         ) : (
           <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm border-2 border-green-400">
@@ -278,6 +295,7 @@ export const GroupCallModal: React.FC<GroupCallModalProps> = ({
             isMicOn={snapshot.isMicOn}
             isCameraOn={snapshot.isCameraOn}
             isLocal
+            audioOnly={snapshot.audioOnly}
           />
           {/* REMOTE TILES */}
           {snapshot.peers.map((peer: GroupPeerState) => (
@@ -289,6 +307,7 @@ export const GroupCallModal: React.FC<GroupCallModalProps> = ({
               isSpeaking={peer.isSpeaking}
               isMicOn={peer.isMicOn}
               isCameraOn={peer.isCameraOn}
+              audioOnly={snapshot.audioOnly}
             />
           ))}
         </div>
