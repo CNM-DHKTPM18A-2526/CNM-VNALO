@@ -57,13 +57,15 @@ export const MessageBubble = memo(function MessageBubble({
   const stickerSrc = message.type === 'sticker' ? resolveStickerSrc(message) : null
   const attachments = message.attachments ?? []
   const isImageMsg = message.type === 'image'
-  const imageAttachments = attachments.filter((attachment) => 
-    isImageMsg || isImageAttachment(attachment.mimeType, attachment.url, attachment.name)
-  )
+  const imageAttachments = attachments.length > 0 
+    ? attachments.filter((attachment) => isImageMsg || isImageAttachment(attachment.mimeType, attachment.url, attachment.name))
+    : (isImageMsg && message.mediaUrl ? [{ url: message.mediaUrl, name: message.text || 'image', mimeType: 'image/png' }] : []);
+
   const isVideoMsg = message.type === 'video'
-  const videoAttachments = attachments.filter((attachment) => 
-    isVideoMsg || isVideoAttachment(attachment.mimeType, attachment.url, attachment.name)
-  )
+  const videoAttachments = attachments.length > 0
+    ? attachments.filter((attachment) => isVideoMsg || isVideoAttachment(attachment.mimeType, attachment.url, attachment.name))
+    : (isVideoMsg && message.mediaUrl ? [{ url: message.mediaUrl, name: message.text || 'video', mimeType: 'video/mp4' }] : []);
+
   const fileAttachments = attachments.filter((attachment) => 
     !isImageMsg && !isVideoMsg &&
     !isImageAttachment(attachment.mimeType, attachment.url, attachment.name) &&

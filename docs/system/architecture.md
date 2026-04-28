@@ -39,37 +39,47 @@ Both services share a single **PostgreSQL** database and communicate via shared 
 ## High-Level Architecture
 
 ```
-┌──────────────────┐
-│  Flutter Mobile   │
-│  (iOS + Android)  │
-└────────┬─────────┘
-         │
-    ┌────┴────────────────────────┐
-    │         REST / WebSocket     │
-    │                              │
-┌───┴──────────┐  ┌───────────────┴──┐
-│ core-service │  │ message-service  │
-│ (Spring Boot)│  │ (NestJS)         │
-│ Port 8081    │  │ Port 3000        │
-│              │  │                  │
-│ • Auth/JWT   │  │ • Conversations  │
-│ • Users      │  │ • Messages       │
-│ • Friends    │  │ • WebSocket GW   │
-│ • Blocks     │  │ • Inbox (CQRS)   │
-│ • QR Code    │  │ • Search         │
-│ • Contacts   │  │ • Reactions      │
-│ • FCM Push   │  │ • Pins           │
-└──────┬───────┘  └───────┬──────────┘
-       │                  │
-       └────────┬─────────┘
-                │
-       ┌────────┴────────┐
-       │   PostgreSQL     │
-       │   (vnalo_core)   │
-       │                  │
-       │   + Redis        │
-       │   (sessions)     │
-       └─────────────────┘
+    ┌──────────────────┐      ┌──────────────────┐
+    │  Flutter Mobile   │      │  Web Frontend    │
+    │  (iOS + Android)  │      │  (React + Vite)  │
+    └────────┬─────────┘      └────────┬─────────┘
+             │                         │
+    ┌────────┴─────────────────────────┴──────────┐
+    │             NGINX (Reverse Proxy)           │
+    │             Port 80 (Gateway)               │
+    └────┬───────────┬────────────┬──────────┬────┘
+         │           │            │          │
+┌────────┴─────┐┌────┴─────────┐┌─┴───────┐┌─┴───────┐
+│ core-service ││message-service││media-sv ││ai-sv    │
+│ (Spring Boot)││ (NodeJS)     ││ (Java)  ││ (Java)   │
+│ Port 8081    ││ Port 3000    ││ Port 8083││ Port 8094│
+└──────┬───────┘└────┬─────────┘└────┬────┘└────┬────┘
+       │             │               │          │
+       └─────────────┼───────────────┴──────────┘
+                     │
+            ┌────────┴────────┐
+            │   PostgreSQL     │
+            │   (vnalo_core)   │
+            │                  │
+            │   + Redis        │
+            │   (sessions)     │
+            └─────────────────┘
+```
+
+---
+
+## Routing & Gateway (Nginx)
+
+Nginx acts as the unified entry point for all clients. It routes requests based on path prefixes:
+
+| Path Prefix | Service | Description |
+|-------------|---------|-------------|
+| `/api/v1/media` | **media-service** | Media uploads, files, stickers (Java) |
+| `/api/v1/upload` | **media-service** | Alias for `/api/v1/media/upload` |
+| `/api/v1/ai` | **ai-service** | AI Assistant (Gemini/Ollama) |
+| `/api/v1/(msgs|convs)` | **message-service** | Chat APIs (Node.js) |
+| `/socket.io/` | **realtime-gateway** | WebSocket connections |
+| `/api/v1/` | **core-service** | Auth, Profile, Social (Catch-all) |
 ```
 
 ---
