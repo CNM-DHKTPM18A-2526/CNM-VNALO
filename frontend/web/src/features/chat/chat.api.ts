@@ -511,6 +511,9 @@ export function mapRawMessage(raw: RawMessageLike, currentUserId: string): ChatM
     ]
   }
 
+  const finalMediaUrl = mediaUrl || (attachments && attachments.length > 0 ? attachments[0].url : null)
+  const finalThumbnailUrl = mediaThumbnailUrl || (attachments && attachments.length > 0 ? attachments[0].thumbnailUrl : null)
+
   return {
     id: raw.id,
     conversationId,
@@ -518,8 +521,8 @@ export function mapRawMessage(raw: RawMessageLike, currentUserId: string): ChatM
     sender: type === 'system' ? 'system' : (senderId === currentUserId ? 'me' : 'other'),
     type: type as ChatMessageType,
     text: type === 'poll' ? '' : messageText,
-    mediaUrl: mediaUrl ? resolveMediaUrl(mediaUrl) : mediaUrl,
-    mediaThumbnailUrl: mediaThumbnailUrl ? resolveMediaUrl(mediaThumbnailUrl) : mediaThumbnailUrl,
+    mediaUrl: finalMediaUrl ? resolveMediaUrl(finalMediaUrl) : null,
+    mediaThumbnailUrl: finalThumbnailUrl ? resolveMediaUrl(finalThumbnailUrl) : null,
     mediaMimeType,
     mediaSizeBytes,
     attachments: attachments?.map(att => ({ ...att, url: resolveMediaUrl(att.url), thumbnailUrl: att.thumbnailUrl ? resolveMediaUrl(att.thumbnailUrl) : null })),
