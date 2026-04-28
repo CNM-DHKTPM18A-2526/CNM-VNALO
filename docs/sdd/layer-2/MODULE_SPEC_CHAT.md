@@ -204,7 +204,7 @@ System message: "[Name] đã được tự động chỉ định làm trưởng 
 
 ## 3. Announcement Mode
 
-**Field**: `onlyAdminCanPost` (boolean, default `false`) — `[SPEC_ONLY]` field, not yet in entity.
+**Field**: `onlyAdminCanPost` (boolean, default `false`) — Enforced by backend logic.
 
 **Behaviour**:
 - When `true`: only ADMIN and DEPUTY can call `sendMessage`. MEMBER attempts are rejected.
