@@ -178,12 +178,12 @@ export function ConversationInfo({
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-[#F1F1F4] pb-20 scrollbar-hide">
+    <div className="h-full overflow-y-auto bg-[var(--surface)] pb-20 scrollbar-hide text-[var(--text)]">
       {/* Header */}
-      <header className="sticky top-0 z-10 border-b border-gray-200 bg-white px-5 py-4 flex items-center gap-3">
+      <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--surface)] px-5 py-4 flex items-center gap-3">
         {(showGroupManagement || showMembersView || showBulletinView || showLeaderDeputyView) && (
           <button
-            className="mr-2 bg-white border-0 outline-none ring-0 hover:bg-gray-100 rounded-full transition-colors cursor-pointer flex items-center justify-center h-8 w-8 shadow-none"
+            className="mr-1 p-1.5 rounded-full hover:bg-[var(--surface-hover)] border-0 bg-transparent flex items-center justify-center cursor-pointer transition-colors outline-none"
             onClick={() => {
               if (showLeaderDeputyView) {
                 setShowLeaderDeputyView(false);
@@ -194,18 +194,18 @@ export function ConversationInfo({
               setShowBulletinView(false);
             }}
           >
-            <ChevronLeft size={24} strokeWidth={2} className="text-slate-700" />
+            <ChevronLeft size={24} className="text-[var(--text)]" />
           </button>
         )}
-        <h3 className="text-[18px] font-semibold text-slate-800 flex-1">
+        <h3 className="text-[18px] font-bold text-[var(--text)] flex-1">
           {showBulletinView ? 'Bảng tin nhóm' : 
            showLeaderDeputyView ? 'Trưởng & phó nhóm' :
            showGroupManagement ? 'Quản lý nhóm' : 
            showMembersView ? 'Thành viên' : 'Thông tin hội thoại'}
         </h3>
         {showBulletinView && (
-          <button className="bg-transparent border-none outline-none cursor-pointer flex items-center justify-center h-8 w-8 hover:bg-gray-100 rounded-full transition-colors" title="Thêm">
-            <Plus size={24} className="text-slate-600" />
+          <button className="bg-transparent border-none outline-none cursor-pointer flex items-center justify-center p-1.5 hover:bg-[var(--surface-hover)] rounded-full transition-colors" title="Thêm">
+            <Plus size={24} className="text-[var(--text)]" />
           </button>
         )}
       </header>
@@ -249,7 +249,7 @@ export function ConversationInfo({
       ) : (
         <>
           {/* Profile Section */}
-          <section className="bg-white px-5 pb-6 pt-6">
+          <section className="bg-[var(--surface)] px-5 pb-6 pt-6">
             <div className="flex justify-center">
               {(() => {
                 const collageData = conversation.isGroup && !conversation.avatarUrl
@@ -262,7 +262,7 @@ export function ConversationInfo({
                       name={conversation.name}
                       imageUrl={conversation.avatarUrl ?? null}
                       size="lg"
-                      className="h-20 w-20 shadow-lg ring-2 ring-white"
+                      className="h-20 w-20 shadow-lg ring-2 ring-white dark:ring-[#1E1E2E]"
                       isGroup={conversation.isGroup}
                       isCloud={conversation.isCloud}
                       memberAvatars={collageData.avatars}
@@ -293,34 +293,34 @@ export function ConversationInfo({
             </div>
 
             <div className="mt-3 flex items-center justify-center gap-2">
-              <h4 className="text-[22px] font-semibold text-slate-900">{conversation.name}</h4>
+              <h4 className="text-[22px] font-semibold text-[var(--text)]">{conversation.name}</h4>
               <button
-                className="rounded-full border-0 p-1 shadow-none outline-none ring-0 hover:bg-gray-100 focus:outline-none cursor-pointer"
+                className="rounded-full border-0 p-1 shadow-none outline-none ring-0 hover:bg-[var(--surface-hover)] focus:outline-none cursor-pointer group"
                 onClick={() => conversation.isGroup ? onEditGroupName?.() : onEditNickname?.()}
               >
-                <Pencil size={18} className="text-gray-500" />
+                <Pencil size={18} className="text-[var(--muted)] group-hover:text-[var(--text)]" />
               </button>
             </div>
 
             {conversation.isCloud ? (
               <div className="mt-4 px-6 text-center">
-                <p className="text-[14px] text-gray-500 leading-relaxed">
+                <p className="text-[14px] text-[var(--muted)] leading-relaxed">
                   Lưu trữ và truy cập nhanh những nội dung quan trọng của bạn ngay trên VNALO
                 </p>
                 <div className="mt-6 text-left">
                   <div className="flex justify-between text-[13px] mb-2 font-medium">
-                    <span className="text-gray-600">Dung lượng</span>
-                    <span className="text-gray-400">291 MB / 500 MB</span>
+                    <span className="text-[var(--text)]">Dung lượng</span>
+                    <span className="text-[var(--muted)]">291 MB / 500 MB</span>
                   </div>
-                  <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden flex">
+                  <div className="h-2 w-full bg-[var(--bg)] rounded-full overflow-hidden flex">
                     <div className="h-full bg-orange-400" style={{ width: '40%' }}></div>
                     <div className="h-full bg-green-400" style={{ width: '15%' }}></div>
                   </div>
-                  <div className="mt-2 flex gap-3 text-[11px] text-gray-400">
+                  <div className="mt-2 flex gap-3 text-[11px] text-[var(--muted)]">
                     <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-400"></span>Ảnh</span>
                     <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400"></span>Video</span>
                   </div>
-                  <button className="w-full mt-4 py-2 border border-gray-200 rounded-lg text-[14px] font-medium hover:bg-gray-50 transition-colors cursor-pointer">
+                  <button className="w-full mt-4 py-2 border border-[var(--border)] rounded-lg text-[14px] font-medium hover:bg-[var(--surface-hover)] text-[var(--text)] transition-colors cursor-pointer bg-transparent">
                     Xem và dọn dẹp My Documents
                   </button>
                 </div>
@@ -350,19 +350,19 @@ export function ConversationInfo({
           {/* Group Management Sections */}
           <section className="mt-3 space-y-3">
             {conversation.isGroup && (
-              <Section title="Thành viên nhóm" expanded={membersExpanded} onToggle={() => setMembersExpanded(!membersExpanded)}>
-                <div 
-                  className="flex items-center gap-3 py-1 cursor-pointer hover:bg-gray-50 rounded-xl transition-colors"
-                  onClick={() => setShowMembersView(true)}
-                >
-                  <div className="h-10 w-10 flex items-center justify-center rounded-full bg-gray-100">
-                    <Users size={20} className="text-slate-600" />
-                  </div>
-                  <span className="text-[15px] font-medium text-slate-700">
-                    {conversation.memberCount || allDisplayMemberIds.length} thành viên
-                  </span>
+              <div 
+                className="w-full flex items-center justify-between p-4 bg-[var(--surface)] hover:bg-[var(--surface-hover)] transition-colors border-y border-[var(--border)] cursor-pointer outline-none"
+                onClick={() => setShowMembersView(true)}
+              >
+                <div className="flex items-center gap-2">
+                  <Users size={18} className="text-[var(--text)]" />
+                  <span className="text-[15px] font-semibold text-[var(--text)]">Thành viên nhóm</span>
                 </div>
-              </Section>
+                <div className="flex items-center gap-1">
+                  <span className="text-[13px] text-[var(--muted)]">{conversation.memberCount || 0}</span>
+                  <ChevronRight className="text-[var(--muted)]" size={18} />
+                </div>
+              </div>
             )}
 
             {conversation.isGroup && (
@@ -397,7 +397,7 @@ export function ConversationInfo({
                     href={item.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="aspect-square overflow-hidden rounded-lg border border-gray-200"
+                    className="aspect-square overflow-hidden rounded-lg border border-[var(--border)]"
                   >
                     <img src={item.url} alt="" className="h-full w-full object-cover" />
                   </a>
@@ -419,17 +419,17 @@ export function ConversationInfo({
                     href={file.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center gap-3 rounded-xl p-3 hover:bg-gray-50 active:bg-gray-100"
+                    className="flex items-center gap-3 rounded-xl p-3 hover:bg-[var(--surface-hover)] transition-colors"
                   >
-                    <div className="h-12 w-12 flex-shrink-0 rounded-lg bg-[#E6F3FF] p-2">
-                      <FileText className="h-full w-full text-[#0091FF]" />
+                    <div className="h-12 w-12 flex-shrink-0 rounded-lg bg-blue-50 dark:bg-blue-500/10 p-2">
+                      <FileText className="h-full w-full text-[#0091FF] dark:text-sky-400" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[15px] font-medium text-slate-800">{file.name}</p>
-                      <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                      <p className="truncate text-[15px] font-medium text-[var(--text)]">{file.name}</p>
+                      <div className="mt-1 flex items-center gap-1.5 text-xs text-[var(--muted)]">
                         <span>{file.sizeText}</span>
                         <CheckCircle2 size={14} className="text-green-500" />
-                        <span className="text-gray-300">•</span>
+                        <span className="opacity-30">•</span>
                         <span>{file.sentDate}</span>
                       </div>
                     </div>
@@ -452,7 +452,7 @@ export function ConversationInfo({
                     href={item.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-start gap-3 rounded-xl px-3 py-3 text-sky-700 hover:bg-slate-50"
+                    className="flex items-start gap-3 rounded-xl px-3 py-3 text-[#0068FF] dark:text-sky-400 hover:bg-[var(--surface-hover)] transition-colors"
                   >
                     <Link2 size={20} className="mt-0.5" />
                     <span className="break-all text-[15px]">{item.url}</span>
@@ -470,17 +470,17 @@ export function ConversationInfo({
           <Section title="Thiết lập bảo mật" expanded={expanded.security} onToggle={() => toggleSection('security')}>
             <div className="space-y-4">
               <div className="flex items-center gap-3 px-3 py-2">
-                <Timer size={20} className="text-slate-600" />
+                <Timer size={20} className="text-[var(--muted)]" />
                 <div>
-                  <p className="text-[15px] font-medium">Tin nhắn tự xóa</p>
-                  <p className="text-sm text-slate-500">Không bao giờ</p>
+                  <p className="text-[15px] font-medium text-[var(--text)]">Tin nhắn tự xóa</p>
+                  <p className="text-sm text-[var(--muted)]">Không bao giờ</p>
                 </div>
               </div>
 
               <div className="flex items-center justify-between px-3 py-2">
                 <div className="flex items-center gap-3">
-                  <EyeOff size={20} className="text-slate-600" />
-                  <span className="text-[15px] font-medium">Ẩn trò chuyện</span>
+                  <EyeOff size={20} className="text-[var(--muted)]" />
+                  <span className="text-[15px] font-medium text-[var(--text)]">Ẩn trò chuyện</span>
                 </div>
                 <ToggleSwitch checked={isHidden} onChange={setIsHidden} />
               </div>
@@ -488,7 +488,7 @@ export function ConversationInfo({
           </Section>
 
           {/* Footer Actions */}
-          <section className="mt-3 bg-white px-5 py-3">
+          <section className="mt-3 bg-[var(--surface)] px-5 py-3">
             <FooterAction icon={TriangleAlert} label="Báo xấu" color="text-red-500" />
             <FooterAction icon={Trash2} label="Xóa lịch sử trò chuyện" color="text-red-500" onClick={onDeleteHistoryClick} />
             {conversation.isGroup && (
@@ -618,14 +618,14 @@ function TransferOwnerModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 animate-in fade-in duration-200">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-[440px] overflow-hidden flex flex-col transition-all">
+      <div className="bg-[var(--surface)] rounded-xl shadow-2xl w-full max-w-[440px] overflow-hidden flex flex-col transition-all border border-[var(--border)]">
         {/* Header */}
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
-          <h3 className="text-[17px] font-bold text-[#001A33]">
+        <div className="px-5 py-4 border-b border-[var(--border)] flex items-center justify-between bg-[var(--surface)] sticky top-0 z-10">
+          <h3 className="text-[17px] font-bold text-[var(--text)]">
             {step === 1 ? 'Chuyển quyền trưởng nhóm' : 'Chọn trưởng nhóm mới'}
           </h3>
-          <button onClick={onClose} className="p-2 hover:bg-slate-50 rounded-full border-0 bg-transparent cursor-pointer">
-            <X size={20} className="text-slate-500" />
+          <button onClick={onClose} className="p-2 hover:bg-[var(--surface-hover)] rounded-full border-0 bg-transparent cursor-pointer transition-colors group outline-none">
+            <X size={20} className="text-[var(--muted)] group-hover:text-[var(--text)]" />
           </button>
         </div>
 
@@ -633,18 +633,18 @@ function TransferOwnerModal({
         <div className="p-5 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
           {step === 1 ? (
             <div className="space-y-4">
-              <p className="text-[15px] text-slate-700 leading-relaxed">
+              <p className="text-[15px] text-[var(--text)] opacity-90 leading-relaxed">
                 Người được chọn sẽ trở thành trưởng nhóm và có mọi quyền quản lý nhóm. Bạn sẽ mất quyền quản lý nhưng vẫn là một thành viên của nhóm. Hành động này không thể phục hồi.
               </p>
             </div>
           ) : (
             <div className="flex flex-col gap-4">
-              <div className="relative text-slate-400">
+              <div className="relative text-[var(--muted)]">
                 <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2" />
                 <input 
                   type="text"
                   placeholder="Tìm kiếm"
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-transparent focus:border-blue-400 focus:bg-white rounded-xl outline-none text-[15px] transition-all"
+                  className="w-full pl-10 pr-4 py-2.5 bg-[var(--bg)] border border-transparent focus:border-blue-400 focus:bg-[var(--surface)] rounded-xl outline-none text-[15px] text-[var(--text)] transition-all"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -658,11 +658,11 @@ function TransferOwnerModal({
                   return (
                     <div 
                       key={member.userId}
-                      className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors group"
+                      className="flex items-center gap-3 p-3 rounded-xl hover:bg-[var(--surface-hover)] cursor-pointer transition-colors group"
                       onClick={() => setSelectedId(member.userId)}
                     >
                       <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                        isSelected ? 'border-[#0091FF]' : 'border-slate-300'
+                        isSelected ? 'border-[#0091FF]' : 'border-[var(--border)]'
                       }`}>
                         {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-[#0091FF]" />}
                       </div>
@@ -671,7 +671,7 @@ function TransferOwnerModal({
                         imageUrl={profile?.avatarUrl || member.avatarUrl} 
                         size="md" 
                       />
-                      <span className="text-[15px] font-medium text-slate-800 truncate flex-1">
+                      <span className="text-[15px] font-medium text-[var(--text)] truncate flex-1">
                         {profile?.displayName || member.displayName}
                       </span>
                     </div>
@@ -683,9 +683,9 @@ function TransferOwnerModal({
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-end gap-3 bg-slate-50/30">
+        <div className="px-5 py-4 border-t border-[var(--border)] flex items-center justify-end gap-3 bg-[var(--surface-hover)]/30">
           <button 
-            className="px-6 py-2.5 rounded-lg text-slate-700 font-bold text-[15px] hover:bg-slate-100 border-0 bg-transparent cursor-pointer transition-colors"
+            className="px-6 py-2.5 rounded-lg text-[var(--muted)] hover:text-[var(--text)] font-bold text-[15px] hover:bg-[var(--surface-hover)] border-0 bg-transparent cursor-pointer transition-colors outline-none"
             onClick={onClose}
           >
             Hủy
@@ -740,17 +740,17 @@ function GroupManagementView({
   const inviteLink = conversation.inviteLink ? `vnalo.me/g/${conversation.inviteLink}` : 'Đang tải...';
 
   return (
-    <div className="flex flex-col bg-[#F3F5F7] h-full overflow-y-auto scrollbar-hide pb-10">
+    <div className="flex flex-col h-full overflow-y-auto scrollbar-hide pb-10">
       {!isOwner && (
-        <div className="bg-[#FFF9EA] px-4 py-2.5 flex items-center justify-center gap-2 border-b border-orange-100 sticky top-0 z-10">
-          <Lock size={14} className="text-orange-600" />
-          <span className="text-[13px] font-medium text-orange-700">Tính năng chỉ dành cho quản trị viên</span>
+        <div className="bg-[#FFF9EA] dark:bg-orange-900/20 px-4 py-2.5 flex items-center justify-center gap-2 border-b border-orange-100 dark:border-orange-900/30 sticky top-0 z-10">
+          <Lock size={14} className="text-orange-600 dark:text-orange-400" />
+          <span className="text-[13px] font-medium text-orange-700 dark:text-orange-300">Tính năng chỉ dành cho quản trị viên</span>
         </div>
       )}
 
       {/* Section 1: Member Permissions */}
-      <div className="bg-white px-5 py-5 border-b border-gray-100">
-        <h4 className="text-[15px] font-bold text-[#001A33] mb-5">
+      <div className="bg-[var(--surface)] px-5 py-5 border-b border-[var(--border)]">
+        <h4 className="text-[15px] font-bold text-[var(--text)] mb-5">
           Cho phép các thành viên trong nhóm:
         </h4>
         <div className="space-y-6">
@@ -786,7 +786,7 @@ function GroupManagementView({
       </div>
 
       {/* Section 2: Advanced Settings */}
-      <div className="mt-2 bg-white divide-y divide-gray-100 border-y border-gray-100">
+      <div className="mt-2 bg-[var(--surface)] divide-y divide-[var(--border)] border-y border-[var(--border)]">
         <SettingToggleRow 
           label="Chế độ phê duyệt thành viên mới" 
           showHelp
@@ -815,7 +815,7 @@ function GroupManagementView({
           />
           
           <div className="px-5 pb-5">
-            <div className="bg-[#F0F7FF] rounded-lg p-3 flex items-center justify-between gap-3">
+            <div className="bg-[var(--bg)] rounded-lg p-3 flex items-center justify-between gap-3">
               <span className="text-[#0068FF] text-[15px] font-medium truncate flex-1">
                 {inviteLink}
               </span>
@@ -830,17 +830,17 @@ function GroupManagementView({
       </div>
 
       {/* Section 3: Bottom Actions */}
-      <div className="mt-2 bg-white divide-y divide-gray-100 border-y border-gray-100">
-         <button className="w-full px-5 py-4 flex items-center gap-4 hover:bg-gray-50 border-0 bg-transparent transition-colors group cursor-pointer outline-none">
-            <Users size={22} className="text-[#4F5E71]" />
-            <span className="text-[16px] font-medium text-[#001A33]">Chặn khỏi nhóm</span>
+      <div className="mt-2 bg-[var(--surface)] divide-y divide-[var(--border)] border-y border-[var(--border)]">
+         <button className="w-full px-5 py-4 flex items-center gap-4 hover:bg-[var(--surface-hover)] border-0 bg-transparent transition-colors group cursor-pointer outline-none">
+            <Users size={22} className="text-[var(--muted)]" />
+            <span className="text-[16px] font-medium text-[var(--text)]">Chặn khỏi nhóm</span>
          </button>
          <button 
-           className="w-full px-5 py-4 flex items-center gap-4 hover:bg-gray-50 border-0 bg-transparent transition-colors group cursor-pointer outline-none"
+           className="w-full px-5 py-4 flex items-center gap-4 hover:bg-[var(--surface-hover)] border-0 bg-transparent transition-colors group cursor-pointer outline-none"
            onClick={onShowLeaderDeputy}
          >
-            <Key size={22} className="text-[#4F5E71]" />
-            <span className="text-[16px] font-medium text-[#001A33]">Trưởng & phó nhóm</span>
+            <Key size={22} className="text-[var(--muted)]" />
+            <span className="text-[16px] font-medium text-[var(--text)]">Trưởng & phó nhóm</span>
          </button>
       </div>
 
@@ -848,7 +848,7 @@ function GroupManagementView({
       {isOwner && (
         <div className="mt-6 px-5 mb-10">
           <button 
-            className="w-full py-3 rounded-lg bg-[#FFEDED] text-[#D83A3A] font-bold text-[16px] hover:bg-[#FFD9D9] border-0 transition-all cursor-pointer active:scale-[0.98]"
+            className="w-full py-3 rounded-xl bg-[#FFE9E9] text-[#E02424] font-bold text-[16px] border-0 transition-all cursor-pointer active:scale-[0.98] shadow-sm uppercase tracking-wide hover:shadow-md"
             onClick={() => setShowDisbandConfirm(true)}
           >
             Giải tán nhóm
@@ -865,7 +865,7 @@ function GroupManagementView({
         footer={
           <div className="flex gap-3 justify-end w-full">
             <button 
-              className="px-6 py-2 rounded-lg bg-[#EBEBEF] text-slate-700 font-bold hover:bg-gray-200 border-0 outline-none cursor-pointer"
+              className="px-6 py-2 rounded-lg bg-[var(--bg)] text-[var(--text)] font-bold hover:bg-[var(--surface-hover)] border-0 outline-none cursor-pointer"
               onClick={() => setShowDisbandConfirm(false)}
             >
               Hủy
@@ -882,7 +882,7 @@ function GroupManagementView({
           </div>
         }
       >
-        <p className="py-2 text-[15px] text-slate-600 leading-relaxed">
+        <p className="py-2 text-[15px] text-[var(--text)] opacity-90 leading-relaxed">
           Mời tất cả mọi người rời nhóm và xóa tin nhắn? Nhóm đã giải tán sẽ KHÔNG THỂ khôi phục.
         </p>
       </Modal>
@@ -905,12 +905,12 @@ function ActionButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex flex-col items-center rounded-xl border-0 bg-transparent px-1 py-2 shadow-none outline-none ring-0 hover:bg-gray-50 focus:outline-none group cursor-pointer"
+      className="flex flex-col items-center rounded-xl border-0 bg-transparent px-1 py-2 shadow-none outline-none ring-0 hover:bg-[var(--surface-hover)] focus:outline-none group cursor-pointer transition-colors"
     >
-      <div className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors ${isActive ? 'bg-[#E6F3FF]' : 'bg-gray-200 group-hover:bg-gray-300'}`}>
-        <Icon size={16} className={isActive ? 'text-[#0091FF]' : 'text-slate-600'} />
+      <div className={`flex h-11 w-11 items-center justify-center rounded-full transition-all ${isActive ? 'bg-[#0068FF]/10 text-[#0068FF]' : 'bg-[var(--surface-hover)] text-[var(--text)] opacity-90'}`}>
+        <Icon size={22} strokeWidth={2.8} />
       </div>
-      <span className={`mt-2 text-center text-[11px] font-medium leading-[1.25] ${isActive ? 'text-[#0091FF]' : 'text-slate-700'}`}>
+      <span className={`mt-2 text-center text-[12.5px] font-semibold leading-tight ${isActive ? 'text-[#0068FF]' : 'text-[var(--text)] opacity-90'}`}>
         {label}
       </span>
     </button>
@@ -922,10 +922,10 @@ function InfoRow({ icon: Icon, text, onClick }: { icon: React.ElementType; text:
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-4 rounded-xl border-0 bg-transparent px-3 py-[13px] text-left shadow-none outline-none ring-0 hover:bg-gray-50 focus:outline-none active:bg-gray-100 cursor-pointer"
+      className="flex w-full items-center gap-4 rounded-xl border-0 bg-transparent px-3 py-[13px] text-left shadow-none outline-none ring-0 hover:bg-[var(--surface-hover)] focus:outline-none active:scale-[0.98] cursor-pointer transition-all"
     >
-      <Icon size={20} className="text-slate-700" />
-      <span className="text-[16px] font-medium text-slate-700">{text}</span>
+      <Icon size={20} className="text-[var(--muted)]" />
+      <span className="text-[16px] font-medium text-[var(--text)]">{text}</span>
     </button>
   );
 }
@@ -942,20 +942,20 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="mt-3 border-y border-gray-200 bg-white px-5 py-4">
+    <div className="mt-3 border-y border-[var(--border)] bg-[var(--surface)] transition-colors">
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center justify-between border-0 bg-transparent text-left shadow-none outline-none ring-0 focus:outline-none cursor-pointer"
+        className="flex w-full items-center justify-between p-4 border-0 bg-transparent text-left shadow-none outline-none ring-0 focus:outline-none cursor-pointer hover:bg-[var(--surface-hover)] transition-colors"
       >
-        <span className="text-[16px] font-semibold text-slate-800">{title}</span>
+        <span className="text-[16px] font-semibold text-[var(--text)]">{title}</span>
         <ChevronDown
           size={20}
-          className={`text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
+          className={`text-[var(--muted)] transition-transform ${expanded ? 'rotate-180' : ''}`}
         />
       </button>
 
-      {expanded && <div className="mt-4">{children}</div>}
+      {expanded && <div className="px-5 pb-4 bg-[var(--surface)]">{children}</div>}
     </div>
   );
 }
@@ -964,7 +964,7 @@ function ViewAllButton() {
   return (
     <button
       type="button"
-      className="mt-4 w-full rounded-xl border-0 bg-gray-200 py-3 text-[15px] font-semibold text-slate-700 shadow-none outline-none ring-0 hover:bg-gray-300 focus:outline-none active:bg-gray-300 cursor-pointer shadow-none ring-0 outline-none"
+      className="mt-4 w-full rounded-xl border-0 bg-[var(--surface-hover)] py-3 text-[15px] font-semibold text-[var(--text)] opacity-90 shadow-none outline-none ring-0 hover:bg-[#E8E9EC] dark:hover:bg-white/10 focus:outline-none active:scale-[0.98] cursor-pointer transition-all"
     >
       Xem tất cả
     </button>
@@ -972,7 +972,7 @@ function ViewAllButton() {
 }
 
 function EmptyState({ text }: { text: string }) {
-  return <p className="py-8 text-center text-sm text-slate-500">{text}</p>;
+  return <p className="py-8 text-center text-sm text-slate-500 dark:text-slate-400 font-medium italic">{text}</p>;
 }
 
 function FooterAction({ icon: Icon, label, color, onClick }: { icon: React.ElementType; label: string; color: string; onClick?: () => void }) {
@@ -980,7 +980,7 @@ function FooterAction({ icon: Icon, label, color, onClick }: { icon: React.Eleme
     <button
       type="button"
       onClick={onClick}
-      className={`flex w-full items-center gap-3 rounded-xl border-0 bg-transparent px-3 py-[13px] text-left shadow-none outline-none ring-0 ${color} hover:bg-red-50 focus:outline-none active:bg-red-100 cursor-pointer`}
+      className={`flex w-full items-center gap-3 rounded-xl border-0 bg-transparent px-3 py-[13px] text-left shadow-none outline-none ring-0 ${color} hover:bg-[var(--surface-hover)] focus:outline-none active:scale-[0.98] cursor-pointer transition-all`}
     >
       <Icon size={20} />
       <span className="text-[15px] font-medium">{label}</span>
@@ -1032,9 +1032,9 @@ function PermissionCheckbox({
       className={`flex items-center justify-between gap-4 group ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
       onClick={() => !disabled && onChange?.(!checked)}
     >
-      <span className="text-[15px] font-medium text-[#001A33] leading-relaxed flex-1">{label}</span>
+      <span className="text-[15px] font-medium text-[var(--text)] leading-relaxed flex-1">{label}</span>
       <div className={`w-[22px] h-[22px] rounded border-2 flex items-center justify-center transition-all ${
-        checked ? 'bg-[#0068FF] border-[#0068FF]' : 'border-gray-300'
+        checked ? 'bg-[#0068FF] border-[#0068FF]' : 'border-[var(--border)]'
       }`}>
         {checked && <Check size={14} strokeWidth={4} className="text-white" />}
       </div>
@@ -1057,11 +1057,11 @@ function SettingToggleRow({
 }) {
   return (
     <div 
-      className={`px-5 py-[18px] flex items-center justify-between hover:bg-gray-50 transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+      className={`px-5 py-[18px] flex items-center justify-between hover:bg-[var(--surface-hover)] transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
       onClick={() => !disabled && onChange?.(!checked)}
     >
       <div className="flex items-center gap-1.5 min-w-0 flex-1">
-        <span className="text-[15px] font-medium text-[#001A33] truncate">{label}</span>
+        <span className="text-[15px] font-medium text-[var(--text)] truncate">{label}</span>
         {showHelp && <HelpCircle size={16} className="text-gray-400 flex-shrink-0" />}
       </div>
       <ToggleSwitch checked={checked} disabled={disabled} />
@@ -1121,21 +1121,21 @@ function LeaderDeputyView({
   const deputies = conversation.members?.filter(m => String(m.role || '').toUpperCase() === 'DEPUTY') || [];
 
   return (
-    <div className="flex flex-col bg-white h-full overflow-y-auto pb-10 scrollbar-hide">
+    <div className="flex flex-col h-full overflow-y-auto scrollbar-hide pb-10">
       <div className="p-4 space-y-6">
         {/* Leader Section */}
         <div>
-          <div className="flex items-center gap-3 py-2 border-b border-gray-50">
+          <div className="flex items-center gap-3 py-2 border-b border-[var(--border)] opacity-80">
             <UserAvatar 
               name={userMap[admin?.userId || '']?.displayName || admin?.displayName || ''} 
               imageUrl={userMap[admin?.userId || '']?.avatarUrl || admin?.avatarUrl} 
               size="lg" 
             />
             <div className="flex flex-col">
-              <span className="font-semibold text-slate-800 text-[16px]">
+              <span className="font-semibold text-[var(--text)] text-[16px]">
                 {userMap[admin?.userId || '']?.displayName || admin?.displayName}
               </span>
-              <span className="text-[13px] text-slate-500">Trưởng nhóm</span>
+              <span className="text-[13px] text-[var(--muted)]">Trưởng nhóm</span>
             </div>
           </div>
         </div>
@@ -1143,13 +1143,13 @@ function LeaderDeputyView({
         {/* Action Buttons */}
         <div className="space-y-3">
           <button 
-            className="w-full py-3 bg-[#EBEBEF] text-[#001A33] font-bold rounded-lg hover:bg-gray-200 border-0 outline-none cursor-pointer transition-all active:scale-95"
+            className="w-full py-3 bg-[var(--bg)] text-[var(--text)] font-bold rounded-lg hover:bg-[var(--surface-hover)] border-0 outline-none cursor-pointer transition-all active:scale-95 shadow-sm"
             onClick={() => setShowAdjustModal(true)}
           >
             Thêm phó nhóm
           </button>
           <button 
-            className="w-full py-3 bg-[#EBEBEF] text-[#001A33] font-bold rounded-lg hover:bg-gray-200 border-0 outline-none cursor-pointer transition-all active:scale-95"
+            className="w-full py-3 bg-[var(--bg)] text-[var(--text)] font-bold rounded-lg hover:bg-[var(--surface-hover)] border-0 outline-none cursor-pointer transition-all active:scale-95 shadow-sm"
             onClick={() => setShowTransferModal(true)}
           >
             Chuyển quyền trưởng nhóm
@@ -1159,7 +1159,7 @@ function LeaderDeputyView({
         {/* Deputies List */}
         {deputies.length > 0 && (
           <div className="mt-6">
-            <h5 className="text-[14px] font-bold text-slate-400 mb-4 uppercase tracking-wider">Danh sách phó nhóm ({deputies.length}/3)</h5>
+            <h5 className="text-[14px] font-bold text-[var(--muted)] mb-4 uppercase tracking-wider opacity-90">Danh sách phó nhóm ({deputies.length}/3)</h5>
             <div className="space-y-4">
               {deputies.map(deputy => (
                 <div key={deputy.userId} className="flex items-center justify-between group">
@@ -1170,14 +1170,14 @@ function LeaderDeputyView({
                       size="md" 
                     />
                     <div className="flex flex-col">
-                      <span className="font-medium text-slate-800">
+                      <span className="font-medium text-[var(--text)]">
                         {userMap[deputy.userId]?.displayName || deputy.displayName}
                       </span>
-                      <span className="text-[13px] text-slate-500">Phó nhóm</span>
+                      <span className="text-[13px] text-[var(--muted)]">Phó nhóm</span>
                     </div>
                   </div>
                   <button 
-                    className="p-2 text-red-500 hover:bg-red-50 rounded-full border-0 outline-none cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-full border-0 outline-none cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity bg-transparent"
                     onClick={() => onUpdateRole?.(deputy.userId, 'MEMBER')}
                   >
                     <Trash2 size={18} />
@@ -1278,24 +1278,24 @@ function AdjustDeputyModal({
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/50 animate-in fade-in duration-200">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-[700px] h-[600px] flex flex-col overflow-hidden">
+      <div className="bg-[var(--surface)] rounded-xl shadow-2xl w-full max-w-[700px] h-[600px] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="text-[17px] font-bold text-slate-800">Điều chỉnh phó nhóm</h3>
-          <button onClick={onClose} className="p-2 hover:bg-slate-50 rounded-full border-0 bg-transparent cursor-pointer transition-colors shadow-none outline-none">
-            <X size={20} className="text-slate-500" />
+        <div className="px-6 py-4 border-b border-[var(--border)] flex items-center justify-between">
+          <h3 className="text-[17px] font-bold text-[var(--text)]">Điều chỉnh phó nhóm</h3>
+          <button onClick={onClose} className="p-2 hover:bg-[var(--surface-hover)] rounded-full border-0 bg-transparent cursor-pointer transition-colors shadow-none outline-none">
+            <X size={20} className="text-[var(--muted)] hover:text-[var(--text)]" />
           </button>
         </div>
 
         <div className="flex-1 flex overflow-hidden">
-          <div className="flex-1 border-r border-gray-100 flex flex-col min-w-0">
+          <div className="flex-1 border-r border-[var(--border)] flex flex-col min-w-0">
             <div className="p-4">
-              <div className="relative text-slate-400">
+              <div className="relative text-[var(--muted)]">
                 <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2" />
                 <input 
                   type="text"
                   placeholder="Tìm kiếm thành viên"
-                  className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-transparent focus:border-blue-400 focus:bg-white rounded-lg outline-none text-[15px] transition-all"
+                  className="w-full pl-10 pr-4 py-2 bg-[var(--bg)] border border-transparent focus:border-blue-400 focus:bg-[var(--surface)] rounded-lg outline-none text-[15px] text-[var(--text)] transition-all"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -1306,11 +1306,11 @@ function AdjustDeputyModal({
                 {filteredMembers.map(m => (
                   <div 
                     key={m.userId}
-                    className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg cursor-pointer group transition-colors"
+                    className="flex items-center gap-3 p-2 hover:bg-[var(--surface-hover)] rounded-lg cursor-pointer group transition-colors"
                     onClick={() => toggleSelect(m.userId)}
                   >
                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                      selectedIds.includes(m.userId) ? 'bg-blue-500 border-blue-500' : 'border-slate-300'
+                      selectedIds.includes(m.userId) ? 'bg-blue-500 border-blue-500' : 'border-[var(--border)]'
                     }`}>
                       {selectedIds.includes(m.userId) && <Check size={12} className="text-white" />}
                     </div>
@@ -1319,7 +1319,7 @@ function AdjustDeputyModal({
                       imageUrl={userMap[m.userId]?.avatarUrl || m.avatarUrl} 
                       size="md" 
                     />
-                    <span className="text-[15px] font-medium text-slate-700 truncate flex-1">
+                    <span className="text-[15px] font-medium text-[var(--text)] truncate flex-1">
                       {userMap[m.userId]?.displayName || m.displayName}
                     </span>
                   </div>
@@ -1328,11 +1328,11 @@ function AdjustDeputyModal({
             </div>
           </div>
 
-          <div className="w-[240px] bg-white flex flex-col min-w-0">
-            <div className="p-4 border-b border-gray-50">
+          <div className="w-[240px] bg-[var(--bg)] flex flex-col min-w-0">
+            <div className="p-4 border-b border-[var(--border)]">
               <div className="flex items-center justify-between">
-                <span className="text-[14px] font-bold text-slate-800">Đã chọn</span>
-                <span className="bg-blue-50 text-blue-600 text-[12px] px-2 py-0.5 rounded-full font-bold">
+                <span className="text-[14px] font-bold text-[var(--text)]">Đã chọn</span>
+                <span className="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-sky-400 text-[12px] px-2 py-0.5 rounded-full font-bold">
                   {selectedIds.length}/3
                 </span>
               </div>
@@ -1342,23 +1342,23 @@ function AdjustDeputyModal({
                 const name = userMap[id]?.displayName || members.find(m => m.userId === id)?.displayName || 'Thành viên';
                 const avatar = userMap[id]?.avatarUrl || members.find(m => m.userId === id)?.avatarUrl;
                 return (
-                  <div key={id} className="flex items-center gap-2 bg-blue-50/50 p-2 rounded-lg border border-blue-100/50 group transition-all">
+                  <div key={id} className="flex items-center gap-2 bg-[var(--surface-hover)] p-2 rounded-lg border border-[var(--border)] group transition-all">
                     <UserAvatar name={name} imageUrl={avatar} size="xs" />
-                    <span className="text-[13px] font-medium text-blue-800 truncate flex-1">{name}</span>
+                    <span className="text-[13px] font-medium text-blue-800 dark:text-sky-300 truncate flex-1">{name}</span>
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
                         toggleSelect(id);
                       }}
-                      className="p-1 hover:bg-blue-100 rounded-full border-0 bg-transparent cursor-pointer transition-colors shadow-none outline-none"
+                      className="p-1 hover:bg-[var(--surface-hover)] rounded-full border-0 bg-transparent cursor-pointer transition-colors shadow-none outline-none"
                     >
-                      <X size={14} className="text-blue-600" />
+                      <X size={14} className="text-blue-600 dark:text-sky-400" />
                     </button>
                   </div>
                 );
               })}
               {selectedIds.length === 0 && (
-                <div className="h-full flex flex-col items-center justify-center opacity-40 py-10">
+                <div className="h-full flex flex-col items-center justify-center opacity-40 py-10 text-[var(--muted)]">
                   <Users size={32} className="mb-2" />
                   <p className="text-[13px]">Chưa chọn ai</p>
                 </div>
@@ -1367,9 +1367,9 @@ function AdjustDeputyModal({
           </div>
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3 bg-slate-50/50">
+        <div className="px-6 py-4 border-t border-[var(--border)] flex items-center justify-end gap-3 bg-[var(--surface-hover)]/30">
           <button 
-            className="px-6 py-2 rounded-lg text-slate-600 font-bold text-[14px] hover:bg-slate-100 border-0 bg-transparent cursor-pointer transition-colors shadow-none outline-none"
+            className="px-6 py-2 rounded-lg text-[var(--muted)] hover:text-[var(--text)] font-bold text-[14px] hover:bg-[var(--surface-hover)] border-0 bg-transparent cursor-pointer transition-colors shadow-none outline-none"
             onClick={onClose}
           >
             Hủy
@@ -1377,8 +1377,8 @@ function AdjustDeputyModal({
           <button 
             className={`px-8 py-2 rounded-lg font-bold text-[14px] shadow-sm border-0 outline-none cursor-pointer transition-all active:scale-95 ${
               selectedIds.length > 0
-                ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                : 'bg-blue-300 text-white cursor-not-allowed'
+                ? 'bg-blue-600 text-white hover:bg-blue-700 font-bold' 
+                : 'bg-blue-300 dark:bg-blue-900/30 text-white dark:text-slate-500 cursor-not-allowed'
             }`}
             disabled={selectedIds.length === 0}
             onClick={() => onConfirm(selectedIds)}
@@ -1415,14 +1415,14 @@ function MemberListView({ conversation, currentUserId, onAddMembers, onKickMembe
   }, [members, searchTerm, userMap]);
 
   return (
-    <div className="flex flex-col bg-white h-full overflow-hidden">
-      <div className="p-4 border-b border-gray-100">
-        <div className="relative text-slate-400">
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="p-4 border-b border-[var(--border)]">
+        <div className="relative text-[var(--muted)]">
           <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2" />
           <input 
             type="text"
             placeholder="Tìm kiếm thành viên"
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-transparent focus:border-blue-400 focus:bg-white rounded-xl outline-none text-[15px] transition-all"
+            className="w-full pl-10 pr-4 py-2 bg-[var(--bg)] text-[var(--text)] border border-transparent focus:border-blue-400 rounded-xl outline-none text-[15px] transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -1437,7 +1437,7 @@ function MemberListView({ conversation, currentUserId, onAddMembers, onKickMembe
              const profile = userMap[member.userId];
              
              return (
-               <div key={member.userId} className="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 group transition-colors">
+               <div key={member.userId} className="flex items-center justify-between p-3 rounded-xl hover:bg-[var(--surface-hover)] group transition-colors bg-transparent">
                   <div className="flex items-center gap-3">
                     <UserAvatar 
                       name={profile?.displayName || member.displayName || 'Thành viên'} 
@@ -1445,11 +1445,11 @@ function MemberListView({ conversation, currentUserId, onAddMembers, onKickMembe
                       size="md" 
                     />
                     <div className="flex flex-col">
-                      <span className="font-medium text-slate-800">
+                      <span className="font-medium text-[var(--text)]">
                         {profile?.displayName || member.displayName} {isMe && '(Bạn)'}
                       </span>
                       {role !== 'MEMBER' && (
-                        <span className="text-[12px] text-[#0068FF] font-medium">
+                        <span className="text-[12px] text-[#0068FF] dark:text-sky-400 font-medium">
                           {role === 'ADMIN' ? 'Trưởng nhóm' : 'Phó nhóm'}
                         </span>
                       )}
@@ -1458,14 +1458,14 @@ function MemberListView({ conversation, currentUserId, onAddMembers, onKickMembe
                   {!isMe && role === 'MEMBER' && (
                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button 
-                          className="p-2 text-slate-500 hover:bg-white hover:shadow-sm rounded-full transition-all border-0 bg-transparent cursor-pointer"
+                          className="p-2 text-[var(--muted)] hover:text-red-500 hover:bg-[var(--surface-hover)] rounded-full transition-all border-0 bg-transparent cursor-pointer"
                           onClick={() => onKickMember?.(member.userId)}
                           title="Xóa khỏi nhóm"
                         >
                           <Trash2 size={18} />
                         </button>
                         <button 
-                          className="p-2 text-[#0068FF] hover:bg-blue-50 rounded-full transition-all border-0 bg-transparent cursor-pointer"
+                          className="p-2 text-[#0068FF] dark:text-sky-400 hover:bg-[var(--surface-hover)] rounded-full transition-all border-0 bg-transparent cursor-pointer"
                           onClick={() => onPromoteDeputy?.(member.userId, 'DEPUTY')}
                           title="Bổ nhiệm phó nhóm"
                         >
@@ -1490,4 +1490,4 @@ function MemberListView({ conversation, currentUserId, onAddMembers, onKickMembe
       </div>
     </div>
   );
-}
+}

@@ -47,14 +47,14 @@ export function PollBubble({ poll, isMyMessage, currentUserId, onVote, reactions
   };
 
   return (
-    <div className={`poll-bubble bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden w-full max-w-[300px] flex flex-col ${isMyMessage ? 'ml-auto' : ''}`}>
+    <div className={`poll-bubble bg-[var(--surface)] rounded-xl border border-[var(--border)] shadow-sm overflow-hidden w-full max-w-[300px] flex flex-col ${isMyMessage ? 'ml-auto' : ''}`}>
       <div className="p-4 space-y-3">
         {/* Title */}
         <div className="text-center space-y-1">
-          <h3 className="text-[16px] font-bold text-slate-800 leading-tight">
+          <h3 className="text-[16px] font-bold text-[var(--text)] leading-tight">
             {poll.question}
           </h3>
-          <p className="text-[13px] text-blue-600 font-medium">
+          <p className="text-[13px] text-[#0068ff] font-medium">
             Đã có {totalVotes} lượt bình chọn <ChevronRight size={14} className="inline-block" />
           </p>
         </div>
@@ -73,10 +73,10 @@ export function PollBubble({ poll, isMyMessage, currentUserId, onVote, reactions
               <div 
                 key={opt.id} 
                 onClick={() => handleOptionClick(opt.id)}
-                className={`relative h-9 w-full bg-slate-50 rounded-lg overflow-hidden border transition-all cursor-pointer ${isActive ? 'border-blue-500 ring-1 ring-blue-500/20' : 'border-slate-100 hover:border-slate-200'}`}
+                className={`relative h-9 w-full bg-[var(--bg)] rounded-lg overflow-hidden border transition-all cursor-pointer ${isActive ? 'border-blue-500 ring-1 ring-blue-500/20' : 'border-[var(--border)] hover:border-slate-200'}`}
               >
                 <div 
-                  className={`absolute top-0 left-0 h-full transition-all duration-500 ${isActive ? 'bg-blue-200' : 'bg-blue-100'}`} 
+                  className={`absolute top-0 left-0 h-full transition-all duration-500 ${isActive ? 'bg-[#0068ff]/20' : 'bg-[#0068ff]/10'}`} 
                   style={{ width: `${percent}%` }}
                 />
                 <div className="relative h-full flex items-center justify-between px-3 text-[14px]">
@@ -86,9 +86,9 @@ export function PollBubble({ poll, isMyMessage, currentUserId, onVote, reactions
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
                       </div>
                     )}
-                    <span className={`font-medium truncate ${isActive ? 'text-blue-700' : 'text-slate-700'}`}>{opt.label}</span>
+                    <span className={`font-medium truncate ${isActive ? 'text-[#0068ff]' : 'text-[var(--text)]'}`}>{opt.label}</span>
                   </div>
-                  <span className={`shrink-0 ${isActive ? 'text-blue-600 font-bold' : 'text-slate-400'}`}>{votesCount}</span>
+                  <span className={`shrink-0 ${isActive ? 'text-[#0068ff] font-bold' : 'text-[var(--muted)]'}`}>{votesCount}</span>
                 </div>
               </div>
             );
@@ -100,10 +100,10 @@ export function PollBubble({ poll, isMyMessage, currentUserId, onVote, reactions
       <button 
         onClick={handleVoteSubmit}
         disabled={!selectedOptionId && !hasVoted}
-        className={`w-full py-3 border-t border-slate-100 text-[14px] font-bold transition-colors uppercase tracking-wide ${
+        className={`w-full py-3 border-t border-[var(--border)] text-[14px] font-bold transition-colors uppercase tracking-wide cursor-pointer outline-none ${
           (selectedOptionId || !hasVoted) 
-            ? 'text-[#005ae0] bg-white hover:bg-slate-50' 
-            : 'text-slate-400 bg-slate-50 cursor-default'
+            ? 'text-[#0068ff] bg-[var(--surface)] hover:bg-[var(--surface-hover)]' 
+            : 'text-[var(--muted)] bg-[var(--bg)] cursor-default'
         }`}
       >
         {hasVoted ? 'Đã bình chọn' : 'Bình chọn'}

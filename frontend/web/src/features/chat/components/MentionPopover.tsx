@@ -61,7 +61,7 @@ export const MentionPopover: React.FC<MentionPopoverProps> = ({
 
   return (
     <div 
-      className="absolute z-50 bg-white rounded-lg shadow-xl border border-slate-200 w-72 overflow-hidden mb-2"
+      className="absolute z-50 bg-white dark:bg-[#1E1E2E] rounded-lg shadow-xl border border-slate-200 dark:border-white/10 w-72 overflow-hidden mb-2"
       style={{ 
         bottom: '100%', 
         left: position.left,
@@ -73,7 +73,7 @@ export const MentionPopover: React.FC<MentionPopoverProps> = ({
           <div
             key={option.userId}
             className={`flex items-center gap-3 p-3 cursor-pointer transition-colors ${
-              index === selectedIndex ? 'bg-blue-50' : 'hover:bg-slate-50'
+              index === selectedIndex ? 'bg-blue-50 dark:bg-blue-500/10' : 'hover:bg-slate-50 dark:hover:bg-white/5 transition-colors'
             }`}
             onClick={() => onSelect(option)}
             onMouseEnter={() => setSelectedIndex(index)}
@@ -89,12 +89,12 @@ export const MentionPopover: React.FC<MentionPopoverProps> = ({
                 size="md" 
               />
             )}
-            <div className="flex flex-col">
-              <span className="font-semibold text-slate-800 text-[15px]">
+            <div className="flex flex-col min-w-0">
+              <span className="font-semibold text-slate-800 dark:text-slate-100 text-[15px] truncate">
                 {option.userId === 'all' ? `@${option.displayName}` : option.displayName}
               </span>
               {(option as any).subText && (
-                <span className="text-[12px] text-slate-500">{(option as any).subText}</span>
+                <span className="text-[12px] text-slate-500 dark:text-slate-400 truncate">{(option as any).subText}</span>
               )}
             </div>
           </div>

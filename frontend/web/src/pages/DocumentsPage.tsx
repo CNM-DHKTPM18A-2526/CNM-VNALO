@@ -33,12 +33,12 @@ export function DocumentsPage() {
       <header className="documents-header">
         <div className="header-title">
           <Icon name="folder" className="title-icon" />
-          <h1>{t('documents.title') || 'Quản lý file'}</h1>
+          <h1>{t('pages.documents.title') || 'Quản lý file'}</h1>
         </div>
         <div className="header-search">
           <div className="search-box">
             <Icon name="search" className="search-icon" />
-            <input type="text" placeholder={t('documents.search_placeholder') || 'Tìm kiếm tài liệu...'} />
+            <input type="text" placeholder={t('pages.documents.search_placeholder') || 'Tìm kiếm tài liệu...'} />
           </div>
         </div>
       </header>
@@ -48,31 +48,31 @@ export function DocumentsPage() {
           className={activeTab === 'all' ? 'tab-item active' : 'tab-item'} 
           onClick={() => setActiveTab('all')}
         >
-          {t('documents.tab_all') || 'Tất cả'}
+          {t('pages.documents.tab_all') || 'Tất cả'}
         </button>
         <button 
           className={activeTab === 'images' ? 'tab-item active' : 'tab-item'} 
           onClick={() => setActiveTab('images')}
         >
-          {t('documents.tab_images') || 'Hình ảnh'}
+          {t('pages.documents.tab_images') || 'Hình ảnh'}
         </button>
         <button 
           className={activeTab === 'videos' ? 'tab-item active' : 'tab-item'} 
           onClick={() => setActiveTab('videos')}
         >
-          {t('documents.tab_videos') || 'Video'}
+          {t('pages.documents.tab_videos') || 'Video'}
         </button>
         <button 
           className={activeTab === 'files' ? 'tab-item active' : 'tab-item'} 
           onClick={() => setActiveTab('files')}
         >
-          {t('documents.tab_files') || 'Tài liệu'}
+          {t('pages.documents.tab_files') || 'Tài liệu'}
         </button>
         <button 
           className={activeTab === 'links' ? 'tab-item active' : 'tab-item'} 
           onClick={() => setActiveTab('links')}
         >
-          {t('documents.tab_links') || 'Liên kết'}
+          {t('pages.documents.tab_links') || 'Liên kết'}
         </button>
       </nav>
 
@@ -81,10 +81,10 @@ export function DocumentsPage() {
           <table className="docs-table">
             <thead>
               <tr>
-                <th>{t('documents.col_name') || 'Tên tài liệu'}</th>
-                <th>{t('documents.col_sender') || 'Người gửi'}</th>
-                <th>{t('documents.col_conversation') || 'Hội thoại'}</th>
-                <th>{t('documents.col_date') || 'Ngày gửi'}</th>
+                <th>{t('pages.documents.col_name') || 'Tên tài liệu'}</th>
+                <th>{t('pages.documents.col_sender') || 'Người gửi'}</th>
+                <th>{t('pages.documents.col_conversation') || 'Hội thoại'}</th>
+                <th>{t('pages.documents.col_date') || 'Ngày gửi'}</th>
                 <th></th>
               </tr>
             </thead>
@@ -119,7 +119,7 @@ export function DocumentsPage() {
             <div className="empty-icon">
               <Icon name="folder" />
             </div>
-            <p>{t('documents.empty') || 'Không tìm thấy tài liệu nào'}</p>
+            <p>{t('pages.documents.empty') || 'Không tìm thấy tài liệu nào'}</p>
           </div>
         )}
       </div>
@@ -129,8 +129,8 @@ export function DocumentsPage() {
           display: flex;
           flex-direction: column;
           height: 100%;
-          background: #fff;
-          color: #333;
+          background: var(--surface);
+          color: var(--text);
         }
 
         .documents-header {
@@ -138,7 +138,8 @@ export function DocumentsPage() {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          border-bottom: 1px solid #efefef;
+          border-bottom: 1px solid var(--border);
+          background: var(--surface);
         }
 
         .header-title {
@@ -150,29 +151,30 @@ export function DocumentsPage() {
         .title-icon {
           width: 32px;
           height: 32px;
-          color: #005ae0;
+          color: var(--primary);
         }
 
         .header-title h1 {
           font-size: 24px;
           font-weight: 600;
-          color: #1a1a1a;
+          color: var(--title-subtle);
         }
 
         .search-box {
           display: flex;
           align-items: center;
           gap: 10px;
-          background: #f1f3f5;
+          background: var(--bg);
           padding: 10px 16px;
           border-radius: 999px;
           min-width: 300px;
+          border: 1px solid var(--border);
         }
 
         .search-icon {
           width: 18px;
           height: 18px;
-          color: #adb5bd;
+          color: var(--muted);
         }
 
         .search-box input {
@@ -181,13 +183,15 @@ export function DocumentsPage() {
           outline: none;
           width: 100%;
           font-size: 14px;
+          color: var(--text);
         }
 
         .documents-tabs {
           padding: 0 32px;
           display: flex;
           gap: 32px;
-          border-bottom: 1px solid #efefef;
+          border-bottom: 1px solid var(--border);
+          background: var(--surface);
         }
 
         .tab-item {
@@ -195,25 +199,26 @@ export function DocumentsPage() {
           background: transparent;
           border: none;
           border-bottom: 3px solid transparent;
-          color: #666;
+          color: var(--muted);
           font-weight: 500;
           cursor: pointer;
           transition: all 0.2s;
         }
 
         .tab-item:hover {
-          color: #005ae0;
+          color: var(--primary);
         }
 
         .tab-item.active {
-          color: #005ae0;
-          border-bottom-color: #005ae0;
+          color: var(--primary);
+          border-bottom-color: var(--primary);
         }
 
         .documents-content {
           flex: 1;
           padding: 0;
           overflow-y: auto;
+          background: var(--bg);
         }
 
         .docs-table {
@@ -225,19 +230,25 @@ export function DocumentsPage() {
           text-align: left;
           padding: 16px 32px;
           font-size: 13px;
-          color: #999;
+          color: var(--muted);
           font-weight: 500;
-          border-bottom: 1px solid #f8f9fa;
+          border-bottom: 1px solid var(--border);
+          background: var(--surface);
         }
 
         .docs-table td {
           padding: 12px 32px;
-          border-bottom: 1px solid #f8f9fa;
+          border-bottom: 1px solid var(--border);
           font-size: 14px;
+          color: var(--text);
+        }
+
+        .docs-table tr {
+          background: var(--surface);
         }
 
         .docs-table tr:hover {
-          background: #f8f9fb;
+          background: var(--surface-hover);
         }
 
         .doc-name-cell {
@@ -255,10 +266,22 @@ export function DocumentsPage() {
           justify-content: center;
         }
 
-        .doc-icon-wrapper.files { background: #e7f3ff; color: #0056b3; }
-        .doc-icon-wrapper.images { background: #fff0f6; color: #d6336c; }
-        .doc-icon-wrapper.videos { background: #f3f0ff; color: #6741d9; }
-        .doc-icon-wrapper.links { background: #fff9db; color: #f08c00; }
+        .doc-icon-wrapper.files { 
+          background: color-mix(in srgb, var(--primary) 12%, transparent); 
+          color: var(--primary); 
+        }
+        .doc-icon-wrapper.images { 
+          background: color-mix(in srgb, #d6336c 12%, transparent); 
+          color: #d6336c; 
+        }
+        .doc-icon-wrapper.videos { 
+          background: color-mix(in srgb, #6741d9 12%, transparent); 
+          color: #6741d9; 
+        }
+        .doc-icon-wrapper.links { 
+          background: color-mix(in srgb, #f08c00 12%, transparent); 
+          color: #f08c00; 
+        }
 
         .doc-info {
           display: flex;
@@ -267,13 +290,13 @@ export function DocumentsPage() {
 
         .doc-name {
           font-weight: 500;
-          color: #1a1a1a;
+          color: var(--title-subtle);
           word-break: break-all;
         }
 
         .doc-size {
           font-size: 11px;
-          color: #999;
+          color: var(--muted);
           margin-top: 2px;
         }
 
@@ -286,13 +309,13 @@ export function DocumentsPage() {
           display: flex;
           align-items: center;
           justify-content: center;
-          color: #adb5bd;
+          color: var(--muted);
           cursor: pointer;
         }
 
         .action-btn:hover {
-          background: #e9ecef;
-          color: #1a1a1a;
+          background: var(--panel-highlight);
+          color: var(--primary);
         }
 
         .empty-state {
@@ -301,7 +324,7 @@ export function DocumentsPage() {
           align-items: center;
           justify-content: center;
           padding: 100px 0;
-          color: #adb5bd;
+          color: var(--muted);
         }
 
         .empty-icon {
