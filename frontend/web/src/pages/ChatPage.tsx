@@ -29,6 +29,7 @@ import {
   searchConversationMessages,
   sendMessage as sendMessageViaRest,
   unpinMessage,
+  updateMessage,
   uploadChatMedia,
   fetchConversation,
   addMembersToConversation,
@@ -410,6 +411,24 @@ function isRestrictedWebToken(token: string): boolean {
   const restrictedWebMode = parseBooleanClaim(payload.restrictedWebMode)
   const platform = String(payload.clientPlatform ?? 'WEB').trim().toLowerCase()
   return restrictedWebMode && platform === 'web'
+}
+
+function isUUID(str: string): boolean {
+  if (typeof str !== 'string') return false
+  const simpleUuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  return simpleUuidRegex.test(str)
+}
+
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  // Fallback for non-HTTPS or older browsers
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
 }
 
 export default function ChatPage() {
@@ -800,7 +819,7 @@ function ChatPageContent() {
 
   const syncMessageReaction = useCallback(
     async (messageId: string): Promise<void> => {
-      if (!accessToken || !messageId) {
+      if (!accessToken || !messageId || !isUUID(messageId)) {
         return
       }
 
@@ -831,19 +850,20 @@ function ChatPageContent() {
   )
 
   const syncConversationReactions = useCallback(async () => {
-    if (!selectedConversationIdRef.current || !accessToken) {
-      return
-    }
+    if (!selectedConversationIdRef.current || !accessToken) return
 
+    // Limit to only 10 latest messages for initial sync to avoid network flood
     const messageIds = selectedMessagesRef.current
       .map((message) => message.id)
-      .slice(-25)
+      .filter((id) => isUUID(id))
+      .slice(-10)
 
-    if (messageIds.length === 0) {
-      return
+    if (messageIds.length === 0) return
+
+    // Execute in sequence or small batches rather than all-at-once Promise.all
+    for (const id of messageIds) {
+      await syncMessageReaction(id)
     }
-
-    await Promise.all(messageIds.map((messageId) => syncMessageReaction(messageId)))
   }, [accessToken, syncMessageReaction])
 
   const loadPinnedMessages = useCallback(
@@ -884,384 +904,137 @@ function ChatPageContent() {
       setIsSocketConnected(false)
     },
     onMessageReceived: async (raw: RawMessage) => {
-      if (!user || !accessToken) {
-        return
-      }
+      if (!user || !accessToken) return;
 
-      const senderId = raw.senderId || raw.from || ''
-      const mapped = applyRestrictedMessage(normalizeMessage(mapRawMessage(raw, user.id)), isRestrictedMode)
+      const mapped = applyRestrictedMessage(normalizeMessage(mapRawMessage(raw, user.id)), isRestrictedMode);
+      if (!mapped.conversationId) return;
 
-      if (!mapped.conversationId) {
-        return
-      }
-
-      // 1. FAST PATH: Handle DISBAND_GROUP immediately before any async work or state updates
+      // ── 0. SYSTEM MESSAGES (CRITICAL SIGNALS) ──
       if (mapped.type === 'system') {
         try {
-          const systemPayload = JSON.parse(mapped.text);
-          if (systemPayload.action === 'DISBAND_GROUP') {
-            console.log('[ChatPage.onMessageReceived] CRITICAL: Handling DISBAND_GROUP signal for:', mapped.conversationId);
-            
-            // Remove from list and navigate away
-            setConversations(prev => prev.filter(c => c.id !== mapped.conversationId));
-            if (selectedConversationIdRef.current === mapped.conversationId) {
-              navigate('/chat');
-            }
-            return; // EXIT IMMEDIATELY - Do not fetch users, do not update preview, do not deduplicate
+          const sys = JSON.parse(mapped.text);
+          const cid = mapped.conversationId;
+
+          if (sys.action === 'DISBAND_GROUP') {
+            setConversations(prev => prev.filter(c => c.id !== cid));
+            if (selectedConversationIdRef.current === cid) navigate('/chat');
+            return;
+          }
+          if (sys.action === 'LEAVE_GROUP' && sys.actorId === user.id) {
+            setConversations(prev => prev.filter(c => c.id !== cid));
+            if (selectedConversationIdRef.current === cid) navigate('/chat');
+            return;
           }
 
-          if (systemPayload.action === 'LEAVE_GROUP') {
-            const leaverId = systemPayload.actorId;
-            console.log('[ChatPage.onMessageReceived] Handling LEAVE_GROUP for:', leaverId, 'in:', mapped.conversationId);
-            
-            if (leaverId === user.id) {
-              setConversations(prev => prev.filter(c => c.id !== mapped.conversationId));
-              if (selectedConversationIdRef.current === mapped.conversationId) {
-                navigate('/chat');
-              }
-              return;
-            }
-
-            // Update list for others
-            setConversations(prev => prev.map(c => {
-              if (c.id === mapped.conversationId) {
-                const updatedMembers = c.members?.filter(m => m.userId !== leaverId) || [];
-                const updatedIds = c.participantUserIds?.filter(id => id !== leaverId) || [];
-                return {
-                  ...c,
-                  members: updatedMembers,
-                  participantUserIds: updatedIds,
-                  memberCount: Math.max(1, (c.memberCount || 1) - 1)
-                };
-              }
-              return c;
-            }));
-            // Continue to normal flow to show the system message preview "X left the group"
-          }
-
-          if (systemPayload.action === 'ADD_MEMBERS') {
-             const newMemberIds = systemPayload.targetMemberIds || [];
-             console.log('[ChatPage.onMessageReceived] Handling ADD_MEMBERS for:', newMemberIds, 'in:', mapped.conversationId);
-             
-             setConversations(prev => prev.map(c => {
-               if (c.id === mapped.conversationId) {
-                 const currentIds = c.participantUserIds || [];
-                 const addedIds = newMemberIds.filter((id: string) => !currentIds.includes(id));
-                 return {
-                   ...c,
-                   participantUserIds: [...currentIds, ...addedIds],
-                   members: [...(c.members || []), ...addedIds.map((id: string) => ({ userId: id, role: 'MEMBER' }))],
-                   memberCount: (c.memberCount || 1) + addedIds.length
-                 };
-               }
-               return c;
-             }));
-          }
-
-          if (systemPayload.action === 'REMOVE_MEMBER') {
-             const targetIds = systemPayload.targetMemberIds || [];
-             console.log('[ChatPage.onMessageReceived] Handling REMOVE_MEMBER for:', targetIds, 'in:', mapped.conversationId);
-             
-             if (user.id && targetIds.includes(user.id)) {
-               setConversations(prev => prev.filter(c => c.id !== mapped.conversationId));
-               if (selectedConversationIdRef.current === mapped.conversationId) {
-                 navigate('/chat');
-               }
-               return;
-             }
-
-             setConversations(prev => prev.map(c => {
-               if (c.id === mapped.conversationId) {
-                 return {
-                   ...c,
-                   participantUserIds: c.participantUserIds?.filter(id => !targetIds.includes(id)),
-                   members: c.members?.filter(m => !targetIds.includes(m.userId)),
-                   memberCount: Math.max(1, (c.memberCount || 1) - targetIds.length)
-                 };
-               }
-               return c;
-             }));
-          }
-        } catch (e) {
-          // Not a JSON system message, continue to normal flow
-        }
-      }
-
-      // 2. Deduplication
-      if (raw.id && processedMessageIds.current.has(raw.id)) {
-        console.log('[ChatPage.onMessageReceived] Skipping duplicate message:', raw.id)
-        return
-      }
-      if (raw.id) processedMessageIds.current.add(raw.id)
-
-      if (deletedMessageIds[mapped.id]) {
-        return
-      }
-
-      // 2. Realtime Discovery & Sync
-      const exists = conversationsRef.current.some((c) => c.id === mapped.conversationId)
-      if (!exists) {
-        // Discovery: Fetch metadata for a conversation we don't know yet
-        if (!pendingMetadataFetches.current.has(mapped.conversationId)) {
-          console.log('🔍 [onMessageReceived] Discovering new conversation:', mapped.conversationId)
-          const fetchPromise = (async () => {
-            try {
-              const rawConvo = await fetchConversation(accessToken, mapped.conversationId)
-              if (rawConvo) {
-                const c = rawConvo as any
-                const inner = c.conversation || c
-                const members = inner.members || []
-                const myId = String(user?.id ?? '').trim()
-                const participantIds = members
-                  .map((m: any) => String(m.userId ?? '').trim())
-                  .filter((id: string) => id && id !== myId)
-
-                const freshConvo: ConversationSummary = {
-                  id: inner.id || c.id,
-                  isGroup: (inner.type || c.type) === 'GROUP',
-                  name: inner.title || c.title || 'Nhóm mới',
-                  avatarUrl: inner.avatarUrl || c.avatarUrl || null,
-                  lastMessage: 'Cuộc trò chuyện mới',
-                  unreadCount: 0,
-                  participantUserIds: participantIds,
-                  memberCount: members.length,
-                  members: members.map((m: any) => ({
-                    userId: String(m.userId ?? '').trim(),
-                    role: String(m.role ?? 'MEMBER').toUpperCase(),
-                  })),
-                  lastMessageAt: inner.updatedAt || c.updatedAt || new Date().toISOString(),
-                  updatedAt: inner.updatedAt || c.updatedAt || new Date().toISOString(),
-                }
-
-                // Seed cache with members only if they have real display names
-                members.forEach((m: any) => {
-                  const mid = String(m.userId ?? '').trim()
-                  const realName = (m.nickname || m.displayName || '').trim();
-                  if (mid && realName && realName !== 'Người dùng') {
-                    upsertUser(mid, {
-                      displayName: realName,
-                      avatarUrl: m.avatarUrl || null
-                    })
-                  } else if (mid) {
-                    // Force a proper profile fetch later
-                    void ensureUser(accessToken, mid);
-                  }
-                })
-
-                setConversations((prev) => [freshConvo, ...prev.filter((p) => p.id !== freshConvo.id)])
-              }
-            } catch (e) {
-              console.warn('[onMessageReceived] Discovery fetch failed:', e)
-            } finally {
-              pendingMetadataFetches.current.delete(mapped.conversationId)
-            }
-          })()
-          pendingMetadataFetches.current.set(mapped.conversationId, fetchPromise)
-          await fetchPromise
-        } else {
-          // Wait for existing fetch
-          await pendingMetadataFetches.current.get(mapped.conversationId)
-        }
-      } else if (mapped.type === 'system') {
-        // Only refresh full inbox for critical structural changes (membership)
-        // or if we don't recognize the action.
-        try {
-          const payload = JSON.parse(mapped.text) as SystemMessagePayload;
-          const { action } = payload as any;
-          
-          const silentActions = [
-            'UPDATE_MESSAGE_REACTIONS',
-            'UPDATE_GROUP_INFO',
-            'PIN_MESSAGE',
-            'UNPIN_MESSAGE'
-          ];
-
-          if (!silentActions.includes(action)) {
-             void loadInbox(accessToken, mapped.conversationId);
-          }
-
-          // Proactively fetch profiles for all users mentioned in the system message
-          const involvedIds = [payload.actorId, ...(payload.targetMemberIds ?? [])].filter(Boolean)
-          involvedIds.forEach((id) => void ensureUser(accessToken, id))
-
-          // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          // PIN/UNPIN REAL-TIME SYNC
-          // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          const actionPayload = payload as any;
-          if (actionPayload.action === 'PIN_MESSAGE' || actionPayload.action === 'UNPIN_MESSAGE') {
-            console.log(`[ChatPage.onMessageReceived] Real-time ${actionPayload.action} signal received for conversation:`, mapped.conversationId);
-            void syncPinnedMessages(mapped.conversationId);
-          }
-          
-          if (actionPayload.action === 'UPDATE_MESSAGE_REACTIONS') {
-            const { messageId, type: actionType, emoji, actorId } = actionPayload;
-            
-            // Optimistic sync if we have the data
-            if (messageId && actionType && emoji) {
-               const reactionKey = EMOJI_TO_REACTION_KEY[emoji];
-               if (reactionKey) {
-                 setReactionStatesByMessage(prev => {
-                   const currentState = prev[messageId] || { reactions: {}, lastUsedReaction: undefined };
-                   const reactions = { ...currentState.reactions };
-                   const currentReaction = reactions[reactionKey] || { count: 0, myCount: 0 };
-                   
-                   if (actionType === 'ADD') {
-                     reactions[reactionKey] = {
-                       count: currentReaction.count + 1,
-                       myCount: currentReaction.myCount + (actorId === user?.id ? 1 : 0)
-                     };
-                   } else if (actionType === 'REMOVE') {
-                     reactions[reactionKey] = {
-                       count: Math.max(0, currentReaction.count - 1),
-                       myCount: Math.max(0, currentReaction.myCount - (actorId === user?.id ? 1 : 0))
-                     };
-                     if (reactions[reactionKey].count <= 0) {
-                       delete reactions[reactionKey];
-                     }
-                   }
-                   
-                   // Resolve lastUsedReaction
-                   const myReaction = (Object.keys(reactions) as ReactionKey[]).find(
-                     (key) => (reactions[key]?.myCount ?? 0) > 0,
-                   );
-
-                   return {
-                     ...prev,
-                     [messageId]: {
-                       reactions,
-                       lastUsedReaction: myReaction
-                     }
-                   };
-                 });
-               }
-            }
-            // Always trigger background sync for reactions to ensure accuracy, 
-            // but this fetch is specific to one message and doesn't flash the whole inbox.
-            void syncMessageReaction(actionPayload.messageId);
-          }
-
-          if (actionPayload.action === 'UPDATE_GROUP_INFO' && actionPayload.metadata?.newName) {
-            const newName = actionPayload.metadata.newName;
-            setConversations(prev => prev.map(c => 
-              c.id === mapped.conversationId ? { ...c, name: newName } : c
-            ));
-          }
-        } catch (e) {
-          // If parse fails, it might be a raw system message format or older signal, 
-          // default to refreshing inbox to be safe.
-          void loadInbox(accessToken, mapped.conversationId);
-        }
-      }
-
-      console.log('[ChatPage.onMessageReceived] Processing message:', {
-        messageId: mapped.id,
-        conversationId: mapped.conversationId,
-        sender: mapped.sender,
-      })
-
-      if (!selectedConversationIdRef.current) {
-        setSelectedConversationId(mapped.conversationId)
-        navigate(`/chat/${mapped.conversationId}`)
-      }
-
-      void ensureUser(accessToken, senderId).then((profile) => {
-        setConversations((prev) => {
-          const existingIndex = prev.findIndex((conversation) => conversation.id === mapped.conversationId)
-
-          if (existingIndex === -1) {
-            // DISCOVERY FALLBACK: If discovery fetch hasn't finished, create placeholder
-            // CRITICAL: We don't know if it's a group yet, so we must be CAREFUL.
-            // Zalo usually waits for metadata, but if we must create one, use generic name for now.
-            return [
-              {
-                id: mapped.conversationId,
-                name: profile.displayName,
-                avatarUrl: profile.avatarUrl,
-                isStranger: senderId ? !friendIdSetRef.current.has(senderId) : false,
-                lastMessage: formatConversationPreview(
-                  profile.displayName,
-                  mapped,
-                  user.id,
-                  (id) => userMapRef.current[id]?.displayName || 'Người dùng',
-                ),
-                unreadCount: mapped.sender === 'me' ? 0 : 1,
-                online: false,
-                lastMessageSeq: mapped.serverSeq,
-                participantUserIds: senderId ? [senderId] : undefined,
-                lastMessageAt: new Date().toISOString(),
-              },
+          // PIN/UNPIN Sync
+          if (sys.action === 'PIN_MESSAGE') {
+            setPinnedMessageIds(prev => ({
               ...prev,
-            ]
+              [cid]: [...(prev[cid] || []), sys.messageId].filter((v, i, a) => a.indexOf(v) === i)
+            }));
+          }
+          if (sys.action === 'UNPIN_MESSAGE') {
+            setPinnedMessageIds(prev => ({
+              ...prev,
+              [cid]: (prev[cid] || []).filter(id => id !== sys.messageId)
+            }));
           }
 
-          const next = [...prev]
-          const current = next[existingIndex]
+          // Group Info Sync
+          if (sys.action === 'UPDATE_GROUP_INFO') {
+            setConversations(prev => prev.map(c => {
+              if (c.id !== cid) return c;
+              return { ...c, ...sys.metadata };
+            }));
+          }
+        } catch (e) { /* ignore */ }
+      }
 
-          // PROTECT CONVERSATION IDENTITY
-          const isGroup = current.isGroup;
-          const isFromMe = mapped.senderId === user.id;
+      // ── 1. DEDUPLICATION (PREVENT DOUBLE RENDERING) ──
+      if (mapped.id && processedMessageIds.current.has(mapped.id)) return;
+      if (mapped.id) processedMessageIds.current.add(mapped.id);
 
-          let updatedAvatarUrl = current.avatarUrl;
-          let updatedName = current.name;
+      // ── 2. INSTANT UI UPDATE (FAST PATH) ──
+      const senderId = mapped.senderId;
+      const senderProfile = userMapRef.current[senderId];
+      const senderDisplayName = senderId === user.id ? 'Bạn' : (senderProfile?.displayName || 'Người dùng');
 
-          if (isGroup) {
-            // Group Protection: Always keep existing group identity (null -> collage)
-            updatedAvatarUrl = current.avatarUrl ?? null;
-            updatedName = current.name ?? profile.displayName;
-          } else {
-            // 1-on-1 Protection: Only update if message is from the partner
-            // If message is from ME, keep existing partner name/avatar
-            if (!isFromMe) {
-              updatedAvatarUrl = profile.avatarUrl ?? current.avatarUrl;
-              updatedName = profile.displayName ?? current.name;
+      const preview = formatConversationPreview(
+        senderDisplayName,
+        mapped,
+        user.id,
+        (id) => userMapRef.current[id]?.displayName || 'Người dùng'
+      );
+
+      // Fast message update
+      setMessagesByConversation(prev => ({
+        ...prev,
+        [mapped.conversationId]: upsertMessage(prev[mapped.conversationId] ?? [], mapped)
+      }));
+
+      // Fast conversation update (Blind Discovery)
+      const exists = conversationsRef.current.some(c => c.id === mapped.conversationId);
+      const isActive = selectedConversationIdRef.current === mapped.conversationId;
+
+      setConversations(prev => {
+        const idx = prev.findIndex(c => c.id === mapped.conversationId);
+        const now = new Date().toISOString();
+
+        if (idx === -1) {
+          const placeholder: ConversationSummary = {
+            id: mapped.conversationId,
+            name: senderDisplayName,
+            avatarUrl: senderProfile?.avatarUrl || null,
+            lastMessage: preview,
+            lastMessageAt: now,
+            unreadCount: mapped.senderId === user.id ? 0 : 1,
+            isStranger: !friendIdSetRef.current.has(senderId),
+            participantUserIds: [senderId],
+            lastMessageSeq: mapped.serverSeq
+          };
+          return [placeholder, ...prev];
+        }
+
+        const next = [...prev];
+        next[idx] = {
+          ...next[idx],
+          lastMessage: preview,
+          lastMessageAt: now,
+          lastMessageSeq: mapped.serverSeq ?? next[idx].lastMessageSeq,
+          unreadCount: (isActive || mapped.senderId === user.id) ? 0 : (next[idx].unreadCount + 1)
+        };
+        const [target] = next.splice(idx, 1);
+        return [target, ...next];
+      });
+
+      // ── 3. BACKGROUND SYNC ──
+      if (isActive && mapped.serverSeq !== undefined) {
+        markAsRead({ conversationId: mapped.conversationId, lastReadSeq: mapped.serverSeq });
+      }
+
+      void (async () => {
+        try {
+          if (!exists) {
+            void joinConversation(mapped.conversationId);
+            if (!pendingMetadataFetches.current.has(mapped.conversationId)) {
+              pendingMetadataFetches.current.add(mapped.conversationId);
+              const data = await fetchConversation(accessToken, mapped.conversationId);
+              if (data) {
+                const inner = (data as any).conversation || data;
+                setConversations(prev => prev.map(c => c.id === mapped.conversationId ? {
+                  ...c,
+                  name: inner.title || inner.name || c.name,
+                  avatarUrl: inner.avatarUrl || c.avatarUrl,
+                  isGroup: inner.type === 'GROUP'
+                } : c));
+              }
+              pendingMetadataFetches.current.delete(mapped.conversationId);
             }
           }
-
-          next[existingIndex] = {
-            ...current,
-            name: updatedName,
-            avatarUrl: updatedAvatarUrl,
-            lastMessage: formatConversationPreview(
-              profile.displayName,
-              mapped,
-              user.id,
-              (id) => userMapRef.current[id]?.displayName || 'Người dùng',
-            ),
-            lastMessageAt: new Date().toISOString(),
-            isStranger:
-              senderId && friendIdSetRef.current.has(senderId)
-                ? false
-                : current.isStranger ?? Boolean(senderId),
-            participantUserIds:
-              current.participantUserIds && senderId
-                ? Array.from(new Set([...current.participantUserIds, senderId]))
-                : current.participantUserIds ?? (senderId ? [senderId] : undefined),
-          }
-
-          return next
-        })
-      })
-
-      setMessagesByConversation((prev) => {
-        const current = prev[mapped.conversationId] ?? []
-        return {
-          ...prev,
-          [mapped.conversationId]: upsertMessage(current, mapped),
-        }
-      })
-
-      // Socket event arrived: refresh reaction snapshot for that message.
-      void syncMessageReaction(mapped.id)
-
-      const isActiveConversation = selectedConversationIdRef.current === mapped.conversationId
-      updateConversationAfterMessage(mapped.conversationId, mapped, isActiveConversation)
-
-      if (isActiveConversation && mapped.serverSeq !== undefined) {
-        const emitted = markAsRead({ conversationId: mapped.conversationId, lastReadSeq: mapped.serverSeq })
-        if (!emitted) {
-          void markConversationRead(accessToken, mapped.conversationId, mapped.serverSeq).catch(() => undefined)
-        }
-      }
+          if (!senderProfile && senderId !== user.id) void ensureUser(accessToken, senderId);
+          void syncMessageReaction(mapped.id);
+        } catch (err) { /* silent bg error */ }
+      })();
     },
     onMessageRecalled: (payload) => {
       if (!payload.messageId || !payload.conversationId) {
@@ -1389,6 +1162,45 @@ function ChatPageContent() {
         return changed ? next : prev
       })
     },
+    onReactionAdded: (payload: any) => {
+      console.log('[ChatPage.socket] Reaction added:', payload);
+      setMessageReactions(prev => {
+        const current = prev[payload.messageId] || {};
+        const voters = current[payload.emoji] || [];
+        if (voters.includes(payload.userId)) return prev;
+
+        return {
+          ...prev,
+          [payload.messageId]: {
+            ...current,
+            [payload.emoji]: [...voters, payload.userId]
+          }
+        };
+      });
+    },
+    onReactionRemoved: (payload: any) => {
+      console.log('[ChatPage.socket] Reaction removed:', payload);
+      setMessageReactions(prev => {
+        const current = prev[payload.messageId] || {};
+        const voters = current[payload.emoji] || [];
+        if (!voters.includes(payload.userId)) return prev;
+
+        return {
+          ...prev,
+          [payload.messageId]: {
+            ...current,
+            [payload.emoji]: voters.filter(id => id !== payload.userId)
+          }
+        };
+      });
+    },
+    onGroupUpdated: (payload: any) => {
+      console.log('[ChatPage.socket] Group updated:', payload);
+      setConversations(prev => prev.map(c => {
+        if (c.id !== payload.conversationId) return c;
+        return { ...c, ...payload.metadata };
+      }));
+    },
     onGroupDisbanded: (payload) => {
       console.log('Group disbanded', payload.conversationId)
       setConversations((prev) => prev.filter((c) => c.id !== payload.conversationId))
@@ -1425,7 +1237,7 @@ function ChatPageContent() {
         }
         return c;
       }))
-      
+
       // If we are removed
       if (user?.id && payload.targetMemberIds.includes(user.id) && selectedConversationIdRef.current === payload.conversationId) {
         navigate('/chat');
@@ -1562,61 +1374,61 @@ function ChatPageContent() {
     }))
     updateConversationAfterMessage(convId, optimisticLog, true)
 
-    // 4. Lưu qua Socket với fallback REST
-    ;(async () => {
-      let success = false
-      for (let attempt = 1; attempt <= 2; attempt++) {
-        try {
-          const ack = await Promise.race([
-            emitSendMessage({ conversationId: convId, content: logText, messageType: 'TEXT', clientMessageId }),
-            new Promise<null>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 4000)),
-          ])
-          if (ack?.event === 'message.sent' && ack?.data) {
-            const serverMsg = {
-              ...normalizeMessage(mapRawMessage(ack.data, currentUserId)),
-              clientMessageId,
-              deliveryState: 'sent' as const,
+      // 4. Lưu qua Socket với fallback REST
+      ; (async () => {
+        let success = false
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            const ack = await Promise.race([
+              emitSendMessage({ conversationId: convId, content: logText, messageType: 'TEXT', clientMessageId }),
+              new Promise<null>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 4000)),
+            ])
+            if (ack?.event === 'message.sent' && ack?.data) {
+              const serverMsg = {
+                ...normalizeMessage(mapRawMessage(ack.data, currentUserId)),
+                clientMessageId,
+                deliveryState: 'sent' as const,
+              }
+              setMessagesByConversation((prev) => ({
+                ...prev,
+                [convId]: upsertMessage(prev[convId] ?? [], serverMsg),
+              }))
+              updateConversationAfterMessage(convId, serverMsg, true)
+              success = true
+              break
             }
-            setMessagesByConversation((prev) => ({
-              ...prev,
-              [convId]: upsertMessage(prev[convId] ?? [], serverMsg),
-            }))
-            updateConversationAfterMessage(convId, serverMsg, true)
-            success = true
-            break
-          }
-        } catch {}
-      }
-      if (!success) {
-        try {
-          const restRes = await sendMessageViaRest(accessToken || '', {
-            conversationId: convId,
-            content: logText,
-            messageType: 'TEXT',
-            clientMessageId,
-          })
-          if (restRes?.id) {
-            const serverMsg = {
-              ...normalizeMessage(mapRawMessage(restRes, currentUserId)),
+          } catch { }
+        }
+        if (!success) {
+          try {
+            const restRes = await sendMessageViaRest(accessToken || '', {
+              conversationId: convId,
+              content: logText,
+              messageType: 'TEXT',
               clientMessageId,
-              deliveryState: 'sent' as const,
+            })
+            if (restRes?.id) {
+              const serverMsg = {
+                ...normalizeMessage(mapRawMessage(restRes, currentUserId)),
+                clientMessageId,
+                deliveryState: 'sent' as const,
+              }
+              setMessagesByConversation((prev) => ({
+                ...prev,
+                [convId]: upsertMessage(prev[convId] ?? [], serverMsg),
+              }))
+              updateConversationAfterMessage(convId, serverMsg, true)
+              success = true
             }
-            setMessagesByConversation((prev) => ({
-              ...prev,
-              [convId]: upsertMessage(prev[convId] ?? [], serverMsg),
-            }))
-            updateConversationAfterMessage(convId, serverMsg, true)
-            success = true
-          }
-        } catch {}
-      }
-      if (!success) {
-        setMessagesByConversation((prev) => ({
-          ...prev,
-          [convId]: markLocalMessageFailed(prev[convId] ?? [], clientMessageId),
-        }))
-      }
-    })()
+          } catch { }
+        }
+        if (!success) {
+          setMessagesByConversation((prev) => ({
+            ...prev,
+            [convId]: markLocalMessageFailed(prev[convId] ?? [], clientMessageId),
+          }))
+        }
+      })()
   }, [
     groupCallSnapshot,
     groupCallElapsed,
@@ -1772,15 +1584,19 @@ function ChatPageContent() {
         }
       }
 
+      const previousPins = [...currentPins]
+
       try {
         if (isPinned) {
-          await unpinMessage(accessToken, conversationId, messageId)
+          // Optimistic UI update
           setPinnedMessageIds((prev) => ({
             ...prev,
             [conversationId]: currentPins.filter((id) => id !== messageId),
           }))
 
-          // Emit signal to sync other clients
+          await unpinMessage(accessToken, conversationId, messageId)
+
+          // Emit signal for other clients
           void emitSendMessage({
             conversationId,
             content: JSON.stringify({
@@ -1800,13 +1616,15 @@ function ChatPageContent() {
           return
         }
 
-        await pinMessage(accessToken, conversationId, messageId)
+        // Optimistic UI update
         setPinnedMessageIds((prev) => ({
           ...prev,
           [conversationId]: [...currentPins, messageId],
         }))
 
-        // Emit signal to sync other clients
+        await pinMessage(accessToken, conversationId, messageId)
+
+        // Emit signal for other clients
         void emitSendMessage({
           conversationId,
           content: JSON.stringify({
@@ -1819,6 +1637,11 @@ function ChatPageContent() {
           clientMessageId: crypto.randomUUID()
         });
       } catch (error) {
+        // Rollback on error
+        setPinnedMessageIds((prev) => ({
+          ...prev,
+          [conversationId]: previousPins,
+        }))
         const action = isPinned ? 'bỏ ghim' : 'ghim'
         console.error(`[ChatPage.handleTogglePinMessage] Failed to ${action} message`, error)
         toast.error(`Không thể ${action} tin nhắn. Vui lòng thử lại sau.`)
@@ -2094,8 +1917,8 @@ function ChatPageContent() {
 
     const logText = `CALL_LOG::${JSON.stringify(logData)}`;
     // 3. Robust Send Pipeline (Shadow Process)
-    // ONLY the Caller (outgoing) is responsible for saving & showing optimistic log to avoid duplicates
-    if (direction === 'outgoing') {
+    // ONLY the Caller (outgoing) or receiver of a missed call is responsible for saving & showing optimistic log
+    if (direction === 'outgoing' || (outcome !== 'completed' && direction === 'incoming')) {
       // 2. OPTIMISTIC UI: Add to chat immediately for caller
       const clientMessageId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
 
@@ -2651,20 +2474,11 @@ function ChatPageContent() {
         }
 
         setConversations((prev) => {
-          if (!targetId) {
-            return deduplicateById(mappedItems)
-          }
-
-          if (mappedItems.some((item) => item.id === targetId)) {
-            return deduplicateById(mappedItems)
-          }
-
+          if (!targetId) return mappedItems
+          if (mappedItems.some((item) => item.id === targetId)) return mappedItems
           const preserved = prev.find((item) => item.id === targetId)
-          if (!preserved) {
-            return deduplicateById(mappedItems)
-          }
-
-          return deduplicateById([preserved, ...mappedItems])
+          if (!preserved) return mappedItems
+          return [preserved, ...mappedItems]
         })
         setSelectedConversationId((prev) => {
           if (preferredConversationId) {
@@ -2749,16 +2563,16 @@ function ChatPageContent() {
 
         // Seed cache for others (best effort using what we might already know from friendsDirectory)
         memberIds.forEach(id => {
-           const friend = friendsDirectory.find(f => f.friendId === id);
-           if (friend) {
-              upsertUser(id, {
-                displayName: friend.nickname || friend.displayName || fallbackUserDisplayName(id),
-                avatarUrl: friend.avatarUrl || null
-              });
-           } else {
-              // Force fetch if unknown
-              void ensureUser(accessToken, id);
-           }
+          const friend = friendsDirectory.find(f => f.friendId === id);
+          if (friend) {
+            upsertUser(id, {
+              displayName: friend.nickname || friend.displayName || fallbackUserDisplayName(id),
+              avatarUrl: friend.avatarUrl || null
+            });
+          } else {
+            // Force fetch if unknown
+            void ensureUser(accessToken, id);
+          }
         });
 
         // Remember this group ID locally to ensure it shows up even if it has no messages
@@ -3121,15 +2935,10 @@ function ChatPageContent() {
       return
     }
 
+    // REMOVED REACTION POLLING: It was causing O(N) requests every 2.5s, 
+    // which flooded the network and caused Socket ACK timeouts (the 4-5s delay).
+    // Reactions are now handled via real-time socket events instead.
     void syncConversationReactions()
-
-    const timerId = window.setInterval(() => {
-      void syncConversationReactions()
-    }, 2500)
-
-    return () => {
-      window.clearInterval(timerId)
-    }
   }, [accessToken, isSocketConnected, selectedConversationId, syncConversationReactions])
 
   useEffect(() => {
@@ -3334,10 +3143,7 @@ function ChatPageContent() {
         }
       }
 
-      const clientMessageId =
-        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-          ? crypto.randomUUID()
-          : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+      const clientMessageId = generateUUID()
 
       // 1. Collect all files to upload
       const allFiles = (draft.files && draft.files.length > 0
@@ -3484,7 +3290,7 @@ function ChatPageContent() {
 
       for (let i = 0; i < uploadResults.length; i++) {
         const res = uploadResults[i];
-        const resClientMessageId = i === 0 ? clientMessageId : (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+        const resClientMessageId = i === 0 ? clientMessageId : generateUUID();
 
         const file = allFiles[i];
         const actualExt = file ? file.name.split('.').pop()?.toLowerCase() || '' : '';
@@ -3586,6 +3392,90 @@ function ChatPageContent() {
       }
     },
     [accessToken, emitSendMessage, isRestrictedMode, routedConversationId, selectedConversationId, updateConversationAfterMessage, user],
+  )
+
+  const handleSendPoll = useCallback(
+    async (poll: PollMetadata) => {
+      const conversationId = selectedConversationIdRef.current || selectedConversationId || routedConversationId
+      if (!conversationId || !user || !accessToken) return
+
+      const clientMessageId = generateUUID()
+      const optimisticMessage: ChatMessage = {
+        id: clientMessageId,
+        clientMessageId,
+        conversationId,
+        sender: 'me',
+        senderId: user.id,
+        type: 'poll',
+        isLocal: false,
+        text: `📊 Bình chọn: ${poll.question}`,
+        pollData: poll,
+        timestamp: formatMessageTimestamp(),
+        deliveryState: 'sending',
+      }
+
+      setMessagesByConversation(prev => ({
+        ...prev,
+        [conversationId]: upsertMessage(prev[conversationId] ?? [], optimisticMessage)
+      }))
+      updateConversationAfterMessage(conversationId, optimisticMessage, true)
+
+      const pollPayload = {
+        type: 'poll',
+        question: poll.question,
+        options: poll.options.map(opt => ({
+          id: opt.id,
+          label: opt.label,
+          votes: []
+        })),
+        allowMulti: poll.allowMulti ?? false,
+        totalVotes: 0
+      }
+
+      const payload = {
+        conversationId,
+        messageType: 'TEXT',
+        content: JSON.stringify(pollPayload),
+        clientMessageId,
+      }
+
+      const ack = await emitSendMessage(payload as any)
+      if (ack?.event === 'message.sent' && ack?.data) {
+        // ... (existing logic)
+        const serverMessage = { ...mapRawMessage(ack.data, user.id), clientMessageId, deliveryState: 'sent' as const }
+        setMessagesByConversation(prev => ({ ...prev, [conversationId]: upsertMessage(prev[conversationId] ?? [], serverMessage) }))
+      } else {
+        // Fallback to REST 
+        try {
+          const restMessage = await sendMessageViaRest(accessToken, payload as any)
+          if (restMessage?.id) {
+            const mapped = { ...mapRawMessage(restMessage, user.id), clientMessageId, deliveryState: 'sent' as const }
+            setMessagesByConversation(prev => ({ ...prev, [conversationId]: upsertMessage(prev[conversationId] ?? [], mapped) }))
+          }
+        } catch (err) {
+          console.error('[ChatPage.handleSendPoll] Failed to send poll via REST fallback', err)
+          setMessagesByConversation(prev => ({ ...prev, [conversationId]: markLocalMessageFailed(prev[conversationId] ?? [], clientMessageId) }))
+        }
+      }
+    },
+    [accessToken, emitSendMessage, routedConversationId, selectedConversationId, updateConversationAfterMessage, upsertMessage, user]
+  )
+
+  const handleVotePoll = useCallback(
+    async (messageId: string, optionId: string) => {
+      const conversationId = selectedConversationIdRef.current || selectedConversationId || routedConversationId
+      if (!conversationId || !user || !accessToken) return
+
+      const emoji = `vote:${optionId}`
+
+      try {
+        // Use existing addReaction logic
+        await handleAddReaction(messageId, emoji as any)
+      } catch (err) {
+        console.error('[ChatPage.handleVotePoll] Failed to sync vote via reaction', err)
+      }
+    },
+    [accessToken, handleAddReaction, routedConversationId, selectedConversationId, user]
   )
 
   const handleSearchConversation = useCallback(
@@ -3749,11 +3639,11 @@ function ChatPageContent() {
       // 0. Permission check (Case-insensitive)
       const currentConv = conversations.find(c => c.id === selectedConversationId)
       if (currentConv?.isGroup) {
-         const myMember = currentConv.members?.find(m => m.userId === user?.id)
-         if (String(myMember?.role || '').toUpperCase() !== 'ADMIN') {
-            toast.error('Chỉ có nhóm trưởng mới có quyền thay đổi ảnh nhóm')
-            return
-         }
+        const myMember = currentConv.members?.find(m => m.userId === user?.id)
+        if (String(myMember?.role || '').toUpperCase() !== 'ADMIN') {
+          toast.error('Chỉ có nhóm trưởng mới có quyền thay đổi ảnh nhóm')
+          return
+        }
       }
 
       // 1. Upload new avatar
@@ -3886,7 +3776,7 @@ function ChatPageContent() {
     if (!selectedConversationId || !accessToken) return;
     try {
       await updateConversation(accessToken, selectedConversationId, settings);
-      
+
       // Update local state
       setConversations(prev => prev.map(conv => {
         if (conv.id !== selectedConversationId) return conv;
@@ -3919,7 +3809,7 @@ function ChatPageContent() {
 
       // Then call API
       await disbandConversation(accessToken, selectedConversationId);
-      
+
       // Update local state
       setConversations(prev => prev.filter(conv => conv.id !== selectedConversationId));
       setSelectedConversationId('');
@@ -3937,7 +3827,7 @@ function ChatPageContent() {
     try {
       const selectedConv = conversations.find(c => c.id === selectedConversationId);
       if (!selectedConv) return;
-      
+
       const targetDisplayName = userMap[targetUserId]?.displayName || 'Thành viên';
 
       // Emit SYSTEM message for UI
@@ -4178,7 +4068,9 @@ function ChatPageContent() {
         onToggleMessageSelection={toggleMessageIdInList}
         onClearMultiSelectMode={handleClearMultiSelectMode}
         onMessageContextMenuAction={handleMessageContextMenuAction}
+        onVotePoll={handleVotePoll}
         onInitiateCall={handleInitiateCall}
+        members={selectedConversation?.members || []}
       />
 
       <CreateGroupModal
@@ -4251,6 +4143,7 @@ function ChatPageContent() {
                   onUpdateGroupSettings={handleUpdateGroupSettings}
                   onDisbandGroup={handleDisbandGroup}
                   onJumpToMessage={setJumpToMessageId}
+                  onSendPoll={handleSendPoll}
                   friends={friendsDirectory}
                   currentUserId={user?.id}
                 />
@@ -4342,6 +4235,7 @@ function ChatPageContent() {
         remoteStream={callState.remoteStream}
         isMicOn={callState.isMicOn}
         isCameraOn={callState.isCameraOn}
+        isRemoteCameraOn={callState.isRemoteCameraOn}
         hasRemoteDescription={callState.hasRemoteDescription}
         onEnd={handleEndCall}
         onAnswer={handleAnswerCall}

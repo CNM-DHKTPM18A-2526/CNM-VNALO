@@ -3,6 +3,8 @@ import { ArrowLeft, Plus, MessageCircle, Link, AlarmClock, FileText, ChevronRigh
 import { UserAvatar } from '../../../shared/components/UserAvatar';
 import { useUserStore } from '../context/UserStoreContext';
 import { fetchPinnedMessages, type RawPinnedMessage, type ChatMessage } from '../chat.api';
+import { CreatePollModal } from './CreatePollModal';
+import type { PollMetadata } from '../chat.types';
 
 type TabType = 'all' | 'pin' | 'note' | 'poll';
 
@@ -12,13 +14,15 @@ interface GroupBulletinProps {
   messages: ChatMessage[]; // Pass current messages to resolve content for pins
   onClose: () => void;
   onJumpToMessage: (messageId: string) => void;
+  onSendPoll?: (poll: PollMetadata) => void;
 }
 
-export function GroupBulletin({ conversationId, token, messages, onClose, onJumpToMessage }: GroupBulletinProps) {
+export function GroupBulletin({ conversationId, token, messages, onClose, onJumpToMessage, onSendPoll }: GroupBulletinProps) {
   const { userMap } = useUserStore();
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [pinnedItems, setPinnedItems] = useState<RawPinnedMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showCreatePoll, setShowCreatePoll] = useState(false);
 
   useEffect(() => {
     const loadPinned = async () => {
@@ -139,7 +143,7 @@ export function GroupBulletin({ conversationId, token, messages, onClose, onJump
     return (
       <div className="p-4 space-y-4">
         {itemsToRender.map((item) => (
-          <div key={item.id} className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden p-3 transition-transform active:scale-[0.98]">
+          <div key={item.id} className="bg-[var(--surface)] rounded-xl border border-[var(--border)] shadow-sm overflow-hidden p-3 transition-transform active:scale-[0.98]">
             {(item.type === 'pin' || item.type === 'note') ? (
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
@@ -149,8 +153,8 @@ export function GroupBulletin({ conversationId, token, messages, onClose, onJump
                     size="sm" 
                   />
                   <div className="flex flex-col">
-                    <span className="text-[14px] font-bold text-slate-800">{userMap[item.senderId]?.displayName || 'Người dùng'}</span>
-                    <div className="flex items-center gap-1 text-[12px] text-slate-500">
+                    <span className="text-[14px] font-bold text-[var(--text)]">{userMap[item.senderId]?.displayName || 'Người dùng'}</span>
+                    <div className="flex items-center gap-1 text-[12px] text-[var(--muted)]">
                       {item.type === 'pin' ? (
                         <>
                           <MessageCircle size={12} className="text-blue-500" />
@@ -166,7 +170,7 @@ export function GroupBulletin({ conversationId, token, messages, onClose, onJump
                   </div>
                 </div>
 
-                <div className="text-[14px] text-slate-700">
+                <div className="text-[14px] text-[var(--text)] opacity-90">
                   <p className="mt-1 line-clamp-3">
                     {item.content.startsWith('http') ? (
                       <span className="flex items-center gap-1 text-blue-500 break-all cursor-pointer hover:underline">
@@ -178,15 +182,15 @@ export function GroupBulletin({ conversationId, token, messages, onClose, onJump
                 </div>
 
                 <div className="flex items-center gap-2 mt-2 text-[12px]">
-                  <span className="text-slate-400">
+                  <span className="text-[var(--muted)] opacity-70">
                     {formatRelativeDate(item.createdAt)}
                   </span>
                   {item.type === 'pin' && (
                     <>
-                      <span className="text-slate-300">|</span>
+                      <span className="text-[var(--border)]">|</span>
                       <button 
                         onClick={() => onJumpToMessage(item.messageId)}
-                        className="font-bold text-blue-600 hover:underline bg-white border-none cursor-pointer p-0"
+                        className="font-bold text-blue-600 hover:underline bg-transparent border-none cursor-pointer p-0"
                       >
                         Xem tin nhắn gốc
                       </button>
@@ -197,8 +201,8 @@ export function GroupBulletin({ conversationId, token, messages, onClose, onJump
             ) : (
               <div className="space-y-3">
                 <div className="flex flex-col">
-                  <h3 className="text-[15px] font-bold text-slate-800">{item.title}</h3>
-                  <p className="text-[13px] text-slate-500">{item.description}</p>
+                  <h3 className="text-[15px] font-bold text-[var(--text)]">{item.title}</h3>
+                  <p className="text-[13px] text-[var(--muted)]">{item.description}</p>
                 </div>
                 
                 <div 
@@ -210,23 +214,23 @@ export function GroupBulletin({ conversationId, token, messages, onClose, onJump
 
                 <div className="space-y-2 mt-2">
                   {item.options.map((opt: any, idx: number) => (
-                    <div key={idx} className="relative h-9 w-full bg-slate-50 rounded-lg overflow-hidden border border-slate-100">
+                    <div key={idx} className="relative h-9 w-full bg-[var(--bg)] rounded-lg overflow-hidden border border-[var(--border)]">
                       <div 
-                        className="absolute top-0 left-0 h-full bg-blue-100 transition-all duration-500" 
+                        className="absolute top-0 left-0 h-full bg-blue-100 dark:bg-blue-900/30 transition-all duration-500" 
                         style={{ width: `${opt.percent}%` }}
                       />
                       <div className="relative h-full flex items-center justify-between px-3 text-[14px]">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-slate-700">{opt.label}</span>
+                          <span className="font-medium text-[var(--text)]">{opt.label}</span>
                           {opt.selected && <div className="h-4 w-4 bg-blue-500 rounded-full flex items-center justify-center"><span className="text-[10px] text-white">✓</span></div>}
                         </div>
-                        <span className="text-slate-400">{opt.votes}</span>
+                        <span className="text-[var(--muted)]">{opt.votes}</span>
                       </div>
                     </div>
                   ))}
                 </div>
 
-                <button className="w-full py-2 text-[14px] font-semibold text-[#005ae0] bg-[#e5efff] rounded-md hover:bg-[#d0e3ff] transition-colors">
+                <button className="w-full py-2 text-[14px] font-semibold text-[#005ae0] bg-[#e5efff] dark:bg-blue-900/20 rounded-md hover:bg-[#d0e3ff] dark:hover:bg-blue-900/30 transition-colors">
                   Đổi lựa chọn
                 </button>
               </div>
@@ -238,15 +242,15 @@ export function GroupBulletin({ conversationId, token, messages, onClose, onJump
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#f4f7fa]">
+    <div className="flex flex-col h-full bg-[var(--bg)]">
       {/* Tabs */}
-      <nav className="flex bg-white shrink-0 sticky top-0 z-20">
+      <nav className="flex bg-[var(--surface)] shrink-0 sticky top-0 z-20">
         {tabs.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 py-3 text-[14px] font-medium transition-all relative border-none bg-white cursor-pointer ${
-              activeTab === tab.id ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'
+            className={`flex-1 py-3 text-[14px] font-medium transition-all relative border-none bg-transparent cursor-pointer ${
+              activeTab === tab.id ? 'text-blue-600' : 'text-[var(--muted)] hover:text-[var(--text)]'
             }`}
           >
             {tab.label}
@@ -256,21 +260,33 @@ export function GroupBulletin({ conversationId, token, messages, onClose, onJump
           </button>
         ))}
       </nav>
-      <div className="h-[1px] bg-slate-100" /> {/* Subtle divider under tabs */}
+      <div className="h-[1px] bg-[var(--border)]" /> {/* Subtle divider under tabs */}
 
       {/* Content Area */}
       <main className="flex-1 overflow-y-auto custom-scrollbar">
         {renderContent()}
-        <div className="p-4 pt-2 space-y-2 mb-6">
-          <button className="w-full h-11 bg-[#e5efff] text-[#005ae0] font-semibold rounded-md hover:bg-[#d0e3ff] transition-colors text-[14px] border-none cursor-pointer">
+        <div className="p-4 pt-2 space-y-2 mb-6 text-[var(--text)]">
+          <button className="w-full h-11 bg-[#e5efff] dark:bg-blue-900/20 text-[#005ae0] dark:text-sky-400 font-semibold rounded-md hover:bg-[#d0e3ff] dark:hover:bg-blue-900/30 transition-colors text-[14px] border-none cursor-pointer">
             Tạo ghi chú
           </button>
-          <button className="w-full h-11 bg-[#e5efff] text-[#005ae0] font-semibold rounded-md hover:bg-[#d0e3ff] transition-colors text-[14px] border-none cursor-pointer">
+          <button 
+            onClick={() => setShowCreatePoll(true)}
+            className="w-full h-11 bg-[#e5efff] dark:bg-blue-900/20 text-[#005ae0] dark:text-sky-400 font-semibold rounded-md hover:bg-[#d0e3ff] dark:hover:bg-blue-900/30 transition-colors text-[14px] border-none cursor-pointer"
+          >
             Tạo bình chọn
           </button>
         </div>
       </main>
 
+      {showCreatePoll && (
+        <CreatePollModal 
+          onClose={() => setShowCreatePoll(false)}
+          onCreate={(poll) => {
+            onSendPoll?.(poll);
+            setShowCreatePoll(false);
+          }}
+        />
+      )}
     </div>
   );
 }

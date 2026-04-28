@@ -459,8 +459,24 @@ export function mapRawMessage(raw: RawMessageLike, currentUserId: string): ChatM
   const mediaThumbnailUrl = raw.mediaThumbnailUrl ?? raw.media_thumbnail_url ?? null
   const mediaMimeType = raw.mediaMimeType ?? raw.media_mime_type ?? null
   const mediaSizeBytes = raw.mediaSizeBytes ?? raw.media_size_bytes ?? null
+
+  let pollData = null
+  let detectedTypeFromContent: ChatMessageType | null = null
+
+  if (content.startsWith('{"type":"poll"')) {
+    try {
+      const parsed = JSON.parse(content)
+      if (parsed.type === 'poll') {
+        pollData = parsed
+        detectedTypeFromContent = 'poll'
+      }
+    } catch (e) {
+      // Not a valid JSON poll, treat as text
+    }
+  }
+
   console.log('Mapped type debug:', (raw as any).type, raw.messageType)
-  const type = normalizeMessageType((raw as any).type || raw.messageType || (raw as any).message_type, raw)
+  const type = detectedTypeFromContent || normalizeMessageType((raw as any).type || raw.messageType || (raw as any).message_type, raw)
   const mediaUrl = mediaUrlFromPayload ?? ((type === 'image' || type === 'file' || type === 'sticker') ? mediaUrlFromContent : null)
   let messageText = mediaUrlFromContent && content.trim() === mediaUrlFromContent ? '' : content
   // Suppression: If it's an image and the text is just the filename/URL, clear it.
@@ -500,7 +516,7 @@ export function mapRawMessage(raw: RawMessageLike, currentUserId: string): ChatM
     senderId,
     sender: type === 'system' ? 'system' : (senderId === currentUserId ? 'me' : 'other'),
     type: type as ChatMessageType,
-    text: messageText,
+    text: type === 'poll' ? '' : messageText,
     mediaUrl: mediaUrl ? resolveMediaUrl(mediaUrl) : mediaUrl,
     mediaThumbnailUrl: mediaThumbnailUrl ? resolveMediaUrl(mediaThumbnailUrl) : mediaThumbnailUrl,
     mediaMimeType,
@@ -510,6 +526,7 @@ export function mapRawMessage(raw: RawMessageLike, currentUserId: string): ChatM
     timestamp: formatTime(createdAt),
     serverSeq,
     clientMessageId,
+    pollData,
     deliveryState: 'sent',
     replyTo: ((raw as any).replyTo || (raw as any).reply_to) ? ((raw as any).replyTo || (raw as any).reply_to) : (
       ((raw as any).replyToMessageId || (raw as any).reply_to_message_id) ? {
@@ -590,6 +607,13 @@ export async function sendMessage(token: string, payload: SendMessageRequest): P
   return authorizedFetch<RawMessage>(token, '/messages', {
     method: 'POST',
     body: JSON.stringify(sanitizedPayload),
+  })
+}
+
+export async function updateMessage(token: string, messageId: string, content: string): Promise<RawMessage> {
+  return authorizedFetch<RawMessage>(token, `/messages/${messageId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ content }),
   })
 }
 

@@ -1,13 +1,13 @@
 .chat-layout {
   display: grid;
-  grid-template-columns: 336px minmax(560px, 1fr) 308px;
-  gap: 10px;
+  grid-template-columns: 344px minmax(560px, 1fr) 330px;
+  gap: 0;
   min-height: 0;
   height: 100%;
 }
 
 .chat-layout.chat-layout-sidebar-closed {
-  grid-template-columns: 336px minmax(560px, 1fr);
+  grid-template-columns: 344px minmax(560px, 1fr);
 }
 
 .chat-list-panel,
@@ -15,9 +15,15 @@
 .chat-side-panel,
 .panel-page {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: var(--shadow-soft);
+  border: none;
+  border-right: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.chat-side-panel {
+  border-right: none;
+  border-left: 1px solid var(--border);
 }
 
 .chat-list-panel {
@@ -29,11 +35,11 @@
 }
 
 .panel-header {
-  padding: 12px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--border);
   display: grid;
   gap: 8px;
-  background: color-mix(in srgb, var(--surface) 92%, #fff);
+  background: var(--surface);
 }
 
 .panel-header h2,
@@ -120,27 +126,28 @@
 }
 
 .chat-list {
-  padding: 8px;
+  padding: 0;
   display: grid;
-  gap: 2px;
+  gap: 0;
   overflow-y: auto;
   overflow-x: hidden;
   min-height: 0;
 }
 
 .chat-item {
-  border: 1px solid transparent;
-  border-radius: 10px;
+  border: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+  border-radius: 0;
   background: transparent;
   color: inherit;
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 10px;
-  padding: 10px;
+  gap: 12px;
+  padding: 12px 14px;
   text-align: left;
   text-decoration: none;
   cursor: pointer;
-  align-items: start;
+  align-items: center;
 }
 
 /* Zalo Picker Custom Styles */
@@ -168,7 +175,7 @@
 
 .chat-item-active {
   background: var(--panel-highlight);
-  border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
+  border-left: 2px solid var(--primary);
 }
 
 .chat-item-avatar-wrap {
@@ -453,7 +460,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  background: color-mix(in srgb, var(--surface) 94%, #fff);
+  background: var(--surface);
   flex-shrink: 0;
 }
 
@@ -1048,7 +1055,7 @@
 .message-input {
   padding: 10px 12px;
   border-top: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface) 95%, #fff);
+  background: var(--surface);
   position: relative;
 }
 
@@ -1539,10 +1546,10 @@
 
 /* Pinned Messages Area - Zalo Card Style */
 .chat-pinned-area {
-  background: #fff;
-  border: 1px solid var(--border);
-  margin: 8px 12px;
-  border-radius: 8px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  margin: 0;
+  border-radius: 0;
   padding: 10px 14px;
   z-index: 20;
   display: flex;
@@ -1605,13 +1612,13 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  background: #f1f5f9;
+  background: var(--bg);
   padding: 5px 12px;
   border-radius: 20px;
   border: 1px solid var(--border);
   font-size: 13px;
   font-weight: 600;
-  color: #475569;
+  color: var(--text);
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.2s;
@@ -1619,8 +1626,8 @@
 }
 
 .pinned-count-pill:hover {
-  background: #e2e8f0;
-  border-color: #cbd5e1;
+  background: var(--surface-hover);
+  border-color: var(--primary);
   color: var(--primary);
 }
 
@@ -1650,8 +1657,8 @@
 }
 
 .pinned-item:hover {
-  background: rgba(255, 255, 255, 0.5);
-  border-color: rgba(0, 104, 255, 0.15);
+  background: var(--surface-hover);
+  border-color: color-mix(in srgb, var(--primary) 20%, transparent);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
@@ -1660,12 +1667,13 @@
   flex-shrink: 0;
 }
 
-.pinned-preview {
+.pinned-content {
   flex: 1;
-  white-space: nowrap;
+  color: #ffffff; /* Brighter for dark mode visibility as requested */
   overflow: hidden;
+  white-space: nowrap;
   text-overflow: ellipsis;
-  color: #374151;
+  font-size: 13.5px;
   font-weight: 500;
 }
 

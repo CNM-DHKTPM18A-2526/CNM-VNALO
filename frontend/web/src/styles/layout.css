@@ -21,8 +21,16 @@
   overflow: auto;
 }
 
-.workspace-main-chat {
-  padding: 10px 12px;
+.workspace-main.workspace-main-contacts,
+.workspace-main.workspace-main-documents {
+  padding: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.workspace-main.workspace-main-chat {
+  padding: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -34,14 +42,14 @@
 }
 
 .sidebar {
-  color: #fff;
+  color: var(--sidebar-text);
   padding: 16px 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  background: #005ae0;
-  border-right: 1px solid rgba(0, 0, 0, 0.05);
+  background: var(--sidebar);
+  border-right: 1px solid var(--border);
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
   z-index: 100;
 }
@@ -77,7 +85,7 @@
 }
 
 .sidebar-link {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--sidebar-muted);
   text-decoration: none;
   display: flex;
   align-items: center;
@@ -89,12 +97,12 @@
 }
 
 .sidebar-link:hover {
-  color: #fff;
+  color: var(--sidebar-text);
   background: rgba(255, 255, 255, 0.1);
 }
 
 .sidebar-link-active {
-  color: #fff;
+  color: var(--sidebar-text);
   background: rgba(0, 0, 0, 0.15);
 }
 
@@ -104,10 +112,10 @@
   left: 0;
   top: 15%;
   bottom: 15%;
-  width: 3px;
-  background: #fff;
+  width: 4px;
+  background: var(--primary);
   border-radius: 0 4px 4px 0;
-  display: none; /* Optional: Zalo sometimes has a line, sometimes not */
+  display: block;
 }
 
 .sidebar-link-icon {

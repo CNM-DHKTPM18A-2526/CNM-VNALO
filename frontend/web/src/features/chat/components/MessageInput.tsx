@@ -24,6 +24,8 @@ import { fetchStickerPacks, fetchStickerPackDetails, fetchMediaByCategory } from
 
 type PickerTab = 'STICKER' | 'EMOJI' | 'GIF'
 
+import { MentionPopover } from './MentionPopover'
+
 type MessageInputProps = {
   onSend: (message: ChatComposePayload) => void
   recipientName?: string
@@ -31,6 +33,7 @@ type MessageInputProps = {
   disabled?: boolean
   replyMessage?: any | null
   onCancelReply?: () => void
+  members?: Array<{ userId: string; displayName: string; avatarUrl?: string | null }>
 }
 
 type FilePreviewItem = {
@@ -49,10 +52,26 @@ export function MessageInput({
   disabled = false,
   replyMessage,
   onCancelReply,
+  members = [],
 }: MessageInputProps) {
   const { accessToken } = useAuth()
   const [messageText, setMessageText] = useState('')
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+
+  // Mention State
+  const [mentionState, setMentionState] = useState<{
+    isOpen: boolean;
+    filter: string;
+    cursorPos: number;
+    left: number;
+  }>({
+    isOpen: false,
+    filter: '',
+    cursorPos: 0,
+    left: 0
+  });
+
+  const messageInputRef = useRef<HTMLInputElement>(null);
 
   // Unified Picker State
   const [isPickerOpen, setIsPickerOpen] = useState(false)
@@ -69,6 +88,48 @@ export function MessageInput({
   const [error, setError] = useState('')
   const [isFocused, setIsFocused] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  
+  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const pos = e.target.selectionStart || 0;
+    setMessageText(value);
+
+    // Mention logic
+    const lastAtIdx = value.lastIndexOf('@', pos - 1);
+    if (lastAtIdx !== -1) {
+      const textAfterAt = value.substring(lastAtIdx + 1, pos);
+      // Only trigger if there's no space between @ and cursor
+      if (!textAfterAt.includes(' ')) {
+        setMentionState({
+          isOpen: true,
+          filter: textAfterAt,
+          cursorPos: lastAtIdx,
+          left: Math.min(pos * 8, 300) 
+        });
+        return;
+      }
+    }
+    
+    if (mentionState.isOpen) {
+      setMentionState(prev => ({ ...prev, isOpen: false }));
+    }
+  };
+
+  const handleSelectMention = (member: { userId: string; displayName: string }) => {
+    const before = messageText.substring(0, mentionState.cursorPos);
+    const after = messageText.substring(messageInputRef.current?.selectionEnd || 0);
+    // Use \u200B (Zero Width Space) as an invisible marker
+    const newText = `${before}\u200B@${member.displayName}\u200B ${after}`;
+    setMessageText(newText);
+    setMentionState(prev => ({ ...prev, isOpen: false }));
+    
+    // Focus back to input
+    setTimeout(() => {
+      messageInputRef.current?.focus();
+      const newPos = before.length + member.displayName.length + 3; // +3 for markers and space
+      messageInputRef.current?.setSelectionRange(newPos, newPos);
+    }, 0);
+  };
   const pickerPanelRef = useRef<HTMLDivElement | null>(null)
   const stickerTriggerRef = useRef<HTMLButtonElement | null>(null)
   const emojiTriggerRef = useRef<HTMLButtonElement | null>(null)
@@ -248,7 +309,16 @@ export function MessageInput({
   }
 
   return (
-    <footer className='message-input'>
+    <footer className='message-input relative'>
+      {mentionState.isOpen && (
+        <MentionPopover 
+          members={members}
+          filter={mentionState.filter}
+          position={{ top: 0, left: mentionState.left }}
+          onSelect={handleSelectMention}
+          onClose={() => setMentionState(prev => ({ ...prev, isOpen: false }))}
+        />
+      )}
       <input
         ref={fileInputRef}
         type='file'
@@ -302,7 +372,7 @@ export function MessageInput({
         </div>
       )}
 
-      <div className='flex flex-col gap-2 rounded-[16px] bg-white p-2 border border-slate-100 shadow-sm'>
+      <div className="flex flex-col gap-2 rounded-[16px] bg-[var(--surface)] p-2 border border-[var(--border)] shadow-sm">
         <div className='flex items-center gap-1 overflow-x-auto px-1 [scrollbar-width:none]'>
           <ToolIconButton ref={stickerTriggerRef} label='Sticker' disabled={disabled} onClick={handleStickerClick} active={isPickerOpen && activeTab === 'STICKER'}>
             <Sticker size={24} />
@@ -319,30 +389,67 @@ export function MessageInput({
           <ToolIconButton label='More' disabled={disabled}><Ellipsis size={24} /></ToolIconButton>
         </div>
 
-        <div className={`flex h-[48px] items-center gap-2 rounded-full transition ${isFocused ? 'bg-white ring-1 ring-slate-200 shadow-sm' : 'bg-white border-0 opacity-90'}`}>
+        <div className={`flex h-[48px] items-center gap-2 rounded-full transition relative ${isFocused ? 'bg-[var(--surface)] ring-1 ring-[#0068ff]/30 shadow-sm' : 'bg-[var(--input-bg)] border-0 shadow-inner'}`}>
+          <div 
+            className="absolute inset-0 px-3 flex items-center pointer-events-none whitespace-pre overflow-hidden text-[15px]"
+            style={{ 
+              letterSpacing: 'normal',
+              wordSpacing: 'normal',
+              lineHeight: 'normal',
+              fontFamily: 'inherit',
+              paddingTop: '0',
+              paddingBottom: '0'
+            }}
+          >
+            {messageText.split(/(\u200B@.*?\u200B)/g).map((part, i) => {
+              if (part.startsWith('\u200B@')) {
+                return (
+                  <span key={i} className="text-[#0068ff] font-medium">
+                    {part.replace(/\u200B/g, '')}
+                  </span>
+                );
+              }
+              return (
+                <span key={i} className="text-[var(--text)]">
+                  {part.replace(/\u200B/g, '')}
+                </span>
+              );
+            })}
+          </div>
           <input
-            className='h-full w-full border-0 bg-white text-[15px] outline-none placeholder:text-slate-400'
+            ref={messageInputRef}
+            className='h-full w-full border-0 bg-transparent text-[15px] outline-none placeholder:text-[var(--muted)] px-3 relative z-10'
+            style={{ 
+              color: 'transparent',
+              caretColor: isFocused ? '#0068ff' : '#1a1a1a',
+              letterSpacing: 'normal',
+              wordSpacing: 'normal',
+              lineHeight: 'normal',
+              fontFamily: 'inherit',
+              paddingTop: '0',
+              paddingBottom: '0'
+            }}
             placeholder={dynamicPlaceholder}
             value={messageText}
             disabled={disabled}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
-            onChange={(e) => setMessageText(e.target.value)}
+            onChange={handleTextChange}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
+              if (e.key === 'Enter' && !e.shiftKey && !mentionState.isOpen) {
                 e.preventDefault()
                 submitMessage()
               }
             }}
           />
-          <div className='flex items-center gap-1 bg-white'>
+          <div className="flex items-center gap-1 pr-1">
             <button
               ref={emojiTriggerRef}
               onClick={handleEmojiTriggerClick}
               className={`p-2 rounded-full transition-all border-0
               ${isPickerOpen
-                  ? 'text-blue-500 bg-blue-50'
-                  : 'text-slate-600 bg-white hover:bg-slate-100'
+                  ? 'text-blue-500 bg-blue-50 dark:bg-blue-500/10'
+                  : 'text-slate-600 dark:text-slate-400 bg-white dark:bg-transparent hover:bg-slate-100 dark:hover:bg-white/5'
                 }`}
             >
               <Smile size={24} strokeWidth={1.5} />
@@ -359,7 +466,7 @@ export function MessageInput({
                 }
               }}
               disabled={disabled}
-              className={`p-2 rounded-full transition-all border-0 bg-transparent ${canSend ? 'text-blue-500 hover:bg-blue-50 hover:scale-105 active:scale-95' : 'text-slate-400 hover:bg-slate-100'}`}
+              className={`p-2 rounded-full transition-all border-0 bg-transparent ${canSend ? 'text-blue-500 hover:bg-blue-50 hover:scale-105 active:scale-95' : 'text-slate-400 dark:text-slate-600 hover:bg-slate-100 dark:hover:bg-white/5'}`}
             >
               {canSend ? (
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
@@ -378,52 +485,43 @@ export function MessageInput({
       {isPickerOpen && (
         <div
           ref={pickerPanelRef}
-          className='absolute bottom-full mb-2 left-0 w-[350px] h-[450px] animate-in fade-in slide-in-from-bottom-2 duration-200 shadow-2xl border border-slate-200 rounded-xl overflow-hidden flex flex-col'
-          style={{ backgroundColor: '#ffffff', zIndex: 100 }}
+          className='absolute bottom-full mb-2 left-0 w-[350px] h-[450px] animate-in fade-in slide-in-from-bottom-2 duration-200 shadow-2xl border border-slate-200 dark:border-white/10 rounded-xl overflow-hidden flex flex-col bg-white dark:bg-[#1E1E2E]'
+          style={{ zIndex: 100 }}
         >
           {/* Zalo Tabs */}
-          <div
-            className='flex items-center border-b border-slate-100 sticky top-0 z-10'
-            style={{ backgroundColor: '#ffffff' }}
-          >
+          <div className='flex items-center border-b border-slate-100 dark:border-white/5 sticky top-0 z-10 bg-white dark:bg-[#1E1E2E]'>
             {(['STICKER', 'EMOJI', 'GIF'] as PickerTab[]).map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`flex-1 py-2.5 text-[13px] font-bold border-0 outline-none transition-all relative ${activeTab === tab ? 'text-blue-600' : 'text-slate-500'}`}
-                style={{ backgroundColor: '#ffffff' }}
+                className={`flex-1 py-2.5 text-[13px] font-bold border-0 outline-none transition-all relative bg-transparent ${activeTab === tab ? 'text-blue-600 dark:text-sky-400' : 'text-slate-500 dark:text-slate-400'}`}
               >
                 {tab === 'STICKER' ? 'STICKER' : tab === 'EMOJI' ? 'EMOJI' : 'GIF'}
                 {activeTab === tab && (
-                  <div className='absolute bottom-0 left-0 right-0 h-[2px] bg-blue-600' />
+                  <div className='absolute bottom-0 left-0 right-0 h-[2px] bg-blue-600 dark:bg-sky-400' />
                 )}
               </button>
             ))}
-            <div className='h-4 w-[1px] bg-slate-200 mx-1' />
-            <button className='px-4 text-blue-500'><Minimize2 size={16} /></button>
+            <div className='h-4 w-[1px] bg-slate-200 dark:bg-white/10 mx-1' />
+            <button className='px-4 text-blue-500 dark:text-sky-400 border-0 bg-transparent cursor-pointer'><Minimize2 size={16} /></button>
           </div>
 
           {/* Search Bar */}
           {activeTab === 'STICKER' && (
-            <div className='px-3 py-2 bg-white'>
-              <div className='relative flex items-center bg-slate-50 rounded-full px-3 py-1.5 border border-slate-100'>
+            <div className='px-3 py-2 bg-white dark:bg-[#1E1E2E]'>
+              <div className='relative flex items-center bg-slate-50 dark:bg-black/20 rounded-full px-3 py-1.5 border border-slate-100 dark:border-white/5'>
                 <Search size={14} className='text-slate-400 mr-2' />
                 <input
                   type='text'
                   placeholder='Tìm kiếm sticker'
-                  className='bg-transparent border-none outline-none text-[13px] w-full text-slate-600'
+                  className='bg-transparent border-none outline-none text-[13px] w-full text-slate-600 dark:text-slate-300'
                 />
               </div>
             </div>
           )}
 
           {/* Content Area */}
-          <div
-            className='flex-1 zalo-picker-content overflow-y-auto [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-slate-400'
-            style={{
-              backgroundColor: '#ffffff'
-            }}
-          >
+          <div className='flex-1 zalo-picker-content overflow-y-auto [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-slate-400 bg-white dark:bg-[#1E1E2E]'>
             {isLoadingAssets ? (
               <div className='flex h-full flex-col items-center justify-center gap-2 text-slate-400 text-sm'>
                 <div className='h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent' />
@@ -438,7 +536,7 @@ export function MessageInput({
                     setEmojis([]);
                     setGifs([]);
                   }}
-                  className='bg-blue-50 text-blue-600 px-4 py-1.5 rounded-full text-sm font-medium hover:bg-blue-100 transition'
+                  className='bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-sky-400 px-4 py-1.5 rounded-full text-sm font-medium hover:bg-blue-100 transition border-0 cursor-pointer'
                 >
                   Thử lại
                 </button>
@@ -448,13 +546,13 @@ export function MessageInput({
                 {activeTab === 'STICKER' && (
                   <div className='flex flex-col gap-5'>
                     <div>
-                      <h4 className='text-[12px] font-bold text-slate-600 mb-2 px-1'>Gần đây</h4>
+                      <h4 className='text-[12px] font-bold text-slate-600 dark:text-slate-400 mb-2 px-1'>Gần đây</h4>
                       <div className='grid grid-cols-4 gap-2'>
                         {selectedPack?.stickers?.slice(0, 4).map((item: any) => (
                           <button
                             key={`rec-${item.stickerId || item.id}`}
                             onClick={() => handleAssetSelect('STICKER', item)}
-                            className='aspect-square rounded-lg transition-all hover:scale-110 active:scale-95'
+                            className='aspect-square rounded-lg transition-all hover:scale-110 active:scale-95 border-0 bg-transparent cursor-pointer'
                           >
                             <img src={item.url} alt={item.name} className='h-full w-full object-contain' />
                           </button>
@@ -463,13 +561,13 @@ export function MessageInput({
                     </div>
 
                     <div>
-                      <h4 className='text-[12px] font-bold text-slate-600 mb-2 px-1'>{selectedPack?.name || 'Stickers'}</h4>
+                      <h4 className='text-[12px] font-bold text-slate-600 dark:text-slate-400 mb-2 px-1'>{selectedPack?.name || 'Stickers'}</h4>
                       <div className='grid grid-cols-4 gap-2'>
                         {selectedPack?.stickers?.map((item: any) => (
                           <button
                             key={item.stickerId || item.id}
                             onClick={() => handleAssetSelect('STICKER', item)}
-                            className='aspect-square rounded-lg transition-all hover:scale-110 active:scale-95 border-0 bg-transparent'
+                            className='aspect-square rounded-lg transition-all hover:scale-110 active:scale-95 border-0 bg-transparent cursor-pointer'
                           >
                             <img src={item.url} alt={item.name} className='h-full w-full object-contain' />
                           </button>
@@ -484,13 +582,13 @@ export function MessageInput({
                     {/* Recently Used Section */}
                     {emojis.length > 0 && (
                       <div>
-                        <h4 className='text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 px-1'>Gần đây</h4>
+                        <h4 className='text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3 px-1'>Gần đây</h4>
                         <div className='grid grid-cols-9 gap-1'>
                           {emojis.slice(0, 9).map((item: any) => (
                             <button
                               key={`rec-${item.mediaId || item.id}`}
                               onClick={() => handleAssetSelect('EMOJI', item)}
-                              className='aspect-square transition-all active:scale-95 border-0 bg-transparent'
+                              className='aspect-square transition-all active:scale-95 border-0 bg-transparent cursor-pointer'
                             >
                               <img src={item.url} alt='Emoji' className='h-full w-full object-contain p-0.5' />
                             </button>
@@ -501,16 +599,15 @@ export function MessageInput({
 
                     {/* Standard Emotions Section (Zalo Style) */}
                     <div>
-                      <h4 className='text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 px-1'>Cảm xúc</h4>
+                      <h4 className='text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3 px-1'>Cảm xúc</h4>
                       <div className='grid grid-cols-9 gap-1'>
-                        {/* Render standard emojis + fetched ones */}
                         {STANDARD_EMOJI_LIST.map((emojiChar, i) => (
                           <button
                             key={`std-${i}`}
                             onClick={() => {
                               setMessageText(prev => prev + emojiChar);
                             }}
-                            className='aspect-square flex items-center justify-center text-3xl transition-all active:scale-75 select-none border-0 bg-transparent'
+                            className='aspect-square flex items-center justify-center text-3xl transition-all active:scale-75 select-none border-0 bg-transparent cursor-pointer'
                           >
                             {emojiChar}
                           </button>
@@ -519,7 +616,7 @@ export function MessageInput({
                           <button
                             key={item.mediaId || item.id}
                             onClick={() => handleAssetSelect('EMOJI', item)}
-                            className='aspect-square transition-all active:scale-95 border-0 bg-transparent'
+                            className='aspect-square transition-all active:scale-95 border-0 bg-transparent cursor-pointer'
                           >
                             <img src={item.url} alt='Emoji' className='h-full w-full object-contain p-0.5' />
                           </button>
@@ -535,13 +632,13 @@ export function MessageInput({
                       <button
                         key={item.mediaId || item.id}
                         onClick={() => handleAssetSelect('GIF', item)}
-                        className='aspect-video rounded-xl overflow-hidden transition-all active:scale-95 border-0 bg-transparent'
+                        className='aspect-video rounded-xl overflow-hidden transition-all active:scale-95 border-0 bg-transparent cursor-pointer'
                       >
                         <img src={item.url} alt='GIF' className='h-full w-full object-cover' />
                       </button>
                     ))}
                     {gifs.length === 0 && (
-                      <div className='col-span-2 flex flex-col items-center justify-center h-40 text-slate-400 text-sm'>
+                      <div className='col-span-2 flex flex-col items-center justify-center h-40 text-slate-400 dark:text-slate-500 text-sm'>
                         Chưa có GIF nào
                       </div>
                     )}
@@ -552,25 +649,25 @@ export function MessageInput({
           </div>
 
           {/* Zalo Footer Sticker Bar */}
-          <div className='flex items-center bg-white h-11 shrink-0 px-1'>
-            <button className='h-full px-2 text-slate-400 border-0 bg-white hover:text-slate-600 transition'><ChevronLeft size={16} /></button>
-            <button className='h-full px-2 text-blue-500 border-0 bg-white'><History size={20} /></button>
+          <div className='flex items-center bg-white dark:bg-[#1E1E2E] h-11 shrink-0 px-1 border-t border-slate-100 dark:border-white/5'>
+            <button className='h-full px-2 text-slate-400 dark:text-slate-500 border-0 bg-transparent hover:text-slate-600 dark:hover:text-slate-300 transition'><ChevronLeft size={16} /></button>
+            <button className='h-full px-2 text-blue-500 dark:text-sky-400 border-0 bg-transparent'><History size={20} /></button>
 
-            <div className='flex-1 flex items-center overflow-x-auto [scrollbar-width:none] px-1 gap-1 bg-white'>
+            <div className='flex-1 flex items-center overflow-x-auto [scrollbar-width:none] px-1 gap-1 bg-transparent'>
               {stickerPacks.map(pack => (
                 <button
                   key={pack.stickerPackId || pack.id}
                   onClick={() => handlePackSelect(pack)}
-                  className={`h-9 w-9 shrink-0 flex items-center justify-center rounded transition-all border-0 ${(selectedPack?.stickerPackId || selectedPack?.id) === (pack.stickerPackId || pack.id) ? 'bg-slate-100 shadow-inner' : 'bg-white hover:bg-slate-50'}`}
+                  className={`h-9 w-9 shrink-0 flex items-center justify-center rounded transition-all border-0 ${(selectedPack?.stickerPackId || selectedPack?.id) === (pack.stickerPackId || pack.id) ? 'bg-slate-100 dark:bg-white/10 shadow-inner' : 'bg-transparent hover:bg-slate-50 dark:hover:bg-white/5'}`}
                 >
                   <img src={pack.coverUrl || pack.thumbnailUrl || pack.avatarUrl} className='h-6 w-6 object-contain' alt='pack' />
                 </button>
               ))}
             </div>
 
-            <button className='h-full px-2 text-slate-400 border-0 bg-white hover:text-slate-600 transition'><Settings size={16} /></button>
-            <button className='h-full px-2 text-slate-400 border-0 bg-white hover:text-slate-600 transition'><ChevronRight size={16} /></button>
-            <button className='h-full px-3 text-slate-400 border-0 bg-white hover:text-slate-600 transition font-light text-xl'><Plus size={18} /></button>
+            <button className='h-full px-2 text-slate-400 dark:text-slate-500 border-0 bg-transparent hover:text-slate-600 dark:hover:text-slate-300 transition'><Settings size={16} /></button>
+            <button className='h-full px-2 text-slate-400 dark:text-slate-500 border-0 bg-transparent hover:text-slate-600 dark:hover:text-slate-300 transition'><ChevronRight size={16} /></button>
+            <button className='h-full px-3 text-slate-400 dark:text-slate-500 border-0 bg-transparent hover:text-slate-600 dark:hover:text-slate-300 transition font-light text-xl'><Plus size={18} /></button>
           </div>
         </div>
       )}

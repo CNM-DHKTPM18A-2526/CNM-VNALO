@@ -33,12 +33,12 @@
     radial-gradient(circle at bottom right, rgba(19, 165, 122, 0.12) 0, rgba(19, 165, 122, 0) 26%),
     linear-gradient(135deg, #e8f3ff 0, #f7fbff 100%);
   --chat-window-bg: linear-gradient(180deg, #f6faff, #ffffff);
-  --sidebar: #0f1930;
-  --sidebar-muted: #8f9dbb;
-  --sidebar-text: #f0f5ff;
-  --sidebar-icon: #c9dbff;
-  --sidebar-footer-text: #d8e7ff;
-  --sidebar-footer-label: #8aa4d8;
+  --sidebar: #005ae0;
+  --sidebar-muted: rgba(255, 255, 255, 0.6);
+  --sidebar-text: #ffffff;
+  --sidebar-icon: #ffffff;
+  --sidebar-footer-text: rgba(255, 255, 255, 0.8);
+  --sidebar-footer-label: rgba(255, 255, 255, 0.4);
   --topbar-bg: rgba(255, 255, 255, 0.92);
   --topbar-border: #dbe5f5;
   --topbar-shadow: 0 8px 24px rgba(23, 49, 94, 0.06);

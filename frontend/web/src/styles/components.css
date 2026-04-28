@@ -1512,15 +1512,15 @@
   grid-template-columns: 132px 1fr;
   gap: 14px;
   align-items: center;
+  border-bottom: 2px solid #2f68f7;
 }
 
 .add-friend-zalo-prefix {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: #334155;
+  color: var(--text);
   font-weight: 600;
-  border-bottom: 1px solid #dbe3ef;
   padding-bottom: 8px;
   min-height: 38px;
 }
@@ -1538,16 +1538,16 @@
 .add-friend-zalo-input {
   width: 100%;
   border: 0;
-  border-bottom: 2px solid #2f68f7;
   background: transparent;
   min-height: 38px;
   font-size: 22px;
-  color: #1e293b;
+  color: var(--text);
   outline: none;
 }
 
 .add-friend-zalo-input::placeholder {
-  color: #8a9ab3;
+  color: var(--muted);
+  opacity: 0.6;
 }
 
 .add-friend-zalo-section {
@@ -1559,7 +1559,7 @@
   margin: 0;
   font-size: 16px;
   font-weight: 700;
-  color: #334155;
+  color: var(--text);
 }
 
 .add-friend-zalo-list {
@@ -1587,7 +1587,7 @@
 
 .add-friend-zalo-recent-item:hover,
 .add-friend-zalo-suggest-item:hover {
-  background: #f8fbff;
+  background: var(--surface-hover);
 }
 
 .add-friend-zalo-suggest-item {
@@ -1602,7 +1602,7 @@
 
 .add-friend-zalo-item-copy strong {
   font-size: 15px;
-  color: #1e293b;
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1610,7 +1610,7 @@
 
 .add-friend-zalo-item-copy small {
   font-size: 12px;
-  color: #64748b;
+  color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1663,8 +1663,8 @@
 }
 
 .add-friend-zalo-btn-cancel {
-  background: #edf1f6;
-  color: #5f6f86;
+  background: var(--bg);
+  color: var(--muted);
 }
 
 .add-friend-zalo-btn-search {
@@ -1709,7 +1709,7 @@
   width: fit-content;
   border: 0;
   background: transparent;
-  color: #2f68f7;
+  color: #007aff;
   font-size: 13px;
   font-weight: 600;
   padding: 2px 0;
@@ -1717,10 +1717,10 @@
 }
 
 .add-friend-profile-card {
-  border: 1px solid #d7e2f0;
+  border: 1px solid var(--border);
   border-radius: 14px;
   overflow: hidden;
-  background: #fff;
+  background: var(--surface);
 }
 
 .add-friend-profile-cover {
@@ -1747,10 +1747,10 @@
 
 .add-friend-profile-avatar {
   border-radius: 999px;
-  border: 3px solid #fff;
-  background: #fff;
+  border: 3px solid var(--surface);
+  background: var(--surface);
   width: fit-content;
-  box-shadow: 0 8px 18px rgba(17, 36, 72, 0.15);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.15);
 }
 
 .add-friend-profile-copy {
@@ -1761,12 +1761,12 @@
 .add-friend-profile-copy h4 {
   margin: 0;
   font-size: 20px;
-  color: #1e293b;
+  color: var(--text);
 }
 
 .add-friend-profile-copy p {
   margin: 3px 0 0;
-  color: #64748b;
+  color: var(--muted);
   font-size: 13px;
 }
 
@@ -1780,7 +1780,7 @@
   display: grid;
   gap: 2px;
   padding: 8px 0;
-  border-bottom: 1px solid #ebf0f7;
+  border-bottom: 1px solid var(--border);
 }
 
 .add-friend-profile-info-row:last-child {
@@ -1789,13 +1789,13 @@
 
 .add-friend-profile-info-row span {
   font-size: 12px;
-  color: #64748b;
+  color: var(--muted);
 }
 
 .add-friend-profile-info-row strong {
   font-size: 14px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--text);
   word-break: break-word;
 }
 
@@ -1808,8 +1808,8 @@
 
 .add-friend-request-box {
   margin: 0 16px 16px;
-  border: 1px solid #d7e2f0;
-  background: #f8fbff;
+  border: 1px solid var(--border);
+  background: var(--bg);
   border-radius: 12px;
   padding: 10px;
   display: grid;
@@ -1819,16 +1819,18 @@
 .add-friend-request-box label {
   font-size: 12px;
   font-weight: 700;
-  color: #334155;
+  color: var(--text);
 }
 
 .add-friend-request-box textarea {
-  border: 1px solid #d4deec;
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 10px;
   outline: none;
   resize: vertical;
   min-height: 84px;
+  background: var(--surface);
+  color: var(--text);
   font: inherit;
 }
 

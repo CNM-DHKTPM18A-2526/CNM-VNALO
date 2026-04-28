@@ -208,6 +208,8 @@ export class WebRtcGroupCallService {
         callerName: this.currentUserName,
         callerAvatar: this.currentUserAvatar,
         audioOnly: this.state.audioOnly,
+        isMicOn: this.state.isMicOn,
+        isCameraOn: this.state.isCameraOn,
       })
 
       console.log('[GroupCall] ✅ Started, waiting for peers to join...')
@@ -256,6 +258,8 @@ export class WebRtcGroupCallService {
         displayName: this.currentUserName,
         avatarUrl: this.currentUserAvatar,
         audioOnly: this.state.audioOnly,
+        isMicOn: this.state.isMicOn,
+        isCameraOn: this.state.isCameraOn,
       })
 
       console.log('[GroupCall] ✅ Join emitted, waiting for offers...')
@@ -319,6 +323,8 @@ export class WebRtcGroupCallService {
     avatarUrl?: string
     callId: string
     conversationId: string
+    isMicOn?: boolean
+    isCameraOn?: boolean
   }) => {
     if (payload.callId !== this.state.callId) return
     if (payload.senderUserId === this.currentUserId) return
@@ -329,6 +335,8 @@ export class WebRtcGroupCallService {
       userId: payload.senderUserId,
       displayName: payload.displayName,
       avatarUrl: payload.avatarUrl,
+      isMicOn: payload.isMicOn,
+      isCameraOn: payload.isCameraOn,
     })
   }
 
@@ -339,6 +347,8 @@ export class WebRtcGroupCallService {
     conversationId: string
     displayName?: string
     avatarUrl?: string
+    isMicOn?: boolean
+    isCameraOn?: boolean
     sdp: RTCSessionDescriptionInit
   }) => {
     if (payload.callId !== this.state.callId) return
@@ -351,6 +361,8 @@ export class WebRtcGroupCallService {
         userId: payload.senderUserId,
         displayName: payload.displayName ?? payload.senderUserId,
         avatarUrl: payload.avatarUrl,
+        isMicOn: payload.isMicOn,
+        isCameraOn: payload.isCameraOn,
       })
     }
 
@@ -409,13 +421,27 @@ export class WebRtcGroupCallService {
     senderUserId: string
     targetUserId: string
     callId: string
-    candidate: RTCIceCandidateInit
+    candidate: RTCIceCandidateInit | null
+    isMediaUpdate?: boolean
+    isMicOn?: boolean
+    isCameraOn?: boolean
   }) => {
     if (payload.callId !== this.state.callId) return
     if (payload.targetUserId !== this.currentUserId) return
 
     const peer = this.state.peers.get(payload.senderUserId)
-    if (!peer || !payload.candidate) return
+    if (!peer) return
+
+    // FRONTEND-ONLY HACK: Handle media state sync piggybacked on ice-candidate
+    if (payload.isMediaUpdate) {
+      console.log(`[GroupCall] 🔔 Piggybacked media update from ${payload.senderUserId}: cam=${payload.isCameraOn}`)
+      if (payload.isMicOn !== undefined) peer.isMicOn = payload.isMicOn
+      if (payload.isCameraOn !== undefined) peer.isCameraOn = payload.isCameraOn
+      this.notify()
+      return
+    }
+
+    if (!payload.candidate) return
 
     try {
       const candidate = new RTCIceCandidate(payload.candidate)
@@ -442,7 +468,13 @@ export class WebRtcGroupCallService {
 
   // ─── PEER MANAGEMENT ────────────────────────────────────────────
 
-  private createPeerState(user: { userId: string; displayName: string; avatarUrl?: string }): GroupPeerState {
+  private createPeerState(user: { 
+    userId: string; 
+    displayName: string; 
+    avatarUrl?: string;
+    isMicOn?: boolean;
+    isCameraOn?: boolean;
+  }): GroupPeerState {
     const pc = new RTCPeerConnection({ iceServers: buildIceServers(), iceCandidatePoolSize: 8 })
 
     const peerState: GroupPeerState = {
@@ -452,8 +484,8 @@ export class WebRtcGroupCallService {
       pc,
       remoteStream: null,
       isSpeaking: false,
-      isMicOn: true,
-      isCameraOn: true,
+      isMicOn: user.isMicOn ?? true,
+      isCameraOn: user.isCameraOn ?? true,
       pendingCandidates: [],
       hasRemoteDescription: false,
     }
@@ -507,7 +539,13 @@ export class WebRtcGroupCallService {
     return peerState
   }
 
-  private async createPeerAndOffer(user: { userId: string; displayName: string; avatarUrl?: string }) {
+  private async createPeerAndOffer(user: { 
+    userId: string; 
+    displayName: string; 
+    avatarUrl?: string;
+    isMicOn?: boolean;
+    isCameraOn?: boolean;
+  }) {
     const peer = this.createPeerState(user)
 
     try {
@@ -524,6 +562,8 @@ export class WebRtcGroupCallService {
         targetUserId: user.userId,
         displayName: this.currentUserName,
         avatarUrl: this.currentUserAvatar,
+        isMicOn: this.state.isMicOn,
+        isCameraOn: this.state.isCameraOn,
         sdp: { type: offer.type, sdp: offer.sdp },
       })
 
@@ -565,6 +605,7 @@ export class WebRtcGroupCallService {
     if (track) {
       track.enabled = !track.enabled
       this.updateState({ isMicOn: track.enabled })
+      this.notifyMediaState()
     }
   }
 
@@ -575,7 +616,27 @@ export class WebRtcGroupCallService {
     if (track) {
       track.enabled = !track.enabled
       this.updateState({ isCameraOn: track.enabled })
+      this.notifyMediaState()
     }
+  }
+
+  private notifyMediaState() {
+    if (!this.socket) return
+    
+    // FRONTEND-ONLY HACK: Piggyback on group-call:ice-candidate which backend already relays.
+    // We send this to each peer since ice-candidate is P2P relay in the backend.
+    this.state.peers.forEach((_peer, targetUserId) => {
+      this.socket?.emit('group-call:ice-candidate', {
+        conversationId: this.state.conversationId,
+        callId: this.state.callId,
+        senderUserId: this.currentUserId,
+        targetUserId: targetUserId,
+        candidate: null, // Dummy candidate
+        isMediaUpdate: true,
+        isMicOn: this.state.isMicOn,
+        isCameraOn: this.state.isCameraOn,
+      })
+    })
   }
 
   // ─── LEAVE / CLEANUP ────────────────────────────────────────────

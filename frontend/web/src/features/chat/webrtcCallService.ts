@@ -10,6 +10,8 @@ export interface WebRTCCallState {
   isEnded: boolean
   isMicOn: boolean
   isCameraOn: boolean
+  isRemoteMicOn: boolean
+  isRemoteCameraOn: boolean
   startedAt?: number
   hasRemoteDescription: boolean
   pendingCandidates: RTCIceCandidate[]
@@ -25,6 +27,8 @@ export class WebRtcCallService {
     isEnded: false,
     isMicOn: true,
     isCameraOn: true,
+    isRemoteMicOn: true,
+    isRemoteCameraOn: true,
     pendingCandidates: [],
     hasRemoteDescription: false,
     error: null,
@@ -95,7 +99,6 @@ export class WebRtcCallService {
         iceCandidatePoolSize: 10,
       };
 
-      // Add TURN server if configured
       if (turnUrl && turnUser && turnPass) {
         console.log('[WebRTC] Adding TURN server:', turnUrl);
         configuration.iceServers?.push({
@@ -132,8 +135,6 @@ export class WebRtcCallService {
 
     pc.onicecandidate = (event) => {
       if (event.candidate && this.socket) {
-        console.log('[CALL][ICE CANDIDATE GENERATED]')
-
         const candidatePayload = {
           candidate: event.candidate.candidate,
           sdpMid: event.candidate.sdpMid,
@@ -152,20 +153,50 @@ export class WebRtcCallService {
           type: 'ice-candidate',
         }
 
-        if (this.socket) {
-          // Quad-broadcast immediately for maximum cross-platform reliability
-          this.socket.emit('call:ice-candidate', payload)
-          this.socket.emit('call.ice-candidate', payload)
-          this.socket.emit('call.signal', { ...payload, type: 'ice-candidate' })
-          this.socket.emit('call:signal', { ...payload, type: 'ice-candidate' })
-        }
+        this.socket.emit('call:ice-candidate', payload)
+        this.socket.emit('call.ice-candidate', payload)
+        this.socket.emit('call.signal', { ...payload, type: 'ice-candidate' })
+        this.socket.emit('call:signal', { ...payload, type: 'ice-candidate' })
       }
     }
 
     pc.ontrack = (event) => {
-      console.log('[WebRTC] Remote track received')
+      console.log('[WebRTC] Remote track received:', event.track.kind)
       if (event.streams && event.streams[0]) {
         this.updateState({ remoteStream: event.streams[0] })
+      }
+
+      // ──────────────────────────────────────────────────────────────────
+      // KEY FIX: Listen to the track's native mute/unmute events.
+      // When a remote peer toggles their camera/mic, the browser fires
+      // 'mute' / 'unmute' on the corresponding MediaStreamTrack.
+      // This is 100% frontend-only, no backend changes needed.
+      // ──────────────────────────────────────────────────────────────────
+      const track = event.track
+
+      if (track.kind === 'video') {
+        track.onmute = () => {
+          console.log('[WebRTC] 🎥 Remote video track MUTED → showing avatar')
+          this.updateState({ isRemoteCameraOn: false })
+        }
+        track.onunmute = () => {
+          console.log('[WebRTC] 🎥 Remote video track UNMUTED → showing video')
+          this.updateState({ isRemoteCameraOn: true })
+        }
+        // Set initial state based on track's current mute status
+        this.updateState({ isRemoteCameraOn: !track.muted })
+      }
+
+      if (track.kind === 'audio') {
+        track.onmute = () => {
+          console.log('[WebRTC] 🎤 Remote audio track MUTED')
+          this.updateState({ isRemoteMicOn: false })
+        }
+        track.onunmute = () => {
+          console.log('[WebRTC] 🎤 Remote audio track UNMUTED')
+          this.updateState({ isRemoteMicOn: true })
+        }
+        this.updateState({ isRemoteMicOn: !track.muted })
       }
     }
 
@@ -204,9 +235,8 @@ export class WebRtcCallService {
         video: this.audioOnly ? false : { facingMode: 'user', width: 1280, height: 720 },
       }
       
-      console.log('[WebRTC] Requesting media (10s timeout):', constraints)
+      console.log('[WebRTC] Requesting media:', constraints)
       
-      // Use a timeout to prevent the UI from hanging if the user doesn't respond to the browser prompt
       const mediaPromise = navigator.mediaDevices.getUserMedia(constraints)
       const timeoutPromise = new Promise<never>((_, reject) => 
         setTimeout(() => reject(new Error('Media request timed out (10s)')), 10000)
@@ -228,6 +258,8 @@ export class WebRtcCallService {
       })
     } catch (error) {
       console.error('[WebRTC] Failed to open local media', error)
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      this.updateState({ error: `Lỗi Microphone/Camera: ${errorMsg}` })
       throw error
     }
   }
@@ -255,10 +287,7 @@ export class WebRtcCallService {
       sdp: { type: offer.type, sdp: offer.sdp },
     }
 
-    console.log('[CALL][SEND OFFER]', offerPayload)
-
     if (this.socket) {
-      // Quad-broadcast Offer for extreme cross-platform reliability
       this.socket.emit('call:offer', offerPayload)
       this.socket.emit('call.offer', offerPayload)
 
@@ -284,7 +313,6 @@ export class WebRtcCallService {
     const pc = this.state.pc
     if (!pc) return
 
-    // Critical State Guard: createAnswer only works in have-remote-offer
     if (pc.signalingState !== 'have-remote-offer') {
       console.warn('[WebRTC] Cannot accept call: PC signalingState is', pc.signalingState)
       return
@@ -309,9 +337,7 @@ export class WebRtcCallService {
         sdp: { type: answer.type, sdp: answer.sdp },
       }
 
-      console.log('[CALL][SEND ANSWER]', answerPayload)
       if (this.socket) {
-        // Quad-broadcast Answer
         this.socket.emit('call:answer', answerPayload)
         this.socket.emit('call.answer', answerPayload)
 
@@ -339,7 +365,9 @@ export class WebRtcCallService {
 
     try {
       await pc.setRemoteDescription(new RTCSessionDescription(offerSdp))
-      this.updateState({ hasRemoteDescription: true })
+      this.updateState({ 
+        hasRemoteDescription: true,
+      })
       await this.flushPendingCandidates()
     } catch (error) {
       console.error('[WebRTC] Failed to handle offer', error)
@@ -358,7 +386,9 @@ export class WebRtcCallService {
     try {
       console.log('[WebRTC] Setting remote answer description...')
       await pc.setRemoteDescription(new RTCSessionDescription(answerSdp))
-      this.updateState({ hasRemoteDescription: true })
+      this.updateState({ 
+        hasRemoteDescription: true,
+      })
       console.log('[WebRTC] Remote answer set. Flushing', this.state.pendingCandidates.length, 'candidates')
       await this.flushPendingCandidates()
     } catch (error) {
@@ -371,7 +401,6 @@ export class WebRtcCallService {
     if (!this.state.pc || !candidateData) return
 
     try {
-      // Support both structured candidate objects and raw candidate strings
       const candidate = new RTCIceCandidate(
         typeof candidateData === 'string' ? { candidate: candidateData } : candidateData
       )
