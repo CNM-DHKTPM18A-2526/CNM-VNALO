@@ -55,6 +55,7 @@ import type {
   MessageReactionMap,
 } from '../features/chat/chat.types'
 import { getFriends, getUserById, searchUsers } from '../features/friends/friends.api'
+import { refreshNotificationBadges } from '../features/notifications/NotificationContext'
 import { getUserByPhone } from '../features/friends/friends.api'
 import type { Friend, UserLookupResult } from '../features/friends/friends.types'
 import { useAuth } from '../features/auth/useAuth'
@@ -432,14 +433,6 @@ function generateUUID(): string {
 }
 
 export default function ChatPage() {
-  return (
-    <UserStoreProvider>
-      <ChatPageContent />
-    </UserStoreProvider>
-  )
-}
-
-function ChatPageContent() {
   const { userMap, upsertUser, ensureUser } = useUserStore()
   const { isBootstrapping, accessToken, user } = useAuth()
   const currentUserId = user?.id || ''
@@ -458,7 +451,18 @@ function ChatPageContent() {
   const [friendResults, setFriendResults] = useState<UserLookupResult[]>([])
   const [friendsDirectory, setFriendsDirectory] = useState<Friend[]>([])
   const [isSocketConnected, setIsSocketConnected] = useState(false)
-  const [rightSidebarContent, setRightSidebarContent] = useState<'info' | 'search' | 'global-search' | null>('info')
+  const [isSocketInitialized, setIsSocketInitialized] = useState(false)
+  const [rightSidebarContent, setRightSidebarContent] = useState<'info' | 'search' | 'global-search' | null>(() => {
+    const saved = localStorage.getItem('vnalo_chat_sidebar_content')
+    if (!saved || saved === 'null' || saved === 'none') return null
+    if (['info', 'search', 'global-search'].includes(saved)) return saved as any
+    return null
+  })
+
+  useEffect(() => {
+    localStorage.setItem('vnalo_chat_sidebar_content', rightSidebarContent || 'none')
+  }, [rightSidebarContent])
+
   const [jumpToMessageId, setJumpToMessageId] = useState<string | null>(null)
   const [pinnedMessageIds, setPinnedMessageIds] = useState<Record<string, string[]>>({})
   const [pinnedMessages, setPinnedMessages] = useState<Record<string, ChatMessage[]>>({})
@@ -484,6 +488,7 @@ function ChatPageContent() {
     direction: 'outgoing' | 'incoming'
     status: 'connecting' | 'connected' | 'failed'
     peerId?: string
+    conversationId?: string
     startedAt?: number
     callId?: string
     localStream?: MediaStream | null
@@ -896,7 +901,9 @@ function ChatPageContent() {
   const { emitSendMessage, emitRecallMessage, joinConversation, markAsRead, getSocket } = useChatSocket({
     token: accessToken,
     onConnected: async () => {
+      console.log('[ChatPage] 🟢 Socket connected event received');
       setIsSocketConnected(true)
+      setIsSocketInitialized(true)
       void syncConversationReactions()
       void syncPinnedMessages(selectedConversationIdRef.current)
     },
@@ -928,16 +935,22 @@ function ChatPageContent() {
 
           // PIN/UNPIN Sync
           if (sys.action === 'PIN_MESSAGE') {
+            console.log('[ChatPage] 📌 Handling PIN_MESSAGE event');
             setPinnedMessageIds(prev => ({
               ...prev,
               [cid]: [...(prev[cid] || []), sys.messageId].filter((v, i, a) => a.indexOf(v) === i)
             }));
+            // Force re-fetch pinned messages to get full message objects immediately
+            void syncPinnedMessages(cid);
           }
           if (sys.action === 'UNPIN_MESSAGE') {
+            console.log('[ChatPage] 📍 Handling UNPIN_MESSAGE event');
             setPinnedMessageIds(prev => ({
               ...prev,
               [cid]: (prev[cid] || []).filter(id => id !== sys.messageId)
             }));
+            // Force re-fetch pinned messages
+            void syncPinnedMessages(cid);
           }
 
           // Group Info Sync
@@ -951,8 +964,13 @@ function ChatPageContent() {
       }
 
       // ── 1. DEDUPLICATION (PREVENT DOUBLE RENDERING) ──
-      if (mapped.id && processedMessageIds.current.has(mapped.id)) return;
+      if (mapped.id && processedMessageIds.current.has(mapped.id)) {
+        console.log('[ChatPage] ⏭️ Skipping duplicate message:', mapped.id);
+        return;
+      }
       if (mapped.id) processedMessageIds.current.add(mapped.id);
+
+      console.log('[ChatPage] 📩 Processing new message:', { id: mapped.id, type: mapped.type, conversationId: mapped.conversationId });
 
       // ── 2. INSTANT UI UPDATE (FAST PATH) ──
       const senderId = mapped.senderId;
@@ -1010,6 +1028,7 @@ function ChatPageContent() {
       // ── 3. BACKGROUND SYNC ──
       if (isActive && mapped.serverSeq !== undefined) {
         markAsRead({ conversationId: mapped.conversationId, lastReadSeq: mapped.serverSeq });
+        refreshNotificationBadges();
       }
 
       void (async () => {
@@ -1307,7 +1326,7 @@ function ChatPageContent() {
   // Rời cuộc gọi nhóm + tạo call log message
   const handleLeaveGroupCall = useCallback(async () => {
     const snap = groupCallSnapshot
-    const convId = selectedConversationId ?? snap?.conversationId
+    const convId = snap?.conversationId
     if (!convId) {
       leaveGroupCall()
       return
@@ -1850,6 +1869,7 @@ function ChatPageContent() {
       direction: 'outgoing',
       status: 'connecting',
       peerId: peerUserId,
+      conversationId: selectedConversationId,
       callId,
       isMicOn: true,
       isCameraOn: type === 'video',
@@ -1870,7 +1890,7 @@ function ChatPageContent() {
   const handleEndCall = useCallback(async (reasonArg: any = 'hangup') => {
     const reason = typeof reasonArg === 'string' ? reasonArg : 'hangup';
     const currentCall = callStateRef.current;
-    if (!currentCall.isOpen || !selectedConversationIdRef.current) return;
+    if (!currentCall.isOpen || !currentCall.conversationId) return;
 
     const { type, direction, startedAt, callId, peerId } = currentCall;
     const duration = startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0;
@@ -1886,7 +1906,7 @@ function ChatPageContent() {
     const shouldNotify = reason !== 'remote-ended';
     callServiceRef.current?.endCall(reason, shouldNotify);
 
-    const targetConvId = selectedConversationIdRef.current;
+    const targetConvId = currentCall.conversationId;
     const peerUserId = peerId || selectedConversation?.userId || targetConvId;
 
     // Reset UI State immediately
@@ -2142,6 +2162,7 @@ function ChatPageContent() {
       direction: 'incoming',
       status: 'connecting',
       peerId: peerUserId,
+      conversationId: conversationId,
       callId: callId,
       isMicOn: true,
       isCameraOn: !signalData.audioOnly,
@@ -3042,25 +3063,47 @@ function ChatPageContent() {
   // SMART JOIN ROOMS (Only join once per session/reconnect)
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   const joinedIdsRef = useRef<Set<string>>(new Set())
+  const lastJoinedSocketIdRef = useRef<string | null>(null)
 
   useEffect(() => {
-    if (!isSocketConnected) {
-      console.log('[ChatPage.join] Socket disconnected, resetting joined cache')
-      joinedIdsRef.current.clear()
-      return
+    // Hard check every time conversations or connection state changes
+    const socket = getSocket();
+    const actualConnected = Boolean(socket?.connected);
+    const currentSocketId = socket?.id || null;
+    
+    // If socket ID changed (reconnect), we MUST clear the joined cache
+    // because server-side room membership is lost on reconnect.
+    if (currentSocketId !== lastJoinedSocketIdRef.current) {
+      console.log(`[ChatPage.join] 🔄 Socket ID changed from ${lastJoinedSocketIdRef.current} to ${currentSocketId}, clearing joined cache`);
+      joinedIdsRef.current.clear();
+      lastJoinedSocketIdRef.current = currentSocketId;
     }
 
-    const currentIds = conversations.map((c) => c.id)
-    const newIds = currentIds.filter((id) => !joinedIdsRef.current.has(id))
+    if (actualConnected && !isSocketConnected) {
+      console.log('[ChatPage.join] ⚡ Fixing connection state (out of sync)');
+      setIsSocketConnected(true);
+      return;
+    }
+
+    if (!actualConnected || !isSocketConnected) {
+      if (joinedIdsRef.current.size > 0) {
+        console.log('[ChatPage.join] ⚪ Socket disconnected, clearing joined cache');
+        joinedIdsRef.current.clear();
+      }
+      return;
+    }
+
+    const currentIds = conversations.map((c) => c.id);
+    const newIds = currentIds.filter((id) => id && !joinedIdsRef.current.has(id));
 
     if (newIds.length > 0) {
-      console.log('[ChatPage.join] 🚀 Joining new conversations:', newIds.length, '/', currentIds.length)
+      console.log(`[ChatPage.join] 🚀 Joining ${newIds.length} new rooms for socket ${currentSocketId}`);
       newIds.forEach((id) => {
-        joinedIdsRef.current.add(id)
-        void joinConversation(id)
-      })
+        joinedIdsRef.current.add(id);
+        void joinConversation(id);
+      });
     }
-  }, [conversationIdsSignature, isSocketConnected, joinConversation])
+  }, [conversations, isSocketConnected, joinConversation, getSocket]);
 
   // 1. Mark as read on conversation change or new messages (with guard)
   const lastEmittedReadRef = useRef<Record<string, number>>({})
@@ -3082,6 +3125,7 @@ function ChatPageContent() {
       console.log('[ChatPage.effect] auto-markAsRead:', { selectedConversationId, latestSeq })
       lastEmittedReadRef.current[selectedConversationId] = latestSeq
       markAsRead({ conversationId: selectedConversationId, lastReadSeq: latestSeq })
+      refreshNotificationBadges()
     }
   }, [markAsRead, messagesByConversation, selectedConversationId])
 

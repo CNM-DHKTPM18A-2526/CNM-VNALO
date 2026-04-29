@@ -18,6 +18,8 @@ type UseChatSocketOptions = {
   onMessageRecalled?: (payload: { messageId: string; conversationId: string; recalledBy: string }) => void
   onMessageRead?: (payload: { userId: string; conversationId: string; lastReadSeq: number }) => void
   onPresenceChanged?: (payload: PresenceChangedPayload) => void
+  onMessagePinned?: (payload: { pin: any; pinnedBy: string }) => void
+  onMessageUnpinned?: (payload: { messageId: string; conversationId: string; unpinnedBy: string }) => void
   onReactionAdded?: (payload: { messageId: string; userId: string; emoji: string }) => void
   onReactionRemoved?: (payload: { messageId: string; userId: string; emoji: string }) => void
   onGroupMemberAdded?: (payload: { conversationId: string; targetMemberIds: string[]; actorId: string }) => void
@@ -55,6 +57,8 @@ export function useChatSocket(options: UseChatSocketOptions) {
   const onMessageRecalledRef = useRef<UseChatSocketOptions['onMessageRecalled']>(onMessageRecalled)
   const onMessageReadRef = useRef<UseChatSocketOptions['onMessageRead']>(onMessageRead)
   const onPresenceChangedRef = useRef<UseChatSocketOptions['onPresenceChanged']>(onPresenceChanged)
+  const onMessagePinnedRef = useRef<UseChatSocketOptions['onMessagePinned']>(options.onMessagePinned)
+  const onMessageUnpinnedRef = useRef<UseChatSocketOptions['onMessageUnpinned']>(options.onMessageUnpinned)
   const onReactionAddedRef = useRef<UseChatSocketOptions['onReactionAdded']>(options.onReactionAdded)
   const onReactionRemovedRef = useRef<UseChatSocketOptions['onReactionRemoved']>(options.onReactionRemoved)
   const onGroupMemberAddedRef = useRef<UseChatSocketOptions['onGroupMemberAdded']>(options.onGroupMemberAdded)
@@ -72,6 +76,8 @@ export function useChatSocket(options: UseChatSocketOptions) {
     onMessageRecalledRef.current = options.onMessageRecalled
     onMessageReadRef.current = options.onMessageRead
     onPresenceChangedRef.current = options.onPresenceChanged
+    onMessagePinnedRef.current = options.onMessagePinned
+    onMessageUnpinnedRef.current = options.onMessageUnpinned
     onReactionAddedRef.current = options.onReactionAdded
     onReactionRemovedRef.current = options.onReactionRemoved
     onGroupMemberAddedRef.current = options.onGroupMemberAdded
@@ -103,6 +109,8 @@ export function useChatSocket(options: UseChatSocketOptions) {
   const stableHandlePresenceChanged = useRef((payload: PresenceChangedPayload) => {
     onPresenceChangedRef.current?.(payload)
   })
+  const stableHandleMessagePinned = useRef((payload: any) => onMessagePinnedRef.current?.(payload))
+  const stableHandleMessageUnpinned = useRef((payload: any) => onMessageUnpinnedRef.current?.(payload))
   const stableHandleReactionAdded = useRef((payload: any) => onReactionAddedRef.current?.(payload))
   const stableHandleReactionRemoved = useRef((payload: any) => onReactionRemovedRef.current?.(payload))
   const stableHandleGroupMemberAdded = useRef((payload: any) => onGroupMemberAddedRef.current?.(payload))
@@ -148,6 +156,8 @@ export function useChatSocket(options: UseChatSocketOptions) {
     socket.off('message.received', stableHandleMessageReceived.current)
     socket.off('message.recalled', stableHandleMessageRecalled.current)
     socket.off('message.read', stableHandleMessageRead.current)
+    socket.off('message.pinned', stableHandleMessagePinned.current)
+    socket.off('message.unpinned', stableHandleMessageUnpinned.current)
     socket.off('message.reaction.added', stableHandleReactionAdded.current)
     socket.off('message.reaction.removed', stableHandleReactionRemoved.current)
     socket.off('presence.changed', stableHandlePresenceChanged.current)
@@ -165,6 +175,8 @@ export function useChatSocket(options: UseChatSocketOptions) {
     socket.on('message.received', stableHandleMessageReceived.current)
     socket.on('message.recalled', stableHandleMessageRecalled.current)
     socket.on('message.read', stableHandleMessageRead.current)
+    socket.on('message.pinned', stableHandleMessagePinned.current)
+    socket.on('message.unpinned', stableHandleMessageUnpinned.current)
     socket.on('message.reaction.added', stableHandleReactionAdded.current)
     socket.on('message.reaction.removed', stableHandleReactionRemoved.current)
     socket.on('presence.changed', stableHandlePresenceChanged.current)
@@ -189,6 +201,8 @@ export function useChatSocket(options: UseChatSocketOptions) {
       socket.off('message.received', stableHandleMessageReceived.current)
       socket.off('message.recalled', stableHandleMessageRecalled.current)
       socket.off('message.read', stableHandleMessageRead.current)
+      socket.off('message.pinned', stableHandleMessagePinned.current)
+      socket.off('message.unpinned', stableHandleMessageUnpinned.current)
       socket.off('message.reaction.added', stableHandleReactionAdded.current)
       socket.off('message.reaction.removed', stableHandleReactionRemoved.current)
       socket.off('presence.changed', stableHandlePresenceChanged.current)
