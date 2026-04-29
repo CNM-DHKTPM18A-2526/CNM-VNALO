@@ -20,6 +20,8 @@ type MessageContextMenuProps = {
   onAction?: (action: MessageContextMenuAction) => void
   isVirtualGroup?: boolean
   isPinned?: boolean
+  userRole?: string
+  allowMemberPin?: boolean
 }
 
 type MenuItemConfig = {
@@ -45,6 +47,14 @@ const MENU_ITEMS: MenuItemConfig[] = [
 
 const MENU_WIDTH = 256
 
+// Helper to check if message was sent within 24 hours
+const isWithin24Hours = (createdAt?: string) => {
+  if (!createdAt) return true;
+  const time = Date.parse(createdAt);
+  const now = Date.now();
+  return (now - time) < 24 * 60 * 60 * 1000;
+};
+
 async function copyMessageToClipboard(text: string) {
   if (!text.trim()) {
     return
@@ -68,7 +78,7 @@ async function copyMessageToClipboard(text: string) {
 }
 
 export const MessageContextMenu = forwardRef<HTMLDivElement, MessageContextMenuProps>(function MessageContextMenu(
-  { message, isMyMessage, position, onClose, onAction, isVirtualGroup, isPinned },
+  { message, isMyMessage, position, onClose, onAction, isVirtualGroup, isPinned, userRole, allowMemberPin },
   ref,
 ) {
   const menuStyle = useMemo<CSSProperties>(
@@ -80,9 +90,22 @@ export const MessageContextMenu = forwardRef<HTMLDivElement, MessageContextMenuP
     [position.left, position.top],
   )
 
+  const isModerator = userRole === 'ADMIN' || userRole === 'DEPUTY';
+
   const visibleItems = MENU_ITEMS.filter((item) => {
-    // Basic recall only for my messages
-    if (item.action === 'recall') return isMyMessage;
+    // Pin logic: ADMIN/DEPUTY always, MEMBER depends on group setting
+    if (item.action === 'pin') {
+      return isModerator || allowMemberPin;
+    }
+
+    // Recall logic:
+    // - My message: allowed if within 24h
+    // - Others' message: allowed if I'm ADMIN/DEPUTY (moderation)
+    if (item.action === 'recall') {
+      if (isModerator) return true; // Admin/Deputy can recall anything anytime
+      return isMyMessage && isWithin24Hours(message.createdAt);
+    }
+
     // Group actions only if it's actually a virtual group
     if (item.action === 'recallGroup') return isVirtualGroup && isMyMessage;
     if (item.action === 'deleteGroupSelf') return isVirtualGroup;

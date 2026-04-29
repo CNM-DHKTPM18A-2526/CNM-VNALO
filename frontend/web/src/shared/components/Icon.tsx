@@ -26,6 +26,7 @@ type IconName =
   | 'close'
   | 'layoutSidebar'
   | 'checkSquare'
+  | 'capture'
   | 'cloud'
   | 'briefcase'
   | 'folder'
@@ -313,10 +314,20 @@ export function Icon({ name, className, size = 24 }: IconProps) {
     )
   }
 
+  if (name === 'capture') {
+    return (
+      <svg {...commonProps}>
+        <rect x='4' y='4' width='16' height='16' rx='2' strokeDasharray='3 2' />
+        <path d='M10 12h4m-2-2v4' />
+      </svg>
+    )
+  }
+
   if (name === 'cloud') {
     return (
       <svg {...commonProps}>
         <path d='M17.5 19c2.5 0 4.5-2 4.5-4.5 0-2.3-1.7-4.2-3.9-4.5-1.1-3.6-4.5-6-8.1-6-3.3 0-6.2 2-7.4 5-2.1.2-3.8 2-3.8 4.2C0 16.5 2 18.5 4.5 18.5h13' />
+        <path d='M9 11h3l-2.5 3h3' strokeWidth='1.2' />
       </svg>
     )
   }

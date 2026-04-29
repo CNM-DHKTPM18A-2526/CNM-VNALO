@@ -111,9 +111,10 @@ export function ConversationInfo({
   const [blockOnKick, setBlockOnKick] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
 
-  const isOwner = useMemo(() => {
+  const isModerator = useMemo(() => {
     if (!currentUserId || !conversation.members) return false;
-    return conversation.members.some(m => m.userId === currentUserId && String(m.role || '').toUpperCase() === 'ADMIN');
+    const role = String(conversation.members.find(m => m.userId === currentUserId)?.role || '').toUpperCase();
+    return role === 'ADMIN' || role === 'DEPUTY';
   }, [currentUserId, conversation.members]);
 
   const allDisplayMemberIds = useMemo(() => {
@@ -240,11 +241,12 @@ export function ConversationInfo({
         />
       ) : showGroupManagement ? (
         <GroupManagementView
-          isOwner={isOwner}
+          isModerator={isModerator}
           conversation={conversation}
           onUpdateSettings={onUpdateGroupSettings}
           onDisband={onDisbandGroup}
           onShowLeaderDeputy={() => setShowLeaderDeputyView(true)}
+          currentUserId={currentUserId}
         />
       ) : (
         <>
@@ -269,7 +271,7 @@ export function ConversationInfo({
                       extraCount={collageData.extraCount}
                     />
                     
-                    {conversation.isGroup && isOwner && (
+                    {conversation.isGroup && (isModerator || conversation.allowMemberEditInfo) && (
                       <label className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full cursor-pointer opacity-0 group-hover/avatar:opacity-100 transition-opacity">
                         <Camera className="text-white" size={24} />
                         <input
@@ -294,12 +296,14 @@ export function ConversationInfo({
 
             <div className="mt-3 flex items-center justify-center gap-2">
               <h4 className="text-[22px] font-semibold text-[var(--text)]">{conversation.name}</h4>
-              <button
-                className="rounded-full border-0 p-1 shadow-none outline-none ring-0 hover:bg-[var(--surface-hover)] focus:outline-none cursor-pointer group"
-                onClick={() => conversation.isGroup ? onEditGroupName?.() : onEditNickname?.()}
-              >
-                <Pencil size={18} className="text-[var(--muted)] group-hover:text-[var(--text)]" />
-              </button>
+              {(!conversation.isGroup || isModerator || conversation.allowMemberEditInfo) && (
+                <button
+                  className="rounded-full border-0 p-1 shadow-none outline-none ring-0 hover:bg-[var(--surface-hover)] focus:outline-none cursor-pointer group"
+                  onClick={() => conversation.isGroup ? onEditGroupName?.() : onEditNickname?.()}
+                >
+                  <Pencil size={18} className="text-[var(--muted)] group-hover:text-[var(--text)]" />
+                </button>
+              )}
             </div>
 
             {conversation.isCloud ? (
@@ -718,22 +722,24 @@ function TransferOwnerModal({
 }
 
 function GroupManagementView({ 
-  isOwner, 
+  isModerator, 
   conversation, 
   onUpdateSettings,
   onDisband,
-  onShowLeaderDeputy
+  onShowLeaderDeputy,
+  currentUserId
 }: { 
-  isOwner: boolean; 
+  isModerator: boolean; 
   conversation: ConversationSummary;
   onUpdateSettings?: (s: any) => void; 
   onDisband?: () => void;
   onShowLeaderDeputy: () => void;
+  currentUserId?: string;
 }) {
   const [showDisbandConfirm, setShowDisbandConfirm] = useState(false);
 
   const handleToggle = (key: string, value: any) => {
-    if (!isOwner) return;
+    if (!isModerator) return;
     onUpdateSettings?.({ [key]: value });
   };
 
@@ -741,10 +747,10 @@ function GroupManagementView({
 
   return (
     <div className="flex flex-col h-full overflow-y-auto scrollbar-hide pb-10">
-      {!isOwner && (
+      {!isModerator && (
         <div className="bg-[#FFF9EA] dark:bg-orange-900/20 px-4 py-2.5 flex items-center justify-center gap-2 border-b border-orange-100 dark:border-orange-900/30 sticky top-0 z-10">
           <Lock size={14} className="text-orange-600 dark:text-orange-400" />
-          <span className="text-[13px] font-medium text-orange-700 dark:text-orange-300">Tính năng chỉ dành cho quản trị viên</span>
+          <span className="text-[13px] font-medium text-orange-700 dark:text-orange-300">Tính năng chỉ dành cho Trưởng/Phó nhóm</span>
         </div>
       )}
 
@@ -757,29 +763,29 @@ function GroupManagementView({
           <PermissionCheckbox 
             label="Thay đổi tên & ảnh đại diện của nhóm" 
             checked={conversation.allowMemberEditInfo ?? false} 
-            disabled={!isOwner}
+            disabled={!isModerator}
             onChange={(val) => handleToggle('allowMemberEditInfo', val)}
           />
           <PermissionCheckbox 
-            label="Ghim tin nhắn, ghi chú, bình chọn lên đầu hội thoại" 
+            label="Cho phép thành viên Ghim tin nhắn" 
             checked={conversation.allowMemberPin ?? false} 
-            disabled={!isOwner}
+            disabled={!isModerator}
             onChange={(val) => handleToggle('allowMemberPin', val)}
           />
           <PermissionCheckbox 
             label="Tạo mới ghi chú, nhắc hẹn" 
             checked={true}
-            disabled={!isOwner}
+            disabled={!isModerator}
           />
           <PermissionCheckbox 
             label="Tạo mới bình chọn" 
             checked={true} 
-            disabled={!isOwner}
+            disabled={!isModerator}
           />
           <PermissionCheckbox 
-            label="Gửi tin nhắn" 
+            label="Cho phép thành viên gửi tin nhắn" 
             checked={!conversation.onlyAdminCanPost} 
-            disabled={!isOwner}
+            disabled={!isModerator}
             onChange={(val) => handleToggle('onlyAdminCanPost', !val)}
           />
         </div>
@@ -791,27 +797,27 @@ function GroupManagementView({
           label="Chế độ phê duyệt thành viên mới" 
           showHelp
           checked={conversation.joinMode === 'APPROVAL'} 
-          disabled={!isOwner}
+          disabled={!isModerator}
           onChange={(val) => handleToggle('joinMode', val ? 'APPROVAL' : 'OPEN')}
         />
         <SettingToggleRow 
           label="Đánh dấu tin nhắn từ trưởng/phó nhóm" 
           showHelp
           checked={true} 
-          disabled={!isOwner}
+          disabled={!isModerator}
         />
         <SettingToggleRow 
           label="Cho phép thành viên mới đọc tin nhắn gần nhất" 
           showHelp
           checked={true}
-          disabled={!isOwner}
+          disabled={!isModerator}
         />
         <div className="flex flex-col">
           <SettingToggleRow 
             label="Cho phép dùng link tham gia nhóm" 
             showHelp
             checked={!!conversation.inviteLink} 
-            disabled={!isOwner}
+            disabled={!isModerator}
           />
           
           <div className="px-5 pb-5">
@@ -845,7 +851,8 @@ function GroupManagementView({
       </div>
 
       {/* Disband Button */}
-      {isOwner && (
+      {/* Disband Button - ONLY ADMIN (OWNER) */}
+      {conversation.members?.some(m => m.userId === currentUserId && String(m.role || '').toUpperCase() === 'ADMIN') && (
         <div className="mt-6 px-5 mb-10">
           <button 
             className="w-full py-3 rounded-xl bg-[#FFE9E9] text-[#E02424] font-bold text-[16px] border-0 transition-all cursor-pointer active:scale-[0.98] shadow-sm uppercase tracking-wide hover:shadow-md"
@@ -1267,7 +1274,7 @@ function AdjustDeputyModal({
       setSelectedIds(prev => prev.filter(id => id !== userId));
     } else {
       if (selectedIds.length >= 3) {
-        alert('Chỉ được phép có tối đa 3 phó nhóm. Vui lòng bỏ chọn bớt hoặc xóa phó nhóm cũ.');
+        console.warn('Chỉ được phép có tối đa 3 phó nhóm. Vui lòng bỏ chọn bớt hoặc xóa phó nhóm cũ.');
         return;
       }
       setSelectedIds(prev => [...prev, userId]);

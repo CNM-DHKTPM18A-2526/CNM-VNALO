@@ -9,23 +9,28 @@ import { SettingsMenu } from './SettingsMenu'
 
 type SidebarProps = {
   onOpenSettingsModal?: () => void
+  onOpenCaptureModal?: () => void
 }
 
-export function Sidebar({ onOpenSettingsModal }: SidebarProps) {
+export function Sidebar({ onOpenSettingsModal, onOpenCaptureModal }: SidebarProps) {
   const { t } = useLanguage()
   const { user } = useAuth()
   const { unreadMessageCount, pendingFriendRequestCount } = useNotifications()
 
-  const menuItems = [
+  const primaryNav = [
     { to: '/chat', labelKey: 'sidebar.chat', icon: 'chat' as const, badge: unreadMessageCount },
     { to: '/contacts', labelKey: 'sidebar.contacts', icon: 'addressBook' as const, badge: pendingFriendRequestCount },
-    { to: '/todo', labelKey: 'sidebar.todo', icon: 'checkSquare' as const },
-    { to: '/documents', labelKey: 'sidebar.documents', icon: 'folder' as const },
+  ]
+
+  const secondaryNav = [
     { 
       to: user ? `/chat/vnalo_cloud_${user.id}` : '/chat', 
       labelKey: 'sidebar.cloud', 
       icon: 'cloud' as const 
     },
+    { to: '/documents', labelKey: 'sidebar.documents', icon: 'folder' as const },
+    { labelKey: 'sidebar.todo', icon: 'capture' as const, onClick: onOpenCaptureModal },
+    { to: '/tools', labelKey: 'sidebar.tools', icon: 'briefcase' as const },
   ]
 
   const handleOpenSettings = () => {
@@ -39,8 +44,9 @@ export function Sidebar({ onOpenSettingsModal }: SidebarProps) {
           <UserAvatar imageUrl={user?.avatarUrl} name={user?.name ?? user?.email ?? 'VNALO User'} size='md' />
         </NavLink>
       </div>
-      <nav className='sidebar-nav'>
-        {menuItems.map((item) => (
+
+      <nav className='sidebar-nav primary-nav'>
+        {primaryNav.map((item) => (
           <NavLink
             key={item.labelKey}
             to={item.to}
@@ -60,12 +66,45 @@ export function Sidebar({ onOpenSettingsModal }: SidebarProps) {
           </NavLink>
         ))}
       </nav>
+
+      <div className='sidebar-spacer' />
+
+      <nav className='sidebar-nav secondary-nav'>
+        {secondaryNav.map((item) => {
+          if ((item as any).onClick) {
+            return (
+              <button
+                key={item.labelKey}
+                className='sidebar-link'
+                onClick={(item as any).onClick}
+                title={t(item.labelKey)}
+                type='button'
+              >
+                <span aria-hidden className='sidebar-link-icon'>
+                  <Icon name={item.icon} />
+                </span>
+              </button>
+            )
+          }
+
+          return (
+            <NavLink
+              key={item.labelKey}
+              to={(item as any).to}
+              className={({ isActive }) =>
+                isActive ? 'sidebar-link sidebar-link-active' : 'sidebar-link'
+              }
+              title={t(item.labelKey)}
+            >
+              <span aria-hidden className='sidebar-link-icon'>
+                <Icon name={item.icon} />
+              </span>
+            </NavLink>
+          )
+        })}
+      </nav>
+
       <div className='sidebar-footer'>
-        <NavLink className='sidebar-link' to='/tools' title="Công cụ">
-          <span aria-hidden className='sidebar-link-icon'>
-            <Icon name="briefcase" />
-          </span>
-        </NavLink>
         <SettingsMenu onOpenSettings={handleOpenSettings} />
       </div>
     </aside>

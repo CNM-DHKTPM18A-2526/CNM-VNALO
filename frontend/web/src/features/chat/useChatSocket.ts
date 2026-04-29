@@ -28,6 +28,7 @@ type UseChatSocketOptions = {
   onGroupRoleChanged?: (payload: { conversationId: string; targetUserId: string; role: string; actorId: string }) => void
   onGroupDisbanded?: (payload: { conversationId: string }) => void
   onGroupUpdated?: (payload: { conversationId: string; metadata: any }) => void
+  onFriendshipUpdated?: (payload: { friendId: string }) => void
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -68,6 +69,8 @@ export function useChatSocket(options: UseChatSocketOptions) {
   const onGroupDisbandedRef = useRef<UseChatSocketOptions['onGroupDisbanded']>(options.onGroupDisbanded)
   const onGroupUpdatedRef = useRef<UseChatSocketOptions['onGroupUpdated']>(options.onGroupUpdated)
 
+  const onFriendshipUpdatedRef = useRef<UseChatSocketOptions['onFriendshipUpdated']>(options.onFriendshipUpdated)
+
   // Keep refs in sync with latest callback props (runs synchronously each render)
   useEffect(() => {
     onConnectedRef.current = options.onConnected
@@ -86,6 +89,7 @@ export function useChatSocket(options: UseChatSocketOptions) {
     onGroupRoleChangedRef.current = options.onGroupRoleChanged
     onGroupDisbandedRef.current = options.onGroupDisbanded
     onGroupUpdatedRef.current = options.onGroupUpdated
+    onFriendshipUpdatedRef.current = options.onFriendshipUpdated
   }, [options])
 
   const stableHandleConnect = useRef(() => {
@@ -119,6 +123,8 @@ export function useChatSocket(options: UseChatSocketOptions) {
   const stableHandleGroupRoleChanged = useRef((payload: any) => onGroupRoleChangedRef.current?.(payload))
   const stableHandleGroupDisbanded = useRef((payload: any) => onGroupDisbandedRef.current?.(payload))
   const stableHandleGroupUpdated = useRef((payload: any) => onGroupUpdatedRef.current?.(payload))
+  const stableHandleFriendshipUpdated = useRef((payload: any) => onFriendshipUpdatedRef.current?.(payload))
+
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // CONNECT + REGISTER LISTENERS (only when token changes)
@@ -167,6 +173,8 @@ export function useChatSocket(options: UseChatSocketOptions) {
     socket.off('group.roleChanged', stableHandleGroupRoleChanged.current)
     socket.off('group.disbanded', stableHandleGroupDisbanded.current)
     socket.off('group.updated', stableHandleGroupUpdated.current)
+    socket.off('friendship.updated', stableHandleFriendshipUpdated.current)
+
 
     // Re-add listeners
     socket.on('connect', stableHandleConnect.current)
@@ -186,6 +194,8 @@ export function useChatSocket(options: UseChatSocketOptions) {
     socket.on('group.roleChanged', stableHandleGroupRoleChanged.current)
     socket.on('group.disbanded', stableHandleGroupDisbanded.current)
     socket.on('group.updated', stableHandleGroupUpdated.current)
+    socket.on('friendship.updated', stableHandleFriendshipUpdated.current)
+
 
     // If already connected, replay onConnected callback
     if (socket.connected && socket.id) {
@@ -212,6 +222,7 @@ export function useChatSocket(options: UseChatSocketOptions) {
       socket.off('group.roleChanged', stableHandleGroupRoleChanged.current)
       socket.off('group.disbanded', stableHandleGroupDisbanded.current)
       socket.off('group.updated', stableHandleGroupUpdated.current)
+      socket.off('friendship.updated', stableHandleFriendshipUpdated.current)
     }
   }, [token])
 

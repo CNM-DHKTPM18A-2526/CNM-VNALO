@@ -317,6 +317,19 @@ function normalizeInboxPreview(rawPreview?: string | null): string {
     return formatMessageContent(preview)
   }
 
+  if (preview.startsWith('{"type":"poll"')) {
+    try {
+      const poll = JSON.parse(preview);
+      return `📊 Bình chọn: ${poll.question}`;
+    } catch (e) {
+      return '📊 Bình chọn';
+    }
+  }
+
+  if (preview.startsWith('{"action":"UPDATE_MESSAGE_REACTIONS"')) {
+    return ''; // Hide sync signals
+  }
+
   return preview
 }
 
@@ -443,7 +456,9 @@ export async function fetchInbox(token: string, currentUserId?: string): Promise
           userId: String(m.userId ?? '').trim(),
           role: String(m.role ?? 'MEMBER').toUpperCase(),
         })),
-        onlyAdminCanPost: Boolean((item.conversation as any)?.onlyAdminCanPost ?? (item as any).onlyAdminCanPost),
+        onlyAdminCanPost: Boolean((item.conversation as any)?.onlyAdminCanPost ?? (item.conversation as any)?.only_admin_can_post ?? (item as any).onlyAdminCanPost ?? (item as any).only_admin_can_post),
+        allowMemberPin: Boolean((item.conversation as any)?.allowMemberPin ?? (item.conversation as any)?.allow_member_pin ?? (item as any).allowMemberPin ?? (item as any).allow_member_pin),
+        allowMemberEditInfo: Boolean((item.conversation as any)?.allowMemberEditInfo ?? (item.conversation as any)?.allow_member_edit_info ?? (item as any).allowMemberEditInfo ?? (item as any).allow_member_edit_info),
       }
     })
 }

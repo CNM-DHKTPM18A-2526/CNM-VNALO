@@ -763,6 +763,35 @@
   overflow-wrap: anywhere;
 }
 
+[data-theme='dark'] .contacts-profile-info h5 {
+  color: #f1f5f9;
+}
+
+[data-theme='dark'] .contacts-profile-info-label {
+  color: #94a3b8;
+}
+
+[data-theme='dark'] .contacts-profile-info-value {
+  color: #cbd5e1;
+}
+
+[data-theme='dark'] .contacts-profile-action-btn {
+  background: #334155;
+  color: #f1f5f9;
+  border-color: #475569;
+}
+
+[data-theme='dark'] .contacts-profile-action-btn:hover {
+  background: #475569;
+}
+
+[data-theme='dark'] .contacts-profile-action-btn-primary {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+
 @media (max-width: 960px) {
   .contacts-shell {
     min-height: calc(100vh - 90px);

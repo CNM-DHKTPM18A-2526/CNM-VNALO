@@ -39,9 +39,12 @@ export interface PollMetadata {
   id: string;
   question: string;
   options: PollOption[];
-  allowMulti?: boolean;
-  totalVotes?: number;
+  allowMultiple?: boolean;
+  allowAddOption?: boolean;
+  isAnonymous?: boolean;
+  expiresAt?: string | null;
   isClosed?: boolean;
+  totalVotes?: number;
 }
 
 export type ReplyMetadata = {
@@ -142,7 +145,8 @@ export interface SystemMessagePayload {
   | 'PROMOTE_ADMIN'
   | 'TRANSFER_OWNERSHIP'
   | 'UPDATE_MESSAGE_REACTIONS'
-  | 'UPDATE_GROUP_INFO';
+  | 'UPDATE_GROUP_INFO'
+  | 'FRIEND_ACCEPTED';
   actorId: string;
   targetMemberIds?: string[];
   metadata?: Record<string, any>;

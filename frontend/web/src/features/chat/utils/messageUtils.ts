@@ -54,10 +54,9 @@ export function formatMessageTimestamp(): string {
 export function formatMessageContent(text: string, currentUserId?: string): string {
   if (!text) return ''
 
-  // Mention Detection: Use invisible marker \u200B to find exact mention boundaries
-  const withMentions = text.replace(/\u200B(@.*?)\u200B/g, (match, name) => {
-    return `<span class="text-[#0068ff] font-medium cursor-pointer hover:underline">${name}</span>`;
-  }).replace(/\u200B/g, ''); // Clean up any stray markers
+  // Clean up mention markers for plain text display (e.g. in sidebar)
+  // Format: \u200B@Name|ID\u200B -> @Name
+  const withMentions = text.replace(/\u200B@(.*?)\|(.*?)\u200B/g, '@$1').replace(/\u200B/g, '');
 
   const match = text.match(/CALL\s*_?LOG/i)
   if (!match) {
@@ -169,16 +168,40 @@ export function formatMessagePreview(
 
   if (!content) return ''
 
+  // Support for poll messages
+  if (content.startsWith('{"type":"poll"')) {
+    try {
+      const poll = JSON.parse(content);
+      return truncatePreview(`${prefix}📊 Bình chọn: ${poll.question}`);
+    } catch (e) {
+      return `${prefix}📊 Bình chọn`;
+    }
+  }
+
   // Support for system-like strings that might be raw JSON in the fallback text
   if (content.startsWith('{"action":')) {
-    // If we are in formatMessagePreview we don't always have getDisplayName, 
-    // but the system should have handled this at a higher level. 
-    // We return a generic label if it's still raw JSON.
+    try {
+      const sys = JSON.parse(content);
+      if (sys.action === 'UPDATE_MESSAGE_REACTIONS') {
+        return ''; // Hide sync signals from sidebar if possible, or return a generic label
+      }
+    } catch (e) { /* ignore */ }
+    
     return `${prefix}[Thông báo hệ thống]`
   }
 
   if (content.startsWith(CALL_LOG_PREFIX) || /CALL\s*_?LOG/i.test(content)) {
     return truncatePreview(`${prefix}${formatMessageContent(content)}`)
+  }
+
+  if (content.includes('"action":"FRIEND_ACCEPTED"')) {
+    try {
+      const payload = JSON.parse(content);
+      const targetName = payload.targetMemberIds?.[0] ? getDisplayName?.(payload.targetMemberIds[0]) : '';
+      return `[Thiệp] Gửi lời chào ${targetName || 'bạn'}`;
+    } catch (e) {
+      return `[Thiệp] Gửi lời chào`;
+    }
   }
 
   return truncatePreview(`${prefix}${content}`)
@@ -256,6 +279,10 @@ export function renderSystemMessage(
           .map((id) => (id === currentUserId ? 'Bạn' : getDisplayName(id)))
           .join(', ')
         return `**${targetName}** đã được **${actorName}** chuyển quyền trưởng nhóm`
+      }
+      case 'FRIEND_ACCEPTED': {
+        const targetName = payload.targetMemberIds?.[0] ? getDisplayName(payload.targetMemberIds[0]) : 'bạn';
+        return `[Thiệp] Gửi lời chào ${targetName}`;
       }
       default:
         return content

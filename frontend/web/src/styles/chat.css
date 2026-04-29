@@ -515,6 +515,69 @@
   border: 1px solid #d4dce7;
 }
 
+.chat-stranger-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.chat-stranger-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.chat-stranger-banner-left svg {
+  color: var(--muted);
+}
+
+.chat-stranger-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chat-stranger-banner-btn {
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--motion-fast);
+  border: none;
+}
+
+.chat-stranger-banner-btn-primary {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.chat-stranger-banner-btn-primary:hover {
+  background: var(--border);
+}
+
+.chat-stranger-banner-more {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.chat-stranger-banner-more:hover {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
 .chat-window-header-actions {
   display: inline-flex;
   gap: 6px;
@@ -639,6 +702,77 @@
 .message-stack:hover .message-action-toolbar,
 .message-stack:focus-within .message-action-toolbar {
   opacity: 1;
+}
+
+/* FriendWelcomeState Styles */
+.welcome-card,
+.welcome-banner {
+  background: #fff;
+  border-color: #f1f5f9;
+}
+
+.welcome-card-name,
+.welcome-header-title {
+  color: #1e293b;
+}
+
+.welcome-card-bio,
+.welcome-header-subtitle {
+  color: #64748b;
+}
+
+.welcome-gallery-label {
+  color: #94a3b8;
+}
+
+.welcome-date-tag {
+  background: rgba(226, 232, 240, 0.5);
+  color: #64748b;
+}
+
+[data-theme='dark'] .welcome-card,
+[data-theme='dark'] .welcome-banner {
+  background: #1e293b;
+  border-color: #334155;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme='dark'] .welcome-card-name,
+[data-theme='dark'] .welcome-header-title {
+  color: #f1f5f9;
+}
+
+[data-theme='dark'] .welcome-card-bio,
+[data-theme='dark'] .welcome-header-subtitle {
+  color: #94a3b8;
+}
+
+[data-theme='dark'] .welcome-gallery-label {
+  color: #64748b;
+}
+
+[data-theme='dark'] .welcome-date-tag {
+  background: rgba(51, 65, 85, 0.5);
+  color: #94a3b8;
+}
+
+.welcome-sticker-nav {
+  background: transparent;
+  border: none !important;
+  outline: none !important;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.welcome-sticker-nav:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme='dark'] .welcome-sticker-nav:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .message-action-toolbar:not(.message-action-toolbar-me) {

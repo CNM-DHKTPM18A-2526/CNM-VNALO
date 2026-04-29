@@ -118,8 +118,8 @@ export function MessageInput({
   const handleSelectMention = (member: { userId: string; displayName: string }) => {
     const before = messageText.substring(0, mentionState.cursorPos);
     const after = messageText.substring(messageInputRef.current?.selectionEnd || 0);
-    // Use \u200B (Zero Width Space) as an invisible marker
-    const newText = `${before}\u200B@${member.displayName}\u200B ${after}`;
+    // Use \u200B (Zero Width Space) as an invisible marker, encoding ID for interactivity
+    const newText = `${before}\u200B@${member.displayName}|${member.userId}\u200B ${after}`;
     setMessageText(newText);
     setMentionState(prev => ({ ...prev, isOpen: false }));
     
@@ -403,9 +403,10 @@ export function MessageInput({
           >
             {messageText.split(/(\u200B@.*?\u200B)/g).map((part, i) => {
               if (part.startsWith('\u200B@')) {
+                const displayName = part.replace(/\u200B/g, '').split('|')[0];
                 return (
                   <span key={i} className="text-[#0068ff] font-medium">
-                    {part.replace(/\u200B/g, '')}
+                    {displayName}
                   </span>
                 );
               }

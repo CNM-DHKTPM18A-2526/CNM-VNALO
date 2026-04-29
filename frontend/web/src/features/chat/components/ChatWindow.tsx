@@ -1,3 +1,4 @@
+import { Info, UserPlus, MoreHorizontal } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { EmptyState } from '../../../shared/components/EmptyState'
@@ -22,11 +23,13 @@ import { MessageGroupBubble } from './MessageGroupBubble'
 import { MessageInput } from './MessageInput'
 import type { MessageContextMenuAction } from './MessageContextMenu'
 import { renderSystemMessage, formatMessagePreview } from '../utils/messageUtils'
+import { FriendWelcomeState } from './FriendWelcomeState'
+import { WelcomeScreen } from './WelcomeScreen'
 
 const toast = {
-  success: (msg: string) => alert(msg),
-  error: (msg: string) => alert(msg),
-  info: (msg: string) => alert(msg),
+  success: (msg: string) => console.log('SUCCESS:', msg),
+  error: (msg: string) => console.error('ERROR:', msg),
+  info: (msg: string) => console.log('INFO:', msg),
 }
 
 type ChatWindowProps = {
@@ -60,6 +63,7 @@ type ChatWindowProps = {
   onUnpinMessage?: (messageId: string) => void
   onTogglePin?: (message: ChatMessage) => void
   onInitiateCall?: (type: 'audio' | 'video') => void
+  onVotePoll?: (messageId: string, optionId: string) => void
   members?: Array<{ userId: string; displayName: string; avatarUrl?: string | null }>
 }
 
@@ -93,6 +97,7 @@ export function ChatWindow({
   pinnedMessages = [],
   onUnpinMessage,
   onInitiateCall,
+  onVotePoll,
   members = [],
 }: ChatWindowProps) {
   const { userMap } = useUserStore()
@@ -232,10 +237,7 @@ export function ChatWindow({
   if (!conversation) {
     return (
       <section className='chat-window'>
-        <EmptyState
-          title={t('chat.windowEmptyTitle')}
-          description={t('chat.windowEmptyDesc')}
-        />
+        <WelcomeScreen />
       </section>
     )
   }
@@ -245,9 +247,12 @@ export function ChatWindow({
   const statusText = isOnline ? 'Đang hoạt động' : formatPresence(false, lastSeenTime)
   const isStranger = Boolean(conversation.isStranger)
 
-  const collageData = conversation && conversation.isGroup && !conversation.avatarUrl 
-    ? getGroupCollageData(conversation, userMap) 
+  const collageData = conversation && conversation.isGroup && !conversation.avatarUrl
+    ? getGroupCollageData(conversation, userMap)
     : { avatars: [], extraCount: 0 }
+
+  const currentUserRole = conversation.members?.find(m => m.userId === currentUserId)?.role;
+  const allowMemberPin = conversation.allowMemberPin;
 
   return (
     <section className='chat-window'>
@@ -315,6 +320,29 @@ export function ChatWindow({
           </button>
         </div>
       </header>
+      
+      {isStranger && (
+        <div className="chat-stranger-banner">
+          <div className="chat-stranger-banner-left">
+            <UserPlus size={20} />
+            <span>Gửi yêu cầu kết bạn tới người này</span>
+          </div>
+          <div className="chat-stranger-banner-actions">
+            <button 
+              className="chat-stranger-banner-btn chat-stranger-banner-btn-primary"
+              onClick={() => {
+                const peerId = conversation.userId || conversation.members?.find(m => m.userId !== currentUserId)?.userId;
+                if (peerId) onOpenUserProfile?.(peerId);
+              }}
+            >
+              Gửi kết bạn
+            </button>
+            <div className="chat-stranger-banner-more">
+              <MoreHorizontal size={20} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {pinnedMessages.length > 0 && (
         <div className={`chat-pinned-area ${isPinnedExpanded ? 'expanded' : 'collapsed'}`}>
@@ -401,11 +429,6 @@ export function ChatWindow({
         <div className='chat-window-messages' ref={messagesContainerRef}>
           {isLoadingMessages ? (
             <LoadingState label={t('chat.loadingConversation')} />
-          ) : conversationMessages.length === 0 ? (
-            <EmptyState
-              title={t('chat.windowEmptyTitle')}
-              description={t('chat.windowEmptyDesc')}
-            />
           ) : (() => {
             type GroupedRenderItem = {
               type: 'single' | 'group';
@@ -455,6 +478,49 @@ export function ChatWindow({
 
             const groupedItems = getGroupedMessages(conversationMessages);
             const renderedElements: React.ReactNode[] = [];
+
+            // Add FriendWelcomeState at the top for 1-on-1 conversations
+            const isOneOnOne = !conversation.isGroup && !conversation.isCloud;
+            if (isOneOnOne) {
+              const peerId = conversation.userId || conversation.members?.find(m => m.userId !== currentUserId)?.userId;
+              const peerProfile = peerId ? userMap[peerId] : null;
+              const myProfile = currentUserId ? userMap[currentUserId] : null;
+
+              renderedElements.push(
+                <FriendWelcomeState 
+                  key="welcome-header"
+                  currentUser={{
+                    displayName: myProfile?.displayName || 'Bạn',
+                    avatarUrl: myProfile?.avatarUrl
+                  }}
+                  user={{
+                    id: peerId || '',
+                    displayName: conversation.name,
+                    avatarUrl: conversation.avatarUrl,
+                    bio: peerProfile?.bio || '',
+                    recentImages: conversation.avatarUrl ? [conversation.avatarUrl] : []
+                   }}
+                   onSendSticker={(sticker) => {
+                      onSend({
+                        text: '',
+                        files: [],
+                        sticker: { id: sticker.id, name: sticker.name, url: sticker.url }
+                      });
+                   }}
+                   isStranger={isStranger}
+                />
+              );
+            }
+
+            if (conversationMessages.length === 0 && !isOneOnOne) {
+              return (
+                <EmptyState
+                  title={t('chat.windowEmptyTitle')}
+                  description={t('chat.windowEmptyDesc')}
+                />
+              );
+            }
+
             let lastProcessedSenderId: string | null = null;
 
             groupedItems.forEach((group) => {
@@ -466,7 +532,7 @@ export function ChatWindow({
 
               // Only calculate clustering for non-system messages
               const isFirstInCluster = isSystem || (firstMsg.senderId !== lastProcessedSenderId);
-              
+
               // Only update lastProcessedSenderId for real chat messages so that 
               // the first real message after a system message always shows an avatar.
               if (!isSystem) {
@@ -505,6 +571,9 @@ export function ChatWindow({
                     isGroupConversation={conversation.isGroup || false}
                     onOpenUserProfile={onOpenUserProfile}
                     onInitiateCall={onInitiateCall}
+                    userRole={currentUserRole}
+                    allowMemberPin={allowMemberPin}
+                    onVotePoll={onVotePoll}
                   />
                 );
               } else {
@@ -539,6 +608,9 @@ export function ChatWindow({
                     onJumpToOriginal={(id) => handleJumpToMessage(id)}
                     onOpenUserProfile={onOpenUserProfile}
                     onInitiateCall={onInitiateCall}
+                    userRole={currentUserRole}
+                    allowMemberPin={allowMemberPin}
+                    onVotePoll={onVotePoll}
                   />
                 );
               }
@@ -565,8 +637,14 @@ export function ChatWindow({
 
         if (isBlocked) {
           return (
-            <div className="text-center text-sm text-gray-500 py-3 bg-white border-t border-gray-200">
-              Chỉ Trưởng/Phó nhóm mới có thể gửi tin nhắn
+            <div className="flex items-center justify-center gap-3 py-4 bg-[var(--surface)] border-t border-[var(--border)] animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-50 text-blue-500">
+                <Info size={20} />
+              </div>
+              <p className="text-[14.5px] text-[var(--text-secondary)]">
+                Chỉ <span className="text-blue-500 font-medium cursor-pointer hover:underline">trưởng/phó nhóm</span> được gửi tin nhắn vào cộng đồng.{" "}
+                <span className="text-blue-500 font-medium cursor-pointer hover:underline">Tìm hiểu thêm</span>
+              </p>
             </div>
           );
         }

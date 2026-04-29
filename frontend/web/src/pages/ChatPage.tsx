@@ -80,9 +80,9 @@ import type { SystemMessagePayload } from '../features/chat/chat.types'
 
 // Fallback toast object to prevent crashes if toast library is missing
 const toast = {
-  success: (msg: string) => alert(msg),
-  error: (msg: string) => alert(msg),
-};
+  success: (msg: string) => console.log('SUCCESS:', msg),
+  error: (msg: string) => console.error('ERROR:', msg),
+}
 
 function sortMessages(messages: ChatMessage[]): ChatMessage[] {
   return [...messages].sort((left, right) => {
@@ -232,6 +232,11 @@ function formatConversationPreview(
   const type = typeof message !== 'string' ? message.type : undefined;
   const attachments = typeof message !== 'string' ? message.attachments : undefined;
   let text = typeof message === 'string' ? message : message.text;
+
+  // Handle poll preview specifically since type='poll' messages might have empty text
+  if (typeof message !== 'string' && message.type === 'poll' && message.pollData) {
+    text = `{"type":"poll","question":"${message.pollData.question}"}`;
+  }
 
   // Preserve complex system formatting if content is JSON
   if (text.startsWith('{"action":')) {
@@ -565,7 +570,7 @@ export default function ChatPage() {
     userMapRef.current = userMap
   }, [userMap])
   const messageLoadRequestSeqRef = useRef(0)
-  const pendingMetadataFetches = useRef<Map<string, Promise<void>>>(new Map())
+  const pendingMetadataFetches = useRef<Map<string, Promise<void>>> (new Map())
   const processedMessageIds = useRef<Set<string>>(new Set())
 
   // Load deleted timestamps & pinned conversations from localStorage on mount
@@ -798,7 +803,13 @@ export default function ChatPage() {
       const reactions = {} as MessageReactionMap
 
       for (const row of rows) {
-        const reactionKey = EMOJI_TO_REACTION_KEY[row.emoji]
+        let reactionKey = EMOJI_TO_REACTION_KEY[row.emoji]
+
+        // Handle poll votes (vote:prefix)
+        if (!reactionKey && row.emoji.startsWith('vote:')) {
+          reactionKey = row.emoji as ReactionKey
+        }
+
         if (!reactionKey) {
           continue
         }
@@ -910,6 +921,24 @@ export default function ChatPage() {
     onDisconnected: () => {
       setIsSocketConnected(false)
     },
+    onFriendshipUpdated: async (payload) => {
+      if (!user || !accessToken || !payload.friendId) return;
+      console.log('[ChatPage] 🤝 Friendship updated via socket for friendId:', payload.friendId);
+
+      try {
+        // 1. Ensure conversation is created in message-service
+        const cid = await getOrCreateDirectConversation(accessToken, payload.friendId);
+        if (!cid) return;
+
+        // 2. Refresh inbox to get latest state
+        await loadInbox(accessToken, cid);
+
+        // 3. (Optional) If it's not already at the top, it will be after loadInbox 
+        // because loadInbox updates the conversations state.
+      } catch (error) {
+        console.warn('[ChatPage] Failed to handle friendship update:', error);
+      }
+    },
     onMessageReceived: async (raw: RawMessage) => {
       if (!user || !accessToken) return;
 
@@ -917,50 +946,81 @@ export default function ChatPage() {
       if (!mapped.conversationId) return;
 
       // ── 0. SYSTEM MESSAGES (CRITICAL SIGNALS) ──
-      if (mapped.type === 'system') {
+      // Handle both SYSTEM messages and TEXT messages that contain JSON signals (like poll sync)
+      if (mapped.type === 'system' || (mapped.type === 'text' && mapped.text.startsWith('{"action":'))) {
         try {
-          const sys = JSON.parse(mapped.text);
-          const cid = mapped.conversationId;
-
-          if (sys.action === 'DISBAND_GROUP') {
-            setConversations(prev => prev.filter(c => c.id !== cid));
-            if (selectedConversationIdRef.current === cid) navigate('/chat');
-            return;
-          }
-          if (sys.action === 'LEAVE_GROUP' && sys.actorId === user.id) {
-            setConversations(prev => prev.filter(c => c.id !== cid));
-            if (selectedConversationIdRef.current === cid) navigate('/chat');
-            return;
+          let sys: any = null;
+          try {
+            sys = JSON.parse(mapped.text);
+          } catch (e) {
+            // Handle plain text or malformed JSON
+            if (mapped.text === 'FRIEND_ACCEPTED' || mapped.text.includes('FRIEND_ACCEPTED')) {
+              sys = { action: 'FRIEND_ACCEPTED' };
+            }
           }
 
-          // PIN/UNPIN Sync
-          if (sys.action === 'PIN_MESSAGE') {
-            console.log('[ChatPage] 📌 Handling PIN_MESSAGE event');
-            setPinnedMessageIds(prev => ({
-              ...prev,
-              [cid]: [...(prev[cid] || []), sys.messageId].filter((v, i, a) => a.indexOf(v) === i)
-            }));
-            // Force re-fetch pinned messages to get full message objects immediately
-            void syncPinnedMessages(cid);
-          }
-          if (sys.action === 'UNPIN_MESSAGE') {
-            console.log('[ChatPage] 📍 Handling UNPIN_MESSAGE event');
-            setPinnedMessageIds(prev => ({
-              ...prev,
-              [cid]: (prev[cid] || []).filter(id => id !== sys.messageId)
-            }));
-            // Force re-fetch pinned messages
-            void syncPinnedMessages(cid);
+          if (!sys || !sys.action) {
+            // Fallback detection
+            if (mapped.text.includes('"action":"FRIEND_ACCEPTED"')) sys = { action: 'FRIEND_ACCEPTED' };
           }
 
-          // Group Info Sync
-          if (sys.action === 'UPDATE_GROUP_INFO') {
-            setConversations(prev => prev.map(c => {
-              if (c.id !== cid) return c;
-              return { ...c, ...sys.metadata };
-            }));
+          if (sys && sys.action) {
+            const cid = mapped.conversationId;
+
+            if (sys.action === 'DISBAND_GROUP') {
+              setConversations(prev => prev.filter(c => c.id !== cid));
+              if (selectedConversationIdRef.current === cid) navigate('/chat');
+              return;
+            }
+            if (sys.action === 'LEAVE_GROUP' && sys.actorId === user.id) {
+              setConversations(prev => prev.filter(c => c.id !== cid));
+              if (selectedConversationIdRef.current === cid) navigate('/chat');
+              return;
+            }
+
+            // PIN/UNPIN Sync
+            if (sys.action === 'PIN_MESSAGE') {
+              console.log('[ChatPage] 📌 Handling PIN_MESSAGE event');
+              setPinnedMessageIds(prev => ({
+                ...prev,
+                [cid]: [...(prev[cid] || []), sys.messageId].filter((v, i, a) => a.indexOf(v) === i)
+              }));
+              void syncPinnedMessages(cid);
+            }
+            if (sys.action === 'UNPIN_MESSAGE') {
+              console.log('[ChatPage] 📍 Handling UNPIN_MESSAGE event');
+              setPinnedMessageIds(prev => ({
+                ...prev,
+                [cid]: (prev[cid] || []).filter(id => id !== sys.messageId)
+              }));
+              void syncPinnedMessages(cid);
+            }
+
+            // Group Info Sync
+            if (sys.action === 'UPDATE_GROUP_INFO') {
+              setConversations(prev => prev.map(c => {
+                if (c.id !== cid) return c;
+                return { ...c, ...sys.metadata };
+              }));
+            }
+
+            // Reaction Sync (Poll Voting)
+            if (sys.action === 'UPDATE_MESSAGE_REACTIONS') {
+              console.log('[ChatPage] 🔄 Handling UPDATE_MESSAGE_REACTIONS signal for poll sync');
+              if (sys.messageId) {
+                void syncMessageReaction(sys.messageId);
+              }
+            }
+
+            // FRIEND_ACCEPTED Sync: Proactively fetch and show the new conversation
+            if (sys.action === 'FRIEND_ACCEPTED' || mapped.text.includes('FRIEND_ACCEPTED')) {
+              console.log('[ChatPage] 🤝 Handling FRIEND_ACCEPTED signal');
+              void loadInbox();
+            }
           }
-        } catch (e) { /* ignore */ }
+        } catch (err) {
+          console.warn('[ChatPage] Error processing system signal:', err);
+        }
       }
 
       // ── 1. DEDUPLICATION (PREVENT DOUBLE RENDERING) ──
@@ -1183,35 +1243,15 @@ export default function ChatPage() {
     },
     onReactionAdded: (payload: any) => {
       console.log('[ChatPage.socket] Reaction added:', payload);
-      setMessageReactions(prev => {
-        const current = prev[payload.messageId] || {};
-        const voters = current[payload.emoji] || [];
-        if (voters.includes(payload.userId)) return prev;
-
-        return {
-          ...prev,
-          [payload.messageId]: {
-            ...current,
-            [payload.emoji]: [...voters, payload.userId]
-          }
-        };
-      });
+      if (payload.messageId) {
+        void syncMessageReaction(payload.messageId);
+      }
     },
     onReactionRemoved: (payload: any) => {
       console.log('[ChatPage.socket] Reaction removed:', payload);
-      setMessageReactions(prev => {
-        const current = prev[payload.messageId] || {};
-        const voters = current[payload.emoji] || [];
-        if (!voters.includes(payload.userId)) return prev;
-
-        return {
-          ...prev,
-          [payload.messageId]: {
-            ...current,
-            [payload.emoji]: voters.filter(id => id !== payload.userId)
-          }
-        };
-      });
+      if (payload.messageId) {
+        void syncMessageReaction(payload.messageId);
+      }
     },
     onGroupUpdated: (payload: any) => {
       console.log('[ChatPage.socket] Group updated:', payload);
@@ -1465,12 +1505,48 @@ export default function ChatPage() {
         return
       }
 
-      const emoji = REACTION_OPTIONS.find((item) => item.key === reactionKey)?.emoji
+      let emoji = REACTION_OPTIONS.find((item) => item.key === reactionKey)?.emoji
       if (!emoji) {
-        return
+        if (typeof reactionKey === 'string' && (reactionKey.startsWith('vote:') || reactionKey.startsWith('v:'))) {
+          emoji = reactionKey
+        } else {
+          return
+        }
       }
 
       try {
+        // Optimistic UI Update for Polls
+        if (reactionKey.startsWith('vote:') || reactionKey.startsWith('v:')) {
+          setReactionStatesByMessage(prev => {
+            const current = prev[messageId] || { reactions: {} };
+            const nextReactions = { ...current.reactions };
+
+            // In poll voting, remove any other poll-related reactions (vote: or v:) from this user
+            Object.keys(nextReactions).forEach(key => {
+              if ((key.startsWith('vote:') || key.startsWith('v:')) && nextReactions[key as ReactionKey]?.myCount > 0) {
+                nextReactions[key as ReactionKey] = {
+                  count: Math.max(0, nextReactions[key as ReactionKey].count - 1),
+                  myCount: 0
+                };
+              }
+            });
+
+            nextReactions[reactionKey as ReactionKey] = {
+              count: (nextReactions[reactionKey as ReactionKey]?.count || 0) + 1,
+              myCount: 1
+            };
+
+            return {
+              ...prev,
+              [messageId]: {
+                ...current,
+                reactions: nextReactions,
+                lastUsedReaction: reactionKey as ReactionKey
+              }
+            };
+          });
+        }
+
         await addMessageReaction(accessToken, messageId, emoji)
         await syncMessageReaction(messageId)
 
@@ -1503,7 +1579,11 @@ export default function ChatPage() {
 
       const emoji = REACTION_OPTIONS.find((item) => item.key === reactionKey)?.emoji
       if (!emoji) {
-        return
+        if (typeof reactionKey === 'string' && reactionKey.startsWith('vote:')) {
+          emoji = reactionKey
+        } else {
+          return
+        }
       }
 
       const current = reactionStatesByMessage[messageId]?.reactions[reactionKey]
@@ -1597,8 +1677,11 @@ export default function ChatPage() {
       const currentConv = conversations.find(c => c.id === conversationId)
       if (currentConv?.isGroup) {
         const myMember = currentConv.members?.find(m => m.userId === user.id)
-        if (String(myMember?.role || '').toUpperCase() !== 'ADMIN') {
-          toast.error('Chỉ có trưởng nhóm mới có quyền ghim tin nhắn')
+        const isModerator = myMember?.role === 'ADMIN' || myMember?.role === 'DEPUTY'
+        const canPin = isModerator || currentConv.allowMemberPin
+
+        if (!canPin) {
+          toast.error('Bạn không có quyền ghim tin nhắn trong nhóm này')
           return
         }
       }
@@ -2315,12 +2398,13 @@ export default function ChatPage() {
                 .map((m: any) => String(m.userId ?? '').trim())
                 .filter((id: string) => id && id !== myId);
 
+              const isGroup = (inner.type || c.type) === 'GROUP';
               const freshConvo: ConversationSummary = {
                 id: inner.id || c.id,
-                isGroup: (inner.type || c.type) === 'GROUP',
-                name: inner.title || c.title || "Nhóm mới",
+                isGroup,
+                name: inner.title || c.title || (isGroup ? "Nhóm mới" : "Người dùng mới"),
                 avatarUrl: inner.avatarUrl || c.avatarUrl || null,
-                lastMessage: "Nhóm mới được tạo",
+                lastMessage: isGroup ? "Nhóm mới được tạo" : "[Thiệp] Gửi lời chào",
                 unreadCount: 0,
                 participantUserIds: participantIds,
                 memberCount: members.length,
@@ -2495,11 +2579,21 @@ export default function ChatPage() {
         }
 
         setConversations((prev) => {
-          if (!targetId) return mappedItems
-          if (mappedItems.some((item) => item.id === targetId)) return mappedItems
-          const preserved = prev.find((item) => item.id === targetId)
-          if (!preserved) return mappedItems
-          return [preserved, ...mappedItems]
+          if (!targetId) return mappedItems;
+
+          // Try to find it in the freshly fetched items first
+          const targetInFetched = mappedItems.find(item => item.id === targetId);
+          if (targetInFetched) {
+            return [targetInFetched, ...mappedItems.filter(item => item.id !== targetId)];
+          }
+
+          // Fallback: try to find it in previous state
+          const targetInPrev = prev.find(item => item.id === targetId);
+          if (targetInPrev) {
+            return [targetInPrev, ...mappedItems.filter(item => item.id !== targetId)];
+          }
+
+          return mappedItems;
         })
         setSelectedConversationId((prev) => {
           if (preferredConversationId) {
@@ -2511,7 +2605,7 @@ export default function ChatPage() {
           if (prev && mappedItems.some((item) => item.id === prev)) {
             return prev
           }
-          return mappedItems[0]?.id ?? ''
+          return ''
         })
       } catch (error) {
         console.error('Failed to fetch inbox', error)
@@ -2717,7 +2811,7 @@ export default function ChatPage() {
       // Proactively refresh metadata for the selected conversation
       if (accessToken && conversationId && !conversationId.startsWith('vnalo_cloud_')) {
         try {
-          const detailRaw = await fetchConversation(accessToken, conversationId);
+          const detailRaw = await fetchConversation(accessToken, conversationId).catch(() => null);
           if (detailRaw) {
             const c = detailRaw as any;
             const inner = c.conversation || c;
@@ -2740,6 +2834,9 @@ export default function ChatPage() {
                 participantUserIds: participantIds,
                 avatarUrl: isGroup ? (inner.avatarUrl || conv.avatarUrl) : (inner.avatarUrl || conv.avatarUrl),
                 name: isGroup ? (inner.title || conv.name) : (inner.title || conv.name),
+                onlyAdminCanPost: Boolean(inner.onlyAdminCanPost ?? inner.only_admin_can_post ?? conv.onlyAdminCanPost),
+                allowMemberPin: Boolean(inner.allowMemberPin ?? inner.allow_member_pin ?? conv.allowMemberPin),
+                allowMemberEditInfo: Boolean(inner.allowMemberEditInfo ?? inner.allow_member_edit_info ?? conv.allowMemberEditInfo),
               };
             }));
 
@@ -2850,7 +2947,7 @@ export default function ChatPage() {
         if (accessToken && !conversationId.startsWith('vnalo_cloud_')) {
           void (async () => {
             try {
-              const detailRaw = await fetchConversation(accessToken, conversationId);
+              const detailRaw = await fetchConversation(accessToken, conversationId).catch(() => null);
               if (detailRaw) {
                 const c = detailRaw as any;
                 const inner = c.conversation || c;
@@ -2873,6 +2970,9 @@ export default function ChatPage() {
                     participantUserIds: participantIds,
                     avatarUrl: isGroup ? (inner.avatarUrl || conv.avatarUrl) : (inner.avatarUrl || conv.avatarUrl),
                     name: isGroup ? (inner.title || conv.name) : (inner.title || conv.name),
+                    onlyAdminCanPost: Boolean(inner.onlyAdminCanPost ?? inner.only_admin_can_post ?? conv.onlyAdminCanPost),
+                    allowMemberPin: Boolean(inner.allowMemberPin ?? inner.allow_member_pin ?? conv.allowMemberPin),
+                    allowMemberEditInfo: Boolean(inner.allowMemberEditInfo ?? inner.allow_member_edit_info ?? conv.allowMemberEditInfo),
                   };
                 }));
 
@@ -3047,17 +3147,29 @@ export default function ChatPage() {
   )
 
   useEffect(() => {
-    if (routedConversationId || conversations.length === 0) {
-      return
+    // Only redirect if we are at the root /chat path AND we have a previously selected ID
+    // but we ARE NOT already on that routed path.
+    if (!routedConversationId && selectedConversationId) {
+      navigate(`/chat/${selectedConversationId}`, { replace: true });
     }
+  }, [navigate, routedConversationId, selectedConversationId])
 
-    const fallbackConversationId = selectedConversationId || conversations[0]?.id
-    if (!fallbackConversationId) {
-      return
+  // Save selection to localStorage whenever it changes
+  useEffect(() => {
+    if (selectedConversationId) {
+      localStorage.setItem('vnalo_last_conv_id', selectedConversationId);
     }
+  }, [selectedConversationId])
 
-    navigate(`/chat/${fallbackConversationId}`, { replace: true })
-  }, [conversations, navigate, routedConversationId, selectedConversationId])
+  // Load last selection on mount if we are at the root
+  useEffect(() => {
+    if (!routedConversationId) {
+      const lastId = localStorage.getItem('vnalo_last_conv_id');
+      if (lastId && conversations.some(c => c.id === lastId)) {
+        setSelectedConversationId(lastId);
+      }
+    }
+  }, [conversations, routedConversationId])
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // SMART JOIN ROOMS (Only join once per session/reconnect)
@@ -3070,7 +3182,7 @@ export default function ChatPage() {
     const socket = getSocket();
     const actualConnected = Boolean(socket?.connected);
     const currentSocketId = socket?.id || null;
-    
+
     // If socket ID changed (reconnect), we MUST clear the joined cache
     // because server-side room membership is lost on reconnect.
     if (currentSocketId !== lastJoinedSocketIdRef.current) {
@@ -3472,7 +3584,10 @@ export default function ChatPage() {
           label: opt.label,
           votes: []
         })),
-        allowMulti: poll.allowMulti ?? false,
+        allowMultiple: poll.allowMultiple ?? false,
+        allowAddOption: poll.allowAddOption ?? false,
+        isAnonymous: poll.isAnonymous ?? false,
+        expiresAt: poll.expiresAt,
         totalVotes: 0
       }
 
@@ -3510,7 +3625,9 @@ export default function ChatPage() {
       const conversationId = selectedConversationIdRef.current || selectedConversationId || routedConversationId
       if (!conversationId || !user || !accessToken) return
 
-      const emoji = `vote:${optionId}`
+      const emoji = (optionId.startsWith('vote:') || optionId.startsWith('v:')) 
+        ? optionId 
+        : `vote:${optionId}`
 
       try {
         // Use existing addReaction logic
@@ -3644,8 +3761,10 @@ export default function ChatPage() {
     // Permission check for group renaming
     if (selectedConversation?.isGroup) {
       const myMember = selectedConversation.members?.find(m => m.userId === user?.id)
-      if (myMember?.role !== 'ADMIN') {
-        toast.error('Chỉ có trưởng nhóm mới có quyền thay đổi tên nhóm')
+      const role = String(myMember?.role || '').toUpperCase()
+      const isModerator = role === 'ADMIN' || role === 'DEPUTY'
+      if (!isModerator && !selectedConversation.allowMemberEditInfo) {
+        toast.error('Bạn không có quyền thay đổi tên nhóm')
         return
       }
     }
@@ -3680,12 +3799,14 @@ export default function ChatPage() {
     if (!selectedConversationId || !accessToken) return;
 
     try {
-      // 0. Permission check (Case-insensitive)
+      // 0. Permission check
       const currentConv = conversations.find(c => c.id === selectedConversationId)
       if (currentConv?.isGroup) {
         const myMember = currentConv.members?.find(m => m.userId === user?.id)
-        if (String(myMember?.role || '').toUpperCase() !== 'ADMIN') {
-          toast.error('Chỉ có nhóm trưởng mới có quyền thay đổi ảnh nhóm')
+        const role = String(myMember?.role || '').toUpperCase()
+        const isModerator = role === 'ADMIN' || role === 'DEPUTY'
+        if (!isModerator && !currentConv.allowMemberEditInfo) {
+          toast.error('Bạn không có quyền thay đổi ảnh nhóm')
           return
         }
       }
@@ -3826,9 +3947,21 @@ export default function ChatPage() {
         if (conv.id !== selectedConversationId) return conv;
         return { ...conv, ...settings };
       }));
+      // Emit SYSTEM notification for realtime sync
+      const systemPayload = JSON.stringify({
+        action: 'UPDATE_GROUP_INFO',
+        actorId: user?.id,
+        metadata: settings
+      });
+
+      emitSendMessage({
+        conversationId: selectedConversationId,
+        messageType: 'system',
+        content: systemPayload
+      });
     } catch (error) {
       console.error('Failed to update group settings', error);
-      alert('Không thể cập nhật cài đặt nhóm');
+      toast.error('Không thể cập nhật cài đặt nhóm');
     }
   };
 
@@ -3859,9 +3992,8 @@ export default function ChatPage() {
       setSelectedConversationId('');
       setRightSidebarContent(null);
       navigate('/chat');
-    } catch (error) {
-      console.error('Failed to disband group', error);
-      alert('Không thể giải tán nhóm');
+    } catch (err) {
+      console.error('Không thể giải tán nhóm', err);
     }
   };
 
@@ -4071,8 +4203,10 @@ export default function ChatPage() {
     )
   }
 
+  const isSidebarOpen = rightSidebarContent && (selectedConversation || rightSidebarContent === 'global-search')
+
   return (
-    <div className={rightSidebarContent ? 'chat-layout' : 'chat-layout chat-layout-sidebar-closed'}>
+    <div className={isSidebarOpen ? 'chat-layout' : 'chat-layout chat-layout-sidebar-closed'}>
       <ChatList
         conversations={visibleConversations}
         friendResults={friendResults}
@@ -4137,7 +4271,7 @@ export default function ChatPage() {
         existingMemberIds={selectedConversation?.participantUserIds ?? []}
       />
 
-      {rightSidebarContent ? (
+      {rightSidebarContent && (selectedConversation || rightSidebarContent === 'global-search') ? (
         <aside className='chat-side-panel'>
           {rightSidebarContent === 'search' && selectedConversation ? (
             <SearchMessagesPanel
@@ -4145,10 +4279,6 @@ export default function ChatPage() {
               onSearchConversation={handleSearchConversation}
               onSelectMessage={(messageId) => setJumpToMessageId(messageId)}
             />
-          ) : null}
-
-          {rightSidebarContent === 'search' && !selectedConversation ? (
-            <p>{t('pages.chat.sideInfoFallback')}</p>
           ) : null}
 
           {rightSidebarContent === 'global-search' ? (
@@ -4161,10 +4291,9 @@ export default function ChatPage() {
             />
           ) : null}
 
-          {rightSidebarContent === 'info' ? (
+          {rightSidebarContent === 'info' && selectedConversation ? (
             <>
-              {selectedConversation ? (
-                <ConversationInfo
+              <ConversationInfo
                   conversation={selectedConversation}
                   messages={selectedMessages}
                   onAddMembersClick={() => setIsAddMembersOpen(true)}
@@ -4191,9 +4320,6 @@ export default function ChatPage() {
                   friends={friendsDirectory}
                   currentUserId={user?.id}
                 />
-              ) : (
-                <p>{t('pages.chat.sideInfoFallback')}</p>
-              )}
             </>
           ) : null}
         </aside>
