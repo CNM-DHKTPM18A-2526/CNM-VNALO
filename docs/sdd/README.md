@@ -29,12 +29,14 @@ This SDD tree makes the repository AI-actionable and auditable:
   - SCREEN_SPEC_VOICE_CALL.md
   - SCREEN_SPEC_VIDEO_CALL.md
 - layer-2
-  - MODULE_SPEC_CHAT.md
+  - MODULE_SPEC_CHAT.md       ← HARDENED 2026-04-29
   - MODULE_SPEC_CALL.md
   - MODULE_SPEC_SOCIAL.md
   - MODULE_SPEC_REALTIME_SYNC.md
   - MODULE_SPEC_WEB_APP.md
-  - MODULE_SPEC_AI_ASSISTANT.md
+  - MODULE_SPEC_AI_ASSISTANT.md  ← HARDENED 2026-04-29
+  - MODULE_SPEC_POLL.md         ← NEW 2026-04-29
+  - MODULE_SPEC_MEDIA_PROXY.md  ← NEW 2026-04-29
 - layer-3
   - API_REFERENCE_CATALOG.md
   - SOCKET_SIGNALING_SCHEMA.md
@@ -43,6 +45,7 @@ This SDD tree makes the repository AI-actionable and auditable:
 - layer-4
   - SYSTEM_RECONCILE_REPORT.md
   - DEFINITION_OF_DONE.md
+  - REMEDIATION_BLUEPRINT.md  ← NEW 2026-04-29
 
 ## Reconcile Protocol
 
