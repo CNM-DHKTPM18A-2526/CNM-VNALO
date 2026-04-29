@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom'
 
 import { useAuth } from '../../features/auth/useAuth'
 import { useLanguage } from '../i18n/LanguageContext'
+import { useNotifications } from '../../features/notifications/NotificationContext'
 import { Icon } from './Icon'
 import { UserAvatar } from './UserAvatar'
 import { SettingsMenu } from './SettingsMenu'
@@ -13,10 +14,11 @@ type SidebarProps = {
 export function Sidebar({ onOpenSettingsModal }: SidebarProps) {
   const { t } = useLanguage()
   const { user } = useAuth()
+  const { unreadMessageCount, pendingFriendRequestCount } = useNotifications()
 
   const menuItems = [
-    { to: '/chat', labelKey: 'sidebar.chat', icon: 'chat' as const },
-    { to: '/contacts', labelKey: 'sidebar.contacts', icon: 'addressBook' as const },
+    { to: '/chat', labelKey: 'sidebar.chat', icon: 'chat' as const, badge: unreadMessageCount },
+    { to: '/contacts', labelKey: 'sidebar.contacts', icon: 'addressBook' as const, badge: pendingFriendRequestCount },
     { to: '/todo', labelKey: 'sidebar.todo', icon: 'checkSquare' as const },
     { to: '/documents', labelKey: 'sidebar.documents', icon: 'folder' as const },
     { 
@@ -49,6 +51,11 @@ export function Sidebar({ onOpenSettingsModal }: SidebarProps) {
           >
             <span aria-hidden className='sidebar-link-icon'>
               <Icon name={item.icon} />
+              {(item as any).badge > 0 && (
+                <span className='sidebar-badge'>
+                  {(item as any).badge > 99 ? '99+' : (item as any).badge}
+                </span>
+              )}
             </span>
           </NavLink>
         ))}

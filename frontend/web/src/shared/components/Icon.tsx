@@ -6,7 +6,9 @@ type IconName =
   | 'user'
   | 'addressBook'
   | 'userPlus'
+  | 'userPlusZalo'
   | 'group'
+  | 'groupPlusZalo'
   | 'settings'
   | 'send'
   | 'logout'
@@ -123,6 +125,17 @@ export function Icon({ name, className, size = 24 }: IconProps) {
     )
   }
 
+  if (name === 'userPlusZalo') {
+    return (
+      <svg {...commonProps}>
+        <circle cx='9' cy='11' r='3.5' />
+        <path d='M3 20a6 6 0 0 1 12 0' />
+        <path d='M16 6h5' strokeWidth='2' />
+        <path d='M18.5 3.5v5' strokeWidth='2' />
+      </svg>
+    )
+  }
+
   if (name === 'group') {
     return (
       <svg {...commonProps}>
@@ -130,6 +143,19 @@ export function Icon({ name, className, size = 24 }: IconProps) {
         <circle cx='16.5' cy='10' r='2.5' />
         <path d='M3.8 19a5.2 5.2 0 0 1 10.4 0' />
         <path d='M14 19a4 4 0 0 1 6 0' />
+      </svg>
+    )
+  }
+
+  if (name === 'groupPlusZalo') {
+    return (
+      <svg {...commonProps}>
+        <circle cx='8' cy='12' r='3' />
+        <path d='M2 21a6 6 0 0 1 12 0' />
+        <circle cx='15' cy='13' r='2.5' />
+        <path d='M10 21a5 5 0 0 1 10 0' />
+        <path d='M16 5h5' strokeWidth='2' />
+        <path d='M18.5 2.5v5' strokeWidth='2' />
       </svg>
     )
   }

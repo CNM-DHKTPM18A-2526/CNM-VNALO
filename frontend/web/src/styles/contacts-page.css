@@ -63,20 +63,59 @@
   text-overflow: ellipsis;
 }
 
-.contacts-sidebar-search {
+.contacts-sidebar-search-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.contacts-sidebar-search-box {
+  flex: 1;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
-  border-radius: 10px;
+  padding: 6px 12px;
+  border-radius: 6px;
   background: var(--bg);
   border: 1px solid var(--border);
+  transition: all 0.2s;
+}
+
+.contacts-sidebar-search-box:focus-within {
+  background: var(--surface);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+.contacts-sidebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.contacts-sidebar-action-btn {
+  width: 32px;
+  height: 32px;
+  border: none !important;
+  outline: none !important;
+  border-radius: 6px;
+  display: inline-grid;
+  place-items: center;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.contacts-sidebar-action-btn:hover {
+  background: var(--surface-hover);
 }
 
 .contacts-icon-sm {
   width: 16px;
   height: 16px;
-  color: #64748b;
+  color: var(--muted);
 }
 
 .contacts-icon-muted {
@@ -89,6 +128,16 @@
   background: transparent;
   outline: none;
   font-size: 13px;
+  color: var(--text) !important;
+}
+
+[data-theme='dark'] .contacts-input {
+  color: #e8ecf1 !important;
+}
+
+.contacts-input::placeholder {
+  color: var(--muted);
+  opacity: 0.7;
 }
 
 .contacts-input-on-blue::placeholder {
@@ -778,4 +827,87 @@
   .contacts-shell {
     border-radius: 0;
   }
+}
+
+.contacts-sidebar-search-results {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.contacts-sidebar-search-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--surface-hover);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.contacts-sidebar-search-clear {
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  cursor: pointer;
+}
+
+.contacts-sidebar-search-section {
+  padding: 8px 0;
+}
+
+.contacts-sidebar-search-section-title {
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.contacts-sidebar-search-item {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.contacts-sidebar-search-item:hover {
+  background: var(--surface-hover);
+}
+
+.contacts-sidebar-search-item-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.contacts-sidebar-search-item-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.contacts-sidebar-search-item-sub {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.contacts-sidebar-search-empty,
+.contacts-sidebar-search-loading {
+  padding: 20px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
 }

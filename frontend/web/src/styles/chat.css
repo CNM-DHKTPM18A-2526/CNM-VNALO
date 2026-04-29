@@ -72,8 +72,9 @@
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--surface);
+  border: none !important;
+  outline: none !important;
+  background: transparent;
   color: var(--menu-text);
   display: inline-grid;
   place-items: center;
@@ -304,8 +305,12 @@
   border: 0;
   outline: 0;
   background: transparent;
-  color: var(--text);
+  color: var(--text) !important;
   font-size: 15px;
+}
+
+[data-theme='dark'] .chat-search-input-wrap input {
+  color: #e8ecf1 !important;
 }
 
 .chat-search-clear {
@@ -1882,9 +1887,13 @@
   padding: 10px 14px;
   font-size: 14px;
   background: var(--surface-soft);
-  color: var(--text);
+  color: var(--text) !important;
   outline: none;
   transition: all var(--motion-fast);
+}
+
+[data-theme='dark'] .friend-search-input {
+  color: #e8ecf1 !important;
 }
 
 .friend-search-input::placeholder {
