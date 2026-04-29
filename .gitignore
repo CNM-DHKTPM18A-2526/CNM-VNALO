@@ -2,6 +2,8 @@
 # Operating System Files
 # ===========================
 
+*.md
+
 # Visual Paradigm files
 *.vpp
 *.vpp.bak

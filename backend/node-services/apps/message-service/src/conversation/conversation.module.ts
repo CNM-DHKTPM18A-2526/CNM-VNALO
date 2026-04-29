@@ -9,6 +9,7 @@ import { ConversationService } from './conversation.service';
 import { ConversationController } from './conversation.controller';
 import { KafkaProducerModule } from '../kafka/kafka-producer.module';
 import { MessageModule } from '../message/message.module';
+import { MembershipCacheService } from './membership-cache.service';
 
 @Module({
   imports: [
@@ -23,7 +24,7 @@ import { MessageModule } from '../message/message.module';
     forwardRef(() => MessageModule),
   ],
   controllers: [ConversationController],
-  providers: [ConversationService],
-  exports: [ConversationService],
+  providers: [ConversationService, MembershipCacheService],
+  exports: [ConversationService, MembershipCacheService],
 })
 export class ConversationModule {}

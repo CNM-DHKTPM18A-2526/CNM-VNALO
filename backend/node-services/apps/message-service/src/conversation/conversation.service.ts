@@ -3,13 +3,19 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
   Logger,
   Inject,
   forwardRef,
 } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, IsNull } from 'typeorm';
+import {
+  Repository,
+  DataSource,
+  IsNull,
+  OptimisticLockVersionMismatchError,
+} from 'typeorm';
 import {
   Conversation,
   ConversationType,
@@ -22,6 +28,7 @@ import {
 } from '../entities/conversation-member.entity';
 import { ConversationDirectMap } from '../entities/conversation-direct-map.entity';
 import { ConversationJoinRequest } from '../entities/conversation-join-request.entity';
+import { MembershipCacheService } from './membership-cache.service';
 import { ConversationInbox } from '../entities/conversation-inbox.entity';
 import { Message } from '../entities/message.entity';
 import { MessageReaction } from '../entities/message-reaction.entity';
@@ -51,6 +58,7 @@ export class ConversationService {
     private readonly kafkaProducer: KafkaProducerService,
     @Inject(forwardRef(() => MessageService))
     private readonly messageService: MessageService,
+    private readonly membershipCache: MembershipCacheService,
   ) {}
 
   /**
@@ -131,6 +139,10 @@ export class ConversationService {
       },
     );
 
+    // V-03 Fix
+    await this.membershipCache.invalidate(conversationId, userId);
+    await this.membershipCache.invalidate(conversationId, targetUserId);
+
     return this.getConversation(conversationId, userId);
   }
 
@@ -175,6 +187,13 @@ export class ConversationService {
         }
 
         await manager.save(ConversationMember, members);
+
+        // V-03 Fix: Invalidate cache for ALL initial members
+        const allInitialMembers = [userId, ...uniqueInitialMembers];
+        await Promise.all(
+          allInitialMembers.map((id) => this.membershipCache.invalidate(saved.id, id)),
+        );
+
         this.logger.log(
           `Group created: ${saved.id} "${dto.title}" with ${members.length} members`,
         );
@@ -365,6 +384,14 @@ export class ConversationService {
     }
 
     const members = await this.getMembers(conversationId, userId);
+
+    // V-03 Fix: Invalidate cache for all new members
+    if (newMembers.length > 0) {
+      await Promise.all(
+        newMembers.map((m) => this.membershipCache.invalidate(conversationId, m.userId!))
+      );
+    }
+
     if (pendingApprovals.length > 0) {
       return { members, pendingApprovals, status: 'PENDING_APPROVAL' };
     }
@@ -420,10 +447,40 @@ export class ConversationService {
       }
     }
 
-    // Soft-delete: set leftAt
-    target.leftAt = new Date();
-    target.removedBy = isSelf ? null : requesterId;
-    await this.memberRepo.save(target);
+    // G-013 Fix & TI-1 Hardening: Use transaction for atomic soft-delete and inbox cleanup
+    try {
+      await this.dataSource.transaction(async (manager) => {
+        // Re-fetch target inside transaction to ensure we have the latest version for optimistic lock
+        const memberToUpdate = await manager.findOne(ConversationMember, {
+          where: { conversationId, userId: targetUserId, leftAt: IsNull() },
+        });
+
+        if (!memberToUpdate) {
+          throw new NotFoundException('Member not found or already left');
+        }
+
+        // Soft-delete: set leftAt
+        memberToUpdate.leftAt = new Date();
+        memberToUpdate.removedBy = isSelf ? null : requesterId;
+        
+        // TypeORM automatically handles @VersionColumn check here
+        await manager.save(ConversationMember, memberToUpdate);
+
+        // Delete inbox entry when leaving/removed to avoid orphaned data
+        await manager.delete(ConversationInbox, {
+          conversationId: conversationId,
+          userId: targetUserId,
+        });
+
+        // V-08 Fix: Invalidate cache INSIDE transaction to ensure consistency
+        await this.membershipCache.invalidate(conversationId, targetUserId);
+      });
+    } catch (err) {
+      if (err instanceof OptimisticLockVersionMismatchError) {
+        throw new ConflictException('Member status was modified by another request. Please retry.');
+      }
+      throw err;
+    }
 
     // G-014: Send system message about member leaving/removal
     try {
@@ -437,19 +494,11 @@ export class ConversationService {
         systemContent = `${targetName} đã bị ${requesterName} mời ra khỏi nhóm.`;
       }
 
-      // Use the internal createSystemMessage to handle sequence and inbox updates.
-      // If silent, only notify ADMIN and DEPUTY.
       const targetRoles = silent ? [MemberRole.ADMIN, MemberRole.DEPUTY] : undefined;
       await this.messageService.createSystemMessage(conversationId, systemContent, targetRoles);
     } catch (err) {
       this.logger.error(`Failed to send system message for member removal: ${err.message}`);
     }
-
-    // G-013 Fix: Delete inbox entry when leaving/removed to avoid orphaned data
-    await this.inboxRepo.delete({
-      conversationId: conversationId,
-      userId: targetUserId,
-    });
 
     this.logger.log(
       `Member ${targetUserId} removed from ${conversationId} by ${requesterId}`,
@@ -498,6 +547,8 @@ export class ConversationService {
         removedBy: null,
         joinedAt: new Date(),
       });
+      // V-03 Fix
+      await this.membershipCache.invalidate(conversationId, userId);
       return { status: 'JOINED', conversationId, userId };
     }
 
@@ -507,6 +558,9 @@ export class ConversationService {
       .values({ conversationId, userId, requestedBy: userId })
       .orIgnore()
       .execute();
+
+    // V-03 Fix: Invalidate requester cache even for pending approval
+    await this.membershipCache.invalidate(conversationId, userId);
 
     return { status: 'PENDING_APPROVAL', conversationId, userId };
   }
@@ -572,6 +626,8 @@ export class ConversationService {
         conversationId,
         userId: targetUserId,
       });
+      // V-08 Fix
+      await this.membershipCache.invalidate(conversationId, targetUserId);
     });
 
     return { status: 'APPROVED', conversationId, userId: targetUserId };
@@ -695,14 +751,12 @@ export class ConversationService {
     return { action: 'TRANSFERRED', newAdminId: successor.userId };
   }
 
-  /** Verify user is an active member. Throws if not. */
+  /** Verify user is an active member. Throws if not. Optimized with Redis cache. */
   async assertMember(
     conversationId: string,
     userId: string,
   ): Promise<ConversationMember> {
-    const member = await this.memberRepo.findOne({
-      where: { conversationId, userId, leftAt: IsNull() },
-    });
+    const member = await this.membershipCache.getActiveMember(conversationId, userId);
     if (!member)
       throw new ForbiddenException('You are not a member of this conversation');
     return member;
@@ -781,19 +835,57 @@ export class ConversationService {
     if (dto.nickname !== undefined) member.nickname = dto.nickname;
     if (dto.role !== undefined && !isSelf) {
       if (dto.role === MemberRole.ADMIN) {
-        // Admin transfer: demote current admin to MEMBER first
-        const currentAdmin = await this.memberRepo.findOne({
-          where: { conversationId, role: MemberRole.ADMIN, leftAt: IsNull() },
-        });
-        if (currentAdmin && currentAdmin.userId !== targetUserId) {
-          currentAdmin.role = MemberRole.MEMBER;
-          await this.memberRepo.save(currentAdmin);
+        // TI-1 Hardening: Admin transfer MUST be atomic
+        try {
+          await this.dataSource.transaction(async (manager) => {
+            // 1. Demote current admin
+            const currentAdmin = await manager.findOne(ConversationMember, {
+              where: { conversationId, role: MemberRole.ADMIN, leftAt: IsNull() },
+            });
+            if (currentAdmin && currentAdmin.userId !== targetUserId) {
+              currentAdmin.role = MemberRole.MEMBER;
+              await manager.save(ConversationMember, currentAdmin);
+            }
+
+            // 2. Promote target to ADMIN
+            const targetToPromote = await manager.findOne(ConversationMember, {
+              where: { conversationId, userId: targetUserId, leftAt: IsNull() },
+            });
+            if (!targetToPromote) throw new NotFoundException('Target member not found');
+            
+            targetToPromote.role = MemberRole.ADMIN;
+            if (dto.nickname !== undefined) targetToPromote.nickname = dto.nickname;
+            
+            await manager.save(ConversationMember, targetToPromote);
+
+            // V-08 Fix: Invalidate INSIDE transaction
+            await this.membershipCache.invalidate(conversationId, requesterId);
+            await this.membershipCache.invalidate(conversationId, targetUserId);
+          });
+        } catch (err) {
+          if (err instanceof OptimisticLockVersionMismatchError) {
+            throw new ConflictException('Admin role was modified by another request. Please retry.');
+          }
+          throw err;
         }
+        
+        return { success: true };
       }
       member.role = dto.role as MemberRole;
     }
 
-    return this.memberRepo.save(member);
+    if (dto.nickname !== undefined) member.nickname = dto.nickname;
+    
+    try {
+      const result = await this.memberRepo.save(member);
+      await this.membershipCache.invalidate(conversationId, targetUserId);
+      return result;
+    } catch (err) {
+      if (err instanceof OptimisticLockVersionMismatchError) {
+        throw new ConflictException('Member status was modified. Please refresh.');
+      }
+      throw err;
+    }
   }
 
   /** Update conversation wallpaper. */
@@ -868,6 +960,10 @@ export class ConversationService {
 
       // 6. Delete conversation itself
       await manager.delete(Conversation, { id: conversationId });
+
+      // V-07 Fix: Bulk invalidate all members in Redis BEFORE commit to ensure no ghosts
+      const invalidations = memberUserIds.map((id) => this.membershipCache.invalidate(conversationId, id));
+      await Promise.all(invalidations);
     });
 
     this.logger.log(
