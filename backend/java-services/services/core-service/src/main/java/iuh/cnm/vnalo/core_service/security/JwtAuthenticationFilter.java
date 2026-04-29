@@ -29,19 +29,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
         try {
             String token = extractTokenFromRequest(request);
-            if (StringUtils.hasText(token) && jwtTokenProvider.validateToken(token)) {
-                String userId = jwtTokenProvider.getUserIdFromToken(token);
-                UserDetails userDetails = userDetailsService.loadUserById(userId);
+            if (StringUtils.hasText(token)) {
+                if (jwtTokenProvider.validateToken(token)) {
+                    String userId = jwtTokenProvider.getUserIdFromToken(token);
+                    UserDetails userDetails = userDetailsService.loadUserById(userId);
 
-                if (userDetails.isEnabled() && userDetails.isAccountNonLocked()) {
-                    UsernamePasswordAuthenticationToken authentication =
-                            new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                    if (userDetails.isEnabled() && userDetails.isAccountNonLocked()) {
+                        UsernamePasswordAuthenticationToken authentication =
+                                new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                        log.debug("User {} authenticated for path {}", userId, request.getServletPath());
+                    }
+                } else {
+                    log.warn("Invalid JWT token provided for path {}", request.getServletPath());
                 }
             }
         } catch (Exception ex) {
-            log.error("Could not set user authentication", ex);
+            log.error("Failed to authenticate user via JWT: {}", ex.getMessage());
         }
         filterChain.doFilter(request, response);
     }
