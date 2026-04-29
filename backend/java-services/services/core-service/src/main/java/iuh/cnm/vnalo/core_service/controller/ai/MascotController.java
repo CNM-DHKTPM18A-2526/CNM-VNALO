@@ -23,6 +23,11 @@ public class MascotController {
         return ResponseEntity.ok(mascotService.getMascotSettings(userId));
     }
 
+    @GetMapping("/internal/settings")
+    public ResponseEntity<UserMascotSettings> getInternalSettings(@RequestParam UUID userId) {
+        return ResponseEntity.ok(mascotService.getMascotSettings(userId));
+    }
+
     @PutMapping
     public ResponseEntity<UserMascotSettings> updateMyMascot(
             @AuthenticationPrincipal UserDetails userDetails,

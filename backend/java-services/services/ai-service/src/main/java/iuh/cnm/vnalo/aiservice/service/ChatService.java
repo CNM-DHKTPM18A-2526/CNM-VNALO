@@ -34,6 +34,7 @@ public class ChatService {
     private final GeminiProvider geminiProvider;
     private final OllamaProvider ollamaProvider;
     private final StringRedisTemplate redisTemplate;
+    private final CoreServiceClient coreServiceClient;
     private final ObjectMapper objectMapper;
 
     @Value("${ai.chat.rate-limit-per-user:5}")
@@ -48,10 +49,12 @@ public class ChatService {
     @Value("${ai.chat.history-ttl:86400}")
     private long historyTtl;
 
-    public ChatService(GeminiProvider geminiProvider, OllamaProvider ollamaProvider, StringRedisTemplate redisTemplate) {
+    public ChatService(GeminiProvider geminiProvider, OllamaProvider ollamaProvider, 
+                       StringRedisTemplate redisTemplate, CoreServiceClient coreServiceClient) {
         this.geminiProvider = geminiProvider;
         this.ollamaProvider = ollamaProvider;
         this.redisTemplate = redisTemplate;
+        this.coreServiceClient = coreServiceClient;
         this.objectMapper = new ObjectMapper();
     }
 
@@ -71,7 +74,11 @@ public class ChatService {
         // Keep last N messages
         List<Message> trimmedHistory = trimHistory(history);
 
-        // 5. Generate Answer (Gemini -> Ollama fallback)
+        // 5. Build Dynamic System Prompt based on Mascot Settings
+        iuh.cnm.vnalo.aiservice.dto.external.MascotSettingsDTO mascot = coreServiceClient.getUserMascotSettings(userId);
+        String dynamicSystemPrompt = buildSystemPrompt(mascot);
+
+        // 6. Generate Answer (Gemini -> Ollama fallback)
         String answer;
         String provider;
 
@@ -79,7 +86,7 @@ public class ChatService {
             if (geminiProvider.isAvailable()) {
                 // Check global rate limit before calling Gemini
                 checkGlobalRateLimit();
-                answer = geminiProvider.generate(SystemPrompt.VNALO_SYSTEM_PROMPT, trimmedHistory);
+                answer = geminiProvider.generate(dynamicSystemPrompt, trimmedHistory);
                 provider = "gemini";
                 log.info("Response via Gemini for user {}", userId);
             } else {
@@ -89,7 +96,7 @@ public class ChatService {
             log.warn("Gemini failed ({}), falling back to Ollama...", geminiEx.getMessage());
             
             try {
-                answer = ollamaProvider.generate(SystemPrompt.VNALO_SYSTEM_PROMPT, trimmedHistory);
+                answer = ollamaProvider.generate(dynamicSystemPrompt, trimmedHistory);
                 provider = "ollama";
                 log.info("Response via Ollama (fallback) for user {}", userId);
             } catch (Exception ollamaEx) {
@@ -147,6 +154,19 @@ public class ChatService {
     }
 
     // --- Helpers ---
+
+    private String buildSystemPrompt(iuh.cnm.vnalo.aiservice.dto.external.MascotSettingsDTO mascot) {
+        if (mascot == null) return SystemPrompt.VNALO_SYSTEM_PROMPT;
+
+        StringBuilder sb = new StringBuilder(SystemPrompt.VNALO_SYSTEM_PROMPT);
+        sb.append("\n\n[DYNAMICS SETTINGS]");
+        sb.append("\n- Tên của bạn hiện tại là: ").append(mascot.getMascotName());
+        sb.append("\n- Cá tính của bạn: ").append(mascot.getPersonalityType());
+        if (mascot.getCustomInstructions() != null && !mascot.getCustomInstructions().isBlank()) {
+            sb.append("\n- Chỉ dẫn đặc biệt từ người dùng: ").append(mascot.getCustomInstructions());
+        }
+        return sb.toString();
+    }
 
     private void checkRateLimit(String userId) {
         long currentMinute = Instant.now().getEpochSecond() / 60;
