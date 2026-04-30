@@ -217,7 +217,14 @@ class _StickerPickerState extends State<StickerPicker> {
 
   Widget _buildSmartImage(String url, bool isDarkMode) {
     if (url.isEmpty) return Icon(Icons.style, size: 24, color: isDarkMode ? DarkColors.textHint : Colors.black38);
-    final resolvedUrl = AvatarResolver.resolveUrl(url) ?? url;
+    
+    // If it's just an ID, resolve it via MediaService first
+    String rawUrl = url;
+    if (!url.contains('/') && !url.contains('.') && !url.startsWith('http')) {
+      rawUrl = context.read<MediaService>().getPublicUrl(url);
+    }
+    
+    final resolvedUrl = AvatarResolver.resolveUrl(rawUrl) ?? rawUrl;
     debugPrint('[StickerPicker] raw=$url => resolved=$resolvedUrl');
     final token = context.watch<AuthProvider>().accessToken;
 

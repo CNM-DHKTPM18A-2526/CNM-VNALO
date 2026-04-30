@@ -401,6 +401,11 @@ class ChatService {
     return list.map((m) => Message.fromJson(m)).toList();
   }
 
+  // Fetch latest messages for a conversation (limit-based).
+  Future<List<Message>> fetchLatestMessages(String conversationId, {int limit = 50}) async {
+    return getMessages(conversationId, limit: limit);
+  }
+
   // Send a message to a conversation
   Future<Message> sendMessage({
     required String conversationId,

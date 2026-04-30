@@ -60,6 +60,7 @@ class _IncomingCallCoordinatorState extends State<IncomingCallCoordinator> {
     if (!mounted) return;
 
     final type = signal['type']?.toString();
+    debugPrint('[IncomingCallCoordinator][GroupCall] Received event type=$type signal=$signal');
     if (type != 'started') return;
 
     final callId = signal['callId']?.toString();
@@ -76,15 +77,23 @@ class _IncomingCallCoordinatorState extends State<IncomingCallCoordinator> {
     _handledOffers.add(dedupeKey);
 
     final auth = context.read<AuthProvider>();
+    final chatProvider = context.read<ChatProvider>();
+    final socketService = context.read<SocketService>();
+
+    // CRITICAL: Force join conversation room to receive call signals
+    debugPrint('[IncomingCallCoordinator][GroupCall] Force joining room: $conversationId');
+    socketService.joinConversation(conversationId);
+
     if (!auth.isInitialized || auth.accessToken == null) {
       var checks = 0;
       while ((!auth.isInitialized || auth.accessToken == null) && checks < 8) {
         await Future.delayed(const Duration(milliseconds: 500));
+        if (!mounted) return;
         checks++;
       }
     }
 
-    final chatProvider = context.read<ChatProvider>();
+    if (!mounted) return;
     final convIndex = chatProvider.conversations.indexWhere(
       (c) => c.id == conversationId,
     );
@@ -98,7 +107,22 @@ class _IncomingCallCoordinatorState extends State<IncomingCallCoordinator> {
 
     if (!mounted) return;
 
-    debugPrint('[IncomingCallCoordinator][GroupCall] Showing group call banner for $convName');
+    // Resolve caller info
+    final senderUserId = signal['senderUserId']?.toString() ?? signal['fromUserId']?.toString();
+    String? callerName;
+    String? callerAvatarUrl;
+    if (conversation != null && senderUserId != null) {
+      for (final member in conversation.members) {
+        if (member.userId == senderUserId) {
+          callerName = member.nickname ?? member.user?.displayName;
+          callerAvatarUrl = member.user?.avatarUrl;
+          break;
+        }
+      }
+    }
+    callerName ??= signal['senderName']?.toString() ?? convName;
+
+    debugPrint('[IncomingCallCoordinator][GroupCall] Showing group call banner for $convName from $callerName');
 
     _isPresentingCall = true;
     try {
@@ -114,6 +138,8 @@ class _IncomingCallCoordinatorState extends State<IncomingCallCoordinator> {
             conversationAvatarUrl: conversation?.avatarUrl,
             audioOnly: audioOnly,
             isCaller: false,
+            callerName: callerName,
+            callerAvatarUrl: callerAvatarUrl,
           ),
         ),
       );
@@ -136,22 +162,31 @@ class _IncomingCallCoordinatorState extends State<IncomingCallCoordinator> {
     final callId = data['callId']?.toString();
     final conversationId = data['conversationId']?.toString();
     final senderUserId = data['senderId']?.toString();
-    final initialSdp = data['initialSdp'];
+    final isGroup = data['isGroup'] == true || data['isGroup'] == 'true';
     
-    if (callId == null || conversationId == null || senderUserId == null) return;
+    if (callId == null || conversationId == null) return;
 
-    debugPrint('[IncomingCallCoordinator] Handling CallKit acceptance for callID=$callId');
+    debugPrint('[IncomingCallCoordinator] Handling CallKit acceptance for callID=$callId (isGroup: $isGroup)');
 
-    // Reuse the same logic as foreground signal
-    final signal = {
-      'type': 'offer',
-      'callId': callId,
-      'conversationId': conversationId,
-      'senderUserId': senderUserId,
-      'sdp': initialSdp,
-    };
-    
-    await _handleSignalEvent(signal);
+    if (isGroup) {
+      final signal = {
+        'type': 'started',
+        'callId': callId,
+        'conversationId': conversationId,
+        'senderUserId': senderUserId,
+      };
+      await _handleGroupCallEvent(signal);
+    } else {
+      if (senderUserId == null) return;
+      final signal = {
+        'type': 'offer',
+        'callId': callId,
+        'conversationId': conversationId,
+        'senderUserId': senderUserId,
+        'sdp': data['initialSdp'],
+      };
+      await _handleSignalEvent(signal);
+    }
   }
 
 
@@ -179,11 +214,13 @@ class _IncomingCallCoordinatorState extends State<IncomingCallCoordinator> {
 
     // Wait for auth to be ready if needed, but be less strict
     final auth = context.read<AuthProvider>();
+    final chatProvider = context.read<ChatProvider>();
     if (!auth.isInitialized || auth.accessToken == null) {
       debugPrint('[IncomingCallCoordinator] Auth/Token not ready, waiting...');
       var checks = 0;
       while ((!auth.isInitialized || auth.accessToken == null) && checks < 8) {
         await Future.delayed(const Duration(milliseconds: 500));
+        if (!mounted) return;
         checks++;
       }
     }
@@ -214,8 +251,9 @@ class _IncomingCallCoordinatorState extends State<IncomingCallCoordinator> {
       return;
     }
 
+    if (!mounted) return;
+
     // Resolve caller display info
-    final chatProvider = context.read<ChatProvider>();
     final conversationIndex = chatProvider.conversations.indexWhere(
       (conversation) => conversation.id == conversationId,
     );

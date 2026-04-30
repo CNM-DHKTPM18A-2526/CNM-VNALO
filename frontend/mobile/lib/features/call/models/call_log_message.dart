@@ -15,6 +15,7 @@ class CallLogMessage {
   final CallOutcome outcome;
   final int durationSeconds;
   final DateTime createdAt;
+  final bool isGroup;
 
   const CallLogMessage({
     required this.callId,
@@ -25,6 +26,7 @@ class CallLogMessage {
     required this.outcome,
     required this.durationSeconds,
     required this.createdAt,
+    this.isGroup = false,
   });
 
   String toMessageContent() {
@@ -38,6 +40,7 @@ class CallLogMessage {
       'outcome': outcome.name,
       'durationSeconds': durationSeconds,
       'createdAt': createdAt.toIso8601String(),
+      'isGroup': isGroup,
     };
     return '$_prefix${jsonEncode(payload)}';
   }
@@ -45,6 +48,18 @@ class CallLogMessage {
   String toLocalizedText({required bool isMine}) {
     final incoming = !isMine;
     final isVideo = mediaType == CallMediaType.video;
+    
+    if (isGroup) {
+      final base = isVideo ? 'Cuộc gọi video nhóm' : 'Cuộc gọi thoại nhóm';
+      if (outcome == CallOutcome.answered) {
+        final minutes = durationSeconds ~/ 60;
+        final seconds = durationSeconds % 60;
+        final durationText = '($minutes:${seconds.toString().padLeft(2, '0')})';
+        return '$base $durationText';
+      }
+      return base;
+    }
+
     final base = isVideo ? 'Cuộc gọi video' : 'Cuộc gọi thoại';
 
     switch (outcome) {
@@ -110,6 +125,7 @@ class CallLogMessage {
         outcome: outcome,
         durationSeconds: (map['durationSeconds'] as num?)?.toInt() ?? 0,
         createdAt: DateTime.tryParse(map['createdAt'] ?? '') ?? DateTime.now(),
+        isGroup: map['isGroup'] == true,
       );
     } catch (e) {
       return null;

@@ -8,9 +8,14 @@ class GifService {
   // Chuyển đổi dữ liệu từ Media Service sang định dạng mà UI Chat đang mong đợi
   List<Map<String, dynamic>> _normalizeResults(List<Map<String, dynamic>> mediaList) {
     return mediaList.map((media) {
-      final url = media['url'] ?? '';
+      final id = media['id']?.toString() ?? media['mediaId']?.toString() ?? '';
+      
+      // Sử dụng ID để tạo URL công khai thông qua MediaService
+      // Điều này đáng tin cậy hơn là sử dụng trường 'url' từ backend vốn có thể là đường dẫn tương đối không hợp lệ
+      final url = _mediaService.getPublicUrl(id);
+      
       return {
-        'id': media['id'],
+        'id': id,
         'url': url,
         'media_formats': {
           'tinygif': {'url': url},

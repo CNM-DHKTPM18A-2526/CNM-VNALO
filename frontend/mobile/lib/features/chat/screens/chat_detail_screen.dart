@@ -17,11 +17,12 @@ import 'package:vnalo_mobile/core/utils/date_formatter.dart';
 import 'package:vnalo_mobile/features/chat/screens/chat_options_screen.dart';
 import 'package:vnalo_mobile/features/call/screens/video_call_screen.dart';
 import 'package:vnalo_mobile/features/call/screens/voice_call_screen.dart';
+import 'package:vnalo_mobile/features/call/screens/group_call_picker_screen.dart';
+import 'package:vnalo_mobile/features/call/widgets/active_call_banner.dart';
 import 'package:vnalo_mobile/features/call/utils/call_id_generator.dart';
 import 'package:vnalo_mobile/features/chat/screens/group_chat_options_screen.dart';
 import 'package:vnalo_mobile/features/chat/screens/reaction_detail_screen.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
-import 'package:vnalo_mobile/models/message_reaction_model.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:vnalo_mobile/core/utils/avatar_resolver.dart';
 import 'package:vnalo_mobile/features/chat/widgets/pinned_message_bar.dart';
@@ -265,8 +266,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 icon: const Icon(Icons.call_outlined, color: Colors.white),
                 onPressed: () {
                   if (!isDirect) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(common.callFlowPlaceholder)),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => GroupCallPickerScreen(conversation: conv),
+                      ),
                     );
                     return;
                   }
@@ -303,8 +307,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 icon: const Icon(Icons.videocam_outlined, color: Colors.white),
                 onPressed: () {
                   if (!isDirect) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(common.callFlowPlaceholder)),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => GroupCallPickerScreen(conversation: conv),
+                      ),
                     );
                     return;
                   }
@@ -376,6 +383,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     final rawItems = chat.getMessagesForConversation(conv.id);
                     _jumpToMessage(msgId, rawItems);
                   },
+                ),
+                ActiveCallBanner(
+                  conversationId: conv.id,
+                  conversationName: displayName,
+                  conversationAvatarUrl: avatarUrl,
                 ),
                 Expanded(
                   child: Builder(
@@ -498,6 +510,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                             return SystemMessage(
                               content: message.content ?? '',
                               timestamp: message.createdAt,
+                              conversationId: conv.id,
                             );
                           }
 

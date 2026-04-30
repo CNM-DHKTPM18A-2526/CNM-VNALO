@@ -28,6 +28,7 @@ import 'package:vnalo_mobile/features/timeline/providers/post_provider.dart';
 import 'package:vnalo_mobile/features/chat/providers/forward_provider.dart';
 import 'package:vnalo_mobile/features/profile/providers/avatar_cache_provider.dart';
 import 'package:vnalo_mobile/features/call/widgets/incoming_call_coordinator.dart';
+import 'package:vnalo_mobile/features/call/services/group_call_tracker.dart';
 import 'package:vnalo_mobile/services/notification_service.dart';
 import 'package:vnalo_mobile/services/ai_service.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
@@ -239,6 +240,9 @@ class VnaloApp extends StatelessWidget {
               // If we just logged out (oldId was set, newId is null), clear memory
               if (newId == null && oldId != null) {
                 currentChat.reset();
+              } else if (newId != null) {
+                // New user logged in - load inbox and start socket processing
+                currentChat.loadInbox();
               }
             }
             return currentChat;
@@ -256,6 +260,9 @@ class VnaloApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<NotificationProvider>(
           create: (context) => NotificationProvider(context.read<ApiService>()),
+        ),
+        ChangeNotifierProvider<GroupCallTracker>(
+          create: (_) => GroupCallTracker(),
         ),
       ],
       child: Consumer2<ThemeProvider, LanguageProvider>(
