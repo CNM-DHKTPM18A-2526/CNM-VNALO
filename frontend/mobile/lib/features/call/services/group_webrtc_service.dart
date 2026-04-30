@@ -38,7 +38,6 @@ class GroupWebRtcService extends ChangeNotifier {
   final String displayName;
   final bool audioOnly;
 
-  RTCPeerConnection? _localPeerConnection;
   MediaStream? _localStream;
   final Map<String, Participant> _participants = {};
   StreamSubscription<Map<String, dynamic>>? _groupCallSub;
@@ -48,11 +47,10 @@ class GroupWebRtcService extends ChangeNotifier {
   bool _isMuted = false;
   bool _isCameraOff = false;
   bool _isSpeakerOn = true;
-  bool _isScreenSharing = false;
   bool _isUsingFrontCamera = true;
+  bool _isAccepted = false;
   String? _errorMessage;
   DateTime? _connectedAt;
-  int _participantCount = 0;
 
   GroupWebRtcService({
     required SocketService socketService,
@@ -68,95 +66,95 @@ class GroupWebRtcService extends ChangeNotifier {
   bool get isMuted => _isMuted;
   bool get isCameraOff => _isCameraOff;
   bool get isSpeakerOn => _isSpeakerOn;
-  bool get isScreenSharing => _isScreenSharing;
   bool get isUsingFrontCamera => _isUsingFrontCamera;
   bool get isConnected => _connectedAt != null;
+  bool get isAccepted => _isAccepted;
   String? get errorMessage => _errorMessage;
   DateTime? get connectedAt => _connectedAt;
-  int get participantCount => _participantCount;
+  int get participantCount => _participants.values.where((p) => p.isConnected).length + 1;
   List<Participant> get participants => _participants.values.toList();
   MediaStream? get localStream => _localStream;
 
-  Future<void> initialize() async {
+  /// Start listening to socket signals without initializing media
+  void startSignalListening() {
+    if (_groupCallSub != null) return;
+    debugPrint('[GroupWebRtcService] Starting signal listening');
+    _groupCallSub = _socketService.onGroupCallSignal.listen(_onGroupSignalEvent);
+  }
+
+  /// Initialize as CALLER — start the call immediately
+  Future<void> initialize({List<String>? targetUserIds}) async {
     if (_isInitialized || _isEnded) return;
     _isInitialized = true;
+    _isAccepted = true; // Caller is always accepted
     _errorMessage = null;
     _isCameraOff = audioOnly;
     notifyListeners();
 
-    _groupCallSub = _socketService.onGroupCallSignal.listen(_onGroupSignalEvent);
+    startSignalListening();
 
     try {
-      final micStatus = await Permission.microphone.request();
-      if (micStatus.isDenied || micStatus.isPermanentlyDenied) {
-        throw 'Quyen micro bi tu choi';
-      }
-      if (!audioOnly) {
-        final camStatus = await Permission.camera.request();
-        if (camStatus.isDenied || camStatus.isPermanentlyDenied) {
-          throw 'Quyen camera bi tu choi';
-        }
-      }
-
-      final config = {
-        'iceServers': CallConfig.getIceServers(),
-        'sdpSemantics': 'unified-plan',
-      };
-      _localPeerConnection = await createPeerConnection(config);
-      _registerLocalCallbacks();
+      await _requestPermissions();
       await _openLocalMedia();
 
       _socketService.emitGroupCallStarted(
         conversationId: conversationId,
         callId: callId,
         audioOnly: audioOnly,
+        senderUserId: currentUserId,
+        senderName: displayName,
+        targetUserIds: targetUserIds,
       );
       await Helper.setSpeakerphoneOn(_isSpeakerOn);
-
-      _participantCount = 1;
       notifyListeners();
     } catch (e) {
-      _errorMessage = 'Khong the khoi tao cuoc goi nhom: $e';
+      _errorMessage = 'Không thể khởi tạo cuộc gọi nhóm: $e';
       debugPrint('[GroupWebRtcService] init error: $_errorMessage');
       _safeEnd();
     }
   }
 
-  void _registerLocalCallbacks() {
-    _localPeerConnection?.onTrack = (RTCTrackEvent event) {
-      if (event.streams.isEmpty) return;
-      // Find the participant that sent this track by checking peer connections
-      for (final p in _participants.values) {
-        p.remoteStream = event.streams.first;
-        p.isConnected = true;
-      }
-      _participantCount = _participants.values.where((p2) => p2.isConnected).length + 1;
+  /// Accept call as CALLEE — initialize media then join
+  Future<void> acceptCall() async {
+    if (_isAccepted || _isEnded) return;
+    _isAccepted = true;
+    _errorMessage = null;
+    _isCameraOff = audioOnly;
+    notifyListeners();
+
+    startSignalListening();
+
+    try {
+      await _requestPermissions();
+      await _openLocalMedia();
+
+      // Emit join signal so the caller knows we've joined
+      _socketService.emitGroupCallJoin(
+        conversationId: conversationId,
+        callId: callId,
+        senderUserId: currentUserId,
+        senderName: displayName,
+      );
+      await Helper.setSpeakerphoneOn(_isSpeakerOn);
       notifyListeners();
-    };
+    } catch (e) {
+      _errorMessage = 'Không thể tham gia cuộc gọi: $e';
+      debugPrint('[GroupWebRtcService] accept error: $_errorMessage');
+      _safeEnd();
+    }
+  }
 
-    _localPeerConnection?.onIceCandidate = (RTCIceCandidate candidate) {
-      if (candidate.candidate == null) return;
-      for (final p in _participants.values) {
-        _socketService.emitGroupCallIceCandidate(
-          conversationId: conversationId,
-          callId: callId,
-          targetUserId: p.odUserId,
-          candidate: {
-            'candidate': candidate.candidate,
-            'sdpMid': candidate.sdpMid,
-            'sdpMLineIndex': candidate.sdpMLineIndex,
-          },
-        );
+  Future<void> _requestPermissions() async {
+    final micStatus = await Permission.microphone.request();
+    if (micStatus.isDenied || micStatus.isPermanentlyDenied) {
+      throw 'Quyền micro bị từ chối';
+    }
+    if (!audioOnly) {
+      final camStatus = await Permission.camera.request();
+      if (camStatus.isDenied || camStatus.isPermanentlyDenied) {
+        throw 'Quyền camera bị từ chối';
       }
-    };
-
-    _localPeerConnection?.onConnectionState = (RTCPeerConnectionState state) {
-      debugPrint('[GroupWebRtc] connection state: $state');
-      if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
-        _connectedAt ??= DateTime.now();
-        notifyListeners();
-      }
-    };
+    }
   }
 
   Future<void> _openLocalMedia() async {
@@ -182,10 +180,58 @@ class GroupWebRtcService extends ChangeNotifier {
     };
 
     _localStream = await navigator.mediaDevices.getUserMedia(constraints);
-    for (final track in _localStream!.getTracks()) {
-      await _localPeerConnection?.addTrack(track, _localStream!);
-    }
     notifyListeners();
+  }
+
+  /// Create a PeerConnection for a specific participant and add local tracks
+  Future<RTCPeerConnection> _createPeerConnectionForParticipant(String odUserId) async {
+    final config = {
+      'iceServers': CallConfig.getIceServers(),
+      'sdpSemantics': 'unified-plan',
+    };
+
+    final pc = await createPeerConnection(config);
+
+    // *** CRITICAL: Add local tracks so the remote peer can see/hear us ***
+    if (_localStream != null) {
+      for (final track in _localStream!.getTracks()) {
+        await pc.addTrack(track, _localStream!);
+      }
+    }
+
+    pc.onTrack = (RTCTrackEvent event) {
+      if (event.streams.isNotEmpty) {
+        _participants[odUserId]?.remoteStream = event.streams.first;
+        _participants[odUserId]?.isConnected = true;
+        _connectedAt ??= DateTime.now();
+        notifyListeners();
+      }
+    };
+
+    pc.onIceCandidate = (RTCIceCandidate candidate) {
+      if (candidate.candidate == null) return;
+      _socketService.emitGroupCallIceCandidate(
+        conversationId: conversationId,
+        callId: callId,
+        targetUserId: odUserId,
+        candidate: {
+          'candidate': candidate.candidate,
+          'sdpMid': candidate.sdpMid,
+          'sdpMLineIndex': candidate.sdpMLineIndex,
+        },
+        senderUserId: currentUserId,
+      );
+    };
+
+    pc.onConnectionState = (RTCPeerConnectionState state) {
+      debugPrint('[GroupWebRtc] PC connection state for $odUserId: $state');
+      if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
+        _connectedAt ??= DateTime.now();
+        notifyListeners();
+      }
+    };
+
+    return pc;
   }
 
   Future<void> _onGroupSignalEvent(Map<String, dynamic> signal) async {
@@ -194,13 +240,15 @@ class GroupWebRtcService extends ChangeNotifier {
     if (type == null) return;
 
     final senderId = signal['senderUserId']?.toString() ?? signal['fromUserId']?.toString() ?? '';
+    debugPrint('[GroupWebRtcService][RECV] signal: $type from: $senderId (current: $currentUserId)');
+    
     if (senderId == currentUserId || senderId.isEmpty) return;
 
     switch (type) {
       case 'started':
-        await _handleParticipantJoined(senderId, signal);
-        break;
       case 'join':
+      case 'user-joined':
+        debugPrint('[GroupWebRtcService] Participant joining: $senderId');
         await _handleParticipantJoined(senderId, signal);
         break;
       case 'offer':
@@ -212,17 +260,37 @@ class GroupWebRtcService extends ChangeNotifier {
       case 'ice-candidate':
         await _handleIceCandidate(senderId, signal);
         break;
+      case 'user-left':
       case 'leave':
+        debugPrint('[GroupWebRtcService] Participant leaving: $senderId');
         _handleParticipantLeft(senderId);
         break;
       case 'ended':
+        debugPrint('[GroupWebRtcService] Call ended by server/caller');
         _safeEnd();
+        break;
+      case 'mute-state':
+        _handleMuteStateChange(senderId, signal);
         break;
     }
   }
 
+  void _handleMuteStateChange(String odUserId, Map<String, dynamic> signal) {
+    final p = _participants[odUserId];
+    if (p == null) return;
+    
+    if (signal.containsKey('isMuted')) {
+      p.isMuted = signal['isMuted'] == true;
+    }
+    if (signal.containsKey('isCameraOff')) {
+      p.isCameraOff = signal['isCameraOff'] == true;
+    }
+    notifyListeners();
+  }
+
   Future<void> _handleParticipantJoined(String odUserId, Map<String, dynamic> signal) async {
     if (_participants.containsKey(odUserId)) return;
+    if (!_isAccepted) return; // Don't create PC if we haven't accepted yet
 
     final participant = Participant(
       odUserId: odUserId,
@@ -230,46 +298,13 @@ class GroupWebRtcService extends ChangeNotifier {
       avatarUrl: signal['senderAvatarUrl']?.toString(),
     );
     _participants[odUserId] = participant;
-    _participantCount = _participants.length + 1;
     notifyListeners();
 
-    final pc = await createPeerConnection({
-      'iceServers': CallConfig.getIceServers(),
-      'sdpSemantics': 'unified-plan',
-    });
+    // Create PC with local tracks attached
+    final pc = await _createPeerConnectionForParticipant(odUserId);
     _participants[odUserId]!.peerConnection = pc;
-    _participants[odUserId]!.isConnected = false;
 
-    // CRITICAL: Add local tracks so the remote participant can receive our audio/video
-    if (_localStream != null) {
-      for (final track in _localStream!.getTracks()) {
-        await pc.addTrack(track, _localStream!);
-      }
-    }
-
-    pc.onTrack = (event) {
-      if (event.streams.isNotEmpty) {
-        _participants[odUserId]!.remoteStream = event.streams.first;
-        _participants[odUserId]!.isConnected = true;
-        _participantCount = _participants.values.where((p2) => p2.isConnected).length + 1;
-        notifyListeners();
-      }
-    };
-
-    pc.onIceCandidate = (candidate) {
-      if (candidate.candidate == null) return;
-      _socketService.emitGroupCallIceCandidate(
-        conversationId: conversationId,
-        callId: callId,
-        targetUserId: odUserId,
-        candidate: {
-          'candidate': candidate.candidate,
-          'sdpMid': candidate.sdpMid,
-          'sdpMLineIndex': candidate.sdpMLineIndex,
-        },
-      );
-    };
-
+    // As the existing party, create and send offer
     final offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
 
@@ -278,10 +313,13 @@ class GroupWebRtcService extends ChangeNotifier {
       callId: callId,
       targetUserId: odUserId,
       sdp: {'type': offer.type, 'sdp': offer.sdp},
+      senderUserId: currentUserId,
     );
   }
 
   Future<void> _handleOffer(String odUserId, Map<String, dynamic> signal) async {
+    if (!_isAccepted) return;
+
     var participant = _participants[odUserId];
     if (participant == null) {
       participant = Participant(
@@ -293,44 +331,9 @@ class GroupWebRtcService extends ChangeNotifier {
       notifyListeners();
     }
 
-    final pc = await createPeerConnection({
-      'iceServers': CallConfig.getIceServers(),
-      'sdpSemantics': 'unified-plan',
-    });
-
-    // CRITICAL: Add local tracks so the remote participant can receive our audio/video
-    if (_localStream != null) {
-      for (final track in _localStream!.getTracks()) {
-        await pc.addTrack(track, _localStream!);
-      }
-    }
-
-    // Assign to map entry directly to avoid nullable warning
+    // Create PC with local tracks attached
+    final pc = await _createPeerConnectionForParticipant(odUserId);
     _participants[odUserId]!.peerConnection = pc;
-    _participants[odUserId]!.isConnected = false;
-
-    pc.onTrack = (event) {
-      if (event.streams.isNotEmpty) {
-        _participants[odUserId]!.remoteStream = event.streams.first;
-        _participants[odUserId]!.isConnected = true;
-        _participantCount = _participants.values.where((p2) => p2.isConnected).length + 1;
-        notifyListeners();
-      }
-    };
-
-    pc.onIceCandidate = (candidate) {
-      if (candidate.candidate == null) return;
-      _socketService.emitGroupCallIceCandidate(
-        conversationId: conversationId,
-        callId: callId,
-        targetUserId: odUserId,
-        candidate: {
-          'candidate': candidate.candidate,
-          'sdpMid': candidate.sdpMid,
-          'sdpMLineIndex': candidate.sdpMLineIndex,
-        },
-      );
-    };
 
     final sdpMap = Map<String, dynamic>.from(signal['sdp'] ?? {});
     await pc.setRemoteDescription(
@@ -345,12 +348,12 @@ class GroupWebRtcService extends ChangeNotifier {
       callId: callId,
       targetUserId: odUserId,
       sdp: {'type': answer.type, 'sdp': answer.sdp},
+      senderUserId: currentUserId,
     );
   }
 
   Future<void> _handleAnswer(String odUserId, Map<String, dynamic> signal) async {
-    final participant = _participants[odUserId];
-    final pc = participant?.peerConnection;
+    final pc = _participants[odUserId]?.peerConnection;
     if (pc == null) return;
 
     final sdpMap = Map<String, dynamic>.from(signal['sdp'] ?? {});
@@ -360,8 +363,7 @@ class GroupWebRtcService extends ChangeNotifier {
   }
 
   Future<void> _handleIceCandidate(String odUserId, Map<String, dynamic> signal) async {
-    final participant = _participants[odUserId];
-    final pc = participant?.peerConnection;
+    final pc = _participants[odUserId]?.peerConnection;
     if (pc == null) return;
 
     final candidateMap = Map<String, dynamic>.from(signal['candidate'] ?? {});
@@ -380,7 +382,6 @@ class GroupWebRtcService extends ChangeNotifier {
   void _handleParticipantLeft(String odUserId) {
     _participants[odUserId]?.peerConnection?.close();
     _participants.remove(odUserId);
-    _participantCount = _participants.values.where((p) => p.isConnected).length + 1;
     notifyListeners();
   }
 
@@ -430,9 +431,10 @@ class GroupWebRtcService extends ChangeNotifier {
   Future<void> endCall() async {
     if (_isEnded) return;
     _isEnded = true;
-    _socketService.emitGroupCallEnded(
+    _socketService.emitGroupCallLeave(
       conversationId: conversationId,
       callId: callId,
+      senderUserId: currentUserId,
     );
     _safeEnd();
   }
@@ -440,12 +442,10 @@ class GroupWebRtcService extends ChangeNotifier {
   void _safeEnd() {
     _isEnded = true;
     _groupCallSub?.cancel();
-    _localPeerConnection?.close();
     for (final p in _participants.values) {
       p.peerConnection?.close();
     }
     _participants.clear();
-    _localPeerConnection = null;
     final tracks = _localStream?.getTracks() ?? [];
     for (final t in tracks) {
       t.stop();

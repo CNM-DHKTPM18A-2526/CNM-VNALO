@@ -46,7 +46,7 @@ class GroupMembersScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: isDarkMode ? DarkColors.scaffold : const Color(0xFFF4F5F7),
       appBar: AppBar(
-        title: Text('Thành viên (${activeMembers.length})', 
+        title: Text('Thành viên (${activeMembers.length})',
           style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w600)),
         flexibleSpace: Container(
           decoration: BoxDecoration(
@@ -54,6 +54,14 @@ class GroupMembersScreen extends StatelessWidget {
             color: isDarkMode ? DarkColors.appBarBg : null,
           ),
         ),
+        actions: [
+          if (isOwnerOrAdmin)
+            IconButton(
+              icon: const Icon(Icons.person_add, color: Colors.white),
+              onPressed: () => _addMembers(context, conv),
+              tooltip: 'Thêm thành viên',
+            ),
+        ],
       ),
       body: ListView.builder(
         itemCount: sortedMembers.length,
@@ -70,6 +78,8 @@ class GroupMembersScreen extends StatelessWidget {
                     imageUrl: member.user?.avatarUrl,
                     name: member.user?.displayName ?? member.nickname ?? 'User',
                     size: 44,
+                    showOnline: member.user != null,
+                    isOnline: member.user?.isOnline ?? false,
                   ),
                   title: Text(
                     isSelf ? '${member.user?.displayName ?? 'Bạn'} (Bạn)' : (member.user?.displayName ?? 'Người dùng'),
@@ -188,6 +198,20 @@ class GroupMembersScreen extends StatelessWidget {
             child: const Text('Đồng ý'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _addMembers(BuildContext context, Conversation conv) {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (ctx) => CupertinoActionSheet(
+        title: const Text('Thêm thành viên'),
+        message: const Text('Tính năng thêm thành viên đang được phát triển. Vui lòng sử dụng mã lời mời để thêm thành viên vào nhóm.'),
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Đóng'),
+        ),
       ),
     );
   }

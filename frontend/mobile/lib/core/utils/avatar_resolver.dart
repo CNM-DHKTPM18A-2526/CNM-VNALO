@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:vnalo_mobile/config/app_config.dart';
 
 /// Centralized avatar URL resolver.
@@ -19,14 +20,32 @@ class AvatarResolver {
   /// Checks if [url] points to the internal media service.
   static bool isInternalUrl(String? url) {
     if (url == null || url.isEmpty) return false;
-    
-    // Relative paths are always internal
+    final isInternal = _checkIsInternal(url);
+    debugPrint('[MEDIA] 🔍 isInternalUrl: $url => $isInternal');
+    return isInternal;
+  }
+
+  static bool _checkIsInternal(String url) {
     if (url.startsWith('/')) return true;
+
+    // S3 and other cloud storage URLs are public - no auth needed
+    if (url.contains('amazonaws.com') || 
+        url.contains('s3.') ||
+        url.contains('cloudfront.net') ||
+        url.contains('digitaloceanspaces.com')) {
+      return false;
+    }
 
     if (!AppConfig.isInitialized) return false;
     
     final mediaBase = AppConfig.instance.mediaServiceUrl.replaceAll(RegExp(r'/+$'), '');
     final normalizedUrl = url.replaceAll(RegExp(r'/+$'), '');
+
+    // Public routes don't need authentication even if they are on our server
+    if (normalizedUrl.contains('/media/public/') || 
+        normalizedUrl.contains('/media/public-file')) {
+      return false;
+    }
 
     if (normalizedUrl.startsWith(mediaBase)) return true;
 
@@ -50,6 +69,15 @@ class AvatarResolver {
   /// * Already has scheme (http/https) ➜ passthrough
   /// * Relative path (e.g. `/media/abc.jpg`) ➜ prepend media-service host
   static String? resolveUrl(String? raw) {
+    final value = raw?.trim();
+    if (value == null || value.isEmpty) return null;
+
+    final resolved = _doResolve(value);
+    debugPrint('[MEDIA] 🔗 Resolve: $value => $resolved');
+    return resolved;
+  }
+
+  static String? _doResolve(String? raw) {
     final value = raw?.trim();
     if (value == null || value.isEmpty) return null;
 
@@ -124,16 +152,10 @@ class AvatarResolver {
   }
 
   static String _normalizeSaveUrl(String input) {
-    // Proactively convert /public/ to /save/ if it's an internal media request.
-    // This allows us to use authenticated endpoints which are more reliable
-    // than anonymous public endpoints on restricted servers.
-    final publicMatch = _publicUrlPattern.firstMatch(input);
-    if (publicMatch != null) {
-      final prefix = publicMatch.group(1)!;
-      final mediaId = publicMatch.group(2)!;
-      final query = publicMatch.group(3) != null ? '?${publicMatch.group(3)}' : '';
-      return '$prefix$mediaId/save$query';
-    }
+    // NOTE: Do NOT convert /public/ to /save/ anymore.
+    // The /save endpoint returns 403 because it requires different auth mechanism.
+    // Public URLs from the server are already accessible without auth.
+    // Let them pass through as-is.
     return input;
   }
 }

@@ -643,6 +643,10 @@ class MessageBubble extends StatelessWidget {
 
 
   String _callLogTitle(CallLogMessage callLog, bool incoming, bool isVideo) {
+    if (callLog.isGroup) {
+      return isVideo ? 'Cuộc gọi video nhóm' : 'Cuộc gọi thoại nhóm';
+    }
+
     final base = isVideo ? 'Cuộc gọi video' : 'Cuộc gọi thoại';
 
     switch (callLog.outcome) {
@@ -825,8 +829,24 @@ class MessageBubble extends StatelessWidget {
                       httpHeaders: (token != null && AvatarResolver.isInternalUrl(resolvedUrl))
                           ? {'Authorization': 'Bearer $token'}
                           : const {},
-                      placeholder: (context, url) => Container(color: Colors.grey.shade200),
-                      errorWidget: (context, url, error) => const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
+                      placeholder: (context, url) => Container(
+                        color: isDarkMode ? Colors.white10 : Colors.grey.shade100,
+                        child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                      ),
+                      errorWidget: (context, url, error) {
+                        debugPrint('[MEDIA] ❌ Load Failed: $url - Error: $error');
+                        return Container(
+                          color: isDarkMode ? Colors.white10 : Colors.grey.shade100,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.broken_image_outlined, color: Colors.grey, size: 32),
+                              if (isDarkMode) const SizedBox(height: 4),
+                              const Text('Lỗi tải ảnh', style: TextStyle(color: Colors.grey, fontSize: 10)),
+                            ],
+                          ),
+                        );
+                      },
                     ),
           );
         },
@@ -846,15 +866,41 @@ class MessageBubble extends StatelessWidget {
 
   Widget _buildImage(BuildContext context) {
     final rawUrl = message.mediaUrl ?? '';
-    if (rawUrl.isEmpty) return const SizedBox.shrink();
+    debugPrint('[_buildImage] msgId=${message.id} type=${message.messageType} rawUrl="$rawUrl" content="${message.content}"');
+    if (rawUrl.isEmpty) {
+      debugPrint('[_buildImage] ⚠️ rawUrl is EMPTY, checking content="${message.content}"');
+      return const SizedBox.shrink();
+    }
 
-    final isLocal = rawUrl.startsWith('/') || rawUrl.contains('Users') || rawUrl.contains('storage');
-    final url = isLocal ? rawUrl : (AvatarResolver.resolveUrl(rawUrl) ?? rawUrl);
-    final isGif = !isLocal && _isGifUrl(rawUrl);
+    // Check if it's a real local file path (mobile storage paths)
+    final isLocalFile = rawUrl.startsWith('/data/') || 
+                        rawUrl.startsWith('/var/') ||
+                        rawUrl.startsWith('file://') ||
+                        (rawUrl.contains('/storage/emulated/') && !rawUrl.contains('/api/')) ||
+                        (rawUrl.contains('Users/') && Platform.isIOS) ||
+                        (rawUrl.contains('DCIM/') || rawUrl.contains('Pictures/') && Platform.isIOS);
+    
+    // Determine if we should use file or network loading
+    final useLocalFile = isLocalFile && File(rawUrl.replaceFirst('file://', '')).existsSync();
+    
+    // If it's just an ID and not local, resolve it via MediaService pattern
+    String resolvedRaw = rawUrl;
+    if (!useLocalFile && !rawUrl.contains('/') && !rawUrl.contains('.') && !rawUrl.startsWith('http')) {
+      // We don't have direct access to MediaService here easily without context.read,
+      // but we know the pattern from MediaService.getPublicUrl.
+      // However, AvatarResolver.resolveUrl already handles prepending the base.
+      // We just need to make sure it has the /media/public/ prefix if it's an ID.
+      resolvedRaw = '/media/public/$rawUrl';
+    }
+
+    final url = useLocalFile ? rawUrl.replaceFirst('file://', '') : (AvatarResolver.resolveUrl(resolvedRaw) ?? resolvedRaw);
+    final isGif = !useLocalFile && _isGifUrl(url);
 
     // GIF hiển thị nhỏ gọn (160×160), ảnh thường thì full width
     final double maxW = isGif ? 160 : MediaQuery.of(context).size.width * 0.75;
     final double maxH = isGif ? 160 : 300;
+
+    debugPrint('[_buildImage] rawUrl=$rawUrl isLocalFile=$isLocalFile useLocalFile=$useLocalFile resolvedUrl=$url');
 
     return GestureDetector(
       onTap: () {
@@ -864,7 +910,7 @@ class MessageBubble extends StatelessWidget {
             builder:
                 (_) => FullScreenImageViewer(
                   imageUrl: url,
-                  isLocal: isLocal,
+                  isLocal: useLocalFile,
                   accessToken: auth.accessToken,
                 ),
           ),
@@ -879,8 +925,8 @@ class MessageBubble extends StatelessWidget {
           ),
           clipBehavior: Clip.antiAlias,
           child:
-              isLocal
-                  ? Image.file(File(rawUrl), fit: BoxFit.cover)
+              useLocalFile
+                  ? Image.file(File(url), fit: BoxFit.cover)
                   : CachedNetworkImage(
                     imageUrl: url,
                     fit: isGif ? BoxFit.contain : BoxFit.cover,
@@ -892,7 +938,10 @@ class MessageBubble extends StatelessWidget {
                       width: isGif ? 160 : 200,
                       height: isGif ? 160 : 200,
                     ),
-                    errorWidget: (context, url, error) => const Icon(Icons.error),
+                    errorWidget: (context, url, error) => Container(
+                      color: Colors.grey.shade200,
+                      child: const Icon(Icons.broken_image, color: Colors.grey),
+                    ),
                   ),
         ),
       ),
@@ -977,14 +1026,20 @@ class MessageBubble extends StatelessWidget {
   }
 
   Widget _buildSticker(BuildContext context) {
-    final url = message.mediaUrl ?? '';
-    if (url.isEmpty) return const SizedBox.shrink();
+    final rawUrl = message.mediaUrl ?? '';
+    if (rawUrl.isEmpty) return const SizedBox.shrink();
     
+    final url = AvatarResolver.resolveUrl(rawUrl) ?? rawUrl;
+    final token = context.read<AuthProvider>().accessToken;
+
     return SizedBox(
       width: 120,
       height: 120,
       child: CachedNetworkImage(
         imageUrl: url,
+        httpHeaders: (token != null && AvatarResolver.isInternalUrl(url))
+            ? {'Authorization': 'Bearer $token'}
+            : const {},
         placeholder: (context, url) => const SizedBox.shrink(),
         errorWidget: (context, url, error) => const Icon(Icons.error),
       ),
