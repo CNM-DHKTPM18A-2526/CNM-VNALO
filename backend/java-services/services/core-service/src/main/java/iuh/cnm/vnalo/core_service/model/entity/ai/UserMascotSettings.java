@@ -1,11 +1,9 @@
 package iuh.cnm.vnalo.core_service.model.entity.ai;
 
-import iuh.cnm.vnalo.core_service.model.entity.base.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
-
 import java.util.Map;
 import java.util.UUID;
 
@@ -16,7 +14,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class UserMascotSettings extends BaseEntity {
+public class UserMascotSettings {
 
     @Id
     @Column(name = "user_id")
