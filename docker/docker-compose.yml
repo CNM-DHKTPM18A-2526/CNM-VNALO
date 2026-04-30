@@ -465,14 +465,15 @@ services:
           memory: 1G
           cpus: "1.0"
 
-  nginx:
-    image: nginx:alpine
+  frontend-web:
+    build:
+      context: ../frontend/web
+      dockerfile: Dockerfile
     restart: unless-stopped
     ports:
       - "80:80"
     volumes:
       - ../nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ../frontend/web/dist:/usr/share/nginx/html:ro
     depends_on:
       - core-service
       - message-service
