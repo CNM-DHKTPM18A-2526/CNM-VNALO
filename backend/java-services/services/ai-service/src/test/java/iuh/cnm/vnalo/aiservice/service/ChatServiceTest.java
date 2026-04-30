@@ -40,12 +40,14 @@ class ChatServiceTest {
     private StringRedisTemplate redisTemplate;
     @Mock
     private ValueOperations<String, String> valueOperations;
+    @Mock
+    private CoreServiceClient coreServiceClient;
 
     private ChatService chatService;
 
     @BeforeEach
     void setUp() {
-        chatService = new ChatService(geminiProvider, ollamaProvider, redisTemplate);
+        chatService = new ChatService(geminiProvider, ollamaProvider, redisTemplate, coreServiceClient);
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
         ReflectionTestUtils.setField(chatService, "rateLimitPerUser", 5);

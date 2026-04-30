@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { sendRegisterOtp, register as registerAccount } from '../features/auth/auth.api'
@@ -6,7 +6,6 @@ import type { Gender } from '../features/auth/auth.types'
 import { OtpCodeInput } from '../features/auth/components/OtpCodeInput'
 import { isNormalizedVietnamPhone, normalizeVietnamPhone } from '../features/auth/phone.util'
 import { validatePassword } from '../features/auth/password.util'
-import { PasswordToggleIcon } from '../features/settings/SettingsModalContent'
 import { useLanguage } from '../shared/i18n/LanguageContext'
 
 type RegisterStep = 'form' | 'otp'
@@ -52,7 +51,7 @@ function isAtLeastAge(dobIso: string, minAge: number, referenceDate = new Date()
   return age >= minAge
 }
 
-function validateRegisterForm(values: RegisterFormState, t: (key: string) => string): RegisterErrors {
+function validateRegisterForm(values: RegisterFormState): RegisterErrors {
   const errors: RegisterErrors = {}
   const normalizedPhone = normalizeVietnamPhone(values.phone)
   const normalizedEmail = values.email.trim().toLowerCase()
@@ -110,7 +109,7 @@ export function RegisterPage() {
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault()
-    const nextErrors = validateRegisterForm(form, t)
+    const nextErrors = validateRegisterForm(form)
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
 

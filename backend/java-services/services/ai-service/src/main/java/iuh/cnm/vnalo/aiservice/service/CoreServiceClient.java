@@ -23,6 +23,12 @@ public class CoreServiceClient {
         try {
             String url = coreServiceUrl + "/api/v1/ai/mascot/internal/settings?userId=" + userId;
             return restTemplate.getForObject(url, MascotSettingsDTO.class);
+        } catch (Exception e) {
+            log.warn("Failed to fetch mascot settings for user {}: {}", userId, e.getMessage());
+            return null;
+        }
+    }
+
     public void saveChatHistory(String userId, String conversationId, java.util.List<java.util.Map<String, String>> messages) {
         try {
             String url = coreServiceUrl + "/api/v1/ai/internal/history";
