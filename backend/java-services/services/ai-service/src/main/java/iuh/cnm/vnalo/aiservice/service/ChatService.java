@@ -107,8 +107,18 @@ public class ChatService {
 
         // 7. Persist to Postgres (Async-like via internal API)
         java.util.List<java.util.Map<String, String>> messagesToSave = new java.util.ArrayList<>();
-        messagesToSave.add(java.util.Map.of("role", "user", "content", message));
-        messagesToSave.add(java.util.Map.of("role", "assistant", "content", answer, "provider", provider));
+        
+        java.util.Map<String, String> userMsg = new java.util.HashMap<>();
+        userMsg.put("role", "user");
+        userMsg.put("content", message);
+        messagesToSave.add(userMsg);
+        
+        java.util.Map<String, String> assistantMsg = new java.util.HashMap<>();
+        assistantMsg.put("role", "assistant");
+        assistantMsg.put("content", answer);
+        assistantMsg.put("provider", provider != null ? provider : "unknown");
+        messagesToSave.add(assistantMsg);
+        
         coreServiceClient.saveChatHistory(userId, convId, messagesToSave);
 
         // 8. Save answer to history (Redis)
