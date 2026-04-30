@@ -4,6 +4,7 @@ import { Outlet, useLocation } from 'react-router-dom'
 import { Sidebar } from '../shared/components/Sidebar'
 import { Topbar } from '../shared/components/Topbar'
 import { SettingsModal } from '../features/settings/SettingsModal'
+import { ScreenCaptureModal } from '../features/chat/components/ScreenCaptureModal'
 import { useAuth } from '../features/auth/useAuth'
 import { useLanguage } from '../shared/i18n/LanguageContext'
 
@@ -16,6 +17,7 @@ export function MainLayout() {
   const isDocumentsPage = location.pathname.startsWith('/documents')
   const shouldShowTopbar = !isChatWorkspace && !isContactsPage && !isDocumentsPage
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
+  const [isCaptureModalOpen, setIsCaptureModalOpen] = useState(false)
 
   const title = useMemo(() => {
     const titleMap: Record<string, string> = {
@@ -48,9 +50,19 @@ export function MainLayout() {
     logout()
   }
 
+  const handleOpenCapture = () => {
+    setIsCaptureModalOpen(true)
+  }
+
+  const handleSendCapture = (file: File) => {
+    console.log('Capture file to send:', file)
+    // Here we would ideally find the current chat and send the file
+    // For now, we just show a placeholder log
+  }
+
   return (
     <div className='app-shell'>
-      <Sidebar onOpenSettingsModal={handleOpenSettings} />
+      <Sidebar onOpenSettingsModal={handleOpenSettings} onOpenCaptureModal={handleOpenCapture} />
       <section className='workspace'>
         {shouldShowTopbar ? (
           <Topbar
@@ -75,6 +87,7 @@ export function MainLayout() {
       </section>
 
       <SettingsModal isOpen={isSettingsModalOpen} onClose={handleCloseSettings} onChangePasswordSuccess={handleChangePasswordSuccess} />
+      <ScreenCaptureModal isOpen={isCaptureModalOpen} onClose={() => setIsCaptureModalOpen(false)} onSend={handleSendCapture} />
     </div>
   )
 }

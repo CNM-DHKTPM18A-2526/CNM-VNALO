@@ -109,10 +109,11 @@ class NotificationService {
     final data = message.data;
     final type = data['type']?.toString();
     
-    if (type == 'call_offer') {
+    if (type == 'call_offer' || type == 'group_call_started') {
+      final isGroup = type == 'group_call_started';
       final callId = data['callId']?.toString() ?? const Uuid().v4();
       final conversationId = data['conversationId']?.toString() ?? '';
-      final senderName = data['senderName']?.toString() ?? 'VNALO Call';
+      final senderName = data['senderName']?.toString() ?? (isGroup ? 'Cuộc gọi nhóm' : 'VNALO Call');
       final senderAvatar = data['senderAvatar']?.toString();
       final audioOnly = data['audioOnly']?.toString() == 'true';
 
@@ -121,7 +122,7 @@ class NotificationService {
         nameCaller: senderName,
         appName: 'VNALO',
         avatar: senderAvatar,
-        handle: 'VNALO',
+        handle: isGroup ? 'Cuộc gọi nhóm' : 'VNALO',
         type: audioOnly ? 0 : 1, // 0: Audio, 1: Video
         duration: 30000,
         textAccept: 'Trả lời',
@@ -137,6 +138,7 @@ class NotificationService {
           'callId': callId,
           'senderId': data['senderUserId']?.toString(),
           'initialSdp': data['sdp'],
+          'isGroup': isGroup,
         },
         android: const AndroidParams(
           isCustomNotification: true,

@@ -1,11 +1,22 @@
-import { useEffect, useState } from 'react'
-import { getUserById } from '../../friends/friends.api'
+import { useEffect, useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
+import {
+  checkFriendshipStatus,
+  getIncomingFriendRequests,
+  getSentFriendRequests,
+  getUserById,
+  sendFriendRequest,
+} from '../../friends/friends.api'
 import type { UserLookupResult } from '../../friends/friends.types'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { LoadingState } from '../../../shared/components/LoadingState'
 import { UserAvatar } from '../../../shared/components/UserAvatar'
 import { EmptyState } from '../../../shared/components/EmptyState'
+import { Button } from '../../../shared/components/ui/Button'
 import { useUserStore } from '../context/UserStoreContext'
+import { useAuth } from '../../auth/useAuth'
+
+type RelationState = 'none' | 'already-friend' | 'incoming' | 'sent' | 'self'
 
 interface UserProfileModalProps {
   isOpen: boolean
@@ -20,8 +31,11 @@ interface UserProfileModalProps {
     email?: string | null
     gender?: string | null
     dob?: string | null
+    coverUrl?: string | null
+    statusMessage?: string | null
   }
   onMessage?: (user: UserLookupResult) => void
+  onCompleted?: () => void | Promise<void>
 }
 
 export function UserProfileModal({
@@ -31,22 +45,76 @@ export function UserProfileModal({
   accessToken,
   initialUser,
   onMessage,
+  onCompleted,
 }: UserProfileModalProps) {
+  const { user: currentUser } = useAuth()
   const { upsertUser } = useUserStore()
+  const navigate = useNavigate()
+
   const [profile, setProfile] = useState<Partial<UserLookupResult> | null>(null)
+  const [relation, setRelation] = useState<RelationState>('none')
   const [isLoading, setIsLoading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  
+  const [isComposingFriendRequest, setIsComposingFriendRequest] = useState(false)
+  const [requestMessage, setRequestMessage] = useState('Xin chào, mình muốn kết bạn với bạn.')
 
   // 1. Reset state when modal closes
   useEffect(() => {
     if (!isOpen) {
       setProfile(null)
+      setRelation('none')
       setError(null)
       setIsLoading(false)
+      setIsComposingFriendRequest(false)
+      setRequestMessage('Xin chào, mình muốn kết bạn với bạn.')
     }
   }, [isOpen])
 
-  // 2. Initialize profile when userId or initialUser changes
+  const getRelationForUser = useCallback(async (targetUserId: string): Promise<RelationState> => {
+    if (!accessToken) {
+      return 'none'
+    }
+
+    if (currentUser?.id === targetUserId) {
+      return 'self'
+    }
+
+    try {
+      const [friendshipStatus, incomingRequests, sentRequests] = await Promise.all([
+        checkFriendshipStatus(accessToken, targetUserId),
+        getIncomingFriendRequests(accessToken),
+        getSentFriendRequests(accessToken),
+      ])
+
+      if (friendshipStatus.areFriends) {
+        return 'already-friend'
+      }
+
+      const incoming = incomingRequests.find((item) => item.fromUserId === targetUserId && item.status === 'PENDING')
+      if (incoming) {
+        return 'incoming'
+      }
+
+      const sent = sentRequests.find((item) => item.toUserId === targetUserId && item.status === 'PENDING')
+      if (sent) {
+        return 'sent'
+      }
+
+      return 'none'
+    } catch (err) {
+      console.error('[ProfileModal] Failed to check relation:', err)
+      return 'none'
+    }
+  }, [accessToken, currentUser?.id])
+
+  const resolveRelationship = useCallback(async (targetUserId: string) => {
+    const relationState = await getRelationForUser(targetUserId)
+    setRelation(relationState)
+  }, [getRelationForUser])
+
+  // 2. Initialize profile and check relation
   useEffect(() => {
     if (!isOpen || !userId) return
 
@@ -54,22 +122,23 @@ export function UserProfileModal({
       id: userId,
       displayName: initialUser?.displayName || 'Người dùng',
       avatarUrl: initialUser?.avatarUrl || null,
-      bio: initialUser?.bio,
+      bio: initialUser?.bio || initialUser?.statusMessage,
       phone: initialUser?.phone,
       email: initialUser?.email,
       gender: initialUser?.gender,
       dob: initialUser?.dob,
+      coverUrl: initialUser?.coverUrl,
     })
-  }, [isOpen, userId, initialUser])
 
-  // 3. Trigger fetch if full details (bio, phone, email) are missing
+    void resolveRelationship(userId)
+  }, [isOpen, userId, initialUser, resolveRelationship])
+
+  // 3. Trigger fetch if details are missing
   useEffect(() => {
     if (!isOpen || !userId || !accessToken) return
 
-    // Trigger fetch if ANY extended field is missing
-    const hasExtendedInfo = !!(initialUser?.bio || initialUser?.phone || initialUser?.email)
-
-    if (!hasExtendedInfo) {
+    const hasFullInfo = !!(initialUser?.phone && initialUser?.email)
+    if (!hasFullInfo) {
       void fetchProfile(accessToken, userId)
     }
   }, [isOpen, userId, accessToken, initialUser])
@@ -79,9 +148,7 @@ export function UserProfileModal({
     setError(null)
     try {
       const data = await getUserById(token, id)
-      console.log('[ProfileModal] API response:', data)
       if (data) {
-        // Handle field name mismatches between backend and frontend
         const mappedData: Partial<UserLookupResult> = {
           ...data,
           dob: data.dob || (data as any).dateOfBirth || null,
@@ -93,14 +160,12 @@ export function UserProfileModal({
           ...mappedData,
         }))
         
-        // Sync back to global user cache
         upsertUser(id, {
           displayName: data.displayName?.trim() || data.phone || data.email || 'Người dùng',
           avatarUrl: data.avatarUrl ?? null,
         })
       }
     } catch (err) {
-      console.error('[UserProfileModal] Fetch failed:', err)
       setError('Không thể tải thông tin người dùng')
     } finally {
       setIsLoading(false)
@@ -120,6 +185,31 @@ export function UserProfileModal({
     }
   }
 
+  const handleSendFriendRequest = async () => {
+    if (!accessToken || !profile?.id) return
+
+    setIsSubmitting(true)
+    setError(null)
+
+    try {
+      await sendFriendRequest(accessToken, {
+        toUserId: profile.id,
+        message: requestMessage,
+        source: 'SEARCH',
+      })
+
+      setRelation('sent')
+      setIsComposingFriendRequest(false)
+      if (onCompleted) {
+        await onCompleted()
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không thể gửi lời mời kết bạn')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   return (
     <Modal
       isOpen={isOpen}
@@ -132,15 +222,12 @@ export function UserProfileModal({
         </div>
       ) : profile ? (
         <div className="contacts-profile-modal">
-          {profile.coverUrl ? (
-            <img 
-              alt={profile.displayName ?? 'Người dùng'} 
-              className="contacts-profile-cover" 
-              src={profile.coverUrl} 
-            />
-          ) : (
-            <div className="contacts-profile-cover-fallback" />
-          )}
+          <div 
+            className={`contacts-profile-cover${profile.coverUrl ? ' contacts-profile-cover-image' : ''}`}
+            style={profile.coverUrl ? { backgroundImage: `url(${profile.coverUrl})` } : undefined}
+          >
+            {!profile.coverUrl && <div className="contacts-profile-cover-fallback" />}
+          </div>
           
           <div className="contacts-profile-head">
             <div className="contacts-profile-avatar-wrap">
@@ -156,48 +243,99 @@ export function UserProfileModal({
           </div>
 
           <div className="contacts-profile-actions">
-            <button 
-              type="button" 
-              className="contacts-profile-action-btn" 
-              onClick={handleCall}
-              disabled={!profile.phone}
-            >
-              Gọi điện
-            </button>
-            <button
-              type="button"
-              className="contacts-profile-action-btn contacts-profile-action-btn-primary"
-              onClick={handleMessage}
-            >
-              Nhắn tin
-            </button>
+            {relation === 'already-friend' ? (
+              <>
+                <button 
+                  type="button" 
+                  className="contacts-profile-action-btn" 
+                  onClick={handleCall}
+                  disabled={!profile.phone}
+                >
+                  Gọi điện
+                </button>
+                <button
+                  type="button"
+                  className="contacts-profile-action-btn contacts-profile-action-btn-primary"
+                  onClick={handleMessage}
+                >
+                  Nhắn tin
+                </button>
+              </>
+            ) : relation === 'self' ? (
+              <button
+                type="button"
+                className="contacts-profile-action-btn contacts-profile-action-btn-primary w-full"
+                onClick={() => navigate('/settings/profile')}
+              >
+                Chỉnh sửa hồ sơ
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="contacts-profile-action-btn"
+                  onClick={handleMessage}
+                >
+                  Nhắn tin
+                </button>
+                <button
+                  type="button"
+                  className="contacts-profile-action-btn contacts-profile-action-btn-primary"
+                  disabled={relation !== 'none' || isSubmitting}
+                  onClick={() => setIsComposingFriendRequest(true)}
+                >
+                  {relation === 'sent' ? 'Đã gửi lời mời' : relation === 'incoming' ? 'Phản hồi lời mời' : 'Kết bạn'}
+                </button>
+              </>
+            )}
           </div>
+
+          {isComposingFriendRequest && (
+            <div className="add-friend-request-box mt-4 p-4 bg-slate-50 dark:bg-slate-900 rounded-lg">
+              <label className="text-xs font-semibold text-slate-500 mb-2 block">Tin nhắn kết bạn</label>
+              <textarea
+                className="w-full border rounded p-2 text-sm bg-white dark:bg-slate-800"
+                maxLength={240}
+                onChange={(e) => setRequestMessage(e.target.value)}
+                rows={3}
+                value={requestMessage}
+              />
+              <div className="flex justify-end gap-2 mt-3">
+                <Button size="sm" variant="subtle" onClick={() => setIsComposingFriendRequest(false)}>
+                  Hủy
+                </Button>
+                <Button size="sm" variant="primary" disabled={isSubmitting} onClick={handleSendFriendRequest}>
+                  {isSubmitting ? 'Đang gửi...' : 'Gửi lời mời'}
+                </Button>
+              </div>
+            </div>
+          )}
 
           <div className="contacts-profile-info">
             <h5>Thông tin cá nhân</h5>
             <div className="contacts-profile-info-grid">
               <div className="contacts-profile-info-label">Bio</div>
-              <div className="contacts-profile-info-value">
-                {isLoading && !profile.bio ? '...' : (profile.bio?.trim() || profile.statusMessage?.trim() || 'Chưa cập nhật')}
+              <div className="contacts-profile-info-value truncate-2-lines">
+                {profile.bio?.trim() || profile.statusMessage?.trim() || 'Chưa cập nhật'}
               </div>
 
               <div className="contacts-profile-info-label">Giới tính</div>
               <div className="contacts-profile-info-value">
-                {isLoading && !profile.gender ? '...' : (profile.gender === 'MALE' ? 'Nam' : profile.gender === 'FEMALE' ? 'Nữ' : 'Chưa cập nhật')}
+                {profile.gender === 'MALE' ? 'Nam' : profile.gender === 'FEMALE' ? 'Nữ' : 'Chưa cập nhật'}
               </div>
               <div className="contacts-profile-info-label">Ngày sinh</div>
               <div className="contacts-profile-info-value">
-                {isLoading && !profile.dob ? '...' : (profile.dob || 'Chưa cập nhật')}
+                {profile.dob || 'Chưa cập nhật'}
               </div>
 
               <div className="contacts-profile-info-label">Điện thoại</div>
               <div className="contacts-profile-info-value">
-                {isLoading && !profile.phone ? 'Đang tải...' : (profile.phone || 'Chưa cập nhật')}
+                {profile.phone || 'Chưa cập nhật'}
               </div>
 
               <div className="contacts-profile-info-label">Email</div>
               <div className="contacts-profile-info-value">
-                {isLoading && !profile.email ? 'Đang tải...' : (profile.email || 'Chưa cập nhật')}
+                {profile.email || 'Chưa cập nhật'}
               </div>
             </div>
           </div>

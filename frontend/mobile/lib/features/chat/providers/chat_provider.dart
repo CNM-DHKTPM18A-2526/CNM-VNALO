@@ -14,6 +14,7 @@ import 'package:vnalo_mobile/services/socket_service.dart';
 import 'package:vnalo_mobile/services/media_service.dart';
 import 'package:vnalo_mobile/services/notification_service.dart';
 import 'package:vnalo_mobile/core/database/local_database.dart';
+import 'package:vnalo_mobile/core/utils/avatar_resolver.dart';
 import 'dart:io';
 import 'dart:convert';
 
@@ -54,6 +55,8 @@ class ChatProvider extends ChangeNotifier {
   Timer? _highlightTimer;
   Message? _lastCloudMessage;
   Timer? _openConversationDebounce;
+  Timer? _inboxPollingTimer; // Polling timer for inbox refresh when socket fails
+  static const _inboxPollingInterval = Duration(seconds: 3); // Poll every 5 seconds
 
   List<Conversation> get conversations => _conversations;
   Message? get lastCloudMessage => _lastCloudMessage;
@@ -109,7 +112,10 @@ class ChatProvider extends ChangeNotifier {
         _typingSub = socketService.onTyping.listen((_) {}),
         _presenceSub = socketService.onPresence.listen((_) {}) {
     _notificationService.ensureInitialized();
-    _messageSub.onData(_handleIncomingMessage);
+    _messageSub.onData((msg) {
+      debugPrint('[ChatProvider] 📡 SOCKET MESSAGE: id=${msg.id} conv=${msg.conversationId} type=${msg.messageType} mediaUrl=${msg.mediaUrl}');
+      _handleIncomingMessage(msg);
+    });
     _readSub.onData(_handleReadEvent);
     _deliveredSub.onData(_handleDeliveredEvent);
     _recalledSub.onData(_handleRecalledEvent);
@@ -180,11 +186,95 @@ class ChatProvider extends ChangeNotifier {
       .toList();
       await _applyLocalReadStateOverrides();
       _sortConversations();
+
+      // Ensure we join all conversation rooms to receive group call signals and other events
+      for (final conv in _conversations) {
+        _socketService.joinConversation(conv.id);
+      }
+      
+      // Start inbox polling as fallback for realtime messaging (since socket.broadcast may not work)
+      _startInboxPolling();
     } catch (e) {
       debugPrint('loadInbox error: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+  
+  void _startInboxPolling() {
+    _inboxPollingTimer?.cancel();
+    _inboxPollingTimer = Timer.periodic(_inboxPollingInterval, (_) => _pollInbox());
+    debugPrint('[ChatProvider] Started inbox polling every ${_inboxPollingInterval.inSeconds}s');
+  }
+  
+  Future<void> _pollInbox() async {
+    try {
+      final newConversations = await _chatService.getInbox();
+      bool hasNewMessages = false;
+      
+      for (final conv in newConversations) {
+        final convId = conv.id;
+        final existingIndex = _conversations.indexWhere((c) => c.id == convId);
+
+        if (existingIndex < 0) {
+          debugPrint('[SYNC] 🆕 New conversation found in poll: $convId');
+          _conversations.add(conv);
+          hasNewMessages = true;
+          await _reloadMessagesForConversation(convId);
+          continue;
+        }
+
+        final existingConv = _conversations[existingIndex];
+        final newSeq = conv.lastMessage?.serverSeq?.toString();
+        final existingSeq = existingConv.lastMessage?.serverSeq?.toString();
+
+        if (newSeq != null && newSeq != existingSeq) {
+          debugPrint('[SYNC] 🔄 Out of sync detected for $convId: existing=$existingSeq, new=$newSeq');
+          hasNewMessages = true;
+          _conversations[existingIndex] = conv;
+          await _reloadMessagesForConversation(convId);
+        }
+      }
+      
+      if (hasNewMessages) {
+        _sortConversations();
+        notifyListeners();
+        debugPrint('[ChatProvider] _pollInbox: Updated UI with new messages');
+      }
+    } catch (e) {
+      debugPrint('[ChatProvider] _pollInbox error: $e');
+    }
+  }
+  
+  Future<void> _reloadMessagesForConversation(String convId) async {
+    try {
+      // Fetch latest 50 messages from server to sync state
+      final messages = await _chatService.fetchLatestMessages(convId, limit: 50);
+      
+      if (messages.isNotEmpty) {
+        debugPrint('[SYNC]   → Got ${messages.length} messages from server for $convId');
+        final existing = _messages[convId] ?? [];
+        final existingIds = existing.map((m) => m.id).toSet();
+        
+        // Find messages that we don't have yet
+        final newItems = messages.where((m) => !existingIds.contains(m.id)).toList();
+        
+        if (newItems.isNotEmpty) {
+          // Merge and sort to ensure newest is at index 0 (bottom of reversed list)
+          final merged = [...newItems, ...existing];
+          merged.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          
+          _messages[convId] = merged;
+          debugPrint('[SYNC]   → Merged ${newItems.length} unique messages. Total: ${merged.length}');
+          
+          if (convId == _activeConversationId) {
+            notifyListeners();
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[ChatProvider] _reloadMessagesForConversation error: $e');
     }
   }
 
@@ -656,6 +746,7 @@ class ChatProvider extends ChangeNotifier {
     required String conversationId,
     required String gifUrl,
   }) {
+    debugPrint('[ChatProvider] sendGif: conv=$conversationId url=$gifUrl');
     sendMediaMessage(
       conversationId: conversationId,
       mediaUrl: gifUrl,
@@ -899,12 +990,18 @@ class ChatProvider extends ChangeNotifier {
 
   void _handleIncomingMessage(Message message) {
     debugPrint('[ChatProvider] _handleIncomingMessage: id=${message.id} conv=${message.conversationId} sender=${message.senderId} clientId=${message.clientMessageId} isMine=${message.senderId == _currentUserId} content=${message.content?.substring(0, min(30, message.content?.length ?? 0))}');
+    // #region agent_h2_provider_entry
+    debugPrint('[DEBUG][H2] ChatProvider._handleIncomingMessage ENTRY - msgId=${message.id} convId=${message.conversationId} senderId=${message.senderId}');
+    // #endregion
 
     // Early deduplication: skip if a message with the same server ID is already in the list
     // This prevents double-add from socket + HTTP race conditions
     final existing = _messages[message.conversationId] ?? [];
     if (!message.id.startsWith('local-') && existing.any((m) => m.id == message.id)) {
       debugPrint('[ChatProvider] _handleIncomingMessage: SKIPPED duplicate server id=${message.id}');
+      // #region agent_h4_skip
+      debugPrint('[DEBUG][H4] Message SKIPPED - duplicate server id=${message.id}');
+      // #endregion
       return;
     }
     // 1. SIGNAL MESSAGE HANDLING (Real-time Sync for Disband/Remove)
@@ -1059,6 +1156,15 @@ class ChatProvider extends ChangeNotifier {
       );
     }
 
+    // Also resolve via AvatarResolver to ensure proper URL formatting for all cases
+    if (resolvedMessage.mediaUrl != null) {
+      final resolvedUrl = AvatarResolver.resolveUrl(resolvedMessage.mediaUrl!);
+      if (resolvedUrl != null && resolvedUrl != resolvedMessage.mediaUrl) {
+        debugPrint('[ChatProvider] _handleIncomingMessage: AvatarResolver mediaUrl ${resolvedMessage.mediaUrl} -> $resolvedUrl');
+        resolvedMessage = resolvedMessage.copyWith(mediaUrl: resolvedUrl);
+      }
+    }
+
     // Resolve reply sender name if missing but ID is present
     if (resolvedMessage.replyToSenderId != null && resolvedMessage.replyToSenderName == null) {
       final resolvedReplyName = getSenderName(conversationId, resolvedMessage.replyToSenderId!);
@@ -1138,9 +1244,16 @@ class ChatProvider extends ChangeNotifier {
       );
       _conversations[index] = updatedConversation;
       resolvedConversation = updatedConversation;
+      debugPrint('[ChatProvider] ✅ Updated conversation lastMessage: convId=$conversationId msgId=${message.id} isMine=$isMine unread=${updatedConversation.unreadCount}');
+      // #region agent_h3_notify
+      debugPrint('[DEBUG][H3] About to call notifyListeners - conversation list updated, _activeConversationId=$_activeConversationId');
+      // #endregion
       _sortConversations();
     } else {
-      // If the conversation is not in the current inbox, reload the inbox to show the new conversation
+      debugPrint('[ChatProvider] ⚠️ Conversation NOT FOUND in list, adding message first then reloading inbox');
+      // First add message to local list so it displays immediately
+      _messages[conversationId] = [resolvedMessage.copyWith(senderName: getSenderName(conversationId, message.senderId)), ...msgList];
+      // Then reload inbox
       loadInbox();
     }
 
@@ -1170,7 +1283,13 @@ class ChatProvider extends ChangeNotifier {
     // Persist newly received message to local DB
     _db.saveMessage(_toLocal(resolvedMessage));
 
+    // #region agent_h3_notify_end
+    debugPrint('[DEBUG][H3] CALLING notifyListeners now - UI should rebuild');
+    // #endregion
     notifyListeners();
+    // #region agent_h3_notify_done
+    debugPrint('[DEBUG][H3] notifyListeners COMPLETED - UI should have rebuilt');
+    // #endregion
   }
 
   Future<void> _removeConversationLocally(String conversationId) async {
@@ -1216,9 +1335,15 @@ class ChatProvider extends ChangeNotifier {
     final currentUserId = _currentUserId;
     if (currentUserId == null) return;
 
-    final title = conversation?.getDisplayName(currentUserId) ??
-        message.senderName ??
-        'Tin nhắn mới';
+    final rawContent = message.content ?? '';
+    final mentionsMe = conversation?.type == ConversationType.GROUP && 
+                      (rawContent.contains('@$currentUserId') || 
+                       rawContent.contains('@Bạn'));
+
+    final title = mentionsMe 
+        ? 'Bạn được nhắc đến trong ${conversation?.getDisplayName(currentUserId) ?? "nhóm"}'
+        : (conversation?.getDisplayName(currentUserId) ?? message.senderName ?? 'Tin nhắn mới');
+        
     final body = _buildNotificationBody(message);
 
     _notificationService.showChatNotification(
@@ -1743,6 +1868,7 @@ class ChatProvider extends ChangeNotifier {
     _typingSub.cancel();
     _presenceSub.cancel();
     _highlightTimer?.cancel();
+    _inboxPollingTimer?.cancel();
     for (final timer in _retryTimers.values) {
       timer.cancel();
     }

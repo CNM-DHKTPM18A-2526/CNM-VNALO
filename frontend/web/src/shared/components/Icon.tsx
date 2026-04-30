@@ -6,7 +6,9 @@ type IconName =
   | 'user'
   | 'addressBook'
   | 'userPlus'
+  | 'userPlusZalo'
   | 'group'
+  | 'groupPlusZalo'
   | 'settings'
   | 'send'
   | 'logout'
@@ -24,6 +26,7 @@ type IconName =
   | 'close'
   | 'layoutSidebar'
   | 'checkSquare'
+  | 'capture'
   | 'cloud'
   | 'briefcase'
   | 'folder'
@@ -123,6 +126,17 @@ export function Icon({ name, className, size = 24 }: IconProps) {
     )
   }
 
+  if (name === 'userPlusZalo') {
+    return (
+      <svg {...commonProps}>
+        <circle cx='9' cy='11' r='3.5' />
+        <path d='M3 20a6 6 0 0 1 12 0' />
+        <path d='M16 6h5' strokeWidth='2' />
+        <path d='M18.5 3.5v5' strokeWidth='2' />
+      </svg>
+    )
+  }
+
   if (name === 'group') {
     return (
       <svg {...commonProps}>
@@ -130,6 +144,19 @@ export function Icon({ name, className, size = 24 }: IconProps) {
         <circle cx='16.5' cy='10' r='2.5' />
         <path d='M3.8 19a5.2 5.2 0 0 1 10.4 0' />
         <path d='M14 19a4 4 0 0 1 6 0' />
+      </svg>
+    )
+  }
+
+  if (name === 'groupPlusZalo') {
+    return (
+      <svg {...commonProps}>
+        <circle cx='8' cy='12' r='3' />
+        <path d='M2 21a6 6 0 0 1 12 0' />
+        <circle cx='15' cy='13' r='2.5' />
+        <path d='M10 21a5 5 0 0 1 10 0' />
+        <path d='M16 5h5' strokeWidth='2' />
+        <path d='M18.5 2.5v5' strokeWidth='2' />
       </svg>
     )
   }
@@ -287,10 +314,20 @@ export function Icon({ name, className, size = 24 }: IconProps) {
     )
   }
 
+  if (name === 'capture') {
+    return (
+      <svg {...commonProps}>
+        <rect x='4' y='4' width='16' height='16' rx='2' strokeDasharray='3 2' />
+        <path d='M10 12h4m-2-2v4' />
+      </svg>
+    )
+  }
+
   if (name === 'cloud') {
     return (
       <svg {...commonProps}>
         <path d='M17.5 19c2.5 0 4.5-2 4.5-4.5 0-2.3-1.7-4.2-3.9-4.5-1.1-3.6-4.5-6-8.1-6-3.3 0-6.2 2-7.4 5-2.1.2-3.8 2-3.8 4.2C0 16.5 2 18.5 4.5 18.5h13' />
+        <path d='M9 11h3l-2.5 3h3' strokeWidth='1.2' />
       </svg>
     )
   }

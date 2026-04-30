@@ -29,6 +29,9 @@ type MessageGroupBubbleProps = {
   onOpenUserProfile?: (userId: string) => void
   onInitiateCall?: (type: 'audio' | 'video') => void
   isRecalled?: boolean
+  userRole?: string
+  allowMemberPin?: boolean
+  onVotePoll?: (messageId: string, optionId: string) => void
 }
 
 export function MessageGroupBubble({
@@ -55,6 +58,9 @@ export function MessageGroupBubble({
   onOpenUserProfile,
   onInitiateCall,
   isRecalled,
+  userRole,
+  allowMemberPin,
+  onVotePoll,
 }: MessageGroupBubbleProps) {
   if (messages.length === 0) return null;
 
@@ -120,6 +126,9 @@ export function MessageGroupBubble({
       onInitiateCall={onInitiateCall}
       isVirtualGroup={true}
       groupedMessages={messages}
+      userRole={userRole}
+      allowMemberPin={allowMemberPin}
+      onVotePoll={onVotePoll}
     />
   );
 }

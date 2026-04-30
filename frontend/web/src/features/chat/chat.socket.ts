@@ -105,6 +105,16 @@ export function getOrCreateSocketManager(token: string): { chat: Socket; root: S
       // Notify all services to clear their room cache
       onDisconnectCallbacks.forEach(cb => cb())
     })
+
+    globalChatSocket?.on('message.error', (payload: any) => {
+      console.error('[Socket.CHAT] ❌ message.error:', payload)
+      window.dispatchEvent(new CustomEvent('vnalo:socket:message-error', { detail: payload }))
+    })
+
+    globalChatSocket?.on('conversation.error', (payload: any) => {
+      console.error('[Socket.CHAT] ❌ conversation.error:', payload)
+      window.dispatchEvent(new CustomEvent('vnalo:socket:conversation-error', { detail: payload }))
+    })
   }
 
   return { chat: globalChatSocket!, root: globalRootSocket! }

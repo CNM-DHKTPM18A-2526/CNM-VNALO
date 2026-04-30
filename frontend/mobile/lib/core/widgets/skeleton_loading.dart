@@ -405,3 +405,46 @@ class DiscoverSkeleton extends StatelessWidget {
     );
   }
 }
+
+/// Skeleton placeholder for GroupSettingsScreen.
+class GroupSettingsSkeleton extends StatelessWidget {
+  const GroupSettingsSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final sectionColor = isDark ? DarkColors.surface : Colors.white;
+
+    return ListView(
+      children: [
+        const SizedBox(height: 16),
+        ...List.generate(3, (i) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: ShimmerBox(width: 120, height: 14, borderRadius: 4),
+            ),
+            Container(
+              color: sectionColor,
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: List.generate(2 + i, (j) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    children: [
+                      Expanded(child: ShimmerBox(width: double.infinity, height: 16, borderRadius: 4)),
+                      const SizedBox(width: 12),
+                      ShimmerBox(width: 40, height: 24, borderRadius: 12),
+                    ],
+                  ),
+                )),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        )),
+      ],
+    );
+  }
+}

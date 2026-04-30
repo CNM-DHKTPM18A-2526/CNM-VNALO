@@ -206,36 +206,26 @@ export function LoginPage() {
             )}
           </div>
 
-          <div className='auth-banner-pc'>
-             <div style={{ width: 60, height: 50, background: '#f0f4ff', borderRadius: 4, display: 'grid', placeItems: 'center' }}>
-                <svg width="30" height="30" viewBox="0 0 24 24" fill="#0068ff"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
-             </div>
-             <div className='auth-banner-content'>
-                <div className='auth-banner-title'>Nâng cao hiệu quả công việc với Vnalo PC</div>
-                <div className='auth-banner-copy'>Gửi file lớn lên đến 1 GB, chụp màn hình, gọi video và nhiều tiện ích hơn nữa</div>
-             </div>
-             <button className='auth-banner-btn'>Tải ngay</button>
-          </div>
         </div>
 
-        <div style={{ textAlign: 'center', marginTop: 20 }}>
-            <p style={{ fontSize: 14 }}>{t('auth.dontHaveAccount')} <Link to='/register' style={{ color: '#0068ff', textDecoration: 'none', fontWeight: 600 }}>{t('auth.createAccountLink')}!</Link></p>
-        </div>
+      <div style={{ textAlign: 'center', marginTop: 20 }}>
+          <p style={{ fontSize: 14 }}>{t('auth.dontHaveAccount')} <Link to='/register' style={{ color: '#0068ff', textDecoration: 'none', fontWeight: 600 }}>{t('auth.createAccountLink')}!</Link></p>
+      </div>
 
-        <div className='auth-lang-selector'>
-            <button 
-              className={`auth-lang-btn ${language === 'vi' ? 'active' : ''}`}
-              onClick={() => setLanguage('vi')}
-            >
-              Tiếng Việt
-            </button>
-            <button 
-              className={`auth-lang-btn ${language === 'en' ? 'active' : ''}`}
-              onClick={() => setLanguage('en')}
-            >
-              English
-            </button>
-        </div>
+      <div className='auth-lang-selector'>
+          <button 
+            className={`auth-lang-btn ${language === 'vi' ? 'active' : ''}`}
+            onClick={() => setLanguage('vi')}
+          >
+            Tiếng Việt
+          </button>
+          <button 
+            className={`auth-lang-btn ${language === 'en' ? 'active' : ''}`}
+            onClick={() => setLanguage('en')}
+          >
+            English
+          </button>
+      </div>
       </div>
     </div>
   )

@@ -1,4 +1,4 @@
-import type { ChatAttachment, ChatMessage, ChatMessageType, ConversationSummary, ReplyMetadata } from './chat.types'
+export type { ChatAttachment, ChatMessage, ChatMessageType, ConversationSummary, ReplyMetadata } from './chat.types'
 import { formatMessageContent } from './utils/messageUtils'
 import { API_BASE_URL, extractMessage, messageApi, mediaApi } from '../../api.client'
 import { resolveMediaUrl } from '../../utils/mediaUtils'
@@ -157,7 +157,7 @@ function formatTime(value?: string): string {
 async function authorizedFetch<T>(token: string, endpoint: string, init?: RequestInit): Promise<T> {
   try {
     const response = await messageApi.request({
-      url: endpoint,
+      url: endpoint.startsWith('/') ? endpoint.slice(1) : endpoint,
       method: init?.method ?? 'GET',
       data: init?.body ? JSON.parse(init.body as string) : undefined,
       headers: {
@@ -317,6 +317,19 @@ function normalizeInboxPreview(rawPreview?: string | null): string {
     return formatMessageContent(preview)
   }
 
+  if (preview.startsWith('{"type":"poll"')) {
+    try {
+      const poll = JSON.parse(preview);
+      return `📊 Bình chọn: ${poll.question}`;
+    } catch (e) {
+      return '📊 Bình chọn';
+    }
+  }
+
+  if (preview.startsWith('{"action":"UPDATE_MESSAGE_REACTIONS"')) {
+    return ''; // Hide sync signals
+  }
+
   return preview
 }
 
@@ -355,7 +368,7 @@ export async function uploadChatMedia(token: string, file: File): Promise<any> {
   formData.append('category', category)
 
   try {
-    const response = await mediaApi.post('/upload', formData, {
+    const response = await mediaApi.post('upload', formData, {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'multipart/form-data',
@@ -387,7 +400,7 @@ export async function uploadChatMedia(token: string, file: File): Promise<any> {
 }
 
 export async function fetchInbox(token: string, currentUserId?: string): Promise<ConversationSummary[]> {
-  const data = await authorizedFetch<InboxItem[]>(token, '/inbox')
+  const data = await authorizedFetch<InboxItem[]>(token, 'inbox')
   const myId = String(currentUserId ?? '').trim()
 
   return data
@@ -443,7 +456,9 @@ export async function fetchInbox(token: string, currentUserId?: string): Promise
           userId: String(m.userId ?? '').trim(),
           role: String(m.role ?? 'MEMBER').toUpperCase(),
         })),
-        onlyAdminCanPost: Boolean((item.conversation as any)?.onlyAdminCanPost ?? (item as any).onlyAdminCanPost),
+        onlyAdminCanPost: Boolean((item.conversation as any)?.onlyAdminCanPost ?? (item.conversation as any)?.only_admin_can_post ?? (item as any).onlyAdminCanPost ?? (item as any).only_admin_can_post),
+        allowMemberPin: Boolean((item.conversation as any)?.allowMemberPin ?? (item.conversation as any)?.allow_member_pin ?? (item as any).allowMemberPin ?? (item as any).allow_member_pin),
+        allowMemberEditInfo: Boolean((item.conversation as any)?.allowMemberEditInfo ?? (item.conversation as any)?.allow_member_edit_info ?? (item as any).allowMemberEditInfo ?? (item as any).allow_member_edit_info),
       }
     })
 }
@@ -473,6 +488,20 @@ export function mapRawMessage(raw: RawMessageLike, currentUserId: string): ChatM
       }
     } catch (e) {
       // Not a valid JSON poll, treat as text
+    }
+  } else if (content.includes('"action":')) {
+    try {
+      // Robust detection of system signals embedded in text
+      const jsonStart = content.indexOf('{"action":');
+      if (jsonStart >= 0) {
+        const potentialJson = content.substring(jsonStart);
+        const parsed = JSON.parse(potentialJson);
+        if (parsed.action) {
+          detectedTypeFromContent = 'system'
+        }
+      }
+    } catch (e) {
+      // Not a valid system signal
     }
   }
 
@@ -580,14 +609,14 @@ function extractRawMessages(payload: unknown): RawMessage[] {
 }
 
 export async function fetchConversation(token: string, conversationId: string): Promise<unknown> {
-  return authorizedFetch<unknown>(token, `/conversations/${conversationId}`)
+  return authorizedFetch<unknown>(token, `conversations/${conversationId}`)
 }
 
 export async function fetchMessages(token: string, conversationId: string, forceSync = false): Promise<RawMessage[]> {
   const query = forceSync ? '&forceSync=true' : ''
   const data = await authorizedFetch<RawMessage[] | { items?: RawMessage[]; content?: RawMessage[] }>(
     token,
-    `/conversations/${conversationId}/messages?limit=50${query}`,
+    `conversations/${conversationId}/messages?limit=50${query}`,
   )
   const normalizedMessages = extractRawMessages(data)
   console.log('[chat.api.fetchMessages] Loaded messages:', {
@@ -608,14 +637,14 @@ export async function sendMessage(token: string, payload: SendMessageRequest): P
     attachments: payload.attachments ?? undefined,
   }
 
-  return authorizedFetch<RawMessage>(token, '/messages', {
+  return authorizedFetch<RawMessage>(token, 'messages', {
     method: 'POST',
     body: JSON.stringify(sanitizedPayload),
   })
 }
 
 export async function updateMessage(token: string, messageId: string, content: string): Promise<RawMessage> {
-  return authorizedFetch<RawMessage>(token, `/messages/${messageId}`, {
+  return authorizedFetch<RawMessage>(token, `messages/${messageId}`, {
     method: 'PATCH',
     body: JSON.stringify({ content }),
   })
@@ -642,7 +671,7 @@ export async function searchConversationMessages(
   }
 
   const query = searchParams.toString()
-  const endpoint = `/conversations/${conversationId}/messages/search${query ? `?${query}` : ''}`
+  const endpoint = `conversations/${conversationId}/messages/search${query ? `?${query}` : ''}`
   const data = await authorizedFetch<
     | SearchConversationMessagesResult
     | {
@@ -665,28 +694,28 @@ export async function searchConversationMessages(
 }
 
 export async function updateGroupAvatar(token: string, conversationId: string, avatarUrl: string): Promise<unknown> {
-  return authorizedFetch<unknown>(token, `/conversations/${conversationId}`, {
+  return authorizedFetch<unknown>(token, `conversations/${conversationId}`, {
     method: 'PATCH',
     body: JSON.stringify({ avatarUrl }),
   })
 }
 
 export async function renameGroupConversation(token: string, conversationId: string, name: string): Promise<unknown> {
-  return authorizedFetch<unknown>(token, `/conversations/${conversationId}`, {
+  return authorizedFetch<unknown>(token, `conversations/${conversationId}`, {
     method: 'PATCH',
     body: JSON.stringify({ title: name }),
   })
 }
 
 export async function setConversationNickname(token: string, conversationId: string, targetUserId: string, nickname: string): Promise<unknown> {
-  return authorizedFetch<unknown>(token, `/conversations/${conversationId}/member/${targetUserId}`, {
+  return authorizedFetch<unknown>(token, `conversations/${conversationId}/member/${targetUserId}`, {
     method: 'PATCH',
     body: JSON.stringify({ nickname }),
   })
 }
 
 export async function markConversationRead(token: string, conversationId: string, lastReadSeq: number): Promise<void> {
-  await authorizedFetch(token, `/conversations/${conversationId}/read`, {
+  await authorizedFetch(token, `conversations/${conversationId}/read`, {
     method: 'POST',
     body: JSON.stringify({ lastReadSeq }),
   })
@@ -701,20 +730,20 @@ export type RawMessageReaction = {
 }
 
 export async function addMessageReaction(token: string, messageId: string, emoji: string): Promise<void> {
-  await authorizedFetch(token, `/messages/${messageId}/reactions`, {
+  await authorizedFetch(token, `messages/${messageId}/reactions`, {
     method: 'POST',
     body: JSON.stringify({ emoji }),
   })
 }
 
 export async function removeMessageReaction(token: string, messageId: string): Promise<void> {
-  await authorizedFetch(token, `/messages/${messageId}/reactions`, {
+  await authorizedFetch(token, `messages/${messageId}/reactions`, {
     method: 'DELETE',
   })
 }
 
 export async function fetchMessageReactions(token: string, messageId: string): Promise<RawMessageReaction[]> {
-  return authorizedFetch<RawMessageReaction[]>(token, `/messages/${messageId}/reactions`)
+  return authorizedFetch<RawMessageReaction[]>(token, `messages/${messageId}/reactions`)
 }
 
 export type RawPinnedMessage = {
@@ -727,31 +756,31 @@ export type RawPinnedMessage = {
 }
 
 export async function recallMessage(token: string, messageId: string): Promise<RawMessage | null> {
-  return authorizedFetch<RawMessage | null>(token, `/messages/${messageId}`, {
+  return authorizedFetch<RawMessage | null>(token, `messages/${messageId}`, {
     method: 'DELETE',
   })
 }
 
 export async function deleteMessageForMe(token: string, messageId: string): Promise<void> {
-  await authorizedFetch(token, `/messages/${messageId}/for-me`, {
+  await authorizedFetch(token, `messages/${messageId}/for-me`, {
     method: 'DELETE',
   })
 }
 
 export async function pinMessage(token: string, conversationId: string, messageId: string): Promise<RawPinnedMessage | null> {
-  return authorizedFetch<RawPinnedMessage | null>(token, `/conversations/${conversationId}/pin/${messageId}`, {
+  return authorizedFetch<RawPinnedMessage | null>(token, `conversations/${conversationId}/pin/${messageId}`, {
     method: 'POST',
   })
 }
 
 export async function unpinMessage(token: string, conversationId: string, messageId: string): Promise<void> {
-  await authorizedFetch(token, `/conversations/${conversationId}/pin/${messageId}`, {
+  await authorizedFetch(token, `conversations/${conversationId}/pin/${messageId}`, {
     method: 'DELETE',
   })
 }
 
 export async function fetchPinnedMessages(token: string, conversationId: string): Promise<RawPinnedMessage[]> {
-  return authorizedFetch<RawPinnedMessage[]>(token, `/conversations/${conversationId}/pins`)
+  return authorizedFetch<RawPinnedMessage[]>(token, `conversations/${conversationId}/pins`)
 }
 
 /**
@@ -770,7 +799,7 @@ export async function searchGlobalMessages(
   searchParams.set('offset', String(offset))
 
   const query = searchParams.toString()
-  const endpoint = `/messages/search${query ? `?${query}` : ''}`
+  const endpoint = `messages/search${query ? `?${query}` : ''}`
 
   try {
     const data = await authorizedFetch<SearchConversationMessagesResult>(token, endpoint)
@@ -794,7 +823,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 export async function getOrCreateDirectConversation(token: string, targetUserId: string): Promise<string> {
   try {
-    const response = await messageApi.post('/conversations/direct', { targetUserId }, {
+    const response = await messageApi.post('conversations/direct', { targetUserId }, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const json = response.data;
@@ -863,7 +892,7 @@ export async function createGroupConversation(
 }
 export async function fetchStickerPacks(token: string): Promise<any[]> {
   try {
-    const response = await mediaApi.get('/stickers/my-packs', {
+    const response = await mediaApi.get('stickers/my-packs', {
       headers: { Authorization: `Bearer ${token}` }
     });
     const json = response.data;
@@ -883,7 +912,7 @@ export async function fetchStickerPacks(token: string): Promise<any[]> {
 
 export async function fetchStickerPackDetails(token: string, packId: string): Promise<any> {
   try {
-    const response = await mediaApi.get(`/stickers/packs/${packId}`, {
+    const response = await mediaApi.get(`stickers/packs/${packId}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     const json = response.data;
@@ -906,18 +935,26 @@ export async function fetchStickerPackDetails(token: string, packId: string): Pr
 
 export async function fetchMediaByCategory(token: string, category: 'EMOJI' | 'GIF'): Promise<any[]> {
   try {
-    const response = await mediaApi.get(`/?category=${category}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    let items: any[] = [];
+    try {
+      const response = await mediaApi.get('', {
+        params: { category },
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
-    const json = response.data;
-    let items = json.data?.content || json.data || json || []
+      const json = response.data;
+      items = json.data?.content || json.data || json || []
+    } catch (e) {
+      console.warn(`[chat.api.fetchMediaByCategory] Primary fetch failed, will try discovery:`, e);
+    }
+
     if (!Array.isArray(items)) items = []
 
     // Fallback: Deep discovery from SYSTEM assets
     if (items.length === 0) {
       console.log(`[chat.api.fetchMediaByCategory] ${category} list empty, performing MASSIVE discovery (limit 3000)...`)
-      const fbResponse = await mediaApi.get('/?size=3000', {
+      const fbResponse = await mediaApi.get('', {
+        params: { size: 3000 },
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -1010,34 +1047,14 @@ export async function fetchMediaByCategory(token: string, category: 'EMOJI' | 'G
 /**
  * Normalizes a media URL from the backend.
  */
-function normalizeMediaUrl(url: string | null | undefined): string {
+export function normalizeMediaUrl(url: string | null | undefined): string {
   if (!url) return '';
-
-  let normalized = url;
-
-  // Fix S3 URLs missing region (common in seeded data)
-  if (normalized.startsWith('https://') && normalized.includes('.s3.amazonaws.com')) {
-    if (!normalized.match(/\.s3\.[a-z0-9-]+\.amazonaws\.com/)) {
-      normalized = normalized.replace('.s3.amazonaws.com', '.s3.ap-southeast-1.amazonaws.com');
-      console.log(`[chat.api.normalize] CORRECTED region: ${url} -> ${normalized}`);
-    }
-  }
-
-  if (normalized.startsWith('http')) {
-    console.log(`[chat.api.normalize] Final URL: ${normalized}`);
-    return normalized;
-  }
-
-  // Handle relative paths from backend local-storage
-  const backendHost = API_BASE_URL.split('/api/v1')[0];
-  const result = `${backendHost}${normalized.startsWith('/') ? '' : '/'}${normalized}`;
-  console.log(`[chat.api.normalize] Relative to Absolute: ${url} -> ${result}`);
-  return result;
+  return resolveMediaUrl(url);
 }
 
 
 export async function addMembersToConversation(token: string, conversationId: string, memberIds: string[]): Promise<void> {
-  await authorizedFetch(token, `/conversations/${conversationId}/members`, {
+  await authorizedFetch(token, `conversations/${conversationId}/members`, {
     method: 'POST',
     body: JSON.stringify({ memberIds }),
   })
@@ -1045,7 +1062,7 @@ export async function addMembersToConversation(token: string, conversationId: st
 
 export async function leaveConversation(token: string, conversationId: string): Promise<void> {
   try {
-    await messageApi.post(`/conversations/${conversationId}/leave`, {}, {
+    await messageApi.post(`conversations/${conversationId}/leave`, {}, {
       headers: { Authorization: `Bearer ${token}` },
     });
   } catch (error: any) {
@@ -1057,26 +1074,26 @@ export async function leaveConversation(token: string, conversationId: string): 
 }
 
 export async function disbandConversation(token: string, conversationId: string): Promise<void> {
-  await authorizedFetch(token, `/conversations/${conversationId}`, {
+  await authorizedFetch(token, `conversations/${conversationId}`, {
     method: 'DELETE',
   })
 }
 
 export async function removeMember(token: string, conversationId: string, userId: string): Promise<void> {
-  await authorizedFetch(token, `/conversations/${conversationId}/members/${userId}`, {
+  await authorizedFetch(token, `conversations/${conversationId}/members/${userId}`, {
     method: 'DELETE',
   })
 }
 
 export async function updateMemberRole(token: string, conversationId: string, userId: string, role: string): Promise<void> {
-  await authorizedFetch(token, `/conversations/${conversationId}/member/${userId}`, {
+  await authorizedFetch(token, `conversations/${conversationId}/member/${userId}`, {
     method: 'PATCH',
     body: JSON.stringify({ role }),
   })
 }
 
 export async function updateConversation(token: string, conversationId: string, settings: Partial<any>): Promise<void> {
-  await authorizedFetch(token, `/conversations/${conversationId}`, {
+  await authorizedFetch(token, `conversations/${conversationId}`, {
     method: 'PATCH',
     body: JSON.stringify(settings),
   })

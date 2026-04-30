@@ -8,12 +8,15 @@ import {
   initializeSearchIndex,
   searchUsersByPhoneLocal,
   searchUsersLocal,
+  searchConversationsLocal,
+  searchMessagesLocal,
   updateSearchIndexUsers,
   type CachedUser,
 } from '../features/chat/searchIndex'
 import { FriendRequestList } from '../features/contacts/components/FriendRequestList'
 import { SentRequestList } from '../features/contacts/components/SentRequestList'
 import { AddFriendModal, type AddFriendTarget } from '../features/friends/components/AddFriendModal'
+import { UserProfileModal } from '../features/chat/components/UserProfileModal'
 import {
   acceptFriendRequest,
   cancelSentFriendRequest,
@@ -36,6 +39,7 @@ import { Button } from '../shared/components/ui/Button'
 import { Card } from '../shared/components/ui/Card'
 import { Modal } from '../shared/components/ui/Modal'
 import { useLanguage } from '../shared/i18n/LanguageContext'
+import { refreshNotificationBadges } from '../features/notifications/NotificationContext'
 import '../styles/contacts-page.css'
 
 type FeedbackState = {
@@ -124,6 +128,7 @@ export function ContactsPage() {
     return (window.localStorage.getItem(SECTION_STORAGE_KEY) as ContactsSection | null) ?? 'friends'
   })
   const [keyword, setKeyword] = useState('')
+  const [sidebarKeyword, setSidebarKeyword] = useState('')
   const [sortMode, setSortMode] = useState<SortMode>('az')
   const [friendFilter, setFriendFilter] = useState<FriendFilter>('all')
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -136,6 +141,7 @@ export function ContactsPage() {
   const [incomingRequests, setIncomingRequests] = useState<FriendRequest[]>([])
   const [sentRequests, setSentRequests] = useState<FriendRequest[]>([])
   const [stats, setStats] = useState<FriendStats | null>(null)
+  const [allConversations, setAllConversations] = useState<ConversationSummary[]>([])
   const [groups, setGroups] = useState<ConversationSummary[]>([])
   const [isLoadingGroups, setIsLoadingGroups] = useState(true)
 
@@ -252,14 +258,18 @@ export function ContactsPage() {
       return
     }
 
-    // Fetch groups from inbox (filter GROUP type)
+    // Fetch inbox (all conversations)
     setIsLoadingGroups(true)
     fetchInbox(accessToken, user?.id)
       .then((conversations) => {
+        setAllConversations(conversations)
         const groupConvs = conversations.filter((c) => c.isGroup && !c.isCloud)
         setGroups(groupConvs)
       })
-      .catch(() => setGroups([]))
+      .catch(() => {
+        setAllConversations([])
+        setGroups([])
+      })
       .finally(() => setIsLoadingGroups(false))
 
     void Promise.all([
@@ -327,7 +337,7 @@ export function ContactsPage() {
   }, [accessToken])
 
   useEffect(() => {
-    const query = keyword.trim()
+    const query = sidebarKeyword.trim()
 
     if (!query) {
       setSearchUserResults([])
@@ -341,7 +351,10 @@ export function ContactsPage() {
         setIsSearchingUsers(true)
 
         try {
-          const localResults = isPhoneQuery ? searchUsersByPhoneLocal(normalizedPhoneKeyword) : searchUsersLocal(query)
+          const sidebarNormalizedPhone = query.replace(/\D/g, '')
+          const sidebarIsPhoneQuery = sidebarNormalizedPhone.length >= 2 && sidebarNormalizedPhone.length >= Math.max(2, query.length - 2)
+
+          const localResults = sidebarIsPhoneQuery ? searchUsersByPhoneLocal(sidebarNormalizedPhone) : searchUsersLocal(query)
           const localLookups = localResults.map((user) => ({
             id: user.id,
             phone: user.phone ?? null,
@@ -356,7 +369,7 @@ export function ContactsPage() {
           let remoteLookups: UserLookupResult[] = []
           if (accessToken) {
             try {
-              if (isPhoneQuery) {
+              if (sidebarIsPhoneQuery) {
                 const maybeUser = await getUserByPhone(accessToken, query)
                 remoteLookups = maybeUser ? [maybeUser] : []
               } else {
@@ -396,7 +409,7 @@ export function ContactsPage() {
       active = false
       window.clearTimeout(timer)
     }
-  }, [accessToken, isPhoneQuery, keyword, normalizedPhoneKeyword])
+  }, [accessToken, sidebarKeyword])
 
   const filteredFriends = useMemo(() => {
     return friends.filter((friend) => {
@@ -461,6 +474,91 @@ export function ContactsPage() {
       ),
     [groups, normalizedKeyword],
   )
+
+  const sidebarFilteredFriends = useMemo(() => {
+    const query = sidebarKeyword.trim().toLowerCase()
+    if (!query) return []
+    return friends.filter((friend) => {
+      const label = getFriendLabel(friend, unknownUserLabel).toLowerCase()
+      const phone = (friend.friendPhone || '').replace(/\D/g, '')
+      return label.includes(query) || phone.includes(query)
+    })
+  }, [friends, sidebarKeyword, unknownUserLabel])
+
+  const sidebarFilteredGroups = useMemo(() => {
+    const query = sidebarKeyword.trim().toLowerCase()
+    if (!query) return []
+    return groups.filter((group) => {
+      return (group.name ?? '').toLowerCase().includes(query)
+    })
+  }, [groups, sidebarKeyword])
+
+  const sidebarFilteredConversations = useMemo(() => {
+    const query = sidebarKeyword.trim().toLowerCase()
+    if (!query) return []
+
+    const conversationNameMatches = searchConversationsLocal(query)
+    const messageMatches = searchMessagesLocal(query)
+    const messageConversationIds = new Set(messageMatches.map((m) => m.conversationId))
+
+    const matchedConversationIds = new Set<string>()
+    const results: Array<ConversationSummary & { searchPreview?: string }> = []
+
+    const resolveName = (conv: ConversationSummary) => {
+      if (conv.isGroup) return conv.name || 'Nhóm'
+      // For 1-1 chat, find the peer ID (participant that is not current user)
+      const peerId = conv.participantUserIds?.find(id => id !== user?.id) || conv.id
+      const friend = friends.find((f) => f.friendId === peerId)
+      if (friend) return getFriendLabel(friend, unknownUserLabel)
+      return conv.name || 'Người dùng'
+    }
+
+    const resolveAvatar = (conv: ConversationSummary) => {
+      if (conv.isGroup) return conv.avatarUrl
+      const peerId = conv.participantUserIds?.find(id => id !== user?.id) || conv.id
+      const friend = friends.find((f) => f.friendId === peerId)
+      return friend?.avatarUrl || conv.avatarUrl
+    }
+
+    const addConversation = (conversation: ConversationSummary, preview?: string) => {
+      if (matchedConversationIds.has(conversation.id)) return
+      matchedConversationIds.add(conversation.id)
+      results.push({
+        ...conversation,
+        name: resolveName(conversation),
+        avatarUrl: resolveAvatar(conversation),
+        searchPreview: preview,
+      })
+    }
+
+    // 1. Matches by conversation name
+    for (const conv of conversationNameMatches) {
+      if (!conv.isGroup) {
+        const fullConv = allConversations.find(c => c.id === conv.id)
+        if (fullConv) addConversation(fullConv)
+      }
+    }
+
+    // 2. Matches by message content
+    for (const conv of allConversations) {
+      if (messageConversationIds.has(conv.id)) {
+        const matchedMessage = messageMatches.find((m) => m.conversationId === conv.id)
+        addConversation(
+          conv,
+          matchedMessage?.content?.trim() || matchedMessage?.messageType || t('chat.searchMessagesSection'),
+        )
+      }
+    }
+
+    // 3. Fallback: simple include check on name if index is empty
+    for (const conv of allConversations) {
+      if (!conv.isGroup && (conv.name ?? '').toLowerCase().includes(query)) {
+        addConversation(conv)
+      }
+    }
+
+    return results
+  }, [allConversations, sidebarKeyword, t])
 
   const sidebarItems: SidebarItem[] = [
     { key: 'friends', icon: 'user', label: 'Danh sách bạn bè' },
@@ -621,6 +719,7 @@ export function ContactsPage() {
       await acceptFriendRequest(accessToken, requestId)
       setFeedback({ type: 'success', message: t('contacts.feedback.acceptSuccess') })
       await Promise.all([refreshFriends(accessToken), refreshIncoming(accessToken), refreshStats(accessToken)])
+      refreshNotificationBadges()
     } catch (error) {
       setFeedback({
         type: 'error',
@@ -656,6 +755,7 @@ export function ContactsPage() {
         await Promise.all([refreshFriends(accessToken), refreshStats(accessToken)])
       }
 
+      refreshNotificationBadges()
       setConfirmAction(null)
     } catch (error) {
       setFeedback({
@@ -706,51 +806,163 @@ export function ContactsPage() {
               </div>
             </div>
 
-            <div className='contacts-sidebar-search'>
-              <Icon name='search' className='contacts-icon-sm' />
-              <input
-                className='contacts-input contacts-input-on-blue'
-                placeholder='Tìm kiếm'
-                value={keyword}
-                onChange={(event) => setKeyword(event.target.value)}
-              />
-              <button
-                type='button'
-                className='contacts-icon-btn contacts-icon-btn-on-blue'
-                title='Thêm bạn'
-                onClick={() => openAddFriendModal()}
-              >
-                <Icon name='userPlus' />
-              </button>
+            <div className='contacts-sidebar-search-row'>
+              <div className='contacts-sidebar-search-box'>
+                <Icon name='search' className='contacts-icon-sm' />
+                <input
+                  className='contacts-input'
+                  placeholder='Tìm kiếm'
+                  value={sidebarKeyword}
+                  onChange={(event) => setSidebarKeyword(event.target.value)}
+                />
+              </div>
+              <div className='contacts-sidebar-actions'>
+                <button
+                  type='button'
+                  className='contacts-sidebar-action-btn'
+                  title='Thêm bạn'
+                  onClick={() => openAddFriendModal()}
+                >
+                  <Icon name='userPlusZalo' size={20} />
+                </button>
+                <button
+                  type='button'
+                  className='contacts-sidebar-action-btn'
+                  title='Tạo nhóm chat'
+                  onClick={() => navigate('/chat?createGroup=true')}
+                >
+                  <Icon name='groupPlusZalo' size={22} />
+                </button>
+              </div>
             </div>
           </div>
 
           <nav className='contacts-sidebar-nav'>
-            {sidebarItems.map((item) => {
-              const active = section === item.key
-              return (
-                <button
-                  key={item.key}
-                  type='button'
-                  onClick={() => {
-                    setSection(item.key)
-                    closeFriendMenu()
-                    setIsSidebarOpen(false)
-                  }}
-                  className={`contacts-sidebar-item ${active ? 'contacts-sidebar-item-active' : ''}`}
-                >
-                  <span className={`contacts-sidebar-item-icon ${active ? 'contacts-sidebar-item-icon-active' : ''}`}>
-                    <Icon name={item.icon} />
-                  </span>
-                  <span className='contacts-sidebar-item-label'>{item.label}</span>
-                  {item.key === 'requests' && incomingCount > 0 ? (
-                    <span className='contacts-sidebar-item-badge' aria-label={`${incomingCount} lời mời kết bạn`}>
-                      {incomingCount > 99 ? '99+' : incomingCount}
+            {!sidebarKeyword.trim() ? (
+              sidebarItems.map((item) => {
+                const active = section === item.key
+                return (
+                  <button
+                    key={item.key}
+                    type='button'
+                    onClick={() => {
+                      setSection(item.key)
+                      closeFriendMenu()
+                      setIsSidebarOpen(false)
+                    }}
+                    className={`contacts-sidebar-item ${active ? 'contacts-sidebar-item-active' : ''}`}
+                  >
+                    <span className={`contacts-sidebar-item-icon ${active ? 'contacts-sidebar-item-icon-active' : ''}`}>
+                      <Icon name={item.icon} />
                     </span>
-                  ) : null}
-                </button>
-              )
-            })}
+                    <span className='contacts-sidebar-item-label'>{item.label}</span>
+                    {item.key === 'requests' && incomingCount > 0 ? (
+                      <span className='contacts-sidebar-item-badge' aria-label={`${incomingCount} lời mời kết bạn`}>
+                        {incomingCount > 99 ? '99+' : incomingCount}
+                      </span>
+                    ) : null}
+                  </button>
+                )
+              })
+            ) : (
+              <div className='contacts-sidebar-search-results'>
+                {/* Search Header */}
+                <div className='contacts-sidebar-search-header'>
+                  <span>Kết quả tìm kiếm cho "{sidebarKeyword}"</span>
+                  <button className='contacts-sidebar-search-clear' onClick={() => setSidebarKeyword('')}>
+                    Đóng
+                  </button>
+                </div>
+
+                {/* Local Matches (Friends & Groups) */}
+                {sidebarFilteredFriends.length > 0 && (
+                  <div className='contacts-sidebar-search-section'>
+                    <p className='contacts-sidebar-search-section-title'>Bạn bè ({sidebarFilteredFriends.length})</p>
+                    {sidebarFilteredFriends.map(friend => (
+                      <button
+                        key={friend.friendId}
+                        className='contacts-sidebar-search-item'
+                        onClick={() => handleOpenConversation(friend)}
+                      >
+                        <UserAvatar imageUrl={friend.avatarUrl} name={getFriendLabel(friend, unknownUserLabel)} size='sm' />
+                        <span className='contacts-sidebar-search-item-label'>{getFriendLabel(friend, unknownUserLabel)}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {sidebarFilteredGroups.length > 0 && (
+                  <div className='contacts-sidebar-search-section'>
+                    <p className='contacts-sidebar-search-section-title'>Nhóm ({sidebarFilteredGroups.length})</p>
+                    {sidebarFilteredGroups.map(group => (
+                      <button
+                        key={group.id}
+                        className='contacts-sidebar-search-item'
+                        onClick={() => navigate(`/chat/${group.id}`)}
+                      >
+                        <UserAvatar imageUrl={group.avatarUrl} name={group.name || 'Group'} size='sm' isGroup />
+                        <span className='contacts-sidebar-search-item-label'>{group.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {sidebarFilteredConversations.length > 0 && (
+                  <div className='contacts-sidebar-search-section'>
+                    <p className='contacts-sidebar-search-section-title'>Hội thoại ({sidebarFilteredConversations.length})</p>
+                    {sidebarFilteredConversations.map(conv => (
+                      <button
+                        key={conv.id}
+                        className='contacts-sidebar-search-item'
+                        onClick={() => navigate(`/chat/${conv.id}`)}
+                      >
+                        <UserAvatar imageUrl={conv.avatarUrl} name={conv.name || 'Conversation'} size='sm' />
+                        <div className='contacts-sidebar-search-item-copy'>
+                          <span className='contacts-sidebar-search-item-label'>{conv.name}</span>
+                          {(conv.searchPreview || conv.lastMessage) && (
+                            <span className='contacts-sidebar-search-item-sub'>
+                              {conv.searchPreview || conv.lastMessage}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Global User Results */}
+                {searchUserResults.length > 0 && (
+                  <div className='contacts-sidebar-search-section'>
+                    <p className='contacts-sidebar-search-section-title'>Người dùng khác</p>
+                    {searchUserResults.filter(u => !friends.some(f => f.friendId === u.id)).map(userResult => (
+                      <button
+                        key={userResult.id}
+                        className='contacts-sidebar-search-item'
+                        onClick={() => handleOpenConversationByUserId(userResult.id, `search-${userResult.id}`)}
+                      >
+                        <UserAvatar imageUrl={userResult.avatarUrl} name={userResult.displayName || 'User'} size='sm' />
+                        <div className='contacts-sidebar-search-item-copy'>
+                          <span className='contacts-sidebar-search-item-label'>{userResult.displayName}</span>
+                          {userResult.phone && <span className='contacts-sidebar-search-item-sub'>{userResult.phone}</span>}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {sidebarFilteredFriends.length === 0 && sidebarFilteredGroups.length === 0 && sidebarFilteredConversations.length === 0 && searchUserResults.length === 0 && !isSearchingUsers && (
+                  <div className='contacts-sidebar-search-empty'>
+                    Không tìm thấy kết quả phù hợp
+                  </div>
+                )}
+
+                {isSearchingUsers && (
+                  <div className='contacts-sidebar-search-loading'>
+                    Đang tìm kiếm...
+                  </div>
+                )}
+              </div>
+            )}
           </nav>
         </aside>
 
@@ -780,21 +992,6 @@ export function ContactsPage() {
                   onChange={(event) => setKeyword(event.target.value)}
                   placeholder='Tìm bạn'
                 />
-                <button
-                  type='button'
-                  onClick={() => openAddFriendModal()}
-                  className='contacts-icon-btn contacts-icon-btn-muted'
-                  title='Thêm bạn'
-                >
-                  <Icon name='userPlus' />
-                </button>
-                <button
-                  type='button'
-                  className='contacts-icon-btn contacts-icon-btn-muted'
-                  title='Tạo nhóm chat'
-                >
-                  <Icon name='group' />
-                </button>
               </div>
 
               <select
@@ -1067,7 +1264,6 @@ export function ContactsPage() {
                       labels={{
                         accept: t('contacts.requests.accept'),
                         decline: t('contacts.requests.decline'),
-                        addFriend: t('contacts.actions.addFriend'),
                         unknownUser: t('contacts.common.unknownUser'),
                       }}
                       onAccept={handleAcceptRequest}
@@ -1079,7 +1275,6 @@ export function ContactsPage() {
                           displayName: request?.fromUserDisplayName ?? t('contacts.common.unknownUser'),
                         })
                       }}
-                      onOpenAddFriend={(target) => openAddFriendModal(target)}
                     />
                   ) : (
                     <EmptyState title={t('contacts.empty.noIncomingRequestsTitle')} description={t('contacts.empty.noIncomingRequestsDesc')} />
@@ -1096,7 +1291,6 @@ export function ContactsPage() {
                       items={filteredSentRequests}
                       labels={{
                         cancelRequest: t('contacts.actions.cancelRequest'),
-                        addFriend: t('contacts.actions.addFriend'),
                         unknownUser: t('contacts.common.unknownUser'),
                       }}
                       onCancel={(requestId) => {
@@ -1107,7 +1301,6 @@ export function ContactsPage() {
                           displayName: request?.toUserDisplayName ?? t('contacts.common.unknownUser'),
                         })
                       }}
-                      onOpenAddFriend={(target) => openAddFriendModal(target)}
                     />
                   ) : (
                     <EmptyState title={t('contacts.empty.noSentRequestsTitle')} description={t('contacts.empty.noSentRequestsDesc')} />
@@ -1139,6 +1332,10 @@ export function ContactsPage() {
         initialTarget={addFriendTarget}
         isOpen={showAddFriendModal}
         onClose={closeAddFriendModal}
+        onUserFound={(user) => {
+          setProfileTargetUserId(user.id)
+          setIsProfileModalOpen(true)
+        }}
         onCompleted={
           accessToken
             ? async () => {
@@ -1148,74 +1345,20 @@ export function ContactsPage() {
         }
       />
 
-      <Modal
+      <UserProfileModal
+        accessToken={accessToken}
         isOpen={isProfileModalOpen}
         onClose={closeProfileModal}
-        title='Thông tin tài khoản'
-      >
-        {isProfileLoading ? (
-          <LoadingState label='Đang tải hồ sơ...' />
-        ) : profilePreview ? (
-          <div className='contacts-profile-modal'>
-            {profilePreview.coverUrl ? (
-              <img alt={profilePreview.displayName ?? 'Người dùng'} className='contacts-profile-cover' src={profilePreview.coverUrl} />
-            ) : (
-              <div className='contacts-profile-cover-fallback' />
-            )}
-            <div className='contacts-profile-head'>
-              <div className='contacts-profile-avatar-wrap'>
-                <UserAvatar
-                  imageUrl={profilePreview.avatarUrl}
-                  name={profilePreview.displayName ?? profilePreview.phone ?? profilePreview.email ?? 'Người dùng'}
-                  size='lg'
-                />
-              </div>
-              <div className='contacts-profile-name-row'>
-                <h4>{profilePreview.displayName ?? profilePreview.phone ?? profilePreview.email ?? 'Người dùng'}</h4>
-              </div>
-            </div>
-
-            <div className='contacts-profile-actions'>
-              <button type='button' className='contacts-profile-action-btn' onClick={handleCallFromProfile}>
-                Gọi điện
-              </button>
-              <button
-                type='button'
-                className='contacts-profile-action-btn contacts-profile-action-btn-primary'
-                onClick={() => {
-                  void handleSendMessageFromProfile()
-                }}
-                disabled={isCreatingConversationFromProfile}
-              >
-                {isCreatingConversationFromProfile ? 'Đang mở hội thoại...' : 'Nhắn tin'}
-              </button>
-            </div>
-
-            <div className='contacts-profile-info'>
-              <h5>Thông tin cá nhân</h5>
-              <div className='contacts-profile-info-grid'>
-                <div className='contacts-profile-info-label'>Bio</div>
-                <div className='contacts-profile-info-value'>{profilePreview.bio?.trim() || profilePreview.statusMessage?.trim() || 'Chưa cập nhật'}</div>
-
-                <div className='contacts-profile-info-label'>Giới tính</div>
-                <div className='contacts-profile-info-value'>Chưa cập nhật</div>
-
-                <div className='contacts-profile-info-label'>Ngày sinh</div>
-                <div className='contacts-profile-info-value'>Chưa cập nhật</div>
-
-                <div className='contacts-profile-info-label'>Điện thoại</div>
-                <div className='contacts-profile-info-value'>{profilePreview.phone || 'Chưa cập nhật'}</div>
-
-                <div className='contacts-profile-info-label'>Email</div>
-                <div className='contacts-profile-info-value'>{profilePreview.email || 'Chưa cập nhật'}</div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <EmptyState title='Không có dữ liệu hồ sơ' description='Không thể tải hồ sơ người dùng vào lúc này.' />
-        )}
-        {profileError ? <p className='contacts-confirm-note'>{profileError}</p> : null}
-      </Modal>
+        userId={profileTargetUserId}
+        onMessage={async (targetUser) => {
+          if (!accessToken) return
+          const conversationId = await getOrCreateDirectConversation(accessToken, targetUser.id)
+          navigate(`/chat/${conversationId}`)
+        }}
+        onCompleted={async () => {
+          if (accessToken) await refreshAll(accessToken)
+        }}
+      />
 
       <Modal
         description={`${confirmAction?.kind === 'unfriend' ? 'Xác nhận thao tác này sẽ xóa bạn' : confirmDescription} ${confirmAction?.displayName ?? ''}`.trim()}

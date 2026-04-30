@@ -1,5 +1,4 @@
 import type { FriendRequest } from '../../friends/friends.types'
-import type { AddFriendTarget } from '../../friends/components/AddFriendModal'
 import { UserAvatar } from '../../../shared/components/UserAvatar'
 import { Button } from '../../../shared/components/ui/Button'
 
@@ -7,11 +6,9 @@ type SentRequestListProps = {
   items: FriendRequest[]
   labels: {
     cancelRequest: string
-    addFriend: string
     unknownUser: string
   }
   onCancel: (id: string) => void
-  onOpenAddFriend?: (target: AddFriendTarget) => void
   actionLoadingId?: string | null
 }
 
@@ -19,7 +16,6 @@ export function SentRequestList({
   items,
   labels,
   onCancel,
-  onOpenAddFriend,
   actionLoadingId = null,
 }: SentRequestListProps) {
   return (
@@ -45,21 +41,7 @@ export function SentRequestList({
             >
               {labels.cancelRequest}
             </Button>
-            {onOpenAddFriend ? (
-              <Button
-                disabled={actionLoadingId === item.id}
-                onClick={() =>
-                  onOpenAddFriend({
-                    userId: item.toUserId,
-                    displayName: item.toUserDisplayName,
-                    avatarUrl: item.toUserAvatarUrl,
-                  })
-                }
-                variant='subtle'
-              >
-                {labels.addFriend}
-              </Button>
-            ) : null}
+
             </div>
           </article>
         )

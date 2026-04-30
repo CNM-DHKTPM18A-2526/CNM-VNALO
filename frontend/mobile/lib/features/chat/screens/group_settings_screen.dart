@@ -7,6 +7,7 @@ import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/features/chat/screens/group_members_screen.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
+import 'package:vnalo_mobile/core/widgets/skeleton_loading.dart';
 
 class GroupSettingsScreen extends StatefulWidget {
   final Conversation conversation;
@@ -18,7 +19,25 @@ class GroupSettingsScreen extends StatefulWidget {
 }
 
 class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
-  // Local UI state removed as we now use real persistence
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+  }
+
+  Future<void> _refresh() async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+    try {
+      await context.read<ChatProvider>().refreshConversation(widget.conversation.id);
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,9 +83,11 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
           ),
         ),
       ),
-      body: ListView(
-        children: [
-          // === Section: Thiết lập tin nhắn ===
+      body: _isLoading 
+        ? const ShimmerLoading(isLoading: true, child: GroupSettingsSkeleton())
+        : ListView(
+          children: [
+            // === Section: Thiết lập tin nhắn ===
           _buildSectionTitle('Thiết lập tin nhắn', sectionTitleColor),
           Container(
             color: bgColor,
