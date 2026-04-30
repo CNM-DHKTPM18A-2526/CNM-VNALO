@@ -86,11 +86,20 @@ const toast = {
 
 function sortMessages(messages: ChatMessage[]): ChatMessage[] {
   return [...messages].sort((left, right) => {
-    const leftSeq = left.serverSeq ?? -1
-    const rightSeq = right.serverSeq ?? -1
+    // If serverSeq is missing (optimistic message), treat it as a very large number 
+    // so it appears at the bottom of the list.
+    const leftSeq = left.serverSeq ?? Number.MAX_SAFE_INTEGER
+    const rightSeq = right.serverSeq ?? Number.MAX_SAFE_INTEGER
 
     if (leftSeq !== rightSeq) {
       return leftSeq - rightSeq
+    }
+
+    // Fallback to timestamp comparison if available
+    const leftTime = new Date(left.timestamp).getTime()
+    const rightTime = new Date(right.timestamp).getTime()
+    if (leftTime !== rightTime) {
+      return leftTime - rightTime
     }
 
     return left.id.localeCompare(right.id)
@@ -814,10 +823,11 @@ export default function ChatPage() {
           continue
         }
 
-        const current = reactions[reactionKey] ?? { count: 0, myCount: 0 }
+        const current = reactions[reactionKey] ?? { count: 0, myCount: 0, userIds: [] }
         reactions[reactionKey] = {
           count: current.count + 1,
           myCount: current.myCount + (row.userId === user?.id ? 1 : 0),
+          userIds: [...current.userIds, row.userId],
         }
       }
 
@@ -835,7 +845,9 @@ export default function ChatPage() {
 
   const syncMessageReaction = useCallback(
     async (messageId: string): Promise<void> => {
-      if (!accessToken || !messageId || !isUUID(messageId)) {
+      // Relaxed validation: ensure we have a token and an ID, but don't strictly enforce UUID 
+      // if it might be a temporary or cross-platform ID format that still maps to the server.
+      if (!accessToken || !messageId) {
         return
       }
 
@@ -947,14 +959,25 @@ export default function ChatPage() {
 
       // ── 0. SYSTEM MESSAGES (CRITICAL SIGNALS) ──
       // Handle both SYSTEM messages and TEXT messages that contain JSON signals (like poll sync)
-      if (mapped.type === 'system' || (mapped.type === 'text' && mapped.text.startsWith('{"action":'))) {
+      if (mapped.type === 'system' || (mapped.text && (mapped.text.includes('"action":') || mapped.text.startsWith('{')))) {
         try {
           let sys: any = null;
+          const content = mapped.text.trim();
+          
           try {
-            sys = JSON.parse(mapped.text);
+            if (content.startsWith('{')) {
+              sys = JSON.parse(content);
+            } else {
+              // Fallback for signals that might be embedded in other text
+              const jsonStart = content.indexOf('{"action":');
+              if (jsonStart >= 0) {
+                const potentialJson = content.substring(jsonStart);
+                sys = JSON.parse(potentialJson);
+              }
+            }
           } catch (e) {
-            // Handle plain text or malformed JSON
-            if (mapped.text === 'FRIEND_ACCEPTED' || mapped.text.includes('FRIEND_ACCEPTED')) {
+            // Handle plain text or specific recognized keywords
+            if (content.includes('FRIEND_ACCEPTED')) {
               sys = { action: 'FRIEND_ACCEPTED' };
             }
           }
@@ -1325,6 +1348,36 @@ export default function ChatPage() {
         }
         return c;
       }))
+    },
+    onMessageError: (payload) => {
+      console.error('[ChatPage] ❌ Message error:', payload);
+      if (payload.code === 'AUTH_DENIED' && payload.clientMessageId) {
+        setMessagesByConversation(prev => {
+          const cid = payload.conversationId || selectedConversationIdRef.current;
+          if (!cid || !prev[cid]) return prev;
+          return {
+            ...prev,
+            [cid]: markLocalMessageFailed(prev[cid], payload.clientMessageId!)
+          };
+        });
+        toast.error('Bạn không có quyền gửi tin nhắn này.');
+      } else {
+        toast.error(payload.message || 'Lỗi gửi tin nhắn.');
+      }
+    },
+    onConversationError: (payload) => {
+      console.error('[ChatPage] ❌ Conversation error:', payload);
+      if (payload.code === 'FORBIDDEN' || payload.code === 'NOT_MEMBER' || payload.code === 'CONVERSATION_NOT_FOUND') {
+        if (payload.conversationId) {
+          setConversations(prev => prev.filter(c => c.id !== payload.conversationId));
+          if (selectedConversationIdRef.current === payload.conversationId) {
+            navigate('/chat');
+          }
+        }
+        toast.error('Bạn không có quyền thực hiện hành động này hoặc cuộc trò chuyện không tồn tại.');
+      } else {
+        toast.error(payload.message || 'Lỗi cuộc trò chuyện.');
+      }
     }
   })
 
@@ -1501,7 +1554,7 @@ export default function ChatPage() {
 
   const handleAddReaction = useCallback(
     async (messageId: string, reactionKey: ReactionKey) => {
-      if (!accessToken || !selectedConversationId) {
+      if (!accessToken || !selectedConversationId || !user) {
         return
       }
 
@@ -1523,17 +1576,23 @@ export default function ChatPage() {
 
             // In poll voting, remove any other poll-related reactions (vote: or v:) from this user
             Object.keys(nextReactions).forEach(key => {
-              if ((key.startsWith('vote:') || key.startsWith('v:')) && nextReactions[key as ReactionKey]?.myCount > 0) {
+              const r = nextReactions[key as ReactionKey];
+              if ((key.startsWith('vote:') || key.startsWith('v:')) && r?.myCount > 0) {
                 nextReactions[key as ReactionKey] = {
-                  count: Math.max(0, nextReactions[key as ReactionKey].count - 1),
-                  myCount: 0
+                  count: Math.max(0, r.count - 1),
+                  myCount: 0,
+                  userIds: r.userIds.filter(id => id !== user.id)
                 };
               }
             });
 
+            const currentCount = nextReactions[reactionKey as ReactionKey]?.count || 0;
+            const currentUserIds = nextReactions[reactionKey as ReactionKey]?.userIds || [];
+            
             nextReactions[reactionKey as ReactionKey] = {
-              count: (nextReactions[reactionKey as ReactionKey]?.count || 0) + 1,
-              myCount: 1
+              count: currentCount + 1,
+              myCount: 1,
+              userIds: [...currentUserIds, user.id]
             };
 
             return {
@@ -1550,20 +1609,26 @@ export default function ChatPage() {
         await addMessageReaction(accessToken, messageId, emoji)
         await syncMessageReaction(messageId)
 
-        // Emit signal to sync other clients
-        void emitSendMessage({
-          conversationId: selectedConversationId,
-          content: JSON.stringify({
+        // Emit signal to sync other clients (Mobile-friendly format)
+        // Note: Mobile uses a strict .contains('"action":"UPDATE_MESSAGE_REACTIONS"') check
+        // on the RAW string. We must ensure NO WHITESPACE anywhere (colons OR commas).
+        if (user?.id) {
+          const reactionSignal = {
             action: 'UPDATE_MESSAGE_REACTIONS',
             messageId,
             conversationId: selectedConversationId,
-            actorId: user?.id,
+            actorId: user.id,
             type: 'ADD',
             emoji: emoji
-          }),
-          messageType: 'SYSTEM',
-          clientMessageId: crypto.randomUUID()
-        });
+          };
+
+          void emitSendMessage({
+            conversationId: selectedConversationId,
+            content: JSON.stringify(reactionSignal).replace(/\s/g, ''),
+            messageType: 'SYSTEM',
+            clientMessageId: crypto.randomUUID()
+          });
+        }
       } catch (error) {
         console.error('[ChatPage.handleAddReaction] Failed to add reaction', { messageId, reactionKey, error })
       }
@@ -1577,7 +1642,7 @@ export default function ChatPage() {
         return
       }
 
-      const emoji = REACTION_OPTIONS.find((item) => item.key === reactionKey)?.emoji
+      let emoji = REACTION_OPTIONS.find((item) => item.key === reactionKey)?.emoji
       if (!emoji) {
         if (typeof reactionKey === 'string' && reactionKey.startsWith('vote:')) {
           emoji = reactionKey
@@ -1595,20 +1660,24 @@ export default function ChatPage() {
         await removeMessageReaction(accessToken, messageId)
         await syncMessageReaction(messageId)
 
-        // Emit signal to sync other clients
-        void emitSendMessage({
-          conversationId: selectedConversationId,
-          content: JSON.stringify({
+        // Emit signal to sync other clients (Mobile-friendly format)
+        if (user?.id) {
+          const reactionSignal = {
             action: 'UPDATE_MESSAGE_REACTIONS',
             messageId,
             conversationId: selectedConversationId,
-            actorId: user?.id,
+            actorId: user.id,
             type: 'REMOVE',
             emoji: emoji
-          }),
-          messageType: 'SYSTEM',
-          clientMessageId: crypto.randomUUID()
-        });
+          };
+
+          void emitSendMessage({
+            conversationId: selectedConversationId,
+            content: JSON.stringify(reactionSignal).replace(/\s/g, ''),
+            messageType: 'SYSTEM',
+            clientMessageId: crypto.randomUUID()
+          });
+        }
       } catch (error) {
         console.error('[ChatPage.handleRemoveReaction] Failed to remove reaction', { messageId, reactionKey, error })
       }
@@ -1698,18 +1767,37 @@ export default function ChatPage() {
 
           await unpinMessage(accessToken, conversationId, messageId)
 
-          // Emit signal for other clients
-          void emitSendMessage({
+          const systemPayload = JSON.stringify({
+            action: 'UNPIN_MESSAGE',
+            messageId,
             conversationId,
-            content: JSON.stringify({
-              action: 'UNPIN_MESSAGE',
-              messageId,
-              conversationId,
-              actorId: user.id
-            }),
-            messageType: 'SYSTEM',
-            clientMessageId: crypto.randomUUID()
+            actorId: user.id
           });
+          
+          const clientMessageId = crypto.randomUUID();
+          void sendMessageViaRest(accessToken, {
+            conversationId,
+            content: systemPayload,
+            messageType: 'TEXT',
+            clientMessageId
+          });
+
+          // Optimistic UI Update
+          const optimisticSystemMessage: ChatMessage = {
+            id: clientMessageId,
+            conversationId,
+            senderId: user.id,
+            sender: 'system',
+            type: 'system',
+            text: systemPayload,
+            timestamp: formatMessageTimestamp(),
+            deliveryState: 'sent',
+            clientMessageId
+          };
+          setMessagesByConversation(prev => ({
+            ...prev,
+            [conversationId]: upsertMessage(prev[conversationId] ?? [], optimisticSystemMessage)
+          }));
           return
         }
 
@@ -1726,18 +1814,37 @@ export default function ChatPage() {
 
         await pinMessage(accessToken, conversationId, messageId)
 
-        // Emit signal for other clients
-        void emitSendMessage({
+        const systemPayload = JSON.stringify({
+          action: 'PIN_MESSAGE',
+          messageId,
           conversationId,
-          content: JSON.stringify({
-            action: 'PIN_MESSAGE',
-            messageId,
-            conversationId,
-            actorId: user.id
-          }),
-          messageType: 'SYSTEM',
-          clientMessageId: crypto.randomUUID()
+          actorId: user.id
         });
+        
+        const clientMessageId = crypto.randomUUID();
+        void sendMessageViaRest(accessToken, {
+          conversationId,
+          content: systemPayload,
+          messageType: 'TEXT',
+          clientMessageId
+        });
+
+        // Optimistic UI Update
+        const optimisticSystemMessage: ChatMessage = {
+          id: clientMessageId,
+          conversationId,
+          senderId: user.id,
+          sender: 'system',
+          type: 'system',
+          text: systemPayload,
+          timestamp: formatMessageTimestamp(),
+          deliveryState: 'sent',
+          clientMessageId
+        };
+        setMessagesByConversation(prev => ({
+          ...prev,
+          [conversationId]: upsertMessage(prev[conversationId] ?? [], optimisticSystemMessage)
+        }));
       } catch (error) {
         // Rollback on error
         setPinnedMessageIds((prev) => ({
@@ -3783,12 +3890,30 @@ export default function ChatPage() {
         metadata: { newName }
       });
 
-      void emitSendMessage({
+      const clientMessageId = crypto.randomUUID();
+      void sendMessageViaRest(accessToken, {
         conversationId: selectedConversationId,
         content: systemPayload,
-        messageType: 'SYSTEM',
-        clientMessageId: typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : String(Date.now()),
-      })
+        messageType: 'TEXT',
+        clientMessageId
+      });
+
+      // Optimistic UI Update
+      const optimisticSystemMessage: ChatMessage = {
+        id: clientMessageId,
+        conversationId: selectedConversationId,
+        senderId: user?.id || '',
+        sender: 'system',
+        type: 'system',
+        text: systemPayload,
+        timestamp: formatMessageTimestamp(),
+        deliveryState: 'sent',
+        clientMessageId
+      };
+      setMessagesByConversation(prev => ({
+        ...prev,
+        [selectedConversationId]: upsertMessage(prev[selectedConversationId] ?? [], optimisticSystemMessage)
+      }));
     } catch (err) {
       toast.error('Có lỗi xảy ra khi đổi tên nhóm')
       console.error(err)
@@ -3801,10 +3926,8 @@ export default function ChatPage() {
     try {
       // 0. Permission check
       const currentConv = conversations.find(c => c.id === selectedConversationId)
+      const isModerator = (currentConv?.members?.find(m => m.userId === user?.id)?.role || '').toUpperCase() === 'ADMIN' || (currentConv?.members?.find(m => m.userId === user?.id)?.role || '').toUpperCase() === 'DEPUTY'
       if (currentConv?.isGroup) {
-        const myMember = currentConv.members?.find(m => m.userId === user?.id)
-        const role = String(myMember?.role || '').toUpperCase()
-        const isModerator = role === 'ADMIN' || role === 'DEPUTY'
         if (!isModerator && !currentConv.allowMemberEditInfo) {
           toast.error('Bạn không có quyền thay đổi ảnh nhóm')
           return
@@ -3831,12 +3954,30 @@ export default function ChatPage() {
         actorId: user?.id,
       });
 
-      void emitSendMessage({
+      const clientMessageId = crypto.randomUUID();
+      void sendMessageViaRest(accessToken, {
         conversationId: selectedConversationId,
         content: systemPayload,
-        messageType: 'SYSTEM',
-        clientMessageId: crypto.randomUUID(),
+        messageType: 'TEXT',
+        clientMessageId
       });
+
+      // Optimistic UI Update
+      const optimisticSystemMessage: ChatMessage = {
+        id: clientMessageId,
+        conversationId: selectedConversationId,
+        senderId: user?.id || '',
+        sender: 'system',
+        type: 'system',
+        text: systemPayload,
+        timestamp: formatMessageTimestamp(),
+        deliveryState: 'sent',
+        clientMessageId
+      };
+      setMessagesByConversation(prev => ({
+        ...prev,
+        [selectedConversationId]: upsertMessage(prev[selectedConversationId] ?? [], optimisticSystemMessage)
+      }));
 
       // 5. Success - Silent per user request
     } catch (err: any) {
@@ -3883,12 +4024,30 @@ export default function ChatPage() {
         targetMemberIds: selectedMemberIds
       });
 
-      void emitSendMessage({
+      const clientMessageId = crypto.randomUUID();
+      void sendMessageViaRest(accessToken, {
         conversationId: selectedConversationId,
         content: systemPayload,
-        messageType: 'SYSTEM',
-        clientMessageId: crypto.randomUUID()
+        messageType: 'TEXT',
+        clientMessageId
       });
+
+      // Optimistic UI Update
+      const optimisticSystemMessage: ChatMessage = {
+        id: clientMessageId,
+        conversationId: selectedConversationId,
+        senderId: user.id,
+        sender: 'system',
+        type: 'system',
+        text: systemPayload,
+        timestamp: formatMessageTimestamp(),
+        deliveryState: 'sent',
+        clientMessageId
+      };
+      setMessagesByConversation(prev => ({
+        ...prev,
+        [selectedConversationId]: upsertMessage(prev[selectedConversationId] ?? [], optimisticSystemMessage)
+      }));
 
       setIsAddMembersOpen(false);
     } catch (error) {
@@ -3915,12 +4074,30 @@ export default function ChatPage() {
         actorId: user.id
       });
 
-      void emitSendMessage({
+      const clientMessageId = crypto.randomUUID();
+      void sendMessageViaRest(accessToken, {
         conversationId: selectedConversationId,
         content: systemPayload,
-        messageType: 'SYSTEM',
-        clientMessageId: crypto.randomUUID()
+        messageType: 'TEXT',
+        clientMessageId
       });
+
+      // Optimistic UI Update
+      const optimisticSystemMessage: ChatMessage = {
+        id: clientMessageId,
+        conversationId: selectedConversationId,
+        senderId: user.id,
+        sender: 'system',
+        type: 'system',
+        text: systemPayload,
+        timestamp: formatMessageTimestamp(),
+        deliveryState: 'sent',
+        clientMessageId
+      };
+      setMessagesByConversation(prev => ({
+        ...prev,
+        [selectedConversationId]: upsertMessage(prev[selectedConversationId] ?? [], optimisticSystemMessage)
+      }));
 
       // Then actually leave via API
       await leaveConversation(accessToken, selectedConversationId);
@@ -3954,6 +4131,7 @@ export default function ChatPage() {
         metadata: settings
       });
 
+      // Emit as transient socket signal only (not a persistent message)
       emitSendMessage({
         conversationId: selectedConversationId,
         messageType: 'system',
@@ -3974,11 +4152,12 @@ export default function ChatPage() {
         actorId: user.id
       });
 
-      void emitSendMessage({
+      const clientMessageId = crypto.randomUUID();
+      void sendMessageViaRest(accessToken, {
         conversationId: selectedConversationId,
         content: systemPayload,
-        messageType: 'SYSTEM',
-        clientMessageId: crypto.randomUUID()
+        messageType: 'TEXT',
+        clientMessageId
       });
 
       // Add a small delay to ensure socket broadcast finishes before backend deletes the group
@@ -4013,12 +4192,33 @@ export default function ChatPage() {
         targetMemberIds: [targetUserId]
       });
 
-      void emitSendMessage({
+      const clientMessageId = crypto.randomUUID();
+      // Send as 'TEXT' (uppercase) to satisfy backend validation.
+      // The frontend mapping logic will automatically detect the system action and render it as a system message.
+      void sendMessageViaRest(accessToken, {
         conversationId: selectedConversationId,
         content: systemPayload,
-        messageType: 'SYSTEM',
-        clientMessageId: crypto.randomUUID()
+        messageType: 'TEXT',
+        clientMessageId: clientMessageId
       });
+
+      // Optimistic UI Update: Add system message to local list immediately
+      const optimisticSystemMessage: ChatMessage = {
+        id: clientMessageId,
+        conversationId: selectedConversationId,
+        senderId: user.id,
+        sender: 'system',
+        type: 'system',
+        text: systemPayload,
+        timestamp: formatMessageTimestamp(),
+        deliveryState: 'sent',
+        clientMessageId: clientMessageId
+      };
+
+      setMessagesByConversation(prev => ({
+        ...prev,
+        [selectedConversationId]: upsertMessage(prev[selectedConversationId] ?? [], optimisticSystemMessage)
+      }));
 
       // API Call
       await removeMember(accessToken, selectedConversationId, targetUserId);
@@ -4057,12 +4257,30 @@ export default function ChatPage() {
           targetMemberIds: [targetUserId]
         });
 
-        void emitSendMessage({
+        const clientMessageId = crypto.randomUUID();
+        void sendMessageViaRest(accessToken, {
           conversationId: selectedConversationId,
           content: systemPayload,
-          messageType: 'SYSTEM',
-          clientMessageId: crypto.randomUUID()
+          messageType: 'TEXT',
+          clientMessageId
         });
+
+        // Optimistic UI Update
+        const optimisticSystemMessage: ChatMessage = {
+          id: clientMessageId,
+          conversationId: selectedConversationId,
+          senderId: user?.id || '',
+          sender: 'system',
+          type: 'system',
+          text: systemPayload,
+          timestamp: formatMessageTimestamp(),
+          deliveryState: 'sent',
+          clientMessageId
+        };
+        setMessagesByConversation(prev => ({
+          ...prev,
+          [selectedConversationId]: upsertMessage(prev[selectedConversationId] ?? [], optimisticSystemMessage)
+        }));
       }
 
       setConversations(prev => prev.map(c => {
@@ -4090,19 +4308,36 @@ export default function ChatPage() {
       // 1. Promote new owner
       await updateMemberRole(accessToken, selectedConversationId, newOwnerId, 'ADMIN');
 
-      // 2. Emit TRANSFER_OWNERSHIP system message
-      const transferPayload = JSON.stringify({
+      const systemPayload = JSON.stringify({
         action: 'TRANSFER_OWNERSHIP',
         actorId: user.id,
         targetMemberIds: [newOwnerId]
       });
 
-      void emitSendMessage({
+      const clientMessageId = crypto.randomUUID();
+      void sendMessageViaRest(accessToken, {
         conversationId: selectedConversationId,
-        content: transferPayload,
-        messageType: 'SYSTEM',
-        clientMessageId: crypto.randomUUID()
+        content: systemPayload,
+        messageType: 'TEXT',
+        clientMessageId
       });
+
+      // Optimistic UI Update
+      const optimisticSystemMessage: ChatMessage = {
+        id: clientMessageId,
+        conversationId: selectedConversationId,
+        senderId: user.id,
+        sender: 'system',
+        type: 'system',
+        text: systemPayload,
+        timestamp: formatMessageTimestamp(),
+        deliveryState: 'sent',
+        clientMessageId
+      };
+      setMessagesByConversation(prev => ({
+        ...prev,
+        [selectedConversationId]: upsertMessage(prev[selectedConversationId] ?? [], optimisticSystemMessage)
+      }));
 
       // 3. Perform standard leave group logic
       await doLeaveGroup();

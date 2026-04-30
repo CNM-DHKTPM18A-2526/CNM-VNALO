@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 
-type ModalVariant = 'default' | 'image' | 'confirm'
+type ModalVariant = 'default' | 'image' | 'confirm' | 'none' | 'custom'
 
 type ModalProps = {
   isOpen: boolean
@@ -64,7 +64,14 @@ export function Modal({
             </svg>
           </button>
         </div>
-        <div className={variant === 'confirm' ? 'modal-body-confirm' : 'modal-body'}>{children}</div>
+        <div className={
+          variant === 'confirm' ? 'modal-body-confirm' : 
+          variant === 'none' ? 'p-0 overflow-hidden' :
+          variant === 'custom' ? '' :
+          'modal-body'
+        }>
+          {children}
+        </div>
         {footer ? <div className='modal-footer'>{footer}</div> : null}
       </div>
     </div>,

@@ -179,12 +179,17 @@ export function formatMessagePreview(
   }
 
   // Support for system-like strings that might be raw JSON in the fallback text
-  if (content.startsWith('{"action":')) {
+  if (content.startsWith('{"action":') || content.includes('"action":')) {
     try {
-      const sys = JSON.parse(content);
-      if (sys.action === 'UPDATE_MESSAGE_REACTIONS') {
-        return ''; // Hide sync signals from sidebar if possible, or return a generic label
-      }
+      const jsonStart = content.indexOf('{"action":');
+      const sys = JSON.parse(content.substring(jsonStart));
+      if (sys.action === 'UPDATE_MESSAGE_REACTIONS') return '';
+      if (sys.action === 'REMOVE_MEMBER') return '[Thông báo] Xóa thành viên';
+      if (sys.action === 'ADD_MEMBERS') return '[Thông báo] Thêm thành viên';
+      if (sys.action === 'PROMOTE_ADMIN') return '[Thông báo] Chỉ định phó nhóm';
+      if (sys.action === 'TRANSFER_OWNERSHIP') return '[Thông báo] Chuyển chủ nhóm';
+      if (sys.action === 'LEAVE_GROUP') return '[Thông báo] Rời nhóm';
+      if (sys.action === 'RENAME_GROUP') return '[Thông báo] Đổi tên nhóm';
     } catch (e) { /* ignore */ }
     
     return `${prefix}[Thông báo hệ thống]`

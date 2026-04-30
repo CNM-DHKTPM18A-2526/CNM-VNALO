@@ -527,7 +527,7 @@ export function ConversationInfo({
         footer={
           <div className="flex gap-3 justify-end w-full">
             <button 
-              className="px-6 py-2 rounded-lg bg-[#EBEBEF] text-slate-700 font-bold text-[15px] hover:bg-gray-200 border-0 outline-none cursor-pointer"
+              className="px-6 py-2 rounded-lg bg-[var(--surface-muted)] text-[var(--text)] font-bold text-[15px] hover:bg-[var(--surface-hover)] border-0 outline-none cursor-pointer"
               onClick={() => setShowKickModal(false)}
             >
               Đóng
@@ -548,15 +548,15 @@ export function ConversationInfo({
         }
       >
         <div className="py-2 space-y-4">
-          <p className="text-[15px] text-slate-700">Xoá thành viên này khỏi nhóm?</p>
+          <p className="text-[15px] text-[var(--text)]">Xoá thành viên này khỏi nhóm?</p>
           <label className="flex items-center gap-3 cursor-pointer group">
             <input 
               type="checkbox" 
-              className="h-5 w-5 rounded border-gray-300 text-[#0091FF] focus:ring-[#0091FF]" 
+              className="h-5 w-5 rounded border-[var(--border)] bg-[var(--surface)] text-[var(--primary)] focus:ring-[var(--primary)]" 
               checked={blockOnKick}
               onChange={(e) => setBlockOnKick(e.target.checked)}
             />
-            <span className="text-[15px] text-slate-700">Chặn người này tham gia lại</span>
+            <span className="text-[15px] text-[var(--text)]">Chặn người này tham gia lại</span>
           </label>
         </div>
       </Modal>
@@ -1421,6 +1421,11 @@ function MemberListView({ conversation, currentUserId, onAddMembers, onKickMembe
     });
   }, [members, searchTerm, userMap]);
 
+  const currentUserRole = useMemo(() => {
+    const me = conversation.members?.find(m => m.userId === currentUserId);
+    return String(me?.role || 'MEMBER').toUpperCase();
+  }, [conversation.members, currentUserId]);
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <div className="p-4 border-b border-[var(--border)]">
@@ -1443,6 +1448,14 @@ function MemberListView({ conversation, currentUserId, onAddMembers, onKickMembe
              const isMe = member.userId === currentUserId;
              const profile = userMap[member.userId];
              
+             // Permission logic
+             const canKick = !isMe && (
+               (currentUserRole === 'ADMIN' && role !== 'ADMIN') || 
+               (currentUserRole === 'DEPUTY' && role === 'MEMBER')
+             );
+
+             const canPromote = !isMe && currentUserRole === 'ADMIN' && role === 'MEMBER';
+             
              return (
                <div key={member.userId} className="flex items-center justify-between p-3 rounded-xl hover:bg-[var(--surface-hover)] group transition-colors bg-transparent">
                   <div className="flex items-center gap-3">
@@ -1462,22 +1475,27 @@ function MemberListView({ conversation, currentUserId, onAddMembers, onKickMembe
                       )}
                     </div>
                   </div>
-                  {!isMe && role === 'MEMBER' && (
+                  
+                  {(canKick || canPromote) && (
                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button 
-                          className="p-2 text-[var(--muted)] hover:text-red-500 hover:bg-[var(--surface-hover)] rounded-full transition-all border-0 bg-transparent cursor-pointer"
-                          onClick={() => onKickMember?.(member.userId)}
-                          title="Xóa khỏi nhóm"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                        <button 
-                          className="p-2 text-[#0068FF] dark:text-sky-400 hover:bg-[var(--surface-hover)] rounded-full transition-all border-0 bg-transparent cursor-pointer"
-                          onClick={() => onPromoteDeputy?.(member.userId, 'DEPUTY')}
-                          title="Bổ nhiệm phó nhóm"
-                        >
-                          <ShieldCheck size={18} />
-                        </button>
+                        {canKick && (
+                          <button 
+                            className="p-2 text-[var(--muted)] hover:text-red-500 hover:bg-[var(--surface-hover)] rounded-full transition-all border-0 bg-transparent cursor-pointer"
+                            onClick={() => onKickMember?.(member.userId)}
+                            title="Xóa khỏi nhóm"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        )}
+                        {canPromote && (
+                          <button 
+                            className="p-2 text-[#0068FF] dark:text-sky-400 hover:bg-[var(--surface-hover)] rounded-full transition-all border-0 bg-transparent cursor-pointer"
+                            onClick={() => onPromoteDeputy?.(member.userId, 'DEPUTY')}
+                            title="Bổ nhiệm phó nhóm"
+                          >
+                            <ShieldCheck size={18} />
+                          </button>
+                        )}
                      </div>
                   )}
                </div>

@@ -84,6 +84,7 @@ export type MessageReactionMap = Record<
   {
     count: number
     myCount: number
+    userIds: string[]
   }
 >
 

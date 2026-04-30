@@ -29,6 +29,8 @@ type UseChatSocketOptions = {
   onGroupDisbanded?: (payload: { conversationId: string }) => void
   onGroupUpdated?: (payload: { conversationId: string; metadata: any }) => void
   onFriendshipUpdated?: (payload: { friendId: string }) => void
+  onMessageError?: (payload: { code: string; message: string; clientMessageId?: string; conversationId?: string }) => void
+  onConversationError?: (payload: { code: string; message: string; conversationId?: string }) => void
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -70,6 +72,8 @@ export function useChatSocket(options: UseChatSocketOptions) {
   const onGroupUpdatedRef = useRef<UseChatSocketOptions['onGroupUpdated']>(options.onGroupUpdated)
 
   const onFriendshipUpdatedRef = useRef<UseChatSocketOptions['onFriendshipUpdated']>(options.onFriendshipUpdated)
+  const onMessageErrorRef = useRef<UseChatSocketOptions['onMessageError']>(options.onMessageError)
+  const onConversationErrorRef = useRef<UseChatSocketOptions['onConversationError']>(options.onConversationError)
 
   // Keep refs in sync with latest callback props (runs synchronously each render)
   useEffect(() => {
@@ -90,6 +94,8 @@ export function useChatSocket(options: UseChatSocketOptions) {
     onGroupDisbandedRef.current = options.onGroupDisbanded
     onGroupUpdatedRef.current = options.onGroupUpdated
     onFriendshipUpdatedRef.current = options.onFriendshipUpdated
+    onMessageErrorRef.current = options.onMessageError
+    onConversationErrorRef.current = options.onConversationError
   }, [options])
 
   const stableHandleConnect = useRef(() => {
@@ -233,8 +239,21 @@ export function useChatSocket(options: UseChatSocketOptions) {
     }
 
     window.addEventListener('vnalo:auth-logout', handleAuthLogout)
+
+    const handleMessageError = (e: any) => {
+      onMessageErrorRef.current?.(e.detail)
+    }
+    const handleConversationError = (e: any) => {
+      onConversationErrorRef.current?.(e.detail)
+    }
+
+    window.addEventListener('vnalo:socket:message-error', handleMessageError)
+    window.addEventListener('vnalo:socket:conversation-error', handleConversationError)
+
     return () => {
       window.removeEventListener('vnalo:auth-logout', handleAuthLogout)
+      window.removeEventListener('vnalo:socket:message-error', handleMessageError)
+      window.removeEventListener('vnalo:socket:conversation-error', handleConversationError)
     }
   }, [])
 

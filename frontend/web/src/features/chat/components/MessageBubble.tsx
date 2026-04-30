@@ -423,9 +423,9 @@ export function MessageBubble({
         className="w-full flex justify-center my-3"
       >
         <span
-          className="text-[13px] text-[#596677] leading-[18px] text-center"
+          className="text-[13px] text-[var(--text-secondary)] leading-[18px] text-center"
           dangerouslySetInnerHTML={{
-            __html: systemText.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-slate-800">$1</strong>')
+            __html: systemText.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-[var(--text)]">$1</strong>')
           }}
         />
       </div>
@@ -457,6 +457,7 @@ export function MessageBubble({
             <MessageReactionBar
               reactions={reactions}
               onAddReaction={handleReactionAdd}
+              onRemoveReaction={onRemoveReaction}
               onOpenFullEmoji={() => {
                 setIsReactionBarOpen(false)
               }}
