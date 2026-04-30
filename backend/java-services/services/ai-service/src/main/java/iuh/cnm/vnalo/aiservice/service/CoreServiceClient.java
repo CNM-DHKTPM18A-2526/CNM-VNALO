@@ -23,9 +23,17 @@ public class CoreServiceClient {
         try {
             String url = coreServiceUrl + "/api/v1/ai/mascot/internal/settings?userId=" + userId;
             return restTemplate.getForObject(url, MascotSettingsDTO.class);
+    public void saveChatHistory(String userId, String conversationId, java.util.List<java.util.Map<String, String>> messages) {
+        try {
+            String url = coreServiceUrl + "/api/v1/ai/internal/history";
+            java.util.Map<String, Object> body = new java.util.HashMap<>();
+            body.put("userId", userId);
+            body.put("conversationId", conversationId);
+            body.put("messages", messages);
+            
+            restTemplate.postForEntity(url, body, Void.class);
         } catch (Exception e) {
-            log.warn("Could not fetch mascot settings for user {}: {}. Using defaults.", userId, e.getMessage());
-            return null;
+            log.warn("Failed to persist chat history to core-service: {}", e.getMessage());
         }
     }
 }
