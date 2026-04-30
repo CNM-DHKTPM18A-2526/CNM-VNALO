@@ -52,16 +52,16 @@ export function EditConversationNameModal({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title}>
-      <div className="flex flex-col bg-white -m-5">
+      <div className="flex flex-col bg-[var(--surface)] -m-5">
         <div className="px-5 py-6 flex flex-col items-center">
           <UserAvatar 
             name={defaultValue || (mode === 'group' ? 'Nhóm' : 'Người dùng')} 
             imageUrl={avatarUrl} 
             size="lg" 
-            className="w-[60px] h-[60px] mb-4 shadow-sm"
+            className="w-[60px] h-[60px] mb-4 shadow-sm border-2 border-[var(--border)]"
             isGroup={mode === 'group'} 
           />
-          <p className="text-[14px] text-center text-slate-500 mb-6 px-4">
+          <p className="text-[14px] text-center text-[var(--muted)] mb-6 px-4">
             {description}
           </p>
           <div className="w-full px-2">
@@ -70,7 +70,7 @@ export function EditConversationNameModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               disabled={isSubmitting}
-              className="w-full text-center border-b-2 border-blue-500 text-[16px] font-medium py-2 focus:outline-none placeholder-slate-300 text-slate-800 bg-transparent transition-colors disabled:opacity-60"
+              className="w-full text-center border-b-2 border-[var(--primary)] text-[16px] font-medium py-2 focus:outline-none placeholder-[var(--muted)] text-[var(--text)] bg-transparent transition-colors disabled:opacity-60"
               placeholder={mode === 'group' ? 'Nhập tên nhóm' : 'Nhập tên gợi nhớ'}
               maxLength={100}
               autoFocus
@@ -78,18 +78,18 @@ export function EditConversationNameModal({
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 px-5 py-4 border-t border-gray-200 bg-white">
+        <div className="flex justify-end gap-3 px-5 py-4 border-t border-[var(--border)] bg-[var(--surface)]">
           <button
-            className="px-6 py-2.5 rounded font-semibold text-[15px] text-[#081c36] bg-[#e9ebed] hover:bg-gray-300 transition-colors duration-200 cursor-pointer"
+            className="px-6 py-2.5 rounded font-semibold text-[15px] text-[var(--text)] bg-[var(--surface-muted)] hover:opacity-80 transition-all duration-200 cursor-pointer border-none"
             onClick={onClose}
             disabled={isSubmitting}
           >
             Hủy
           </button>
           <button
-            className={`px-6 py-2.5 rounded font-semibold text-[15px] transition-all duration-200 ${canSubmit
-              ? 'bg-[#0068ff] text-white hover:bg-blue-600 shadow-sm cursor-pointer'
-              : 'bg-[#abc9ff] text-white cursor-not-allowed'
+            className={`px-6 py-2.5 rounded font-semibold text-[15px] transition-all duration-200 border-none ${canSubmit
+              ? 'bg-[var(--primary)] text-white hover:opacity-90 shadow-sm cursor-pointer'
+              : 'bg-[var(--primary)] opacity-40 text-white cursor-not-allowed'
               }`}
             onClick={handleSubmit}
             disabled={!canSubmit}

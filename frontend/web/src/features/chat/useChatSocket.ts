@@ -18,6 +18,8 @@ type UseChatSocketOptions = {
   onMessageRecalled?: (payload: { messageId: string; conversationId: string; recalledBy: string }) => void
   onMessageRead?: (payload: { userId: string; conversationId: string; lastReadSeq: number }) => void
   onPresenceChanged?: (payload: PresenceChangedPayload) => void
+  onMessagePinned?: (payload: { pin: any; pinnedBy: string }) => void
+  onMessageUnpinned?: (payload: { messageId: string; conversationId: string; unpinnedBy: string }) => void
   onReactionAdded?: (payload: { messageId: string; userId: string; emoji: string }) => void
   onReactionRemoved?: (payload: { messageId: string; userId: string; emoji: string }) => void
   onGroupMemberAdded?: (payload: { conversationId: string; targetMemberIds: string[]; actorId: string }) => void
@@ -26,6 +28,9 @@ type UseChatSocketOptions = {
   onGroupRoleChanged?: (payload: { conversationId: string; targetUserId: string; role: string; actorId: string }) => void
   onGroupDisbanded?: (payload: { conversationId: string }) => void
   onGroupUpdated?: (payload: { conversationId: string; metadata: any }) => void
+  onFriendshipUpdated?: (payload: { friendId: string }) => void
+  onMessageError?: (payload: { code: string; message: string; clientMessageId?: string; conversationId?: string }) => void
+  onConversationError?: (payload: { code: string; message: string; conversationId?: string }) => void
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -55,6 +60,8 @@ export function useChatSocket(options: UseChatSocketOptions) {
   const onMessageRecalledRef = useRef<UseChatSocketOptions['onMessageRecalled']>(onMessageRecalled)
   const onMessageReadRef = useRef<UseChatSocketOptions['onMessageRead']>(onMessageRead)
   const onPresenceChangedRef = useRef<UseChatSocketOptions['onPresenceChanged']>(onPresenceChanged)
+  const onMessagePinnedRef = useRef<UseChatSocketOptions['onMessagePinned']>(options.onMessagePinned)
+  const onMessageUnpinnedRef = useRef<UseChatSocketOptions['onMessageUnpinned']>(options.onMessageUnpinned)
   const onReactionAddedRef = useRef<UseChatSocketOptions['onReactionAdded']>(options.onReactionAdded)
   const onReactionRemovedRef = useRef<UseChatSocketOptions['onReactionRemoved']>(options.onReactionRemoved)
   const onGroupMemberAddedRef = useRef<UseChatSocketOptions['onGroupMemberAdded']>(options.onGroupMemberAdded)
@@ -64,6 +71,10 @@ export function useChatSocket(options: UseChatSocketOptions) {
   const onGroupDisbandedRef = useRef<UseChatSocketOptions['onGroupDisbanded']>(options.onGroupDisbanded)
   const onGroupUpdatedRef = useRef<UseChatSocketOptions['onGroupUpdated']>(options.onGroupUpdated)
 
+  const onFriendshipUpdatedRef = useRef<UseChatSocketOptions['onFriendshipUpdated']>(options.onFriendshipUpdated)
+  const onMessageErrorRef = useRef<UseChatSocketOptions['onMessageError']>(options.onMessageError)
+  const onConversationErrorRef = useRef<UseChatSocketOptions['onConversationError']>(options.onConversationError)
+
   // Keep refs in sync with latest callback props (runs synchronously each render)
   useEffect(() => {
     onConnectedRef.current = options.onConnected
@@ -72,6 +83,8 @@ export function useChatSocket(options: UseChatSocketOptions) {
     onMessageRecalledRef.current = options.onMessageRecalled
     onMessageReadRef.current = options.onMessageRead
     onPresenceChangedRef.current = options.onPresenceChanged
+    onMessagePinnedRef.current = options.onMessagePinned
+    onMessageUnpinnedRef.current = options.onMessageUnpinned
     onReactionAddedRef.current = options.onReactionAdded
     onReactionRemovedRef.current = options.onReactionRemoved
     onGroupMemberAddedRef.current = options.onGroupMemberAdded
@@ -80,6 +93,9 @@ export function useChatSocket(options: UseChatSocketOptions) {
     onGroupRoleChangedRef.current = options.onGroupRoleChanged
     onGroupDisbandedRef.current = options.onGroupDisbanded
     onGroupUpdatedRef.current = options.onGroupUpdated
+    onFriendshipUpdatedRef.current = options.onFriendshipUpdated
+    onMessageErrorRef.current = options.onMessageError
+    onConversationErrorRef.current = options.onConversationError
   }, [options])
 
   const stableHandleConnect = useRef(() => {
@@ -103,6 +119,8 @@ export function useChatSocket(options: UseChatSocketOptions) {
   const stableHandlePresenceChanged = useRef((payload: PresenceChangedPayload) => {
     onPresenceChangedRef.current?.(payload)
   })
+  const stableHandleMessagePinned = useRef((payload: any) => onMessagePinnedRef.current?.(payload))
+  const stableHandleMessageUnpinned = useRef((payload: any) => onMessageUnpinnedRef.current?.(payload))
   const stableHandleReactionAdded = useRef((payload: any) => onReactionAddedRef.current?.(payload))
   const stableHandleReactionRemoved = useRef((payload: any) => onReactionRemovedRef.current?.(payload))
   const stableHandleGroupMemberAdded = useRef((payload: any) => onGroupMemberAddedRef.current?.(payload))
@@ -111,6 +129,8 @@ export function useChatSocket(options: UseChatSocketOptions) {
   const stableHandleGroupRoleChanged = useRef((payload: any) => onGroupRoleChangedRef.current?.(payload))
   const stableHandleGroupDisbanded = useRef((payload: any) => onGroupDisbandedRef.current?.(payload))
   const stableHandleGroupUpdated = useRef((payload: any) => onGroupUpdatedRef.current?.(payload))
+  const stableHandleFriendshipUpdated = useRef((payload: any) => onFriendshipUpdatedRef.current?.(payload))
+
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // CONNECT + REGISTER LISTENERS (only when token changes)
@@ -148,6 +168,8 @@ export function useChatSocket(options: UseChatSocketOptions) {
     socket.off('message.received', stableHandleMessageReceived.current)
     socket.off('message.recalled', stableHandleMessageRecalled.current)
     socket.off('message.read', stableHandleMessageRead.current)
+    socket.off('message.pinned', stableHandleMessagePinned.current)
+    socket.off('message.unpinned', stableHandleMessageUnpinned.current)
     socket.off('message.reaction.added', stableHandleReactionAdded.current)
     socket.off('message.reaction.removed', stableHandleReactionRemoved.current)
     socket.off('presence.changed', stableHandlePresenceChanged.current)
@@ -157,6 +179,8 @@ export function useChatSocket(options: UseChatSocketOptions) {
     socket.off('group.roleChanged', stableHandleGroupRoleChanged.current)
     socket.off('group.disbanded', stableHandleGroupDisbanded.current)
     socket.off('group.updated', stableHandleGroupUpdated.current)
+    socket.off('friendship.updated', stableHandleFriendshipUpdated.current)
+
 
     // Re-add listeners
     socket.on('connect', stableHandleConnect.current)
@@ -165,6 +189,8 @@ export function useChatSocket(options: UseChatSocketOptions) {
     socket.on('message.received', stableHandleMessageReceived.current)
     socket.on('message.recalled', stableHandleMessageRecalled.current)
     socket.on('message.read', stableHandleMessageRead.current)
+    socket.on('message.pinned', stableHandleMessagePinned.current)
+    socket.on('message.unpinned', stableHandleMessageUnpinned.current)
     socket.on('message.reaction.added', stableHandleReactionAdded.current)
     socket.on('message.reaction.removed', stableHandleReactionRemoved.current)
     socket.on('presence.changed', stableHandlePresenceChanged.current)
@@ -174,6 +200,8 @@ export function useChatSocket(options: UseChatSocketOptions) {
     socket.on('group.roleChanged', stableHandleGroupRoleChanged.current)
     socket.on('group.disbanded', stableHandleGroupDisbanded.current)
     socket.on('group.updated', stableHandleGroupUpdated.current)
+    socket.on('friendship.updated', stableHandleFriendshipUpdated.current)
+
 
     // If already connected, replay onConnected callback
     if (socket.connected && socket.id) {
@@ -189,6 +217,8 @@ export function useChatSocket(options: UseChatSocketOptions) {
       socket.off('message.received', stableHandleMessageReceived.current)
       socket.off('message.recalled', stableHandleMessageRecalled.current)
       socket.off('message.read', stableHandleMessageRead.current)
+      socket.off('message.pinned', stableHandleMessagePinned.current)
+      socket.off('message.unpinned', stableHandleMessageUnpinned.current)
       socket.off('message.reaction.added', stableHandleReactionAdded.current)
       socket.off('message.reaction.removed', stableHandleReactionRemoved.current)
       socket.off('presence.changed', stableHandlePresenceChanged.current)
@@ -198,6 +228,7 @@ export function useChatSocket(options: UseChatSocketOptions) {
       socket.off('group.roleChanged', stableHandleGroupRoleChanged.current)
       socket.off('group.disbanded', stableHandleGroupDisbanded.current)
       socket.off('group.updated', stableHandleGroupUpdated.current)
+      socket.off('friendship.updated', stableHandleFriendshipUpdated.current)
     }
   }, [token])
 
@@ -208,8 +239,21 @@ export function useChatSocket(options: UseChatSocketOptions) {
     }
 
     window.addEventListener('vnalo:auth-logout', handleAuthLogout)
+
+    const handleMessageError = (e: any) => {
+      onMessageErrorRef.current?.(e.detail)
+    }
+    const handleConversationError = (e: any) => {
+      onConversationErrorRef.current?.(e.detail)
+    }
+
+    window.addEventListener('vnalo:socket:message-error', handleMessageError)
+    window.addEventListener('vnalo:socket:conversation-error', handleConversationError)
+
     return () => {
       window.removeEventListener('vnalo:auth-logout', handleAuthLogout)
+      window.removeEventListener('vnalo:socket:message-error', handleMessageError)
+      window.removeEventListener('vnalo:socket:conversation-error', handleConversationError)
     }
   }, [])
 

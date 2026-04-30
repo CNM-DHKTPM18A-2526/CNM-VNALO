@@ -301,7 +301,7 @@ export function SearchGlobalPanel({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
-          className="flex-1 outline-none bg-transparent text-sm text-gray-800 dark:text-gray-100 placeholder-gray-400"
+          className="flex-1 outline-none bg-transparent text-sm text-[var(--text)] placeholder-gray-400"
         />
         {query && (
           <button onClick={() => setQuery('')} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">

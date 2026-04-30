@@ -39,6 +39,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [accessToken])
 
   useEffect(() => {
+    const handleRevoked = () => {
+      console.log('[AuthContext] Auth revoked (401/403), logging out...');
+      logout();
+    };
+
+    window.addEventListener('vnalo:auth:revoked', handleRevoked);
+    return () => {
+      window.removeEventListener('vnalo:auth:revoked', handleRevoked);
+    };
+  }, []);
+
+  useEffect(() => {
     const handleStorage = (event: StorageEvent) => {
       if (event.key !== ACCESS_TOKEN_KEY) {
         return

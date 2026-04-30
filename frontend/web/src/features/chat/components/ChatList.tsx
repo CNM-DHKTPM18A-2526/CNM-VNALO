@@ -9,6 +9,10 @@ import { useLanguage } from '../../../shared/i18n/LanguageContext'
 import type { UserLookupResult } from '../../friends/friends.types'
 import type { ConversationSummary } from '../chat.types'
 import { ChatItem } from './ChatItem'
+import { UserProfileModal } from './UserProfileModal'
+import { useAuth } from '../../auth/useAuth'
+import { getOrCreateDirectConversation } from '../chat.api'
+import { useNavigate } from 'react-router-dom'
 import {
   searchConversationsLocal,
   searchMessagesLocal,
@@ -40,10 +44,13 @@ export const ChatList = memo(function ChatList({
   onSelectConversation,
   onCreateGroupClick,
 }: ChatListProps) {
+  const { accessToken } = useAuth()
+  const navigate = useNavigate()
   const { t } = useLanguage()
   const [keyword, setKeyword] = useState('')
   const [debouncedKeyword, setDebouncedKeyword] = useState('')
   const [isAddFriendOpen, setIsAddFriendOpen] = useState(false)
+  const [selectedProfileUserId, setSelectedProfileUserId] = useState<string | null>(null)
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false)
   const [groupName, setGroupName] = useState('')
   const [groupMembers, setGroupMembers] = useState('')
@@ -220,7 +227,7 @@ export const ChatList = memo(function ChatList({
               title={t('chat.addFriend')}
               type='button'
             >
-              <Icon name='userPlus' />
+              <Icon name='userPlusZalo' size={20} />
               <span className='chat-toolbar-tooltip'>{t('chat.addFriend')}</span>
             </button>
             <button
@@ -229,7 +236,7 @@ export const ChatList = memo(function ChatList({
               title={t('chat.createGroup')}
               type='button'
             >
-              <Icon name='group' />
+              <Icon name='groupPlusZalo' size={22} />
               <span className='chat-toolbar-tooltip'>{t('chat.createGroup')}</span>
             </button>
           </div>
@@ -267,6 +274,21 @@ export const ChatList = memo(function ChatList({
         initialTarget={addFriendInitialTarget}
         isOpen={isAddFriendOpen}
         onClose={() => setIsAddFriendOpen(false)}
+        onUserFound={(user) => {
+          setSelectedProfileUserId(user.id)
+        }}
+      />
+
+      <UserProfileModal
+        accessToken={accessToken}
+        isOpen={Boolean(selectedProfileUserId)}
+        onClose={() => setSelectedProfileUserId(null)}
+        userId={selectedProfileUserId}
+        onMessage={async (targetUser) => {
+          if (!accessToken) return
+          const conversationId = await getOrCreateDirectConversation(accessToken, targetUser.id)
+          navigate(`/chat/${conversationId}`)
+        }}
       />
 
       <Modal

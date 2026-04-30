@@ -42,13 +42,29 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (
     : `http://${FALLBACK_HOST}/api/v1`
 );
 
+if (typeof window !== 'undefined') {
+  // Store the root origin (without /api/v1) for media resolution
+  (window as any).__VNALO_API_ROOT__ = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
+}
+
 export const MESSAGE_API_URL = import.meta.env.VITE_MESSAGE_API_URL ?? API_BASE_URL;
 
-export const MEDIA_API_URL = import.meta.env.VITE_MEDIA_API_URL ?? (
+const rawMediaUrl = import.meta.env.VITE_MEDIA_API_URL ?? (
   typeof window !== 'undefined'
     ? `${window.location.origin}/api/v1/media`
     : `http://${FALLBACK_HOST}/api/v1/media`
 );
+
+// Robust normalization for Media API URL
+const normalizeMediaUrl = (url: string) => {
+  let cleaned = url.replace(/\/+$/, ''); // Remove trailing slashes
+  if (cleaned.endsWith('/api/v1')) {
+    cleaned = `${cleaned}/media`;
+  }
+  return `${cleaned}/`; // Always end with a single slash to avoid redirects
+};
+
+export const MEDIA_API_URL = normalizeMediaUrl(rawMediaUrl);
 
 export const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL ?? (
   typeof window !== 'undefined'
@@ -83,10 +99,21 @@ mediaApi.interceptors.request.use(req => {
   return req;
 });
 
+const globalLogoutHandler = () => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('vnalo:auth:revoked', {
+      detail: { reason: 'token_expired' }
+    }));
+  }
+};
+
 const commonResponseInterceptor = [
   (res: any) => res,
   (err: any) => {
     console.error('[API ERROR]', err.response?.data || err.message);
+    if (err.response?.status === 401) {
+      globalLogoutHandler();
+    }
     return Promise.reject(err);
   }
 ] as const;

@@ -1,4 +1,4 @@
-import { WS_BASE_URL } from '../api.client';
+import { API_BASE_URL } from '../api.client';
 
 export function resolveMediaUrl(url?: string | null): string {
   if (!url) return '';
@@ -13,7 +13,23 @@ export function resolveMediaUrl(url?: string | null): string {
       const urlObj = new URL(url);
       // Object key is the path after the bucket name (e.g., /chat_image/...)
       const objectKey = urlObj.pathname.startsWith('/') ? urlObj.pathname.slice(1) : urlObj.pathname;
-      return `${window.location.origin}/api/v1/media/public-file?key=${encodeURIComponent(objectKey)}`;
+      
+      // Mandatory: Detect category from key prefix for the Java Backend Proxy
+      let category = 'CHAT_FILE';
+      const lowerKey = objectKey.toLowerCase();
+      if (lowerKey.startsWith('emoji/')) category = 'EMOJI';
+      else if (lowerKey.startsWith('sticker/')) category = 'STICKER';
+      else if (lowerKey.startsWith('chat_image/')) category = 'CHAT_IMAGE';
+      else if (lowerKey.startsWith('chat_video/')) category = 'CHAT_VIDEO';
+      else if (lowerKey.startsWith('avatar/')) category = 'AVATAR';
+      else if (lowerKey.startsWith('cover/')) category = 'COVER';
+      else if (lowerKey.startsWith('story/')) category = 'STORY';
+      else if (lowerKey.startsWith('timeline/')) category = 'TIMELINE';
+
+      // Use API_BASE_URL from api.client for reliability
+      const base = (API_BASE_URL || '').replace(/\/api\/v1\/?$/, '');
+      const finalBase = base || window.location.origin;
+      return `${finalBase}/api/v1/media/public-file?key=${encodeURIComponent(objectKey)}&category=${category}`;
     } catch (e) {
       return url;
     }
@@ -23,12 +39,16 @@ export function resolveMediaUrl(url?: string | null): string {
   if (url.startsWith('http://') || url.startsWith('https://')) {
     const urlObj = new URL(url);
     if (urlObj.hostname === 'localhost' || urlObj.hostname === '127.0.0.1') {
-      return `${window.location.origin}${urlObj.pathname}${urlObj.search}`;
+      const base = (API_BASE_URL || '').replace(/\/api\/v1\/?$/, '');
+      const finalBase = base || window.location.origin;
+      return `${finalBase}${urlObj.pathname}${urlObj.search}`;
     }
     return url;
   }
 
   // Handle relative paths
   const relativePath = url.startsWith('/') ? url : `/${url}`;
-  return `${window.location.origin}${relativePath}`;
+  const base = (API_BASE_URL || '').replace(/\/api\/v1\/?$/, '');
+  const finalBase = base || window.location.origin;
+  return `${finalBase}${relativePath}`;
 }

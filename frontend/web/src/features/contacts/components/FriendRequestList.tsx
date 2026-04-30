@@ -1,5 +1,4 @@
 import type { FriendRequest } from '../../friends/friends.types'
-import type { AddFriendTarget } from '../../friends/components/AddFriendModal'
 import { UserAvatar } from '../../../shared/components/UserAvatar'
 import { Button } from '../../../shared/components/ui/Button'
 
@@ -8,12 +7,10 @@ type FriendRequestListProps = {
   labels: {
     accept: string
     decline: string
-    addFriend: string
     unknownUser: string
   }
   onAccept: (id: string) => void
   onDecline: (id: string) => void
-  onOpenAddFriend?: (target: AddFriendTarget) => void
   actionLoadingId?: string | null
   actionType?: 'accept' | 'decline' | null
 }
@@ -23,7 +20,6 @@ export function FriendRequestList({
   labels,
   onAccept,
   onDecline,
-  onOpenAddFriend,
   actionLoadingId = null,
   actionType = null,
 }: FriendRequestListProps) {
@@ -57,21 +53,7 @@ export function FriendRequestList({
             >
               {labels.decline}
             </Button>
-            {onOpenAddFriend ? (
-              <Button
-                disabled={actionLoadingId === item.id}
-                onClick={() =>
-                  onOpenAddFriend({
-                    userId: item.fromUserId,
-                    displayName: item.fromUserDisplayName,
-                    avatarUrl: item.fromUserAvatarUrl,
-                  })
-                }
-                variant='subtle'
-              >
-                {labels.addFriend}
-              </Button>
-            ) : null}
+
             {actionLoadingId === item.id && actionType ? <p className='contacts-inline-loading'>{actionType}...</p> : null}
             </div>
           </article>

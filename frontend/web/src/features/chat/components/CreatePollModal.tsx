@@ -10,6 +10,10 @@ interface CreatePollModalProps {
 export function CreatePollModal({ onClose, onCreate }: CreatePollModalProps) {
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState(['', '']);
+  const [allowMultiple, setAllowMultiple] = useState(false);
+  const [allowAddOption, setAllowAddOption] = useState(false);
+  const [isAnonymous, setIsAnonymous] = useState(false);
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
 
   const handleAddField = () => {
     setOptions([...options, '']);
@@ -28,13 +32,17 @@ export function CreatePollModal({ onClose, onCreate }: CreatePollModalProps) {
     if (!isValid) return;
 
     const poll: PollMetadata = {
-      id: `poll-${Date.now()}`,
+      id: `p${Date.now()}`,
       question: question.trim(),
       options: filledOptions.map((opt, idx) => ({
-        id: `opt-${idx}-${Date.now()}`,
+        id: `o${idx}`,
         label: opt.trim(),
         votes: []
       })),
+      allowMultiple,
+      allowAddOption,
+      isAnonymous,
+      expiresAt,
       totalVotes: 0
     };
 
@@ -96,6 +104,46 @@ export function CreatePollModal({ onClose, onCreate }: CreatePollModalProps) {
               <Plus size={20} strokeWidth={2.5} />
               Thêm lựa chọn
             </button>
+          </div>
+
+          {/* Settings Section */}
+          <div className="pt-4 border-t border-[var(--border)] space-y-4">
+            <label className="text-[14px] font-medium text-[var(--muted)] flex items-center gap-2">
+              <Settings size={16} />
+              Cài đặt bình chọn
+            </label>
+            
+            <div className="space-y-3">
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  checked={allowMultiple}
+                  onChange={(e) => setAllowMultiple(e.target.checked)}
+                  className="w-5 h-5 rounded border-[var(--border)] text-blue-600 focus:ring-blue-500 cursor-pointer" 
+                />
+                <span className="text-[15px] text-[var(--text)] group-hover:text-blue-600 transition-colors">Cho phép chọn nhiều phương án</span>
+              </label>
+
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  checked={allowAddOption}
+                  onChange={(e) => setAllowAddOption(e.target.checked)}
+                  className="w-5 h-5 rounded border-[var(--border)] text-blue-600 focus:ring-blue-500 cursor-pointer" 
+                />
+                <span className="text-[15px] text-[var(--text)] group-hover:text-blue-600 transition-colors">Có thể thêm phương án</span>
+              </label>
+
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  checked={isAnonymous}
+                  onChange={(e) => setIsAnonymous(e.target.checked)}
+                  className="w-5 h-5 rounded border-[var(--border)] text-blue-600 focus:ring-blue-500 cursor-pointer" 
+                />
+                <span className="text-[15px] text-[var(--text)] group-hover:text-blue-600 transition-colors">Bình chọn ẩn danh</span>
+              </label>
+            </div>
           </div>
         </div>
 
