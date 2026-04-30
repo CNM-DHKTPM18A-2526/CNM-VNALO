@@ -5,6 +5,7 @@ import {
   ManyToOne,
   JoinColumn,
   PrimaryColumn,
+  VersionColumn,
   Index,
 } from 'typeorm';
 import { Conversation } from './conversation.entity';
@@ -86,6 +87,9 @@ export class ConversationMember {
     default: NotificationSetting.ALL,
   })
   notificationSetting: NotificationSetting;
+
+  @VersionColumn({ default: 0 })
+  version: number;
 
   // Relations
   @ManyToOne(() => Conversation, (c) => c.members, { onDelete: 'CASCADE' })

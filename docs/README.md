@@ -10,7 +10,7 @@ Core technical references that describe architecture, APIs, and storage.
 
 | Document | Description |
 |----------|-------------|
-| [Architecture](system/architecture.md) | Current service map, ports, communication patterns, runtime scope |
+| [Architecture](system/architecture.md) | **HARDENED** — Target service map, ports, trust boundaries, routing, JWT contract, hardened security perimeter |
 | [Database Schema](system/database-schema.md) | PostgreSQL-first schema documentation with reconcile notes |
 | [API Reference](system/api-reference.md) | REST endpoints and Socket.IO events |
 
