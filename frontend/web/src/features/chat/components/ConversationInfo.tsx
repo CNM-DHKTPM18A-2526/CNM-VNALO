@@ -117,6 +117,12 @@ export function ConversationInfo({
     return role === 'ADMIN' || role === 'DEPUTY';
   }, [currentUserId, conversation.members]);
 
+  const isOwner = useMemo(() => {
+    if (!currentUserId || !conversation.members) return false;
+    const role = String(conversation.members.find(m => m.userId === currentUserId)?.role || '').toUpperCase();
+    return role === 'ADMIN';
+  }, [currentUserId, conversation.members]);
+
   const allDisplayMemberIds = useMemo(() => {
     const ids = [...(conversation.participantUserIds || [])];
     if (currentUserId && !ids.includes(currentUserId)) {
