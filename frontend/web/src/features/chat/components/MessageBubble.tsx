@@ -408,11 +408,24 @@ export function MessageBubble({
   const showReactionTrigger = isReactionBarOpen || (supportsHover ? isMessageHovered : isMessageTapped)
   const quickReactionEmoji = REACTION_OPTIONS.find((item) => item.key === quickReaction)?.emoji ?? '❤️'
 
+  const isModerator = userRole?.toUpperCase() === 'ADMIN' || userRole?.toUpperCase() === 'DEPUTY'
+
   if (message.type === 'system') {
     const getDisplayName = (id: string) => {
       if (id === currentUserId) return 'Bạn'
       return userMap[id]?.displayName || 'Người dùng'
     }
+
+    // Silent Leave Group logic: Only show to Moderators if payload has silent: true
+    try {
+      const payload = JSON.parse(message.text || '{}');
+      if (payload.action === 'LEAVE_GROUP' && payload.silent && !isModerator) {
+        return null;
+      }
+    } catch (e) {
+      // Not a JSON payload or missing action, continue normally
+    }
+
     const systemText = formatMessage(message, currentUserId || '', getDisplayName)
 
     if (!systemText) return null

@@ -111,7 +111,7 @@ const commonResponseInterceptor = [
   (res: any) => res,
   (err: any) => {
     console.error('[API ERROR]', err.response?.data || err.message);
-    if (err.response?.status === 401 || err.response?.status === 403) {
+    if (err.response?.status === 401) {
       globalLogoutHandler();
     }
     return Promise.reject(err);

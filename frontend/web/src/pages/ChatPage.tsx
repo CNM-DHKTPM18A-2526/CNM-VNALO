@@ -220,8 +220,9 @@ function getConversationPreview(
   message: ChatMessage,
   currentUserId: string,
   getDisplayName: (id: string) => string,
+  isModerator?: boolean
 ): string {
-  return formatMessage(message, currentUserId, getDisplayName)
+  return formatMessage(message, currentUserId, getDisplayName, isModerator)
 }
 
 
@@ -232,9 +233,10 @@ function formatConversationPreview(
   message: ChatMessage | string,
   currentUserId: string,
   getDisplayName: (id: string) => string,
+  isModerator?: boolean
 ): string {
   if (typeof message !== 'string' && message.type === 'system') {
-    return getConversationPreview(message, currentUserId, getDisplayName)
+    return getConversationPreview(message, currentUserId, getDisplayName, isModerator)
   }
 
   const isMe = typeof message !== 'string' && message.senderId === currentUserId;
@@ -249,10 +251,10 @@ function formatConversationPreview(
 
   // Preserve complex system formatting if content is JSON
   if (text.startsWith('{"action":')) {
-    text = renderSystemMessage(text, currentUserId, getDisplayName);
+    text = renderSystemMessage(text, currentUserId, getDisplayName, isModerator);
   }
 
-  return formatMessagePreview(text, isMe, type, senderName || undefined, attachments);
+  return formatMessagePreview(text, isMe, type, senderName || undefined, attachments, isModerator);
 }
 
 function getDraftMessageType(payload: ChatComposePayload): ChatMessageType {
@@ -492,6 +494,7 @@ export default function ChatPage() {
   const [pinnedConversationIds, setPinnedConversationIds] = useState<Record<string, boolean>>({})
   const [confirmDeleteHistoryId, setConfirmDeleteHistoryId] = useState<string | null>(null)
   const [confirmLeaveGroupOpen, setConfirmLeaveGroupOpen] = useState(false)
+  const [leaveGroupSilently, setLeaveGroupSilently] = useState(false)
   const [selectedProfileUserId, setSelectedProfileUserId] = useState<string | null>(null)
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
 
@@ -579,7 +582,7 @@ export default function ChatPage() {
     userMapRef.current = userMap
   }, [userMap])
   const messageLoadRequestSeqRef = useRef(0)
-  const pendingMetadataFetches = useRef<Map<string, Promise<void>>> (new Map())
+  const pendingMetadataFetches = useRef<Map<string, Promise<void>>>(new Map())
   const processedMessageIds = useRef<Set<string>>(new Set())
 
   // Load deleted timestamps & pinned conversations from localStorage on mount
@@ -963,7 +966,7 @@ export default function ChatPage() {
         try {
           let sys: any = null;
           const content = mapped.text.trim();
-          
+
           try {
             if (content.startsWith('{')) {
               sys = JSON.parse(content);
@@ -1060,11 +1063,17 @@ export default function ChatPage() {
       const senderProfile = userMapRef.current[senderId];
       const senderDisplayName = senderId === user.id ? 'Bạn' : (senderProfile?.displayName || 'Người dùng');
 
+      // Calculate if current user is moderator for this conversation
+      const conversation = conversationsRef.current.find(c => c.id === mapped.conversationId);
+      const myMember = conversation?.members?.find(m => m.userId === user.id);
+      const isModerator = myMember?.role === 'ADMIN' || myMember?.role === 'DEPUTY';
+
       const preview = formatConversationPreview(
         senderDisplayName,
         mapped,
         user.id,
-        (id) => userMapRef.current[id]?.displayName || 'Người dùng'
+        (id) => userMapRef.current[id]?.displayName || 'Người dùng',
+        isModerator
       );
 
       // Fast message update
@@ -1588,7 +1597,7 @@ export default function ChatPage() {
 
             const currentCount = nextReactions[reactionKey as ReactionKey]?.count || 0;
             const currentUserIds = nextReactions[reactionKey as ReactionKey]?.userIds || [];
-            
+
             nextReactions[reactionKey as ReactionKey] = {
               count: currentCount + 1,
               myCount: 1,
@@ -1773,7 +1782,7 @@ export default function ChatPage() {
             conversationId,
             actorId: user.id
           });
-          
+
           const clientMessageId = crypto.randomUUID();
           void sendMessageViaRest(accessToken, {
             conversationId,
@@ -1820,7 +1829,7 @@ export default function ChatPage() {
           conversationId,
           actorId: user.id
         });
-        
+
         const clientMessageId = crypto.randomUUID();
         void sendMessageViaRest(accessToken, {
           conversationId,
@@ -3732,8 +3741,8 @@ export default function ChatPage() {
       const conversationId = selectedConversationIdRef.current || selectedConversationId || routedConversationId
       if (!conversationId || !user || !accessToken) return
 
-      const emoji = (optionId.startsWith('vote:') || optionId.startsWith('v:')) 
-        ? optionId 
+      const emoji = (optionId.startsWith('vote:') || optionId.startsWith('v:'))
+        ? optionId
         : `vote:${optionId}`
 
       try {
@@ -4071,7 +4080,8 @@ export default function ChatPage() {
       // Emit structured SYSTEM message via socket FIRST while we still have permissions
       const systemPayload = JSON.stringify({
         action: 'LEAVE_GROUP',
-        actorId: user.id
+        actorId: user.id,
+        silent: leaveGroupSilently
       });
 
       const clientMessageId = crypto.randomUUID();
@@ -4529,32 +4539,32 @@ export default function ChatPage() {
           {rightSidebarContent === 'info' && selectedConversation ? (
             <>
               <ConversationInfo
-                  conversation={selectedConversation}
-                  messages={selectedMessages}
-                  onAddMembersClick={() => setIsAddMembersOpen(true)}
-                  onDeleteHistoryClick={() => setConfirmDeleteHistoryId(selectedConversationId || routedConversationId)}
-                  onLeaveGroupClick={handleLeaveGroupClick}
-                  onCreateGroupClick={handleCreateGroupFromDirect}
-                  onEditGroupName={() => {
-                    setEditConversationNameMode('group')
-                    setIsEditConversationNameOpen(true)
-                  }}
-                  onEditNickname={() => {
-                    setEditConversationNameMode('nickname')
-                    setIsEditConversationNameOpen(true)
-                  }}
-                  onTogglePinConversation={() => handleTogglePinConversation(selectedConversation.id)}
-                  onRemoveMember={handleRemoveMember}
-                  onUpdateMemberRole={handleUpdateMemberRole}
-                  onTransferOwnerAndLeave={handleTransferAndLeave}
-                  onUpdateGroupAvatar={handleUpdateGroupAvatar}
-                  onUpdateGroupSettings={handleUpdateGroupSettings}
-                  onDisbandGroup={handleDisbandGroup}
-                  onJumpToMessage={setJumpToMessageId}
-                  onSendPoll={handleSendPoll}
-                  friends={friendsDirectory}
-                  currentUserId={user?.id}
-                />
+                conversation={selectedConversation}
+                messages={selectedMessages}
+                onAddMembersClick={() => setIsAddMembersOpen(true)}
+                onDeleteHistoryClick={() => setConfirmDeleteHistoryId(selectedConversationId || routedConversationId)}
+                onLeaveGroupClick={handleLeaveGroupClick}
+                onCreateGroupClick={handleCreateGroupFromDirect}
+                onEditGroupName={() => {
+                  setEditConversationNameMode('group')
+                  setIsEditConversationNameOpen(true)
+                }}
+                onEditNickname={() => {
+                  setEditConversationNameMode('nickname')
+                  setIsEditConversationNameOpen(true)
+                }}
+                onTogglePinConversation={() => handleTogglePinConversation(selectedConversation.id)}
+                onRemoveMember={handleRemoveMember}
+                onUpdateMemberRole={handleUpdateMemberRole}
+                onTransferOwnerAndLeave={handleTransferAndLeave}
+                onUpdateGroupAvatar={handleUpdateGroupAvatar}
+                onUpdateGroupSettings={handleUpdateGroupSettings}
+                onDisbandGroup={handleDisbandGroup}
+                onJumpToMessage={setJumpToMessageId}
+                onSendPoll={handleSendPoll}
+                friends={friendsDirectory}
+                currentUserId={user?.id}
+              />
             </>
           ) : null}
         </aside>
@@ -4605,20 +4615,49 @@ export default function ChatPage() {
       <Modal
         isOpen={confirmLeaveGroupOpen}
         onClose={() => setConfirmLeaveGroupOpen(false)}
-        title="Xác nhận"
+        title="Rời nhóm và xóa trò chuyện"
         variant="confirm"
         footer={
           <div className="flex gap-3 justify-end w-full">
-            <button className="btn-zalo-secondary" onClick={() => setConfirmLeaveGroupOpen(false)}>
-              Không
+            <button
+              className="px-6 py-2 rounded-lg bg-[var(--surface-muted)] text-[var(--text)] font-bold text-[15px] hover:bg-[var(--surface-hover)] border-0 outline-none cursor-pointer"
+              onClick={() => setConfirmLeaveGroupOpen(false)}
+            >
+              Hủy
             </button>
-            <button className="btn-zalo-danger" onClick={doLeaveGroup}>
+            <button
+              className="px-6 py-2 rounded-lg bg-red-600 text-white font-bold text-[15px] hover:bg-red-700 border-0 outline-none cursor-pointer"
+              onClick={doLeaveGroup}
+            >
               Rời nhóm
             </button>
           </div>
         }
       >
-        Bạn có chắc chắn muốn rời khỏi nhóm này không?
+        <div className="py-2 space-y-5">
+          <p className="text-[15px] text-[var(--text)] leading-relaxed">
+            Bạn sẽ không thể xem lại tin nhắn trong nhóm này sau khi rời nhóm.
+          </p>
+
+          <div
+            className="flex items-center justify-between p-4 rounded-xl bg-[var(--surface-muted)] cursor-pointer group hover:bg-[var(--surface-hover)] transition-colors"
+            onClick={() => setLeaveGroupSilently(!leaveGroupSilently)}
+          >
+            <div className="space-y-1">
+              <p className="text-[15px] font-semibold text-[var(--text)]">Rời nhóm trong im lặng</p>
+              <p className="text-[13px] text-[var(--text-secondary)]">Chỉ trưởng/phó nhóm biết bạn rời nhóm.</p>
+            </div>
+            <div
+              className={`relative h-6 w-11 rounded-full transition-all duration-200 ${leaveGroupSilently ? 'bg-[#0091FF]' : 'bg-gray-400 shadow-inner'
+                }`}
+            >
+              <div
+                className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-all duration-200 transform ${leaveGroupSilently ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+              />
+            </div>
+          </div>
+        </div>
       </Modal>
 
       <UserProfileModal

@@ -103,7 +103,7 @@ export function formatMessageContent(text: string, currentUserId?: string): stri
 
 export function parseCallLog(text: string): CallLogData | null {
   if (!text || (!text.startsWith(CALL_LOG_PREFIX) && !text.includes('CALL_LOG::'))) return null
-  
+
   try {
     const jsonPart = text.includes('::') ? text.split('::')[1] : text
     return JSON.parse(jsonPart) as CallLogData
@@ -118,14 +118,14 @@ export function parseCallLog(text: string): CallLogData | null {
  */
 export function formatDurationZalo(seconds: number): string {
   if (typeof seconds !== 'number' || isNaN(seconds) || seconds <= 0) return ''
-  
+
   const mins = Math.floor(seconds / 60)
   const secs = seconds % 60
-  
+
   if (mins > 0) {
     return `${mins} phút ${secs > 0 ? `${secs} giây` : ''}`.trim()
   }
-  
+
   return `${secs} giây`
 }
 
@@ -191,7 +191,7 @@ export function formatMessagePreview(
       if (sys.action === 'LEAVE_GROUP') return '[Thông báo] Rời nhóm';
       if (sys.action === 'RENAME_GROUP') return '[Thông báo] Đổi tên nhóm';
     } catch (e) { /* ignore */ }
-    
+
     return `${prefix}[Thông báo hệ thống]`
   }
 
