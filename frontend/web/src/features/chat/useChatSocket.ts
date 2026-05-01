@@ -37,6 +37,7 @@ type UseChatSocketOptions = {
 // SINGLETON SERVICE (prevents multiple instances)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 let globalChatService: ChatSocketService | null = null
+let globalListenersAttached = false
 
 function getOrCreateChatService(): ChatSocketService {
   if (!globalChatService) {
@@ -44,6 +45,10 @@ function getOrCreateChatService(): ChatSocketService {
     globalChatService = new ChatSocketService()
   }
   return globalChatService
+}
+
+function resetGlobalState() {
+  globalListenersAttached = false
 }
 
 export function useChatSocket(options: UseChatSocketOptions) {
@@ -133,75 +138,73 @@ export function useChatSocket(options: UseChatSocketOptions) {
 
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // CONNECT + REGISTER LISTENERS (only when token changes)
+  // REGISTER EVENT HANDLERS ON GLOBAL SERVICE (idempotent)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  useEffect(() => {
+    const service = getOrCreateChatService()
+    
+    // Register handlers on service (NOT socket directly to avoid listener lifecycle issues)
+    service.registerEventHandlers({
+      onConnected: stableHandleConnect.current,
+      onDisconnected: stableHandleDisconnect.current,
+      onMessageReceived: stableHandleMessageReceived.current,
+      onMessageRecalled: stableHandleMessageRecalled.current,
+      onMessageRead: stableHandleMessageRead.current,
+      onPresenceChanged: stableHandlePresenceChanged.current,
+      onMessagePinned: stableHandleMessagePinned.current,
+      onMessageUnpinned: stableHandleMessageUnpinned.current,
+      onReactionAdded: stableHandleReactionAdded.current,
+      onReactionRemoved: stableHandleReactionRemoved.current,
+      onGroupMemberAdded: stableHandleGroupMemberAdded.current,
+      onGroupMemberRemoved: stableHandleGroupMemberRemoved.current,
+      onGroupMemberLeft: stableHandleGroupMemberLeft.current,
+      onGroupRoleChanged: stableHandleGroupRoleChanged.current,
+      onGroupDisbanded: stableHandleGroupDisbanded.current,
+      onGroupUpdated: stableHandleGroupUpdated.current,
+      onFriendshipUpdated: stableHandleFriendshipUpdated.current,
+    })
+
+    // Only attach listeners ONCE to socket to prevent race conditions
+    const socket = service.getSocket()
+    if (!globalListenersAttached && socket) {
+      globalListenersAttached = true
+      console.log('[useChatSocket] 🎯 Attaching listeners to socket (one-time)')
+      service.attachEventListeners()
+
+      // Reset flag on disconnect so listeners are re-attached on reconnect
+      socket.on('disconnect', () => {
+        console.log('[useChatSocket] Reset listener flag on disconnect for next reconnect')
+        globalListenersAttached = false
+      })
+    }
+  }, [])
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // CONNECT WHEN TOKEN PROVIDED
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   useEffect(() => {
     if (!token) {
       console.log('[useChatSocket.effect] Skipping: no token provided')
       hasConnectedRef.current = false
+      resetGlobalState()
       getOrCreateChatService().disconnect()
       return
     }
 
     const service = getOrCreateChatService()
 
-    // Connect only once per token, but always sync listeners
     if (!hasConnectedRef.current) {
       hasConnectedRef.current = true
-      console.log('[useChatSocket.effect] ✅ Initializing socket connection')
-    } else {
-      console.log('[useChatSocket.effect] Re-attaching listeners to existing socket')
+      console.log('[useChatSocket.effect] ✅ Initializing socket connection with token')
     }
 
     const socket = service.connect(token)
     if (!socket) {
-      console.warn('[useChatSocket.effect] Socket unavailable, skipping listener registration')
+      console.warn('[useChatSocket.effect] Socket unavailable')
       return
     }
 
     console.log('[useChatSocket.effect] Socket obtained, ID:', socket.id, 'Connected:', socket.connected)
-
-    // Remove listeners first
-    socket.off('connect', stableHandleConnect.current)
-    socket.off('disconnect', stableHandleDisconnect.current)
-    socket.off('message.sent', stableHandleMessageReceived.current)
-    socket.off('message.received', stableHandleMessageReceived.current)
-    socket.off('message.recalled', stableHandleMessageRecalled.current)
-    socket.off('message.read', stableHandleMessageRead.current)
-    socket.off('message.pinned', stableHandleMessagePinned.current)
-    socket.off('message.unpinned', stableHandleMessageUnpinned.current)
-    socket.off('message.reaction.added', stableHandleReactionAdded.current)
-    socket.off('message.reaction.removed', stableHandleReactionRemoved.current)
-    socket.off('presence.changed', stableHandlePresenceChanged.current)
-    socket.off('group.memberAdded', stableHandleGroupMemberAdded.current)
-    socket.off('group.memberRemoved', stableHandleGroupMemberRemoved.current)
-    socket.off('group.memberLeft', stableHandleGroupMemberLeft.current)
-    socket.off('group.roleChanged', stableHandleGroupRoleChanged.current)
-    socket.off('group.disbanded', stableHandleGroupDisbanded.current)
-    socket.off('group.updated', stableHandleGroupUpdated.current)
-    socket.off('friendship.updated', stableHandleFriendshipUpdated.current)
-
-
-    // Re-add listeners
-    socket.on('connect', stableHandleConnect.current)
-    socket.on('disconnect', stableHandleDisconnect.current)
-    socket.on('message.sent', stableHandleMessageReceived.current)
-    socket.on('message.received', stableHandleMessageReceived.current)
-    socket.on('message.recalled', stableHandleMessageRecalled.current)
-    socket.on('message.read', stableHandleMessageRead.current)
-    socket.on('message.pinned', stableHandleMessagePinned.current)
-    socket.on('message.unpinned', stableHandleMessageUnpinned.current)
-    socket.on('message.reaction.added', stableHandleReactionAdded.current)
-    socket.on('message.reaction.removed', stableHandleReactionRemoved.current)
-    socket.on('presence.changed', stableHandlePresenceChanged.current)
-    socket.on('group.memberAdded', stableHandleGroupMemberAdded.current)
-    socket.on('group.memberRemoved', stableHandleGroupMemberRemoved.current)
-    socket.on('group.memberLeft', stableHandleGroupMemberLeft.current)
-    socket.on('group.roleChanged', stableHandleGroupRoleChanged.current)
-    socket.on('group.disbanded', stableHandleGroupDisbanded.current)
-    socket.on('group.updated', stableHandleGroupUpdated.current)
-    socket.on('friendship.updated', stableHandleFriendshipUpdated.current)
-
 
     // If already connected, replay onConnected callback
     if (socket.connected && socket.id) {
@@ -210,25 +213,9 @@ export function useChatSocket(options: UseChatSocketOptions) {
       })
     }
 
+    // Cleanup on token change or unmount
     return () => {
-      socket.off('connect', stableHandleConnect.current)
-      socket.off('disconnect', stableHandleDisconnect.current)
-      socket.off('message.sent', stableHandleMessageReceived.current)
-      socket.off('message.received', stableHandleMessageReceived.current)
-      socket.off('message.recalled', stableHandleMessageRecalled.current)
-      socket.off('message.read', stableHandleMessageRead.current)
-      socket.off('message.pinned', stableHandleMessagePinned.current)
-      socket.off('message.unpinned', stableHandleMessageUnpinned.current)
-      socket.off('message.reaction.added', stableHandleReactionAdded.current)
-      socket.off('message.reaction.removed', stableHandleReactionRemoved.current)
-      socket.off('presence.changed', stableHandlePresenceChanged.current)
-      socket.off('group.memberAdded', stableHandleGroupMemberAdded.current)
-      socket.off('group.memberRemoved', stableHandleGroupMemberRemoved.current)
-      socket.off('group.memberLeft', stableHandleGroupMemberLeft.current)
-      socket.off('group.roleChanged', stableHandleGroupRoleChanged.current)
-      socket.off('group.disbanded', stableHandleGroupDisbanded.current)
-      socket.off('group.updated', stableHandleGroupUpdated.current)
-      socket.off('friendship.updated', stableHandleFriendshipUpdated.current)
+      // Don't disconnect here - let disconnect be called explicitly
     }
   }, [token])
 
@@ -282,6 +269,10 @@ export function useChatSocket(options: UseChatSocketOptions) {
     return getOrCreateChatService().joinConversation(conversationId) ?? false
   }, [])
 
+  const joinMultipleConversations = useCallback(async (conversationIds: string[]): Promise<void> => {
+    return getOrCreateChatService().joinMultipleConversations(conversationIds)
+  }, [])
+
   const markAsRead = useCallback((payload: MessageReadPayload): boolean => {
     return getOrCreateChatService().markAsRead(payload) ?? false
   }, [])
@@ -305,6 +296,7 @@ export function useChatSocket(options: UseChatSocketOptions) {
     emitSendMessage,
     emitRecallMessage,
     joinConversation,
+    joinMultipleConversations,
     markAsRead,
     isConnected,
     getSocket,

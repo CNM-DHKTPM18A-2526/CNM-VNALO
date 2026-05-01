@@ -95,7 +95,11 @@ export const MessageContextMenu = forwardRef<HTMLDivElement, MessageContextMenuP
   const visibleItems = MENU_ITEMS.filter((item) => {
     // Pin logic: ADMIN/DEPUTY always, MEMBER depends on group setting
     if (item.action === 'pin') {
-      return isModerator || allowMemberPin;
+      if (!isVirtualGroup) {
+        return true
+      }
+
+      return isModerator || allowMemberPin
     }
 
     // Recall logic:
