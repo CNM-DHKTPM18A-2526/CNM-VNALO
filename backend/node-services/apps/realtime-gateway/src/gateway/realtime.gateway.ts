@@ -33,6 +33,10 @@ import { PresenceService } from '../presence/presence.service';
   cors: { origin: '*' },
   namespace: '/chat',
   transports: ['websocket', 'polling'],
+  // Explicit ping/pong timeouts — prevents load-balancer/proxy from closing idle connections.
+  // pingInterval (how often server sends a ping) < pingTimeout (how long client waits for pong).
+  pingTimeout: 60000,    // 60s — server-side wait for pong before considering connection dead
+  pingInterval: 25000,   // 25s — server sends ping every 25s
 })
 export class RealtimeGateway
   implements OnGatewayConnection, OnGatewayDisconnect {
@@ -178,6 +182,16 @@ export class RealtimeGateway
       data.userIds,
     );
     return { event: 'presence.list', data: presenceList };
+  }
+
+  // Handles 'presence.set' emitted by Flutter client (also extends Redis TTL like heartbeat)
+  @SubscribeMessage('presence.set')
+  async handlePresenceSet(@ConnectedSocket() client: Socket, @MessageBody() data: { isOnline: boolean }) {
+    const userId = client.data?.user?.userId;
+    if (userId && data.isOnline) {
+      await this.presenceService.heartbeat(userId);
+    }
+    return { event: 'presence.set.ack' };
   }
 
   @SubscribeMessage('heartbeat')

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
@@ -19,6 +20,10 @@ class SocketService {
 
   // Stream controller for send errors (added by M-01)
   final _sendErrorController = StreamController<Map<String, dynamic>>.broadcast();
+
+  // Heartbeat timer — emits 'heartbeat' every 25 seconds (well under the 60s Redis TTL on the server)
+  Timer? _heartbeatTimer;
+  static const _heartbeatIntervalSeconds = 25;
 
   final _messageController =
       StreamController<
@@ -101,8 +106,8 @@ class SocketService {
     debugPrint('[SocketService] token present: $hasToken');
     debugPrint('[SocketService] existing socket: ${_socket != null}, connected: ${_socket?.connected}');
 
-    if (_socket != null && _socket!.connected) {
-      debugPrint('[SocketService] Already connected, skipping connect.');
+    if (!hasToken) {
+      debugPrint('[SocketService] ⚠️ connect() called with empty/invalid token — SKIPPING to prevent timeout loop');
       return;
     }
 
@@ -118,8 +123,13 @@ class SocketService {
       _seenMessageKeys.clear();
       _disposed = false;
     } else if (_socket != null) {
-      debugPrint('[SocketService] Disposing existing socket.');
-      disconnect();
+      if (_socket!.connected) {
+        debugPrint('[SocketService] Already connected, skipping connect.');
+        return;
+      }
+      debugPrint('[SocketService] Disposing existing socket (disconnected state).');
+      _socket?.dispose();
+      _socket = null;
     }
 
     _globalToken = token;
@@ -127,7 +137,7 @@ class SocketService {
     final url = '${AppConfig.instance.socketUrl}/chat';
     debugPrint('[SOCKET] 🔌 Connecting to: $url');
     debugPrint('[SOCKET]   Path: /socket.io/');
-    debugPrint('[SOCKET]   Token: ${token.substring(0, 10)}...');
+    debugPrint('[SOCKET]   Token: ${token.substring(0, min(10, token.length))}...');
 
     _socket = io.io(
       url,
@@ -145,6 +155,8 @@ class SocketService {
           .setReconnectionDelayMax(8000)    // max cap: 8 seconds
           .setRandomizationFactor(0.5)      // ±50% jitter — spreads reconnect load over 0.5–12s
           .setReconnectionAttempts(10)
+          // Explicit ping/pong timeouts — prevents proxy/load-balancer from closing idle connections
+          .setTimeout(10000)                 // Socket.IO client-side timeout: 10s
           .build(),
     );
 
@@ -177,13 +189,17 @@ class SocketService {
       }
       _connectController.add(null);
       _onSocketReady?.call();
-      
+
       // ⚡ AUTO-REPORT ONLINE STATUS
       emitPresence(true);
+
+      // Start heartbeat timer — keeps Redis presence TTL alive on the server
+      _startHeartbeat();
     });
-    
+
     _socket!.onDisconnect((data) {
       debugPrint('[SOCKET] 🔴 DISCONNECTED from gateway: $data');
+      _stopHeartbeat();
     });
 
     _socket!.onConnectError((data) {
@@ -511,6 +527,25 @@ class SocketService {
     _socket?.emit('presence.set', {'isOnline': isOnline});
   }
 
+  void _startHeartbeat() {
+    _stopHeartbeat();
+    _heartbeatTimer = Timer.periodic(
+      const Duration(seconds: _heartbeatIntervalSeconds),
+      (_) {
+        if (_socket != null && _socket!.connected) {
+          _socket!.emit('heartbeat');
+          debugPrint('[SocketService] 💓 Heartbeat sent');
+        }
+      },
+    );
+    debugPrint('[SocketService] 💓 Heartbeat timer started (interval: ${_heartbeatIntervalSeconds}s)');
+  }
+
+  void _stopHeartbeat() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
+  }
+
   void markRead(String conversationId, int lastReadSeq) {
     _socket?.emit('message.read', {
       'conversationId': conversationId,
@@ -797,9 +832,10 @@ class SocketService {
   }
 
   void disconnect() {
+    _stopHeartbeat();
     _socket?.disconnect(); // Disconnect from the socket server
     _socket?.dispose(); // Dispose the socket instance to free up resources
-    _socket = null; // Set the socket instance to null
+    _socket = null;
     _joinedRooms.clear(); // Clear joined rooms on disconnect
   }
 

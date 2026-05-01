@@ -14,9 +14,6 @@ import { MessageService } from '../message/message.service';
 import { SendMessageDto } from '../dto/send-message.dto';
 import { WsJwtGuard } from '../auth/ws-jwt.guard';
 import { ConversationService } from '../conversation/conversation.service';
-import { InjectRedis } from '@nestjs-modules/ioredis';
-import type Redis from 'ioredis';
-
 
 const allowedOrigins = (
   process.env.CORS_ALLOWED_ORIGINS ??
@@ -43,7 +40,10 @@ const allowedOrigins = (
     credentials: true,
   },
   namespace: '/chat',
-  transports: ['websocket'],
+  transports: ['websocket', 'polling'],
+  // Explicit ping/pong timeouts — prevents load-balancer/proxy from closing idle connections.
+  pingTimeout: 60000,   // 60s — server waits 60s for client pong before marking dead
+  pingInterval: 25000,  // 25s — server sends ping every 25s
 })
 @UseGuards(WsJwtGuard)
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -65,8 +65,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly jwtService: JwtService,
     private readonly messageService: MessageService,
     private readonly conversationService: ConversationService,
-    @InjectRedis()
-    private readonly redis: Redis,
   ) {}
 
   // ─── Call Signaling ───────────────────────────────────────
@@ -171,6 +169,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         `[Gateway.conn] ✅ Connected: client=${client.id} user=${userId} restrictedWebMode=${client.data.user.restrictedWebMode}`,
       );
 
+      // Join Redis-backed user room so emitToUser works cross-node (via Redis adapter)
+      await client.join(`user:${userId}`);
+
       // Broadcast presence
       this.server.emit('presence.changed', { userId, status: 'online' });
     } catch (err) {
@@ -188,6 +189,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         // Only emit offline if no more sockets for this user
         this.server.emit('presence.changed', { userId, status: 'offline' });
       }
+      // Leave Redis-backed user room (Redis adapter cleans socket from room on disconnect automatically,
+      // but explicit leave ensures consistency)
+      client.leave(`user:${userId}`);
     }
     this.logger.log(`Client disconnected: ${client.id}`);
   }
@@ -876,59 +880,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     );
   }
 
-  /** Emit an event to a specific user's sockets. */
-  emitToUser(userId: string, event: string, data: any) {
-    const sockets = this.userSockets.get(userId);
-
-    if (!sockets || sockets.size === 0) {
-      if (event === 'call.offer') {
-        const offlinePayload = {
-          channel: 'CALL_OFFLINE',
-          targetUserId: userId,
-          event,
-          payload: data,
-          createdAt: new Date().toISOString(),
-        };
-
-        this.redis
-          .publish('CALL_OFFLINE', JSON.stringify(offlinePayload))
-          .then(() => {
-            this.logger.log(
-              `[Gateway.emitToUser] Published CALL_OFFLINE event for user=${userId} callId=${data?.callId ?? 'unknown'}`,
-            );
-          })
-          .catch((err) => {
-            this.logger.error(
-              `[Gateway.emitToUser] Failed to publish CALL_OFFLINE for user=${userId}: ${err.message}`,
-            );
-          });
-      }
-
-      if (event === 'call.offer') {
-        this.logger.warn(
-          `[Gateway.emitToUser] Received call.offer for offline user=${userId} callId=${data?.callId ?? 'unknown'}, but no offline fallback consumer is configured in this repository; event will not be delivered via FCM`,
-        );
-      }
-
-      this.logger.warn(
-        `[Gateway.emitToUser] ⚠️  User ${userId} has no active sockets, event='${event}' will not be sent`,
-      );
-      return;
-    }
-
+  /** Emit an event to a specific user's sockets. Uses Redis-backed user:{userId} room for cross-node delivery. */
+  emitToUser(userId: string, event: string, data: unknown) {
+    // With RedisIoAdapter installed, server.to('user:${userId}') reaches ALL sockets of
+    // that user across ALL nodes. This replaces the broken in-memory Map lookup.
+    this.server.to(`user:${userId}`).emit(event, data);
     this.logger.log(
-      `[Gateway.emitToUser] Emitting to ${sockets.size} socket(s) of user=${userId} event='${event}'`,
-    );
-
-    for (const socketId of sockets) {
-      this.logger.log(
-        `[Gateway.emitToUser]   → socketId=${socketId} event='${event}'`,
-      );
-      this.server.to(socketId).emit(event, data);
-    }
-
-    this.logger.log(
-      `[Gateway.emitToUser] ✅ Emission to user=${userId} completed`,
+      `[Gateway.emitToUser] Emitted event='${event}' to user=${userId} via Redis-backed user room`,
     );
   }
   // ─── Group Call Signaling ────────────────────────────────────────────
