@@ -28,7 +28,11 @@ export class KafkaConsumer implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit() {
-    await this.connect();
+    try {
+      await this.connect();
+    } catch (err) {
+      this.logger.error(`KafkaConsumer onModuleInit failed: ${err.message}`);
+    }
   }
 
   async onModuleDestroy() {
