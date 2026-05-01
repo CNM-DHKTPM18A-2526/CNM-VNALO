@@ -247,6 +247,14 @@ export function ChatWindow({
   const statusText = isOnline ? 'Đang hoạt động' : formatPresence(false, lastSeenTime)
   const isStranger = Boolean(conversation.isStranger)
 
+  const peerId = !conversation.isGroup && !conversation.isCloud 
+    ? (conversation.userId || (conversation.participantUserIds || []).find(id => id !== currentUserId))
+    : null
+  
+  const displayName = conversation.isGroup 
+    ? conversation.name 
+    : (userMap[peerId || '']?.displayName || conversation.name)
+
   const collageData = conversation && conversation.isGroup && !conversation.avatarUrl
     ? getGroupCollageData(conversation, userMap)
     : { avatars: [], extraCount: 0 }
@@ -260,8 +268,8 @@ export function ChatWindow({
         <div className='chat-window-header-main'>
           <div className='relative'>
             <UserAvatar
-              name={conversation.name}
-              imageUrl={conversation.avatarUrl ?? null}
+              name={displayName ?? ''}
+              imageUrl={(!conversation.isGroup && peerId ? userMap[peerId]?.avatarUrl : conversation.avatarUrl) ?? conversation.avatarUrl ?? null}
               size='md'
               isGroup={conversation.isGroup}
               isCloud={conversation.isCloud}
@@ -273,7 +281,7 @@ export function ChatWindow({
             )}
           </div>
           <div className='chat-window-header-copy'>
-            <h2>{conversation.name}</h2>
+            <h2>{displayName ?? ''}</h2>
             <div className='chat-window-header-meta'>
               {isStranger ? <span className='chat-stranger-badge'>Người lạ</span> : null}
               {conversation.isCloud ? (
@@ -657,7 +665,7 @@ export function ChatWindow({
             }}
             replyMessage={replyMessage}
             onCancelReply={() => setReplyMessage(null)}
-            recipientName={conversation.name}
+            recipientName={displayName}
             placeholder={isRestrictedMode ? 'Tin nhắn bị khóa khi ở chế độ giới hạn' : undefined}
             disabled={isRestrictedMode}
             members={conversation.members?.map(m => ({

@@ -74,7 +74,7 @@ const VideoTile: React.FC<VideoTileProps> = ({
     }
   }, [stream, isLocal, isCameraOn, audioOnly])
 
-  const initials = displayName
+  const initials = (displayName || 'Người dùng')
     .split(' ')
     .map((w) => w[0] ?? '')
     .join('')
@@ -169,65 +169,121 @@ export const IncomingGroupCallBanner: React.FC<IncomingGroupCallBannerProps> = (
   onJoin,
   onDecline,
 }) => {
-  const initials = info.callerName.split(' ').map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase()
+  const initials = (info.callerName || 'Người dùng').split(' ').map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase()
+  const resolvedCallerAvatar = resolveMediaUrl(info.callerAvatar)
+  const resolvedGroupAvatar = resolveMediaUrl(info.groupAvatar)
+
+  // Prioritize showing Group Avatar in the center if it's a group call
+  const mainAvatar = resolvedGroupAvatar || resolvedCallerAvatar
 
   return (
-    <div
-      className="fixed top-6 right-6 z-[300] flex items-center gap-4 bg-gray-900/95 backdrop-blur-md text-white rounded-2xl shadow-2xl px-5 py-4 w-[360px] border border-white/10"
-      style={{ animation: 'slideInRight 0.3s ease-out' }}
-    >
+    <div className="fixed inset-0 z-[500] flex flex-col items-center justify-between py-20 bg-slate-950 overflow-hidden">
       <style>{`
-        @keyframes slideInRight {
-          from { transform: translateX(120%); opacity: 0; }
-          to { transform: translateX(0); opacity: 1; }
-        }
         @keyframes pulseRing {
-          0% { transform: scale(1); opacity: 0.8; }
-          100% { transform: scale(1.6); opacity: 0; }
+          0% { transform: scale(1); opacity: 0.5; }
+          100% { transform: scale(2.5); opacity: 0; }
+        }
+        @keyframes fadeInDown {
+          from { transform: translateY(-20px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes fadeInUp {
+          from { transform: translateY(20px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes shake {
+          0%, 100% { transform: rotate(0); }
+          25% { transform: rotate(-10deg); }
+          75% { transform: rotate(10deg); }
         }
       `}</style>
 
-      {/* Avatar with pulse ring */}
-      <div className="relative flex-shrink-0">
-        <div className="absolute inset-0 rounded-full bg-green-500 opacity-0"
-          style={{ animation: 'pulseRing 1.5s ease-out infinite' }} />
-        {info.callerAvatar ? (
-          <img src={resolveMediaUrl(info.callerAvatar)} alt={info.callerName}
-            className="w-12 h-12 rounded-full object-cover border-2 border-green-400" />
+      {/* BACKGROUND BACKDROP */}
+      <div className="absolute inset-0 z-0">
+        {mainAvatar ? (
+          <img src={mainAvatar} alt="" className="w-full h-full object-cover blur-3xl opacity-30 scale-110" />
         ) : (
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm border-2 border-green-400">
-            {initials}
-          </div>
+          <div className="w-full h-full bg-gradient-to-b from-blue-900 to-slate-950" />
         )}
-        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
-          <PhoneIncoming size={11} />
+        <div className="absolute inset-0 bg-black/40" />
+      </div>
+
+      {/* TOP SECTION: GROUP INFO */}
+      <div className="relative z-10 flex flex-col items-center gap-2 px-6 text-center" style={{ animation: 'fadeInDown 0.6s ease-out' }}>
+        <div className="flex items-center gap-2 bg-white/10 px-4 py-1.5 rounded-full backdrop-blur-md border border-white/10">
+          <Users size={16} className="text-blue-400" />
+          <span className="text-white/80 text-sm font-medium">{info.conversationName}</span>
+        </div>
+        <h2 className="text-white text-3xl font-bold mt-4">Cuộc gọi nhóm đến</h2>
+        <p className="text-blue-400 text-lg font-medium animate-pulse">
+          {info.audioOnly ? '🎙️ Cuộc gọi thoại' : '📹 Cuộc gọi video'}
+        </p>
+      </div>
+
+      {/* MIDDLE SECTION: CALLER/GROUP AVATAR */}
+      <div className="relative z-10 flex flex-col items-center">
+        {/* Pulsing Rings */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-32 h-32 rounded-full border-2 border-green-500/30" style={{ animation: 'pulseRing 2s linear infinite' }} />
+          <div className="w-32 h-32 rounded-full border-2 border-green-500/20" style={{ animation: 'pulseRing 2s linear infinite 0.7s' }} />
+          <div className="w-32 h-32 rounded-full border-2 border-green-500/10" style={{ animation: 'pulseRing 2s linear infinite 1.4s' }} />
+        </div>
+
+        <div className="relative">
+          {mainAvatar ? (
+            <img 
+              src={mainAvatar} 
+              alt={info.callerName}
+              className="w-40 h-40 rounded-full object-cover border-4 border-white/20 shadow-[0_0_50px_rgba(34,197,94,0.3)]" 
+            />
+          ) : (
+            <div className="w-40 h-40 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-5xl font-bold border-4 border-white/20 shadow-2xl">
+              {initials}
+            </div>
+          )}
+          
+          {/* Small badge for caller if we are showing group avatar */}
+          {resolvedGroupAvatar && resolvedCallerAvatar && (
+            <div className="absolute -top-2 -right-2 w-14 h-14 rounded-full border-4 border-slate-950 overflow-hidden shadow-lg">
+               <img src={resolvedCallerAvatar} alt={info.callerName} className="w-full h-full object-cover" />
+            </div>
+          )}
+
+          <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-green-500 rounded-full flex items-center justify-center border-4 border-slate-950 text-white shadow-xl">
+             <PhoneIncoming size={24} className="animate-bounce" />
+          </div>
+        </div>
+        
+        <p className="text-white text-2xl font-bold mt-8 tracking-wide">{info.callerName}</p>
+        <p className="text-white/50 text-sm mt-2">Đang chờ bạn trả lời...</p>
+      </div>
+
+      {/* BOTTOM SECTION: ACTIONS */}
+      <div className="relative z-10 flex gap-12 sm:gap-24 px-6 pb-10" style={{ animation: 'fadeInUp 0.8s ease-out' }}>
+        <div className="flex flex-col items-center gap-3">
+          <button
+            onClick={onDecline}
+            className="w-20 h-20 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-all active:scale-90 shadow-[0_10px_30px_rgba(239,68,68,0.4)] group"
+          >
+            <PhoneOff size={32} className="text-white group-hover:scale-110 transition-transform" />
+          </button>
+          <span className="text-white/70 text-sm font-semibold uppercase tracking-widest">Từ chối</span>
+        </div>
+
+        <div className="flex flex-col items-center gap-3">
+          <button
+            onClick={onJoin}
+            className="w-20 h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all active:scale-90 shadow-[0_10px_30px_rgba(34,197,94,0.4)] group"
+            style={{ animation: 'shake 2s infinite ease-in-out' }}
+          >
+            <Phone size={32} className="text-white group-hover:scale-110 transition-transform" />
+          </button>
+          <span className="text-white/70 text-sm font-semibold uppercase tracking-widest">Tham gia</span>
         </div>
       </div>
 
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <p className="text-xs text-slate-400 font-medium truncate">{info.conversationName}</p>
-        <p className="text-sm font-bold truncate">{info.callerName} đang gọi</p>
-        <p className="text-xs text-slate-400">{info.audioOnly ? '🎙️ Cuộc gọi thoại' : '📹 Cuộc gọi video'} nhóm</p>
-      </div>
-
-      {/* Buttons */}
-      <div className="flex gap-2 flex-shrink-0">
-        <button
-          onClick={onDecline}
-          className="w-11 h-11 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-all active:scale-90"
-          title="Từ chối"
-        >
-          <PhoneOff size={18} />
-        </button>
-        <button
-          onClick={onJoin}
-          className="w-11 h-11 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all active:scale-90"
-          title="Tham gia"
-        >
-          <Phone size={18} />
-        </button>
-      </div>
+      {/* AUDIO ELEMENT FOR RINGING (Optional: if we had a ringtone file) */}
+      {/* <audio src="/assets/sounds/ringtone.mp3" autoPlay loop /> */}
     </div>
   )
 }
@@ -363,6 +419,8 @@ interface UseGroupCallOptions {
   currentUserId: string
   currentUserName: string
   currentUserAvatar?: string
+  userMap?: Record<string, any>
+  conversations?: ConversationSummary[]
 }
 
 export function useGroupCall({
@@ -370,6 +428,8 @@ export function useGroupCall({
   currentUserId,
   currentUserName,
   currentUserAvatar,
+  userMap,
+  conversations,
 }: UseGroupCallOptions) {
   const [snapshot, setSnapshot] = useState<GroupCallSnapshot | null>(null)
   const [incomingCall, setIncomingCall] = useState<IncomingGroupCallInfo | null>(null)
@@ -377,32 +437,50 @@ export function useGroupCall({
   const serviceRef = useRef<WebRtcGroupCallService | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  const resolveName = useCallback((uid: string) => {
+    return userMap?.[uid]?.displayName || userMap?.[uid]?.name
+  }, [userMap])
+
+  const resolveAvatar = useCallback((uid: string) => {
+    return userMap?.[uid]?.avatarUrl
+  }, [userMap])
+
   // Listen for incoming group-call:started from OTHER users
   useEffect(() => {
     if (!socket) return
 
-    const onGroupCallStarted = (payload: {
-      conversationId: string
-      conversationName: string
-      callId: string
-      callerUserId: string
-      callerName: string
-      callerAvatar?: string
-      audioOnly: boolean
-    }) => {
+    const onGroupCallStarted = (payload: any) => {
+      // Normalize payload fields (mobile might use different keys)
+      const callerUserId = payload.callerUserId || payload.senderUserId || payload.userId
+      
+      const isId = (s: any) => typeof s === 'string' && s.length > 20 && /^[0-9a-fA-F-]/.test(s)
+      let callerName = payload.callerName || payload.displayName || payload.name || payload.fullName || payload.full_name
+      if (!callerName || isId(callerName)) {
+        callerName = resolveName(callerUserId) || callerName || 'Người dùng'
+      }
+
+      const conversationId = payload.conversationId || payload.groupId
+      const conversationName = payload.conversationName || payload.groupName || 'Cuộc gọi nhóm'
+      const callId = payload.callId
+
+      // Attempt to resolve group avatar from local conversations list
+      const conv = (conversations || []).find(c => c.id === conversationId)
+      const groupAvatar = conv?.avatarUrl || payload.groupAvatar || payload.conversationAvatar
+
       // Bỏ qua nếu chính mình là người gọi
-      if (payload.callerUserId === currentUserId) return
+      if (callerUserId === currentUserId) return
       // Bỏ qua nếu đang trong cuộc gọi khác
       if (snapshot !== null) return
 
-      console.log('[useGroupCall] 📞 Incoming group call from:', payload.callerName)
+      console.log('[useGroupCall] 📞 Incoming group call normalized:', { callerName, conversationName })
       setIncomingCall({
-        callId: payload.callId,
-        conversationId: payload.conversationId,
-        conversationName: payload.conversationName,
-        callerName: payload.callerName,
-        callerAvatar: payload.callerAvatar,
-        audioOnly: payload.audioOnly,
+        callId: callId,
+        conversationId: conversationId,
+        conversationName: conversationName,
+        callerName: callerName,
+        callerAvatar: payload.callerAvatar || payload.avatarUrl || userMap?.[callerUserId]?.avatarUrl,
+        groupAvatar: groupAvatar,
+        audioOnly: !!payload.audioOnly,
       })
     }
 
@@ -412,28 +490,52 @@ export function useGroupCall({
     return () => {
       socket.off('group-call:started', onGroupCallStarted)
     }
-  }, [socket, currentUserId, snapshot])
+  }, [socket, currentUserId, snapshot, resolveName, userMap, conversations])
 
-  // Khi cuộc gọi kết thúc hoàn toàn (người cuối rời) → dismiss banner cho người chưa bắt máy
+  // Khi cuộc gọi kết thúc hoàn toàn (người cuối rời) HOẶC chính mình đã join từ máy khác → dismiss banner
   useEffect(() => {
     if (!socket) return
 
     const onGroupCallEnded = (payload: { conversationId: string; callId: string }) => {
       console.log('[useGroupCall] 📴 group-call:ended received, dismissing incoming banner', payload)
       setIncomingCall((prev) => {
-        // Chỉ dismiss nếu đúng callId
         if (prev && prev.callId === payload.callId) return null
         return prev
       })
     }
 
-    socket.off('group-call:ended', onGroupCallEnded)
+    // Nếu nhận được user-joined mà ID là chính mình => mình đã bắt máy ở máy khác (mobile)
+    const onUserJoined = (payload: any) => {
+      const joinedUserId = payload.senderUserId || payload.userId || payload.uid
+      console.log('[useGroupCall] 👤 User joined event received:', { joinedUserId, currentUserId })
+      if (joinedUserId && String(joinedUserId) === String(currentUserId)) {
+         console.log('[useGroupCall] 📱 You joined from another device, dismissing web banner')
+         setIncomingCall(null)
+      }
+    }
+
+    // Tương tự cho user-left (nếu mình từ chối ở máy khác)
+    const onUserLeft = (payload: any) => {
+      const leftUserId = payload.senderUserId || payload.userId || payload.uid
+      if (leftUserId && String(leftUserId) === String(currentUserId)) {
+        console.log('[useGroupCall] 📱 You left/declined from another device, dismissing web banner')
+        setIncomingCall(null)
+      }
+    }
+
     socket.on('group-call:ended', onGroupCallEnded)
+    socket.on('group-call:user-joined', onUserJoined)
+    socket.on('group-call:user-left', onUserLeft)
+    // Mobile might emit join directly
+    socket.on('group-call:join', onUserJoined)
 
     return () => {
       socket.off('group-call:ended', onGroupCallEnded)
+      socket.off('group-call:user-joined', onUserJoined)
+      socket.off('group-call:user-left', onUserLeft)
+      socket.off('group-call:join', onUserJoined)
     }
-  }, [socket])
+  }, [socket, currentUserId])
 
   const startTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current)
@@ -456,10 +558,10 @@ export function useGroupCall({
         stopTimer()
         setSnapshot(null)
       }
-    })
+    }, resolveName, resolveAvatar)
     serviceRef.current = service
     return service
-  }, [stopTimer])
+  }, [stopTimer, resolveName, resolveAvatar])
 
   /** Caller: bắt đầu cuộc gọi nhóm */
   const startGroupCall = useCallback(

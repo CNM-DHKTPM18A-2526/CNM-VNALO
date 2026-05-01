@@ -26,7 +26,7 @@ export async function uploadCover(file: File, token: string): Promise<string> {
   formData.append('file', file)
   formData.append('category', 'COVER')
 
-  const response = await fetch(`${MEDIA_API_BASE_URL}/upload`, {
+  const response = await fetch(`${MEDIA_API_BASE_URL}upload`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,

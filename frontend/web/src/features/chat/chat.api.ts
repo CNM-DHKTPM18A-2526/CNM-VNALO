@@ -1,6 +1,7 @@
 export type { ChatAttachment, ChatMessage, ChatMessageType, ConversationSummary, ReplyMetadata } from './chat.types'
+import type { ChatAttachment, ChatMessage, ChatMessageType, ConversationSummary, ReplyMetadata } from './chat.types'
 import { formatMessageContent } from './utils/messageUtils'
-import { API_BASE_URL, extractMessage, messageApi, mediaApi } from '../../api.client'
+import { extractMessage, messageApi, mediaApi } from '../../api.client'
 import { resolveMediaUrl } from '../../utils/mediaUtils'
 
 type InboxItem = {

@@ -23,6 +23,18 @@ export function normalizeMessage(msg: ChatMessage): ChatMessage {
     }
   }
 
+  const txt = (msg.text || '').trim()
+  const isSystem =
+    msg.type === 'system' ||
+    (txt.startsWith('{') && txt.includes('"action":'))
+
+  if (isSystem) {
+    return {
+      ...msg,
+      type: 'system',
+    }
+  }
+
   return msg
 }
 
@@ -179,17 +191,17 @@ export function formatMessagePreview(
   }
 
   // Support for system-like strings that might be raw JSON in the fallback text
-  if (content.startsWith('{"action":') || content.includes('"action":')) {
+  const trimmed = content.trim();
+  if (trimmed.startsWith('{') && trimmed.includes('"action":')) {
     try {
-      const jsonStart = content.indexOf('{"action":');
-      const sys = JSON.parse(content.substring(jsonStart));
+      const sys = JSON.parse(trimmed);
       if (sys.action === 'UPDATE_MESSAGE_REACTIONS') return '';
       if (sys.action === 'REMOVE_MEMBER') return '[Thông báo] Xóa thành viên';
       if (sys.action === 'ADD_MEMBERS') return '[Thông báo] Thêm thành viên';
       if (sys.action === 'PROMOTE_ADMIN') return '[Thông báo] Chỉ định phó nhóm';
       if (sys.action === 'TRANSFER_OWNERSHIP') return '[Thông báo] Chuyển chủ nhóm';
       if (sys.action === 'LEAVE_GROUP') return '[Thông báo] Rời nhóm';
-      if (sys.action === 'RENAME_GROUP') return '[Thông báo] Đổi tên nhóm';
+      if (sys.action === 'RENAME_GROUP' || sys.action === 'UPDATE_GROUP_INFO') return '[Thông báo] Đổi tên nhóm';
     } catch (e) { /* ignore */ }
 
     return `${prefix}[Thông báo hệ thống]`
@@ -200,13 +212,7 @@ export function formatMessagePreview(
   }
 
   if (content.includes('"action":"FRIEND_ACCEPTED"')) {
-    try {
-      const payload = JSON.parse(content);
-      const targetName = payload.targetMemberIds?.[0] ? getDisplayName?.(payload.targetMemberIds[0]) : '';
-      return `[Thiệp] Gửi lời chào ${targetName || 'bạn'}`;
-    } catch (e) {
-      return `[Thiệp] Gửi lời chào`;
-    }
+    return `[Thiệp] Gửi lời chào`;
   }
 
   return truncatePreview(`${prefix}${content}`)
