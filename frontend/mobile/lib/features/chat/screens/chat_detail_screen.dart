@@ -431,9 +431,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         itemBuilder: (context, index) {
                           if (index == items.length) {
                             if (isDirect) {
-                              return _buildFriendProfileCard(displayName, avatarUrl, coverUrl);
+                              return _buildFriendProfileCard(displayName, avatarUrl, coverUrl, chat, conv, currentUserId, isDirect);
                             } else {
-                              return _buildGroupProfileCard(displayName, conv);
+                              return _buildGroupProfileCard(displayName, conv, chat, currentUserId);
                             }
                           }
 
@@ -599,7 +599,46 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   Widget _buildSubtext(bool isDirect) {
     final common = CommonTexts.of(context);
+    final chat = context.read<ChatProvider>();
+    final currentUserId = context.read<AuthProvider>().user?.id ?? '';
+    
     if (isDirect) {
+      final otherMember = widget.conversation.members.firstWhere(
+        (m) => m.userId != currentUserId,
+        orElse: () => widget.conversation.members.first,
+      );
+      
+      final otherUserId = otherMember.userId;
+      
+      // Get the latest user object from provider to access lastSeen
+      final convInProvider = chat.conversations.firstWhere((c) => c.id == widget.conversation.id, orElse: () => widget.conversation);
+      final latestUser = convInProvider.members.firstWhere((m) => m.userId == otherMember.userId, orElse: () => otherMember).user;
+      
+      final bool isOnline = chat.isUserOnline(otherUserId);
+      final DateTime? lastSeen = latestUser?.lastSeen;
+
+      if (isOnline) {
+        return const Text(
+          'Đang hoạt động',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.white, // Bright white for active status
+            fontWeight: FontWeight.w500,
+          ),
+        );
+      }
+
+      if (lastSeen != null) {
+        return Text(
+          'Truy cập ${DateFormatter.relative(lastSeen)}',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.white.withValues(alpha: 0.8),
+            fontWeight: FontWeight.w400,
+          ),
+        );
+      }
+
       return const SizedBox.shrink();
     }
 
@@ -619,6 +658,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     String displayName,
     String? avatarUrl,
     String? coverUrl,
+    ChatProvider chat,
+    Conversation conv,
+    String currentUserId,
+    bool isDirect,
   ) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final common = CommonTexts.of(context);
@@ -684,6 +727,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     imageUrl: avatarUrl,
                     name: displayName,
                     size: 60,
+                    showOnline: isDirect,
+                    isOnline: isDirect && chat.isUserOnline(conv.members.firstWhere((m) => m.userId != currentUserId, orElse: () => conv.members.first).userId),
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -719,10 +764,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     );
   }
 
-  Widget _buildGroupProfileCard(String displayName, Conversation conv) {
+  Widget _buildGroupProfileCard(String displayName, Conversation conv, ChatProvider chat, String currentUserId) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final common = CommonTexts.of(context);
-    final currentUserId = context.read<AuthProvider>().user?.id ?? '';
     
     return Container(
       margin: const EdgeInsets.only(bottom: 24, top: 16),
@@ -797,7 +841,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         child: AvatarWidget(
                           imageUrl: m.user?.avatarUrl, 
                           name: m.user?.displayName ?? m.nickname ?? common.groupMemberLabel, 
-                          size: 32
+                          size: 32,
+                          showOnline: m.userId != currentUserId,
+                          isOnline: m.userId != currentUserId && (m.user?.isOnline ?? false),
                         ),
                       )),
                       Container(

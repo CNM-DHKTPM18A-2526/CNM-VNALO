@@ -41,16 +41,18 @@ class ApiService {
     String baseUrl,
     String endpoint, {
     Map<String, dynamic>? body,
+    Map<String, String>? queryParams,
   }) {
-    return _request('POST', baseUrl, endpoint, body: body);
+    return _request('POST', baseUrl, endpoint, body: body, queryParams: queryParams);
   }
 
   Future<Map<String, dynamic>> patch(
     String baseUrl,
     String endpoint, {
     Map<String, dynamic>? body,
+    Map<String, String>? queryParams,
   }) {
-    return _request('PATCH', baseUrl, endpoint, body: body);
+    return _request('PATCH', baseUrl, endpoint, body: body, queryParams: queryParams);
   }
 
   Future<Map<String, dynamic>> postMultipart(
@@ -136,8 +138,12 @@ class ApiService {
         .timeout(_multipartTimeout);
   }
 
-  Future<Map<String, dynamic>> delete(String baseUrl, String endpoint) {
-    return _request('DELETE', baseUrl, endpoint);
+  Future<Map<String, dynamic>> delete(
+    String baseUrl,
+    String endpoint, {
+    Map<String, String>? queryParams,
+  }) {
+    return _request('DELETE', baseUrl, endpoint, queryParams: queryParams);
   }
 
   // Internal method to handle all HTTP requests with error handling and response parsing

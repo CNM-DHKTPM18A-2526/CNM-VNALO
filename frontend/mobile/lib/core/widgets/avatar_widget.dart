@@ -60,6 +60,7 @@ class _AvatarWidgetState extends State<AvatarWidget> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final activeUrl = _resolvedUrl;
     final initials = AvatarUtils.getInitials(widget.name);
     final initialsBg = AvatarUtils.getColor(widget.name);
@@ -102,15 +103,25 @@ class _AvatarWidgetState extends State<AvatarWidget> {
         ),
         if (widget.showOnline)
           Positioned(
-            right: 0,
-            bottom: 0,
+            right: 2,
+            bottom: 2,
             child: Container(
-              width: widget.size * 0.28,
-              height: widget.size * 0.28,
+              width: widget.size * 0.25,
+              height: widget.size * 0.25,
               decoration: BoxDecoration(
                 color: widget.isOnline ? AppColors.online : Colors.grey.shade500,
                 shape: BoxShape.circle,
-                border: Border.all(color: scheme.surface, width: widget.borderWidth ?? 2),
+                border: Border.all(
+                  color: isDarkMode ? DarkColors.surface : Colors.white,
+                  width: 2.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 2,
+                    spreadRadius: 1,
+                  ),
+                ],
               ),
             ),
           ),

@@ -15,10 +15,12 @@ import 'package:vnalo_mobile/services/media_service.dart';
 import 'package:vnalo_mobile/services/notification_service.dart';
 import 'package:vnalo_mobile/core/database/local_database.dart';
 import 'package:vnalo_mobile/core/utils/avatar_resolver.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'dart:io';
 import 'dart:convert';
 
-class ChatProvider extends ChangeNotifier {
+class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
   final ChatService _chatService;
   final SocketService _socketService;
   final MediaService _mediaService;
@@ -39,6 +41,11 @@ class ChatProvider extends ChangeNotifier {
   final StreamSubscription<Map<String, dynamic>> _reactionAddedSub;
   final StreamSubscription<Map<String, dynamic>> _reactionRemovedSub;
   final StreamSubscription<Map<String, dynamic>> _groupDisbandedSub;
+  final StreamSubscription<Map<String, dynamic>> _groupSettingsChangedSub;
+  final StreamSubscription<Map<String, dynamic>> _groupMemberAddedSub;
+  final StreamSubscription<Map<String, dynamic>> _groupMemberRemovedSub;
+  final StreamSubscription<Map<String, dynamic>> _groupRoleChangedSub;
+  final StreamSubscription<Map<String, dynamic>> _groupAdminTransferredSub;
   final StreamSubscription<Map<String, dynamic>> _typingSub;
   final StreamSubscription<Map<String, dynamic>> _presenceSub;
   final Random _random = Random.secure();
@@ -53,6 +60,9 @@ class ChatProvider extends ChangeNotifier {
   Message? _replyingTo;
   String? _highlightedMessageId;
   Timer? _highlightTimer;
+  
+  // Deduplication cache for system notifications (ID -> Timestamp)
+  final Map<String, DateTime> _processedSystemEvents = {};
   Message? _lastCloudMessage;
   Timer? _openConversationDebounce;
   Timer? _inboxPollingTimer; // Polling timer for inbox refresh when socket fails
@@ -109,6 +119,11 @@ class ChatProvider extends ChangeNotifier {
         _reactionAddedSub = socketService.onReactionAdded.listen((_) {}),
         _reactionRemovedSub = socketService.onReactionRemoved.listen((_) {}),
         _groupDisbandedSub = socketService.onGroupDisbanded.listen((_) {}),
+        _groupSettingsChangedSub = socketService.onGroupSettingsChanged.listen((_) {}),
+        _groupMemberAddedSub = socketService.onGroupMemberAdded.listen((_) {}),
+        _groupMemberRemovedSub = socketService.onGroupMemberRemoved.listen((_) {}),
+        _groupRoleChangedSub = socketService.onGroupRoleChanged.listen((_) {}),
+        _groupAdminTransferredSub = socketService.onGroupAdminTransferred.listen((_) {}),
         _typingSub = socketService.onTyping.listen((_) {}),
         _presenceSub = socketService.onPresence.listen((_) {}) {
     _notificationService.ensureInitialized();
@@ -124,8 +139,55 @@ class ChatProvider extends ChangeNotifier {
     _reactionAddedSub.onData(_handleReactionAddedEvent);
     _reactionRemovedSub.onData(_handleReactionRemovedEvent);
     _groupDisbandedSub.onData(_handleGroupDisbandedEvent);
+    _groupSettingsChangedSub.onData(_handleGroupSettingsChangedEvent);
+    _groupMemberAddedSub.onData(_handleGroupMemberAddedEvent);
+    _groupMemberRemovedSub.onData(_handleGroupMemberRemovedEvent);
+    _groupRoleChangedSub.onData(_handleGroupRoleChangedEvent);
+    _groupAdminTransferredSub.onData(_handleGroupAdminTransferredEvent);
     _typingSub.onData(_handleTypingEvent);
     _presenceSub.onData(_handlePresenceEvent);
+    
+    // Listen for app lifecycle changes
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      debugPrint('[ChatProvider] 📱 App Resumed: Reporting Online');
+      _socketService.emitPresence(true);
+      loadInbox(); // Refresh to get latest state
+    } else if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      debugPrint('[ChatProvider] 📱 App Paused/Inactive: Reporting Offline');
+      _socketService.emitPresence(false);
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _messageSub.cancel();
+    _readSub.cancel();
+    _deliveredSub.cancel();
+    _recalledSub.cancel();
+    _pinnedSub.cancel();
+    _unpinnedSub.cancel();
+    _reactionAddedSub.cancel();
+    _reactionRemovedSub.cancel();
+    _groupDisbandedSub.cancel();
+    _groupSettingsChangedSub.cancel();
+    _groupMemberAddedSub.cancel();
+    _groupMemberRemovedSub.cancel();
+    _groupRoleChangedSub.cancel();
+    _groupAdminTransferredSub.cancel();
+    _typingSub.cancel();
+    _presenceSub.cancel();
+    _inboxPollingTimer?.cancel();
+    _highlightTimer?.cancel();
+    for (final timer in _retryTimers.values) {
+      timer.cancel();
+    }
+    super.dispose();
   }
 
   List<Message> getMessages(String conversationId) =>
@@ -226,14 +288,57 @@ class ChatProvider extends ChangeNotifier {
         }
 
         final existingConv = _conversations[existingIndex];
+        bool hasChanges = false;
+        
+        // --- SYNC GUARD: Detect missed member changes ---
+        if (conv.members.length != existingConv.members.length) {
+          debugPrint('[SYNC] 👥 Member count change detected for ${conv.id}: ${existingConv.members.length} -> ${conv.members.length}');
+          
+          final String eventKey = 'member_count_${conv.id}_${conv.members.length}';
+          final now = DateTime.now();
+          
+          // Check if we already processed this change recently via Socket
+          if (_processedSystemEvents[eventKey] == null || 
+              now.difference(_processedSystemEvents[eventKey]!).inSeconds > 10) {
+            
+            _processedSystemEvents[eventKey] = now;
+
+            if (conv.members.length > existingConv.members.length) {
+              // Someone was added
+              final existingIds = existingConv.members.map((m) => m.userId).toSet();
+              final added = conv.members.where((m) => !existingIds.contains(m.userId)).toList();
+              if (added.isNotEmpty) {
+                final names = added.map((m) => m.user?.displayName ?? 'Thành viên mới').join(', ');
+                _sendSystemNotification(conv.id, '$names đã được thêm vào nhóm');
+              }
+            } else {
+              // Someone left/removed
+              final newIds = conv.members.map((m) => m.userId).toSet();
+              final removed = existingConv.members.where((m) => !newIds.contains(m.userId)).toList();
+              if (removed.isNotEmpty) {
+                final names = removed.map((m) => m.user?.displayName ?? 'Thành viên').join(', ');
+                _sendSystemNotification(conv.id, '$names đã không còn trong nhóm');
+              }
+            }
+          }
+          hasChanges = true;
+        }
+        // -----------------------------------------------
+
         final newSeq = conv.lastMessage?.serverSeq?.toString();
         final existingSeq = existingConv.lastMessage?.serverSeq?.toString();
 
         if (newSeq != null && newSeq != existingSeq) {
           debugPrint('[SYNC] 🔄 Out of sync detected for $convId: existing=$existingSeq, new=$newSeq');
           hasNewMessages = true;
-          _conversations[existingIndex] = conv;
+          hasChanges = true;
           await _reloadMessagesForConversation(convId);
+        }
+
+        // CRITICAL: Update the in-memory conversation object if ANY change was detected
+        // to prevent the next poll from triggering the same notification.
+        if (hasChanges) {
+          _conversations[existingIndex] = conv;
         }
       }
       
@@ -262,7 +367,10 @@ class ChatProvider extends ChangeNotifier {
         
         if (newItems.isNotEmpty) {
           // Merge and sort to ensure newest is at index 0 (bottom of reversed list)
-          final merged = [...newItems, ...existing];
+          // Also preserve local-only messages (system/pending)
+          final localOnly = existing.where((m) => m.id.startsWith('sys_') || m.id.startsWith('local-')).toList();
+          
+          final merged = [...newItems, ...existing.where((m) => !m.id.startsWith('sys_') && !m.id.startsWith('local-')), ...localOnly];
           merged.sort((a, b) => b.createdAt.compareTo(a.createdAt));
           
           _messages[convId] = merged;
@@ -312,6 +420,23 @@ class ChatProvider extends ChangeNotifier {
       if (isMissingInRemote && isVeryRecent && localM.leftAt == null) {
         mergedMembers.add(localM);
         debugPrint('Sync protection: Preserved optimistic member ${localM.userId} in ${remote.id}');
+      } else {
+        // ⚡ PRESENCE PROTECTION: If member exists in both, keep the latest online status from local
+        final remoteIdx = mergedMembers.indexWhere((rm) => rm.userId == localM.userId);
+        if (remoteIdx >= 0 && localM.user != null && mergedMembers[remoteIdx].user != null) {
+           final localUser = localM.user!;
+           final remoteUser = mergedMembers[remoteIdx].user!;
+           
+           // If local knows the user is online but remote says offline, trust local (it's more real-time)
+           if (localUser.isOnline && !remoteUser.isOnline) {
+              mergedMembers[remoteIdx] = mergedMembers[remoteIdx].copyWith(
+                user: remoteUser.copyWith(
+                  isOnline: true,
+                  lastSeen: localUser.lastSeen,
+                ),
+              );
+           }
+        }
       }
     }
 
@@ -459,14 +584,33 @@ class ChatProvider extends ChangeNotifier {
       }
 
       if (before == null) {
-        _messages[conversationId] = response;
-        // Sync API messages to local DB in background (fire and forget)
+        // MERGE: Keep existing local system messages or local pending messages
+        final existing = _messages[conversationId] ?? [];
+        final localOnly = existing.where((m) => m.id.startsWith('sys_') || m.id.startsWith('local-')).toList();
+        
+        // Deduplicate: If server already confirmed a local message, don't keep the local version
+        final serverIds = response.map((m) => m.id).toSet();
+        final serverClientIds = response.map((m) => m.clientMessageId).whereType<String>().toSet();
+        
+        final filteredLocal = localOnly.where((m) {
+          if (serverIds.contains(m.id)) return false;
+          if (m.clientMessageId != null && serverClientIds.contains(m.clientMessageId)) return false;
+          return true;
+        }).toList();
+
+        final merged = [...response, ...filteredLocal];
+        // Ensure chronological order (newest first for UI list)
+        merged.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        
+        _messages[conversationId] = merged;
+        
+        // Sync API messages to local DB in background
         _db.saveMessagesBatch(response.map(_toLocal).toList());
       } else {
-        _messages[conversationId] = [
-          ...(_messages[conversationId] ?? []),
-          ...response,
-        ];
+        final existing = _messages[conversationId] ?? [];
+        final merged = [...existing, ...response];
+        merged.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        _messages[conversationId] = merged;
       }
       notifyListeners();
     } catch (e, stack) {
@@ -517,11 +661,8 @@ class ChatProvider extends ChangeNotifier {
   }
 
   Future<void> openConversation(String conversationId) async {
-    // Debounce: cancel any pending openConversation call
-    _openConversationDebounce?.cancel();
-    _openConversationDebounce = Timer(const Duration(milliseconds: 300), () async {
-      await _openConversationInternal(conversationId);
-    });
+    // Zero latency: open immediately without debounce
+    await _openConversationInternal(conversationId);
   }
 
   Future<void> _openConversationInternal(String conversationId) async {
@@ -657,6 +798,14 @@ class ChatProvider extends ChangeNotifier {
     _messages[conversationId] = [optimistic, ...(getMessagesForConversation(conversationId))];
     _replyingTo = null; // Clear reply state after sending
 
+    // ⚡ ZERO LATENCY: Update Inbox immediately (move to top)
+    final idx = _conversations.indexWhere((c) => c.id == conversationId);
+    if (idx >= 0) {
+      final conv = _conversations[idx];
+      _conversations.removeAt(idx);
+      _conversations.insert(0, conv.copyWith(lastMessage: optimistic, updatedAt: DateTime.now()));
+    }
+
     // Persist optimistic message locally
     _db.saveMessage(_toLocal(optimistic));
 
@@ -690,6 +839,15 @@ class ChatProvider extends ChangeNotifier {
     );
 
     _messages[conversationId] = [optimistic, ...(getMessagesForConversation(conversationId))];
+
+    // ⚡ ZERO LATENCY: Update Inbox immediately (move to top)
+    final idx = _conversations.indexWhere((c) => c.id == conversationId);
+    if (idx >= 0) {
+      final conv = _conversations[idx];
+      _conversations.removeAt(idx);
+      _conversations.insert(0, conv.copyWith(lastMessage: optimistic, updatedAt: DateTime.now()));
+    }
+
     notifyListeners();
 
     if (file == null && mediaUrl != null) {
@@ -1004,144 +1162,55 @@ class ChatProvider extends ChangeNotifier {
       // #endregion
       return;
     }
-    // 1. SIGNAL MESSAGE HANDLING (Real-time Sync for Disband/Remove)
-    // Since backend doesn't emit dedicated socket events, we use hidden "Signal Messages"
-    // that are broadcasted as normal messages but intercepted here.
-    if (message.messageType == MessageType.SYSTEM || message.content?.startsWith('[ACTION:') == true) {
-      final content = message.content ?? '';
-      if (content == '[ACTION:DISBAND]') {
-        debugPrint('SIGNAL: Group ${message.conversationId} disbanded. Removing...');
-        _removeConversationLocally(message.conversationId);
-        return;
-      }
-      if (content.startsWith('[ACTION:REMOVE:')) {
-        // Extract userId: [ACTION:REMOVE:user-uuid-here]
-        final targetUserId = content.replaceFirst('[ACTION:REMOVE:', '').replaceFirst(']', '');
-        if (targetUserId == _currentUserId) {
-          debugPrint('SIGNAL: I was removed from ${message.conversationId}. Removing...');
-          _removeConversationLocally(message.conversationId);
-          return;
+    // 1. SYSTEM MESSAGE HANDLING
+    // Display system notifications from the backend (including "Silent Leave" notifications for Admins)
+    if (message.messageType == MessageType.SYSTEM) {
+      debugPrint('[ChatProvider] Received SYSTEM message: ${message.content}');
+      // Fallback: if we haven't received a dedicated socket event yet, we might want to refresh.
+      // But usually, the dedicated event is more reliable.
+    }
+    
+    final content = message.content ?? '';
+    try {
+      if (content.contains('"action":"UPDATE_MESSAGE_REACTIONS"')) {
+        final data = jsonDecode(content);
+        final msgId = data['messageId'];
+        final actionType = data['type']; // 'ADD' or 'REMOVE'
+        final emoji = data['emoji'];
+        final actorId = data['actorId'];
+
+        if (msgId != null) {
+          debugPrint('SIGNAL: Reaction update signal received for $msgId.');
+          
+          // Optimistic local update if we have enough info
+          if (actionType != null && emoji != null && actorId != null) {
+            final currentReactions = _reactions[msgId] ?? [];
+            if (actionType == 'ADD') {
+              final newReaction = MessageReaction(
+                id: 'signal_${DateTime.now().millisecondsSinceEpoch}',
+                conversationId: message.conversationId,
+                messageId: msgId,
+                serverSeq: 0,
+                userId: actorId,
+                emoji: emoji,
+                createdAt: DateTime.now(),
+              );
+              // Replace existing if from same user
+              final filtered = currentReactions.where((r) => r.userId != actorId).toList();
+              filtered.add(newReaction);
+              _reactions[msgId] = filtered;
+            } else if (actionType == 'REMOVE') {
+              _reactions[msgId] = currentReactions.where((r) => r.userId != actorId).toList();
+            }
+            notifyListeners();
+          }
+          
+          // Background sync to ensure data integrity
+          loadReactions(msgId);
         }
       }
-
-      // Handle JSON-based system signals
-      if (content.contains('"action":')) {
-        try {
-          final data = jsonDecode(content);
-          final action = data['action'];
-          final actorId = data['actorId'];
-
-          if (action == 'CREATE_GROUP') {
-            debugPrint('SIGNAL: New group created. Refreshing inbox...');
-            loadInbox();
-          }
-
-          if (action == 'LEAVE_GROUP' || action == 'REMOVE_MEMBER') {
-            final targetIds = List<String>.from(data['targetMemberIds'] ?? [actorId]);
-            debugPrint('SIGNAL: Membership update received for ${message.conversationId}. Targets: $targetIds');
-
-            if (targetIds.contains(_currentUserId)) {
-              debugPrint('SIGNAL: I was removed from or left ${message.conversationId}. Removing locally.');
-              _removeConversationLocally(message.conversationId);
-            } else {
-              // Someone else left/removed
-              bool changed = false;
-              for (int i = 0; i < _conversations.length; i++) {
-                if (_conversations[i].id == message.conversationId) {
-                  final conv = _conversations[i];
-                  final updatedMembers = conv.members.where((m) => !targetIds.contains(m.userId)).toList();
-                  
-                  if (updatedMembers.length != conv.members.length) {
-                    _conversations[i] = conv.copyWith(members: updatedMembers);
-                    changed = true;
-                  }
-                  break;
-                }
-              }
-              if (changed) notifyListeners();
-            }
-          }
-
-          if (action == 'DISBAND_GROUP') {
-            debugPrint('SIGNAL: Group disbanded: ${message.conversationId}. Removing locally.');
-            _removeConversationLocally(message.conversationId);
-          }
-
-          if (action == 'UPDATE_GROUP_INFO' || action == 'CHANGE_GROUP_AVATAR') {
-             final metadata = data['metadata'] ?? {};
-             final newName = metadata['newName'];
-             final newAvatarUrl = metadata['newAvatarUrl'];
-             
-             debugPrint('SIGNAL: Group metadata update received for ${message.conversationId}.');
-             
-             bool changed = false;
-             for (int i = 0; i < _conversations.length; i++) {
-               if (_conversations[i].id == message.conversationId) {
-                 var updated = _conversations[i];
-                 if (newName != null) {
-                   updated = updated.copyWith(title: newName);
-                   changed = true;
-                 }
-                 if (newAvatarUrl != null) {
-                   updated = updated.copyWith(avatarUrl: newAvatarUrl);
-                   changed = true;
-                 }
-                 if (changed) {
-                   _conversations[i] = updated;
-                 }
-                 break;
-               }
-             }
-             if (changed) {
-               notifyListeners();
-             } else {
-               // Fallback to refresh if we didn't find it in local list 
-               // (might be a new conversation for us)
-               loadInbox();
-             }
-          }
-
-          if (content.contains('"action":"UPDATE_MESSAGE_REACTIONS"')) {
-            final data = jsonDecode(content);
-            final msgId = data['messageId'];
-            final actionType = data['type']; // 'ADD' or 'REMOVE'
-            final emoji = data['emoji'];
-            final actorId = data['actorId'];
-
-            if (msgId != null) {
-              debugPrint('SIGNAL: Reaction update signal received for $msgId.');
-              
-              // Optimistic local update if we have enough info
-              if (actionType != null && emoji != null && actorId != null) {
-                final currentReactions = _reactions[msgId] ?? [];
-                if (actionType == 'ADD') {
-                  final newReaction = MessageReaction(
-                    id: 'signal_${DateTime.now().millisecondsSinceEpoch}',
-                    conversationId: message.conversationId,
-                    messageId: msgId,
-                    serverSeq: 0,
-                    userId: actorId,
-                    emoji: emoji,
-                    createdAt: DateTime.now(),
-                  );
-                  // Replace existing if from same user
-                  final filtered = currentReactions.where((r) => r.userId != actorId).toList();
-                  filtered.add(newReaction);
-                  _reactions[msgId] = filtered;
-                } else if (actionType == 'REMOVE') {
-                  _reactions[msgId] = currentReactions.where((r) => r.userId != actorId).toList();
-                }
-                notifyListeners();
-              }
-              
-              // Background sync to ensure data integrity
-              loadReactions(msgId);
-            }
-          }
-        } catch (e) {
-          debugPrint('Error parsing system signal: $e');
-        }
-      }
+    } catch (e) {
+      debugPrint('Error parsing system signal: $e');
     }
 
     final conversationId = message.conversationId;
@@ -1266,6 +1335,24 @@ class ChatProvider extends ChangeNotifier {
         _playIncomingMessageSound();
       }
 
+      // 2. Real-time Inbox Update (Zero Latency)
+      // Move conversation to top and update last message state locally
+      final convIndex = _conversations.indexWhere((c) => c.id == conversationId);
+      if (convIndex >= 0) {
+        final conv = _conversations[convIndex];
+        final updatedConv = conv.copyWith(
+          lastMessage: resolvedMessage,
+          unreadCount: !isActiveConversation ? (conv.unreadCount + 1) : 0,
+          updatedAt: DateTime.now(),
+        );
+        
+        // Move to top: remove from current pos and insert at 0
+        _conversations.removeAt(convIndex);
+        _conversations.insert(0, updatedConv);
+        
+        debugPrint('[ChatProvider] ⚡ Real-time Inbox update: Moved $conversationId to top');
+      }
+      
       if (!isActiveConversation && !isMuted && !message.isSystemMessage) {
         _notifyIncomingMessage(resolvedMessage, resolvedConversation);
       }
@@ -1318,9 +1405,117 @@ class ChatProvider extends ChangeNotifier {
   void _handleGroupDisbandedEvent(Map<String, dynamic> data) {
     final String? conversationId = data['conversationId'];
     if (conversationId != null) {
-      debugPrint('EVENT: Group disbanded received: $conversationId. Purging cache...');
+      debugPrint('[ChatProvider] EVENT: Group disbanded: $conversationId. Purging cache...');
       _removeConversationLocally(conversationId);
     }
+  }
+
+  void _handleGroupSettingsChangedEvent(Map<String, dynamic> data) {
+    final String? conversationId = data['conversationId'];
+    if (conversationId == null) return;
+    debugPrint('[ChatProvider] EVENT: Group settings changed: $conversationId');
+    
+    // Optional: Show notification if actor info is available
+    final String? actorId = data['actorId'];
+    if (actorId != null) {
+      final actorName = getSenderName(conversationId, actorId);
+      _sendSystemNotification(conversationId, '$actorName đã cập nhật thiết lập nhóm');
+    }
+
+    refreshConversation(conversationId);
+  }
+
+  void _handleGroupMemberAddedEvent(Map<String, dynamic> data) {
+    final String? conversationId = data['conversationId'];
+    final String? actorId = data['actorId'];
+    final List<dynamic>? memberIds = data['memberIds'];
+    
+    if (conversationId == null) return;
+    debugPrint('[ChatProvider] EVENT: Member added to group: $conversationId');
+
+    // Deduplication
+    if (memberIds != null) {
+      for (final id in memberIds) {
+        _processedSystemEvents['member_added_${conversationId}_$id'] = DateTime.now();
+      }
+      // Also mark member count event as processed to prevent Polling from firing
+      final int idx = _conversations.indexWhere((c) => c.id == conversationId);
+      if (idx >= 0) {
+        final int newCount = _conversations[idx].members.length + memberIds.length;
+        _processedSystemEvents['member_count_${conversationId}_$newCount'] = DateTime.now();
+      }
+    }
+    
+    // First refresh to get the latest member list (to resolve names)
+    refreshConversation(conversationId).then((_) {
+      if (actorId != null && memberIds != null && memberIds.isNotEmpty) {
+        final actorName = getSenderName(conversationId, actorId);
+        // Resolve names for all added members
+        final List<String> names = memberIds.map((id) => getSenderName(conversationId, id.toString())).toList();
+        final namesString = names.join(', ');
+        
+        _sendSystemNotification(conversationId, '$actorName đã thêm $namesString vào nhóm');
+      }
+    });
+  }
+
+  void _handleGroupMemberRemovedEvent(Map<String, dynamic> data) {
+    final String? conversationId = data['conversationId'];
+    final String? removedUserId = data['userId'];
+    final String? actorId = data['actorId'];
+    if (conversationId == null || removedUserId == null) return;
+
+    if (removedUserId == _currentUserId) {
+      debugPrint('[ChatProvider] EVENT: I was removed from $conversationId');
+      _removeConversationLocally(conversationId);
+    } else {
+      debugPrint('[ChatProvider] EVENT: Member $removedUserId removed from $conversationId');
+      
+      // Use a consistent event key for deduplication
+      final String eventKey = 'member_removed_${conversationId}_$removedUserId';
+      _processedSystemEvents[eventKey] = DateTime.now();
+
+      // Refresh first to get accurate names and state
+      refreshConversation(conversationId).then((_) {
+        final actorName = actorId != null ? getSenderName(conversationId, actorId) : null;
+        final removedName = getSenderName(conversationId, removedUserId);
+        final bool isSilent = data['silent'] == true;
+        
+        if (!isSilent) {
+          if (actorId == removedUserId) {
+            _sendSystemNotification(conversationId, '$removedName đã rời khỏi nhóm');
+          } else if (actorName != null) {
+            _sendSystemNotification(conversationId, '$removedName đã bị $actorName xóa khỏi nhóm');
+          } else {
+            _sendSystemNotification(conversationId, '$removedName đã không còn trong nhóm');
+          }
+        }
+      });
+    }
+  }
+
+  void _handleGroupRoleChangedEvent(Map<String, dynamic> data) {
+    final String? conversationId = data['conversationId'];
+    if (conversationId == null) return;
+    debugPrint('[ChatProvider] EVENT: Role changed in group: $conversationId');
+    refreshConversation(conversationId);
+  }
+
+  void _handleGroupAdminTransferredEvent(Map<String, dynamic> data) {
+    final String? conversationId = data['conversationId'];
+    final String? newAdminId = data['newAdminId'];
+    final String? oldAdminId = data['oldAdminId'];
+
+    if (conversationId == null) return;
+    debugPrint('[ChatProvider] EVENT: Admin transferred in group: $conversationId');
+    
+    if (newAdminId != null && oldAdminId != null) {
+      final newAdminName = getSenderName(conversationId, newAdminId);
+      final oldAdminName = getSenderName(conversationId, oldAdminId);
+      _sendSystemNotification(conversationId, '$oldAdminName đã chuyển quyền trưởng nhóm cho $newAdminName');
+    }
+
+    refreshConversation(conversationId);
   }
 
   void _playIncomingMessageSound() {
@@ -1540,41 +1735,72 @@ class ChatProvider extends ChangeNotifier {
     });
   }
 
+  // Global cache for user presence to ensure consistency across different conversation objects
+  final Map<String, bool> _userPresence = {};
+  bool isUserOnline(String userId) => _userPresence[userId] ?? false;
+
   void _handlePresenceEvent(Map<String, dynamic> data) {
-    final userId = data['userId']?.toString();
-    final isOnline = data['isOnline'] == true;
-    final lastSeen = data['lastSeen'] != null
-        ? DateTime.tryParse(data['lastSeen'].toString())
+    debugPrint('[ChatProvider] 📡 PRESENCE EVENT: $data');
+    final rawUserId = (data['userId'] ?? data['id'])?.toString();
+    if (rawUserId == null) {
+      debugPrint('[ChatProvider] ⚠️ Presence event ignored: No userId found');
+      return;
+    }
+
+    final userId = rawUserId.toLowerCase(); // Standardize ID
+    
+    // Super safe boolean parsing
+    final isOnline = data['isOnline'] == true || 
+                     data['online'] == true || 
+                     data['isOnline']?.toString().toLowerCase() == 'true' ||
+                     data['online']?.toString().toLowerCase() == 'true' ||
+                     data['isOnline'] == 1 ||
+                     data['online'] == 1;
+
+    final lastSeenRaw = data['lastSeen'] ?? data['last_seen'];
+    final lastSeen = lastSeenRaw != null
+        ? DateTime.tryParse(lastSeenRaw.toString())
         : (isOnline ? DateTime.now() : null);
 
-    if (userId == null) return;
+    // Update global cache
+    _userPresence[userId] = isOnline;
 
     // Update all conversations where this user is a member
     bool changed = false;
     for (int i = 0; i < _conversations.length; i++) {
       final conv = _conversations[i];
-      final memberIdx = conv.members.indexWhere((m) => m.userId == userId);
+      
+      // Use case-insensitive search for members
+      final memberIdx = conv.members.indexWhere((m) => m.userId.toLowerCase() == userId);
       if (memberIdx < 0) continue;
 
       final member = conv.members[memberIdx];
-      if (member.user == null) continue;
+      if (member.user == null) {
+        debugPrint('[ChatProvider] ⚠️ Member user object is null for $userId in ${conv.id}');
+        // Optional: create a dummy user if needed, but usually it should be there
+        continue;
+      }
 
-      final updatedUser = member.user!.copyWith(
-        isOnline: isOnline,
-        lastSeen: lastSeen,
-      );
-
+      // Check if status actually changed
       if (member.user!.isOnline != isOnline ||
           member.user!.lastSeen != lastSeen) {
+        
+        final updatedUser = member.user!.copyWith(
+          isOnline: isOnline,
+          lastSeen: lastSeen,
+        );
+
         final updatedMember = member.copyWith(user: updatedUser);
         final updatedMembers = List<ConversationMember>.from(conv.members);
         updatedMembers[memberIdx] = updatedMember;
         _conversations[i] = conv.copyWith(members: updatedMembers);
         changed = true;
+        debugPrint('[ChatProvider] ✅ Updated presence for $userId in ${conv.id}: online=$isOnline');
       }
     }
 
-    if (changed) {
+    if (changed || isOnline) {
+      // Always notify if someone goes online to ensure UI catches it
       notifyListeners();
     }
   }
@@ -1855,28 +2081,8 @@ class ChatProvider extends ChangeNotifier {
   }
 
   @override
-  void dispose() {
-    _messageSub.cancel();
-    _readSub.cancel();
-    _deliveredSub.cancel();
-    _recalledSub.cancel();
-    _pinnedSub.cancel();
-    _unpinnedSub.cancel();
-    _reactionAddedSub.cancel();
-    _reactionRemovedSub.cancel();
-    _groupDisbandedSub.cancel();
-    _typingSub.cancel();
-    _presenceSub.cancel();
-    _highlightTimer?.cancel();
-    _inboxPollingTimer?.cancel();
-    for (final timer in _retryTimers.values) {
-      timer.cancel();
-    }
-    super.dispose();
-  }
 
-  // Settings and management helpers.
-
+  // Settings and management
   Future<void> updateConversationSettings({
     required String conversationId,
     bool? isPinned,
@@ -2007,16 +2213,18 @@ class ChatProvider extends ChangeNotifier {
   }
 
   String getSenderName(String conversationId, String senderId) {
+    if (senderId == 'SYSTEM' || senderId == 'SERVER') return 'Hệ thống';
+    
     final index = _conversations.indexWhere((c) => c.id == conversationId);
     if (index >= 0) {
       final conv = _conversations[index];
       final memberIndex = conv.members.indexWhere((m) => m.userId == senderId);
       if (memberIndex >= 0) {
         final member = conv.members[memberIndex];
-        return member.nickname ?? member.user?.displayName ?? 'User';
+        return member.nickname ?? member.user?.displayName ?? 'Người dùng ($senderId)';
       }
     }
-    return 'User';
+    return 'Người dùng ($senderId)';
   }
 
   void updateUserProfileInConversations(User updatedUser) {
@@ -2077,31 +2285,42 @@ class ChatProvider extends ChangeNotifier {
 
   // --- Group Management ---
 
-  Future<void> _sendSystemNotification(String conversationId, String content) async {
+  Future<void> _sendSystemNotification(String conversationId, String content, {Map<String, dynamic>? metadata}) async {
     try {
-      debugPrint('Adding system notification to local state for $conversationId: $content');
-      
-      // Create system message locally and add to messages list
+      // Use a consistent ID format that can be easily identified as a local system message
+      // but still unique enough to avoid collisions.
+      final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      final String localId = 'sys_${conversationId}_$timestamp';
+
       final systemMessage = Message(
-        id: 'system-${DateTime.now().millisecondsSinceEpoch}',
+        id: localId,
         conversationId: conversationId,
-        senderId: _currentUserId ?? '',
+        senderId: 'SERVER', // Use 'SERVER' or 'SYSTEM' consistently
         messageType: MessageType.SYSTEM,
         content: content,
         status: MessageStatus.SENT,
         createdAt: DateTime.now(),
+        // metadata can store actorId, targetId, or action type for Web to parse
+        // content: jsonEncode({'text': content, ...metadata}), // Optional: if Web expects JSON
       );
       
-      // Add to local messages
+      // 1. Memory update
       if (_messages[conversationId] == null) {
         _messages[conversationId] = [];
       }
-      _messages[conversationId]!.insert(0, systemMessage);
-      notifyListeners();
       
-      debugPrint('System notification added to local state successfully');
+      // Avoid adding duplicate local system messages if they arrive fast
+      if (!_messages[conversationId]!.any((m) => m.content == content && 
+          DateTime.now().difference(m.createdAt).inSeconds < 2)) {
+        _messages[conversationId]!.insert(0, systemMessage);
+        notifyListeners();
+
+        // 2. Persist to local database
+        await _db.saveMessage(_toLocal(systemMessage));
+        debugPrint('[ChatProvider] System notification persisted: $content');
+      }
     } catch (e) {
-      debugPrint('Failed to add system notification: $e');
+      debugPrint('Failed to persist system notification: $e');
     }
   }
 
@@ -2165,20 +2384,15 @@ class ChatProvider extends ChangeNotifier {
       if (showHistoryToNewMembers != null) body['showHistoryToNewMembers'] = showHistoryToNewMembers;
       if (allowMemberCreateNote != null) body['allowMemberCreateNote'] = allowMemberCreateNote;
       if (allowMemberCreatePoll != null) body['allowMemberCreatePoll'] = allowMemberCreatePoll;
+      
+      await _chatService.updateGroupInfo(conversationId, body);
 
-      await _chatService.updateGroup(conversationId, body);
-      
-      // Send system actions via socket for real-time sync across platforms
-      if (title != null || avatarUrl != null) {
-        final syncPayload = '{"action":"UPDATE_GROUP_INFO","actorId":"$currentUser"}';
-        _socketService.sendMessage(
-          conversationId: conversationId,
-          content: syncPayload,
-          messageType: 'SYSTEM'
-        );
+      // Restore Optimistic UI Notification
+      if (title != null) {
+        await _sendSystemNotification(conversationId, '$userName đã đổi tên nhóm thành "$title"');
+      } else if (avatarUrl == null) {
+        await _sendSystemNotification(conversationId, '$userName đã cập nhật thiết lập nhóm');
       }
-      
-      // No need to update local state again since we did it optimistically.
     } catch (e) {
       debugPrint('updateGroupInfo error: $e');
       rethrow;
@@ -2259,22 +2473,8 @@ class ChatProvider extends ChangeNotifier {
     final myId = _currentUserId;
     if (myId == null) return;
 
-    // Get user names for notification
-    String myName = 'Một thành viên';
-    String targetName = 'Một thành viên';
-    final index = _conversations.indexWhere((c) => c.id == conversationId);
-    if (index >= 0) {
-      final myMemberIndex = _conversations[index].members.indexWhere((m) => m.userId == myId);
-      if (myMemberIndex >= 0) {
-        myName = _conversations[index].members[myMemberIndex].user?.displayName ?? myName;
-      }
-      final targetMemberIndex = _conversations[index].members.indexWhere((m) => m.userId == targetUserId);
-      if (targetMemberIndex >= 0) {
-        targetName = _conversations[index].members[targetMemberIndex].user?.displayName ?? targetName;
-      }
-    }
-
     // Step 1: Surgical Local Update for immediate feedback (Optimistic UI)
+    final index = _conversations.indexWhere((c) => c.id == conversationId);
     if (index >= 0) {
       final conv = _conversations[index];
       final updatedMembers = conv.members.map((m) {
@@ -2291,36 +2491,33 @@ class ChatProvider extends ChangeNotifier {
     }
 
     try {
-      // Step 2: API Update
-      await _chatService.updateMemberRole(conversationId, targetUserId, 'OWNER');
+      // Use updateMemberRole to transfer ownership (set target to ADMIN)
+      // The backend should handle demoting the current owner automatically or via separate call
+      await _chatService.updateMemberRole(conversationId, targetUserId, 'ADMIN');
+
+      final index = _conversations.indexWhere((c) => c.id == conversationId);
+      String myName = 'Trưởng nhóm';
+      String targetName = 'Thành viên';
       
-      // Send system notification for ownership transfer
+      if (index >= 0) {
+        final myMemberIndex = _conversations[index].members.indexWhere((m) => m.userId == myId);
+        if (myMemberIndex >= 0) {
+          myName = _conversations[index].members[myMemberIndex].user?.displayName ?? myName;
+        }
+        final targetMemberIndex = _conversations[index].members.indexWhere((m) => m.userId == targetUserId);
+        if (targetMemberIndex >= 0) {
+          targetName = _conversations[index].members[targetMemberIndex].user?.displayName ?? targetName;
+        }
+      }
+      
       await _sendSystemNotification(conversationId, '$myName đã chuyển quyền trưởng nhóm cho $targetName');
-      
-      // Step 3: Unified Sync
-      await refreshConversation(conversationId);
     } catch (e) {
       debugPrint('transferOwnership error: $e');
-      // ROLLBACK: Sync back to server truth if API fails
-      await refreshConversation(conversationId);
       rethrow;
     }
   }
 
   Future<void> addMembersToGroup(String conversationId, List<User> newUsers) async {
-    // Get current user name for notification
-    final currentUser = _currentUserId;
-    String userName = 'Một thành viên';
-    if (currentUser != null) {
-      final index = _conversations.indexWhere((c) => c.id == conversationId);
-      if (index >= 0) {
-        final memberIndex = _conversations[index].members.indexWhere((m) => m.userId == currentUser);
-        if (memberIndex >= 0) {
-          userName = _conversations[index].members[memberIndex].user?.displayName ?? userName;
-        }
-      }
-    }
-
     // Step 1: Surgical Local Update for immediate visual feedback (TRUE Optimistic UI)
     final index = _conversations.indexWhere((c) => c.id == conversationId);
     if (index >= 0) {
@@ -2351,57 +2548,32 @@ class ChatProvider extends ChangeNotifier {
       
       _conversations[index] = conv.copyWith(members: currentMembers);
       notifyListeners();
-      debugPrint('addMembersToGroup (Optimistic): Added/Updated ${newUsers.length} members. New total: ${currentMembers.length}');
     }
 
     try {
-      final memberIds = newUsers.map((u) => u.id).toList();
-      await _chatService.addMembers(conversationId, memberIds);
+      await _chatService.addMembers(conversationId, newUsers.map((u) => u.id).toList());
+
+      // Restore Optimistic UI Notification
+      final currentUser = _currentUserId;
+      String userName = 'Một thành viên';
+      if (currentUser != null) {
+        final conv = _conversations.firstWhere((c) => c.id == conversationId);
+        userName = conv.members.firstWhere((m) => m.userId == currentUser).user?.displayName ?? userName;
+      }
       
-      // Send system notification for adding members
       if (newUsers.length == 1) {
-        final memberName = newUsers.first.displayName ?? 'Một thành viên';
+        final memberName = newUsers.first.displayName;
         await _sendSystemNotification(conversationId, '$userName đã thêm $memberName vào nhóm');
       } else {
         await _sendSystemNotification(conversationId, '$userName đã thêm ${newUsers.length} thành viên vào nhóm');
       }
-      
-      // Step 2: Synchronization Delay
-      // Allow the backend some time to process the addition before we refresh the state.
-      await Future.delayed(const Duration(seconds: 2));
-      
-      // Step 3: Server Refresh
-      await refreshConversation(conversationId);
-      debugPrint('addMembersToGroup: Successfully synced with server for $conversationId');
     } catch (e) {
-      debugPrint('addMembersToGroup API error: $e');
-      // ROLLBACK: If the API fails, sync back to server truth immediately.
-      // This will remove the optimistic members that weren't actually added.
-      await refreshConversation(conversationId);
+      debugPrint('addMembers error: $e');
       rethrow;
     }
   }
 
   Future<void> removeMember(String conversationId, String userId) async {
-    // Get current user name and removed user name for notification
-    final currentUser = _currentUserId;
-    String userName = 'Một thành viên';
-    String removedUserName = 'Một thành viên';
-    
-    if (currentUser != null) {
-      final index = _conversations.indexWhere((c) => c.id == conversationId);
-      if (index >= 0) {
-        final memberIndex = _conversations[index].members.indexWhere((m) => m.userId == currentUser);
-        if (memberIndex >= 0) {
-          userName = _conversations[index].members[memberIndex].user?.displayName ?? userName;
-        }
-        final removedMemberIndex = _conversations[index].members.indexWhere((m) => m.userId == userId);
-        if (removedMemberIndex >= 0) {
-          removedUserName = _conversations[index].members[removedMemberIndex].user?.displayName ?? removedUserName;
-        }
-      }
-    }
-
     // Step 1: Surgical Local Update for immediate feedback
     final index = _conversations.indexWhere((c) => c.id == conversationId);
     if (index >= 0) {
@@ -2411,30 +2583,25 @@ class ChatProvider extends ChangeNotifier {
     }
 
     try {
-      // NOTIFY: Send signal message so others know about the removal
-      final removeSignal = {
-        'action': 'REMOVE_MEMBER',
-        'actorId': _currentUserId,
-        'targetMemberIds': [userId]
-      };
-      
-      _socketService.sendMessage(
-        conversationId: conversationId,
-        content: jsonEncode(removeSignal),
-        messageType: 'SYSTEM',
-      );
-      
       await _chatService.removeMember(conversationId, userId);
-      
-      // Send system notification for removing member
-      await _sendSystemNotification(conversationId, '$userName đã loại $removedUserName khỏi nhóm');
+
+      // Restore Optimistic UI Notification (Silent Leave - will only be visible locally for the actor)
+      final currentUser = _currentUserId;
+      String userName = 'Admin';
+      String targetName = 'Thành viên';
+      if (currentUser != null) {
+        final conv = _conversations.firstWhere((c) => c.id == conversationId);
+        userName = conv.members.firstWhere((m) => m.userId == currentUser).user?.displayName ?? userName;
+        targetName = conv.members.firstWhere((m) => m.userId == userId).user?.displayName ?? targetName;
+      }
+      await _sendSystemNotification(conversationId, '$userName đã mời $targetName rời khỏi nhóm');
     } catch (e) {
       debugPrint('removeMember error: $e');
       rethrow;
     }
   }
 
-  Future<void> leaveGroup(String conversationId) async {
+  Future<void> leaveGroup(String conversationId, {bool silent = false}) async {
     final userId = _currentUserId;
     if (userId == null) return;
     
@@ -2460,10 +2627,10 @@ class ChatProvider extends ChangeNotifier {
     await _removeConversationLocally(conversationId);
 
     try {
-      await removeMember(conversationId, userId);
+      await _chatService.leaveGroup(conversationId, userId, silent: silent);
+      debugPrint('[ChatProvider] leaveGroup: Success (silent=$silent)');
     } catch (e) {
       debugPrint('leaveGroup error: $e');
-      // If error, maybe we should reload inbox, but usually user wants to get out anyway.
     }
   }
 
@@ -2473,46 +2640,28 @@ class ChatProvider extends ChangeNotifier {
       throw StateError('Current user is not available');
     }
 
-    // Get current user name for notification
-    String userName = 'Một thành viên';
-    final convToRemove = _conversations.firstWhere((c) => c.id == conversationId, 
-      orElse: () => throw Exception('Conversation not found'));
-    final memberIndex = convToRemove.members.indexWhere((m) => m.userId == currentUserId);
-    if (memberIndex >= 0) {
-      userName = convToRemove.members[memberIndex].user?.displayName ?? userName;
-    }
-    
-    final memberIdsToNotify = convToRemove.members
-        .where((m) => m.leftAt == null)
-        .map((m) => m.userId)
-        .toList();
+    // Optimistic UI update
+    await _removeConversationLocally(conversationId);
 
     try {
-      // Send system notification for disbanding group
-      await _sendSystemNotification(conversationId, '$userName đã giải tán nhóm');
-      
-      // NOTIFY: Send signal message so everyone's app knows the group is disbanded in real-time
-      final disbandSignal = {
-        'action': 'DISBAND_GROUP',
-        'actorId': _currentUserId
-      };
-      
-      _socketService.sendMessage(
-        conversationId: conversationId,
-        content: jsonEncode(disbandSignal),
-        messageType: 'SYSTEM',
-      );
-      
-      await _removeConversationLocally(conversationId);
+      final conv = _conversations.firstWhere((c) => c.id == conversationId);
+      final memberIds = conv.members.map((m) => m.userId);
       
       await _chatService.disbandGroup(
         conversationId: conversationId,
         currentUserId: currentUserId,
-        memberIds: memberIdsToNotify,
+        memberIds: memberIds,
       );
-      debugPrint('disbandGroup: Successfully signaled and started disband cleanup');
+      
+      // Local notification before removal
+      final userName = _conversations.firstWhere((c) => c.id == conversationId)
+          .members.firstWhere((m) => m.userId == _currentUserId).user?.displayName ?? 'Admin';
+      await _sendSystemNotification(conversationId, '$userName đã giải tán nhóm');
+      
+      debugPrint('[ChatProvider] disbandGroup: Successfully disbanded group $conversationId');
     } catch (e) {
-      debugPrint('disbandGroup error: $e');
+      debugPrint('[ChatProvider] disbandGroup error: $e');
+      rethrow;
     }
   }
 

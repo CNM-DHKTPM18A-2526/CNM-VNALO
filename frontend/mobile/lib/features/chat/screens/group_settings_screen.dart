@@ -106,6 +106,13 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
                   (val) => provider.updateGroupInfo(conv.id, showHistoryToNewMembers: val),
                   textColor,
                 ),
+                Divider(height: 1, color: dividerColor, indent: 16),
+                _buildSwitchTile(
+                  'Cho phép thành viên mời người khác',
+                  conv.allowMemberInvite,
+                  (val) => provider.updateGroupInfo(conv.id, allowMemberInvite: val),
+                  textColor,
+                ),
               ],
             ),
           ),
