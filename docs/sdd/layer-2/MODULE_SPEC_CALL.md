@@ -2,7 +2,7 @@
 
 > [!IMPORTANT]
 > Module owner: Flutter call feature + message-service chat.gateway signaling.
-> Last audited: 2026-04-22. All rules derived from code-first scan unless marked `[SPEC_ONLY]`.
+> Last audited: 2026-05-01. All rules derived from code-first scan unless marked `[SPEC_ONLY]`.
 
 ---
 

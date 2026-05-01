@@ -2,7 +2,7 @@
 
 > [!IMPORTANT]
 > Module owner: message-service chat.gateway + Flutter SocketService.
-> Last audited: 2026-04-22. All rules derived from code-first scan of chat.gateway.ts unless marked `[SPEC_ONLY]`.
+> Last audited: 2026-05-01. All rules derived from code-first scan of chat.gateway.ts unless marked `[SPEC_ONLY]`.
 
 ---
 
@@ -432,8 +432,13 @@ On every reconnect (socket re-established after disconnect):
 | Implement `group.updated` event | Open | P1 | `[SPEC_ONLY]` |
 | Wire CALL_OFFLINE Redis consumer to FCM push | Open | P1 | Offline call delivery |
 | Re-enable `restrictedWebMode` enforcement at gateway | Open | P2 | D-008 debt |
-| Flutter: deduplicate `message.received` by `message.id` | Open | P1 | Required due to dual delivery |
+| Flutter: deduplicate `message.received` by `message.id` | **Done** | P1 | `socket_service.dart` — `_seenMessageKeys` Set |
 | Flutter: re-join rooms on reconnect | Done | — | socket_service reconnect flow |
+| Flutter: sendMessage ACK with timeout | **Done** | P0 | `socket_service.dart` — `emitWithAckAsync` + `_sendErrorController` |
+| Flutter: reconnection jitter (thundering herd fix) | **Done** | P0 | `socket_service.dart` — `setRandomizationFactor(0.5)` |
+| Flutter: StreamController dispose safety | **Done** | P1 | `socket_service.dart` — `_disposeAllControllers()` + `_disposed` guard |
+| RedisIoAdapter for multi-node socket sync | Open | P0 | Required before multi-node deployment |
+
 
 ---
 
