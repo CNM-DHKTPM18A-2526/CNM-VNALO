@@ -68,20 +68,22 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
     final dividerColor = isDarkMode ? Colors.white10 : Colors.grey.shade200;
 
     return Scaffold(
-      backgroundColor: isDarkMode ? DarkColors.scaffold : const Color(0xFFF4F5F7),
+      backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
       appBar: AppBar(
         title: const Text(
           'Cài đặt nhóm',
           style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w600),
         ),
-        backgroundColor: Colors.transparent,
+        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
+        foregroundColor: Colors.white,
         elevation: 0,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: isDarkMode ? null : AppColors.appBarGradient,
-            color: isDarkMode ? DarkColors.appBarBg : null,
-          ),
-        ),
+        forceMaterialTransparency: !isDarkMode,
+        iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: isDarkMode
+            ? null
+            : Container(
+                decoration: const BoxDecoration(gradient: AppColors.appBarGradient),
+              ),
       ),
       body: _isLoading 
         ? const ShimmerLoading(isLoading: true, child: GroupSettingsSkeleton())

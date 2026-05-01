@@ -123,7 +123,7 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
           children: [
             const Icon(Icons.search, size: 24, color: Colors.white),
             const SizedBox(width: 8),
-            Text(common.searchHintTimeline, style: TextStyle(color: searchHint, fontSize: 16, fontWeight: FontWeight.normal)),
+            Text(common.searchHintTimeline, style: TextStyle(color: searchHint, fontSize: 16, fontWeight: FontWeight.w400)),
           ],
         ),
       ),

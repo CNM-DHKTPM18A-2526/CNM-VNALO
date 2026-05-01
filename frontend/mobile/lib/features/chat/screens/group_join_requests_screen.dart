@@ -40,16 +40,22 @@ class _GroupJoinRequestsScreenState extends State<GroupJoinRequestsScreen> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDarkMode ? DarkColors.scaffold : const Color(0xFFF4F5F7),
+      backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
       appBar: AppBar(
-        title: const Text('Yêu cầu tham gia', 
-          style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w600)),
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: isDarkMode ? null : AppColors.appBarGradient,
-            color: isDarkMode ? DarkColors.appBarBg : null,
-          ),
+        title: const Text(
+          'Yêu cầu tham gia',
+          style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w600),
         ),
+        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        forceMaterialTransparency: !isDarkMode,
+        iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: isDarkMode
+            ? null
+            : Container(
+                decoration: const BoxDecoration(gradient: AppColors.appBarGradient),
+              ),
       ),
       body: _isLoading
         ? const Center(child: CupertinoActivityIndicator())
@@ -83,12 +89,11 @@ class _GroupJoinRequestsScreenState extends State<GroupJoinRequestsScreen> {
   Widget _buildRequestItem(dynamic req) {
     final String userId = req['userId'] ?? '';
     final String requestedAt = req['requestedAt'] ?? '';
-    // For now, assuming we might need to resolve the user info.
-    // In a real app, the API should return the user object.
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     
     return Container(
       margin: const EdgeInsets.only(top: 8),
-      color: Colors.white,
+      color: isDarkMode ? DarkColors.surface : Colors.white,
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [

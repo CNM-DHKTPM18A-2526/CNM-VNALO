@@ -124,27 +124,28 @@ class _AddGroupMembersScreenState extends State<AddGroupMembersScreen> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => Navigator.pop(context),
-        ),
+        forceMaterialTransparency: !isDarkMode,
+        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: isDarkMode 
+          ? null 
+          : Container(decoration: const BoxDecoration(gradient: AppColors.appBarGradient)),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-             const Text('Thêm vào nhóm', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.black87)),
-             Text('Đã chọn: ${_selectedUsers.length}', style: const TextStyle(fontSize: 13, color: Colors.black54)),
+             const Text('Thêm vào nhóm', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white)),
+             Text('Đã chọn: ${_selectedUsers.length}', style: const TextStyle(fontSize: 13, color: Colors.white70)),
           ],
         ),
-        backgroundColor: Colors.white,
-        elevation: 0.5,
       ),
       body: Column(
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            color: isDarkMode ? DarkColors.surface : Colors.white,
             child: Row(
               children: [
                 Expanded(
@@ -153,38 +154,41 @@ class _AddGroupMembersScreenState extends State<AddGroupMembersScreen> {
                     onChanged: _onSearchChanged,
                     decoration: InputDecoration(
                       hintText: 'Tìm tên hoặc số điện thoại',
-                      prefixIcon: const Icon(Icons.search, size: 20),
+                      prefixIcon: Icon(Icons.search, size: 20, color: isDarkMode ? DarkColors.textHint : LightColors.textHint),
                       filled: true,
-                      fillColor: Colors.grey.shade100,
+                      fillColor: isDarkMode ? DarkColors.scaffold : Colors.grey.shade100,
                       isDense: true,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(10),
                         borderSide: BorderSide.none,
                       ),
                       contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                      hintStyle: TextStyle(color: isDarkMode ? DarkColors.textHint : LightColors.textHint),
                     ),
+                    style: TextStyle(color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Text('123', style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.bold, fontSize: 16)),
               ],
             ),
           ),
-          ListTile(
-            leading: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                shape: BoxShape.circle,
+          Container(
+            color: isDarkMode ? DarkColors.surface : Colors.white,
+            child: ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: (isDarkMode ? DarkColors.primary : AppColors.primary).withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.link, color: isDarkMode ? DarkColors.primary : AppColors.primary, size: 24),
               ),
-              child: const Icon(Icons.link, color: Colors.blue, size: 24),
+              title: const Text('Mời vào nhóm bằng link', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+              onTap: () {
+                 ScaffoldMessenger.of(context).showSnackBar(
+                   const SnackBar(content: Text('Tính năng mời bằng link đang được phát triển')),
+                 );
+              },
             ),
-            title: const Text('Mời vào nhóm bằng link', style: TextStyle(fontSize: 16)),
-            onTap: () {
-               ScaffoldMessenger.of(context).showSnackBar(
-                 const SnackBar(content: Text('Tính năng mời bằng link đang được phát triển')),
-               );
-            },
           ),
           const Divider(height: 1, thickness: 0.5),
           Expanded(
@@ -196,35 +200,38 @@ class _AddGroupMembersScreenState extends State<AddGroupMembersScreen> {
                         children: _groupedFriends.entries.expand((entry) {
                           return [
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                              color: Colors.grey.shade100,
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                              color: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
                               width: double.infinity,
-                              child: Text(entry.key, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black54)),
+                              child: Text(entry.key, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary)),
                             ),
                             ...entry.value.map((user) {
                               final isSelected = _selectedUsers.any((u) => u.id == user.id);
-                              return InkWell(
-                                onTap: () => _toggleSelection(user),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                  child: Row(
-                                    children: [
-                                      AvatarWidget(imageUrl: user.avatarUrl, name: user.displayName, size: 44),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Text(user.displayName, style: const TextStyle(fontSize: 16)),
-                                      ),
-                                      Container(
-                                        width: 22,
-                                        height: 22,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          border: isSelected ? null : Border.all(color: Colors.grey.shade400, width: 1.5),
-                                          color: isSelected ? Colors.blue : Colors.transparent,
+                              return Container(
+                                color: isDarkMode ? DarkColors.surface : Colors.white,
+                                child: InkWell(
+                                  onTap: () => _toggleSelection(user),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                    child: Row(
+                                      children: [
+                                        AvatarWidget(imageUrl: user.avatarUrl, name: user.displayName, size: 48),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(user.displayName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
                                         ),
-                                        child: isSelected ? const Icon(Icons.check, size: 14, color: Colors.white) : null,
-                                      ),
-                                    ],
+                                        Container(
+                                          width: 22,
+                                          height: 22,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            border: isSelected ? null : Border.all(color: isDarkMode ? DarkColors.divider : AppColors.itemDivider, width: 1.5),
+                                            color: isSelected ? (isDarkMode ? DarkColors.primary : AppColors.primary) : Colors.transparent,
+                                          ),
+                                          child: isSelected ? const Icon(Icons.check, size: 14, color: Colors.white) : null,
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               );
@@ -235,9 +242,9 @@ class _AddGroupMembersScreenState extends State<AddGroupMembersScreen> {
           ),
           if (_selectedUsers.isNotEmpty)
             Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, -2))],
+            decoration: BoxDecoration(
+                color: isDarkMode ? DarkColors.surface : Colors.white,
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.05), blurRadius: 4, offset: const Offset(0, -2))],
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -292,7 +299,7 @@ class _AddGroupMembersScreenState extends State<AddGroupMembersScreen> {
                       ],
                     ),
                   ),
-                  const Divider(height: 1, thickness: 0.5),
+                    const Divider(height: 1, thickness: 0.5, color: AppColors.itemDivider),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                     child: Row(
@@ -301,7 +308,7 @@ class _AddGroupMembersScreenState extends State<AddGroupMembersScreen> {
                         Switch.adaptive(
                           value: _seeRecentHistory,
                           onChanged: (v) => setState(() => _seeRecentHistory = v),
-                          activeColor: Colors.blue,
+                          activeColor: isDarkMode ? DarkColors.primary : AppColors.primary,
                         ),
                       ],
                     ),

@@ -64,15 +64,22 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDarkMode ? DarkColors.scaffold : const Color(0xFFF4F5F7),
+      backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
       appBar: AppBar(
-        title: const Text('Tham gia nhóm', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: isDarkMode ? null : AppColors.appBarGradient,
-            color: isDarkMode ? DarkColors.appBarBg : null,
-          ),
+        title: const Text(
+          'Tham gia nhóm',
+          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
         ),
+        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        forceMaterialTransparency: !isDarkMode,
+        iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: isDarkMode
+            ? null
+            : Container(
+                decoration: const BoxDecoration(gradient: AppColors.appBarGradient),
+              ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(24.0),

@@ -54,7 +54,7 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
         if (mounted) Navigator.pop(context);
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
           setState(() => _isSaving = false);
         }
       }
@@ -64,19 +64,22 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: isDarkMode ? DarkColors.scaffold : Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0.5,
+        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        forceMaterialTransparency: !isDarkMode,
+        iconTheme: const IconThemeData(color: Colors.white),
         centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.grey),
-          onPressed: () => Navigator.pop(context),
-        ),
+        flexibleSpace: isDarkMode
+            ? null
+            : Container(decoration: const BoxDecoration(gradient: AppColors.appBarGradient)),
         title: const Text(
           'Đổi hình nền',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.black87),
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white),
         ),
         actions: [
           TextButton(
@@ -84,7 +87,7 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
             child: Text(
               'XONG',
               style: TextStyle(
-                color: (_selectedUrl != null && !_isSaving) ? AppColors.primary : Colors.grey.shade400,
+                color: (_selectedUrl != null && !_isSaving) ? Colors.white : Colors.white54,
                 fontWeight: FontWeight.bold,
                 fontSize: 15,
               ),
@@ -100,7 +103,7 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
               children: [
                 _buildGrid(),
                 const SizedBox(height: 20),
-                _buildApplyToBothCheckbox(),
+                _buildApplyToBothCheckbox(isDarkMode),
               ],
             ),
           ),
@@ -168,7 +171,7 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
     );
   }
 
-  Widget _buildApplyToBothCheckbox() {
+  Widget _buildApplyToBothCheckbox(bool isDarkMode) {
     return GestureDetector(
       onTap: () => setState(() => _applyToBoth = !_applyToBoth),
       child: Container(
@@ -192,9 +195,12 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
                 : null,
             ),
             const SizedBox(width: 10),
-            const Text(
+            Text(
               'Đổi hình nền cho cả 2 bên',
-              style: TextStyle(fontSize: 14, color: Colors.black87),
+              style: TextStyle(
+                fontSize: 14,
+                color: isDarkMode ? DarkColors.textPrimary : Colors.black87,
+              ),
             ),
           ],
         ),
@@ -244,7 +250,7 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi: $e')));
         setState(() => _isSaving = false);
       }
     }
@@ -265,8 +271,8 @@ class _WallpaperSelectionScreenState extends State<WallpaperSelectionScreen> {
             Expanded(
               child: Text(
                 isFallback
-                  ? 'Wallpaper updated only for you (insufficient permission for both)'
-                  : 'Wallpaper updated successfully',
+                  ? 'Đã đổi hình nền chỉ của bạn (không có quyền đổi cho cả 2)'
+                  : 'Đã cập nhật hình nền thành công',
                 style: const TextStyle(color: Colors.white, fontSize: 13),
               ),
             ),

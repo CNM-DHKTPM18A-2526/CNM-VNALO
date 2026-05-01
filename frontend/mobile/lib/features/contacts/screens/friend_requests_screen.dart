@@ -145,7 +145,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> with Single
     final common = CommonTexts.of(context);
 
     return Scaffold(
-      backgroundColor: isDarkMode ? DarkColors.scaffold : Colors.white,
+      backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
       appBar: AppBar(
         forceMaterialTransparency: !isDarkMode,
         backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
@@ -178,7 +178,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> with Single
               controller: _tabController,
               dividerColor: Colors.transparent,
               labelColor: isDarkMode ? DarkColors.primary : AppColors.primary,
-              unselectedLabelColor: Colors.grey,
+              unselectedLabelColor: isDarkMode ? DarkColors.textHint : LightColors.textHint,
               indicatorColor: isDarkMode ? DarkColors.primary : AppColors.primary,
               indicatorWeight: 3,
               labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
@@ -188,7 +188,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> with Single
               ],
             ),
           ),
-          const Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
+          const Divider(height: 1, thickness: 0.5, color: AppColors.sectionDivider),
           Expanded(
             child: TabBarView(
               controller: _tabController,
@@ -244,7 +244,9 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> with Single
       decoration: BoxDecoration(
         color: isDarkMode ? DarkColors.surface : Colors.white,
         border: Border(
-          bottom: BorderSide(color: Colors.grey.withValues(alpha: 0.1)),
+          bottom: BorderSide(
+            color: isDarkMode ? DarkColors.divider : AppColors.itemDivider,
+          ),
         ),
       ),
       child: Row(
@@ -266,8 +268,8 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> with Single
                       child: ElevatedButton(
                         onPressed: () => _reject(req),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: isDarkMode ? const Color(0xFF2C2C2C) : const Color(0xFFE5E7EB),
-                          foregroundColor: isDarkMode ? Colors.white : const Color(0xFF111827),
+                          backgroundColor: isDarkMode ? DarkColors.surface : const Color(0xFFE5E7EB),
+                          foregroundColor: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
                           elevation: 0,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                           padding: const EdgeInsets.symmetric(vertical: 8),

@@ -398,6 +398,6 @@ class _SectionDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const SizedBox(height: 10);
+    return const SizedBox(height: 8);
   }
 }

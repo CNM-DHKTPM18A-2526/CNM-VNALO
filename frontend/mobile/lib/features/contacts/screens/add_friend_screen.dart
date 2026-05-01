@@ -135,7 +135,7 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
     final common = CommonTexts.of(context);
 
     return Scaffold(
-      backgroundColor: isDarkMode ? DarkColors.scaffold : Colors.white,
+      backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
       appBar: AppBar(
         forceMaterialTransparency: !isDarkMode,
         backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
@@ -229,7 +229,7 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
                         ? Colors.transparent
                         : (_isValid
                              ? (isDarkMode ? DarkColors.primary : AppColors.primary)
-                             : (isDarkMode ? DarkColors.surface : const Color(0xFFE3E7ED))),
+                             : (isDarkMode ? DarkColors.surface : AppColors.itemDivider)),
                     child: IconButton(
                       onPressed: (_isValid && !_isSearching) ? _searchByPhone : null,
                       icon: _isSearching
@@ -262,7 +262,7 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
                     );
                   },
                 ),
-                const Divider(height: 1, indent: 64, color: AppColors.itemDivider),
+                const Divider(height: 1, indent: 70, color: AppColors.itemDivider),
                 ListTile(
                   leading: Icon(Icons.contact_page_outlined, color: isDarkMode ? DarkColors.primary : AppColors.primary),
                   title: Text(common.peopleNearby, style: const TextStyle(fontSize: 18)),
@@ -284,8 +284,8 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
                 icon: const Icon(Icons.refresh),
                 label: Text(common.reloadQr),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isDarkMode ? const Color(0xFF2C2C2C) : const Color(0xFFE5E7EB),
-                  foregroundColor: isDarkMode ? Colors.white : const Color(0xFF111827),
+                  backgroundColor: isDarkMode ? DarkColors.surface : const Color(0xFFE5E7EB),
+                  foregroundColor: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
                   elevation: 0,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),

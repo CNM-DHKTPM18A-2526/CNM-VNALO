@@ -35,28 +35,31 @@ class _ForwardScreenState extends State<ForwardScreen> {
     final filteredConversations = forwardProvider.getFilteredConversations(currentUserId);
 
     return Scaffold(
-      backgroundColor: isDarkMode ? DarkColors.scaffold : Colors.white,
+      backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
       appBar: AppBar(
-        titleSpacing: 0,
-        backgroundColor: isDarkMode ? DarkColors.surface : Colors.white,
+        forceMaterialTransparency: !isDarkMode,
+        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
         elevation: 0,
-        iconTheme: IconThemeData(color: isDarkMode ? Colors.white : Colors.black87),
+        iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: isDarkMode 
+          ? null 
+          : Container(decoration: const BoxDecoration(gradient: AppColors.appBarGradient)),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               'Forward',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: isDarkMode ? Colors.white : Colors.black87,
+                color: Colors.white,
               ),
             ),
             Text(
               'Selected: ${forwardProvider.selectedCount}',
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 13,
-                color: isDarkMode ? DarkColors.textSecondary : Colors.grey.shade600,
+                color: Colors.white70,
                 fontWeight: FontWeight.w400,
               ),
             ),
@@ -67,11 +70,11 @@ class _ForwardScreenState extends State<ForwardScreen> {
         children: [
           // Search Bar
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             child: Container(
-              height: 44,
+              height: 40,
               decoration: BoxDecoration(
-                color: isDarkMode ? Colors.white10 : Colors.grey.shade100,
+                color: isDarkMode ? DarkColors.surface : Colors.grey.shade100,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: TextField(
@@ -79,17 +82,19 @@ class _ForwardScreenState extends State<ForwardScreen> {
                 onChanged: forwardProvider.updateSearch,
                 decoration: InputDecoration(
                   hintText: 'Search',
-                  hintStyle: TextStyle(color: isDarkMode ? Colors.white38 : Colors.grey.shade500),
-                  prefixIcon: Icon(Icons.search, color: isDarkMode ? Colors.white38 : Colors.grey.shade500, size: 22),
+                  hintStyle: TextStyle(color: isDarkMode ? DarkColors.textHint : LightColors.textHint, fontSize: 15),
+                  prefixIcon: Icon(Icons.search, color: isDarkMode ? DarkColors.textHint : LightColors.textHint, size: 20),
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 11),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 8),
                 ),
+                style: TextStyle(color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary, fontSize: 15),
               ),
             ),
           ),
 
           // Quick Actions
-          Padding(
+          Container(
+            color: isDarkMode ? DarkColors.surface : Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 12),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -108,7 +113,12 @@ class _ForwardScreenState extends State<ForwardScreen> {
             child: ListView(
               children: [
                 _buildSectionTitle('Recent', isDarkMode),
-                ...filteredConversations.map((conv) => _buildRecipientItem(conv, currentUserId, forwardProvider, isDarkMode)),
+                Container(
+                  color: isDarkMode ? DarkColors.surface : Colors.white,
+                  child: Column(
+                    children: filteredConversations.map((conv) => _buildRecipientItem(conv, currentUserId, forwardProvider, isDarkMode)).toList(),
+                  ),
+                ),
 
                 const SizedBox(height: 16),
                 _buildSectionTitle('Groups', isDarkMode),
@@ -182,7 +192,7 @@ class _ForwardScreenState extends State<ForwardScreen> {
                   name,
                   style: TextStyle(
                     fontSize: 16,
-                    color: isDarkMode ? Colors.white : Colors.black87,
+                    color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
                     fontWeight: FontWeight.w400,
                   ),
                 ),
@@ -193,10 +203,10 @@ class _ForwardScreenState extends State<ForwardScreen> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: isSelected ? AppColors.primary : Colors.grey.shade300,
+                    color: isSelected ? (isDarkMode ? DarkColors.primary : AppColors.primary) : (isDarkMode ? DarkColors.divider : AppColors.itemDivider),
                     width: 1.5,
                   ),
-                  color: isSelected ? AppColors.primary : Colors.transparent,
+                  color: isSelected ? (isDarkMode ? DarkColors.primary : AppColors.primary) : Colors.transparent,
                 ),
                 child: isSelected
                     ? const Icon(Icons.check, color: Colors.white, size: 16)
