@@ -1,10 +1,10 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Kafka, Consumer } from 'kafkajs';
 import { RealtimeGateway } from '../gateway/realtime.gateway';
 
 @Injectable()
-export class KafkaConsumer implements OnModuleInit, OnModuleDestroy {
+export class KafkaConsumer implements OnApplicationInit, OnModuleDestroy {
   private readonly logger = new Logger(KafkaConsumer.name);
   private kafka: Kafka;
   private consumer: Consumer;
@@ -27,8 +27,12 @@ export class KafkaConsumer implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  async onModuleInit() {
-    await this.connect();
+  async onApplicationInit() {
+    try {
+      await this.connect();
+    } catch (err) {
+      this.logger.error(`KafkaConsumer onApplicationInit failed: ${err.message}`);
+    }
   }
 
   async onModuleDestroy() {

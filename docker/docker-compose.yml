@@ -265,6 +265,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      kafka:
+        condition: service_started
     networks:
       - vnalo-network
     healthcheck:
@@ -272,7 +274,7 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 20s
+      start_period: 60s
     deploy:
       resources:
         limits:

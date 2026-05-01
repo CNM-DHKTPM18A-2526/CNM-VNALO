@@ -20,16 +20,29 @@ export class RedisIoAdapter extends IoAdapter {
     const pubClient = new Redis(redisOptions);
     const subClient = pubClient.duplicate();
 
-    await Promise.all([
-      new Promise<void>((resolve, reject) => {
-        pubClient.once('ready', resolve);
-        pubClient.once('error', reject);
-      }),
-      new Promise<void>((resolve, reject) => {
-        subClient.once('ready', resolve);
-        subClient.once('error', reject);
-      }),
-    ]);
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Redis connection timeout (10s)')), 10000),
+    );
+
+    try {
+      await Promise.race([
+        Promise.all([
+          new Promise<void>((resolve, reject) => {
+            pubClient.once('ready', resolve);
+            pubClient.once('error', reject);
+          }),
+          new Promise<void>((resolve, reject) => {
+            subClient.once('ready', resolve);
+            subClient.once('error', reject);
+          }),
+        ]),
+        timeout,
+      ]);
+    } catch (err) {
+      pubClient.disconnect();
+      subClient.disconnect();
+      throw err;
+    }
 
     this.adapterConstructor = createAdapter(pubClient, subClient);
     this.logger.log(`Redis adapter connected to ${redisHost}:${redisPort}`);
