@@ -1,7 +1,7 @@
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { ServerOptions } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
-import { Redis } from 'ioredis';
+import { Redis, RedisOptions } from 'ioredis';
 import { Logger } from '@nestjs/common';
 
 export class RedisIoAdapter extends IoAdapter {
@@ -13,14 +13,14 @@ export class RedisIoAdapter extends IoAdapter {
     redisPort: number,
     redisPassword?: string,
   ): Promise<void> {
-    const redisOptions: Record<string, unknown> = {
+    const redisOptions: RedisOptions = {
       host: redisHost,
       port: redisPort,
     };
     if (redisPassword) {
       redisOptions.password = redisPassword;
     }
-    const pubClient = new Redis(redisOptions as Parameters<typeof Redis>[0]);
+    const pubClient = new Redis(redisOptions);
     const subClient = pubClient.duplicate();
 
     await Promise.all([
