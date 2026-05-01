@@ -552,30 +552,52 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
       }
     }
 
+    bool isSilent = false;
     showCupertinoDialog(
       context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('Rời nhóm?'),
-        content: const Text('Bạn sẽ không còn nhận được tin nhắn từ nhóm này nữa.'),
-        actions: [
-          CupertinoDialogAction(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
-          CupertinoDialogAction(
-            onPressed: () {
-              // Dismiss dialog first
-              Navigator.pop(context);
-              
-              final chatProvider = context.read<ChatProvider>();
-              // Don't await here to allow immediate navigation
-              chatProvider.leaveGroup(conv.id);
-              
-              // Navigate to chat tab immediately
-              Navigator.of(context).popUntil((route) => route.isFirst);
-              MainShellState.globalKey.currentState?.setTabIndex(0);
-            },
-            isDestructiveAction: true,
-            child: const Text('Rời nhóm'),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => CupertinoAlertDialog(
+          title: const Text('Rời nhóm?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Bạn sẽ không còn nhận được tin nhắn từ nhóm này nữa.'),
+              const SizedBox(height: 16),
+              GestureDetector(
+                onTap: () => setDialogState(() => isSilent = !isSilent),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CupertinoCheckbox(
+                      value: isSilent,
+                      onChanged: (val) => setDialogState(() => isSilent = val ?? false),
+                    ),
+                    const Flexible(
+                      child: Text(
+                        'Rời nhóm trong im lặng',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
+          actions: [
+            CupertinoDialogAction(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
+            CupertinoDialogAction(
+              onPressed: () {
+                Navigator.pop(context);
+                final chatProvider = context.read<ChatProvider>();
+                chatProvider.leaveGroup(conv.id, silent: isSilent);
+                Navigator.of(context).popUntil((route) => route.isFirst);
+                MainShellState.globalKey.currentState?.setTabIndex(0);
+              },
+              isDestructiveAction: true,
+              child: const Text('Rời nhóm'),
+            ),
+          ],
+        ),
       ),
     );
   }

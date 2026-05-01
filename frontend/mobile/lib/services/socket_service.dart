@@ -87,7 +87,8 @@ class SocketService {
 
   void connect(String token) {
     debugPrint('[SocketService] connect() called — socketUrl=${AppConfig.instance.socketUrl}/chat');
-    debugPrint('[SocketService] token present: ${token != null && token.isNotEmpty}');
+    final hasToken = token.isNotEmpty;
+    debugPrint('[SocketService] token present: $hasToken');
     debugPrint('[SocketService] existing socket: ${_socket != null}, connected: ${_socket?.connected}');
 
     if (_socket != null && _socket!.connected) {
@@ -150,6 +151,9 @@ class SocketService {
       }
       _connectController.add(null);
       _onSocketReady?.call();
+      
+      // ⚡ AUTO-REPORT ONLINE STATUS
+      emitPresence(true);
     });
     
     _socket!.onDisconnect((data) {
@@ -289,33 +293,29 @@ class SocketService {
       _groupCallSignalController.add({'type': type, ...payload});
     }
 
-    _socket!.on('group-call:started', (data) {
-      debugPrint('[SocketService] 🔔🔔🔔 group-call:started received: $data');
-      _emitGroupCallSignal('started', data);
-    });
-    _socket!.on('group-call:join', (data) {
-      debugPrint('[SocketService] 🔔 group-call:join received: $data');
-      _emitGroupCallSignal('join', data);
-    });
-    _socket!.on('group-call:user-joined', (data) {
-      _emitGroupCallSignal('user-joined', data);
-    });
-    _socket!.on('group-call:offer', (data) {
-      _emitGroupCallSignal('offer', data);
-    });
-    _socket!.on('group-call:answer', (data) {
-      _emitGroupCallSignal('answer', data);
-    });
-    _socket!.on('group-call:ice-candidate', (data) {
-      _emitGroupCallSignal('ice-candidate', data);
-    });
-    _socket!.on('group-call:user-left', (data) {
-      _emitGroupCallSignal('user-left', data);
-    });
-    _socket!.on('group-call:ended', (data) {
-      debugPrint('[SocketService] group-call:ended received: $data');
-      _emitGroupCallSignal('ended', data);
-    });
+    _socket!.on('group-call:started', (data) => _emitGroupCallSignal('started', data));
+    _socket!.on('group-call.started', (data) => _emitGroupCallSignal('started', data));
+
+    _socket!.on('group-call:join', (data) => _emitGroupCallSignal('join', data));
+    _socket!.on('group-call.join', (data) => _emitGroupCallSignal('join', data));
+
+    _socket!.on('group-call:user-joined', (data) => _emitGroupCallSignal('user-joined', data));
+    _socket!.on('group-call.user-joined', (data) => _emitGroupCallSignal('user-joined', data));
+
+    _socket!.on('group-call:offer', (data) => _emitGroupCallSignal('offer', data));
+    _socket!.on('group-call.offer', (data) => _emitGroupCallSignal('offer', data));
+
+    _socket!.on('group-call:answer', (data) => _emitGroupCallSignal('answer', data));
+    _socket!.on('group-call.answer', (data) => _emitGroupCallSignal('answer', data));
+
+    _socket!.on('group-call:ice-candidate', (data) => _emitGroupCallSignal('ice-candidate', data));
+    _socket!.on('group-call.ice-candidate', (data) => _emitGroupCallSignal('ice-candidate', data));
+
+    _socket!.on('group-call:user-left', (data) => _emitGroupCallSignal('user-left', data));
+    _socket!.on('group-call.user-left', (data) => _emitGroupCallSignal('user-left', data));
+
+    _socket!.on('group-call:ended', (data) => _emitGroupCallSignal('ended', data));
+    _socket!.on('group-call.ended', (data) => _emitGroupCallSignal('ended', data));
     _socket!.on('group-call:mute-state', (data) {
       _emitGroupCallSignal('mute-state', data);
     });
@@ -405,6 +405,12 @@ class SocketService {
       'conversationId': conversationId,
       'isTyping': isTyping,
     });
+  }
+
+  void emitPresence(bool isOnline) {
+    if (_socket == null || !_socket!.connected) return;
+    debugPrint('[SocketService] 📡 Emitting presence: ${isOnline ? 'ONLINE' : 'OFFLINE'}');
+    _socket?.emit('presence.set', {'isOnline': isOnline});
   }
 
   void markRead(String conversationId, int lastReadSeq) {
@@ -557,9 +563,9 @@ class SocketService {
       'conversationId': conversationId,
       'callId': callId,
       'audioOnly': audioOnly,
-      'senderUserId': senderUserId,
-      'senderName': senderName,
-      'senderAvatarUrl': senderAvatarUrl,
+      'callerUserId': senderUserId,  // Backend expects this
+      'callerName': senderName,      // Backend expects this
+      'callerAvatar': senderAvatarUrl, // Backend expects this
       if (targetUserIds != null) 'targetUserIds': targetUserIds,
     });
   }
@@ -571,12 +577,13 @@ class SocketService {
     String? senderName,
     String? senderAvatarUrl,
   }) {
+    debugPrint('[SocketService][GROUP_CALL][SEND] join callId=$callId conv=$conversationId');
     _socket?.emit('group-call:join', {
       'conversationId': conversationId,
       'callId': callId,
       'senderUserId': senderUserId,
-      'senderName': senderName,
-      'senderAvatarUrl': senderAvatarUrl,
+      'displayName': senderName,
+      'avatarUrl': senderAvatarUrl,
     });
   }
 

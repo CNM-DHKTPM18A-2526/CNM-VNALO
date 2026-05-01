@@ -10,7 +10,6 @@ import 'package:vnalo_mobile/features/call/services/group_call_tracker.dart';
 import 'package:vnalo_mobile/features/call/services/ringtone_service.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
-import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:vnalo_mobile/features/call/models/call_log_message.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
@@ -697,10 +696,12 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (!cameraOff && stream != null)
+          if (cameraOff)
+            _CameraOffPlaceholder(name: name, avatarUrl: avatar)
+          else if (stream != null)
             _buildVideoView(userId, stream, isLocal)
           else
-            _CameraOffPlaceholder(name: name, avatarUrl: avatar),
+            _CameraOffPlaceholder(name: name, avatarUrl: avatar, isWaiting: true),
           
           Positioned(
             bottom: 8,
@@ -724,7 +725,11 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
 
   Widget _buildVideoView(String userId, MediaStream stream, bool isLocal) {
     if (isLocal) {
-      if (!_renderersReady) return const SizedBox.shrink();
+      if (!_renderersReady) {
+        return const Center(
+          child: CircularProgressIndicator(color: Colors.white54),
+        );
+      }
       return RTCVideoView(
         _localRenderer,
         mirror: true,
@@ -732,7 +737,11 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
       );
     } else {
       final renderer = _remoteRenderers[userId];
-      if (renderer == null) return const SizedBox.shrink();
+      if (renderer == null) {
+        return const Center(
+          child: CircularProgressIndicator(color: Colors.white54),
+        );
+      }
       return RTCVideoView(
         renderer,
         objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
@@ -846,7 +855,6 @@ class _CallActionButton extends StatelessWidget {
   final VoidCallback onTap;
   final bool active;
   final bool destructive;
-  final Color? color;
 
   const _CallActionButton({
     required this.icon,
@@ -854,7 +862,6 @@ class _CallActionButton extends StatelessWidget {
     required this.onTap,
     this.active = true,
     this.destructive = false,
-    this.color,
   });
 
   @override
@@ -865,7 +872,7 @@ class _CallActionButton extends StatelessWidget {
     if (destructive) {
       bg = const Color(0xFFFF3B30);
     } else {
-      bg = color ?? Colors.black.withValues(alpha: 0.5);
+      bg = Colors.black.withValues(alpha: 0.5);
     }
 
     return Column(

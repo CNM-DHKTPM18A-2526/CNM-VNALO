@@ -333,6 +333,11 @@ class ChatService {
     return Conversation.fromJson(response['data'] ?? response);
   }
 
+  // Alias for updateGroup to match provider usage
+  Future<Conversation> updateGroupInfo(String conversationId, Map<String, dynamic> body) async {
+    return updateGroup(conversationId, body);
+  }
+
   Future<void> addMembers(String conversationId, List<String> memberIds) async {
     await _apiService.post(
       _base,
@@ -343,6 +348,14 @@ class ChatService {
 
   Future<void> removeMember(String conversationId, String userId) async {
     await _apiService.delete(_base, '/conversations/$conversationId/members/$userId');
+  }
+
+  Future<void> leaveGroup(String conversationId, String userId, {bool silent = false}) async {
+    await _apiService.delete(
+      _base,
+      '/conversations/$conversationId/members/$userId',
+      queryParams: {if (silent) 'silent': 'true'},
+    );
   }
 
   Future<void> disbandGroup({

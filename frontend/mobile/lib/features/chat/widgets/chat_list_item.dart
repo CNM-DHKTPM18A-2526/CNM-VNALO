@@ -34,8 +34,12 @@ class ChatListItem extends StatelessWidget {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final common = CommonTexts.of(context);
 
-    final isOnline = _getOtherMember(conversation, currentUserId)?.user?.isOnline ?? false;
-    final lastSeen = _getOtherMember(conversation, currentUserId)?.user?.lastSeen;
+    final chat = context.watch<ChatProvider>();
+    final otherMember = _getOtherMember(conversation, currentUserId);
+    final otherUserId = otherMember?.userId;
+    
+    final isOnline = otherUserId != null ? chat.isUserOnline(otherUserId) : (otherMember?.user?.isOnline ?? false);
+    final lastSeen = otherMember?.user?.lastSeen;
     String? statusText;
     if (conversation.type == ConversationType.DIRECT && !isOnline && lastSeen != null) {
       statusText = DateFormatter.relative(lastSeen);
@@ -107,8 +111,8 @@ class ChatListItem extends StatelessWidget {
                   name: displayName,
                   size: 48,
                   showOnline: conversation.type == ConversationType.DIRECT,
-                  isOnline: _getOtherMember(conversation, currentUserId)?.user?.isOnline ?? false,
-                  lastSeen: _getOtherMember(conversation, currentUserId)?.user?.lastSeen,
+                  isOnline: isOnline,
+                  lastSeen: lastSeen,
                   cacheVersion: avatarVersion,
                 ),
           title: Row(
