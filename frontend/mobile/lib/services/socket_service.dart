@@ -326,6 +326,11 @@ class SocketService {
       debugPrint('[SocketService] group.roleChanged received: $data');
       _groupRoleChangedController.add(Map<String, dynamic>.from(data));
     });
+    _socket!.on('group.memberLeft', (data) {
+      // B-02: group.memberLeft emitted when user voluntarily leaves group
+      debugPrint('[SocketService] group.memberLeft received: $data');
+      _groupMemberRemovedController.add(Map<String, dynamic>.from(data));
+    });
     _socket!.on('group.adminTransferred', (data) {
       debugPrint('[SocketService] group.adminTransferred received: $data');
       _groupAdminTransferredController.add(Map<String, dynamic>.from(data));

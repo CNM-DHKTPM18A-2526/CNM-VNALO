@@ -358,6 +358,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const eventName = isSelf ? 'group.memberLeft' : 'group.memberRemoved';
       const room = this.getConversationRoom(conversationId);
       const payload = { conversationId, userId: targetUserId, removedBy: isSelf ? null : userId };
+      // Emit with dot notation (Flutter listens on 'group.memberRemoved')
       this.server.to(room).emit(eventName, payload);
       this.emitToUser(targetUserId, eventName, payload);
       // G-009: create system message in chat history
@@ -391,7 +392,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (role) {
         const eventName = role === 'ADMIN' ? 'group.adminTransferred' : 'group.roleChanged';
         const payload = { conversationId, targetUserId, newRole: role, changedBy: userId, member: updated };
+        // Emit to full room
         this.server.to(room).emit(eventName, payload);
+        // B-02: Also emit individually to target user (they may be offline from room)
+        this.emitToUser(targetUserId, eventName, payload);
         return { event: eventName, data: payload };
       }
       // Nickname-only change — no event broadcast needed (local UI update)
