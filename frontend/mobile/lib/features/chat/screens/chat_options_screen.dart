@@ -171,22 +171,20 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFEDEDED),
+      backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
       appBar: AppBar(
-        title: Text(common.options, style: const TextStyle(fontSize: 17, color: Colors.white, fontWeight: FontWeight.w500)),
-        backgroundColor: Colors.transparent,
+        title: Text(common.options, style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w600)),
+        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
+        foregroundColor: Colors.white,
         elevation: 0,
+        forceMaterialTransparency: !isDarkMode,
+        iconTheme: const IconThemeData(color: Colors.white),
         centerTitle: false,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: isDarkMode ? null : AppColors.appBarGradient,
-            color: isDarkMode ? DarkColors.appBarBg : null,
-          ),
-        ),
+        flexibleSpace: isDarkMode
+            ? null
+            : Container(
+                decoration: const BoxDecoration(gradient: AppColors.appBarGradient),
+              ),
       ),
       body: ListView(
         children: [
@@ -555,12 +553,15 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
     );
   }
 
-  Widget _buildDivider() => Divider(
-    height: 0.5,
-    thickness: 0.5,
-    indent: 54,
-    color: Colors.grey.shade200,
-  );
+  Widget _buildDivider() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    return Divider(
+      height: 1,
+      thickness: 0.5,
+      indent: 70,
+      color: isDarkMode ? DarkColors.divider : AppColors.itemDivider,
+    );
+  }
 
   String _formatAutoDelete(BuildContext context, int seconds) {
     final common = CommonTexts.of(context, listen: false);

@@ -252,7 +252,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                                   leading: AvatarWidget(
                                     imageUrl: user.avatarUrl,
                                     name: user.displayName,
-                                    size: 44,
+                                    size: 48,
                                     showOnline: user.isOnline,
                                   ),
                                   title: Text(user.displayName),
@@ -284,15 +284,15 @@ class _ContactsScreenState extends State<ContactsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: isActive ? (isDarkMode ? const Color(0xFF333333) : const Color(0xFFE5E7EB)) : Colors.transparent,
+        color: isActive ? (isDarkMode ? DarkColors.primary : AppColors.primary) : Colors.transparent,
         borderRadius: BorderRadius.circular(20),
-        border: isActive ? null : Border.all(color: Colors.grey.withValues(alpha: 0.5)),
+        border: isActive ? null : Border.all(color: isDarkMode ? DarkColors.divider : AppColors.itemDivider),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: isActive ? (isDarkMode ? Colors.white : Colors.black87) : Colors.grey,
-          fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+          color: isActive ? Colors.white : (isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary),
+          fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
         ),
       ),
     );
@@ -314,15 +314,15 @@ class _ContactsScreenState extends State<ContactsScreen> {
             color: sectionColor,
             child: ListTile(
               leading: Container(
-                width: 44,
-                height: 44,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
                   color: (isDarkMode ? DarkColors.primary : AppColors.primary).withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(Icons.group_add, color: isDarkMode ? DarkColors.primary : AppColors.primary),
               ),
-              title: Text(CommonTexts.of(context).createNewGroup, style: TextStyle(color: isDarkMode ? DarkColors.primary : AppColors.primary, fontWeight: FontWeight.normal)),
+              title: Text(CommonTexts.of(context).createNewGroup, style: TextStyle(fontWeight: FontWeight.w500, color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary)),
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const CreateGroupScreen()),
@@ -400,8 +400,8 @@ class _ContactsScreenState extends State<ContactsScreen> {
             color: sectionColor,
             child: ListTile(
               leading: Container(
-                width: 44,
-                height: 44,
+                width: 48,
+                height: 48,
                 decoration: const BoxDecoration(
                   color: Colors.deepPurpleAccent,
                   shape: BoxShape.circle,

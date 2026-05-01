@@ -33,6 +33,10 @@ import { PresenceService } from '../presence/presence.service';
   cors: { origin: '*' },
   namespace: '/chat',
   transports: ['websocket', 'polling'],
+  // Explicit ping/pong timeouts — prevents load-balancer/proxy from closing idle connections.
+  // pingInterval (how often server sends a ping) < pingTimeout (how long client waits for pong).
+  pingTimeout: 60000,    // 60s — server-side wait for pong before considering connection dead
+  pingInterval: 25000,   // 25s — server sends ping every 25s
 })
 export class RealtimeGateway
   implements OnGatewayConnection, OnGatewayDisconnect {
@@ -41,7 +45,7 @@ export class RealtimeGateway
 
   private readonly logger = new Logger(RealtimeGateway.name);
 
-  /** userId → Set<socketId> (đa thiết bị) */
+  /** userId → Set<socketId> (đa thiết bị) — kept for multi-device count on THIS node only */
   private readonly userSockets = new Map<string, Set<string>>();
 
   constructor(
@@ -68,7 +72,10 @@ export class RealtimeGateway
 
       client.data.user = { userId, phone: payload.phone };
 
-      // Theo dõi socket theo userId
+      // B-01: Join user's personal room so emitToUser can work across all nodes
+      await client.join(`user:${userId}`);
+
+      // Theo dõi socket theo userId (for multi-device count on this node only)
       if (!this.userSockets.has(userId)) {
         this.userSockets.set(userId, new Set());
       }
@@ -92,6 +99,9 @@ export class RealtimeGateway
     if (userId) {
       const sockets = this.userSockets.get(userId);
       sockets?.delete(client.id);
+
+      // B-01: Leave user's personal room (Redis adapter auto-cleans socket from room on disconnect)
+      await client.leave(`user:${userId}`);
 
       // Chỉ offline nếu không còn socket nào active
       if (!sockets || sockets.size === 0) {
@@ -174,6 +184,16 @@ export class RealtimeGateway
     return { event: 'presence.list', data: presenceList };
   }
 
+  // Handles 'presence.set' emitted by Flutter client (also extends Redis TTL like heartbeat)
+  @SubscribeMessage('presence.set')
+  async handlePresenceSet(@ConnectedSocket() client: Socket, @MessageBody() data: { isOnline: boolean }) {
+    const userId = client.data?.user?.userId;
+    if (userId && data.isOnline) {
+      await this.presenceService.heartbeat(userId);
+    }
+    return { event: 'presence.set.ack' };
+  }
+
   @SubscribeMessage('heartbeat')
   async handleHeartbeat(@ConnectedSocket() client: Socket) {
     const userId = client.data?.user?.userId;
@@ -222,14 +242,12 @@ export class RealtimeGateway
     this.server.to(room).emit(event, data);
   }
 
-  /** Emit event tới 1 user cụ thể (đa thiết bị) */
+  /** Emit event tới 1 user cụ thể (đa thiết bị) — works cross-node via Redis user:{userId} room */
   emitToUser(userId: string, event: string, data: any) {
-    const sockets = this.userSockets.get(userId);
-    if (sockets) {
-      for (const socketId of sockets) {
-        this.server.to(socketId).emit(event, data);
-      }
-    }
+    // B-01: Use Redis-backed user room instead of in-memory Map.
+    // With RedisIoAdapter, `server.to('user:${userId}')` reaches ALL sockets of that user
+    // across ALL gateway nodes.
+    this.server.to(`user:${userId}`).emit(event, data);
   }
 
   isUserOnline(userId: string): boolean {

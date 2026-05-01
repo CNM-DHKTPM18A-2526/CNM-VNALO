@@ -155,17 +155,19 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
         : conv.members.firstWhere((m) => m.userId == userId, orElse: () => conv.members.first);
 
     return Scaffold(
-      backgroundColor: isDarkMode ? DarkColors.scaffold : const Color(0xFFF4F5F7),
+      backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
       appBar: AppBar(
         title: Text(common.options, style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w600)),
-        backgroundColor: Colors.transparent,
+        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
+        foregroundColor: Colors.white,
         elevation: 0,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: isDarkMode ? null : AppColors.appBarGradient,
-            color: isDarkMode ? DarkColors.appBarBg : null,
-          ),
-        ),
+        forceMaterialTransparency: !isDarkMode,
+        iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: isDarkMode
+            ? null
+            : Container(
+                decoration: const BoxDecoration(gradient: AppColors.appBarGradient),
+              ),
       ),
       body: ListView(
         children: [
@@ -296,8 +298,9 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
   }
 
   Widget _buildHeader(Conversation conv) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      color: Colors.white,
+      color: isDarkMode ? DarkColors.surface : Colors.white,
       padding: const EdgeInsets.symmetric(vertical: 24),
       child: Column(
         children: [
@@ -364,8 +367,9 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
   }
 
   Widget _buildQuickActions(Conversation conv) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      color: Colors.white,
+      color: isDarkMode ? DarkColors.surface : Colors.white,
       padding: const EdgeInsets.only(bottom: 20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -412,8 +416,9 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
   }
 
   Widget _buildMediaSection() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      color: Colors.white,
+      color: isDarkMode ? DarkColors.surface : Colors.white,
       child: Column(
         children: [
           _buildTile(CupertinoIcons.photo, 'Ảnh, file, link', onTap: () => _showComingSoon('Kho tài liệu')),
@@ -459,8 +464,9 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
   }
 
   Widget _buildSection(List<Widget> children) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      color: Colors.white,
+      color: isDarkMode ? DarkColors.surface : Colors.white,
       child: Column(children: children),
     );
   }
@@ -477,7 +483,15 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
     );
   }
 
-  Widget _buildDivider() => const Divider(height: 1, thickness: 0.5, indent: 56);
+  Widget _buildDivider() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    return Divider(
+      height: 1,
+      thickness: 0.5,
+      indent: 56,
+      color: isDarkMode ? DarkColors.divider : AppColors.itemDivider,
+    );
+  }
 
   void _confirmDeleteHistory(Conversation conv) {
     showCupertinoDialog(

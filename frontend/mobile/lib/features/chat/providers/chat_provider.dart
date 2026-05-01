@@ -1816,7 +1816,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
 
-    // Emit via socket immediately (fire-and-forget)
+    // M-TASK: Emit via socket with ACK timeout — retry via HTTP on failure
     _socketService.sendMessage(
       conversationId: message.conversationId,
       content: message.content ?? '',
@@ -1828,7 +1828,10 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       replyToMessageId: message.replyToMessageId,
       replyToSenderName: message.replyToSenderName,
       replyToContent: message.replyToContent,
-    );
+    ).catchError((e) {
+      debugPrint('[ChatProvider] sendMessage threw (ACK timeout/network): $e — retrying via HTTP');
+      _sendViaHttp(message);
+    });
 
     // Check after a short delay if message was confirmed by server
     Timer(const Duration(milliseconds: 800), () async {

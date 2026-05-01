@@ -12,7 +12,6 @@ class AccountSecurityScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
     final auth = context.watch<AuthProvider?>();
     final user = auth?.user;
     final displayName = user?.displayName ?? 'Người dùng';
@@ -30,8 +29,10 @@ class AccountSecurityScreen extends StatelessWidget {
           'Tài khoản và bảo mật',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
-        backgroundColor: appBarBg,
+        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
         foregroundColor: Colors.white,
+        elevation: 0,
+        forceMaterialTransparency: !isDarkMode,
         iconTheme: const IconThemeData(color: Colors.white),
         flexibleSpace: isDarkMode
             ? null

@@ -122,22 +122,36 @@ class _FriendOptionsScreenState extends State<FriendOptionsScreen> {
     final common = CommonTexts.of(context);
 
     return Scaffold(
+      backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
       appBar: AppBar(
-        backgroundColor: isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg,
-        title: Text(common.friendOptionsHeader, style: const TextStyle(fontWeight: FontWeight.w700)),
+        forceMaterialTransparency: !isDarkMode,
+        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: isDarkMode 
+          ? null 
+          : Container(decoration: const BoxDecoration(gradient: AppColors.appBarGradient)),
+        title: Text(
+          common.friendOptionsHeader, 
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 18, 
+            fontWeight: FontWeight.w600
+          )
+        ),
       ),
       body: Column(
         children: [
           const SizedBox(height: 8),
           Container(
-            color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+            color: isDarkMode ? DarkColors.surface : Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
                 AvatarWidget(
                   imageUrl: widget.friendAvatarUrl,
                   name: widget.friendName,
-                  size: 52,
+                  size: 48,
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -170,7 +184,7 @@ class _FriendOptionsScreenState extends State<FriendOptionsScreen> {
           ),
           const SizedBox(height: 8),
           Container(
-            color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+            color: isDarkMode ? DarkColors.surface : Colors.white,
             child: SwitchListTile(
               title: Text(common.blockActivityFromMe),
               value: _blockActivity,

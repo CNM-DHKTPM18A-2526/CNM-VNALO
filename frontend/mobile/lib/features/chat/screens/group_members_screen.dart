@@ -44,16 +44,22 @@ class GroupMembersScreen extends StatelessWidget {
       });
 
     return Scaffold(
-      backgroundColor: isDarkMode ? DarkColors.scaffold : const Color(0xFFF4F5F7),
+      backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
       appBar: AppBar(
-        title: Text('Thành viên (${activeMembers.length})',
-          style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w600)),
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: isDarkMode ? null : AppColors.appBarGradient,
-            color: isDarkMode ? DarkColors.appBarBg : null,
-          ),
+        title: Text(
+          'Thành viên (${activeMembers.length})',
+          style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w600),
         ),
+        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        forceMaterialTransparency: !isDarkMode,
+        iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: isDarkMode
+            ? null
+            : Container(
+                decoration: const BoxDecoration(gradient: AppColors.appBarGradient),
+              ),
         actions: [
           if (isOwnerOrAdmin)
             IconButton(
@@ -70,7 +76,7 @@ class GroupMembersScreen extends StatelessWidget {
           final isSelf = member.userId == currentUserId;
           
           return Container(
-            color: Colors.white,
+            color: isDarkMode ? DarkColors.surface : Colors.white,
             child: Column(
               children: [
                 ListTile(
@@ -100,7 +106,12 @@ class GroupMembersScreen extends StatelessWidget {
                     : null,
                 ),
                 if (index < sortedMembers.length - 1)
-                  const Divider(height: 1, thickness: 0.5, indent: 72),
+                  Divider(
+                    height: 1,
+                    thickness: 0.5,
+                    indent: 70,
+                    color: isDarkMode ? DarkColors.divider : AppColors.itemDivider,
+                  ),
               ],
             ),
           );

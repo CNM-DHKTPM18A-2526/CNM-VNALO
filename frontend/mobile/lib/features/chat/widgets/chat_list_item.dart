@@ -47,11 +47,11 @@ class ChatListItem extends StatelessWidget {
       statusText = 'Đang hoạt động';
     }
 
-    final regularTileColor = isDarkMode ? DarkColors.surface : const Color(0xFFFFFFFF);
-    final pinnedTileColor = isDarkMode ? const Color(0xFF1E2633) : const Color(0xFFEFF2F7);
+    final regularTileColor = isDarkMode ? DarkColors.surface : Colors.white;
+    final pinnedTileColor = isDarkMode ? const Color(0xFF1E2633) : const Color(0xFFF0F5FF);
     final secondaryTextColor = isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary;
     final hintColor = isDarkMode ? DarkColors.textHint : LightColors.textHint;
-    final dividerColor = isDarkMode ? DarkColors.divider : const Color(0xFFE9EDF3);
+    final dividerColor = isDarkMode ? DarkColors.divider : AppColors.itemDivider;
     final lastPreview = _buildLastMessagePreview(currentUserId, common);
 
     return Slidable(
@@ -143,11 +143,11 @@ class ChatListItem extends StatelessWidget {
                     fontSize: 12,
                     color: isOnline
                         ? const Color(0xFF22C55E)
-                        : (isDarkMode ? DarkColors.textHint : Colors.grey.shade500),
+                        : (isDarkMode ? DarkColors.textHint : LightColors.textHint),
                   ),
                 ),
                 const SizedBox(width: 6),
-                Text('·', style: TextStyle(color: isDarkMode ? DarkColors.textHint : Colors.grey.shade500)),
+                Text('·', style: TextStyle(color: isDarkMode ? DarkColors.textHint : LightColors.textHint)),
                 const SizedBox(width: 6),
               ],
               Expanded(

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
@@ -10,6 +11,19 @@ class SocketService {
   io.Socket? _socket;
   final _joinedRooms = <String>{};
   final _pendingRoomJoins = <String>{};
+
+  // M-03: Message deduplication — prevents double delivery from room + emitToUser paths
+  final _seenMessageKeys = <String>{};
+  static const kMaxDedupCache = 500;
+
+  String? _globalToken;
+
+  // Stream controller for send errors (added by M-01)
+  final _sendErrorController = StreamController<Map<String, dynamic>>.broadcast();
+
+  // Heartbeat timer — emits 'heartbeat' every 25 seconds (well under the 60s Redis TTL on the server)
+  Timer? _heartbeatTimer;
+  static const _heartbeatIntervalSeconds = 25;
 
   final _messageController =
       StreamController<
@@ -75,6 +89,7 @@ class SocketService {
   Stream<Map<String, dynamic>> get onGroupMemberRemoved => _groupMemberRemovedController.stream;
   Stream<Map<String, dynamic>> get onGroupRoleChanged => _groupRoleChangedController.stream;
   Stream<Map<String, dynamic>> get onGroupAdminTransferred => _groupAdminTransferredController.stream;
+  Stream<Map<String, dynamic>> get onSendError => _sendErrorController.stream;
 
   void _emitCallSignal(String type, dynamic data) {
     if (data is! Map) return;
@@ -91,20 +106,38 @@ class SocketService {
     debugPrint('[SocketService] token present: $hasToken');
     debugPrint('[SocketService] existing socket: ${_socket != null}, connected: ${_socket?.connected}');
 
-    if (_socket != null && _socket!.connected) {
-      debugPrint('[SocketService] Already connected, skipping connect.');
+    if (!hasToken) {
+      debugPrint('[SocketService] ⚠️ connect() called with empty/invalid token — SKIPPING to prevent timeout loop');
       return;
     }
 
-    if (_socket != null) {
-      debugPrint('[SocketService] Disposing existing socket.');
-      disconnect();
+    // M-04: If token changed (logout/re-login), dispose old controllers before creating new socket
+    if (_globalToken != null && _globalToken != token) {
+      debugPrint('[SocketService] Token changed — disposing old controllers and socket');
+      _disposeAllControllers();
+      _socket?.disconnect();
+      _socket?.dispose();
+      _socket = null;
+      _joinedRooms.clear();
+      _pendingRoomJoins.clear();
+      _seenMessageKeys.clear();
+      _disposed = false;
+    } else if (_socket != null) {
+      if (_socket!.connected) {
+        debugPrint('[SocketService] Already connected, skipping connect.');
+        return;
+      }
+      debugPrint('[SocketService] Disposing existing socket (disconnected state).');
+      _socket?.dispose();
+      _socket = null;
     }
+
+    _globalToken = token;
 
     final url = '${AppConfig.instance.socketUrl}/chat';
     debugPrint('[SOCKET] 🔌 Connecting to: $url');
     debugPrint('[SOCKET]   Path: /socket.io/');
-    debugPrint('[SOCKET]   Token: ${token.substring(0, 10)}...');
+    debugPrint('[SOCKET]   Token: ${token.substring(0, min(10, token.length))}...');
 
     _socket = io.io(
       url,
@@ -117,8 +150,13 @@ class SocketService {
           .setPath('/socket.io/')
           .enableAutoConnect()
           .enableReconnection()
-          .setReconnectionDelay(1000)
+          // Thundering herd fix (M-02): exponential backoff with jitter
+          .setReconnectionDelay(1000)       // base: 1 second
+          .setReconnectionDelayMax(8000)    // max cap: 8 seconds
+          .setRandomizationFactor(0.5)      // ±50% jitter — spreads reconnect load over 0.5–12s
           .setReconnectionAttempts(10)
+          // Explicit ping/pong timeouts — prevents proxy/load-balancer from closing idle connections
+          .setTimeout(10000)                 // Socket.IO client-side timeout: 10s
           .build(),
     );
 
@@ -151,13 +189,17 @@ class SocketService {
       }
       _connectController.add(null);
       _onSocketReady?.call();
-      
+
       // ⚡ AUTO-REPORT ONLINE STATUS
       emitPresence(true);
+
+      // Start heartbeat timer — keeps Redis presence TTL alive on the server
+      _startHeartbeat();
     });
-    
+
     _socket!.onDisconnect((data) {
       debugPrint('[SOCKET] 🔴 DISCONNECTED from gateway: $data');
+      _stopHeartbeat();
     });
 
     _socket!.onConnectError((data) {
@@ -172,7 +214,20 @@ class SocketService {
     _socket!.on('message.received', (data) {
       debugPrint('[SOCKET] 📨 message.received: $data');
       try {
+        // M-03 Deduplication: skip if already processed
         final message = Message.fromJson(data);
+        final key = message.id;
+        if (_seenMessageKeys.contains(key)) {
+          debugPrint('[SocketService][DEDUP] message.received ignored: $key');
+          return;
+        }
+        if (_seenMessageKeys.length >= kMaxDedupCache) {
+          // Evict oldest entries to prevent unbounded memory growth
+          final oldest = _seenMessageKeys.first;
+          _seenMessageKeys.remove(oldest);
+        }
+        _seenMessageKeys.add(key);
+
         debugPrint('[SocketService][RECV] ✅ Parsed message ID: ${message.id} conv: ${message.conversationId} sender: ${message.senderId}');
         _messageController.add(message);
       } catch (e) {
@@ -183,7 +238,19 @@ class SocketService {
     _socket!.on('message.sent', (data) {
       debugPrint('[SocketService][RECV] 📤 message.sent: $data');
       try {
+        // M-03 Deduplication: skip if already processed
         final msg = Message.fromJson(data);
+        final key = msg.id;
+        if (_seenMessageKeys.contains(key)) {
+          debugPrint('[SocketService][DEDUP] message.sent ignored: $key');
+          return;
+        }
+        if (_seenMessageKeys.length >= kMaxDedupCache) {
+          final oldest = _seenMessageKeys.first;
+          _seenMessageKeys.remove(oldest);
+        }
+        _seenMessageKeys.add(key);
+
         debugPrint('[SocketService][RECV] ✅ Parsed message.sent ID: ${msg.id} conv: ${msg.conversationId}');
         _messageController.add(msg);
       } catch (e) {
@@ -275,6 +342,11 @@ class SocketService {
       debugPrint('[SocketService] group.roleChanged received: $data');
       _groupRoleChangedController.add(Map<String, dynamic>.from(data));
     });
+    _socket!.on('group.memberLeft', (data) {
+      // B-02: group.memberLeft emitted when user voluntarily leaves group
+      debugPrint('[SocketService] group.memberLeft received: $data');
+      _groupMemberRemovedController.add(Map<String, dynamic>.from(data));
+    });
     _socket!.on('group.adminTransferred', (data) {
       debugPrint('[SocketService] group.adminTransferred received: $data');
       _groupAdminTransferredController.add(Map<String, dynamic>.from(data));
@@ -356,10 +428,11 @@ class SocketService {
     _joinedRooms.remove(conversationId);
   }
 
-  // Send a message by emitting a 'message.send' event with the conversation ID,
-  //message content, and optional message type and client message ID.
-  // Uses fire-and-forget: message.sent event will update UI when server confirms.
-  void sendMessage({
+  // M-01: Send a message with ACK timeout — prevents silent message loss on socket stalling.
+  // If no server ACK within 3 seconds, emits error to _sendErrorController for UI feedback.
+  static const kSendAckTimeoutMs = 3000;
+
+  Future<void> sendMessage({
     required String conversationId,
     required String content,
     String messageType = 'TEXT',
@@ -371,33 +444,74 @@ class SocketService {
     String? replyToMessageId,
     String? replyToSenderName,
     String? replyToContent,
-  }) {
+  }) async {
     if (_socket == null) {
       debugPrint('[SocketService] sendMessage FAILED: socket is null');
+      _sendErrorController.add({
+        'conversationId': conversationId,
+        'message': 'Socket chưa kết nối',
+        'timestamp': DateTime.now().toIso8601String(),
+      });
       return;
     }
     if (!_socket!.connected) {
       debugPrint('[SocketService] sendMessage FAILED: socket not connected');
+      _sendErrorController.add({
+        'conversationId': conversationId,
+        'message': 'Mất kết nối socket',
+        'timestamp': DateTime.now().toIso8601String(),
+      });
       return;
     }
 
     debugPrint('[SocketService] sendMessage: conv=$conversationId type=$messageType clientId=$clientMessageId mediaUrl=$mediaUrl connected=${_socket?.connected}');
-    _socket?.emit(
-      'message.send',
-      {
+
+    final completer = Completer<void>();
+    final timeoutKey = clientMessageId ?? DateTime.now().millisecondsSinceEpoch.toString();
+
+    Timer(Duration(milliseconds: kSendAckTimeoutMs), () {
+      if (!completer.isCompleted) {
+        debugPrint('[SocketService][M-01] ⏱️ sendMessage ACK timeout for conv=$conversationId, key=$timeoutKey');
+        completer.completeError(TimeoutException(
+          'Message send timeout — network may be unstable',
+        ));
+        _sendErrorController.add({
+          'conversationId': conversationId,
+          'clientMessageId': timeoutKey,
+          'message': 'Gửi tin nhắn thất bại. Nhấn để gửi lại.',
+          'timestamp': DateTime.now().toIso8601String(),
+        });
+      }
+    });
+
+    try {
+      await _socket!.emitWithAckAsync(
+        'message.send',
+        {
+          'conversationId': conversationId,
+          'content': content,
+          'messageType': messageType,
+          'clientMessageId': clientMessageId,
+          if (mediaUrl != null) 'mediaUrl': mediaUrl,
+          if (mediaThumbnailUrl != null) 'mediaThumbnailUrl': mediaThumbnailUrl,
+          if (mediaMimeType != null) 'mediaMimeType': mediaMimeType,
+          if (mediaSizeBytes != null) 'mediaSizeBytes': mediaSizeBytes,
+          if (replyToMessageId != null) 'replyToMessageId': replyToMessageId,
+          if (replyToSenderName != null) 'replyToSenderName': replyToSenderName,
+          if (replyToContent != null) 'replyToContent': replyToContent,
+        },
+      );
+      debugPrint('[SocketService][M-01] ✅ sendMessage ACK received for conv=$conversationId');
+    } catch (e) {
+      debugPrint('[SocketService][M-01] ❌ sendMessage ACK error/timeout: $e');
+      _sendErrorController.add({
         'conversationId': conversationId,
-        'content': content,
-        'messageType': messageType,
-        'clientMessageId': clientMessageId,
-        if (mediaUrl != null) 'mediaUrl': mediaUrl,
-        if (mediaThumbnailUrl != null) 'mediaThumbnailUrl': mediaThumbnailUrl,
-        if (mediaMimeType != null) 'mediaMimeType': mediaMimeType,
-        if (mediaSizeBytes != null) 'mediaSizeBytes': mediaSizeBytes,
-        if (replyToMessageId != null) 'replyToMessageId': replyToMessageId,
-        if (replyToSenderName != null) 'replyToSenderName': replyToSenderName,
-        if (replyToContent != null) 'replyToContent': replyToContent,
-      },
-    );
+        'clientMessageId': timeoutKey,
+        'message': 'Gửi tin nhắn thất bại. Nhấn để gửi lại.',
+        'timestamp': DateTime.now().toIso8601String(),
+      });
+      rethrow;
+    }
   }
 
   void sendTyping(String conversationId, bool isTyping) {
@@ -411,6 +525,25 @@ class SocketService {
     if (_socket == null || !_socket!.connected) return;
     debugPrint('[SocketService] 📡 Emitting presence: ${isOnline ? 'ONLINE' : 'OFFLINE'}');
     _socket?.emit('presence.set', {'isOnline': isOnline});
+  }
+
+  void _startHeartbeat() {
+    _stopHeartbeat();
+    _heartbeatTimer = Timer.periodic(
+      const Duration(seconds: _heartbeatIntervalSeconds),
+      (_) {
+        if (_socket != null && _socket!.connected) {
+          _socket!.emit('heartbeat');
+          debugPrint('[SocketService] 💓 Heartbeat sent');
+        }
+      },
+    );
+    debugPrint('[SocketService] 💓 Heartbeat timer started (interval: ${_heartbeatIntervalSeconds}s)');
+  }
+
+  void _stopHeartbeat() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
   }
 
   void markRead(String conversationId, int lastReadSeq) {
@@ -699,17 +832,18 @@ class SocketService {
   }
 
   void disconnect() {
+    _stopHeartbeat();
     _socket?.disconnect(); // Disconnect from the socket server
     _socket?.dispose(); // Dispose the socket instance to free up resources
-    _socket = null; // Set the socket instance to null
+    _socket = null;
     _joinedRooms.clear(); // Clear joined rooms on disconnect
   }
 
-  void dispose() {
-    disconnect(); // Disconnect from the socket server and dispose the socket instance
-    _messageController.close(); // Close the message stream controller
-    _typingController.close(); // Close the typing stream controller
-    _presenceController.close(); // Close the presence stream controller
+  // M-04: Extract controller cleanup into reusable helper
+  void _disposeAllControllers() {
+    _messageController.close();
+    _typingController.close();
+    _presenceController.close();
     _readController.close();
     _deliveredController.close();
     _recalledController.close();
@@ -729,5 +863,15 @@ class SocketService {
     _groupAdminTransferredController.close();
     _groupCallSignalController.close();
     _connectController.close();
+    _sendErrorController.close();
+  }
+
+  bool _disposed = false;
+
+  void dispose() {
+    if (_disposed) return; // Idempotent: guard against double-dispose
+    _disposed = true;
+    disconnect();
+    _disposeAllControllers();
   }
 }

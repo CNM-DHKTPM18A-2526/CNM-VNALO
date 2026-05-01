@@ -320,34 +320,36 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> with SingleTicker
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
-    final common = CommonTexts.of(context);
 
     return Scaffold(
-      backgroundColor: isDarkMode ? DarkColors.scaffold : const Color(0xFFF4F5F7),
+      backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
       appBar: AppBar(
-        backgroundColor: isDarkMode ? appBarBg : Colors.white,
+        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
+        foregroundColor: Colors.white,
         elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: isDarkMode ? Colors.white : Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
+        forceMaterialTransparency: !isDarkMode,
+        iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: isDarkMode
+            ? null
+            : Container(
+                decoration: const BoxDecoration(gradient: AppColors.appBarGradient),
+              ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               'Nhóm mới',
               style: TextStyle(
-                fontSize: 18, 
-                fontWeight: FontWeight.bold,
-                color: isDarkMode ? Colors.white : Colors.black,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
               ),
             ),
             Text(
               'Đã chọn: ${_selectedUserIds.length}',
-              style: TextStyle(
-                fontSize: 13, 
-                color: isDarkMode ? DarkColors.textSecondary : Colors.grey,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Colors.white70,
               ),
             ),
           ],
@@ -356,7 +358,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> with SingleTicker
           if (_selectedUserIds.length >= 2)
             TextButton(
               onPressed: _createGroup,
-              child: const Text('TẠO', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              child: const Text('TẠO', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
             ),
         ],
       ),
@@ -477,11 +479,11 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> with SingleTicker
         return CheckboxListTile(
           value: isSelected,
           onChanged: (_) => _toggleSelection(user.id),
-          title: Text(user.displayName, style: const TextStyle(fontWeight: FontWeight.w400)),
+          title: Text(user.displayName, style: const TextStyle(fontWeight: FontWeight.w500)),
           secondary: AvatarWidget(
             imageUrl: user.avatarUrl,
             name: user.displayName,
-            size: 44,
+            size: 48,
           ),
           controlAffinity: ListTileControlAffinity.trailing,
           activeColor: AppColors.primary,

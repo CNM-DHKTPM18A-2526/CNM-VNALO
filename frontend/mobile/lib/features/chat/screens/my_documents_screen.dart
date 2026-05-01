@@ -206,9 +206,9 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
-    final bgColor = isDarkMode ? Colors.black : LightColors.scaffold;
-    final cardColor = isDarkMode ? const Color(0xFF1E1E1E) : Colors.white;
+    final appBarBg = isDarkMode ? DarkColors.appBarBg : Colors.transparent;
+    final bgColor = isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground;
+    final cardColor = isDarkMode ? DarkColors.surface : Colors.white;
 
     final texts = CommonTexts.of(context);
     final tabs = texts.docTabs;
@@ -216,6 +216,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
+        forceMaterialTransparency: !isDarkMode,
         titleSpacing: 0,
         elevation: 0,
         backgroundColor: appBarBg,
@@ -225,11 +226,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
             ? null
             : Container(
                 decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF0068FF), Color(0xFF00A2ED)],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  ),
+                  gradient: AppColors.appBarGradient,
                 ),
               ),
         title: Row(
@@ -262,20 +259,20 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? (isDarkMode ? const Color(0xFF333333) : const Color(0xFFE5E7EB))
+                            ? (isDarkMode ? DarkColors.primary : AppColors.primary)
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(20),
                         border: isSelected
                             ? null
-                            : Border.all(color: Colors.grey.withValues(alpha: 0.4)),
+                            : Border.all(color: isDarkMode ? DarkColors.divider : AppColors.itemDivider),
                       ),
                       child: Text(
                         tabs[i],
                         style: TextStyle(
                           color: isSelected
-                              ? (isDarkMode ? Colors.white : Colors.black87)
-                              : Colors.grey,
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                              ? Colors.white
+                              : (isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary),
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                           fontSize: 14,
                         ),
                       ),

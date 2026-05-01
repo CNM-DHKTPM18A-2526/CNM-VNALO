@@ -118,7 +118,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     final common = CommonTexts.of(context);
     final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
     final dividerColor =
-        isDarkMode ? DarkColors.divider : const Color(0xFFE9EDF3);
+        isDarkMode ? DarkColors.divider : AppColors.itemDivider;
 
     return Scaffold(
       backgroundColor:
@@ -194,8 +194,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 color: isDarkMode ? DarkColors.surface : Colors.white,
                 child: Row(
                   children: [
-                    const SizedBox(width: 80),
-                    Expanded(child: Container(height: 0.6, color: dividerColor)),
+                    const SizedBox(width: 76),
+                    Expanded(child: Container(height: 0.5, color: dividerColor)),
                   ],
                 ),
               ),
@@ -219,9 +219,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     color: isDarkMode ? DarkColors.surface : Colors.white,
                     child: Row(
                       children: [
-                        const SizedBox(width: 80),
+                        const SizedBox(width: 76),
                         Expanded(
-                          child: Container(height: 0.6, color: dividerColor),
+                          child: Container(height: 0.5, color: dividerColor),
                         ),
                       ],
                     ),
@@ -264,8 +264,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
                         ),
 
                         leading: Container(
-                          width: 52,
-                          height: 52,
+                          width: 48,
+                          height: 48,
                           decoration: BoxDecoration(
                             color:
                                 isDarkMode ? DarkColors.primary : Colors.blue,
@@ -335,7 +335,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                             color:
                                 isDarkMode
                                     ? DarkColors.textSecondary
-                                    : Colors.grey,
+                                    : LightColors.textSecondary,
                           ),
                         ),
                         onTap: () {
@@ -364,8 +364,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           vertical: 10,
                         ),
                         leading: Container(
-                          width: 52,
-                          height: 52,
+                          width: 48,
+                          height: 48,
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
                               colors: [Color(0xFF2B6CF6), Color(0xFF0F8BFF)],
@@ -417,7 +417,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                             color:
                                 isDarkMode
                                     ? DarkColors.textSecondary
-                                    : Colors.grey,
+                                    : LightColors.textSecondary,
                           ),
                         ),
                         trailing: Container(
