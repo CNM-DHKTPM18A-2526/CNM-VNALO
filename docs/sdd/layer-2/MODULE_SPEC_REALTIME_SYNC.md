@@ -438,6 +438,7 @@ On every reconnect (socket re-established after disconnect):
 | Flutter: reconnection jitter (thundering herd fix) | **Done** | P0 | `socket_service.dart` — `setRandomizationFactor(0.5)` |
 | Flutter: StreamController dispose safety | **Done** | P1 | `socket_service.dart` — `_disposeAllControllers()` + `_disposed` guard |
 | RedisIoAdapter for multi-node socket sync | Open | P0 | Required before multi-node deployment |
+| Backend: emit group.memberLeft event + individual emit for role changes | **Done** | P1 | `chat.gateway.ts` — add emitToUser + listen group.memberLeft on mobile |
 
 
 ---
