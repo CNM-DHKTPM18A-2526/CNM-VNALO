@@ -50,6 +50,7 @@ export interface IncomingGroupCallInfo {
   conversationName: string
   callerName: string
   callerAvatar?: string
+  groupAvatar?: string
   audioOnly: boolean
 }
 
@@ -161,8 +162,17 @@ export class WebRtcGroupCallService {
   private localAnalyser: SpeakerAnalyser | null = null
   private remoteAnalysers: Map<string, SpeakerAnalyser> = new Map()
 
-  constructor(onStateChange: (snapshot: GroupCallSnapshot) => void) {
+  private resolveName?: (userId: string) => string | undefined
+  private resolveAvatar?: (userId: string) => string | undefined
+
+  constructor(
+    onStateChange: (snapshot: GroupCallSnapshot) => void,
+    resolveName?: (userId: string) => string | undefined,
+    resolveAvatar?: (userId: string) => string | undefined
+  ) {
     this.onStateChange = onStateChange
+    this.resolveName = resolveName
+    this.resolveAvatar = resolveAvatar
   }
 
   // ─── INIT (Caller starts) ────────────────────────────────────────
@@ -317,24 +327,29 @@ export class WebRtcGroupCallService {
    * (backend relay tới mọi người trong room),
    * người trong room tạo offer gửi tới người vừa join.
    */
-  private onUserJoined = async (payload: {
-    senderUserId: string
-    displayName: string
-    avatarUrl?: string
-    callId: string
-    conversationId: string
-    isMicOn?: boolean
-    isCameraOn?: boolean
-  }) => {
-    if (payload.callId !== this.state.callId) return
-    if (payload.senderUserId === this.currentUserId) return
-    if (this.state.peers.has(payload.senderUserId)) return
+  private onUserJoined = async (payload: any) => {
+    const senderUserId = payload.senderUserId || payload.userId
+    let displayName = payload.displayName || payload.name || payload.callerName
+    let avatarUrl = payload.avatarUrl || payload.callerAvatar
+    const callId = payload.callId
 
-    console.log('[GroupCall] 👤 New peer joined:', payload.senderUserId)
+    if (callId !== this.state.callId) return
+    if (senderUserId === this.currentUserId) return
+    if (this.state.peers.has(senderUserId)) return
+
+    // Resolve identity if missing
+    if (!displayName || displayName === 'Người dùng') {
+      displayName = this.resolveName?.(senderUserId) || displayName || 'Người dùng'
+    }
+    if (!avatarUrl) {
+      avatarUrl = this.resolveAvatar?.(senderUserId) || ''
+    }
+
+    console.log('[GroupCall] 👤 New peer joined (resolved):', { senderUserId, displayName })
     await this.createPeerAndOffer({
-      userId: payload.senderUserId,
-      displayName: payload.displayName,
-      avatarUrl: payload.avatarUrl,
+      userId: senderUserId,
+      displayName: displayName,
+      avatarUrl: avatarUrl,
       isMicOn: payload.isMicOn,
       isCameraOn: payload.isCameraOn,
     })
@@ -346,7 +361,11 @@ export class WebRtcGroupCallService {
     callId: string
     conversationId: string
     displayName?: string
+    name?: string
+    fullName?: string
+    full_name?: string
     avatarUrl?: string
+    callerAvatar?: string
     isMicOn?: boolean
     isCameraOn?: boolean
     sdp: RTCSessionDescriptionInit
@@ -356,17 +375,29 @@ export class WebRtcGroupCallService {
 
     console.log('[GroupCall] 📥 Offer from:', payload.senderUserId)
 
-    if (!this.state.peers.has(payload.senderUserId)) {
+    const senderUserId = payload.senderUserId || payload.userId
+    if (!this.state.peers.has(senderUserId)) {
+      const isId = (s: any) => typeof s === 'string' && s.length > 20 && /^[0-9a-fA-F-]/.test(s)
+      let name = payload.displayName || payload.name || payload.fullName || payload.full_name || payload.callerName
+      if (!name || isId(name)) {
+        name = this.resolveName?.(senderUserId) || name || senderUserId
+      }
+
+      let avatarUrl = payload.avatarUrl || payload.callerAvatar
+      if (!avatarUrl) {
+        avatarUrl = this.resolveAvatar?.(senderUserId) || ''
+      }
+
       this.createPeerState({
-        userId: payload.senderUserId,
-        displayName: payload.displayName ?? payload.senderUserId,
-        avatarUrl: payload.avatarUrl,
+        userId: senderUserId,
+        displayName: name,
+        avatarUrl: avatarUrl,
         isMicOn: payload.isMicOn,
         isCameraOn: payload.isCameraOn,
       })
     }
 
-    const peer = this.state.peers.get(payload.senderUserId)!
+    const peer = this.state.peers.get(senderUserId)!
     try {
       await peer.pc.setRemoteDescription(new RTCSessionDescription(payload.sdp))
       peer.hasRemoteDescription = true

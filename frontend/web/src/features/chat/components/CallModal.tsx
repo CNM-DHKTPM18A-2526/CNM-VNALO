@@ -159,17 +159,30 @@ export const CallModal: React.FC<CallModalProps> = ({
           className="flex flex-col items-center transition-all duration-500"
           style={{ opacity: showAvatar ? 1 : 0, transform: showAvatar ? 'scale(1)' : 'scale(0.95)' }}
         >
-          <div className="relative mb-8">
+          <div className="relative mb-12">
+            {/* Pulsing Rings */}
+            {status === 'connecting' && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <style>{`
+                  @keyframes pulseRing {
+                    0% { transform: scale(1); opacity: 0.4; }
+                    50% { transform: scale(1.5); opacity: 0.2; }
+                    100% { transform: scale(2); opacity: 0; }
+                  }
+                `}</style>
+                <div className="w-32 h-32 rounded-full border-2 border-white/30" style={{ animation: 'pulseRing 2s ease-out infinite' }} />
+                <div className="w-32 h-32 rounded-full border-2 border-white/20" style={{ animation: 'pulseRing 2s ease-out infinite 0.6s' }} />
+                <div className="w-32 h-32 rounded-full border-2 border-white/10" style={{ animation: 'pulseRing 2s ease-out infinite 1.2s' }} />
+              </div>
+            )}
+            
             <UserAvatar
               name={peerName}
               imageUrl={peerAvatar}
               size='xl'
-              className='border-4 border-white/10 shadow-2xl'
-              style={{ width: 120, height: 120 } as any}
+              className='border-4 border-white/20 shadow-[0_0_50px_rgba(34,197,94,0.3)] relative z-10'
+              style={{ width: 140, height: 140 } as any}
             />
-            {status === 'connecting' && (
-              <div className="absolute inset-[-16px] rounded-full border-4 border-green-400 border-t-transparent animate-spin opacity-60" />
-            )}
           </div>
 
           <h2 className='text-3xl font-bold text-white mb-2 drop-shadow-xl'>{peerName}</h2>
