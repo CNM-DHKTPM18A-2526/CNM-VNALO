@@ -11,7 +11,7 @@ WORKDIR /build
 
 # Copy package files first
 COPY package*.json ./
-RUN npm ci --ignore-scripts
+RUN npm install --legacy-peer-deps --ignore-scripts
 
 # Copy source and build
 COPY . .
@@ -21,7 +21,7 @@ RUN npm run build
 FROM node:20-alpine AS deps
 WORKDIR /deps
 COPY package*.json ./
-RUN npm ci --omit=dev --ignore-scripts
+RUN npm install --omit=dev --legacy-peer-deps --ignore-scripts
 
 # --- Stage 3: Runtime ---
 FROM node:20-alpine
