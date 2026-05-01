@@ -36,9 +36,14 @@ export class RedisIoAdapter extends IoAdapter {
   }
 
   createIOServer(port: number, options?: ServerOptions): unknown {
-    const server = super.createIOServer(port, options);
-    (server as unknown as { adapter: typeof this.adapterConstructor }).adapter =
-      this.adapterConstructor;
+    const server = super.createIOServer(port, options) as {
+      adapter: (adapter: unknown) => void;
+      _nsps: Map<string, unknown>;
+    };
+    server.adapter(this.adapterConstructor);
+    server._nsps.forEach((nsp: unknown) => {
+      (nsp as { adapter: unknown }).adapter = this.adapterConstructor;
+    });
     return server;
   }
 }
