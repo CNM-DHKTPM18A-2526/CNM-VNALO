@@ -11,7 +11,7 @@ WORKDIR /build
 
 # Copy package files first
 COPY package*.json ./
-RUN npm install --legacy-peer-deps --ignore-scripts
+RUN npm install --include=dev --legacy-peer-deps --ignore-scripts
 
 # Copy source and build
 COPY . .

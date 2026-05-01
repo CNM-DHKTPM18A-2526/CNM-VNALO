@@ -11,7 +11,7 @@ WORKDIR /build
 
 # Copy package files
 COPY package*.json ./
-RUN npm install --legacy-peer-deps --ignore-scripts
+RUN npm install --include=dev --legacy-peer-deps --ignore-scripts
 
 # Copy shared configs and source
 COPY nest-cli.json ./
