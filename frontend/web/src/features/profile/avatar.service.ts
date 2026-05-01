@@ -31,7 +31,7 @@ async function uploadAvatarToMedia(token: string, file: File): Promise<string> {
   formData.append('file', file)
   formData.append('category', 'AVATAR')
 
-  const response = await fetch(`${MEDIA_API_BASE_URL}/upload`, {
+  const response = await fetch(`${MEDIA_API_BASE_URL}upload`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
