@@ -43,17 +43,17 @@ services:
       timeout: 3s
       retries: 5
 
-  ollama:
-    image: ollama/ollama:latest
-    restart: unless-stopped
-    profiles:
-      - ai-local
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    networks:
-      - vnalo-network
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   restart: unless-stopped
+  #   profiles:
+  #     - ai-local
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   networks:
+  #     - vnalo-network
 
   rabbitmq:
     image: rabbitmq:4-management-alpine
@@ -81,6 +81,7 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+      KAFKA_HEAP_OPTS: "-Xmx256M -Xms256M"
     networks:
       - vnalo-network
 
@@ -96,6 +97,7 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_HEAP_OPTS: "-Xmx512M -Xms512M"
       KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:9093
       KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:9093
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
@@ -131,6 +133,7 @@ services:
       APP_SYNC_POLICY_ENFORCE_WEB_RESTRICTION: ${APP_SYNC_POLICY_ENFORCE_WEB_RESTRICTION:-false}
       FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:-iuh-cnm-vnalo-firebase-adminsdk-fbsvc-5008b7c5eb.json}
       KAFKA_SERVERS: kafka:9092
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xss256k"
     depends_on:
       postgres:
         condition: service_healthy
@@ -216,7 +219,7 @@ services:
       AWS_REGION: ${AWS_REGION:-ap-southeast-1}
       AWS_S3_PUBLIC_ENDPOINT: ${AWS_S3_PUBLIC_ENDPOINT:-https://${AWS_BUCKET_NAME:-vnalo-media-service}.s3.${AWS_REGION:-ap-southeast-1}.amazonaws.com}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
-      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xss256k"
     volumes:
       - media_local_data:/app/.media-local
       - ../backend/java-services/services/media-service/img:/app/img
@@ -238,8 +241,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G
-          cpus: "1.0"
+          memory: 512M
+          cpus: "0.5"
 
   realtime-gateway:
     build:
@@ -313,44 +316,44 @@ services:
   #         memory: 512M
   #         cpus: "0.5"
 
-  analytics-service:
-    build:
-      context: ../backend/java-services/services/analytics-service
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    profiles:
-      - planned
-    ports:
-      - "8084:8084"
-    environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: vnalo_analytics
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASS: ${DB_PASS:-postgres}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
-      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - vnalo-network
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8084/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: "0.5"
+  # analytics-service:
+  #   build:
+  #     context: ../backend/java-services/services/analytics-service
+  #     dockerfile: Dockerfile
+  #   restart: unless-stopped
+  #   profiles:
+  #     - planned
+  #   ports:
+  #     - "8084:8084"
+  #   environment:
+  #     DB_HOST: postgres
+  #     DB_PORT: 5432
+  #     DB_NAME: vnalo_analytics
+  #     DB_USER: ${DB_USER:-postgres}
+  #     DB_PASS: ${DB_PASS:-postgres}
+  #     REDIS_HOST: redis
+  #     REDIS_PORT: 6379
+  #     JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+  #     SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+  #     JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   networks:
+  #     - vnalo-network
+  #   healthcheck:
+  #     test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8084/actuator/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 40s
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 512M
+  #         cpus: "0.5"
 
   ai-service:
     build:
@@ -371,7 +374,7 @@ services:
       AI_RATE_LIMIT: ${AI_RATE_LIMIT:-5}
       AI_RATE_LIMIT_GLOBAL: ${AI_RATE_LIMIT_GLOBAL:-10}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
-      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xss256k"
     depends_on:
       redis:
         condition: service_healthy
@@ -389,40 +392,41 @@ services:
           memory: 512M
           cpus: "0.5"
 
-  content-service:
-    build:
-      context: ../backend/java-services/services/content-service
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    ports:
-      - "8086:8086"
-    environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: vnalo_content
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASS: ${DB_PASS:-postgres}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - vnalo-network
-    healthcheck:
-      test: ["CMD-SHELL", "nc -z localhost 8086 || exit 1"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 40s
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-          cpus: "1.0"
+  # content-service:
+  #   build:
+  #     context: ../backend/java-services/services/content-service
+  #     dockerfile: Dockerfile
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8086:8086"
+  #   environment:
+  #     DB_HOST: postgres
+  #     DB_PORT: 5432
+  #     DB_NAME: vnalo_content
+  #     DB_USER: ${DB_USER:-postgres}
+  #     DB_PASS: ${DB_PASS:-postgres}
+  #     REDIS_HOST: redis
+  #     REDIS_PORT: 6379
+  #     SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+  #     JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xss256k"
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   networks:
+  #     - vnalo-network
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "nc -z localhost 8086 || exit 1"]
+  #     interval: 30s
+  #     timeout: 5s
+  #     retries: 3
+  #     start_period: 40s
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 512M
+  #         cpus: "0.5"
 
   notification-service:
     build:
@@ -444,6 +448,7 @@ services:
       JWT_ISSUER: ${JWT_ISSUER:-vnalo}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:-iuh-cnm-vnalo-firebase-adminsdk-fbsvc-5008b7c5eb.json}
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xss256k"
     depends_on:
       postgres:
         condition: service_healthy
@@ -462,8 +467,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G
-          cpus: "1.0"
+          memory: 512M
+          cpus: "0.5"
 
   frontend-web:
     build:
