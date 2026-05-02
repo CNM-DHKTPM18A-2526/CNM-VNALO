@@ -110,8 +110,16 @@ const globalLogoutHandler = () => {
 const commonResponseInterceptor = [
   (res: any) => res,
   (err: any) => {
-    console.error('[API ERROR]', err.response?.data || err.message);
-    if (err.response?.status === 401) {
+    const status = err.response?.status;
+    const isSilenced = status === 404 || status === 403; // Ignore noise for deleted/forbidden content
+    
+    if (!isSilenced) {
+      console.error('[API ERROR]', err.response?.data || err.message);
+    } else {
+      console.warn(`[API ${status}]`, err.config?.url);
+    }
+
+    if (status === 401) {
       globalLogoutHandler();
     }
     return Promise.reject(err);

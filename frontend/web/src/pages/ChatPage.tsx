@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { getSyncPolicy } from '../features/auth/auth.api'
@@ -363,7 +363,7 @@ function fallbackUserDisplayName(_userId: string): string {
 }
 
 function applyRestrictedMessage(message: ChatMessage, restricted: boolean): ChatMessage {
-  if (!restricted) {
+  if (!restricted || message.type === 'system') {
     return message
   }
 
@@ -878,6 +878,11 @@ export default function ChatPage() {
     const conversationId = targetId || selectedConversationIdRef.current
     if (!conversationId || !accessToken) return
 
+    // Don't poll for conversations that are no longer in our list (ghost groups)
+    if (!targetId && !conversationsRef.current.some(c => c.id === conversationId)) {
+      return;
+    }
+
     const now = Date.now()
     const lastSync = lastSyncTimeRef.current[conversationId] ?? 0
     if (!targetId && now - lastSync < SYNC_INTERVAL_MS) return
@@ -1182,7 +1187,62 @@ export default function ChatPage() {
   )
 
 
+
   const syncPinnedMessages = loadPinnedMessages
+  
+  const syncConversationMetadata = useCallback(async (conversationId: string) => {
+    if (!accessToken) return;
+    try {
+      const data = await fetchConversation(accessToken, conversationId) as any;
+      if (!data) return;
+
+      setConversations(prev => prev.map(c => {
+        if (c.id !== conversationId) return c;
+        // Merge settings from various possible backend field names
+        const settings = {
+          name: data.title || data.name || c.name,
+          avatarUrl: data.avatarUrl || data.avatar_url || c.avatarUrl,
+          onlyAdminCanPost: Boolean(data.onlyAdminCanPost ?? data.only_admin_can_post ?? c.onlyAdminCanPost),
+          allowMemberPin: Boolean(data.allowMemberPin ?? data.allow_member_pin ?? c.allowMemberPin),
+          allowMemberEditInfo: Boolean(data.allowMemberEditInfo ?? data.allow_member_edit_info ?? c.allowMemberEditInfo),
+          members: data.members || c.members,
+          memberCount: (data.members || []).length || c.memberCount,
+          updatedAt: new Date().toISOString(),
+          _syncVersion: Date.now() 
+        };
+        return { ...c, ...settings };
+      }));
+      console.log('[ChatPage] 🔄 Metadata refreshed for', conversationId);
+    } catch (e: any) {
+      if (e.response?.status === 404) {
+        console.log('[ChatPage] 🗑️ Conversation no longer exists, cleaning up:', conversationId);
+        setConversations(prev => prev.filter(c => c.id !== conversationId));
+        if (selectedConversationIdRef.current === conversationId) {
+          navigate('/chat');
+        }
+      } else {
+        console.warn('[ChatPage] Metadata sync failed', e);
+      }
+    }
+  }, [accessToken]);
+
+  // Fail-Safe Heartbeat: Ensure active conversation settings are always fresh
+  useEffect(() => {
+    if (!accessToken || !selectedConversationId || !isSocketConnected) return;
+    
+    // Only poll if the conversation exists in our list to avoid 404 noise
+    // (Wait for inbox to load first)
+    if (conversations.length === 0) return;
+    const exists = conversations.some(c => c.id === selectedConversationId);
+    if (!exists) return;
+
+    // Fast poll for settings while in active chat (fallback if socket fails)
+    const timer = setInterval(() => {
+      void syncConversationMetadata(selectedConversationId);
+    }, 3500); 
+    
+    return () => clearInterval(timer);
+  }, [accessToken, selectedConversationId, isSocketConnected, syncConversationMetadata, conversations]);
 
   const { emitSendMessage, emitRecallMessage, joinConversation, joinMultipleConversations, markAsRead, getSocket } = useChatSocket({
     token: accessToken,
@@ -1301,9 +1361,32 @@ export default function ChatPage() {
               void syncPinnedMessages(cid);
             }
 
-            // Group Info Sync handled in Fast Path below
+            // Group Info Sync: Essential for permissions/settings
             if (sys.action === 'UPDATE_GROUP_INFO') {
-              console.log('[ChatPage]  Received UPDATE_GROUP_INFO signal');
+              console.log('[ChatPage] 🔄 Realtime Group Update Signal Received:', mapped.conversationId, sys.metadata);
+              
+              // 1. Optimistic update from payload
+              setConversations(prev => prev.map(c => {
+                if (c.id !== mapped.conversationId) return c;
+                return { ...c, ...sys.metadata, updatedAt: new Date().toISOString() };
+              }));
+              
+              // 2. Proactive Sync: Trigger a refresh of the whole inbox summary
+              // to ensure we have the most authoritative state for ALL groups
+              void syncInboxSummaries();
+              
+              // 3. Fallback: Specific metadata refresh
+              void syncConversationMetadata(mapped.conversationId);
+
+              // 4. UI Hint
+              if (sys.metadata && Object.keys(sys.metadata).length > 0) {
+                toast.info('Cài đặt nhóm đã được cập nhật');
+              }
+
+              // 5. Silent Update: If it's just settings (no rename), don't show a bubble in chat
+              if (!sys.metadata?.newName && !sys.newName) {
+                return; 
+              }
             }
 
             // Reaction Sync (Poll Voting)
@@ -1657,11 +1740,20 @@ export default function ChatPage() {
       void syncPinnedMessages(conversationId)
     },
     onGroupUpdated: (payload: any) => {
-      console.log('[ChatPage.socket] Group updated:', payload);
-      setConversations(prev => prev.map(c => {
-        if (c.id !== payload.conversationId) return c;
-        return { ...c, ...payload.metadata };
-      }));
+      console.log('[ChatPage.socket] 👥 Group Updated (Socket):', payload);
+      const conversationId = payload.conversationId || payload.conversation_id;
+      if (!conversationId) return;
+
+      // Trigger full refresh to ensure all settings are synced correctly
+      void syncConversationMetadata(conversationId);
+      void syncInboxSummaries();
+    },
+    onConversationUpdated: (payload: any) => {
+      console.log('[ChatPage.socket] 🔄 Conversation Updated (Socket):', payload);
+      const conversationId = payload.conversationId || payload.id;
+      if (conversationId) {
+        void syncConversationMetadata(conversationId);
+      }
     },
     onGroupDisbanded: (payload) => {
       console.log('Group disbanded', payload.conversationId)
@@ -3117,7 +3209,35 @@ export default function ChatPage() {
         if (missingIds.length > 0) {
           console.log("⚡ [ChatPage] Proactively fetching missing conversations:", missingIds);
           const fetchedResults = await Promise.all(
-            missingIds.map(id => fetchConversation(token, id).catch(() => null))
+            missingIds.map(async (id) => {
+              try {
+                const result = await fetchConversation(token, id);
+                return result;
+              } catch (err: any) {
+                const status = err.response?.status;
+                // If it's a 404/403, cleanup localStorage so we don't keep trying forever
+                if (status === 404 || status === 403) {
+                  console.log(`[ChatPage] 🧹 Purging ghost group ID: ${id}`);
+                  
+                  // 1. Cleanup localStorage
+                  const stored = localStorage.getItem(`vnalo_pending_groups_${user?.id}`);
+                  if (stored) {
+                    try {
+                      const ids: string[] = JSON.parse(stored);
+                      const filtered = ids.filter(pid => pid !== id);
+                      localStorage.setItem(`vnalo_pending_groups_${user?.id}`, JSON.stringify(filtered));
+                    } catch (e) { /* ignore */ }
+                  }
+
+                  // 2. If this is the active conversation in URL, it's dead. Redirect!
+                  if (id === targetId) {
+                    console.warn(`[ChatPage] ⚠️ Current URL points to dead conversation ${id}. Redirecting to /chat.`);
+                    navigate('/chat');
+                  }
+                }
+                return null;
+              }
+            })
           );
 
           const myId = String(user?.id ?? '').trim();
@@ -3409,6 +3529,21 @@ export default function ChatPage() {
               incomingTime > currentTime ||
               (incoming.unreadCount ?? 0) !== (conversation.unreadCount ?? 0)
             )
+
+            // 1. If incoming summary is older than local, ignore it entirely
+            if (isStaleSummary) {
+              return conversation
+            }
+
+            // 2. If timestamps are exactly equal, trust the local state (prevents optimistic UI flickering)
+            if (incomingTime === currentTime && incomingTime > 0) {
+              // Only check for unread count if everything else is equal
+              if ((incoming.unreadCount ?? 0) !== (conversation.unreadCount ?? 0)) {
+                changed = true;
+                return { ...conversation, unreadCount: incoming.unreadCount };
+              }
+              return conversation;
+            }
 
             if (!hasNewerSummary) {
               const metadataChanged =
@@ -4913,7 +5048,7 @@ export default function ChatPage() {
       // Update local state
       setConversations(prev => prev.map(conv => {
         if (conv.id !== selectedConversationId) return conv;
-        return { ...conv, ...settings };
+        return { ...conv, ...settings, updatedAt: new Date().toISOString() };
       }));
       // Emit SYSTEM notification for realtime sync
       const systemPayload = JSON.stringify({
@@ -4922,12 +5057,18 @@ export default function ChatPage() {
         metadata: settings
       });
 
-      // Emit as transient socket signal only (not a persistent message)
-      emitSendMessage({
-        conversationId: selectedConversationId,
-        messageType: 'system',
-        content: systemPayload
-      });
+      // Emit as SYSTEM signal (using SYSTEM type for maximum priority)
+      try {
+        await emitSendMessage({
+          conversationId: selectedConversationId,
+          messageType: 'SYSTEM', 
+          content: systemPayload,
+          clientMessageId: crypto.randomUUID()
+        });
+        console.log('[ChatPage] 📤 Group sync signal sent successfully');
+      } catch (e) {
+        console.warn('[ChatPage] ⚠️ Failed to emit group sync signal');
+      }
     } catch (error) {
       console.error('Failed to update group settings', error);
       toast.error('Không thể cập nhật cài đặt nhóm');

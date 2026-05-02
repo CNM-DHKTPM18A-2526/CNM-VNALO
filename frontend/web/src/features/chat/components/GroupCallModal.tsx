@@ -84,8 +84,8 @@ const VideoTile: React.FC<VideoTileProps> = ({
   const resolvedAvatar = resolveMediaUrl(avatarUrl)
 
   // Logic to determine if we should show active video or avatar
-  const hasVideoTrack = stream && stream.getVideoTracks().length > 0
-  const showVideo = !!(hasVideoTrack && isCameraOn && !audioOnly)
+  const videoTrack = stream?.getVideoTracks().find(t => t.enabled && t.readyState === 'live')
+  const showVideo = !!(videoTrack && isCameraOn && !audioOnly)
 
   return (
     <div className={`relative w-full h-full bg-slate-800 rounded-2xl overflow-hidden shadow-inner flex items-center justify-center transition-all duration-300 ${isSpeaking ? 'ring-2 ring-green-500' : ''}`} style={{ minHeight: '120px', aspectRatio: '16/10' }}>

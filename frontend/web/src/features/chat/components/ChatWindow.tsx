@@ -148,18 +148,34 @@ export function ChatWindow({
     onLoadConversationMessages?.(conversation.id)
   }, [conversation?.id, onLoadConversationMessages])
 
+  // 1. Initial scroll to bottom when switching conversation or finishing initial load
   useEffect(() => {
     if (!conversation || isLoadingMessages) {
       return
     }
 
     const container = messagesContainerRef.current
-    if (!container) {
+    if (!container) return
+
+    container.scrollTop = container.scrollHeight
+  }, [conversation?.id, isLoadingMessages])
+
+  // 2. Smart scroll for new messages in the CURRENT conversation
+  useEffect(() => {
+    if (!conversation || isLoadingMessages) {
       return
     }
 
-    container.scrollTop = container.scrollHeight
-  }, [conversation, conversationMessages.length, isLoadingMessages])
+    const container = messagesContainerRef.current
+    if (!container) return
+
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200
+    const lastMessageIsMine = conversationMessages.length > 0 && conversationMessages[conversationMessages.length - 1].sender === 'me'
+
+    if (isNearBottom || lastMessageIsMine) {
+      container.scrollTop = container.scrollHeight
+    }
+  }, [conversationMessages.length])
 
   useEffect(() => {
     if (!jumpToMessageId || lastHandledJumpIdRef.current === jumpToMessageId) {
@@ -645,8 +661,8 @@ export function ChatWindow({
         </div>
       )}
       {(() => {
-        const currentUserRole = conversation.members?.find(m => m.userId === currentUserId)?.role;
-        const isBlocked = conversation.onlyAdminCanPost && currentUserRole === 'MEMBER';
+        const currentUserRole = String(conversation.members?.find(m => String(m.userId) === String(currentUserId))?.role || '').toUpperCase();
+        const isBlocked = !!conversation.onlyAdminCanPost && currentUserRole === 'MEMBER';
 
         if (isBlocked) {
           return (

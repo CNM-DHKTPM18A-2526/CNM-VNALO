@@ -802,7 +802,11 @@ export function MessageBubble({
           </time>
         </article>
 
-        <MessageReactionSummary reactions={reactions} onRemoveReaction={onRemoveReaction} />
+        <MessageReactionSummary 
+          reactions={reactions} 
+          onRemoveReaction={onRemoveReaction} 
+          isIncoming={!isMyMessage} 
+        />
       </div>
     </div>
   )

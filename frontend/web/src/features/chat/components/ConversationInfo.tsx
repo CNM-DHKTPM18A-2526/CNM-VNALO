@@ -1133,6 +1133,11 @@ function LeaderDeputyView({
   const admin = conversation.members?.find(m => String(m.role || '').toUpperCase() === 'ADMIN');
   const deputies = conversation.members?.filter(m => String(m.role || '').toUpperCase() === 'DEPUTY') || [];
 
+  const currentUserRole = useMemo(() => {
+    const me = conversation.members?.find(m => m.userId === currentUserId);
+    return String(me?.role || 'MEMBER').toUpperCase();
+  }, [conversation.members, currentUserId]);
+
   return (
     <div className="flex flex-col h-full overflow-y-auto scrollbar-hide pb-10">
       <div className="p-4 space-y-6">
@@ -1189,12 +1194,15 @@ function LeaderDeputyView({
                       <span className="text-[13px] text-[var(--muted)]">Phó nhóm</span>
                     </div>
                   </div>
-                  <button 
-                    className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-full border-0 outline-none cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity bg-transparent"
-                    onClick={() => onUpdateRole?.(deputy.userId, 'MEMBER')}
-                  >
-                    <Trash2 size={18} />
-                  </button>
+                  {currentUserRole === 'ADMIN' && (
+                    <button 
+                      className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-full border-0 outline-none cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity bg-transparent"
+                      onClick={() => onUpdateRole?.(deputy.userId, 'MEMBER')}
+                      title="Gỡ chức danh phó nhóm"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
