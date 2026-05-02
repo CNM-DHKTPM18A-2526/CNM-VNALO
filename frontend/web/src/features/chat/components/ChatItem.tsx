@@ -63,6 +63,14 @@ export function ChatItem({ conversation, active, index, onSelect }: ChatItemProp
           <p className='chat-item-message'>
             {(() => {
               const msg = conversation?.lastMessage ?? ''
+              // Normalize recalled preview text (including legacy mojibake values from cache/state)
+              if (typeof msg === 'string') {
+                const normalized = msg.toLowerCase()
+                if (normalized.includes('tin nhắn đã được thu hồi') || normalized.includes('thu há»“i') || normalized.includes('thu hồi')) {
+                  return 'Tin nhắn đã được thu hồi'
+                }
+              }
+
               // Defensive: if message looks like raw JSON system action, apply formatting
               if (typeof msg === 'string' && msg.trim().startsWith('{') && msg.includes('"action":')) {
                 try {
