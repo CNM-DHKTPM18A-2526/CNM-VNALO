@@ -2,7 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';

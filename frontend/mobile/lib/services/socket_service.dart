@@ -7,7 +7,7 @@ import 'package:vnalo_mobile/config/app_config.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
 import 'package:vnalo_mobile/services/auth_events.dart';
 
-class SocketService {
+class SocketService with ChangeNotifier {
   io.Socket? _socket;
   final _joinedRooms = <String>{};
   final _pendingRoomJoins = <String>{};
@@ -16,55 +16,68 @@ class SocketService {
   final _seenMessageKeys = <String>{};
   static const kMaxDedupCache = 500;
 
+  String? _lastToken;
+  int _reinitCount = 0;
+  int get reinitCount => _reinitCount;
   String? _globalToken;
-
-  // Stream controller for send errors (added by M-01)
-  final _sendErrorController = StreamController<Map<String, dynamic>>.broadcast();
+  bool _disposed = false;
+  VoidCallback? _onSocketReady;
 
   // Heartbeat timer — emits 'heartbeat' every 25 seconds (well under the 60s Redis TTL on the server)
   Timer? _heartbeatTimer;
   static const _heartbeatIntervalSeconds = 25;
 
-  final _messageController =
-      StreamController<
-        Message
-      >.broadcast(); // Stream controller for incoming messages
-  final _typingController = StreamController<Map<String, dynamic>>.broadcast();
-  final _presenceController =
-      StreamController<Map<String, dynamic>>.broadcast();
-  final _readController = StreamController<Map<String, dynamic>>.broadcast();
-  final _deliveredController =
-      StreamController<Map<String, dynamic>>.broadcast();
-  final _recalledController =
-      StreamController<Map<String, dynamic>>.broadcast();
-  final _pinnedController =
-      StreamController<Map<String, dynamic>>.broadcast();
-  final _unpinnedController =
-      StreamController<Map<String, dynamic>>.broadcast();
-  final _callSignalController =
-      StreamController<Map<String, dynamic>>.broadcast();
-  final _callErrorController =
-      StreamController<Map<String, dynamic>>.broadcast();
-  final _reactionAddedController =
-      StreamController<Map<String, dynamic>>.broadcast();
-  final _reactionRemovedController =
-      StreamController<Map<String, dynamic>>.broadcast();
-  final _groupDisbandedController =
-      StreamController<Map<String, dynamic>>.broadcast();
-  final _friendshipUpdatedController =
-      StreamController<Map<String, dynamic>>.broadcast();
-  final _friendRequestReceivedController =
-      StreamController<Map<String, dynamic>>.broadcast();
-  final _groupSettingsChangedController =
-      StreamController<Map<String, dynamic>>.broadcast();
-  final _groupMemberAddedController =
-      StreamController<Map<String, dynamic>>.broadcast();
-  final _groupMemberRemovedController =
-      StreamController<Map<String, dynamic>>.broadcast();
-  final _groupRoleChangedController =
-      StreamController<Map<String, dynamic>>.broadcast();
-  final _groupAdminTransferredController =
-      StreamController<Map<String, dynamic>>.broadcast();
+  // ─── Stream Controllers (Non-final to allow re-initialization) ───────────
+  StreamController<Message> _messageController = StreamController<Message>.broadcast();
+  StreamController<Map<String, dynamic>> _typingController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _presenceController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _readController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _deliveredController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _recalledController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _pinnedController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _unpinnedController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _callSignalController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _callErrorController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _reactionAddedController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _reactionRemovedController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _groupDisbandedController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _friendshipUpdatedController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _friendRequestReceivedController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _groupSettingsChangedController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _groupMemberAddedController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _groupMemberRemovedController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _groupRoleChangedController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _groupAdminTransferredController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _sendErrorController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<Map<String, dynamic>> _groupCallSignalController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<void> _connectController = StreamController<void>.broadcast();
+
+
+  void _disposeAllControllers() {
+    _messageController.close();
+    _typingController.close();
+    _presenceController.close();
+    _readController.close();
+    _deliveredController.close();
+    _recalledController.close();
+    _pinnedController.close();
+    _unpinnedController.close();
+    _callSignalController.close();
+    _callErrorController.close();
+    _reactionAddedController.close();
+    _reactionRemovedController.close();
+    _groupDisbandedController.close();
+    _friendshipUpdatedController.close();
+    _friendRequestReceivedController.close();
+    _groupSettingsChangedController.close();
+    _groupMemberAddedController.close();
+    _groupMemberRemovedController.close();
+    _groupRoleChangedController.close();
+    _groupAdminTransferredController.close();
+    _sendErrorController.close();
+    _groupCallSignalController.close();
+    _connectController.close();
+  }
 
   Stream<Message> get onMessage =>
       _messageController.stream; // Stream for incoming messages
@@ -113,8 +126,9 @@ class SocketService {
 
     // M-04: If token changed (logout/re-login), dispose old controllers before creating new socket
     if (_globalToken != null && _globalToken != token) {
-      debugPrint('[SocketService] Token changed — disposing old controllers and socket');
+      debugPrint('[SocketService] Token changed — re-initializing controllers');
       _disposeAllControllers();
+      _initControllers();
       _socket?.disconnect();
       _socket?.dispose();
       _socket = null;
@@ -351,11 +365,21 @@ class SocketService {
       debugPrint('[SocketService] group.adminTransferred received: $data');
       _groupAdminTransferredController.add(Map<String, dynamic>.from(data));
     });
+    _socket!.onAny((event, data) {
+      debugPrint('📩 [SOCKET ANY] Event: $event | Data: $data');
+    });
+
     _socket!.on('friendship.updated', (data) {
-      _friendshipUpdatedController.add(Map<String, dynamic>.from(data));
+      debugPrint('[SOCKET] 🤝 friendship.updated: $data');
+      _friendshipUpdatedController.add(Map<String, dynamic>.from(data ?? {}));
     });
     _socket!.on('friend.request.received', (data) {
-      _friendRequestReceivedController.add(Map<String, dynamic>.from(data));
+      debugPrint('[SOCKET] 🤝 friend.request.received: $data');
+      if (data != null) {
+        _friendRequestReceivedController.add(Map<String, dynamic>.from(data as Map));
+      } else {
+        _friendRequestReceivedController.add({});
+      }
     });
 
     // ─── Group Call Signal Listeners ────────────────────────────────────────
@@ -808,14 +832,36 @@ class SocketService {
 
   // ─── Stream for group call signals ────────────────────────────────────────
 
-  final _groupCallSignalController = StreamController<Map<String, dynamic>>.broadcast();
-  final _connectController = StreamController<void>.broadcast();
-  
-  // Callback for when socket is ready (connected and authenticated)
-  VoidCallback? _onSocketReady;
-
   Stream<Map<String, dynamic>> get onGroupCallSignal => _groupCallSignalController.stream;
   Stream<void> get onConnectStream => _connectController.stream;
+
+  void _initControllers() {
+    if (_messageController.isClosed) _messageController = StreamController<Message>.broadcast();
+    if (_typingController.isClosed) _typingController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_presenceController.isClosed) _presenceController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_readController.isClosed) _readController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_deliveredController.isClosed) _deliveredController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_recalledController.isClosed) _recalledController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_pinnedController.isClosed) _pinnedController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_unpinnedController.isClosed) _unpinnedController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_callSignalController.isClosed) _callSignalController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_callErrorController.isClosed) _callErrorController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_reactionAddedController.isClosed) _reactionAddedController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_reactionRemovedController.isClosed) _reactionRemovedController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_groupDisbandedController.isClosed) _groupDisbandedController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_friendshipUpdatedController.isClosed) _friendshipUpdatedController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_friendRequestReceivedController.isClosed) _friendRequestReceivedController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_groupSettingsChangedController.isClosed) _groupSettingsChangedController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_groupMemberAddedController.isClosed) _groupMemberAddedController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_groupMemberRemovedController.isClosed) _groupMemberRemovedController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_groupRoleChangedController.isClosed) _groupRoleChangedController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_groupAdminTransferredController.isClosed) _groupAdminTransferredController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_groupCallSignalController.isClosed) _groupCallSignalController = StreamController<Map<String, dynamic>>.broadcast();
+    if (_connectController.isClosed) _connectController = StreamController<void>.broadcast();
+    if (_sendErrorController.isClosed) _sendErrorController = StreamController<Map<String, dynamic>>.broadcast();
+    _reinitCount++;
+    notifyListeners();
+  }
 
   /// Set a callback to be called when socket is ready (connected)
   void setOnSocketReady(VoidCallback? callback) {
@@ -839,37 +885,8 @@ class SocketService {
     _joinedRooms.clear(); // Clear joined rooms on disconnect
   }
 
-  // M-04: Extract controller cleanup into reusable helper
-  void _disposeAllControllers() {
-    _messageController.close();
-    _typingController.close();
-    _presenceController.close();
-    _readController.close();
-    _deliveredController.close();
-    _recalledController.close();
-    _pinnedController.close();
-    _unpinnedController.close();
-    _callSignalController.close();
-    _callErrorController.close();
-    _reactionAddedController.close();
-    _reactionRemovedController.close();
-    _groupDisbandedController.close();
-    _friendshipUpdatedController.close();
-    _friendRequestReceivedController.close();
-    _groupSettingsChangedController.close();
-    _groupMemberAddedController.close();
-    _groupMemberRemovedController.close();
-    _groupRoleChangedController.close();
-    _groupAdminTransferredController.close();
-    _groupCallSignalController.close();
-    _connectController.close();
-    _sendErrorController.close();
-  }
-
-  bool _disposed = false;
-
   void dispose() {
-    if (_disposed) return; // Idempotent: guard against double-dispose
+    if (_disposed) return;
     _disposed = true;
     disconnect();
     _disposeAllControllers();

@@ -32,22 +32,23 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
   final Map<String, int> _retryCounts = {};
   final Map<String, List<Message>> _pinnedMessages = {};
   final Map<String, List<MessageReaction>> _reactions = {};
-  final StreamSubscription<Message> _messageSub;
-  final StreamSubscription<Map<String, dynamic>> _readSub;
-  final StreamSubscription<Map<String, dynamic>> _deliveredSub;
-  final StreamSubscription<Map<String, dynamic>> _recalledSub;
-  final StreamSubscription<Map<String, dynamic>> _pinnedSub;
-  final StreamSubscription<Map<String, dynamic>> _unpinnedSub;
-  final StreamSubscription<Map<String, dynamic>> _reactionAddedSub;
-  final StreamSubscription<Map<String, dynamic>> _reactionRemovedSub;
-  final StreamSubscription<Map<String, dynamic>> _groupDisbandedSub;
-  final StreamSubscription<Map<String, dynamic>> _groupSettingsChangedSub;
-  final StreamSubscription<Map<String, dynamic>> _groupMemberAddedSub;
-  final StreamSubscription<Map<String, dynamic>> _groupMemberRemovedSub;
-  final StreamSubscription<Map<String, dynamic>> _groupRoleChangedSub;
-  final StreamSubscription<Map<String, dynamic>> _groupAdminTransferredSub;
-  final StreamSubscription<Map<String, dynamic>> _typingSub;
-  final StreamSubscription<Map<String, dynamic>> _presenceSub;
+  StreamSubscription<Message>? _messageSub;
+  StreamSubscription<Map<String, dynamic>>? _readSub;
+  StreamSubscription<Map<String, dynamic>>? _deliveredSub;
+  StreamSubscription<Map<String, dynamic>>? _recalledSub;
+  StreamSubscription<Map<String, dynamic>>? _pinnedSub;
+  StreamSubscription<Map<String, dynamic>>? _unpinnedSub;
+  StreamSubscription<Map<String, dynamic>>? _reactionAddedSub;
+  StreamSubscription<Map<String, dynamic>>? _reactionRemovedSub;
+  StreamSubscription<Map<String, dynamic>>? _groupDisbandedSub;
+  StreamSubscription<Map<String, dynamic>>? _groupSettingsChangedSub;
+  StreamSubscription<Map<String, dynamic>>? _groupMemberAddedSub;
+  StreamSubscription<Map<String, dynamic>>? _groupMemberRemovedSub;
+  StreamSubscription<Map<String, dynamic>>? _groupRoleChangedSub;
+  StreamSubscription<Map<String, dynamic>>? _groupAdminTransferredSub;
+  StreamSubscription<Map<String, dynamic>>? _typingSub;
+  StreamSubscription<Map<String, dynamic>>? _presenceSub;
+  int _lastSocketReinitCount = -1;
   final Random _random = Random.secure();
 
   // Typing indicator state: conversationId -> { userId -> lastSeen }
@@ -105,50 +106,62 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     required MediaService mediaService,
     required NotificationService notificationService,
     required LocalDatabase db,
-  })  : _chatService = chatService,
+  })      : _chatService = chatService,
         _socketService = socketService,
         _mediaService = mediaService,
-      _notificationService = notificationService,
-        _db = db,
-        _messageSub = socketService.onMessage.listen((_) {}),
-        _readSub = socketService.onRead.listen((_) {}),
-        _deliveredSub = socketService.onDelivered.listen((_) {}),
-        _recalledSub = socketService.onRecalled.listen((_) {}),
-        _pinnedSub = socketService.onPinned.listen((_) {}),
-        _unpinnedSub = socketService.onUnpinned.listen((_) {}),
-        _reactionAddedSub = socketService.onReactionAdded.listen((_) {}),
-        _reactionRemovedSub = socketService.onReactionRemoved.listen((_) {}),
-        _groupDisbandedSub = socketService.onGroupDisbanded.listen((_) {}),
-        _groupSettingsChangedSub = socketService.onGroupSettingsChanged.listen((_) {}),
-        _groupMemberAddedSub = socketService.onGroupMemberAdded.listen((_) {}),
-        _groupMemberRemovedSub = socketService.onGroupMemberRemoved.listen((_) {}),
-        _groupRoleChangedSub = socketService.onGroupRoleChanged.listen((_) {}),
-        _groupAdminTransferredSub = socketService.onGroupAdminTransferred.listen((_) {}),
-        _typingSub = socketService.onTyping.listen((_) {}),
-        _presenceSub = socketService.onPresence.listen((_) {}) {
+        _notificationService = notificationService,
+        _db = db {
     _notificationService.ensureInitialized();
-    _messageSub.onData((msg) {
-      debugPrint('[ChatProvider] 📡 SOCKET MESSAGE: id=${msg.id} conv=${msg.conversationId} type=${msg.messageType} mediaUrl=${msg.mediaUrl}');
-      _handleIncomingMessage(msg);
-    });
-    _readSub.onData(_handleReadEvent);
-    _deliveredSub.onData(_handleDeliveredEvent);
-    _recalledSub.onData(_handleRecalledEvent);
-    _pinnedSub.onData(_handlePinnedEvent);
-    _unpinnedSub.onData(_handleUnpinnedEvent);
-    _reactionAddedSub.onData(_handleReactionAddedEvent);
-    _reactionRemovedSub.onData(_handleReactionRemovedEvent);
-    _groupDisbandedSub.onData(_handleGroupDisbandedEvent);
-    _groupSettingsChangedSub.onData(_handleGroupSettingsChangedEvent);
-    _groupMemberAddedSub.onData(_handleGroupMemberAddedEvent);
-    _groupMemberRemovedSub.onData(_handleGroupMemberRemovedEvent);
-    _groupRoleChangedSub.onData(_handleGroupRoleChangedEvent);
-    _groupAdminTransferredSub.onData(_handleGroupAdminTransferredEvent);
-    _typingSub.onData(_handleTypingEvent);
-    _presenceSub.onData(_handlePresenceEvent);
+    _initSocketListeners();
     
     // Listen for app lifecycle changes
     WidgetsBinding.instance.addObserver(this);
+  }
+
+  void _initSocketListeners() {
+    _cancelSubscriptions();
+    
+    debugPrint('🟢 [ChatProvider] Initializing socket listeners (Socket reinit count: ${_socketService.reinitCount})');
+    _lastSocketReinitCount = _socketService.reinitCount;
+
+    _messageSub = _socketService.onMessage.listen((msg) {
+      debugPrint('[ChatProvider] 📡 SOCKET MESSAGE: id=${msg.id} conv=${msg.conversationId} type=${msg.messageType}');
+      _handleIncomingMessage(msg);
+    });
+    _readSub = _socketService.onRead.listen(_handleReadEvent);
+    _deliveredSub = _socketService.onDelivered.listen(_handleDeliveredEvent);
+    _recalledSub = _socketService.onRecalled.listen(_handleRecalledEvent);
+    _pinnedSub = _socketService.onPinned.listen(_handlePinnedEvent);
+    _unpinnedSub = _socketService.onUnpinned.listen(_handleUnpinnedEvent);
+    _reactionAddedSub = _socketService.onReactionAdded.listen(_handleReactionAddedEvent);
+    _reactionRemovedSub = _socketService.onReactionRemoved.listen(_handleReactionRemovedEvent);
+    _groupDisbandedSub = _socketService.onGroupDisbanded.listen(_handleGroupDisbandedEvent);
+    _groupSettingsChangedSub = _socketService.onGroupSettingsChanged.listen(_handleGroupSettingsChangedEvent);
+    _groupMemberAddedSub = _socketService.onGroupMemberAdded.listen(_handleGroupMemberAddedEvent);
+    _groupMemberRemovedSub = _socketService.onGroupMemberRemoved.listen(_handleGroupMemberRemovedEvent);
+    _groupRoleChangedSub = _socketService.onGroupRoleChanged.listen(_handleGroupRoleChangedEvent);
+    _groupAdminTransferredSub = _socketService.onGroupAdminTransferred.listen(_handleGroupAdminTransferredEvent);
+    _typingSub = _socketService.onTyping.listen(_handleTypingEvent);
+    _presenceSub = _socketService.onPresence.listen(_handlePresenceEvent);
+  }
+
+  void _cancelSubscriptions() {
+    _messageSub?.cancel();
+    _readSub?.cancel();
+    _deliveredSub?.cancel();
+    _recalledSub?.cancel();
+    _pinnedSub?.cancel();
+    _unpinnedSub?.cancel();
+    _reactionAddedSub?.cancel();
+    _reactionRemovedSub?.cancel();
+    _groupDisbandedSub?.cancel();
+    _groupSettingsChangedSub?.cancel();
+    _groupMemberAddedSub?.cancel();
+    _groupMemberRemovedSub?.cancel();
+    _groupRoleChangedSub?.cancel();
+    _groupAdminTransferredSub?.cancel();
+    _typingSub?.cancel();
+    _presenceSub?.cancel();
   }
 
   @override
@@ -166,22 +179,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _messageSub.cancel();
-    _readSub.cancel();
-    _deliveredSub.cancel();
-    _recalledSub.cancel();
-    _pinnedSub.cancel();
-    _unpinnedSub.cancel();
-    _reactionAddedSub.cancel();
-    _reactionRemovedSub.cancel();
-    _groupDisbandedSub.cancel();
-    _groupSettingsChangedSub.cancel();
-    _groupMemberAddedSub.cancel();
-    _groupMemberRemovedSub.cancel();
-    _groupRoleChangedSub.cancel();
-    _groupAdminTransferredSub.cancel();
-    _typingSub.cancel();
-    _presenceSub.cancel();
+    _cancelSubscriptions();
     _inboxPollingTimer?.cancel();
     _highlightTimer?.cancel();
     for (final timer in _retryTimers.values) {
@@ -718,8 +716,32 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
+  void update(String? userId) {
+    if (_currentUserId != userId) {
+      debugPrint('[ChatProvider] User changed: $_currentUserId -> $userId');
+      _currentUserId = userId;
+      if (userId == null || userId.isEmpty) {
+        _cancelSubscriptions();
+        _messages.clear();
+        _conversations = [];
+        _activeConversationId = null;
+        notifyListeners();
+      } else {
+        loadInbox();
+      }
+    }
+
+    if (userId != null && userId.isNotEmpty && _lastSocketReinitCount != _socketService.reinitCount) {
+      debugPrint('🟢 [ChatProvider] Socket re-initialized, re-subscribing listeners');
+      _initSocketListeners();
+      if (_currentUserId != null && _currentUserId!.isNotEmpty) {
+        loadInbox();
+      }
+    }
+  }
+
   void setCurrentUserId(String userId) {
-    _currentUserId = userId;
+    update(userId);
   }
 
   void closeConversation() {
@@ -1147,73 +1169,69 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void _handleIncomingMessage(Message message) {
-    debugPrint('[ChatProvider] _handleIncomingMessage: id=${message.id} conv=${message.conversationId} sender=${message.senderId} clientId=${message.clientMessageId} isMine=${message.senderId == _currentUserId} content=${message.content?.substring(0, min(30, message.content?.length ?? 0))}');
+    final conversationId = message.conversationId;
+    debugPrint('[ChatProvider] 📩 _handleIncomingMessage: id=${message.id} conv=$conversationId sender=${message.senderId} type=${message.messageType} clientId=${message.clientMessageId} isMine=${message.senderId == _currentUserId} content=${message.content?.substring(0, min(30, message.content?.length ?? 0))}');
     // #region agent_h2_provider_entry
-    debugPrint('[DEBUG][H2] ChatProvider._handleIncomingMessage ENTRY - msgId=${message.id} convId=${message.conversationId} senderId=${message.senderId}');
+    debugPrint('[DEBUG][H2] ChatProvider._handleIncomingMessage ENTRY - msgId=${message.id} convId=$conversationId senderId=${message.senderId}');
     // #endregion
 
     // Early deduplication: skip if a message with the same server ID is already in the list
-    // This prevents double-add from socket + HTTP race conditions
-    final existing = _messages[message.conversationId] ?? [];
+    final existing = _messages[conversationId] ?? [];
     if (!message.id.startsWith('local-') && existing.any((m) => m.id == message.id)) {
       debugPrint('[ChatProvider] _handleIncomingMessage: SKIPPED duplicate server id=${message.id}');
-      // #region agent_h4_skip
-      debugPrint('[DEBUG][H4] Message SKIPPED - duplicate server id=${message.id}');
-      // #endregion
       return;
     }
-    // 1. SYSTEM MESSAGE HANDLING
-    // Display system notifications from the backend (including "Silent Leave" notifications for Admins)
-    if (message.messageType == MessageType.SYSTEM) {
-      debugPrint('[ChatProvider] Received SYSTEM message: ${message.content}');
-      // Fallback: if we haven't received a dedicated socket event yet, we might want to refresh.
-      // But usually, the dedicated event is more reliable.
-    }
-    
-    final content = message.content ?? '';
-    try {
-      if (content.contains('"action":"UPDATE_MESSAGE_REACTIONS"')) {
-        final data = jsonDecode(content);
-        final msgId = data['messageId'];
-        final actionType = data['type']; // 'ADD' or 'REMOVE'
-        final emoji = data['emoji'];
-        final actorId = data['actorId'];
 
-        if (msgId != null) {
-          debugPrint('SIGNAL: Reaction update signal received for $msgId.');
-          
-          // Optimistic local update if we have enough info
-          if (actionType != null && emoji != null && actorId != null) {
-            final currentReactions = _reactions[msgId] ?? [];
-            if (actionType == 'ADD') {
-              final newReaction = MessageReaction(
-                id: 'signal_${DateTime.now().millisecondsSinceEpoch}',
-                conversationId: message.conversationId,
-                messageId: msgId,
-                serverSeq: 0,
-                userId: actorId,
-                emoji: emoji,
-                createdAt: DateTime.now(),
-              );
-              // Replace existing if from same user
-              final filtered = currentReactions.where((r) => r.userId != actorId).toList();
-              filtered.add(newReaction);
-              _reactions[msgId] = filtered;
-            } else if (actionType == 'REMOVE') {
-              _reactions[msgId] = currentReactions.where((r) => r.userId != actorId).toList();
-            }
-            notifyListeners();
-          }
-          
-          // Background sync to ensure data integrity
-          loadReactions(msgId);
+    // FILTER: Prevent "Ghost Conversations" from friend requests
+    if (message.isSystemMessage) {
+      final content = message.content ?? '';
+      if (content.contains('lời mời kết bạn') || content.contains('[ACTION:FRIEND_REQUEST]')) {
+        final index = _conversations.indexWhere((c) => c.id == conversationId);
+        if (index < 0) {
+          debugPrint('[ChatProvider] 🚫 Filtering out ghost conversation from friend request: $conversationId');
+          _db.saveMessage(_toLocal(message));
+          return;
         }
       }
-    } catch (e) {
-      debugPrint('Error parsing system signal: $e');
-    }
 
-    final conversationId = message.conversationId;
+      // Signal handling for reactions etc
+      try {
+        if (content.contains('"action":"UPDATE_MESSAGE_REACTIONS"')) {
+          final data = jsonDecode(content);
+          final msgId = data['messageId'];
+          final actionType = data['type'];
+          final emoji = data['emoji'];
+          final actorId = data['actorId'];
+
+          if (msgId != null) {
+            debugPrint('SIGNAL: Reaction update signal received for $msgId.');
+            if (actionType != null && emoji != null && actorId != null) {
+              final currentReactions = _reactions[msgId] ?? [];
+              if (actionType == 'ADD') {
+                final newReaction = MessageReaction(
+                  id: 'signal_${DateTime.now().millisecondsSinceEpoch}',
+                  conversationId: conversationId,
+                  messageId: msgId,
+                  serverSeq: 0,
+                  userId: actorId,
+                  emoji: emoji,
+                  createdAt: DateTime.now(),
+                );
+                final filtered = currentReactions.where((r) => r.userId != actorId).toList();
+                filtered.add(newReaction);
+                _reactions[msgId] = filtered;
+              } else if (actionType == 'REMOVE') {
+                _reactions[msgId] = currentReactions.where((r) => r.userId != actorId).toList();
+              }
+              notifyListeners();
+            }
+            loadReactions(msgId);
+          }
+        }
+      } catch (e) {
+        debugPrint('Error parsing system signal: $e');
+      }
+    }
 
     // Resolve mediaId to URL if it's just an ID
     Message resolvedMessage = message;

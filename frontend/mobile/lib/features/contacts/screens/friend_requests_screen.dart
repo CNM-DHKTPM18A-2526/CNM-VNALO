@@ -20,9 +20,7 @@ class FriendRequestsScreen extends StatefulWidget {
 
 class _FriendRequestsScreenState extends State<FriendRequestsScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  List<Map<String, dynamic>> _incoming = [];
   List<Map<String, dynamic>> _sent = [];
-  bool _loadingIncoming = true;
   bool _loadingSent = true;
 
   @override
@@ -39,24 +37,10 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> with Single
   }
 
   Future<void> _loadData() async {
-    await Future.wait([_loadIncoming(), _loadSent()]);
-  }
-
-  Future<void> _loadIncoming() async {
-    final fs = context.read<FriendService>();
-    try {
-      final res = await fs.getIncomingRequests();
-      if (mounted) {
-        setState(() { 
-          _incoming = res; 
-          _loadingIncoming = false; 
-        });
-        // Sync global badge count
-        context.read<ContactProvider>().updatePendingCount(res.length);
-      }
-    } catch (_) {
-      if (mounted) setState(() => _loadingIncoming = false);
-    }
+    await Future.wait([
+      context.read<ContactProvider>().fetchIncomingRequests(),
+      _loadSent()
+    ]);
   }
 
   Future<void> _loadSent() async {
@@ -77,24 +61,19 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> with Single
       await context.read<FriendService>().acceptRequest(id);
       if (!context.mounted) return;
       
-      // Update global badge count
-      context.read<ContactProvider>().fetchPendingRequestCount();
+      // Update global provider
+      context.read<ContactProvider>().onFriendshipUpdated();
       
-      setState(() => _incoming.removeWhere((r) => r['id']?.toString() == id));
-
       // Create direct conversation with the new friend
       final friendUserId = request['fromUserId']?.toString() ?? '';
       Conversation? conversation;
       if (friendUserId.isNotEmpty) {
         try {
           conversation = await context.read<ChatService>().getOrCreateDirect(friendUserId);
-          // Refresh inbox so the new friend appears in the messages tab
           if (context.mounted) {
             context.read<ChatProvider>().loadInbox();
           }
-        } catch (_) {
-          // Conversation creation may fail, continue to options screen
-        }
+        } catch (_) {}
       }
       if (!context.mounted) return;
 
@@ -124,10 +103,9 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> with Single
       await context.read<FriendService>().rejectRequest(id);
       if (!context.mounted) return;
       
-      // Update global badge count
-      context.read<ContactProvider>().fetchPendingRequestCount();
+      // Update global provider
+      context.read<ContactProvider>().fetchIncomingRequests();
 
-      setState(() => _incoming.removeWhere((r) => r['id']?.toString() == id));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(common.requestRejected)),
       );
@@ -143,6 +121,8 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> with Single
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final common = CommonTexts.of(context);
+    final contactProvider = context.watch<ContactProvider>();
+    final incoming = contactProvider.incomingRequestsRaw;
 
     return Scaffold(
       backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
@@ -183,7 +163,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> with Single
               indicatorWeight: 3,
               labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
               tabs: [
-                Tab(text: '${common.receivedTab}  ${_incoming.length}'),
+                Tab(text: '${common.receivedTab}  ${incoming.length}'),
                 Tab(text: common.sentTab),
               ],
             ),
@@ -193,7 +173,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> with Single
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildIncomingTab(isDarkMode),
+                _buildIncomingTab(isDarkMode, contactProvider),
                 _buildSentTab(isDarkMode),
               ],
             ),
@@ -203,10 +183,15 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> with Single
     );
   }
 
-  Widget _buildIncomingTab(bool isDarkMode) {
+  Widget _buildIncomingTab(bool isDarkMode, ContactProvider provider) {
     final common = CommonTexts.of(context);
-    if (_loadingIncoming) return const Center(child: CircularProgressIndicator());
-    if (_incoming.isEmpty) {
+    if (provider.isLoading && provider.incomingRequestsRaw.isEmpty) {
+        return const Center(child: CircularProgressIndicator());
+    }
+    
+    final incoming = provider.incomingRequestsRaw;
+    
+    if (incoming.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -220,14 +205,14 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> with Single
     }
 
     return RefreshIndicator(
-      onRefresh: _loadIncoming,
+      onRefresh: () => provider.fetchIncomingRequests(),
       child: ListView(
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             child: Text(common.olderHeader, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
           ),
-          ..._incoming.map((req) => _buildIncomingItem(req, isDarkMode)),
+          ...incoming.map((req) => _buildIncomingItem(req, isDarkMode)),
         ],
       ),
     );
