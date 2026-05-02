@@ -184,6 +184,17 @@ export function ConversationInfo({
     setExpanded((prev) => ({ ...prev, [section]: !prev[section] }));
   };
 
+  const peerId = useMemo(() => {
+    if (conversation.isGroup || conversation.isCloud) return null;
+    return conversation.userId || (conversation.participantUserIds || []).find(id => id !== currentUserId);
+  }, [conversation, currentUserId]);
+
+  const resolvedName = useMemo(() => {
+    if (conversation.isGroup) return conversation.name;
+    if (conversation.isCloud) return 'My Cloud';
+    return userMap[peerId || '']?.displayName || conversation.name;
+  }, [conversation.isGroup, conversation.isCloud, conversation.name, peerId, userMap]);
+
   return (
     <div className="h-full overflow-y-auto bg-[var(--surface)] pb-20 scrollbar-hide text-[var(--text)]">
       {/* Header */}
@@ -267,8 +278,8 @@ export function ConversationInfo({
                 return (
                   <div className="relative group/avatar">
                     <UserAvatar
-                      name={conversation.name}
-                      imageUrl={conversation.avatarUrl ?? null}
+                      name={resolvedName}
+                      imageUrl={(!conversation.isGroup && peerId ? userMap[peerId]?.avatarUrl : conversation.avatarUrl) ?? conversation.avatarUrl ?? null}
                       size="lg"
                       className="h-20 w-20 shadow-lg ring-2 ring-white dark:ring-[#1E1E2E]"
                       isGroup={conversation.isGroup}
@@ -301,7 +312,7 @@ export function ConversationInfo({
             </div>
 
             <div className="mt-3 flex items-center justify-center gap-2">
-              <h4 className="text-[22px] font-semibold text-[var(--text)]">{conversation.name}</h4>
+              <h4 className="text-[22px] font-semibold text-[var(--text)]">{resolvedName}</h4>
               {(!conversation.isGroup || isModerator || conversation.allowMemberEditInfo) && (
                 <button
                   className="rounded-full border-0 p-1 shadow-none outline-none ring-0 hover:bg-[var(--surface-hover)] focus:outline-none cursor-pointer group"

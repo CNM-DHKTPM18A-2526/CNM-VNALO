@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { getSyncPolicy } from '../features/auth/auth.api'
@@ -1251,7 +1251,7 @@ export default function ChatPage() {
         if (c.id !== conversationId) return c;
         // Merge settings from various possible backend field names
         const settings = {
-          name: data.title || data.name || c.name,
+          name: data.isGroup || data.type === 'GROUP' ? (data.title || data.name || c.name) : c.name,
           avatarUrl: data.avatarUrl || data.avatar_url || c.avatarUrl,
           onlyAdminCanPost: Boolean(data.onlyAdminCanPost ?? data.only_admin_can_post ?? c.onlyAdminCanPost),
           allowMemberPin: Boolean(data.allowMemberPin ?? data.allow_member_pin ?? c.allowMemberPin),
