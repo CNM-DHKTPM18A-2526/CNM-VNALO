@@ -6,7 +6,8 @@ import 'package:vnalo_mobile/services/socket_service.dart';
 
 class ContactProvider with ChangeNotifier {
   final FriendService _friendService;
-  final SocketService _socketService;
+  SocketService _socketService;
+  Timer? _pollingTimer;
   
   List<User> _friends = [];
   List<Map<String, dynamic>> _incomingRequestsRaw = [];
@@ -19,6 +20,14 @@ class ContactProvider with ChangeNotifier {
 
   ContactProvider(this._friendService, this._socketService) {
     _initSocketListeners();
+    _startPolling();
+  }
+
+  void _startPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+       fetchIncomingRequests();
+    });
   }
 
   @override
@@ -28,6 +37,7 @@ class ContactProvider with ChangeNotifier {
   }
 
   void _cancelSubscriptions() {
+    _pollingTimer?.cancel();
     for (var sub in _subscriptions) {
       sub.cancel();
     }
@@ -41,22 +51,32 @@ class ContactProvider with ChangeNotifier {
     _lastSocketReinitCount = _socketService.reinitCount;
 
     _subscriptions.add(
-      _socketService.onFriendshipUpdated.listen((_) {
+      _socketService.onFriendshipUpdated.listen((_) async {
         debugPrint('🟢 [ContactProvider] Received friendship.updated event');
+        // Add a small delay to allow backend transaction to commit
+        await Future.delayed(const Duration(milliseconds: 500));
         onFriendshipUpdated();
       })
     );
 
     _subscriptions.add(
-      _socketService.onFriendRequestReceived.listen((data) {
+      _socketService.onFriendRequestReceived.listen((data) async {
         debugPrint('🟢 [ContactProvider] Received friend.request.received event: $data');
+        // Add a small delay to allow backend transaction to commit
+        await Future.delayed(const Duration(milliseconds: 500));
         fetchIncomingRequests();
       })
     );
   }
 
-  void update(String? userId) {
+  void update(String? userId, SocketService socketService) {
     bool needsReinit = false;
+
+    if (socketService != _socketService) {
+      debugPrint('🟢 [ContactProvider] SocketService instance changed, updating reference');
+      _socketService = socketService;
+      needsReinit = true;
+    }
 
     if (_currentUserId != userId) {
       debugPrint('🟢 [ContactProvider] User ID changed: $_currentUserId -> $userId');
@@ -76,6 +96,8 @@ class ContactProvider with ChangeNotifier {
 
     if (needsReinit && userId != null) {
       _initSocketListeners();
+      _startPolling();
+      fetchIncomingRequests();
     }
   }
 
@@ -122,12 +144,8 @@ class ContactProvider with ChangeNotifier {
 
   Future<void> fetchPendingRequestCount() async {
     try {
-      // For efficiency, if we have raw requests, use that count
-      if (_incomingRequestsRaw.isNotEmpty) {
-          _pendingRequestCount = _incomingRequestsRaw.length;
-      } else {
-          _pendingRequestCount = await _friendService.getPendingRequestCount();
-      }
+      _pendingRequestCount = await _friendService.getPendingRequestCount();
+      debugPrint('🟢 [ContactProvider] Polled pending request count: $_pendingRequestCount');
       notifyListeners();
     } catch (e) {
       debugPrint('Error fetching pending request count: $e');

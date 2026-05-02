@@ -216,7 +216,7 @@ class VnaloApp extends StatelessWidget {
                   ctx.read<FriendService>(),
                   socket,
                 );
-            currentContact.update(auth.user?.id);
+            currentContact.update(auth.user?.id, socket);
             return currentContact;
           },
         ),
@@ -237,7 +237,7 @@ class VnaloApp extends StatelessWidget {
                   db: context.read<LocalDatabase>(),
                   notificationService: context.read<NotificationService>(),
                 );
-            currentChat.update(auth.user?.id);
+            currentChat.update(auth.user?.id, socket);
             return currentChat;
           },
         ),
