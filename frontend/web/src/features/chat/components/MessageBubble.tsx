@@ -88,6 +88,8 @@ type MessageBubbleProps = {
   userRole?: string
   allowMemberPin?: boolean
   onVotePoll?: (messageId: string, optionId: string) => void
+  hoveredMessageId?: string | null
+  setHoveredMessageId?: (messageId: string | null) => void
 }
 
 const HOVER_HIDE_DELAY_MS = 180
@@ -123,6 +125,8 @@ export function MessageBubble({
   userRole,
   allowMemberPin,
   onVotePoll,
+  hoveredMessageId = null,
+  setHoveredMessageId,
 }: MessageBubbleProps) {
   const { userMap } = useUserStore()
   const { openImageViewerByMessageId } = useImageViewer()
@@ -169,6 +173,7 @@ export function MessageBubble({
   const [isReactionBarOpen, setIsReactionBarOpen] = useState(false)
   const [isContextMenuOpen, setIsContextMenuOpen] = useState(false)
   const [contextMenuPosition, setContextMenuPosition] = useState({ top: 0, left: 0 })
+  const isHoverToolbarActive = hoveredMessageId === message.id
 
   const statusLabel = (() => {
     if (message.sender !== 'me') {
@@ -192,18 +197,48 @@ export function MessageBubble({
 
   const handleContainerMouseEnter = () => {
     if (!supportsHover || isRecalled) return
-    setIsMessageHovered(true)
+    setHoveredMessageId?.(message.id)
     if (hideTimerRef.current) {
       window.clearTimeout(hideTimerRef.current)
       hideTimerRef.current = null
     }
   }
 
-  const handleContainerMouseLeave = () => {
-    if (isReactionBarOpen || isContextMenuOpen) return
-    hideTimerRef.current = window.setTimeout(() => {
-      setIsMessageHovered(false)
-    }, HOVER_HIDE_DELAY_MS)
+  const handleContainerMouseLeave = (e?: ReactMouseEvent) => {
+    // If context menu is open, don't auto-close here; menu manages its own lifecycle.
+    if (isContextMenuOpen) return
+
+    const related = (e?.relatedTarget ?? null) as Node | null
+    const stack = stackRef.current
+
+    // If pointer moved into an element inside this stack (including reaction popover), keep it open
+    if (related && stack && stack.contains(related)) {
+      return
+    }
+
+    // If the reaction bar is currently open, we may be transitioning into it; give a short grace period
+    // so users can move the pointer into the popover without it immediately closing.
+    if (isReactionBarOpen) {
+      if (hideTimerRef.current) {
+        window.clearTimeout(hideTimerRef.current)
+      }
+      hideTimerRef.current = window.setTimeout(() => {
+        if (hoveredMessageId === message.id) {
+          setHoveredMessageId?.(null)
+        }
+        hideTimerRef.current = null
+      }, 250)
+      return
+    }
+
+    // Otherwise (reaction bar not open), clear hover state immediately for snappy UX
+    if (hoveredMessageId === message.id) {
+      setHoveredMessageId?.(null)
+    }
+    if (hideTimerRef.current) {
+      window.clearTimeout(hideTimerRef.current)
+      hideTimerRef.current = null
+    }
   }
 
   const clearHideTimer = () => {
@@ -216,7 +251,9 @@ export function MessageBubble({
   const closeReactionUi = () => {
     setIsReactionBarOpen(false)
     setIsMessageTapped(false)
-    setIsMessageHovered(false)
+    if (hoveredMessageId === message.id) {
+      setHoveredMessageId?.(null)
+    }
   }
 
   const closeContextMenu = () => {
@@ -341,6 +378,13 @@ export function MessageBubble({
   }, [])
 
   useEffect(() => {
+    if (!isHoverToolbarActive) {
+      setIsReactionBarOpen(false)
+      setIsMessageTapped(false)
+    }
+  }, [isHoverToolbarActive])
+
+  useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
       const stack = stackRef.current
       if (!stack) {
@@ -405,7 +449,7 @@ export function MessageBubble({
   }, [])
 
   // Desktop uses hover state, mobile uses tap state.
-  const showReactionTrigger = isReactionBarOpen || (supportsHover ? isMessageHovered : isMessageTapped)
+  const showReactionTrigger = isReactionBarOpen || (supportsHover ? isHoverToolbarActive : isMessageTapped)
   const quickReactionEmoji = REACTION_OPTIONS.find((item) => item.key === quickReaction)?.emoji ?? '❤️'
 
   const isModerator = userRole?.toUpperCase() === 'ADMIN' || userRole?.toUpperCase() === 'DEPUTY'
@@ -457,7 +501,7 @@ export function MessageBubble({
       ) : null}
       <div
         ref={stackRef}
-        className='message-stack'
+        className={isHoverToolbarActive ? 'message-stack message-stack-hover-active' : 'message-stack'}
         onMouseEnter={handleContainerMouseEnter}
         onMouseLeave={handleContainerMouseLeave}
       >
