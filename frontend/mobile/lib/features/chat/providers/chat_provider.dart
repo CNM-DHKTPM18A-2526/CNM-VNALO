@@ -22,7 +22,7 @@ import 'dart:convert';
 
 class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
   final ChatService _chatService;
-  final SocketService _socketService;
+  SocketService _socketService;
   final MediaService _mediaService;
   final NotificationService _notificationService;
   final LocalDatabase _db;
@@ -716,7 +716,15 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
-  void update(String? userId) {
+  void update(String? userId, SocketService socketService) {
+    bool needsReinit = false;
+
+    if (_socketService != socketService) {
+      debugPrint('🟢 [ChatProvider] SocketService instance changed, updating reference');
+      _socketService = socketService;
+      needsReinit = true;
+    }
+
     if (_currentUserId != userId) {
       debugPrint('[ChatProvider] User changed: $_currentUserId -> $userId');
       _currentUserId = userId;
@@ -727,21 +735,19 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
         _activeConversationId = null;
         notifyListeners();
       } else {
-        loadInbox();
+        needsReinit = true;
       }
     }
 
-    if (userId != null && userId.isNotEmpty && _lastSocketReinitCount != _socketService.reinitCount) {
-      debugPrint('🟢 [ChatProvider] Socket re-initialized, re-subscribing listeners');
+    if (userId != null && userId.isNotEmpty && (_lastSocketReinitCount != _socketService.reinitCount || needsReinit)) {
+      debugPrint('🟢 [ChatProvider] Re-initializing socket listeners and loading inbox');
       _initSocketListeners();
-      if (_currentUserId != null && _currentUserId!.isNotEmpty) {
-        loadInbox();
-      }
+      loadInbox();
     }
   }
 
   void setCurrentUserId(String userId) {
-    update(userId);
+    update(userId, _socketService);
   }
 
   void closeConversation() {

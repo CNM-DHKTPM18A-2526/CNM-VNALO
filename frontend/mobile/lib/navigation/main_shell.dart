@@ -390,6 +390,7 @@ class MainShellState extends State<MainShell> {
       body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: Consumer2<ChatProvider, ContactProvider>(
         builder: (context, chatProvider, contactProvider, child) {
+          debugPrint('🎨 [MainShell] Rebuilding BottomNavigationBar (pendingFriendCount: ${contactProvider.pendingRequestCount})');
           int unreadCount = 0;
           for (var c in chatProvider.conversations) {
             unreadCount += c.unreadCount;
