@@ -631,7 +631,7 @@ class ProfileDetailScreen extends StatelessWidget {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: isDark ? DarkColors.primary : AppColors.primary,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
                         elevation: 0,
                       ),
                       child: Text(

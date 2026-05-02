@@ -253,16 +253,17 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> with Single
                       child: ElevatedButton(
                         onPressed: () => _reject(req),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: isDarkMode ? DarkColors.surface : const Color(0xFFE5E7EB),
+                          backgroundColor: isDarkMode ? const Color(0xFF2C2C2E) : const Color(0xFFF3F4F6),
                           foregroundColor: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
                           elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          minimumSize: const Size.fromHeight(40),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                          padding: const EdgeInsets.symmetric(vertical: 0),
                         ),
-                        child: Text(common.rejectAction, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        child: Text(common.rejectAction, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () => _accept(req),
@@ -270,10 +271,11 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> with Single
                           backgroundColor: isDarkMode ? DarkColors.primary : AppColors.primary,
                           foregroundColor: Colors.white,
                           elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          minimumSize: const Size.fromHeight(40),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                          padding: const EdgeInsets.symmetric(vertical: 0),
                         ),
-                        child: Text(common.acceptAction, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        child: Text(common.acceptAction, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                       ),
                     ),
                   ],
@@ -318,7 +320,7 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> with Single
               common.waitingResponse,
               style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
             ),
-            trailing: TextButton(
+            trailing: OutlinedButton(
               onPressed: () async {
                 final id = req['id']?.toString() ?? '';
                 if (id.isEmpty) return;
@@ -330,13 +332,19 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> with Single
                     SnackBar(content: Text(common.requestCancelled)),
                   );
                 } catch (e) {
-                if (!context.mounted) return;
+                  if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('${common.errorOccurred}: $e')),
                   );
                 }
               },
-              child: Text(common.cancelAction, style: const TextStyle(color: Colors.redAccent)),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Colors.redAccent, width: 1),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
+                minimumSize: const Size(0, 36),
+              ),
+              child: Text(common.cancelAction, style: const TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.w600)),
             ),
           );
         },

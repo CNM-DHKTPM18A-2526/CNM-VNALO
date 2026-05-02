@@ -287,7 +287,7 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
                   backgroundColor: isDarkMode ? DarkColors.surface : const Color(0xFFE5E7EB),
                   foregroundColor: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
                   elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
                 ),
               ),
             ),

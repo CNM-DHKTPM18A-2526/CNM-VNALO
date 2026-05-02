@@ -226,7 +226,7 @@ class _SendRequestScreenState extends State<SendRequestScreen> {
                   onPressed: _isSending ? null : (_isAlreadySent ? _handleCancel : _handleSend),
                   style: FilledButton.styleFrom(
                     backgroundColor: _isAlreadySent ? Colors.redAccent : AppColors.primary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
                   ),
                   child: _isSending 
                     ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
