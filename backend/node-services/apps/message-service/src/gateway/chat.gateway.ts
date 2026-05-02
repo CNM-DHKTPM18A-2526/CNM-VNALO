@@ -173,7 +173,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       await client.join(`user:${userId}`);
 
       // Broadcast presence
-      this.server.emit('presence.changed', { userId, status: 'online' });
+      this.server.emit('presence.changed', { userId, status: 'online', isOnline: true });
     } catch (err) {
       this.logger.warn(`[Gateway.conn] Connection rejected: ${err.message}`);
       client.disconnect();
@@ -187,7 +187,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (this.userSockets.get(userId)?.size === 0) {
         this.userSockets.delete(userId);
         // Only emit offline if no more sockets for this user
-        this.server.emit('presence.changed', { userId, status: 'offline' });
+        this.server.emit('presence.changed', { userId, status: 'offline', isOnline: false });
       }
       // Leave Redis-backed user room (Redis adapter cleans socket from room on disconnect automatically,
       // but explicit leave ensures consistency)
