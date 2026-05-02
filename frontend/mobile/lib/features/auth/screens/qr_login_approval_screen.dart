@@ -186,7 +186,7 @@ class _QrLoginApprovalScreenState extends State<QrLoginApprovalScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(common.loginConfirmedSuccess)),
       );
-      Navigator.pop(context);
+      Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
       setState(() {

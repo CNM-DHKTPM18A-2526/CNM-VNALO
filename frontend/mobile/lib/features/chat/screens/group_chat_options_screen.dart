@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
+import 'package:vnalo_mobile/core/widgets/group_avatar.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/features/chat/screens/add_group_members_screen.dart';
@@ -326,9 +327,13 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
                       name: conv.title ?? 'Group',
                       size: 100,
                     )
-                  : AvatarWidget(
-                      imageUrl: null,
-                      name: conv.title ?? 'Group',
+                  : GroupAvatar(
+                      members: conv.members
+                          .where((m) => m.userId != context.read<ChatProvider>().currentUserId)
+                          .take(3)
+                          .map((m) => (imageUrl: m.user?.avatarUrl, name: m.user?.displayName ?? 'User'))
+                          .toList(),
+                      totalMemberCount: conv.members.length,
                       size: 100,
                     ),
               Positioned(

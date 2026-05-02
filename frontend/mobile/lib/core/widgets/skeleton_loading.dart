@@ -120,11 +120,11 @@ class ChatListSkeletonItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? const Color(0xFF1A1A1A) : Colors.white;
+    final bgColor = isDark ? const Color(0xFF131313) : Colors.white;
 
     return Container(
       color: bgColor,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Row(
         children: [
           const ShimmerBox(width: 52, height: 52, borderRadius: 26),
@@ -283,7 +283,7 @@ class ContactListSkeletonItem extends StatelessWidget {
 
     return Container(
       color: bgColor,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Row(
         children: [
           const ShimmerBox(width: 44, height: 44, borderRadius: 22),

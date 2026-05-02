@@ -566,7 +566,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
           color: isDarkMode ? DarkColors.surface : LightColors.surface,
           child: TabBar(
             controller: _tabController,
-            dividerColor: isDarkMode ? DarkColors.divider : AppColors.sectionDivider,
+            dividerColor: Colors.transparent,
             labelColor: _primaryColor,
             unselectedLabelColor: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary,
             indicatorColor: _primaryColor,

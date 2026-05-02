@@ -110,7 +110,7 @@ class MessageBubble extends StatelessWidget {
           child: Row(
             mainAxisAlignment:
                 isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (!isMine)
                 SizedBox(
