@@ -39,7 +39,7 @@ class ProfileDetailScreen extends StatelessWidget {
                 margin: const EdgeInsets.only(top: 10, bottom: 6),
                 width: 40, height: 4,
                 decoration: BoxDecoration(
-                  color: isDark ? DarkColors.divider : Colors.grey[300],
+                  color: isDark ? DarkColors.divider : LightColors.divider,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -57,10 +57,10 @@ class ProfileDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             ListTile(
-              leading: Icon(Icons.account_circle_outlined, size: 28, color: isDark ? DarkColors.textPrimary : Colors.black87),
+              leading: Icon(Icons.account_circle_outlined, size: 28, color: isDark ? DarkColors.textPrimary : LightColors.textPrimary),
               title: Text(
                 t.language == AppLanguage.vi ? 'Xem ảnh đại diện' : 'View profile picture',
-                style: TextStyle(fontSize: 15, color: isDark ? DarkColors.textPrimary : Colors.black87)
+                style: TextStyle(fontSize: 15, color: isDark ? DarkColors.textPrimary : LightColors.textPrimary)
               ),
               onTap: () {
                 Navigator.pop(ctx);
@@ -129,7 +129,7 @@ class ProfileDetailScreen extends StatelessWidget {
                 margin: const EdgeInsets.only(top: 10, bottom: 6),
                 width: 40, height: 4,
                 decoration: BoxDecoration(
-                  color: isDark ? DarkColors.divider : Colors.grey[300],
+                  color: isDark ? DarkColors.divider : LightColors.divider,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -147,10 +147,10 @@ class ProfileDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             ListTile(
-              leading: Icon(Icons.panorama_outlined, size: 28, color: isDark ? DarkColors.textPrimary : Colors.black87),
+              leading: Icon(Icons.panorama_outlined, size: 28, color: isDark ? DarkColors.textPrimary : LightColors.textPrimary),
               title: Text(
                 t.language == AppLanguage.vi ? 'Xem ảnh bìa' : 'View cover photo',
-                style: TextStyle(fontSize: 15, color: isDark ? DarkColors.textPrimary : Colors.black87)
+                style: TextStyle(fontSize: 15, color: isDark ? DarkColors.textPrimary : LightColors.textPrimary)
               ),
               onTap: () {
                 Navigator.pop(ctx);
@@ -483,7 +483,7 @@ class ProfileDetailScreen extends StatelessWidget {
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 12,
-                        color: isDark ? DarkColors.textPrimary : Colors.black87
+                        color: isDark ? DarkColors.textPrimary : LightColors.textPrimary
                       ),
                     ),
                   ),
@@ -570,10 +570,10 @@ class ProfileDetailScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: ListTile(
-                leading: Icon(Icons.person_outline, color: isDark ? DarkColors.textHint : const Color(0xFF9CA3AF)),
+                leading: Icon(Icons.person_outline, color: isDark ? DarkColors.textHint : LightColors.textHint),
                 title: Text(t.personalInfo,
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: isDark ? DarkColors.textPrimary : LightColors.textPrimary)),
-                trailing: Icon(Icons.chevron_right, color: isDark ? DarkColors.divider : const Color(0xFFD1D5DB)),
+                trailing: Icon(Icons.chevron_right, color: isDark ? DarkColors.divider : LightColors.divider),
                 onTap: () {
                   Navigator.push(
                     context,

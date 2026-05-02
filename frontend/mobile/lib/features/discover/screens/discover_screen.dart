@@ -22,7 +22,7 @@ class DiscoverScreen extends StatelessWidget {
     final common = CommonTexts.of(context);
 
     return Scaffold(
-      backgroundColor: isDarkMode ? Colors.black : LightColors.scaffold,
+      backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
       appBar: AppBar(
         backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
         elevation: 0,
@@ -31,7 +31,7 @@ class DiscoverScreen extends StatelessWidget {
             isDarkMode
                 ? null
                 : Container(
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     gradient: AppColors.appBarGradient,
                   ),
                 ),
@@ -58,9 +58,9 @@ class DiscoverScreen extends StatelessWidget {
                   const SizedBox(width: 8),
                   Text(
                     common.search,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
+                    style: TextStyle(
+                      color: isDarkMode ? DarkColors.textHint : Colors.white.withValues(alpha: 0.7),
+                      fontSize: 15,
                       fontWeight: FontWeight.w400,
                     ),
                   ),
@@ -153,8 +153,8 @@ class DiscoverScreen extends StatelessWidget {
     return Divider(
       height: 1,
       thickness: 0.5,
-      indent: 72,
-      color: isDarkMode ? DarkColors.divider : AppColors.sectionDivider,
+      indent: 70,
+      color: isDarkMode ? DarkColors.divider : AppColors.itemDivider,
     );
   }
 }
@@ -181,8 +181,8 @@ class _DiscoverItem extends StatelessWidget {
 
     return ListTile(
       leading: Container(
-        width: 40,
-        height: 40,
+        width: 48,
+        height: 48,
         decoration: BoxDecoration(
           color:
               isPremium
@@ -205,6 +205,7 @@ class _DiscoverItem extends StatelessWidget {
         ),
         child: Icon(
           icon,
+          size: 28,
           color:
               isPremium
                   ? Colors.white
@@ -216,7 +217,7 @@ class _DiscoverItem extends StatelessWidget {
         style: TextStyle(
           fontWeight: FontWeight.w500,
           fontSize: 16,
-          color: isPremium && isDarkMode ? Colors.orange.shade300 : null,
+          color: isPremium && isDarkMode ? Colors.orange.shade300 : (isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary),
         ),
       ),
       subtitle: Text(
@@ -224,11 +225,12 @@ class _DiscoverItem extends StatelessWidget {
         style:
             isPremium && isDarkMode
                 ? TextStyle(color: Colors.orange.shade100.withOpacity(0.7))
-                : null,
+                : TextStyle(color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary, fontSize: 13),
       ),
       trailing: Icon(
         Icons.chevron_right,
-        color: isDarkMode ? DarkColors.textHint : Colors.grey.shade300,
+        size: 20,
+        color: isDarkMode ? DarkColors.textHint : AppColors.iconSubtle.withValues(alpha: 0.5),
       ),
       onTap: onTap,
     );

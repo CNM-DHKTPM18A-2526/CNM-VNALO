@@ -65,7 +65,8 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
     final bgColor = isDarkMode ? DarkColors.surface : Colors.white;
     final textColor = isDarkMode ? Colors.white : Colors.black;
     final subtitleColor = isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600;
-    final dividerColor = isDarkMode ? Colors.white10 : Colors.grey.shade200;
+    final dividerColor = isDarkMode ? DarkColors.divider : AppColors.itemDivider;
+    final hintColor = isDarkMode ? DarkColors.textHint : Colors.grey;
 
     return Scaffold(
       backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
@@ -82,7 +83,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
         flexibleSpace: isDarkMode
             ? null
             : Container(
-                decoration: const BoxDecoration(gradient: AppColors.appBarGradient),
+                decoration: BoxDecoration(gradient: AppColors.appBarGradient),
               ),
       ),
       body: _isLoading 
@@ -309,6 +310,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
   }
 
   Widget _buildNavTile(String title, String? trailing, Color textColor, {Color? trailingColor, VoidCallback? onTap}) {
+    final hintColor = Theme.of(context).brightness == Brightness.dark ? DarkColors.textHint : Colors.grey;
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -326,7 +328,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
                 trailing,
                 style: TextStyle(fontSize: 14, color: trailingColor ?? Colors.grey),
               ),
-            const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+            Icon(Icons.chevron_right, size: 20, color: hintColor),
           ],
         ),
       ),
@@ -334,6 +336,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
   }
 
   Widget _buildPermissionTile(String title, String subtitle, Color textColor, Color subtitleColor, {VoidCallback? onTap}) {
+    final hintColor = Theme.of(context).brightness == Brightness.dark ? DarkColors.textHint : Colors.grey;
     return InkWell(
       onTap: onTap,
       child: Container(
@@ -355,7 +358,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right, size: 18, color: Colors.grey),
+                Icon(Icons.chevron_right, size: 18, color: hintColor),
               ],
             ),
           ],

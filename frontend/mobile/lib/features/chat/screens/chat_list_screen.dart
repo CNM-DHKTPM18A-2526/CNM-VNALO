@@ -132,7 +132,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
             isDarkMode
                 ? null
                 : Container(
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     gradient: AppColors.appBarGradient,
                   ),
                 ),
@@ -153,13 +153,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
               color: Colors.transparent,
               child: Row(
                 children: [
-                  Icon(Icons.search, size: 24, color: Colors.white),
+                  const Icon(Icons.search, size: 24, color: Colors.white),
                   const SizedBox(width: 8),
                   Text(
                     common.search,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
+                    style: TextStyle(
+                      color: isDarkMode ? DarkColors.textHint : Colors.white.withValues(alpha: 0.7),
+                      fontSize: 15,
                       fontWeight: FontWeight.w400,
                     ),
                   ),
@@ -268,7 +268,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           height: 48,
                           decoration: BoxDecoration(
                             color:
-                                isDarkMode ? DarkColors.primary : Colors.blue,
+                                isDarkMode ? DarkColors.primary : AppColors.primary,
                             shape: BoxShape.circle,
                           ),
                           child: Stack(
@@ -321,7 +321,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                                   color:
                                       isDarkMode
                                           ? DarkColors.textSecondary
-                                          : Colors.grey,
+                                          : LightColors.textSecondary,
                                 ),
                               ),
                           ],
@@ -367,11 +367,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           width: 48,
                           height: 48,
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF2B6CF6), Color(0xFF0F8BFF)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
+                            gradient: AppColors.appBarGradient,
                             borderRadius: BorderRadius.circular(16),
                           ),
                           child: const Icon(
@@ -403,7 +399,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                                   color:
                                       isDarkMode
                                           ? DarkColors.textSecondary
-                                          : Colors.grey,
+                                          : LightColors.textSecondary,
                                 ),
                               ),
                           ],
@@ -429,7 +425,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                             color:
                                 isDarkMode
                                     ? Colors.white.withValues(alpha: 0.08)
-                                    : const Color(0xFFEAF3FF),
+                                    : AppColors.itemPressBackground,
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(

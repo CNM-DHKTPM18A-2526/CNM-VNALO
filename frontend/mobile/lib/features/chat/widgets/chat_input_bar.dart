@@ -305,7 +305,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
             decoration: BoxDecoration(
               color: bgColor,
               border: Border(
-                top: BorderSide(color: isDarkMode ? DarkColors.divider : Colors.black12, width: 0.5),
+                top: BorderSide(color: isDarkMode ? DarkColors.divider : AppColors.itemDivider, width: 0.5),
               ),
             ),
             child: SafeArea(
@@ -317,7 +317,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                   IconButton(
                     icon: Icon(
                       _showStickers ? Icons.keyboard : Icons.emoji_emotions_outlined,
-                      color: isDarkMode ? DarkColors.textSecondary : const Color(0xFF5D6470),
+                      color: isDarkMode ? DarkColors.textSecondary : AppColors.iconSubtle,
                     ),
                     onPressed: () {
                       setState(() => _showStickers = !_showStickers);
@@ -364,11 +364,11 @@ class _ChatInputBarState extends State<ChatInputBar> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
-                          icon: Icon(Icons.more_horiz, color: isDarkMode ? DarkColors.textSecondary : const Color(0xFF5D6470)),
+                          icon: Icon(Icons.more_horiz, color: isDarkMode ? DarkColors.textSecondary : AppColors.iconSubtle),
                           onPressed: () => _showAttachmentMenu(context),
                         ),
                         IconButton(
-                          icon: Icon(Icons.mic_none_outlined, color: isDarkMode ? DarkColors.textSecondary : const Color(0xFF5D6470)),
+                          icon: Icon(Icons.mic_none_outlined, color: isDarkMode ? DarkColors.textSecondary : AppColors.iconSubtle),
                           onPressed: () {
                             setState(() {
                               _showVoiceRecording = true;
@@ -378,7 +378,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                           },
                         ),
                         IconButton(
-                          icon: Icon(Icons.image_outlined, color: isDarkMode ? DarkColors.textSecondary : const Color(0xFF5D6470)),
+                          icon: Icon(Icons.image_outlined, color: isDarkMode ? DarkColors.textSecondary : AppColors.iconSubtle),
                           onPressed: _pickImage,
                         ),
                       ],
@@ -438,7 +438,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
       decoration: BoxDecoration(
         color: isDarkMode ? DarkColors.surface : Colors.white,
         border: Border(
-          top: BorderSide(color: isDarkMode ? DarkColors.divider : Colors.black12, width: 0.5),
+          top: BorderSide(color: isDarkMode ? DarkColors.divider : AppColors.itemDivider, width: 0.5),
         ),
       ),
       child: Row(
@@ -590,11 +590,11 @@ class _ChatInputBarState extends State<ChatInputBar> {
                     Navigator.pop(context);
                     _pickFile();
                   }),
-                  _buildMenuButton(context, isDarkMode, Icons.videocam, const Color(0xFF34A853), 'Video', () {
+                  _buildMenuButton(context, isDarkMode, Icons.videocam, AppColors.success, 'Video', () {
                     Navigator.pop(context);
                     _pickVideo();
                   }),
-                  _buildMenuButton(context, isDarkMode, Icons.alarm, const Color(0xFFE56353), 'Nhắc hẹn', () {
+                  _buildMenuButton(context, isDarkMode, Icons.alarm, AppColors.warning, 'Nhắc hẹn', () {
                     Navigator.pop(context);
                     showDialog(
                       context: context,
@@ -605,7 +605,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                       ),
                     );
                   }),
-                  _buildMenuButton(context, isDarkMode, Icons.poll_rounded, const Color(0xFFE56353), 'Bình chọn', () {
+                  _buildMenuButton(context, isDarkMode, Icons.poll_rounded, AppColors.primary, 'Bình chọn', () {
                     Navigator.pop(context);
                     showDialog(
                       context: context,

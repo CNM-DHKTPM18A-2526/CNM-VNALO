@@ -39,7 +39,7 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
     final postProvider = context.watch<PostProvider>();
     final common = CommonTexts.of(context);
     final displayName = auth.user?.displayName ?? common.unknownUser;
-    final searchHint = isDarkMode ? DarkColors.textHint : Colors.white.withValues(alpha: 0.8);
+    final searchHint = isDarkMode ? DarkColors.textHint : Colors.white.withValues(alpha: 0.7);
 
     return Scaffold(
       backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
@@ -47,10 +47,9 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
         backgroundColor: isDarkMode ? appBarBg : Colors.transparent,
         elevation: 0,
         forceMaterialTransparency: !isDarkMode,
-        titleSpacing: 0,
         flexibleSpace: isDarkMode
             ? null
-            : Container(decoration: const BoxDecoration(gradient: AppColors.appBarGradient)),
+            : Container(decoration: BoxDecoration(gradient: AppColors.appBarGradient)),
         title: _buildSearchHeader(context, isDarkMode, searchHint),
         actions: [
           IconButton(
@@ -72,7 +71,7 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
               controller: _tabController,
               dividerColor: Colors.transparent,
               labelColor: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
-              unselectedLabelColor: isDarkMode ? DarkColors.textSecondary : Colors.grey.shade400,
+              unselectedLabelColor: isDarkMode ? DarkColors.textSecondary : LightColors.textHint,
               indicatorColor: isDarkMode ? DarkColors.primary : AppColors.primary,
               indicatorWeight: 3,
               labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
@@ -113,18 +112,30 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
 
   Widget _buildSearchHeader(BuildContext context, bool isDarkMode, Color searchHint) {
     final common = CommonTexts.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(left: 16),
-      child: GestureDetector(
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const UnifiedSearchScreen(searchTag: 'search_bar_timeline')),
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const UnifiedSearchScreen(searchTag: 'search_bar_timeline'),
         ),
-        child: Row(
-          children: [
-            const Icon(Icons.search, size: 24, color: Colors.white),
-            const SizedBox(width: 8),
-            Text(common.searchHintTimeline, style: TextStyle(color: searchHint, fontSize: 16, fontWeight: FontWeight.w400)),
-          ],
+      ),
+      child: Hero(
+        tag: 'search_bar_timeline',
+        child: Material(
+          color: Colors.transparent,
+          child: Row(
+            children: [
+              const Icon(Icons.search, size: 24, color: Colors.white),
+              const SizedBox(width: 8),
+              Text(
+                common.search,
+                style: TextStyle(
+                  color: searchHint,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -145,13 +156,13 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
             children: [
               Row(
                 children: [
-                  AvatarWidget(imageUrl: auth.user?.avatarUrl, name: displayName, size: 45),
+                  AvatarWidget(imageUrl: auth.user?.avatarUrl, name: displayName, size: 48),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       common.postInputPlaceholder,
                       style: TextStyle(
-                        color: isDarkMode ? DarkColors.textHint : Colors.grey,
+                        color: isDarkMode ? DarkColors.textHint : LightColors.textHint,
                         fontSize: 16
                       ),
                     ),
@@ -206,7 +217,7 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
                 Text(
                   isVi ? 'Chưa có kỷ niệm nào được chia sẻ.' : 'No memories shared yet.',
                   style: TextStyle(
-                    color: isDarkMode ? DarkColors.textHint : Colors.grey.shade400,
+                    color: isDarkMode ? DarkColors.textHint : LightColors.textHint,
                     fontSize: 16,
                   ),
                 ),
@@ -286,23 +297,23 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
         children: [
           Row(
             children: [
-              AvatarWidget(imageUrl: post.author.avatarUrl, name: post.author.displayName, size: 40),
+              AvatarWidget(imageUrl: post.author.avatarUrl, name: post.author.displayName, size: 48),
               const SizedBox(width: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(post.author.displayName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  Text(timeStr, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                  Text(timeStr, style: TextStyle(color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary, fontSize: 12)),
                 ],
               ),
               const Spacer(),
-              const Icon(Icons.more_horiz, color: Colors.grey),
+              Icon(Icons.more_horiz, color: isDarkMode ? DarkColors.textHint : AppColors.iconSubtle),
             ],
           ),
           const SizedBox(height: 12),
           Text(post.content,
             style: TextStyle(
-              fontSize: 15,
+              fontSize: 16,
               color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
             ),
           ),
@@ -316,13 +327,13 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
           const SizedBox(height: 16),
           Row(
             children: [
-              const Icon(Icons.favorite_border, size: 24, color: Colors.grey),
+              Icon(Icons.favorite_border, size: 24, color: isDarkMode ? DarkColors.textHint : AppColors.iconSubtle),
               const SizedBox(width: 4),
-              Text('${post.likeCount}', style: const TextStyle(color: Colors.grey)),
+              Text('${post.likeCount}', style: TextStyle(color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary)),
               const SizedBox(width: 24),
-              const Icon(Icons.chat_bubble_outline, size: 24, color: Colors.grey),
+              Icon(Icons.chat_bubble_outline, size: 24, color: isDarkMode ? DarkColors.textHint : AppColors.iconSubtle),
               const SizedBox(width: 4),
-              Text('${post.commentCount}', style: const TextStyle(color: Colors.grey)),
+              Text('${post.commentCount}', style: TextStyle(color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary)),
             ],
           ),
         ],

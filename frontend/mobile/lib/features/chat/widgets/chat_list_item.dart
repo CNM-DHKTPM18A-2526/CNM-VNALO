@@ -142,7 +142,7 @@ class ChatListItem extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     color: isOnline
-                        ? const Color(0xFF22C55E)
+                        ? AppColors.online
                         : (isDarkMode ? DarkColors.textHint : LightColors.textHint),
                   ),
                 ),
