@@ -166,47 +166,52 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
         flexibleSpace: isDarkMode
             ? null
             : Container(
-                decoration: const BoxDecoration(gradient: AppColors.appBarGradient),
+                decoration: BoxDecoration(gradient: AppColors.appBarGradient),
               ),
       ),
       body: ListView(
         children: [
-          _buildHeader(conv),
-          _buildQuickActions(conv),
+          _buildHeader(conv, isDarkMode),
+          _buildQuickActions(conv, isDarkMode),
           const SizedBox(height: 8),
           _buildSection([
             _buildTile(CupertinoIcons.info, 'Thêm mô tả nhóm', 
               subtitle: conv.description,
-              onTap: () => _showComingSoon('Mô tả nhóm')),
-          ]),
+              onTap: () => _showComingSoon('Mô tả nhóm'),
+              isDarkMode: isDarkMode),
+          ], isDarkMode),
           const SizedBox(height: 8),
-          _buildMediaSection(),
+          _buildMediaSection(isDarkMode),
           const SizedBox(height: 8),
           _buildSection([
-            _buildTile(CupertinoIcons.calendar, 'Lịch nhóm', onTap: () => _showComingSoon('Lịch nhóm')),
-            _buildDivider(),
-            _buildTile(CupertinoIcons.pin, 'Tin nhắn đã ghim', onTap: () => _showComingSoon('Ghim tin nhắn')),
-            _buildDivider(),
-            _buildTile(CupertinoIcons.chart_bar, 'Bình chọn', onTap: () => _showComingSoon('Bình chọn')),
-          ]),
+            _buildTile(CupertinoIcons.calendar, 'Lịch nhóm', onTap: () => _showComingSoon('Lịch nhóm'), isDarkMode: isDarkMode),
+            _buildDivider(isDarkMode),
+            _buildTile(CupertinoIcons.pin, 'Tin nhắn đã ghim', onTap: () => _showComingSoon('Ghim tin nhắn'), isDarkMode: isDarkMode),
+            _buildDivider(isDarkMode),
+            _buildTile(CupertinoIcons.chart_bar, 'Bình chọn', onTap: () => _showComingSoon('Bình chọn'), isDarkMode: isDarkMode),
+          ], isDarkMode),
           const SizedBox(height: 8),
           _buildSection([
             _buildTile(CupertinoIcons.settings, 'Cài đặt nhóm', 
               onTap: () => Navigator.push(context, MaterialPageRoute(
                 builder: (_) => GroupSettingsScreen(conversation: conv),
               )),
+              isDarkMode: isDarkMode,
             ),
-            _buildDivider(),
+            _buildDivider(isDarkMode),
             _buildTile(CupertinoIcons.person_2, 'Xem thành viên (${conv.activeMemberCount})', 
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GroupMembersScreen(conversation: conv)))),
-            _buildDivider(),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GroupMembersScreen(conversation: conv))),
+              isDarkMode: isDarkMode),
+            _buildDivider(isDarkMode),
             _buildTile(CupertinoIcons.person_badge_plus, 'Duyệt thành viên', 
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GroupJoinRequestsScreen(conversation: conv)))),
-            _buildDivider(),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GroupJoinRequestsScreen(conversation: conv))),
+              isDarkMode: isDarkMode),
+            _buildDivider(isDarkMode),
             _buildTile(CupertinoIcons.link, 'Link nhóm', 
               subtitle: conv.joinMode == JoinMode.APPROVAL ? 'Cần phê duyệt' : 'Đã tắt',
-              onTap: () => _showComingSoon('Link nhóm')),
-          ]),
+              onTap: () => _showComingSoon('Link nhóm'),
+              isDarkMode: isDarkMode),
+          ], isDarkMode),
           if (_isAdminOrOwner(conv, context.read<AuthProvider>().user?.id)) ...[
             const SizedBox(height: 8),
             _buildSection([
@@ -219,22 +224,25 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
                   value: conv.allowMemberInvite, 
                   onChanged: (v) => provider.updateGroupInfo(conv.id, allowMemberInvite: v),
                   activeTrackColor: AppColors.primary,
-                )),
-              _buildDivider(),
+                ),
+                isDarkMode: isDarkMode),
+              _buildDivider(isDarkMode),
               _buildTile(CupertinoIcons.pin, 'Cho phép ghim tin nhắn', 
                 trailing: CupertinoSwitch(
                   value: conv.allowMemberPin, 
                   onChanged: (v) => provider.updateGroupInfo(conv.id, allowMemberPin: v),
                   activeTrackColor: AppColors.primary,
-                )),
-              _buildDivider(),
+                ),
+                isDarkMode: isDarkMode),
+              _buildDivider(isDarkMode),
               _buildTile(CupertinoIcons.pencil, 'Cho phép sửa thông tin nhóm', 
                 trailing: CupertinoSwitch(
                   value: conv.allowMemberEditInfo, 
                   onChanged: (v) => provider.updateGroupInfo(conv.id, allowMemberEditInfo: v),
                   activeTrackColor: AppColors.primary,
-                )),
-            ]),
+                ),
+                isDarkMode: isDarkMode),
+            ], isDarkMode),
           ],
           const SizedBox(height: 8),
           _buildSection([
@@ -243,46 +251,53 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
                 value: conv.isPinned, 
                 onChanged: (v) => provider.updateConversationSettings(conversationId: conv.id, isPinned: v),
                 activeTrackColor: AppColors.primary,
-              )),
-            _buildDivider(),
+              ),
+              isDarkMode: isDarkMode),
+            _buildDivider(isDarkMode),
             _buildTile(CupertinoIcons.eye_slash, 'Ẩn trò chuyện', 
               trailing: CupertinoSwitch(
                 value: conv.isHidden, 
                 onChanged: (v) => provider.updateConversationSettings(conversationId: conv.id, isHidden: v),
                 activeTrackColor: AppColors.primary,
-              )),
-            _buildDivider(),
+              ),
+              isDarkMode: isDarkMode),
+            _buildDivider(isDarkMode),
             _buildTile(CupertinoIcons.time, 'Tin nhắn tự xóa', 
               subtitle: 'Không tự xóa',
-              onTap: () => _showComingSoon('Tự xóa')),
-            _buildDivider(),
-            _buildTile(CupertinoIcons.person_crop_circle, 'Cài đặt cá nhân', onTap: () => _showComingSoon('Cài đặt cá nhân')),
-          ]),
+              onTap: () => _showComingSoon('Tự xóa'),
+              isDarkMode: isDarkMode),
+            _buildDivider(isDarkMode),
+            _buildTile(CupertinoIcons.person_crop_circle, 'Cài đặt cá nhân', onTap: () => _showComingSoon('Cài đặt cá nhân'), isDarkMode: isDarkMode),
+          ], isDarkMode),
           const SizedBox(height: 8),
           _buildSection([
-            _buildTile(CupertinoIcons.exclamationmark_triangle, 'Báo xấu', onTap: () => _showComingSoon('Báo xấu')),
-            _buildDivider(),
+            _buildTile(CupertinoIcons.exclamationmark_triangle, 'Báo xấu', onTap: () => _showComingSoon('Báo xấu'), isDarkMode: isDarkMode),
+            _buildDivider(isDarkMode),
             _buildTile(CupertinoIcons.person_2_square_stack, 'Chuyển quyền trưởng nhóm', 
-               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GroupMembersScreen(conversation: conv, selectionMode: true)))),
-            _buildDivider(),
-            _buildTile(CupertinoIcons.cloud, 'Dung lượng trò chuyện', onTap: () => _showComingSoon('Dung lượng')),
-            _buildDivider(),
+               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GroupMembersScreen(conversation: conv, selectionMode: true))),
+               isDarkMode: isDarkMode),
+            _buildDivider(isDarkMode),
+            _buildTile(CupertinoIcons.cloud, 'Dung lượng trò chuyện', onTap: () => _showComingSoon('Dung lượng'), isDarkMode: isDarkMode),
+            _buildDivider(isDarkMode),
             _buildTile(CupertinoIcons.trash, 'Xóa lịch sử trò chuyện', 
               textColor: Colors.red,
-              onTap: () => _confirmDeleteHistory(conv)),
-          ]),
+              onTap: () => _confirmDeleteHistory(conv),
+              isDarkMode: isDarkMode),
+          ], isDarkMode),
           const SizedBox(height: 8),
           _buildSection([
             _buildTile(CupertinoIcons.arrow_right_square, 'Rời nhóm', 
               textColor: Colors.red,
-              onTap: () => _confirmLeaveGroup(conv)),
+              onTap: () => _confirmLeaveGroup(conv),
+              isDarkMode: isDarkMode),
             if (myMember.role == MemberRole.ADMIN) ...[
-              _buildDivider(),
+              _buildDivider(isDarkMode),
               _buildTile(CupertinoIcons.delete, 'Giải tán nhóm', 
                 textColor: Colors.red,
-                onTap: () => _confirmDisbandGroup(conv)),
+                onTap: () => _confirmDisbandGroup(conv),
+                isDarkMode: isDarkMode),
             ],
-          ]),
+          ], isDarkMode),
           const SizedBox(height: 32),
         ],
       ),
@@ -297,8 +312,7 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
     return member.role == MemberRole.DEPUTY || member.role == MemberRole.ADMIN;
   }
 
-  Widget _buildHeader(Conversation conv) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+  Widget _buildHeader(Conversation conv, bool isDarkMode) {
     return Container(
       color: isDarkMode ? DarkColors.surface : Colors.white,
       padding: const EdgeInsets.symmetric(vertical: 24),
@@ -325,9 +339,9 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
+                      color: isDarkMode ? DarkColors.divider : Colors.grey.shade200,
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
+                      border: Border.all(color: isDarkMode ? DarkColors.surface : Colors.white, width: 2),
                     ),
                     child: _isUpdatingAvatar
                         ? const SizedBox(
@@ -335,7 +349,7 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
                             height: 18,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Icon(Icons.camera_alt, size: 18, color: Colors.blue),
+                        : Icon(Icons.camera_alt, size: 18, color: isDarkMode ? Colors.white : Colors.blue),
                   ),
                 ),
               ),
@@ -348,7 +362,11 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
               Flexible(
                 child: Text(
                   conv.title ?? 'Nhóm',
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 20, 
+                    fontWeight: FontWeight.bold,
+                    color: isDarkMode ? Colors.white : Colors.black87,
+                  ),
                   textAlign: TextAlign.center,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -357,7 +375,7 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
               const SizedBox(width: 8),
               GestureDetector(
                 onTap: _editGroupName,
-                child: Icon(Icons.edit_outlined, size: 20, color: Colors.grey.shade600),
+                child: Icon(Icons.edit_outlined, size: 20, color: isDarkMode ? DarkColors.textHint : Colors.grey.shade600),
               ),
             ],
           ),
@@ -366,32 +384,32 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
     );
   }
 
-  Widget _buildQuickActions(Conversation conv) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+  Widget _buildQuickActions(Conversation conv, bool isDarkMode) {
     return Container(
       color: isDarkMode ? DarkColors.surface : Colors.white,
       padding: const EdgeInsets.only(bottom: 20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _buildQuickAction(CupertinoIcons.search, 'Tìm\ntin nhắn', () => _showComingSoon('Tìm kiếm')),
+          _buildQuickAction(CupertinoIcons.search, 'Tìm\ntin nhắn', () => _showComingSoon('Tìm kiếm'), isDarkMode),
           _buildQuickAction(CupertinoIcons.person_badge_plus, 'Thêm\nthành viên', () {
               Navigator.push(context, MaterialPageRoute(builder: (_) => AddGroupMembersScreen(conversation: conv)));
-          }),
+          }, isDarkMode),
           _buildQuickAction(CupertinoIcons.paintbrush, 'Đổi\nhình nền', () {
              Navigator.push(context, MaterialPageRoute(builder: (_) => WallpaperSelectionScreen(conversation: conv)));
-          }),
+          }, isDarkMode),
           _buildQuickAction(
             conv.isMuted ? CupertinoIcons.bell_slash : CupertinoIcons.bell, 
             conv.isMuted ? 'Bật\nthông báo' : 'Tắt\nthông báo', 
             () => context.read<ChatProvider>().updateConversationSettings(conversationId: conv.id, isMuted: !conv.isMuted),
+            isDarkMode,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildQuickAction(IconData icon, String label, VoidCallback onTap) {
+  Widget _buildQuickAction(IconData icon, String label, VoidCallback onTap, bool isDarkMode) {
     return GestureDetector(
       onTap: onTap,
       child: Column(
@@ -399,29 +417,28 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.grey.shade100,
+              color: isDarkMode ? Colors.white10 : Colors.grey.shade100,
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 24, color: Colors.black87),
+            child: Icon(icon, size: 24, color: isDarkMode ? Colors.white : Colors.black87),
           ),
           const SizedBox(height: 8),
           Text(
             label,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 12, color: Colors.black54),
+            style: TextStyle(fontSize: 12, color: isDarkMode ? DarkColors.textSecondary : Colors.black54),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildMediaSection() {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+  Widget _buildMediaSection(bool isDarkMode) {
     return Container(
       color: isDarkMode ? DarkColors.surface : Colors.white,
       child: Column(
         children: [
-          _buildTile(CupertinoIcons.photo, 'Ảnh, file, link', onTap: () => _showComingSoon('Kho tài liệu')),
+          _buildTile(CupertinoIcons.photo, 'Ảnh, file, link', onTap: () => _showComingSoon('Kho tài liệu'), isDarkMode: isDarkMode),
           if (_recentMedia.isNotEmpty)
             Container(
               height: 80,
@@ -436,7 +453,7 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
                     width: 80,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(8),
-                      color: Colors.grey.shade200,
+                      color: isDarkMode ? Colors.white10 : Colors.grey.shade200,
                     ),
                     clipBehavior: Clip.antiAlias,
                     child: CachedNetworkImage(
@@ -453,9 +470,12 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
                child: Container(
                  width: double.infinity,
                  padding: const EdgeInsets.all(12),
-                 decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(8)),
+                 decoration: BoxDecoration(
+                   color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.grey.shade50, 
+                   borderRadius: BorderRadius.circular(8),
+                 ),
                  child: Text('Hình mới nhất của trò chuyện sẽ xuất hiện tại đây', 
-                   style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
+                   style: TextStyle(fontSize: 13, color: isDarkMode ? DarkColors.textHint : Colors.grey.shade500)),
                ),
              ),
         ],
@@ -463,28 +483,26 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
     );
   }
 
-  Widget _buildSection(List<Widget> children) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+  Widget _buildSection(List<Widget> children, bool isDarkMode) {
     return Container(
       color: isDarkMode ? DarkColors.surface : Colors.white,
       child: Column(children: children),
     );
   }
 
-  Widget _buildTile(IconData icon, String title, {String? subtitle, Widget? trailing, VoidCallback? onTap, Color? textColor}) {
+  Widget _buildTile(IconData icon, String title, {String? subtitle, Widget? trailing, VoidCallback? onTap, Color? textColor, required bool isDarkMode}) {
     return ListTile(
-      leading: Icon(icon, color: textColor ?? Colors.grey.shade700, size: 22),
-      title: Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w400, color: textColor)),
-      subtitle: subtitle != null ? Text(subtitle, style: TextStyle(fontSize: 13, color: Colors.grey.shade500)) : null,
-      trailing: trailing ?? Icon(Icons.chevron_right, size: 20, color: Colors.grey.shade400),
+      leading: Icon(icon, color: textColor ?? (isDarkMode ? DarkColors.textSecondary : Colors.grey.shade700), size: 22),
+      title: Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w400, color: textColor ?? (isDarkMode ? Colors.white : Colors.black87))),
+      subtitle: subtitle != null ? Text(subtitle, style: TextStyle(fontSize: 13, color: isDarkMode ? DarkColors.textHint : Colors.grey.shade500)) : null,
+      trailing: trailing ?? Icon(Icons.chevron_right, size: 20, color: isDarkMode ? DarkColors.textHint : Colors.grey.shade400),
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
       visualDensity: VisualDensity.compact,
     );
   }
 
-  Widget _buildDivider() {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+  Widget _buildDivider(bool isDarkMode) {
     return Divider(
       height: 1,
       thickness: 0.5,

@@ -132,7 +132,7 @@ class _AddGroupMembersScreenState extends State<AddGroupMembersScreen> {
         iconTheme: const IconThemeData(color: Colors.white),
         flexibleSpace: isDarkMode 
           ? null 
-          : Container(decoration: const BoxDecoration(gradient: AppColors.appBarGradient)),
+          : Container(decoration: BoxDecoration(gradient: AppColors.appBarGradient)),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -190,7 +190,7 @@ class _AddGroupMembersScreenState extends State<AddGroupMembersScreen> {
               },
             ),
           ),
-          const Divider(height: 1, thickness: 0.5),
+          Divider(height: 1, thickness: 0.5, color: isDarkMode ? DarkColors.divider : LightColors.divider),
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
@@ -299,7 +299,7 @@ class _AddGroupMembersScreenState extends State<AddGroupMembersScreen> {
                       ],
                     ),
                   ),
-                    const Divider(height: 1, thickness: 0.5, color: AppColors.itemDivider),
+                    Divider(height: 1, thickness: 0.5, color: isDarkMode ? DarkColors.divider : LightColors.divider),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                     child: Row(

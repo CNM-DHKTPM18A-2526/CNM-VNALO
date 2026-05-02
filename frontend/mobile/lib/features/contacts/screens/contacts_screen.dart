@@ -73,24 +73,34 @@ class _ContactsScreenState extends State<ContactsScreen> {
           flexibleSpace: isDarkMode
               ? null
               : Container(
-                  decoration: const BoxDecoration(gradient: AppColors.appBarGradient),
+                  decoration: BoxDecoration(gradient: AppColors.appBarGradient),
                 ),
           title: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () {
               Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const UnifiedSearchScreen()),
+                MaterialPageRoute(builder: (_) => const UnifiedSearchScreen(searchTag: 'search_bar_contacts')),
               );
             },
-            child: Row(
-              children: [
-                const Icon(Icons.search, size: 24, color: Colors.white),
-                const SizedBox(width: 8),
-                Text(
-                  CommonTexts.of(context).search,
-                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w400),
+            child: Hero(
+              tag: 'search_bar_contacts',
+              child: Material(
+                color: Colors.transparent,
+                child: Row(
+                  children: [
+                    const Icon(Icons.search, size: 24, color: Colors.white),
+                    const SizedBox(width: 8),
+                    Text(
+                      CommonTexts.of(context).search,
+                      style: TextStyle(
+                        color: isDarkMode ? DarkColors.textHint : Colors.white.withValues(alpha: 0.7),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
           actions: [

@@ -225,7 +225,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
         flexibleSpace: isDarkMode
             ? null
             : Container(
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   gradient: AppColors.appBarGradient,
                 ),
               ),
@@ -288,7 +288,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _filteredMessages.isEmpty
-                    ? _buildEmpty()
+                    ? _buildEmpty(isDarkMode)
                     : RefreshIndicator(
                         onRefresh: _loadMessages,
                         child: _buildMessageList(isDarkMode),
@@ -318,21 +318,24 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
     );
   }
 
-  Widget _buildEmpty() {
+  Widget _buildEmpty(bool isDarkMode) {
+    final hintColor = isDarkMode ? DarkColors.textHint : Colors.grey[400];
+    final subColor = isDarkMode ? DarkColors.textSecondary : Colors.grey[600];
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.folder_open_outlined, size: 64, color: Colors.grey[400]),
+          Icon(Icons.folder_open_outlined, size: 64, color: hintColor),
           const SizedBox(height: 12),
           Text(
             'No content yet',
-            style: TextStyle(color: Colors.grey[600], fontSize: 16),
+            style: TextStyle(color: subColor, fontSize: 16),
           ),
           const SizedBox(height: 8),
           Text(
             'Send a message, image, or file to store it here',
-            style: TextStyle(color: Colors.grey[400], fontSize: 13),
+            style: TextStyle(color: hintColor, fontSize: 13),
           ),
         ],
       ),
@@ -391,7 +394,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.12),
+                color: isDarkMode ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(

@@ -226,10 +226,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         final canSend = !isRestrictedSending || myMember.role == MemberRole.ADMIN || myMember.role == MemberRole.DEPUTY;
 
         return Scaffold(
-          backgroundColor:
-              wallpaperUrl != null
-                  ? (isDarkMode ? Colors.black : LightColors.scaffold)
-                  : (isDarkMode ? Colors.black : LightColors.scaffold),
+          backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
           appBar: AppBar(
             titleSpacing: 0,
             backgroundColor:
@@ -242,7 +239,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 isDarkMode
                     ? null
                     : Container(
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         gradient: AppColors.appBarGradient,
                       ),
                     ),
@@ -253,7 +250,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 Text(
                   displayName,
                   style: const TextStyle(
-                    fontSize: 16,
+                    fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
                   ),
@@ -368,7 +365,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         fit: BoxFit.cover,
                         colorFilter: ColorFilter.mode(
                           Colors.black.withValues(
-                            alpha: isDarkMode ? 0.3 : 0.1,
+                            alpha: isDarkMode ? 0.35 : 0.15,
                           ),
                           BlendMode.darken,
                         ),
@@ -704,8 +701,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                                   DarkColors.primary.withValues(alpha: 0.8),
                                 ]
                                 : [
-                                  const Color(0xFF0068FF),
-                                  const Color(0xFF00A2ED),
+                                  AppColors.primary,
+                                  AppColors.primary.withValues(alpha: 0.8),
                                 ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -743,7 +740,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 Text(
                   common.startConversationNote,
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+                  style: TextStyle(color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary, fontSize: 14),
                 ),
                 const SizedBox(height: 12),
                 Wrap(
@@ -813,22 +810,22 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
+                    color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : AppColors.itemPressBackground,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.camera_alt, color: Colors.grey.shade400, size: 28),
+                  child: Icon(Icons.camera_alt, color: isDarkMode ? DarkColors.textHint : AppColors.iconSubtle, size: 28),
                 ),
                 const SizedBox(height: 12),
                 Wrap(
                   alignment: WrapAlignment.center,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Text(common.setGroupNameAction, style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
-                    Icon(Icons.chevron_right, size: 18, color: Colors.grey.shade400),
+                    Text(common.setGroupNameAction, style: TextStyle(color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary, fontWeight: FontWeight.w600)),
+                    Icon(Icons.chevron_right, size: 18, color: isDarkMode ? DarkColors.textHint : AppColors.iconSubtle),
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text(common.groupCreatedNote, style: TextStyle(color: Colors.grey.shade400, fontSize: 13)),
+                Text(common.groupCreatedNote, style: TextStyle(color: isDarkMode ? DarkColors.textHint : LightColors.textSecondary, fontSize: 13)),
                 const SizedBox(height: 16),
                 // Tiny avatars row
                 SingleChildScrollView(
@@ -855,7 +852,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                           border: Border.all(color: Colors.blue.shade100),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.person_add, size: 16, color: Colors.blue),
+                        child: Icon(Icons.person_add, size: 16, color: isDarkMode ? DarkColors.primary : AppColors.primary),
                       ),
                     ],
                   ),

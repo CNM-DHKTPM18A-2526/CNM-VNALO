@@ -189,24 +189,24 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
       body: ListView(
         children: [
           // ── Header ──
-          _buildHeader(displayName, avatarUrl),
+          _buildHeader(displayName, avatarUrl, isDarkMode),
           // ── Quick Actions (no gap, same white card) ──
-          _buildQuickActions(currentConv),
+          _buildQuickActions(currentConv, isDarkMode),
           const SizedBox(height: 8),
           // ── Primary Settings ──
-          _buildPrimarySettings(displayName, currentConv),
+          _buildPrimarySettings(displayName, currentConv, isDarkMode),
           const SizedBox(height: 8),
           // ── Media Section ──
-          _buildMediaSection(),
+          _buildMediaSection(isDarkMode),
           const SizedBox(height: 8),
           // ── Interaction Settings ──
-          _buildInteractionSettings(displayName),
+          _buildInteractionSettings(displayName, isDarkMode),
           const SizedBox(height: 8),
           // ── Conversation Settings ──
-          _buildConversationSettings(currentConv),
+          _buildConversationSettings(currentConv, isDarkMode),
           const SizedBox(height: 8),
           // ── Security / Danger Zone ──
-          _buildSecurityActions(),
+          _buildSecurityActions(isDarkMode),
           const SizedBox(height: 40),
         ],
       ),
@@ -215,9 +215,9 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
 
   // ========================= HEADER =========================
 
-  Widget _buildHeader(String name, String? avatarUrl) {
+  Widget _buildHeader(String name, String? avatarUrl, bool isDarkMode) {
     return Container(
-      color: Colors.white,
+      color: isDarkMode ? DarkColors.surface : Colors.white,
       padding: const EdgeInsets.only(top: 28, bottom: 20),
       width: double.infinity,
       child: Column(
@@ -232,10 +232,10 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
           const SizedBox(height: 14),
           Text(
             name,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 19,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF1A1A1A),
+              color: isDarkMode ? Colors.white : const Color(0xFF1A1A1A),
             ),
           ),
         ],
@@ -245,34 +245,33 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
 
   // ========================= QUICK ACTIONS =========================
 
-  Widget _buildQuickActions(Conversation conv) {
+  Widget _buildQuickActions(Conversation conv, bool isDarkMode) {
     final common = CommonTexts.of(context);
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final iconColor = isDarkMode ? DarkColors.textPrimary : Colors.black87;
 
     return Container(
-      color: Colors.white,
+      color: isDarkMode ? DarkColors.surface : Colors.white,
       padding: const EdgeInsets.only(top: 4, bottom: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildQuickBtn(CupertinoIcons.search, common.searchMessagesAction, () => _showComingSoon('Tìm kiếm')),
-          _buildQuickBtn(CupertinoIcons.person, common.viewProfileQuickAction, () => _showComingSoon('Trang cá nhân')),
-          _buildQuickBtn(CupertinoIcons.photo, common.changeWallpaperQuickAction, _openWallpaperSelection),
+          _buildQuickBtn(CupertinoIcons.search, common.searchMessagesAction, () => _showComingSoon('Tìm kiếm'), isDarkMode),
+          _buildQuickBtn(CupertinoIcons.person, common.viewProfileQuickAction, () => _showComingSoon('Trang cá nhân'), isDarkMode),
+          _buildQuickBtn(CupertinoIcons.photo, common.changeWallpaperQuickAction, _openWallpaperSelection, isDarkMode),
           _buildQuickBtn(
             conv.isMuted ? CupertinoIcons.bell_slash_fill : CupertinoIcons.bell,
             common.muteNotifsQuickAction,
             () => context.read<ChatProvider>().updateConversationSettings(
               conversationId: conv.id,
               isMuted: !conv.isMuted,
-            )
+            ),
+            isDarkMode,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildQuickBtn(IconData icon, String label, VoidCallback onTap) {
+  Widget _buildQuickBtn(IconData icon, String label, VoidCallback onTap, bool isDarkMode) {
     return GestureDetector(
       onTap: onTap,
       child: SizedBox(
@@ -284,9 +283,9 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
               height: 44,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFFE0E0E0), width: 1),
+                border: Border.all(color: isDarkMode ? DarkColors.divider : const Color(0xFFE0E0E0), width: 1),
               ),
-              child: Icon(icon, color: const Color(0xFF555555), size: 20),
+              child: Icon(icon, color: isDarkMode ? DarkColors.textPrimary : const Color(0xFF555555), size: 20),
             ),
             const SizedBox(height: 8),
             Text(
@@ -294,10 +293,10 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11,
                 height: 1.3,
-                color: Color(0xFF333333),
+                color: isDarkMode ? DarkColors.textSecondary : const Color(0xFF333333),
                 fontWeight: FontWeight.w400,
               ),
             ),
@@ -309,10 +308,10 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
 
   // ========================= PRIMARY SETTINGS =========================
 
-  Widget _buildPrimarySettings(String name, Conversation conv) {
+  Widget _buildPrimarySettings(String name, Conversation conv, bool isDarkMode) {
     final common = CommonTexts.of(context);
     return Container(
-      color: Colors.white,
+      color: isDarkMode ? DarkColors.surface : Colors.white,
       child: Column(
         children: [
           _buildTile(CupertinoIcons.pencil, common.editNicknameAction, onTap: _editNickname, showChevron: true),
@@ -324,7 +323,7 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
                 conversationId: conv.id,
                 isFavorite: v,
               ),
-              activeTrackColor: const Color(0xFF0068FF),
+              activeTrackColor: AppColors.primary,
             ),
           ),
           _buildDivider(),
@@ -336,10 +335,10 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
 
   // ========================= MEDIA SECTION =========================
 
-  Widget _buildMediaSection() {
+  Widget _buildMediaSection(bool isDarkMode) {
     final common = CommonTexts.of(context);
     return Container(
-      color: Colors.white,
+      color: isDarkMode ? DarkColors.surface : Colors.white,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -354,7 +353,7 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
               padding: const EdgeInsets.only(left: 56, bottom: 16, top: 2),
               child: Text(
                 common.noSharedMediaNote,
-                style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+                style: TextStyle(color: isDarkMode ? DarkColors.textHint : Colors.grey.shade500, fontSize: 13),
               ),
             )
           else
@@ -374,13 +373,13 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
                           width: 72,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(6),
-                            color: Colors.grey.shade200,
+                            color: isDarkMode ? DarkColors.scaffold : Colors.grey.shade200,
                           ),
                           clipBehavior: Clip.antiAlias,
                           child: CachedNetworkImage(
                             imageUrl: m.mediaUrl ?? '',
                             fit: BoxFit.cover,
-                            placeholder: (ctx, url) => Container(color: Colors.grey.shade200),
+                            placeholder: (ctx, url) => Container(color: isDarkMode ? Colors.white10 : Colors.grey.shade200),
                             errorWidget: (ctx, url, err) => const Icon(Icons.broken_image, color: Colors.grey),
                           ),
                         );
@@ -394,10 +393,10 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
                       height: 72,
                       margin: const EdgeInsets.only(left: 4, right: 16),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF0F6FF),
+                        color: isDarkMode ? DarkColors.scaffold : const Color(0xFFF0F6FF),
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: const Icon(Icons.arrow_forward, color: Color(0xFF0068FF), size: 22),
+                      child: Icon(Icons.arrow_forward, color: isDarkMode ? DarkColors.textPrimary : const Color(0xFF0068FF), size: 22),
                     ),
                   ),
                 ],
@@ -410,10 +409,10 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
 
   // ========================= INTERACTION SETTINGS =========================
 
-  Widget _buildInteractionSettings(String name) {
+  Widget _buildInteractionSettings(String name, bool isDarkMode) {
     final common = CommonTexts.of(context);
     return Container(
-      color: Colors.white,
+      color: isDarkMode ? DarkColors.surface : Colors.white,
       child: Column(
         children: [
           _buildTile(CupertinoIcons.person_2, common.createGroupWithLabel(name), showChevron: false),
@@ -428,17 +427,17 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
 
   // ========================= CONVERSATION SETTINGS =========================
 
-  Widget _buildConversationSettings(Conversation conv) {
+  Widget _buildConversationSettings(Conversation conv, bool isDarkMode) {
     final common = CommonTexts.of(context);
     return Container(
-      color: Colors.white,
+      color: isDarkMode ? DarkColors.surface : Colors.white,
       child: Column(
         children: [
           _buildTile(CupertinoIcons.pin, common.pinConversationAction,
             trailing: CupertinoSwitch(
               value: conv.isPinned,
               onChanged: (v) => context.read<ChatProvider>().updateConversationSettings(conversationId: conv.id, isPinned: v),
-              activeTrackColor: const Color(0xFF0068FF),
+              activeTrackColor: AppColors.primary,
             ),
           ),
           _buildDivider(),
@@ -446,7 +445,7 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
             trailing: CupertinoSwitch(
               value: conv.isHidden,
               onChanged: (v) => context.read<ChatProvider>().updateConversationSettings(conversationId: conv.id, isHidden: v),
-              activeTrackColor: const Color(0xFF0068FF),
+              activeTrackColor: AppColors.primary,
             ),
           ),
           _buildDivider(),
@@ -454,7 +453,7 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
             trailing: CupertinoSwitch(
               value: conv.notifyCall,
               onChanged: (v) => context.read<ChatProvider>().updateConversationSettings(conversationId: conv.id, notifyCall: v),
-              activeTrackColor: const Color(0xFF0068FF),
+              activeTrackColor: AppColors.primary,
             ),
           ),
           _buildDivider(),
@@ -472,10 +471,10 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
 
   // ========================= SECURITY / DANGER ZONE =========================
 
-  Widget _buildSecurityActions() {
+  Widget _buildSecurityActions(bool isDarkMode) {
     final common = CommonTexts.of(context);
     return Container(
-      color: Colors.white,
+      color: isDarkMode ? DarkColors.surface : Colors.white,
       child: Column(
         children: [
           _buildTile(CupertinoIcons.exclamationmark_triangle, common.reportUserAction, showChevron: false),
@@ -513,7 +512,7 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
     if (trailing != null) {
       trailingWidget = trailing;
     } else if (showChevron) {
-      trailingWidget = Icon(CupertinoIcons.chevron_right, size: 15, color: Colors.grey.shade400);
+      trailingWidget = Icon(CupertinoIcons.chevron_right, size: 15, color: isDarkMode ? DarkColors.textHint : Colors.grey.shade400);
     } else {
       trailingWidget = null;
     }
@@ -541,7 +540,7 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
                   ),
                   if (subtitle != null) ...[
                     const SizedBox(height: 2),
-                    Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                    Text(subtitle, style: TextStyle(fontSize: 12, color: isDarkMode ? DarkColors.textHint : Colors.grey.shade500)),
                   ],
                 ],
               ),
