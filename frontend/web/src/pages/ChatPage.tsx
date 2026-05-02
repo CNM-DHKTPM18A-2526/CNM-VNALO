@@ -774,8 +774,8 @@ export default function ChatPage() {
           ? user?.name?.trim() || fallbackUserDisplayName(message.senderId)
           : userMapRef.current[message.senderId]?.displayName || fallbackUserDisplayName(message.senderId)
       const getName = (id: string) => {
-        if (id === user?.id) return 'Báº¡n'
-        return userMapRef.current[id]?.displayName || 'NgÆ°á»i dÃ¹ng'
+        if (id === user?.id) return 'Bạn'
+        return userMapRef.current[id]?.displayName || 'Người dùng'
       }
 
       const formattedPreview = formatConversationPreview(senderName, message, user?.id || '', getName)
@@ -838,9 +838,9 @@ export default function ChatPage() {
           }
 
           if (count > 1) {
-            const icon = groupType === 'image' ? 'ðŸ–¼ï¸' : 'ðŸ“Ž';
-            const label = groupType === 'image' ? 'hÃ¬nh áº£nh' : 'táº­p tin';
-            const prefix = message.senderId === user?.id ? 'Báº¡n: ' : (senderName ? `${senderName}: ` : '');
+            const icon = groupType === 'image' ? '🖼️' : '📎';
+            const label = groupType === 'image' ? 'hình ảnh' : 'tập tin';
+            const prefix = message.senderId === user?.id ? 'Bạn: ' : (senderName ? `${senderName}: ` : '');
             finalPreview = `${prefix}${icon} ${count} ${label}`;
           }
         }
