@@ -36,7 +36,7 @@ class SettingsScreen extends StatelessWidget {
         flexibleSpace: isDarkMode
             ? null
             : Container(
-                decoration: const BoxDecoration(gradient: AppColors.appBarGradient),
+                decoration: BoxDecoration(gradient: AppColors.appBarGradient),
               ),
         actions: [
           IconButton(
@@ -218,7 +218,7 @@ class SettingsScreen extends StatelessWidget {
               fontWeight: FontWeight.w500,
             ),
           ),
-          trailing: Icon(Icons.chevron_right, size: 20, color: isDarkMode ? DarkColors.textHint : const Color(0xFF9CA3AF)),
+          trailing: Icon(Icons.chevron_right, size: 20, color: isDarkMode ? DarkColors.textHint : AppColors.iconSubtle),
         ),
       ),
     );
@@ -251,7 +251,7 @@ class SettingsScreen extends StatelessWidget {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: isDarkMode ? Colors.white24 : Colors.grey.shade300,
+                      color: isDarkMode ? Colors.white24 : AppColors.sectionDivider,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -296,7 +296,7 @@ class SettingsScreen extends StatelessWidget {
                     child: ElevatedButton(
                       onPressed: () => Navigator.pop(sheetContext, false),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: isDarkMode ? DarkColors.divider : Colors.grey.shade100,
+                        backgroundColor: isDarkMode ? DarkColors.divider : AppColors.itemPressBackground,
                         foregroundColor: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
                         elevation: 0,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

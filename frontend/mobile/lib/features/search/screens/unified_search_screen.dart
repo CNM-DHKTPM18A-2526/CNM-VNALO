@@ -471,7 +471,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
         flexibleSpace: isDarkMode
             ? null
             : Container(
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   gradient: AppColors.appBarGradient,
                 ),
               ),
@@ -566,7 +566,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
           color: isDarkMode ? DarkColors.surface : LightColors.surface,
           child: TabBar(
             controller: _tabController,
-            dividerColor: isDarkMode ? DarkColors.divider : AppColors.sectionDivider,
+            dividerColor: Colors.transparent,
             labelColor: _primaryColor,
             unselectedLabelColor: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary,
             indicatorColor: _primaryColor,
@@ -622,7 +622,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
             padding: const EdgeInsets.all(16),
             child: Text(
               isVi ? 'Chưa có lịch sử tìm kiếm' : 'No search history',
-              style: const TextStyle(color: Colors.grey),
+              style: TextStyle(color: isDarkMode ? DarkColors.textHint : Colors.grey),
             ),
           )
         else
@@ -668,7 +668,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
     return Center(
       child: Text(
         isVi ? 'Khám phá các tính năng mới trên Vnalo' : 'Discover new features on Vnalo',
-        style: TextStyle(color: isDarkMode ? DarkColors.textSecondary : Colors.grey)
+        style: TextStyle(color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary)
       )
     );
   }
@@ -691,14 +691,14 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.search_off, size: 64, color: Colors.grey.shade300),
+              Icon(Icons.search_off, size: 64, color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
               const SizedBox(height: 16),
               Text(
                 isVi 
                   ? 'Không tìm thấy liên hệ, tin nhắn\ncó chứa nội dung bạn đang tìm kiếm'
                   : 'No contacts or messages found matching your search',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Color(0xFF757575), fontSize: 14),
+                style: TextStyle(color: isDarkMode ? DarkColors.textSecondary : const Color(0xFF757575), fontSize: 14),
               ),
             ],
           ),
@@ -787,7 +787,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
                       style: IconButton.styleFrom(
-                        backgroundColor: const Color(0xFFE3F2FD),
+                        backgroundColor: isDarkMode ? Colors.white.withValues(alpha: 0.1) : AppColors.primary.withValues(alpha: 0.1),
                         shape: const CircleBorder(),
                         fixedSize: const Size(32, 32),
                       ),

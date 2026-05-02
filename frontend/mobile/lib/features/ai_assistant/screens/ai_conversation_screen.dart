@@ -83,14 +83,14 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
     final messages = provider.getHistoryAsMessages(currentUserId, userAvatarUrl: userAvatarUrl).reversed.toList();
 
     return Scaffold(
-      backgroundColor: isDarkMode ? Colors.black : const Color(0xFFE2E9F1),
+      backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
       appBar: AppBar(
         titleSpacing: 0,
         elevation: 0,
         backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
         flexibleSpace: isDarkMode 
           ? null 
-          : Container(decoration: const BoxDecoration(gradient: AppColors.appBarGradient)),
+          : Container(decoration: BoxDecoration(gradient: AppColors.appBarGradient)),
         iconTheme: const IconThemeData(color: Colors.white),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -98,7 +98,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
             const Text(
               'Trợ lý AI VNALO',
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 18,
                 fontWeight: FontWeight.w600,
                 color: Colors.white,
               ),
@@ -192,7 +192,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.7),
+      color: isDarkMode ? DarkColors.surface : Colors.white,
       child: Row(
         children: [
           Icon(
@@ -218,7 +218,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
   }
 
   Widget _buildInputBar(AiAssistantProvider provider, bool isDarkMode) {
-    final bgColor = isDarkMode ? DarkColors.surface : Colors.white;
+    final bgColor = isDarkMode ? DarkColors.surface : LightColors.surface;
     
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
@@ -226,7 +226,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
         color: bgColor,
         border: Border(
           top: BorderSide(
-            color: isDarkMode ? DarkColors.divider : Colors.black12,
+            color: isDarkMode ? DarkColors.divider : AppColors.itemDivider,
             width: 0.5,
           ),
         ),
@@ -238,7 +238,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
             IconButton(
               icon: Icon(
                 provider.state == AiState.listening ? Icons.mic_off : Icons.mic_none_outlined,
-                color: provider.state == AiState.listening ? Colors.red : (isDarkMode ? Colors.white70 : const Color(0xFF5D6470)),
+                color: provider.state == AiState.listening ? AppColors.error : (isDarkMode ? Colors.white70 : AppColors.iconSubtle),
               ),
               onPressed: () => provider.onPrimaryAction(source: 'conversation_screen_mic'),
             ),
@@ -252,13 +252,22 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
                   onSubmitted: (_) => _sendPrompt(provider),
                   minLines: 1,
                   maxLines: 4,
-                  style: const TextStyle(fontSize: 16),
-                  decoration: const InputDecoration(
-                    hintText: 'Hỏi trợ lý VNALO AI...',
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.symmetric(vertical: 10),
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: isDarkMode ? Colors.white : Colors.black87,
                   ),
+                    decoration: InputDecoration(
+                      hintText: 'Hỏi trợ lý VNALO AI...',
+                      hintStyle: TextStyle(
+                        color: isDarkMode ? DarkColors.textHint : const Color(0xFFA1A3A7),
+                        fontSize: 16,
+                      ),
+                      border: InputBorder.none,
+                      isDense: true,
+                      filled: false,
+                      fillColor: Colors.transparent,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
                 ),
               ),
             ),
@@ -269,7 +278,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
               )
             else
               IconButton(
-                icon: Icon(Icons.image_outlined, color: isDarkMode ? Colors.white70 : const Color(0xFF5D6470)),
+                icon: Icon(Icons.image_outlined, color: isDarkMode ? Colors.white70 : AppColors.iconSubtle),
                 onPressed: () {
                   // Placeholder for future AI vision features
                 },
@@ -325,32 +334,33 @@ class _EmptyAiConversation extends StatelessWidget {
                 'Hãy đặt câu hỏi về công việc, dịch thuật hoặc tóm tắt video cho tôi.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 14,
-                  color: isDarkMode ? Colors.white60 : Colors.black54,
+                  fontSize: 15,
+                  color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary,
                 ),
               ),
             ),
             const SizedBox(height: 32),
-            _buildQuickAction('Dịch tin nhắn này sang tiếng Anh'),
-            _buildQuickAction('Tóm tắt nội dung cuộc họp'),
+            _buildQuickAction(context, 'Dịch tin nhắn này sang tiếng Anh'),
+            _buildQuickAction(context, 'Tóm tắt nội dung cuộc họp'),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildQuickAction(String text) {
+  Widget _buildQuickAction(BuildContext context, String text) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.8),
+        color: isDarkMode ? DarkColors.surface : Colors.white.withValues(alpha: 0.8),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
       ),
       child: Text(
         text,
-        style: const TextStyle(color: AppColors.primary, fontSize: 13),
+        style: const TextStyle(color: AppColors.primary, fontSize: 13, fontWeight: FontWeight.w500),
       ),
     );
   }

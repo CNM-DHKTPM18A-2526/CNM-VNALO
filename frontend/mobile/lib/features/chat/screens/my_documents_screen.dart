@@ -213,82 +213,64 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
     final texts = CommonTexts.of(context);
     final tabs = texts.docTabs;
 
-    return Scaffold(
-      backgroundColor: bgColor,
-      appBar: AppBar(
-        forceMaterialTransparency: !isDarkMode,
-        titleSpacing: 0,
-        elevation: 0,
-        backgroundColor: appBarBg,
-        foregroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.white),
-        flexibleSpace: isDarkMode
-            ? null
-            : Container(
-                decoration: const BoxDecoration(
-                  gradient: AppColors.appBarGradient,
+    return DefaultTabController(
+      length: tabs.length,
+      child: Scaffold(
+        backgroundColor: bgColor,
+        appBar: AppBar(
+          forceMaterialTransparency: !isDarkMode,
+          titleSpacing: 0,
+          elevation: 0,
+          backgroundColor: appBarBg,
+          foregroundColor: Colors.white,
+          iconTheme: const IconThemeData(color: Colors.white),
+          flexibleSpace: isDarkMode
+              ? null
+              : Container(
+                  decoration: BoxDecoration(
+                    gradient: AppColors.appBarGradient,
+                  ),
                 ),
+          title: Row(
+            children: [
+              Text(
+                texts.myDocumentsHeader,
+                style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w600),
               ),
-        title: Row(
-          children: [
-            Text(
-              texts.myDocumentsHeader,
-              style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(width: 6),
-            const Icon(Icons.verified, color: Colors.orange, size: 18),
-          ],
-        ),
-      ),
-      body: Column(
-        children: [
-          // Tab bar
-          Container(
-            color: cardColor,
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: List.generate(tabs.length, (i) {
-                  final isSelected = _selectedTabIndex == i;
-                  return GestureDetector(
-                    onTap: () => setState(() => _selectedTabIndex = i),
-                    child: Container(
-                      margin: const EdgeInsets.only(right: 10),
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? (isDarkMode ? DarkColors.primary : AppColors.primary)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(20),
-                        border: isSelected
-                            ? null
-                            : Border.all(color: isDarkMode ? DarkColors.divider : AppColors.itemDivider),
-                      ),
-                      child: Text(
-                        tabs[i],
-                        style: TextStyle(
-                          color: isSelected
-                              ? Colors.white
-                              : (isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary),
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  );
-                }),
+              const SizedBox(width: 6),
+              const Icon(Icons.verified, color: Colors.orange, size: 18),
+            ],
+          ),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(48),
+            child: Container(
+              color: cardColor,
+              child: TabBar(
+                onTap: (index) {
+                  setState(() => _selectedTabIndex = index);
+                },
+                dividerColor: Colors.transparent,
+                labelColor: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
+                unselectedLabelColor: isDarkMode ? DarkColors.textSecondary : Colors.grey.shade400,
+                indicatorColor: isDarkMode ? DarkColors.primary : AppColors.primary,
+                indicatorWeight: 3,
+                labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w400, fontSize: 14),
+                tabs: tabs.map((t) => Tab(text: t)).toList(),
               ),
             ),
           ),
+        ),
+        body: Column(
+          children: [
+            const SizedBox(height: 1), // Tiny gap below tab bar
 
           // Message list
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _filteredMessages.isEmpty
-                    ? _buildEmpty()
+                    ? _buildEmpty(isDarkMode)
                     : RefreshIndicator(
                         onRefresh: _loadMessages,
                         child: _buildMessageList(isDarkMode),
@@ -315,24 +297,30 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
-  Widget _buildEmpty() {
+  Widget _buildEmpty(bool isDarkMode) {
+    final common = CommonTexts.of(context);
+    final hintColor = isDarkMode ? DarkColors.textHint : Colors.grey[400];
+    final subColor = isDarkMode ? DarkColors.textSecondary : Colors.grey[600];
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.folder_open_outlined, size: 64, color: Colors.grey[400]),
+          Icon(Icons.folder_open_outlined, size: 64, color: hintColor),
           const SizedBox(height: 12),
           Text(
-            'No content yet',
-            style: TextStyle(color: Colors.grey[600], fontSize: 16),
+            common.noContentYet,
+            style: TextStyle(color: subColor, fontSize: 16),
           ),
           const SizedBox(height: 8),
           Text(
-            'Send a message, image, or file to store it here',
-            style: TextStyle(color: Colors.grey[400], fontSize: 13),
+            common.saveContentNote,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: hintColor, fontSize: 13),
           ),
         ],
       ),
@@ -391,7 +379,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.12),
+                color: isDarkMode ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(

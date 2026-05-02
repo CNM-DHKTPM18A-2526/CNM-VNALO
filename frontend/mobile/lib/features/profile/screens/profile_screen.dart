@@ -65,7 +65,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final pageBg = isDarkMode ? Colors.black : AppColors.sectionBackground;
+    final pageBg = isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground;
     final sectionBg = isDarkMode ? DarkColors.surface : Colors.white;
     final auth = context.watch<AuthProvider>();
     final common = CommonTexts.of(context);
@@ -81,7 +81,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         flexibleSpace: isDarkMode
             ? null
             : Container(
-                decoration: const BoxDecoration(gradient: AppColors.appBarGradient),
+                decoration: BoxDecoration(gradient: AppColors.appBarGradient),
               ),
         title: GestureDetector(
           behavior: HitTestBehavior.opaque,
@@ -102,9 +102,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(width: 8),
                   Text(
                     common.search,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
+                    style: TextStyle(
+                      color: isDarkMode ? DarkColors.textHint : Colors.white.withValues(alpha: 0.7),
+                      fontSize: 15,
                       fontWeight: FontWeight.w400,
                     ),
                   ),
@@ -186,8 +186,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                     ),
-                    const Icon(Icons.chevron_right,
-                        color: Colors.grey),
+                    Icon(Icons.chevron_right,
+                        color: isDarkMode ? DarkColors.textHint : Colors.grey),
                   ],
                 ),
               ),
@@ -237,7 +237,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             title: 'Thông báo',
             trailing: Consumer<NotificationProvider>(
               builder: (context, provider, child) {
-                if (provider.unreadCount == 0) return const Icon(Icons.chevron_right, color: Colors.grey);
+                final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+                if (provider.unreadCount == 0) return Icon(Icons.chevron_right, color: isDarkMode ? DarkColors.textHint : AppColors.iconSubtle);
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
@@ -336,7 +337,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Divider(
                       height: 1,
                       indent: 70,
-                      color: isDarkMode ? DarkColors.divider : const Color(0xFFF3F4F6),
+                      color: isDarkMode ? DarkColors.divider : AppColors.itemDivider,
                     ),
                 ],
               );
@@ -385,7 +386,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             size: 20,
             color: Theme.of(context).brightness == Brightness.dark
                 ? DarkColors.textHint
-                : Colors.grey.shade300,
+                : AppColors.iconSubtle.withValues(alpha: 0.5),
           ),
         ),
       ),

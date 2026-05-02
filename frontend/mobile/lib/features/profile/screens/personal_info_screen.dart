@@ -212,7 +212,7 @@ class PersonalInfoScreen extends StatelessWidget {
                   label,
                   style: TextStyle(
                     fontSize: 15,
-                    color: isDarkMode ? DarkColors.textSecondary : Colors.black54,
+                    color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary,
                   ),
                 ),
               ),
@@ -232,7 +232,7 @@ class PersonalInfoScreen extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         subtext,
-                        style: TextStyle(fontSize: 12, color: isDarkMode ? DarkColors.textHint : Colors.grey, height: 1.3),
+                        style: TextStyle(fontSize: 12, color: isDarkMode ? DarkColors.textHint : LightColors.textHint, height: 1.3),
                       ),
                     ],
                   ],

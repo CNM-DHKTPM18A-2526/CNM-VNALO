@@ -100,7 +100,7 @@ class MessageBubble extends StatelessWidget {
                 ),
                 child: Text(
                   milestoneText!,
-                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
                 ),
               ),
             ),
@@ -110,7 +110,7 @@ class MessageBubble extends StatelessWidget {
           child: Row(
             mainAxisAlignment:
                 isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (!isMine)
                 SizedBox(
@@ -169,8 +169,8 @@ class MessageBubble extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isDarkMode ? DarkColors.surface : Colors.transparent,
-          border: Border.all(color: isDarkMode ? DarkColors.divider : Colors.grey.shade300),
+          color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.transparent,
+          border: Border.all(color: isDarkMode ? DarkColors.divider : AppColors.itemDivider),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
@@ -226,7 +226,7 @@ class MessageBubble extends StatelessWidget {
             ? Border.all(color: Colors.white.withValues(alpha: 0.1), width: 0.5)
             : null,
         boxShadow: [
-          if (!isDarkMode && !isMine && !isMediaOnly)
+          if (!isDarkMode && !isMediaOnly)
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 3,
@@ -508,14 +508,14 @@ class MessageBubble extends StatelessWidget {
         return Text(
           message.content ?? '',
           style: TextStyle(
-            fontSize: 15,
+            fontSize: 16,
             color:
                 isMine
-                    ? (isDarkMode ? Colors.white : const Color(0xFF1F2937))
+                    ? (isDarkMode ? Colors.white : LightColors.textPrimary)
                     : (isDarkMode
                         ? DarkColors.textPrimary
                         : LightColors.textPrimary),
-            height: 1.3,
+            height: 1.35,
           ),
         );
     }
@@ -542,12 +542,12 @@ class MessageBubble extends StatelessWidget {
 
     final labelColor =
         isDarkMode
-            ? Colors.white60
-            : (isMine ? const Color(0xFF5D6470) : LightColors.textSecondary);
+            ? DarkColors.textSecondary
+            : (isMine ? AppColors.iconSubtle : LightColors.textSecondary);
     final dividerColor =
         isDarkMode
-            ? Colors.white.withValues(alpha: 0.12)
-            : Colors.black.withValues(alpha: 0.08);
+            ? Colors.white.withValues(alpha: 0.1)
+            : AppColors.itemDivider;
 
     final title = _callLogTitle(callLog, incoming, isVideo);
     final subtitle = _callLogSubtitle(callLog, isVideo);
@@ -628,7 +628,7 @@ class MessageBubble extends StatelessWidget {
                   common.callAgainAction,
                   style: TextStyle(
                     color:
-                        canCallAgain ? const Color(0xFF1890FF) : (isDarkMode ? Colors.white30 : Colors.black26),
+                        canCallAgain ? AppColors.primary : (isDarkMode ? Colors.white24 : Colors.black26),
                     fontWeight: FontWeight.w700,
                     fontSize: 13,
                   ),
@@ -957,7 +957,9 @@ class MessageBubble extends StatelessWidget {
       width: 240,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDarkMode ? DarkColors.surfaceLight : Colors.white.withValues(alpha: 0.1),
+        color: isDarkMode 
+            ? DarkColors.surfaceLight 
+            : (isMine ? Colors.white.withValues(alpha: 0.2) : Colors.black.withValues(alpha: 0.05)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -965,7 +967,11 @@ class MessageBubble extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.insert_drive_file, color: Colors.white, size: 32),
+              Icon(
+                Icons.insert_drive_file,
+                color: isDarkMode ? Colors.white : (isMine ? AppColors.primary : AppColors.primary),
+                size: 32,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -975,11 +981,17 @@ class MessageBubble extends StatelessWidget {
                       fileName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.white : (isMine ? LightColors.textPrimary : LightColors.textPrimary),
+                        fontWeight: FontWeight.bold
+                      ),
                     ),
                     Text(
                       isDownloaded ? common.downloadedLabel : common.documentLabel,
-                      style: const TextStyle(color: Colors.white70, fontSize: 12),
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.white70 : (isMine ? LightColors.textSecondary : LightColors.textSecondary),
+                        fontSize: 12
+                      ),
                     ),
                   ],
                 ),
@@ -1175,11 +1187,11 @@ class MessageBubble extends StatelessWidget {
         color:
             isDarkMode
                 ? Colors.white.withValues(alpha: 0.08)
-                : const Color(0xFFF3F7FF),
+                : (isMine ? Colors.white.withValues(alpha: 0.4) : AppColors.itemPressBackground),
         borderRadius: BorderRadius.circular(10),
         border: Border(
           left: BorderSide(
-            color: isDarkMode ? Colors.blue[300]! : const Color(0xFF0068FF),
+            color: isDarkMode ? DarkColors.primary : AppColors.primary,
             width: 2.5,
           ),
         ),
@@ -1192,7 +1204,7 @@ class MessageBubble extends StatelessWidget {
             style: TextStyle(
               fontWeight: FontWeight.w600,
               fontSize: 12,
-              color: isDarkMode ? Colors.blue[300] : const Color(0xFF0068FF),
+              color: isDarkMode ? DarkColors.primary : AppColors.primary,
             ),
           ),
           const SizedBox(height: 2),
@@ -1205,7 +1217,7 @@ class MessageBubble extends StatelessWidget {
               color:
                   isDarkMode
                       ? DarkColors.textSecondary
-                      : const Color(0xFF4A4A4A),
+                      : LightColors.textSecondary,
             ),
           ),
         ],

@@ -127,34 +127,40 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     }
 
     try {
+      bool success = false;
       switch (payload.type) {
         case _QrPayloadType.login:
-          await Navigator.of(context).push(
+          final result = await Navigator.of(context).push<bool>(
             MaterialPageRoute(
               builder: (_) => QrLoginApprovalScreen(initialToken: payload.token),
             ),
           );
+          success = result == true;
           break;
         case _QrPayloadType.friend:
-          await _handleFriendQr(payload);
+          success = await _handleFriendQr(payload);
           break;
         case _QrPayloadType.group:
-          await _handleGroupQr(payload);
+          success = await _handleGroupQr(payload);
           break;
         case _QrPayloadType.unsupported:
           break;
       }
+      
+      if (success && mounted) {
+        Navigator.of(context).pop();
+      }
     } finally {
       _handling = false;
-      if (mounted) {
+      if (mounted && !Navigator.of(context).canPop()) { // Only restart if still visible
         await _controller.start();
       }
     }
   }
 
-  Future<void> _handleFriendQr(_ParsedQrPayload payload) async {
+  Future<bool> _handleFriendQr(_ParsedQrPayload payload) async {
     if (!mounted || payload.userId == null || payload.token == null || payload.nonce == null) {
-      return;
+      return false;
     }
 
     final common = CommonTexts.of(context, listen: false);
@@ -166,24 +172,26 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       );
 
       if (!mounted) {
-        return;
+        return true;
       }
 
       final message = result['message']?.toString() ?? common.processedFriendQr;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      return true;
     } catch (e) {
       if (!mounted) {
-        return;
+        return false;
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${common.cannotProcessFriendQr}: $e')),
       );
+      return false;
     }
   }
 
-  Future<void> _handleGroupQr(_ParsedQrPayload payload) async {
+  Future<bool> _handleGroupQr(_ParsedQrPayload payload) async {
     if (!mounted || payload.conversationId == null) {
-      return;
+      return false;
     }
 
     final common = CommonTexts.of(context, listen: false);
@@ -193,7 +201,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         '/conversations/${payload.conversationId}/join',
       );
       if (!mounted) {
-        return;
+        return true;
       }
       final status =
           response['status']?.toString() ??
@@ -203,13 +211,15 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(common.groupJoinStatus(status))),
       );
+      return true;
     } catch (e) {
       if (!mounted) {
-        return;
+        return false;
       }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${common.cannotJoinGroup}: $e')),
       );
+      return false;
     }
   }
 

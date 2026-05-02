@@ -153,7 +153,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> with SingleTicker
                 ),
               ),
             ),
-            const Divider(),
+            Divider(color: isDarkMode ? DarkColors.divider : LightColors.divider),
             ListTile(
               leading: const Icon(Icons.camera_alt_outlined),
               title: const Text('Chụp ảnh mới'),
@@ -332,7 +332,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> with SingleTicker
         flexibleSpace: isDarkMode
             ? null
             : Container(
-                decoration: const BoxDecoration(gradient: AppColors.appBarGradient),
+                decoration: BoxDecoration(gradient: AppColors.appBarGradient),
               ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -376,7 +376,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> with SingleTicker
                     width: 50,
                     height: 50,
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
+                      color: isDarkMode ? Colors.white10 : Colors.grey.shade200,
                       shape: BoxShape.circle,
                     ),
                     child: _selectedAvatar != null 
@@ -412,7 +412,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> with SingleTicker
               ],
             ),
           ),
-          const Divider(height: 1),
+          Divider(height: 1, color: isDarkMode ? DarkColors.divider : LightColors.divider),
           // Search Bar
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -441,17 +441,20 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> with SingleTicker
             color: isDarkMode ? DarkColors.surface : Colors.white,
             child: TabBar(
               controller: _tabController,
+              dividerColor: Colors.transparent,
               tabs: const [
                 Tab(text: 'GẦN ĐÂY'),
                 Tab(text: 'DANH BẠ'),
               ],
-              labelColor: AppColors.primary,
-              unselectedLabelColor: Colors.grey,
-              indicatorColor: AppColors.primary,
-              indicatorWeight: 2,
+              labelColor: isDarkMode ? DarkColors.primary : AppColors.primary,
+              unselectedLabelColor: isDarkMode ? DarkColors.textSecondary : Colors.grey.shade400,
+              indicatorColor: isDarkMode ? DarkColors.primary : AppColors.primary,
+              indicatorWeight: 3,
+              labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w400, fontSize: 14),
             ),
           ),
-          const Divider(height: 1),
+          Divider(height: 1, color: isDarkMode ? DarkColors.divider : LightColors.divider),
           // List
           Expanded(
             child: _isLoading 

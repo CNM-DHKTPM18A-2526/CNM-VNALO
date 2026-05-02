@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/ai_assistant/models/mascot_metadata.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_robot_avatar.dart';
@@ -22,156 +23,150 @@ class _MascotGalleryScreenState extends State<MascotGalleryScreen> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor:
-          isDarkMode ? const Color(0xFF050913) : const Color(0xFFF3F7FF),
+      backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
       appBar: AppBar(
         title: const Text('Mascot Gallery'),
-        backgroundColor: Colors.transparent,
+        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
         elevation: 0,
+        forceMaterialTransparency: !isDarkMode,
+        flexibleSpace: isDarkMode 
+          ? null 
+          : Container(decoration: BoxDecoration(gradient: AppColors.appBarGradient)),
+        iconTheme: const IconThemeData(color: Colors.white),
+        titleTextStyle: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
       ),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+            padding: const EdgeInsets.all(24.0),
             child: Text(
-              'Ưu tiên robot 2D cho độ ổn định gesture và độ mượt 60fps. 3D vẫn giữ làm tuỳ chọn mở rộng.',
-              textAlign: TextAlign.center,
+              'Chọn trợ lý Mascot của bạn',
               style: TextStyle(
-                color: isDarkMode ? Colors.white70 : Colors.black54,
-                fontSize: 13,
-                height: 1.4,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
               ),
             ),
           ),
           Expanded(
             child: PageView.builder(
               controller: _pageController,
-              itemCount: mascots.length,
               onPageChanged: (index) {
                 setState(() {
                   _currentPage = index;
                 });
               },
+              itemCount: mascots.length,
               itemBuilder: (context, index) {
                 final mascot = mascots[index];
                 final isSelected = provider.currentMascot.id == mascot.id;
-                final isCurrentPage = _currentPage == index;
+                final scale = _currentPage == index ? 1.0 : 0.85;
 
-                return AnimatedContainer(
+                return TweenAnimationBuilder<double>(
+                  tween: Tween(begin: scale, end: scale),
                   duration: const Duration(milliseconds: 300),
-                  margin: EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: isCurrentPage ? 20 : 50,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isDarkMode ? const Color(0xFF121A2A) : Colors.white,
-                    borderRadius: BorderRadius.circular(30),
-                    border: Border.all(
-                      color:
-                          isSelected ? Colors.blueAccent : Colors.transparent,
-                      width: 3,
+                  builder: (context, value, child) {
+                    return Transform.scale(
+                      scale: value,
+                      child: child,
+                    );
+                  },
+                  child: Card(
+                    elevation: isSelected ? 8 : 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      side: BorderSide(
+                        color: isSelected ? AppColors.primary : Colors.transparent,
+                        width: 2,
+                      ),
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.18),
-                        blurRadius: 20,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: const Center(
-                          child: AiRobotAvatar(
-                            state: AiState.idle,
-                            emotion: 'joyful',
-                            size: 190,
-                          ),
-                        ),
-                      ),
-                      if (mascot.recommended)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.green.withValues(alpha: 0.16),
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(
-                                color: Colors.green.withValues(alpha: 0.45),
-                              ),
-                            ),
-                            child: const Text(
-                              'Khuyến nghị mặc định',
-                              style: TextStyle(
-                                color: Colors.greenAccent,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 11,
-                              ),
+                    color: isDarkMode ? DarkColors.surface : Colors.white,
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: AiRobotAvatar(
+                              state: provider.state,
+                              emotion: provider.currentEmotion,
+                              size: 180,
                             ),
                           ),
-                        ),
-                      Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          children: [
-                            Text(
-                              mascot.name,
-                              style: TextStyle(
-                                color:
-                                    isDarkMode
-                                        ? Colors.white
-                                        : const Color(0xFF0F172A),
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
+                          const SizedBox(height: 24),
+                          Text(
+                            mascot.name,
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              mascot.description,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color:
-                                    isDarkMode
-                                        ? Colors.grey[400]
-                                        : Colors.black54,
-                              ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            mascot.description,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary,
                             ),
-                            const SizedBox(height: 20),
-                            ElevatedButton(
-                              onPressed:
-                                  isSelected
-                                      ? null
-                                      : () => provider.setMascot(mascot),
+                          ),
+                          const SizedBox(height: 32),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: isSelected
+                                  ? null
+                                  : () {
+                                      provider.setMascot(mascot);
+                                    },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor:
-                                    isSelected
-                                        ? Colors.grey
-                                        : Colors.blueAccent,
+                                backgroundColor: isSelected
+                                    ? Colors.grey
+                                    : AppColors.primary,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
+                                elevation: 0,
                               ),
                               child: Text(
-                                isSelected
-                                    ? 'Đang chọn'
-                                    : 'Dùng bản 2D',
+                                isSelected ? 'Đang sử dụng' : 'Sử dụng Mascot này',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 );
               },
             ),
           ),
-          const SizedBox(height: 28),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 32.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: mascots.asMap().entries.map((entry) {
+                return Container(
+                  width: 8,
+                  height: 8,
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _currentPage == entry.key
+                        ? AppColors.primary
+                        : (isDarkMode ? Colors.white24 : Colors.grey.shade300),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
         ],
       ),
     );

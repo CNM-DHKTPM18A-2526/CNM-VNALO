@@ -12,11 +12,13 @@ import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 /// - Mỗi avatar con có borderWidth: 1.0 (viền trắng) để tách biệt
 class GroupAvatar extends StatelessWidget {
   final List<({String? imageUrl, String name})> members;
+  final int? totalMemberCount;
   final double size;
 
   const GroupAvatar({
     super.key,
     required this.members,
+    this.totalMemberCount,
     this.size = 48,
   });
 
@@ -26,7 +28,7 @@ class GroupAvatar extends StatelessWidget {
       return AvatarWidget(name: 'G', size: size);
     }
 
-    if (members.length == 1) {
+    if (members.length == 1 && (totalMemberCount == null || totalMemberCount! <= 1)) {
       return AvatarWidget(
         imageUrl: members[0].imageUrl,
         name: members[0].name,
@@ -34,6 +36,7 @@ class GroupAvatar extends StatelessWidget {
       );
     }
 
+    final effectiveCount = totalMemberCount ?? members.length;
     final displayMembers = members.take(4).toList();
 
     return SizedBox(
@@ -41,18 +44,20 @@ class GroupAvatar extends StatelessWidget {
       height: size,
       child: Stack(
         clipBehavior: Clip.antiAlias,
-        children: _buildAvatarPositions(displayMembers),
+        children: _buildAvatarPositions(context, displayMembers, effectiveCount),
       ),
     );
   }
 
-  List<Widget> _buildAvatarPositions(List<({String? imageUrl, String name})> items) {
-    // Border width cho từng avatar con — đủ để tạo gap thị giác
+  List<Widget> _buildAvatarPositions(
+    BuildContext context,
+    List<({String? imageUrl, String name})> items,
+    int totalCount,
+  ) {
     const double border = 1.0;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    if (items.length == 2) {
-      // 2 thành viên: đường chéo trên-trái / dưới-phải
-      // Mỗi avatar chiếm 62% kích thước, offset 5% vào phía trong
+    if (totalCount == 2) {
       final childSize = size * 0.62;
       final offset = size * 0.05;
       return [
@@ -60,8 +65,8 @@ class GroupAvatar extends StatelessWidget {
           top: offset,
           left: offset,
           child: AvatarWidget(
-            imageUrl: items[0].imageUrl,
-            name: items[0].name,
+            imageUrl: items.isNotEmpty ? items[0].imageUrl : null,
+            name: items.isNotEmpty ? items[0].name : '?',
             size: childSize,
             borderWidth: border,
           ),
@@ -70,8 +75,8 @@ class GroupAvatar extends StatelessWidget {
           bottom: offset,
           right: offset,
           child: AvatarWidget(
-            imageUrl: items[1].imageUrl,
-            name: items[1].name,
+            imageUrl: items.length > 1 ? items[1].imageUrl : null,
+            name: items.length > 1 ? items[1].name : '?',
             size: childSize,
             borderWidth: border,
           ),
@@ -79,18 +84,16 @@ class GroupAvatar extends StatelessWidget {
       ];
     }
 
-    if (items.length == 3) {
-      // 3 thành viên: 1 ở trên giữa, 2 ở hàng dưới
-      // Mỗi avatar ~54% size
+    if (totalCount == 3) {
       final childSize = size * 0.54;
-      final topCenter = (size - childSize) / 2; // Căn giữa theo trục X
+      final topCenter = (size - childSize) / 2;
       return [
         Positioned(
           top: 0,
           left: topCenter,
           child: AvatarWidget(
-            imageUrl: items[0].imageUrl,
-            name: items[0].name,
+            imageUrl: items.isNotEmpty ? items[0].imageUrl : null,
+            name: items.isNotEmpty ? items[0].name : '?',
             size: childSize,
             borderWidth: border,
           ),
@@ -99,8 +102,8 @@ class GroupAvatar extends StatelessWidget {
           bottom: 0,
           left: 0,
           child: AvatarWidget(
-            imageUrl: items[1].imageUrl,
-            name: items[1].name,
+            imageUrl: items.length > 1 ? items[1].imageUrl : null,
+            name: items.length > 1 ? items[1].name : '?',
             size: childSize,
             borderWidth: border,
           ),
@@ -109,8 +112,8 @@ class GroupAvatar extends StatelessWidget {
           bottom: 0,
           right: 0,
           child: AvatarWidget(
-            imageUrl: items[2].imageUrl,
-            name: items[2].name,
+            imageUrl: items.length > 2 ? items[2].imageUrl : null,
+            name: items.length > 2 ? items[2].name : '?',
             size: childSize,
             borderWidth: border,
           ),
@@ -118,55 +121,87 @@ class GroupAvatar extends StatelessWidget {
       ];
     }
 
-    // 4 thành viên trở lên: grid 2×2
-    // Mỗi avatar chiếm đúng 50% kích thước, không gap thêm (border tạo khoảng cách)
-    // Dùng size * 0.50 để lấp đầy, border 1.0px tạo viền trắng mỏng
+    // 4 members or more
     final childSize = size * 0.50;
-    return [
-      // Trên-trái
+    final widgets = <Widget>[
+      // Top-left
       Positioned(
         top: 0,
         left: 0,
         child: AvatarWidget(
-          imageUrl: items[0].imageUrl,
-          name: items[0].name,
+          imageUrl: items.isNotEmpty ? items[0].imageUrl : null,
+          name: items.isNotEmpty ? items[0].name : '?',
           size: childSize,
           borderWidth: border,
         ),
       ),
-      // Trên-phải
+      // Top-right
       Positioned(
         top: 0,
         right: 0,
         child: AvatarWidget(
-          imageUrl: items[1].imageUrl,
-          name: items[1].name,
+          imageUrl: items.length > 1 ? items[1].imageUrl : null,
+          name: items.length > 1 ? items[1].name : '?',
           size: childSize,
           borderWidth: border,
         ),
       ),
-      // Dưới-trái
+      // Bottom-left
       Positioned(
         bottom: 0,
         left: 0,
         child: AvatarWidget(
-          imageUrl: items[2].imageUrl,
-          name: items[2].name,
-          size: childSize,
-          borderWidth: border,
-        ),
-      ),
-      // Dưới-phải
-      Positioned(
-        bottom: 0,
-        right: 0,
-        child: AvatarWidget(
-          imageUrl: items[3].imageUrl,
-          name: items[3].name,
+          imageUrl: items.length > 2 ? items[2].imageUrl : null,
+          name: items.length > 2 ? items[2].name : '?',
           size: childSize,
           borderWidth: border,
         ),
       ),
     ];
+
+    if (totalCount > 4) {
+      // Show remaining count in bottom-right
+      final remainingCount = totalCount - 3;
+      widgets.add(
+        Positioned(
+          bottom: 0,
+          right: 0,
+          child: Container(
+            width: childSize,
+            height: childSize,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isDarkMode ? Colors.grey[800] : Colors.grey[300],
+              border: Border.all(color: Colors.white, width: border),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              '$remainingCount',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white70 : Colors.black54,
+                fontSize: childSize * 0.45,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+      );
+    } else {
+      // Bottom-right avatar (4 members case)
+      widgets.add(
+        Positioned(
+          bottom: 0,
+          right: 0,
+          child: AvatarWidget(
+            imageUrl: items.length > 3 ? items[3].imageUrl : null,
+            name: items.length > 3 ? items[3].name : '?',
+            size: childSize,
+            borderWidth: border,
+          ),
+        ),
+      );
+    }
+
+    return widgets;
   }
 }

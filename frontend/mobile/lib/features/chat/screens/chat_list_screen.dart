@@ -20,6 +20,8 @@ import 'package:vnalo_mobile/features/chat/screens/create_group_screen.dart';
 import 'package:vnalo_mobile/features/chat/screens/join_group_screen.dart';
 import 'package:vnalo_mobile/features/search/screens/unified_search_screen.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
+import 'package:vnalo_mobile/models/conversation_model.dart';
+import 'package:vnalo_mobile/models/message_model.dart';
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
@@ -117,33 +119,27 @@ class _ChatListScreenState extends State<ChatListScreen> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final common = CommonTexts.of(context);
     final appBarBg = isDarkMode ? DarkColors.appBarBg : LightColors.appBarBg;
-    final dividerColor =
-        isDarkMode ? DarkColors.divider : AppColors.itemDivider;
+    final dividerColor = isDarkMode ? const Color(0xFF2A2A2A) : AppColors.itemDivider;
 
     return Scaffold(
-      backgroundColor:
-          isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
+      backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
       appBar: AppBar(
         backgroundColor: isDarkMode ? appBarBg : Colors.transparent,
         elevation: 0,
-        forceMaterialTransparency:
-            !isDarkMode, // Only transparent in light mode to show gradient
-        flexibleSpace:
-            isDarkMode
-                ? null
-                : Container(
-                  decoration: const BoxDecoration(
-                    gradient: AppColors.appBarGradient,
-                  ),
+        forceMaterialTransparency: !isDarkMode,
+        flexibleSpace: isDarkMode
+            ? null
+            : Container(
+                decoration: BoxDecoration(
+                  gradient: AppColors.appBarGradient,
                 ),
+              ),
         title: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder:
-                    (_) =>
-                        const UnifiedSearchScreen(searchTag: 'search_bar_chat'),
+                builder: (_) => const UnifiedSearchScreen(searchTag: 'search_bar_chat'),
               ),
             );
           },
@@ -153,13 +149,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
               color: Colors.transparent,
               child: Row(
                 children: [
-                  Icon(Icons.search, size: 24, color: Colors.white),
+                  const Icon(Icons.search, size: 24, color: Colors.white),
                   const SizedBox(width: 8),
                   Text(
                     common.search,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
+                    style: TextStyle(
+                      color: isDarkMode ? DarkColors.textHint : Colors.white.withValues(alpha: 0.7),
+                      fontSize: 15,
                       fontWeight: FontWeight.w400,
                     ),
                   ),
@@ -190,53 +186,87 @@ class _ChatListScreenState extends State<ChatListScreen> {
           if (chatProvider.isLoading && chatProvider.conversations.isEmpty) {
             return ListView.separated(
               itemCount: 8,
-              separatorBuilder: (_, __) => Container(
-                color: isDarkMode ? DarkColors.surface : Colors.white,
-                child: Row(
-                  children: [
-                    const SizedBox(width: 76),
-                    Expanded(child: Container(height: 0.5, color: dividerColor)),
-                  ],
-                ),
-              ),
-              itemBuilder: (_, __) => const _SkeletonChatListItem(),
+              separatorBuilder: (context, index) {
+                return Container(
+                  color: isDarkMode ? DarkColors.surface : Colors.white,
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 76),
+                      Expanded(
+                        child: Container(height: 0.5, color: dividerColor),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              itemBuilder: (context, index) => const _SkeletonChatListItem(),
             );
           }
 
           final hasAiConversation = aiProvider.hasConversation;
-          final fixedItemCount = hasAiConversation ? 2 : 1;
+
+          final List<_UnifiedChatItem> allItems = [
+            _UnifiedChatItem(
+              type: _UnifiedChatItemType.cloud,
+              isPinned: false, // Default not pinned
+              timestamp: chatProvider.lastCloudMessage?.createdAt ?? DateTime(2000),
+            ),
+            if (hasAiConversation)
+              _UnifiedChatItem(
+                type: _UnifiedChatItemType.ai,
+                isPinned: false, // Default not pinned
+                timestamp: aiProvider.lastConversationAt ?? DateTime(1999),
+              ),
+            ...chatProvider.conversations.map((c) => _UnifiedChatItem(
+                  type: _UnifiedChatItemType.conversation,
+                  conversation: c,
+                  isPinned: c.isPinned,
+                  timestamp: c.lastMessage?.createdAt ?? c.updatedAt ?? DateTime(0),
+                )),
+          ];
+
+          allItems.sort((a, b) {
+            if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
+            return b.timestamp.compareTo(a.timestamp);
+          });
+
+          final pinnedTileColor = isDarkMode ? const Color(0xFF1A1A1A) : const Color(0xFFF0F2F5);
+          final regularTileColor = isDarkMode ? DarkColors.surface : Colors.white;
 
           return RefreshIndicator(
             onRefresh: () => chatProvider.loadInbox(),
             color: AppColors.primary,
-            child: ColoredBox(
-              color:
-                  isDarkMode ? DarkColors.surface : AppColors.sectionBackground,
-              child: ListView.separated(
-                itemCount: chatProvider.conversations.length + fixedItemCount,
-                separatorBuilder: (context, index) {
-                  return Container(
-                    color: isDarkMode ? DarkColors.surface : Colors.white,
-                    child: Row(
-                      children: [
-                        const SizedBox(width: 76),
-                        Expanded(
-                          child: Container(height: 0.5, color: dividerColor),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-                itemBuilder: (context, index) {
-                  if (index == 0) {
-                    // 1. My Documents (First Item)
+            child: ListView.separated(
+              itemCount: allItems.length,
+              separatorBuilder: (context, index) {
+                final item = allItems[index];
+                final bgColor = item.isPinned ? pinnedTileColor : regularTileColor;
+                return Container(
+                  color: bgColor,
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 76),
+                      Expanded(
+                        child: Container(height: 0.5, color: dividerColor),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              itemBuilder: (context, index) {
+                final item = allItems[index];
+                final tileColor = item.isPinned ? pinnedTileColor : regularTileColor;
+                final secondaryTextColor = isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary;
+
+                switch (item.type) {
+                  case _UnifiedChatItemType.cloud:
                     final lastCloud = chatProvider.lastCloudMessage;
-                    String cloudSubtitle = common.myDocumentsSubtitle;
+                    String cloudSubtitle = common.noContentYet; // Use localized empty string
                     String? cloudTime;
 
                     if (lastCloud != null) {
                       cloudTime = DateFormatter.relative(lastCloud.createdAt);
-                      final prefix = 'Bạn: ';
+                      const prefix = 'Bạn: ';
 
                       if (lastCloud.messageType == MessageType.TEXT) {
                         cloudSubtitle = '$prefix${lastCloud.content ?? ''}';
@@ -244,9 +274,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                         final label = switch (lastCloud.messageType) {
                           MessageType.IMAGE => '[${common.photoAction}]',
                           MessageType.VIDEO => '[${common.videoAction}]',
-                          MessageType.FILE =>
-                            '[${common.documentLabel}] ${lastCloud.content ?? ''}'
-                                .trim(),
+                          MessageType.FILE => '[${common.documentLabel}] ${lastCloud.content ?? ''}'.trim(),
                           MessageType.AUDIO => '[${common.audioAction}]',
                           MessageType.STICKER => '[Sticker]',
                           _ => common.msgSent,
@@ -256,48 +284,31 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     }
 
                     return ColoredBox(
-                      color: isDarkMode ? DarkColors.surface : Colors.white,
+                      color: tileColor,
                       child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
-
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                         leading: Container(
                           width: 48,
                           height: 48,
                           decoration: BoxDecoration(
-                            color:
-                                isDarkMode ? DarkColors.primary : Colors.blue,
+                            color: isDarkMode ? DarkColors.primary : AppColors.primary,
                             shape: BoxShape.circle,
                           ),
                           child: Stack(
                             alignment: Alignment.center,
                             children: [
-                              const Icon(
-                                Icons.cloud_upload_rounded,
-                                color: Colors.white,
-                                size: 28,
-                              ),
+                              const Icon(Icons.cloud_upload_rounded, color: Colors.white, size: 28),
                               Positioned(
                                 bottom: 0,
                                 right: 0,
                                 child: Container(
-                                  decoration: const BoxDecoration(
-                                    color: Colors.orange,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.check,
-                                    color: Colors.white,
-                                    size: 12,
-                                  ),
+                                  decoration: const BoxDecoration(color: Colors.orange, shape: BoxShape.circle),
+                                  child: const Icon(Icons.check, color: Colors.white, size: 12),
                                 ),
                               ),
                             ],
                           ),
                         ),
-
                         title: Row(
                           children: [
                             Expanded(
@@ -306,24 +317,19 @@ class _ChatListScreenState extends State<ChatListScreen> {
                                 style: TextStyle(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 16,
-                                  color:
-                                      isDarkMode
-                                          ? DarkColors.textPrimary
-                                          : LightColors.textPrimary,
+                                  color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
                                 ),
                               ),
                             ),
-                            if (cloudTime != null)
+                            if (item.isPinned)
+                              Icon(Icons.push_pin, size: 14, color: secondaryTextColor),
+                            if (cloudTime != null) ...[
+                              const SizedBox(width: 4),
                               Text(
                                 cloudTime,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color:
-                                      isDarkMode
-                                          ? DarkColors.textSecondary
-                                          : Colors.grey,
-                                ),
+                                style: TextStyle(fontSize: 12, color: secondaryTextColor),
                               ),
+                            ],
                           ],
                         ),
                         subtitle: Text(
@@ -332,53 +338,35 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 13,
-                            color:
-                                isDarkMode
-                                    ? DarkColors.textSecondary
-                                    : LightColors.textSecondary,
+                            color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary,
                           ),
                         ),
                         onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(
-                              builder: (_) => const MyDocumentsScreen(),
-                            ),
+                            MaterialPageRoute(builder: (_) => const MyDocumentsScreen()),
                           );
                         },
                       ),
                     );
-                  }
 
-                  if (hasAiConversation && index == 1) {
+                  case _UnifiedChatItemType.ai:
                     final lastAt = aiProvider.lastConversationAt;
-                    final lastAtLabel =
-                        lastAt != null ? DateFormatter.relative(lastAt) : null;
+                    final lastAtLabel = lastAt != null ? DateFormatter.relative(lastAt) : null;
 
                     return ColoredBox(
-                      color: isDarkMode ? DarkColors.surface : Colors.white,
+                      color: tileColor,
                       child: ListTile(
                         key: const ValueKey('chat_list_ai_assistant_tile'),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                         leading: Container(
                           width: 48,
                           height: 48,
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF2B6CF6), Color(0xFF0F8BFF)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
+                            gradient: AppColors.appBarGradient,
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          child: const Icon(
-                            Icons.smart_toy_outlined,
-                            color: Colors.white,
-                            size: 28,
-                          ),
+                          child: const Icon(Icons.smart_toy_outlined, color: Colors.white, size: 28),
                         ),
                         title: Row(
                           children: [
@@ -388,24 +376,19 @@ class _ChatListScreenState extends State<ChatListScreen> {
                                 style: TextStyle(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 16,
-                                  color:
-                                      isDarkMode
-                                          ? DarkColors.textPrimary
-                                          : LightColors.textPrimary,
+                                  color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
                                 ),
                               ),
                             ),
-                            if (lastAtLabel != null)
+                            if (item.isPinned)
+                              Icon(Icons.push_pin, size: 14, color: secondaryTextColor),
+                            if (lastAtLabel != null) ...[
+                              const SizedBox(width: 4),
                               Text(
                                 lastAtLabel,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color:
-                                      isDarkMode
-                                          ? DarkColors.textSecondary
-                                          : Colors.grey,
-                                ),
+                                style: TextStyle(fontSize: 12, color: secondaryTextColor),
                               ),
+                            ],
                           ],
                         ),
                         subtitle: Text(
@@ -414,64 +397,43 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 13,
-                            color:
-                                isDarkMode
-                                    ? DarkColors.textSecondary
-                                    : LightColors.textSecondary,
+                            color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary,
                           ),
                         ),
                         trailing: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color:
-                                isDarkMode
-                                    ? Colors.white.withValues(alpha: 0.08)
-                                    : const Color(0xFFEAF3FF),
+                            color: isDarkMode ? Colors.white.withValues(alpha: 0.08) : AppColors.itemPressBackground,
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
                             'AI',
-                            style: TextStyle(
-                              color: AppColors.primary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                            ),
+                            style: TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w700),
                           ),
                         ),
                         onTap: () {
                           Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const AiConversationScreen(),
-                            ),
+                            MaterialPageRoute(builder: (_) => const AiConversationScreen()),
                           );
                         },
                       ),
                     );
-                  }
 
-                  // 2. Conversations
-                  final conversationStartIndex = fixedItemCount;
-                  final conversation =
-                      chatProvider.conversations[index -
-                          conversationStartIndex];
-                  return ChatListItem(
-                    key: ValueKey(conversation.id),
-                    conversation: conversation,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder:
-                              (_) =>
-                                  ChatDetailScreen(conversation: conversation),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
+                  case _UnifiedChatItemType.conversation:
+                    final conv = item.conversation!;
+                    return ChatListItem(
+                      conversation: conv,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ChatDetailScreen(conversation: conv),
+                          ),
+                        );
+                      },
+                    );
+                }
+              },
             ),
           );
         },
@@ -482,9 +444,24 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
 class _SkeletonChatListItem extends StatelessWidget {
   const _SkeletonChatListItem();
-
   @override
   Widget build(BuildContext context) {
-    return ChatListSkeletonItem();
+    return const ChatListSkeletonItem();
   }
+}
+
+enum _UnifiedChatItemType { cloud, ai, conversation }
+
+class _UnifiedChatItem {
+  final _UnifiedChatItemType type;
+  final Conversation? conversation;
+  final bool isPinned;
+  final DateTime timestamp;
+
+  _UnifiedChatItem({
+    required this.type,
+    this.conversation,
+    this.isPinned = false,
+    required this.timestamp,
+  });
 }
