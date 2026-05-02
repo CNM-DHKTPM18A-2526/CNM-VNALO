@@ -1761,7 +1761,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
 
   // Global cache for user presence to ensure consistency across different conversation objects
   final Map<String, bool> _userPresence = {};
-  bool isUserOnline(String userId) => _userPresence[userId] ?? false;
+  bool isUserOnline(String userId) => _userPresence[userId.toLowerCase()] ?? false;
 
   void _handlePresenceEvent(Map<String, dynamic> data) {
     debugPrint('[ChatProvider] 📡 PRESENCE EVENT: $data');

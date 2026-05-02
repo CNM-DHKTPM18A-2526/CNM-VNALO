@@ -101,7 +101,7 @@ class _AvatarWidgetState extends State<AvatarWidget> {
                   ),
           ),
         ),
-        if (widget.showOnline)
+        if (widget.showOnline && widget.isOnline)
           Positioned(
             right: 2,
             bottom: 2,
