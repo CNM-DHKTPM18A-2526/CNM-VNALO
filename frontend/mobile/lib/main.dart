@@ -184,12 +184,6 @@ class VnaloApp extends StatelessWidget {
           ),
         ),
         Provider<NotificationService>(create: (_) => NotificationService()),
-        ChangeNotifierProvider(
-          create: (ctx) => ContactProvider(
-            ctx.read<FriendService>(),
-            ctx.read<SocketService>(),
-          ),
-        ),
         Provider<AiService>(
           create: (context) => AiService(context.read<ApiService>()),
         ),
@@ -210,6 +204,21 @@ class VnaloApp extends StatelessWidget {
                 context.read<SocketService>(),
                 context.read<LocalSyncService>(),
               ),
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, ContactProvider>(
+          create: (ctx) => ContactProvider(
+            ctx.read<FriendService>(),
+            ctx.read<SocketService>(),
+          ),
+          update: (ctx, auth, contact) {
+            final currentContact = contact ??
+                ContactProvider(
+                  ctx.read<FriendService>(),
+                  ctx.read<SocketService>(),
+                );
+            currentContact.update(auth.user?.id);
+            return currentContact;
+          },
         ),
         ChangeNotifierProxyProvider<AuthProvider, ChatProvider>(
           create:

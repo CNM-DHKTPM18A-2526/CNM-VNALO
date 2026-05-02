@@ -200,7 +200,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
   }
 
   Future<void> _pickVideo() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
+    FilePickerResult? result = await FilePicker.pickFiles(
       type: FileType.video,
       allowMultiple: true,
     );
@@ -230,7 +230,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
   }
 
   Future<void> _pickFile() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(allowMultiple: true);
+    FilePickerResult? result = await FilePicker.pickFiles(allowMultiple: true);
     if (result != null && mounted) {
       final paths = result.files.map((f) => f.path).whereType<String>().toList();
       if (widget.onSendFiles != null) {

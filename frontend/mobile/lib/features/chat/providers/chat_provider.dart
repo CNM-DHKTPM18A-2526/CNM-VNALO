@@ -1147,73 +1147,69 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void _handleIncomingMessage(Message message) {
-    debugPrint('[ChatProvider] _handleIncomingMessage: id=${message.id} conv=${message.conversationId} sender=${message.senderId} clientId=${message.clientMessageId} isMine=${message.senderId == _currentUserId} content=${message.content?.substring(0, min(30, message.content?.length ?? 0))}');
+    final conversationId = message.conversationId;
+    debugPrint('[ChatProvider] 📩 _handleIncomingMessage: id=${message.id} conv=$conversationId sender=${message.senderId} type=${message.messageType} clientId=${message.clientMessageId} isMine=${message.senderId == _currentUserId} content=${message.content?.substring(0, min(30, message.content?.length ?? 0))}');
     // #region agent_h2_provider_entry
-    debugPrint('[DEBUG][H2] ChatProvider._handleIncomingMessage ENTRY - msgId=${message.id} convId=${message.conversationId} senderId=${message.senderId}');
+    debugPrint('[DEBUG][H2] ChatProvider._handleIncomingMessage ENTRY - msgId=${message.id} convId=$conversationId senderId=${message.senderId}');
     // #endregion
 
     // Early deduplication: skip if a message with the same server ID is already in the list
-    // This prevents double-add from socket + HTTP race conditions
-    final existing = _messages[message.conversationId] ?? [];
+    final existing = _messages[conversationId] ?? [];
     if (!message.id.startsWith('local-') && existing.any((m) => m.id == message.id)) {
       debugPrint('[ChatProvider] _handleIncomingMessage: SKIPPED duplicate server id=${message.id}');
-      // #region agent_h4_skip
-      debugPrint('[DEBUG][H4] Message SKIPPED - duplicate server id=${message.id}');
-      // #endregion
       return;
     }
-    // 1. SYSTEM MESSAGE HANDLING
-    // Display system notifications from the backend (including "Silent Leave" notifications for Admins)
-    if (message.messageType == MessageType.SYSTEM) {
-      debugPrint('[ChatProvider] Received SYSTEM message: ${message.content}');
-      // Fallback: if we haven't received a dedicated socket event yet, we might want to refresh.
-      // But usually, the dedicated event is more reliable.
-    }
-    
-    final content = message.content ?? '';
-    try {
-      if (content.contains('"action":"UPDATE_MESSAGE_REACTIONS"')) {
-        final data = jsonDecode(content);
-        final msgId = data['messageId'];
-        final actionType = data['type']; // 'ADD' or 'REMOVE'
-        final emoji = data['emoji'];
-        final actorId = data['actorId'];
 
-        if (msgId != null) {
-          debugPrint('SIGNAL: Reaction update signal received for $msgId.');
-          
-          // Optimistic local update if we have enough info
-          if (actionType != null && emoji != null && actorId != null) {
-            final currentReactions = _reactions[msgId] ?? [];
-            if (actionType == 'ADD') {
-              final newReaction = MessageReaction(
-                id: 'signal_${DateTime.now().millisecondsSinceEpoch}',
-                conversationId: message.conversationId,
-                messageId: msgId,
-                serverSeq: 0,
-                userId: actorId,
-                emoji: emoji,
-                createdAt: DateTime.now(),
-              );
-              // Replace existing if from same user
-              final filtered = currentReactions.where((r) => r.userId != actorId).toList();
-              filtered.add(newReaction);
-              _reactions[msgId] = filtered;
-            } else if (actionType == 'REMOVE') {
-              _reactions[msgId] = currentReactions.where((r) => r.userId != actorId).toList();
-            }
-            notifyListeners();
-          }
-          
-          // Background sync to ensure data integrity
-          loadReactions(msgId);
+    // FILTER: Prevent "Ghost Conversations" from friend requests
+    if (message.isSystemMessage) {
+      final content = message.content ?? '';
+      if (content.contains('lời mời kết bạn') || content.contains('[ACTION:FRIEND_REQUEST]')) {
+        final index = _conversations.indexWhere((c) => c.id == conversationId);
+        if (index < 0) {
+          debugPrint('[ChatProvider] 🚫 Filtering out ghost conversation from friend request: $conversationId');
+          _db.saveMessage(_toLocal(message));
+          return;
         }
       }
-    } catch (e) {
-      debugPrint('Error parsing system signal: $e');
-    }
 
-    final conversationId = message.conversationId;
+      // Signal handling for reactions etc
+      try {
+        if (content.contains('"action":"UPDATE_MESSAGE_REACTIONS"')) {
+          final data = jsonDecode(content);
+          final msgId = data['messageId'];
+          final actionType = data['type'];
+          final emoji = data['emoji'];
+          final actorId = data['actorId'];
+
+          if (msgId != null) {
+            debugPrint('SIGNAL: Reaction update signal received for $msgId.');
+            if (actionType != null && emoji != null && actorId != null) {
+              final currentReactions = _reactions[msgId] ?? [];
+              if (actionType == 'ADD') {
+                final newReaction = MessageReaction(
+                  id: 'signal_${DateTime.now().millisecondsSinceEpoch}',
+                  conversationId: conversationId,
+                  messageId: msgId,
+                  serverSeq: 0,
+                  userId: actorId,
+                  emoji: emoji,
+                  createdAt: DateTime.now(),
+                );
+                final filtered = currentReactions.where((r) => r.userId != actorId).toList();
+                filtered.add(newReaction);
+                _reactions[msgId] = filtered;
+              } else if (actionType == 'REMOVE') {
+                _reactions[msgId] = currentReactions.where((r) => r.userId != actorId).toList();
+              }
+              notifyListeners();
+            }
+            loadReactions(msgId);
+          }
+        }
+      } catch (e) {
+        debugPrint('Error parsing system signal: $e');
+      }
+    }
 
     // Resolve mediaId to URL if it's just an ID
     Message resolvedMessage = message;

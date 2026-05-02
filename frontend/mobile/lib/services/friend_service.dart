@@ -49,6 +49,17 @@ class FriendService {
     return List<Map<String, dynamic>>.from(data as List? ?? []);
   }
 
+  Future<List<User>> getPendingRequests() async {
+    final requests = await getIncomingRequests();
+    return requests.map((req) {
+      final fromUser = req['fromUser'];
+      if (fromUser != null) {
+        return User.fromJson(Map<String, dynamic>.from(fromUser));
+      }
+      return User.fromJson(Map<String, dynamic>.from(req));
+    }).toList();
+  }
+
   Future<List<Map<String, dynamic>>> getIncommingRequests() {
     return getIncomingRequests();
   }
