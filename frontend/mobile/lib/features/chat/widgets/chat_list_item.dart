@@ -48,7 +48,7 @@ class ChatListItem extends StatelessWidget {
     }
 
     final regularTileColor = isDarkMode ? DarkColors.surface : Colors.white;
-    final pinnedTileColor = isDarkMode ? const Color(0xFF1E2633) : const Color(0xFFF0F5FF);
+    final pinnedTileColor = isDarkMode ? const Color(0xFF1A1A1A) : const Color(0xFFF0F2F5);
     final secondaryTextColor = isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary;
     final hintColor = isDarkMode ? DarkColors.textHint : LightColors.textHint;
     final dividerColor = isDarkMode ? DarkColors.divider : AppColors.itemDivider;
@@ -96,14 +96,15 @@ class ChatListItem extends StatelessWidget {
         color: conversation.isPinned ? pinnedTileColor : regularTileColor,
         child: ListTile(
           onTap: onTap,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           leading: (conversation.type == ConversationType.GROUP && (conversation.avatarUrl == null || conversation.avatarUrl!.isEmpty))
               ? GroupAvatar(
                   members: conversation.members
                       .where((m) => m.userId != currentUserId)
-                      .take(4)
+                      .take(3)
                       .map((m) => (imageUrl: m.user?.avatarUrl, name: m.user?.displayName ?? 'User'))
                       .toList(),
+                  totalMemberCount: conversation.members.length,
                   size: 48,
                 )
               : AvatarWidget(
@@ -126,7 +127,7 @@ class ChatListItem extends StatelessWidget {
                 ),
               ),
               if (conversation.isPinned)
-                Icon(Icons.push_pin, size: 14, color: AppColors.pinIcon),
+                Icon(Icons.push_pin, size: 14, color: secondaryTextColor),
               const SizedBox(width: 4),
               Text(
                 DateFormatter.relative(conversation.lastMessage?.createdAt),

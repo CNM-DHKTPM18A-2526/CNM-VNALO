@@ -32,9 +32,10 @@ class ActiveCallBanner extends StatelessWidget {
         final convIndex = chatProvider.conversations.indexWhere(
           (c) => c.id == conversationId,
         );
-        final members = convIndex == -1
+        final conversation = convIndex == -1 ? null : chatProvider.conversations[convIndex];
+        final members = conversation == null
             ? <_ParticipantInfo>[]
-            : chatProvider.conversations[convIndex].members
+            : conversation.members
                 .where((m) =>
                     activeCall.participantUserIds.contains(m.userId) ||
                     m.userId == chatProvider.currentUserId)
@@ -94,10 +95,12 @@ class ActiveCallBanner extends StatelessWidget {
                       )
                     else
                       GroupAvatar(
-                        members: [
-                          (name: conversationName,
-                              imageUrl: conversationAvatarUrl),
-                        ],
+                        members: (conversation?.members ?? [])
+                            .where((m) => m.userId != chatProvider.currentUserId)
+                            .take(3)
+                            .map((m) => (imageUrl: m.user?.avatarUrl, name: m.user?.displayName ?? 'User'))
+                            .toList(),
+                        totalMemberCount: conversation?.members.length,
                         size: 44,
                       ),
                     const SizedBox(width: 10),

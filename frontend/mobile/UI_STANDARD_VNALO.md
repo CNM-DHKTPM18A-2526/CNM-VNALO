@@ -64,9 +64,43 @@ Trong Dark Mode, để tạo độ sâu và cảm giác cao cấp, ứng dụng 
 
 ---
 
-## 4. Tài liệu tham khảo Code
+---
+
+## 4. Quy chuẩn Avatar & Nhắn tin (Avatar & Messaging)
+
+Để đảm bảo UI chuyên nghiệp và nhất quán với chuẩn Zalo:
+
+### 4.1. Avatar trong cụm tin nhắn
+- **Vị trí**: Avatar của người gửi luôn neo đậu ở **trên cùng (Top-anchored)** của cụm tin nhắn đầu tiên trong nhóm.
+- **Căn lề**: Sử dụng `CrossAxisAlignment.start` trong Row chứa avatar và nội dung.
+- **Logic hiển thị**: Chỉ hiển thị avatar ở tin nhắn đầu tiên của một cụm (hoặc sau một khoảng thời gian dài - Milestone). Không lặp lại avatar cho mỗi tin nhắn đơn lẻ trong cùng một cụm.
+
+### 4.2. Avatar Nhóm (Group Avatar)
+- **Bố cục mặc định**: Khi nhóm chưa đặt ảnh đại diện:
+  - Nhóm 2-4 thành viên: Hiển thị grid avatar các thành viên (2-4 ảnh nhỏ).
+  - **Nhóm > 4 thành viên**: Hiển thị **3 avatar nhỏ** (trên-trái, trên-phải, dưới-trái) + **1 ô tròn đếm số** (dưới-phải).
+- **Ô đếm số (Remaining Count)**:
+  - Giá trị = `Tổng số thành viên - 3`.
+  - Màu sắc: Nền xám (`Grey[800]` - Dark, `Grey[300]` - Light), chữ trắng mờ/đen mờ.
+
+---
+
+## 5. Quy chuẩn Layout & Danh sách (Layout & List View)
+
+### 5.1. Padding Danh sách
+- **ListTile Padding**: Sử dụng `vertical: 8` cho tất cả các mục trong Chat List và Contacts để tối ưu mật độ thông tin.
+- **Đồng bộ Skeleton**: Toàn bộ Skeleton loading phải có cùng thông số padding với item thật để tránh giật lag UI khi dữ liệu load xong.
+
+### 5.2. Phân tầng Layering (Bổ sung)
+- **Chat List**: Toàn bộ danh sách (bao gồm Cloud và AI) phải là một khối `surface` liền mạch.
+- **Nền màn hình (Layer 0)**: Phải được lộ ra ở dưới cùng hoặc khi cuộn để tạo độ sâu. Không bao phủ toàn bộ body bằng một màu duy nhất.
+
+---
+
+## 6. Tài liệu tham khảo Code
 - Theme chính: [app_theme.dart](file:///d:/Download/Project/cnm-vnalo/frontend/mobile/lib/core/theme/app_theme.dart)
 - Hệ thống màu: [app_colors.dart](file:///d:/Download/Project/cnm-vnalo/frontend/mobile/lib/core/theme/app_colors.dart)
+- Widget Avatar Nhóm: [group_avatar.dart](file:///d:/Download/Project/cnm-vnalo/frontend/mobile/lib/core/widgets/group_avatar.dart)
 
 > [!IMPORTANT]
 > Toàn bộ Code mới phải sử dụng `final isDarkMode = Theme.of(context).brightness == Brightness.dark;` để gán màu sắc adaptive, thay vì fix cứng một màu duy nhất.

@@ -533,11 +533,24 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                           // For now, let's just pass canPin logic as a proxy if needed, or keep it true for own messages.
                           const canRecall = true;
 
+                          bool showAvatar = false;
+                          if (!isMine) {
+                            if (index == items.length - 1 || milestoneText != null) {
+                              showAvatar = true;
+                            } else {
+                              final olderItem = items[index + 1];
+                              final olderMsg = olderItem is List<Message> ? (olderItem as List<Message>).first : olderItem as Message;
+                              if (olderMsg.senderId != message.senderId) {
+                                showAvatar = true;
+                              }
+                            }
+                          }
+
                           return MessageBubble(
                             message: message,
                             isMine: isMine,
                             showTime: showTime,
-                            showAvatar: !isMine && showTime,
+                            showAvatar: showAvatar,
                             senderAvatarUrl:
                                 message.senderAvatarUrl ??
                                 senderMember.user?.avatarUrl,
@@ -776,9 +789,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             GroupAvatar(
               members: conv.members
                   .where((m) => m.userId != currentUserId)
-                  .take(4)
+                  .take(3)
                   .map((m) => (imageUrl: m.user?.avatarUrl, name: m.user?.displayName ?? 'User'))
                   .toList(),
+              totalMemberCount: conv.members.length,
               size: 80,
             ),
           const SizedBox(height: 12),
