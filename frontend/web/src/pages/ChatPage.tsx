@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { getSyncPolicy } from '../features/auth/auth.api'
@@ -600,6 +600,7 @@ export default function ChatPage() {
   const messageLoadRequestSeqRef = useRef(0)
   const pendingMetadataFetches = useRef<Set<string>>(new Set())
   const processedMessageIds = useRef<Set<string>>(new Set())
+  const lastPinnedSyncTimeRef = useRef<Record<string, number>>({})
 
   // Load deleted timestamps & pinned conversations from localStorage on mount
   useEffect(() => {
@@ -778,6 +779,8 @@ export default function ChatPage() {
       }
 
       const formattedPreview = formatConversationPreview(senderName, message, user?.id || '', getName)
+      // Defensive: ensure formatted preview is never empty if original message has content
+      const safePreview = formattedPreview && formattedPreview.trim() ? formattedPreview : formatMessagePreview(message.text || '', false)
 
       setConversations((prev) => {
         const index = prev.findIndex((conversation) => conversation.id === conversationId)
@@ -805,6 +808,12 @@ export default function ChatPage() {
             };
 
         let finalPreview = formattedPreview;
+
+        // Defensive: if formatted preview is empty or looks suspicious, use direct formatting
+        if (!finalPreview || finalPreview.trim() === '' || (finalPreview.startsWith('{') && finalPreview.includes('"action":'))) {
+          console.log('[ChatPage.updateConversationAfterMessage] Defensive formatting applied for message:', message.id);
+          finalPreview = formatMessagePreview(message.text || '', message.senderId === user?.id, message.type, senderName || undefined, message.attachments);
+        }
 
         // Inspect last few messages for grouping in sidebar
         const conversationMsgs = conversationMsgsOverride ?? messagesByConversationRef.current[conversationId] ?? [];
@@ -875,8 +884,12 @@ export default function ChatPage() {
     lastSyncTimeRef.current[conversationId] = now
 
     try {
+      console.log('[ChatPage.syncLatestMessages] fetching messages for', conversationId);
       const latest = await fetchMessages(accessToken, conversationId, true)
       if (!latest || latest.length === 0) return
+      console.log('[ChatPage.syncLatestMessages] fetched', latest.length, 'messages, syncing pinned list too');
+      // Refresh pinned messages after fetching new messages
+      void syncPinnedMessages(conversationId);
       const newMessages: ChatMessage[] = []
       setMessagesByConversation((prev) => {
         const current = prev[conversationId] ?? []
@@ -1061,6 +1074,27 @@ export default function ChatPage() {
     [syncMessageReaction, (user ? user.id : "")],
   )
 
+  const resolveReactionActorId = useCallback((payload: any): string | undefined => {
+    return String(
+      payload?.actorId ??
+      payload?.userId ??
+      payload?.user_id ??
+      payload?.senderId ??
+      payload?.sender_id ??
+      ''
+    ).trim() || undefined
+  }, [])
+
+  const resolveReactionEmoji = useCallback((payload: any): string | undefined => {
+    return String(
+      payload?.emoji ??
+      payload?.reaction ??
+      payload?.reactionKey ??
+      payload?.reaction_key ??
+      ''
+    ).trim() || undefined
+  }, [])
+
   const syncConversationReactions = useCallback(async () => {
     if (!selectedConversationIdRef.current || !accessToken) return
 
@@ -1087,21 +1121,66 @@ export default function ChatPage() {
       loadingPinnedRef.current[conversationId] = true
 
       try {
+        console.log('[ChatPage.loadPinnedMessages] fetching pinned messages for', conversationId, 'accessToken present:', !!accessToken)
         const pins = await fetchPinnedMessages(accessToken, conversationId)
+        console.log('[ChatPage.loadPinnedMessages] fetched pins response:', pins);
         const ids = pins.map(p => p.messageId).filter(Boolean) as string[]
+        console.log('[ChatPage.loadPinnedMessages] fetched pins:', { conversationId, count: ids.length, ids })
 
+        // Update pinned id list first
         setPinnedMessageIds((prev) => ({
           ...prev,
           [conversationId]: ids,
         }))
+
+        // Try to resolve message objects from current cache
+        let resolved: ChatMessage[] = (messagesByConversationRef.current[conversationId] ?? []).filter(m => ids.includes(m.id))
+        const missingIds = ids.filter(id => !resolved.find(m => m.id === id))
+
+        if (missingIds.length > 0) {
+          console.log('[ChatPage.loadPinnedMessages] missing pinned message objects, will fetch conversation messages', { conversationId, missingIds })
+          try {
+            const rawMessages = await fetchMessages(accessToken, conversationId, true)
+            const mapped = rawMessages.map(r => applyRestrictedMessage(normalizeMessage(mapRawMessage(r, user?.id || '')), isRestrictedMode))
+
+            // Merge into messagesByConversation cache
+            setMessagesByConversation((prev) => {
+              const current = prev[conversationId] ?? []
+              const next = [...current]
+              for (const m of mapped) {
+                const idx = next.findIndex(x => (x.id && x.id === m.id) || (m.clientMessageId && x.clientMessageId === m.clientMessageId))
+                if (idx === -1) {
+                  next.push(m)
+                } else {
+                  next[idx] = mergeMessage(next[idx], m)
+                }
+              }
+              return { ...prev, [conversationId]: sortMessages(dedupeMessages(next)) }
+            })
+
+            // Re-resolve from freshly fetched 'mapped' list (don't rely on ref synchronization)
+            resolved = mapped.filter(m => ids.includes(m.id))
+            console.log('[ChatPage.loadPinnedMessages] after fetch resolved pinned objects count:', resolved.length)
+          } catch (err) {
+            console.warn('[ChatPage.loadPinnedMessages] Failed to fetch conversation messages for pinned resolution', { conversationId, err })
+          }
+        }
+
+        // Populate pinnedMessages map with message objects we have
+        setPinnedMessages((prev) => ({
+          ...prev,
+          [conversationId]: ids.map(id => (resolved.find(m => m.id === id) as ChatMessage | undefined)).filter(Boolean) as ChatMessage[],
+        }))
+
       } catch (error) {
         console.warn('[ChatPage.loadPinnedMessages] Failed to fetch pinned messages', { conversationId, error })
       } finally {
         loadingPinnedRef.current[conversationId] = false
       }
     },
-    [accessToken],
+    [accessToken, isRestrictedMode, user?.id],
   )
+
 
   const syncPinnedMessages = loadPinnedMessages
 
@@ -1200,18 +1279,26 @@ export default function ChatPage() {
 
             // PIN/UNPIN Sync
             if (sys.action === 'PIN_MESSAGE') {
-              console.log('[ChatPage] Ã¯Â¿Â½Ã¯Â¿Â½ Handling PIN_MESSAGE event');
-              setPinnedMessageIds(prev => ({
-                ...prev,
-                [cid]: [...(prev[cid] || []), sys.messageId].filter((v, i, a) => a.indexOf(v) === i)
-              }));
+              console.log('[ChatPage] Handling PIN_MESSAGE event -> sys:', sys, 'cid:', cid);
+              setPinnedMessageIds(prev => {
+                const next = ({ ...prev, [cid]: [...(prev[cid] || []), sys.messageId].filter((v, i, a) => a.indexOf(v) === i) });
+                console.log('[ChatPage] setPinnedMessageIds updated (PIN):', { cid, nextIds: next[cid] });
+                return next;
+              });
+              // Ensure pinned message objects are loaded for remote clients
+              console.log('[ChatPage] syncPinnedMessages requested for', cid);
+              void syncPinnedMessages(cid);
             }
             if (sys.action === 'UNPIN_MESSAGE') {
-              console.log('[ChatPage] Ã¯Â¿Â½Ã¯Â¿Â½ Handling UNPIN_MESSAGE event');
-              setPinnedMessageIds(prev => ({
-                ...prev,
-                [cid]: (prev[cid] || []).filter(id => id !== sys.messageId)
-              }));
+              console.log('[ChatPage] Handling UNPIN_MESSAGE event -> sys:', sys, 'cid:', cid);
+              setPinnedMessageIds(prev => {
+                const next = ({ ...prev, [cid]: (prev[cid] || []).filter(id => id !== sys.messageId) });
+                console.log('[ChatPage] setPinnedMessageIds updated (UNPIN):', { cid, nextIds: next[cid] });
+                return next;
+              });
+              // Refresh pinned list from server to keep state consistent
+              console.log('[ChatPage] syncPinnedMessages requested for', cid);
+              void syncPinnedMessages(cid);
             }
 
             // Group Info Sync handled in Fast Path below
@@ -1237,6 +1324,18 @@ export default function ChatPage() {
               console.log('[ChatPage] Ã¯Â¿Â½Ã¯Â¿Â½ Handling FRIEND_ACCEPTED signal');
               void loadInbox(accessToken);
             }
+          }
+
+          // Fallback: sometimes system payloads are delivered as TEXT that our JSON parse missed.
+          // If the raw text contains PIN_MESSAGE / UNPIN_MESSAGE, trigger a pinned sync.
+          try {
+            const raw = mapped.text || '';
+            if (typeof raw === 'string' && (raw.includes('PIN_MESSAGE') || raw.includes('UNPIN_MESSAGE'))) {
+              console.log('[ChatPage] Fallback detected PIN/UNPIN inside text, syncing pinned messages for', mapped.conversationId)
+              void syncPinnedMessages(mapped.conversationId)
+            }
+          } catch (e) {
+            /* ignore fallback errors */
           }
         } catch (err) {
           console.warn('[ChatPage] Error processing system signal:', err);
@@ -1362,6 +1461,17 @@ export default function ChatPage() {
           void syncMessageReaction(mapped.id);
         } catch (err) { /* silent bg error */ }
       })();
+
+      // FALLBACK: Always refresh pinned list when any message arrives
+      // This ensures pinned list updates even if PIN_MESSAGE event is not delivered by gateway
+      // Debounce: only sync pinned messages once every 3 seconds per conversation
+      const now = Date.now();
+      const lastSync = lastPinnedSyncTimeRef.current[mapped.conversationId] ?? 0;
+      if (now - lastSync >= 3000) {
+        lastPinnedSyncTimeRef.current[mapped.conversationId] = now;
+        console.log('[ChatPage.onMessageReceived] fallback: refreshing pinned messages due to new message for', mapped.conversationId);
+        void syncPinnedMessages(mapped.conversationId);
+      }
     },
     onMessageRecalled: (payload) => {
       if (!payload.messageId || !payload.conversationId) {
@@ -1475,8 +1585,8 @@ export default function ChatPage() {
 
       console.log('Ã¯Â¿Â½Ã§â€œÅ  nhÃ¥Â»â€¢Ã¨Â¦Â sÃ¥Â»â„¢Ã¯Â¿Â½ kiÃ¥Â»â„¢Ã°Â¡ÂµÅ¾ presence:', payload)
       console.log('Ã¯Â¿Â½ang tÃ§Â©Â«m userId:', payload.userId, 'trong danh sÃ§ÂÂºch conversations...')
-      console.log('Danh sÃ§ÂÂºch ID hiÃ¥Â»â„¢Ã°Â¡ÂµÅ¾ cÃ§Â±â‚¬:', conversations.map((conv) => conv.userId))
-
+        console.log('[ChatPage.onPresenceChanged] Presence updated:', payload)
+        console.log('[ChatPage.onPresenceChanged] Looking for userId:', payload.userId, 'in conversations...')
       setConversations((prev) => {
         let changed = false
         const next = prev.map((conv) => {
@@ -1508,13 +1618,13 @@ export default function ChatPage() {
     onReactionAdded: (payload: any) => {
       console.log('[ChatPage.socket] Reaction added:', payload);
       if (payload.messageId) {
-        applyReactionSocketEvent(payload.messageId, payload.emoji, payload.actorId, 'added');
+        applyReactionSocketEvent(payload.messageId, resolveReactionEmoji(payload), resolveReactionActorId(payload), 'added');
       }
     },
     onReactionRemoved: (payload: any) => {
       console.log('[ChatPage.socket] Reaction removed:', payload);
       if (payload.messageId) {
-        applyReactionSocketEvent(payload.messageId, payload.emoji, payload.actorId, 'removed');
+        applyReactionSocketEvent(payload.messageId, resolveReactionEmoji(payload), resolveReactionActorId(payload), 'removed');
       }
     },
     onMessagePinned: (payload: any) => {
@@ -1529,6 +1639,8 @@ export default function ChatPage() {
         ...prev,
         [conversationId]: [...(prev[conversationId] || []), messageId].filter((id, index, list) => list.indexOf(id) === index),
       }))
+      // Also refresh pinned messages from server to ensure UI shows message objects
+      void syncPinnedMessages(conversationId)
     },
     onMessageUnpinned: (payload: any) => {
       const conversationId = String(payload?.conversationId ?? payload?.pin?.conversationId ?? payload?.pin?.conversation_id ?? '').trim()
@@ -1542,6 +1654,7 @@ export default function ChatPage() {
         ...prev,
         [conversationId]: (prev[conversationId] || []).filter((id) => id !== messageId),
       }))
+      void syncPinnedMessages(conversationId)
     },
     onGroupUpdated: (payload: any) => {
       console.log('[ChatPage.socket] Group updated:', payload);
@@ -1887,33 +2000,124 @@ export default function ChatPage() {
         }
 
         await addMessageReaction(accessToken, messageId, emoji)
+
+        // Optimistic local update for normal reactions so sender sees change immediately
+        setReactionStatesByMessage(prev => {
+          const current = prev[messageId] || { reactions: {} };
+          const nextReactions = { ...current.reactions } as MessageReactionMap
+          const key = (Object.keys(nextReactions) as ReactionKey[]).find(k => REACTION_OPTIONS.find(o => o.key === k)?.emoji === emoji) || EMOJI_TO_REACTION_KEY[emoji] || undefined
+
+          if (key) {
+            const cur = nextReactions[key] ?? { count: 0, myCount: 0, userIds: [] }
+            if (!cur.userIds.includes(user?.id || '')) {
+              nextReactions[key] = {
+                count: cur.count + 1,
+                myCount: (cur.myCount || 0) + 1,
+                userIds: [...cur.userIds, user?.id || '']
+              }
+            }
+          }
+
+          return {
+            ...prev,
+            [messageId]: {
+              ...current,
+              reactions: nextReactions,
+              lastUsedReaction: key ?? current.lastUsedReaction,
+            }
+          }
+        })
+
         await syncMessageReaction(messageId)
 
-        // Emit signal to sync other clients (Mobile-friendly format)
-        // Note: Mobile uses a strict .contains('"action":"UPDATE_MESSAGE_REACTIONS"') check
-        // on the RAW string. We must ensure NO WHITESPACE anywhere (colons OR commas).
+        // Emit both a system signal (already used by mobile) and a socket reaction event
         if (user?.id) {
           const reactionSignal = {
             action: 'UPDATE_MESSAGE_REACTIONS',
             messageId,
+            message_id: messageId,
             conversationId: selectedConversationId,
+            conversation_id: selectedConversationId,
             actorId: user.id,
+            actor_id: user.id,
+            userId: user.id,
+            user_id: user.id,
             type: 'ADD',
             emoji: emoji
           };
 
-          void emitSendMessage({
-            conversationId: selectedConversationId,
-            content: JSON.stringify(reactionSignal).replace(/\s/g, ''),
-            messageType: 'SYSTEM',
-            clientMessageId: crypto.randomUUID()
-          });
+          // Ensure we're in the room before emitting low-level socket event and system signal
+          try {
+            console.log('[ChatPage.emit] join before reaction.added', { conversationId: selectedConversationId, messageId, actorId: user.id, emoji })
+            await joinConversation(selectedConversationId)
+            const socket = getSocket()
+            console.log('[ChatPage.emit] join done for reaction.added', { connected: socket?.connected, socketId: socket?.id, conversationId: selectedConversationId })
+
+            const reactionContent = JSON.stringify(reactionSignal).replace(/\s/g, '')
+            try {
+              console.log('[ChatPage.emit] sending reaction via socket primary (ADD)', reactionSignal)
+              if (socket?.connected) {
+                try {
+                  const ack = await emitSendMessage({
+                    conversationId: selectedConversationId,
+                    content: reactionContent,
+                    messageType: 'TEXT',
+                    clientMessageId: crypto.randomUUID(),
+                  })
+                  console.log('[ChatPage.emit] send ACK (ADD):', ack)
+                  if (!ack || ack.event === 'message.error') {
+                    console.warn('[ChatPage.emit] message.send ack error, falling back to REST', ack)
+                    void sendMessageViaRest(accessToken, {
+                      conversationId: selectedConversationId,
+                      content: reactionContent,
+                      messageType: 'SYSTEM',
+                      clientMessageId: crypto.randomUUID(),
+                    })
+                  }
+                } catch (innerErr) {
+                  console.warn('[ChatPage.emit] emitSendMessage threw, fallback to REST (ADD)', innerErr)
+                  void sendMessageViaRest(accessToken, {
+                    conversationId: selectedConversationId,
+                    content: reactionContent,
+                    messageType: 'SYSTEM',
+                    clientMessageId: crypto.randomUUID(),
+                  })
+                }
+              } else {
+                console.warn('[ChatPage.emit] socket not connected, fallback to REST for ADD')
+                void sendMessageViaRest(accessToken, {
+                  conversationId: selectedConversationId,
+                  content: reactionContent,
+                  messageType: 'SYSTEM',
+                  clientMessageId: crypto.randomUUID()
+                })
+              }
+            } catch (e) {
+              console.warn('[ChatPage.emit] failed to send reaction signal via socket', e)
+            }
+
+            // Also emit low-level socket event to encourage immediate broadcast
+            console.log('[ChatPage.emit] emitting message.reaction.added', { messageId, conversationId: selectedConversationId, actorId: user.id, userId: user.id, emoji })
+            socket?.emit && socket.emit('message.reaction.added', {
+              messageId,
+              message_id: messageId,
+              conversationId: selectedConversationId,
+              conversation_id: selectedConversationId,
+              actorId: user.id,
+              actor_id: user.id,
+              userId: user.id,
+              user_id: user.id,
+              emoji,
+            })
+          } catch (e) {
+            console.warn('[ChatPage.emit] failed to emit reaction.added', e)
+          }
         }
       } catch (error) {
         console.error('[ChatPage.handleAddReaction] Failed to add reaction', { messageId, reactionKey, error })
       }
     },
-    [accessToken, selectedConversationId, (user ? user.id : ""), emitSendMessage, syncMessageReaction],
+    [accessToken, selectedConversationId, (user ? user.id : ""), emitSendMessage, syncMessageReaction, getSocket],
   )
 
   const handleRemoveReaction = useCallback(
@@ -1938,31 +2142,125 @@ export default function ChatPage() {
 
       try {
         await removeMessageReaction(accessToken, messageId)
+
+        // Optimistic local update for removal
+        setReactionStatesByMessage(prev => {
+          const current = prev[messageId] || { reactions: {} };
+          const nextReactions = { ...current.reactions } as MessageReactionMap
+          const key = (Object.keys(nextReactions) as ReactionKey[]).find(k => REACTION_OPTIONS.find(o => o.key === k)?.emoji === emoji) || EMOJI_TO_REACTION_KEY[emoji] || undefined
+
+          if (key) {
+            const cur = nextReactions[key]
+            if (cur) {
+              const nextUserIds = cur.userIds.filter(id => id !== user?.id)
+              const nextCount = Math.max(0, cur.count - (cur.userIds.includes(user?.id || '') ? 1 : 0))
+              const nextMyCount = user?.id && cur.myCount > 0 && cur.userIds.includes(user.id) ? Math.max(0, cur.myCount - 1) : cur.myCount
+
+              if (nextCount <= 0 && nextMyCount <= 0 && nextUserIds.length === 0) {
+                delete nextReactions[key]
+              } else {
+                nextReactions[key] = { count: nextCount, myCount: nextMyCount, userIds: nextUserIds }
+              }
+            }
+          }
+
+          return {
+            ...prev,
+            [messageId]: {
+              ...current,
+              reactions: nextReactions,
+            }
+          }
+        })
+
         await syncMessageReaction(messageId)
 
-        // Emit signal to sync other clients (Mobile-friendly format)
         if (user?.id) {
           const reactionSignal = {
             action: 'UPDATE_MESSAGE_REACTIONS',
             messageId,
+            message_id: messageId,
             conversationId: selectedConversationId,
+            conversation_id: selectedConversationId,
             actorId: user.id,
+            actor_id: user.id,
+            userId: user.id,
+            user_id: user.id,
             type: 'REMOVE',
             emoji: emoji
           };
 
-          void emitSendMessage({
-            conversationId: selectedConversationId,
-            content: JSON.stringify(reactionSignal).replace(/\s/g, ''),
-            messageType: 'SYSTEM',
-            clientMessageId: crypto.randomUUID()
-          });
+          // Ensure we're in the room before emitting low-level socket event and system signal
+          try {
+            console.log('[ChatPage.emit] join before reaction.removed', { conversationId: selectedConversationId, messageId, actorId: user.id, emoji })
+            await joinConversation(selectedConversationId)
+            const socket = getSocket()
+            console.log('[ChatPage.emit] join done for reaction.removed', { connected: socket?.connected, socketId: socket?.id, conversationId: selectedConversationId })
+
+            const reactionContent = JSON.stringify(reactionSignal).replace(/\s/g, '')
+            try {
+              console.log('[ChatPage.emit] sending reaction via socket primary (REMOVE)', reactionSignal)
+              if (socket?.connected) {
+                try {
+                  const ack = await emitSendMessage({
+                    conversationId: selectedConversationId,
+                    content: reactionContent,
+                    messageType: 'TEXT',
+                    clientMessageId: crypto.randomUUID(),
+                  })
+                  console.log('[ChatPage.emit] send ACK (REMOVE):', ack)
+                  if (!ack || ack.event === 'message.error') {
+                    console.warn('[ChatPage.emit] message.send ack error, falling back to REST', ack)
+                    void sendMessageViaRest(accessToken, {
+                      conversationId: selectedConversationId,
+                      content: reactionContent,
+                      messageType: 'SYSTEM',
+                      clientMessageId: crypto.randomUUID(),
+                    })
+                  }
+                } catch (innerErr) {
+                  console.warn('[ChatPage.emit] emitSendMessage threw, fallback to REST (REMOVE)', innerErr)
+                  void sendMessageViaRest(accessToken, {
+                    conversationId: selectedConversationId,
+                    content: reactionContent,
+                    messageType: 'SYSTEM',
+                    clientMessageId: crypto.randomUUID(),
+                  })
+                }
+              } else {
+                console.warn('[ChatPage.emit] socket not connected, fallback to REST for REMOVE')
+                void sendMessageViaRest(accessToken, {
+                  conversationId: selectedConversationId,
+                  content: reactionContent,
+                  messageType: 'SYSTEM',
+                  clientMessageId: crypto.randomUUID()
+                })
+              }
+            } catch (e) {
+              console.warn('[ChatPage.emit] failed to send reaction signal via socket', e)
+            }
+
+            console.log('[ChatPage.emit] emitting message.reaction.removed', { messageId, conversationId: selectedConversationId, actorId: user.id, userId: user.id, emoji })
+            socket?.emit && socket.emit('message.reaction.removed', {
+              messageId,
+              message_id: messageId,
+              conversationId: selectedConversationId,
+              conversation_id: selectedConversationId,
+              actorId: user.id,
+              actor_id: user.id,
+              userId: user.id,
+              user_id: user.id,
+              emoji,
+            })
+          } catch (e) {
+            console.warn('[ChatPage.emit] failed to emit reaction.removed', e)
+          }
         }
       } catch (error) {
         console.error('[ChatPage.handleRemoveReaction] Failed to remove reaction', { messageId, reactionKey, error })
       }
     },
-    [accessToken, selectedConversationId, (user ? user.id : ""), emitSendMessage, reactionStatesByMessage, syncMessageReaction],
+    [accessToken, selectedConversationId, (user ? user.id : ""), emitSendMessage, reactionStatesByMessage, syncMessageReaction, getSocket],
   )
 
   const handleDeleteForMe = useCallback(
@@ -2074,12 +2372,26 @@ export default function ChatPage() {
           });
 
           const clientMessageId = crypto.randomUUID();
-          void sendMessageViaRest(accessToken, {
-            conversationId,
-            content: systemPayload,
-            messageType: 'TEXT',
-            clientMessageId
-          });
+          void (async () => {
+            try {
+              await sendMessageViaRest(accessToken, {
+                conversationId,
+                content: systemPayload,
+                messageType: 'TEXT',
+                clientMessageId,
+              })
+
+              // Also attempt to emit via socket so gateway broadcasts to other clients in realtime
+              try {
+                await joinConversation(conversationId)
+                await emitSendMessage({ conversationId, content: systemPayload, messageType: 'TEXT', clientMessageId: crypto.randomUUID() })
+              } catch (e) {
+                // ignore socket errors; REST is source-of-truth
+              }
+            } catch (e) {
+              // ignore REST errors here; handled by outer catch
+            }
+          })();
 
           // Optimistic UI Update
           const optimisticSystemMessage: ChatMessage = {
@@ -2121,12 +2433,26 @@ export default function ChatPage() {
         });
 
         const clientMessageId = crypto.randomUUID();
-        void sendMessageViaRest(accessToken, {
-          conversationId,
-          content: systemPayload,
-          messageType: 'TEXT',
-          clientMessageId
-        });
+        void (async () => {
+          try {
+            await sendMessageViaRest(accessToken, {
+              conversationId,
+              content: systemPayload,
+              messageType: 'TEXT',
+              clientMessageId,
+            })
+
+            // Also attempt to emit via socket so gateway broadcasts to other clients in realtime
+            try {
+              await joinConversation(conversationId)
+              await emitSendMessage({ conversationId, content: systemPayload, messageType: 'TEXT', clientMessageId: crypto.randomUUID() })
+            } catch (e) {
+              // ignore socket errors; REST is source-of-truth
+            }
+          } catch (e) {
+            // ignore REST errors here; handled by outer catch
+          }
+        })();
 
         // Optimistic UI Update
         const optimisticSystemMessage: ChatMessage = {
@@ -3610,14 +3936,22 @@ export default function ChatPage() {
       return
     }
 
-    // REMOVED REACTION POLLING: It was causing O(N) requests every 2.5s, 
-    // which flooded the network and caused Socket ACK timeouts (the 4-5s delay).
-    // Reactions are now handled via real-time socket events instead.
+    // Lightweight fallback polling for the active conversation only.
+    // This keeps reactions in sync even when the gateway does not emit
+    // message.reaction.* events for some sessions.
     void syncConversationReactions()
+
+    const interval = window.setInterval(() => {
+      void syncConversationReactions()
+    }, 4000)
+
+    return () => {
+      window.clearInterval(interval)
+    }
   }, [accessToken, isSocketConnected, selectedConversationId, syncConversationReactions])
 
   useEffect(() => {
-    console.log('Danh sách ID sau khi mapping:', conversations.map((conv) => conv.userId))
+    console.log('[ChatPage.onPresenceChanged] Conversation IDs:', conversations.map((conv) => conv.userId))
   }, [conversations])
 
   const conversationIdsSignature = useMemo(
@@ -5185,10 +5519,18 @@ function PinnedLogicHooks({
 }: any) {
   // ISOLATED PINNED FETCH (NO loadInbox call)
   useEffect(() => {
-    if (!accessToken || isBootstrapping || !selectedConversationId) return
+    console.log('[PinnedLogicHooks.effect] Checking pinned fetch conditions', { accessToken: !!accessToken, isBootstrapping, selectedConversationId, lastConv: lastConvRef.current });
+    if (!accessToken || isBootstrapping || !selectedConversationId) {
+      console.log('[PinnedLogicHooks.effect] Skipping pinned fetch due to missing conditions');
+      return;
+    }
 
     // Avoid re-fetching same conversation (Double Guard)
-    if (lastConvRef.current === selectedConversationId) return
+    if (lastConvRef.current === selectedConversationId) {
+      console.log('[PinnedLogicHooks.effect] Skipping pinned fetch - same conversation');
+      return;
+    }
+    console.log('[PinnedLogicHooks.effect] Calling loadPinnedMessages for conversation', selectedConversationId);
     lastConvRef.current = selectedConversationId
 
     void loadPinnedMessages(selectedConversationId)
@@ -5200,6 +5542,8 @@ function PinnedLogicHooks({
 
     const ids = pinnedMessageIds[selectedConversationId] || []
     const convMessages = messagesByConversation[selectedConversationId] || []
+
+    console.log('[PinnedLogicHooks] mapping pinned ids -> messages', { conversationId: selectedConversationId, ids, convCount: convMessages.length })
 
     const mapped = ids.map((id: string) => {
       const found = convMessages.find((m: any) => m.id === id)
@@ -5219,6 +5563,8 @@ function PinnedLogicHooks({
         isPlaceholder: true, // Custom flag for UI
       }
     })
+
+    console.log('[PinnedLogicHooks] mapped pinned messages count:', mapped.length)
 
     setPinnedMessages((prev: any) => ({
       ...prev,
@@ -5247,6 +5593,7 @@ function PinnedLogicHooks({
 
   return null;
 }
+
 
 
 

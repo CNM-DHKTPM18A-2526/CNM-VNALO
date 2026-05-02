@@ -103,6 +103,7 @@ export function ChatWindow({
   const { userMap } = useUserStore()
   const { t } = useLanguage()
   const messagesContainerRef = useRef<HTMLDivElement | null>(null)
+  const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null)
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null)
   const [replyMessage, setReplyMessage] = useState<ChatMessage | null>(null)
   const [isPinnedExpanded, setIsPinnedExpanded] = useState(false)
@@ -582,6 +583,8 @@ export function ChatWindow({
                     userRole={currentUserRole}
                     allowMemberPin={allowMemberPin}
                     onVotePoll={onVotePoll}
+                    hoveredMessageId={hoveredMessageId}
+                    setHoveredMessageId={setHoveredMessageId}
                   />
                 );
               } else {
@@ -619,6 +622,8 @@ export function ChatWindow({
                     userRole={currentUserRole}
                     allowMemberPin={allowMemberPin}
                     onVotePoll={onVotePoll}
+                    hoveredMessageId={hoveredMessageId}
+                    setHoveredMessageId={setHoveredMessageId}
                   />
                 );
               }
