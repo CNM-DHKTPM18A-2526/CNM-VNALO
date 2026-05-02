@@ -32,22 +32,23 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
   final Map<String, int> _retryCounts = {};
   final Map<String, List<Message>> _pinnedMessages = {};
   final Map<String, List<MessageReaction>> _reactions = {};
-  final StreamSubscription<Message> _messageSub;
-  final StreamSubscription<Map<String, dynamic>> _readSub;
-  final StreamSubscription<Map<String, dynamic>> _deliveredSub;
-  final StreamSubscription<Map<String, dynamic>> _recalledSub;
-  final StreamSubscription<Map<String, dynamic>> _pinnedSub;
-  final StreamSubscription<Map<String, dynamic>> _unpinnedSub;
-  final StreamSubscription<Map<String, dynamic>> _reactionAddedSub;
-  final StreamSubscription<Map<String, dynamic>> _reactionRemovedSub;
-  final StreamSubscription<Map<String, dynamic>> _groupDisbandedSub;
-  final StreamSubscription<Map<String, dynamic>> _groupSettingsChangedSub;
-  final StreamSubscription<Map<String, dynamic>> _groupMemberAddedSub;
-  final StreamSubscription<Map<String, dynamic>> _groupMemberRemovedSub;
-  final StreamSubscription<Map<String, dynamic>> _groupRoleChangedSub;
-  final StreamSubscription<Map<String, dynamic>> _groupAdminTransferredSub;
-  final StreamSubscription<Map<String, dynamic>> _typingSub;
-  final StreamSubscription<Map<String, dynamic>> _presenceSub;
+  StreamSubscription<Message>? _messageSub;
+  StreamSubscription<Map<String, dynamic>>? _readSub;
+  StreamSubscription<Map<String, dynamic>>? _deliveredSub;
+  StreamSubscription<Map<String, dynamic>>? _recalledSub;
+  StreamSubscription<Map<String, dynamic>>? _pinnedSub;
+  StreamSubscription<Map<String, dynamic>>? _unpinnedSub;
+  StreamSubscription<Map<String, dynamic>>? _reactionAddedSub;
+  StreamSubscription<Map<String, dynamic>>? _reactionRemovedSub;
+  StreamSubscription<Map<String, dynamic>>? _groupDisbandedSub;
+  StreamSubscription<Map<String, dynamic>>? _groupSettingsChangedSub;
+  StreamSubscription<Map<String, dynamic>>? _groupMemberAddedSub;
+  StreamSubscription<Map<String, dynamic>>? _groupMemberRemovedSub;
+  StreamSubscription<Map<String, dynamic>>? _groupRoleChangedSub;
+  StreamSubscription<Map<String, dynamic>>? _groupAdminTransferredSub;
+  StreamSubscription<Map<String, dynamic>>? _typingSub;
+  StreamSubscription<Map<String, dynamic>>? _presenceSub;
+  int _lastSocketReinitCount = -1;
   final Random _random = Random.secure();
 
   // Typing indicator state: conversationId -> { userId -> lastSeen }
@@ -105,50 +106,62 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     required MediaService mediaService,
     required NotificationService notificationService,
     required LocalDatabase db,
-  })  : _chatService = chatService,
+  })      : _chatService = chatService,
         _socketService = socketService,
         _mediaService = mediaService,
-      _notificationService = notificationService,
-        _db = db,
-        _messageSub = socketService.onMessage.listen((_) {}),
-        _readSub = socketService.onRead.listen((_) {}),
-        _deliveredSub = socketService.onDelivered.listen((_) {}),
-        _recalledSub = socketService.onRecalled.listen((_) {}),
-        _pinnedSub = socketService.onPinned.listen((_) {}),
-        _unpinnedSub = socketService.onUnpinned.listen((_) {}),
-        _reactionAddedSub = socketService.onReactionAdded.listen((_) {}),
-        _reactionRemovedSub = socketService.onReactionRemoved.listen((_) {}),
-        _groupDisbandedSub = socketService.onGroupDisbanded.listen((_) {}),
-        _groupSettingsChangedSub = socketService.onGroupSettingsChanged.listen((_) {}),
-        _groupMemberAddedSub = socketService.onGroupMemberAdded.listen((_) {}),
-        _groupMemberRemovedSub = socketService.onGroupMemberRemoved.listen((_) {}),
-        _groupRoleChangedSub = socketService.onGroupRoleChanged.listen((_) {}),
-        _groupAdminTransferredSub = socketService.onGroupAdminTransferred.listen((_) {}),
-        _typingSub = socketService.onTyping.listen((_) {}),
-        _presenceSub = socketService.onPresence.listen((_) {}) {
+        _notificationService = notificationService,
+        _db = db {
     _notificationService.ensureInitialized();
-    _messageSub.onData((msg) {
-      debugPrint('[ChatProvider] 📡 SOCKET MESSAGE: id=${msg.id} conv=${msg.conversationId} type=${msg.messageType} mediaUrl=${msg.mediaUrl}');
-      _handleIncomingMessage(msg);
-    });
-    _readSub.onData(_handleReadEvent);
-    _deliveredSub.onData(_handleDeliveredEvent);
-    _recalledSub.onData(_handleRecalledEvent);
-    _pinnedSub.onData(_handlePinnedEvent);
-    _unpinnedSub.onData(_handleUnpinnedEvent);
-    _reactionAddedSub.onData(_handleReactionAddedEvent);
-    _reactionRemovedSub.onData(_handleReactionRemovedEvent);
-    _groupDisbandedSub.onData(_handleGroupDisbandedEvent);
-    _groupSettingsChangedSub.onData(_handleGroupSettingsChangedEvent);
-    _groupMemberAddedSub.onData(_handleGroupMemberAddedEvent);
-    _groupMemberRemovedSub.onData(_handleGroupMemberRemovedEvent);
-    _groupRoleChangedSub.onData(_handleGroupRoleChangedEvent);
-    _groupAdminTransferredSub.onData(_handleGroupAdminTransferredEvent);
-    _typingSub.onData(_handleTypingEvent);
-    _presenceSub.onData(_handlePresenceEvent);
+    _initSocketListeners();
     
     // Listen for app lifecycle changes
     WidgetsBinding.instance.addObserver(this);
+  }
+
+  void _initSocketListeners() {
+    _cancelSubscriptions();
+    
+    debugPrint('🟢 [ChatProvider] Initializing socket listeners (Socket reinit count: ${_socketService.reinitCount})');
+    _lastSocketReinitCount = _socketService.reinitCount;
+
+    _messageSub = _socketService.onMessage.listen((msg) {
+      debugPrint('[ChatProvider] 📡 SOCKET MESSAGE: id=${msg.id} conv=${msg.conversationId} type=${msg.messageType}');
+      _handleIncomingMessage(msg);
+    });
+    _readSub = _socketService.onRead.listen(_handleReadEvent);
+    _deliveredSub = _socketService.onDelivered.listen(_handleDeliveredEvent);
+    _recalledSub = _socketService.onRecalled.listen(_handleRecalledEvent);
+    _pinnedSub = _socketService.onPinned.listen(_handlePinnedEvent);
+    _unpinnedSub = _socketService.onUnpinned.listen(_handleUnpinnedEvent);
+    _reactionAddedSub = _socketService.onReactionAdded.listen(_handleReactionAddedEvent);
+    _reactionRemovedSub = _socketService.onReactionRemoved.listen(_handleReactionRemovedEvent);
+    _groupDisbandedSub = _socketService.onGroupDisbanded.listen(_handleGroupDisbandedEvent);
+    _groupSettingsChangedSub = _socketService.onGroupSettingsChanged.listen(_handleGroupSettingsChangedEvent);
+    _groupMemberAddedSub = _socketService.onGroupMemberAdded.listen(_handleGroupMemberAddedEvent);
+    _groupMemberRemovedSub = _socketService.onGroupMemberRemoved.listen(_handleGroupMemberRemovedEvent);
+    _groupRoleChangedSub = _socketService.onGroupRoleChanged.listen(_handleGroupRoleChangedEvent);
+    _groupAdminTransferredSub = _socketService.onGroupAdminTransferred.listen(_handleGroupAdminTransferredEvent);
+    _typingSub = _socketService.onTyping.listen(_handleTypingEvent);
+    _presenceSub = _socketService.onPresence.listen(_handlePresenceEvent);
+  }
+
+  void _cancelSubscriptions() {
+    _messageSub?.cancel();
+    _readSub?.cancel();
+    _deliveredSub?.cancel();
+    _recalledSub?.cancel();
+    _pinnedSub?.cancel();
+    _unpinnedSub?.cancel();
+    _reactionAddedSub?.cancel();
+    _reactionRemovedSub?.cancel();
+    _groupDisbandedSub?.cancel();
+    _groupSettingsChangedSub?.cancel();
+    _groupMemberAddedSub?.cancel();
+    _groupMemberRemovedSub?.cancel();
+    _groupRoleChangedSub?.cancel();
+    _groupAdminTransferredSub?.cancel();
+    _typingSub?.cancel();
+    _presenceSub?.cancel();
   }
 
   @override
@@ -166,22 +179,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _messageSub.cancel();
-    _readSub.cancel();
-    _deliveredSub.cancel();
-    _recalledSub.cancel();
-    _pinnedSub.cancel();
-    _unpinnedSub.cancel();
-    _reactionAddedSub.cancel();
-    _reactionRemovedSub.cancel();
-    _groupDisbandedSub.cancel();
-    _groupSettingsChangedSub.cancel();
-    _groupMemberAddedSub.cancel();
-    _groupMemberRemovedSub.cancel();
-    _groupRoleChangedSub.cancel();
-    _groupAdminTransferredSub.cancel();
-    _typingSub.cancel();
-    _presenceSub.cancel();
+    _cancelSubscriptions();
     _inboxPollingTimer?.cancel();
     _highlightTimer?.cancel();
     for (final timer in _retryTimers.values) {
@@ -718,8 +716,32 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     notifyListeners();
   }
 
+  void update(String? userId) {
+    if (_currentUserId != userId) {
+      debugPrint('[ChatProvider] User changed: $_currentUserId -> $userId');
+      _currentUserId = userId;
+      if (userId == null || userId.isEmpty) {
+        _cancelSubscriptions();
+        _messages.clear();
+        _conversations = [];
+        _activeConversationId = null;
+        notifyListeners();
+      } else {
+        loadInbox();
+      }
+    }
+
+    if (userId != null && userId.isNotEmpty && _lastSocketReinitCount != _socketService.reinitCount) {
+      debugPrint('🟢 [ChatProvider] Socket re-initialized, re-subscribing listeners');
+      _initSocketListeners();
+      if (_currentUserId != null && _currentUserId!.isNotEmpty) {
+        loadInbox();
+      }
+    }
+  }
+
   void setCurrentUserId(String userId) {
-    _currentUserId = userId;
+    update(userId);
   }
 
   void closeConversation() {

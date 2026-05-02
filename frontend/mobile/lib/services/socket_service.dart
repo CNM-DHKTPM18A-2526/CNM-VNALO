@@ -7,7 +7,7 @@ import 'package:vnalo_mobile/config/app_config.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
 import 'package:vnalo_mobile/services/auth_events.dart';
 
-class SocketService {
+class SocketService with ChangeNotifier {
   io.Socket? _socket;
   final _joinedRooms = <String>{};
   final _pendingRoomJoins = <String>{};
@@ -16,6 +16,9 @@ class SocketService {
   final _seenMessageKeys = <String>{};
   static const kMaxDedupCache = 500;
 
+  String? _lastToken;
+  int _reinitCount = 0;
+  int get reinitCount => _reinitCount;
   String? _globalToken;
   bool _disposed = false;
   VoidCallback? _onSocketReady;
@@ -362,11 +365,21 @@ class SocketService {
       debugPrint('[SocketService] group.adminTransferred received: $data');
       _groupAdminTransferredController.add(Map<String, dynamic>.from(data));
     });
+    _socket!.onAny((event, data) {
+      debugPrint('📩 [SOCKET ANY] Event: $event | Data: $data');
+    });
+
     _socket!.on('friendship.updated', (data) {
-      _friendshipUpdatedController.add(Map<String, dynamic>.from(data));
+      debugPrint('[SOCKET] 🤝 friendship.updated: $data');
+      _friendshipUpdatedController.add(Map<String, dynamic>.from(data ?? {}));
     });
     _socket!.on('friend.request.received', (data) {
-      _friendRequestReceivedController.add(Map<String, dynamic>.from(data));
+      debugPrint('[SOCKET] 🤝 friend.request.received: $data');
+      if (data != null) {
+        _friendRequestReceivedController.add(Map<String, dynamic>.from(data as Map));
+      } else {
+        _friendRequestReceivedController.add({});
+      }
     });
 
     // ─── Group Call Signal Listeners ────────────────────────────────────────
@@ -846,6 +859,8 @@ class SocketService {
     if (_groupCallSignalController.isClosed) _groupCallSignalController = StreamController<Map<String, dynamic>>.broadcast();
     if (_connectController.isClosed) _connectController = StreamController<void>.broadcast();
     if (_sendErrorController.isClosed) _sendErrorController = StreamController<Map<String, dynamic>>.broadcast();
+    _reinitCount++;
+    notifyListeners();
   }
 
   /// Set a callback to be called when socket is ready (connected)

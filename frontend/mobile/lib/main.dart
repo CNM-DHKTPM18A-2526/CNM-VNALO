@@ -145,7 +145,7 @@ class VnaloApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         Provider<StorageService>(create: (_) => StorageService()),
-        Provider<SocketService>(create: (_) => SocketService()),
+        ChangeNotifierProvider<SocketService>(create: (_) => SocketService()),
         Provider<ApiService>(
           create: (context) => ApiService(context.read<StorageService>()),
         ),
@@ -205,55 +205,39 @@ class VnaloApp extends StatelessWidget {
                 context.read<LocalSyncService>(),
               ),
         ),
-        ChangeNotifierProxyProvider<AuthProvider, ContactProvider>(
+        ChangeNotifierProxyProvider2<AuthProvider, SocketService, ContactProvider>(
           create: (ctx) => ContactProvider(
             ctx.read<FriendService>(),
             ctx.read<SocketService>(),
           ),
-          update: (ctx, auth, contact) {
+          update: (ctx, auth, socket, contact) {
             final currentContact = contact ??
                 ContactProvider(
                   ctx.read<FriendService>(),
-                  ctx.read<SocketService>(),
+                  socket,
                 );
             currentContact.update(auth.user?.id);
             return currentContact;
           },
         ),
-        ChangeNotifierProxyProvider<AuthProvider, ChatProvider>(
-          create:
-              (context) => ChatProvider(
-                chatService: context.read<ChatService>(),
-                socketService: context.read<SocketService>(),
-                mediaService: context.read<MediaService>(),
-                db: context.read<LocalDatabase>(),
-                notificationService: context.read<NotificationService>(),
-              ),
-          update: (context, auth, chat) {
-            final currentChat =
-                chat ??
+        ChangeNotifierProxyProvider2<AuthProvider, SocketService, ChatProvider>(
+          create: (context) => ChatProvider(
+            chatService: context.read<ChatService>(),
+            socketService: context.read<SocketService>(),
+            mediaService: context.read<MediaService>(),
+            db: context.read<LocalDatabase>(),
+            notificationService: context.read<NotificationService>(),
+          ),
+          update: (context, auth, socket, chat) {
+            final currentChat = chat ??
                 ChatProvider(
                   chatService: context.read<ChatService>(),
-                  socketService: context.read<SocketService>(),
+                  socketService: socket,
                   mediaService: context.read<MediaService>(),
                   db: context.read<LocalDatabase>(),
                   notificationService: context.read<NotificationService>(),
                 );
-            
-            // Sync current user ID
-            final newId = auth.user?.id;
-            final oldId = currentChat.currentUserId;
-            
-            if (newId != oldId) {
-              currentChat.setCurrentUserId(newId ?? '');
-              // If we just logged out (oldId was set, newId is null), clear memory
-              if (newId == null && oldId != null) {
-                currentChat.reset();
-              } else if (newId != null) {
-                // New user logged in - load inbox and start socket processing
-                currentChat.loadInbox();
-              }
-            }
+            currentChat.update(auth.user?.id);
             return currentChat;
           },
         ),

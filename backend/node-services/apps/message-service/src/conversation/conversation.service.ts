@@ -110,28 +110,6 @@ export class ConversationService {
           conversationId: saved.id,
         });
 
-        // Create inbox entries for both users so the conversation appears in messages tab
-        await manager.save(ConversationInbox, [
-          {
-            userId,
-            conversationId: saved.id,
-            lastMessageSeq: 0,
-            unreadCount: 0,
-            isPinned: false,
-            isMuted: false,
-            isHidden: false,
-          },
-          {
-            userId: targetUserId,
-            conversationId: saved.id,
-            lastMessageSeq: 0,
-            unreadCount: 0,
-            isPinned: false,
-            isMuted: false,
-            isHidden: false,
-          },
-        ]);
-
         this.logger.log(
           `Direct conversation created: ${saved.id} between ${uid1} and ${uid2}`,
         );
