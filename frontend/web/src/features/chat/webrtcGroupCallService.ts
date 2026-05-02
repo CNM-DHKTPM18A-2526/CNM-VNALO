@@ -212,9 +212,12 @@ export class WebRtcGroupCallService {
       // 3. Broadcast thông báo tới cả nhóm (BẮT BUỘC backend relay tới conversation room)
       this.socket?.emit('group-call:started', {
         conversationId: this.state.conversationId,
+        groupId: this.state.conversationId, // Mobile compatibility
         conversationName: params.conversationName,
+        groupName: params.conversationName, // Mobile compatibility
         callId: this.state.callId,
         callerUserId: this.currentUserId,
+        callerId: this.currentUserId, // Mobile compatibility
         callerName: this.currentUserName,
         callerAvatar: this.currentUserAvatar,
         audioOnly: this.state.audioOnly,
@@ -263,8 +266,10 @@ export class WebRtcGroupCallService {
       // Thông báo cho cả room biết mình vừa join
       this.socket?.emit('group-call:join', {
         conversationId: this.state.conversationId,
+        groupId: this.state.conversationId, // Mobile compatibility
         callId: this.state.callId,
         senderUserId: this.currentUserId,
+        userId: this.currentUserId, // Mobile compatibility
         displayName: this.currentUserName,
         avatarUrl: this.currentUserAvatar,
         audioOnly: this.state.audioOnly,
@@ -310,6 +315,7 @@ export class WebRtcGroupCallService {
     this.socket.on('group-call:offer', this.onRemoteOffer)
     this.socket.on('group-call:answer', this.onRemoteAnswer)
     this.socket.on('group-call:ice-candidate', this.onRemoteIceCandidate)
+    this.socket.on('group-call:media-update', this.onMediaUpdate) // New dedicated event
     this.socket.on('group-call:user-left', this.onUserLeft)
   }
 
@@ -350,8 +356,8 @@ export class WebRtcGroupCallService {
       userId: senderUserId,
       displayName: displayName,
       avatarUrl: avatarUrl,
-      isMicOn: payload.isMicOn,
-      isCameraOn: payload.isCameraOn,
+      isMicOn: payload.isMicOn ?? true,
+      isCameraOn: payload.isCameraOn ?? !payload.audioOnly,
     })
   }
 
@@ -392,8 +398,8 @@ export class WebRtcGroupCallService {
         userId: senderUserId,
         displayName: name,
         avatarUrl: avatarUrl,
-        isMicOn: payload.isMicOn,
-        isCameraOn: payload.isCameraOn,
+        isMicOn: payload.isMicOn ?? true,
+        isCameraOn: payload.isCameraOn ?? true,
       })
     }
 
@@ -654,20 +660,42 @@ export class WebRtcGroupCallService {
   private notifyMediaState() {
     if (!this.socket) return
     
-    // FRONTEND-ONLY HACK: Piggyback on group-call:ice-candidate which backend already relays.
-    // We send this to each peer since ice-candidate is P2P relay in the backend.
+    // 1. Dedicated media-update event (Cleaner)
+    this.socket.emit('group-call:media-update', {
+      conversationId: this.state.conversationId,
+      groupId: this.state.conversationId,
+      callId: this.state.callId,
+      senderUserId: this.currentUserId,
+      isMicOn: this.state.isMicOn,
+      isCameraOn: this.state.isCameraOn,
+    })
+
+    // 2. Piggyback on ice-candidate for older clients/fallback
     this.state.peers.forEach((_peer, targetUserId) => {
       this.socket?.emit('group-call:ice-candidate', {
         conversationId: this.state.conversationId,
         callId: this.state.callId,
         senderUserId: this.currentUserId,
         targetUserId: targetUserId,
-        candidate: null, // Dummy candidate
+        candidate: null, 
         isMediaUpdate: true,
         isMicOn: this.state.isMicOn,
         isCameraOn: this.state.isCameraOn,
       })
     })
+  }
+
+  private onMediaUpdate = (payload: any) => {
+    const senderUserId = payload.senderUserId || payload.userId || payload.uid
+    if (senderUserId === this.currentUserId) return
+    
+    const peer = this.state.peers.get(senderUserId)
+    if (!peer) return
+
+    console.log(`[GroupCall] 🔔 Media update from ${senderUserId}: mic=${payload.isMicOn}, cam=${payload.isCameraOn}`)
+    if (payload.isMicOn !== undefined) peer.isMicOn = payload.isMicOn
+    if (payload.isCameraOn !== undefined) peer.isCameraOn = payload.isCameraOn
+    this.notify()
   }
 
   // ─── LEAVE / CLEANUP ────────────────────────────────────────────

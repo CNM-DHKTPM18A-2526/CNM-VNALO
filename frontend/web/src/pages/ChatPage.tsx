@@ -14,7 +14,7 @@ import { GroupCallModal, IncomingGroupCallBanner, useGroupCall } from '../featur
 import type { MessageContextMenuAction } from '../features/chat/components/MessageContextMenu'
 import {
   addMessageReaction,
-  createGroupConversation,           // Ã¯Â¿Â½Ã¯Â¿Â½ NEW
+  createGroupConversation,           // ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ NEW
   deleteMessageForMe,
   fetchMessageReactions,
   fetchInbox,
@@ -359,11 +359,11 @@ function persistDeletedMessageIds(userId: string, deletedMap: Record<string, tru
 }
 
 function fallbackUserDisplayName(_userId: string): string {
-  return 'NgÃ¢â€˜Â¹Ã¥Â»â„¢Ã°Â©Â¥â€° dÃ§Â¾â€¦ng'
+  return 'NgÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° dÃƒÂ§Ã‚Â¾Ã¢â‚¬Â¦ng'
 }
 
 function applyRestrictedMessage(message: ChatMessage, restricted: boolean): ChatMessage {
-  if (!restricted) {
+  if (!restricted || message.type === 'system') {
     return message
   }
 
@@ -454,7 +454,7 @@ function generateUUID(): string {
 
 const isGenericDirectName = (value: string | undefined | null) => {
   const normalized = String(value ?? '').trim()
-  const isGenericLabel = !normalized || normalized === 'Người dùng' || /^Người dùng\s+[0-9a-f]{6,}$/i.test(normalized)
+  const isGenericLabel = !normalized || normalized === 'NgÆ°á»i dÃ¹ng' || /^NgÆ°á»i dÃ¹ng\s+[0-9a-f]{6,}$/i.test(normalized)
   const isRawId = /^[0-9a-f]{24}$/i.test(normalized) // Common MongoDB ID format
   return isGenericLabel || isRawId
 }
@@ -600,6 +600,7 @@ export default function ChatPage() {
   const messageLoadRequestSeqRef = useRef(0)
   const pendingMetadataFetches = useRef<Set<string>>(new Set())
   const processedMessageIds = useRef<Set<string>>(new Set())
+  const lastPinnedSyncTimeRef = useRef<Record<string, number>>({})
 
   // Load deleted timestamps & pinned conversations from localStorage on mount
   useEffect(() => {
@@ -778,6 +779,8 @@ export default function ChatPage() {
       }
 
       const formattedPreview = formatConversationPreview(senderName, message, user?.id || '', getName)
+      // Defensive: ensure formatted preview is never empty if original message has content
+      const safePreview = formattedPreview && formattedPreview.trim() ? formattedPreview : formatMessagePreview(message.text || '', false)
 
       setConversations((prev) => {
         const index = prev.findIndex((conversation) => conversation.id === conversationId)
@@ -805,6 +808,12 @@ export default function ChatPage() {
             };
 
         let finalPreview = formattedPreview;
+
+        // Defensive: if formatted preview is empty or looks suspicious, use direct formatting
+        if (!finalPreview || finalPreview.trim() === '' || (finalPreview.startsWith('{') && finalPreview.includes('"action":'))) {
+          console.log('[ChatPage.updateConversationAfterMessage] Defensive formatting applied for message:', message.id);
+          finalPreview = formatMessagePreview(message.text || '', message.senderId === user?.id, message.type, senderName || undefined, message.attachments);
+        }
 
         // Inspect last few messages for grouping in sidebar
         const conversationMsgs = conversationMsgsOverride ?? messagesByConversationRef.current[conversationId] ?? [];
@@ -869,32 +878,92 @@ export default function ChatPage() {
     const conversationId = targetId || selectedConversationIdRef.current
     if (!conversationId || !accessToken) return
 
+    // Don't poll for conversations that are no longer in our list (ghost groups)
+    if (!targetId && !conversationsRef.current.some(c => c.id === conversationId)) {
+      return;
+    }
+
     const now = Date.now()
     const lastSync = lastSyncTimeRef.current[conversationId] ?? 0
     if (!targetId && now - lastSync < SYNC_INTERVAL_MS) return
     lastSyncTimeRef.current[conversationId] = now
 
     try {
+      console.log('[ChatPage.syncLatestMessages] fetching messages for', conversationId);
       const latest = await fetchMessages(accessToken, conversationId, true)
       if (!latest || latest.length === 0) return
+      console.log('[ChatPage.syncLatestMessages] fetched', latest.length, 'messages, syncing pinned list too');
+      // Refresh pinned messages after fetching new messages
+      void syncPinnedMessages(conversationId);
       const newMessages: ChatMessage[] = []
+      const recalledFromSync: Record<string, true> = {}
+      let latestMessageForPreview: ChatMessage | null = null
+      let hasServerChanges = false
+
       setMessagesByConversation((prev) => {
         const current = prev[conversationId] ?? []
-        const currentIds = new Set(current.map(m => m.id))
         const result = [...current]
+        const indexById = new Map(result.map((m, idx) => [m.id, idx]))
+
         for (const rawMsg of latest) {
           const mapped = applyRestrictedMessage(normalizeMessage(mapRawMessage(rawMsg, user?.id || '')), isRestrictedMode)
-          if (!currentIds.has(mapped.id)) {
+          if (mapped.isRecalled) {
+            recalledFromSync[mapped.id] = true
+          }
+
+          const existingIndex = indexById.get(mapped.id)
+          if (existingIndex === undefined) {
             processedMessageIds.current.add(mapped.id)
             result.push(mapped)
             newMessages.push(mapped)
+            indexById.set(mapped.id, result.length - 1)
+            hasServerChanges = true
+            continue
+          }
+
+          const existing = result[existingIndex]
+          const merged = {
+            ...existing,
+            ...mapped,
+            // keep client-side id if server payload does not carry it
+            clientMessageId: mapped.clientMessageId ?? existing.clientMessageId,
+          }
+
+          const isChanged =
+            existing.text !== merged.text ||
+            existing.type !== merged.type ||
+            existing.isRecalled !== merged.isRecalled ||
+            existing.mediaUrl !== merged.mediaUrl ||
+            existing.mediaThumbnailUrl !== merged.mediaThumbnailUrl ||
+            existing.mediaMimeType !== merged.mediaMimeType ||
+            existing.mediaSizeBytes !== merged.mediaSizeBytes ||
+            (existing.attachments?.length ?? 0) !== (merged.attachments?.length ?? 0)
+
+          if (isChanged) {
+            result[existingIndex] = merged
+            hasServerChanges = true
           }
         }
-        if (result.length === current.length) return prev
-        return { ...prev, [conversationId]: sortMessages(dedupeMessages(result)) }
+
+        if (!hasServerChanges) {
+          return prev
+        }
+
+        const sorted = sortMessages(dedupeMessages(result))
+        latestMessageForPreview = sorted.at(-1) ?? null
+        return { ...prev, [conversationId]: sorted }
       })
-      if (newMessages.length > 0) {
-        updateConversationAfterMessage(conversationId, newMessages[newMessages.length - 1], true)
+
+      if (Object.keys(recalledFromSync).length > 0) {
+        setRecalledMessageIds((prev) => ({
+          ...prev,
+          ...recalledFromSync,
+        }))
+      }
+
+      const previewMessage = latestMessageForPreview ?? newMessages[newMessages.length - 1] ?? null
+      if (previewMessage) {
+        updateConversationAfterMessage(conversationId, previewMessage, true)
       }
     } catch (error) {
       console.warn("[ChatPage] Polling sync failed:", error)
@@ -1061,6 +1130,27 @@ export default function ChatPage() {
     [syncMessageReaction, (user ? user.id : "")],
   )
 
+  const resolveReactionActorId = useCallback((payload: any): string | undefined => {
+    return String(
+      payload?.actorId ??
+      payload?.userId ??
+      payload?.user_id ??
+      payload?.senderId ??
+      payload?.sender_id ??
+      ''
+    ).trim() || undefined
+  }, [])
+
+  const resolveReactionEmoji = useCallback((payload: any): string | undefined => {
+    return String(
+      payload?.emoji ??
+      payload?.reaction ??
+      payload?.reactionKey ??
+      payload?.reaction_key ??
+      ''
+    ).trim() || undefined
+  }, [])
+
   const syncConversationReactions = useCallback(async () => {
     if (!selectedConversationIdRef.current || !accessToken) return
 
@@ -1087,35 +1177,135 @@ export default function ChatPage() {
       loadingPinnedRef.current[conversationId] = true
 
       try {
+        console.log('[ChatPage.loadPinnedMessages] fetching pinned messages for', conversationId, 'accessToken present:', !!accessToken)
         const pins = await fetchPinnedMessages(accessToken, conversationId)
+        console.log('[ChatPage.loadPinnedMessages] fetched pins response:', pins);
         const ids = pins.map(p => p.messageId).filter(Boolean) as string[]
+        console.log('[ChatPage.loadPinnedMessages] fetched pins:', { conversationId, count: ids.length, ids })
 
+        // Update pinned id list first
         setPinnedMessageIds((prev) => ({
           ...prev,
           [conversationId]: ids,
         }))
+
+        // Try to resolve message objects from current cache
+        let resolved: ChatMessage[] = (messagesByConversationRef.current[conversationId] ?? []).filter(m => ids.includes(m.id))
+        const missingIds = ids.filter(id => !resolved.find(m => m.id === id))
+
+        if (missingIds.length > 0) {
+          console.log('[ChatPage.loadPinnedMessages] missing pinned message objects, will fetch conversation messages', { conversationId, missingIds })
+          try {
+            const rawMessages = await fetchMessages(accessToken, conversationId, true)
+            const mapped = rawMessages.map(r => applyRestrictedMessage(normalizeMessage(mapRawMessage(r, user?.id || '')), isRestrictedMode))
+
+            // Merge into messagesByConversation cache
+            setMessagesByConversation((prev) => {
+              const current = prev[conversationId] ?? []
+              const next = [...current]
+              for (const m of mapped) {
+                const idx = next.findIndex(x => (x.id && x.id === m.id) || (m.clientMessageId && x.clientMessageId === m.clientMessageId))
+                if (idx === -1) {
+                  next.push(m)
+                } else {
+                  next[idx] = mergeMessage(next[idx], m)
+                }
+              }
+              return { ...prev, [conversationId]: sortMessages(dedupeMessages(next)) }
+            })
+
+            // Re-resolve from freshly fetched 'mapped' list (don't rely on ref synchronization)
+            resolved = mapped.filter(m => ids.includes(m.id))
+            console.log('[ChatPage.loadPinnedMessages] after fetch resolved pinned objects count:', resolved.length)
+          } catch (err) {
+            console.warn('[ChatPage.loadPinnedMessages] Failed to fetch conversation messages for pinned resolution', { conversationId, err })
+          }
+        }
+
+        // Populate pinnedMessages map with message objects we have
+        setPinnedMessages((prev) => ({
+          ...prev,
+          [conversationId]: ids.map(id => (resolved.find(m => m.id === id) as ChatMessage | undefined)).filter(Boolean) as ChatMessage[],
+        }))
+
       } catch (error) {
         console.warn('[ChatPage.loadPinnedMessages] Failed to fetch pinned messages', { conversationId, error })
       } finally {
         loadingPinnedRef.current[conversationId] = false
       }
     },
-    [accessToken],
+    [accessToken, isRestrictedMode, user?.id],
   )
 
+
+
   const syncPinnedMessages = loadPinnedMessages
+  
+  const syncConversationMetadata = useCallback(async (conversationId: string) => {
+    if (!accessToken) return;
+    try {
+      const data = await fetchConversation(accessToken, conversationId) as any;
+      if (!data) return;
+
+      setConversations(prev => prev.map(c => {
+        if (c.id !== conversationId) return c;
+        // Merge settings from various possible backend field names
+        const settings = {
+          name: data.isGroup || data.type === 'GROUP' ? (data.title || data.name || c.name) : c.name,
+          avatarUrl: data.avatarUrl || data.avatar_url || c.avatarUrl,
+          onlyAdminCanPost: Boolean(data.onlyAdminCanPost ?? data.only_admin_can_post ?? c.onlyAdminCanPost),
+          allowMemberPin: Boolean(data.allowMemberPin ?? data.allow_member_pin ?? c.allowMemberPin),
+          allowMemberEditInfo: Boolean(data.allowMemberEditInfo ?? data.allow_member_edit_info ?? c.allowMemberEditInfo),
+          members: data.members || c.members,
+          memberCount: (data.members || []).length || c.memberCount,
+          updatedAt: new Date().toISOString(),
+          _syncVersion: Date.now() 
+        };
+        return { ...c, ...settings };
+      }));
+      console.log('[ChatPage] ðŸ”„ Metadata refreshed for', conversationId);
+    } catch (e: any) {
+      if (e.response?.status === 404) {
+        console.log('[ChatPage] ðŸ—‘ï¸ Conversation no longer exists, cleaning up:', conversationId);
+        setConversations(prev => prev.filter(c => c.id !== conversationId));
+        if (selectedConversationIdRef.current === conversationId) {
+          navigate('/chat');
+        }
+      } else {
+        console.warn('[ChatPage] Metadata sync failed', e);
+      }
+    }
+  }, [accessToken]);
+
+  // Fail-Safe Heartbeat: Ensure active conversation settings are always fresh
+  useEffect(() => {
+    if (!accessToken || !selectedConversationId || !isSocketConnected) return;
+    
+    // Only poll if the conversation exists in our list to avoid 404 noise
+    // (Wait for inbox to load first)
+    if (conversations.length === 0) return;
+    const exists = conversations.some(c => c.id === selectedConversationId);
+    if (!exists) return;
+
+    // Fast poll for settings while in active chat (fallback if socket fails)
+    const timer = setInterval(() => {
+      void syncConversationMetadata(selectedConversationId);
+    }, 3500); 
+    
+    return () => clearInterval(timer);
+  }, [accessToken, selectedConversationId, isSocketConnected, syncConversationMetadata, conversations]);
 
   const { emitSendMessage, emitRecallMessage, joinConversation, joinMultipleConversations, markAsRead, getSocket } = useChatSocket({
     token: accessToken,
     onConnected: async () => {
-      console.log('[ChatPage] Ã¯Â¿Â½Ã¥ÂÅ¡ Socket connected event received');
+      console.log('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¥Ã‚ÂÃ…Â¡ Socket connected event received');
       setIsSocketConnected(true)
       setIsSocketInitialized(true)
       
       // AUTO-JOIN ALL CONVERSATIONS ON CONNECT
       if (conversationsRef.current.length > 0) {
         const conversationIds = conversationsRef.current.map(c => c.id);
-        console.log('[ChatPage] Ã¯Â¿Â½Ã¯Â¿Â½ Auto-joining', conversationIds.length, 'conversations on connect');
+        console.log('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ Auto-joining', conversationIds.length, 'conversations on connect');
         void joinMultipleConversations(conversationIds);
       }
       
@@ -1127,7 +1317,7 @@ export default function ChatPage() {
     },
     onFriendshipUpdated: async (payload) => {
       if (!user || !accessToken || !payload.friendId) return;
-      console.log('[ChatPage] Ã¯Â¿Â½Ã¯Â¿Â½ Friendship updated via socket for friendId:', payload.friendId);
+      console.log('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ Friendship updated via socket for friendId:', payload.friendId);
 
       try {
         // 1. Ensure conversation is created in message-service
@@ -1154,7 +1344,7 @@ export default function ChatPage() {
       // - Server auto-joined us, OR
       // - This is a message from our own send
 
-      // Ã¯Â¿Â½Ã¯Â¿Â½Ã¯Â¿Â½Ã¯Â¿Â½ 0. SYSTEM MESSAGES (CRITICAL SIGNALS) Ã¯Â¿Â½Ã¯Â¿Â½Ã¯Â¿Â½Ã¯Â¿Â½
+      // ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ 0. SYSTEM MESSAGES (CRITICAL SIGNALS) ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½
       // Handle both SYSTEM messages and TEXT messages that contain JSON signals (like poll sync)
       if (mapped.type === 'system' || (mapped.text && (mapped.text.includes('"action":') || mapped.text.startsWith('{')))) {
         try {
@@ -1200,28 +1390,59 @@ export default function ChatPage() {
 
             // PIN/UNPIN Sync
             if (sys.action === 'PIN_MESSAGE') {
-              console.log('[ChatPage] Ã¯Â¿Â½Ã¯Â¿Â½ Handling PIN_MESSAGE event');
-              setPinnedMessageIds(prev => ({
-                ...prev,
-                [cid]: [...(prev[cid] || []), sys.messageId].filter((v, i, a) => a.indexOf(v) === i)
-              }));
+              console.log('[ChatPage] Handling PIN_MESSAGE event -> sys:', sys, 'cid:', cid);
+              setPinnedMessageIds(prev => {
+                const next = ({ ...prev, [cid]: [...(prev[cid] || []), sys.messageId].filter((v, i, a) => a.indexOf(v) === i) });
+                console.log('[ChatPage] setPinnedMessageIds updated (PIN):', { cid, nextIds: next[cid] });
+                return next;
+              });
+              // Ensure pinned message objects are loaded for remote clients
+              console.log('[ChatPage] syncPinnedMessages requested for', cid);
+              void syncPinnedMessages(cid);
             }
             if (sys.action === 'UNPIN_MESSAGE') {
-              console.log('[ChatPage] Ã¯Â¿Â½Ã¯Â¿Â½ Handling UNPIN_MESSAGE event');
-              setPinnedMessageIds(prev => ({
-                ...prev,
-                [cid]: (prev[cid] || []).filter(id => id !== sys.messageId)
-              }));
+              console.log('[ChatPage] Handling UNPIN_MESSAGE event -> sys:', sys, 'cid:', cid);
+              setPinnedMessageIds(prev => {
+                const next = ({ ...prev, [cid]: (prev[cid] || []).filter(id => id !== sys.messageId) });
+                console.log('[ChatPage] setPinnedMessageIds updated (UNPIN):', { cid, nextIds: next[cid] });
+                return next;
+              });
+              // Refresh pinned list from server to keep state consistent
+              console.log('[ChatPage] syncPinnedMessages requested for', cid);
+              void syncPinnedMessages(cid);
             }
 
-            // Group Info Sync handled in Fast Path below
+            // Group Info Sync: Essential for permissions/settings
             if (sys.action === 'UPDATE_GROUP_INFO') {
-              console.log('[ChatPage]  Received UPDATE_GROUP_INFO signal');
+              console.log('[ChatPage] ðŸ”„ Realtime Group Update Signal Received:', mapped.conversationId, sys.metadata);
+              
+              // 1. Optimistic update from payload
+              setConversations(prev => prev.map(c => {
+                if (c.id !== mapped.conversationId) return c;
+                return { ...c, ...sys.metadata, updatedAt: new Date().toISOString() };
+              }));
+              
+              // 2. Proactive Sync: Trigger a refresh of the whole inbox summary
+              // to ensure we have the most authoritative state for ALL groups
+              void syncInboxSummaries();
+              
+              // 3. Fallback: Specific metadata refresh
+              void syncConversationMetadata(mapped.conversationId);
+
+              // 4. UI Hint
+              if (sys.metadata && Object.keys(sys.metadata).length > 0) {
+                toast.info('CÃ i Ä‘áº·t nhÃ³m Ä‘Ã£ Ä‘Æ°á»£c cáº­p nháº­t');
+              }
+
+              // 5. Silent Update: If it's just settings (no rename), don't show a bubble in chat
+              if (!sys.metadata?.newName && !sys.newName) {
+                return; 
+              }
             }
 
             // Reaction Sync (Poll Voting)
             if (sys.action === 'UPDATE_MESSAGE_REACTIONS') {
-              console.log('[ChatPage] Ã¯Â¿Â½Ã¯Â¿Â½ Handling UPDATE_MESSAGE_REACTIONS signal for poll sync');
+              console.log('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ Handling UPDATE_MESSAGE_REACTIONS signal for poll sync');
               if (sys.messageId) {
                 applyReactionSocketEvent(
                   sys.messageId,
@@ -1234,28 +1455,40 @@ export default function ChatPage() {
 
             // FRIEND_ACCEPTED Sync: Proactively fetch and show the new conversation
             if (sys.action === 'FRIEND_ACCEPTED' || mapped.text.includes('FRIEND_ACCEPTED')) {
-              console.log('[ChatPage] Ã¯Â¿Â½Ã¯Â¿Â½ Handling FRIEND_ACCEPTED signal');
+              console.log('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ Handling FRIEND_ACCEPTED signal');
               void loadInbox(accessToken);
             }
+          }
+
+          // Fallback: sometimes system payloads are delivered as TEXT that our JSON parse missed.
+          // If the raw text contains PIN_MESSAGE / UNPIN_MESSAGE, trigger a pinned sync.
+          try {
+            const raw = mapped.text || '';
+            if (typeof raw === 'string' && (raw.includes('PIN_MESSAGE') || raw.includes('UNPIN_MESSAGE'))) {
+              console.log('[ChatPage] Fallback detected PIN/UNPIN inside text, syncing pinned messages for', mapped.conversationId)
+              void syncPinnedMessages(mapped.conversationId)
+            }
+          } catch (e) {
+            /* ignore fallback errors */
           }
         } catch (err) {
           console.warn('[ChatPage] Error processing system signal:', err);
         }
       }
 
-      // Ã¯Â¿Â½Ã¯Â¿Â½Ã¯Â¿Â½Ã¯Â¿Â½ 1. DEDUPLICATION (PREVENT DOUBLE RENDERING) Ã¯Â¿Â½Ã¯Â¿Â½Ã¯Â¿Â½Ã¯Â¿Â½
+      // ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ 1. DEDUPLICATION (PREVENT DOUBLE RENDERING) ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½
       if (mapped.id && processedMessageIds.current.has(mapped.id)) {
-        console.log('[ChatPage] Ã¯Â¿Â½Ã¥â€œÂ¨Ã¯Â¿Â½ Skipping duplicate message:', mapped.id);
+        console.log('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¥Ã¢â‚¬Å“Ã‚Â¨ÃƒÂ¯Ã‚Â¿Ã‚Â½ Skipping duplicate message:', mapped.id);
         return;
       }
       if (mapped.id) processedMessageIds.current.add(mapped.id);
 
-      console.log('[ChatPage] Ã¯Â¿Â½Ã¦Å’Â· Processing new message:', { id: mapped.id, type: mapped.type, conversationId: mapped.conversationId });
+      console.log('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¦Ã…â€™Ã‚Â· Processing new message:', { id: mapped.id, type: mapped.type, conversationId: mapped.conversationId });
 
-      // Ã¯Â¿Â½Ã¯Â¿Â½Ã¯Â¿Â½Ã¯Â¿Â½ 2. INSTANT UI UPDATE (FAST PATH) Ã¯Â¿Â½Ã¯Â¿Â½Ã¯Â¿Â½Ã¯Â¿Â½
+      // ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ 2. INSTANT UI UPDATE (FAST PATH) ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½
       const senderId = mapped.senderId;
       const senderProfile = userMapRef.current[senderId];
-      const senderDisplayName = senderId === user.id ? 'BÃ¥Â»â€¢Ã£â‚¬â€¹' : (senderProfile?.displayName || 'NgÃ¢â€˜Â¹Ã¥Â»â„¢Ã°Â©Â¥â€° dÃ§Â¾â€¦ng');
+      const senderDisplayName = senderId === user.id ? 'BÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Â¹' : (senderProfile?.displayName || 'NgÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° dÃƒÂ§Ã‚Â¾Ã¢â‚¬Â¦ng');
 
       // Fast conversation update (Blind Discovery)
       const exists = conversationsRef.current.some(c => c.id === mapped.conversationId);
@@ -1298,7 +1531,7 @@ export default function ChatPage() {
         conversationSeed,
       );
 
-      // Ã¯Â¿Â½Ã¯Â¿Â½Ã¯Â¿Â½Ã¯Â¿Â½ 3. BACKGROUND SYNC Ã¯Â¿Â½Ã¯Â¿Â½Ã¯Â¿Â½Ã¯Â¿Â½
+      // ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ 3. BACKGROUND SYNC ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½
       if (isActive && mapped.serverSeq !== undefined) {
         markAsRead({ conversationId: mapped.conversationId, lastReadSeq: mapped.serverSeq });
         refreshNotificationBadges();
@@ -1362,8 +1595,20 @@ export default function ChatPage() {
           void syncMessageReaction(mapped.id);
         } catch (err) { /* silent bg error */ }
       })();
+
+      // FALLBACK: Always refresh pinned list when any message arrives
+      // This ensures pinned list updates even if PIN_MESSAGE event is not delivered by gateway
+      // Debounce: only sync pinned messages once every 3 seconds per conversation
+      const now = Date.now();
+      const lastSync = lastPinnedSyncTimeRef.current[mapped.conversationId] ?? 0;
+      if (now - lastSync >= 3000) {
+        lastPinnedSyncTimeRef.current[mapped.conversationId] = now;
+        console.log('[ChatPage.onMessageReceived] fallback: refreshing pinned messages due to new message for', mapped.conversationId);
+        void syncPinnedMessages(mapped.conversationId);
+      }
     },
     onMessageRecalled: (payload) => {
+      console.log('[ChatPage.onMessageRecalled] Recall event received:', { messageId: payload?.messageId, conversationId: payload?.conversationId })
       if (!payload.messageId || !payload.conversationId) {
         return
       }
@@ -1473,10 +1718,10 @@ export default function ChatPage() {
         return
       }
 
-      console.log('Ã¯Â¿Â½Ã§â€œÅ  nhÃ¥Â»â€¢Ã¨Â¦Â sÃ¥Â»â„¢Ã¯Â¿Â½ kiÃ¥Â»â„¢Ã°Â¡ÂµÅ¾ presence:', payload)
-      console.log('Ã¯Â¿Â½ang tÃ§Â©Â«m userId:', payload.userId, 'trong danh sÃ§ÂÂºch conversations...')
-      console.log('Danh sÃ§ÂÂºch ID hiÃ¥Â»â„¢Ã°Â¡ÂµÅ¾ cÃ§Â±â‚¬:', conversations.map((conv) => conv.userId))
-
+      console.log('ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ§Ã¢â‚¬Å“Ã…Â  nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â¦Ã‚Â sÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ kiÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¡Ã‚ÂµÃ…Â¾ presence:', payload)
+      console.log('ÃƒÂ¯Ã‚Â¿Ã‚Â½ang tÃƒÂ§Ã‚Â©Ã‚Â«m userId:', payload.userId, 'trong danh sÃƒÂ§Ã‚ÂÃ‚Âºch conversations...')
+        console.log('[ChatPage.onPresenceChanged] Presence updated:', payload)
+        console.log('[ChatPage.onPresenceChanged] Looking for userId:', payload.userId, 'in conversations...')
       setConversations((prev) => {
         let changed = false
         const next = prev.map((conv) => {
@@ -1508,13 +1753,13 @@ export default function ChatPage() {
     onReactionAdded: (payload: any) => {
       console.log('[ChatPage.socket] Reaction added:', payload);
       if (payload.messageId) {
-        applyReactionSocketEvent(payload.messageId, payload.emoji, payload.actorId, 'added');
+        applyReactionSocketEvent(payload.messageId, resolveReactionEmoji(payload), resolveReactionActorId(payload), 'added');
       }
     },
     onReactionRemoved: (payload: any) => {
       console.log('[ChatPage.socket] Reaction removed:', payload);
       if (payload.messageId) {
-        applyReactionSocketEvent(payload.messageId, payload.emoji, payload.actorId, 'removed');
+        applyReactionSocketEvent(payload.messageId, resolveReactionEmoji(payload), resolveReactionActorId(payload), 'removed');
       }
     },
     onMessagePinned: (payload: any) => {
@@ -1529,6 +1774,8 @@ export default function ChatPage() {
         ...prev,
         [conversationId]: [...(prev[conversationId] || []), messageId].filter((id, index, list) => list.indexOf(id) === index),
       }))
+      // Also refresh pinned messages from server to ensure UI shows message objects
+      void syncPinnedMessages(conversationId)
     },
     onMessageUnpinned: (payload: any) => {
       const conversationId = String(payload?.conversationId ?? payload?.pin?.conversationId ?? payload?.pin?.conversation_id ?? '').trim()
@@ -1542,13 +1789,23 @@ export default function ChatPage() {
         ...prev,
         [conversationId]: (prev[conversationId] || []).filter((id) => id !== messageId),
       }))
+      void syncPinnedMessages(conversationId)
     },
     onGroupUpdated: (payload: any) => {
-      console.log('[ChatPage.socket] Group updated:', payload);
-      setConversations(prev => prev.map(c => {
-        if (c.id !== payload.conversationId) return c;
-        return { ...c, ...payload.metadata };
-      }));
+      console.log('[ChatPage.socket] ðŸ‘¥ Group Updated (Socket):', payload);
+      const conversationId = payload.conversationId || payload.conversation_id;
+      if (!conversationId) return;
+
+      // Trigger full refresh to ensure all settings are synced correctly
+      void syncConversationMetadata(conversationId);
+      void syncInboxSummaries();
+    },
+    onConversationUpdated: (payload: any) => {
+      console.log('[ChatPage.socket] ðŸ”„ Conversation Updated (Socket):', payload);
+      const conversationId = payload.conversationId || payload.id;
+      if (conversationId) {
+        void syncConversationMetadata(conversationId);
+      }
     },
     onGroupDisbanded: (payload) => {
       console.log('Group disbanded', payload.conversationId)
@@ -1617,7 +1874,7 @@ export default function ChatPage() {
       }))
     },
     onMessageError: (payload) => {
-      console.error('[ChatPage] Ã¯Â¿Â½Ã¯Â¿Â½ Message error:', payload);
+      console.error('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ Message error:', payload);
       if (payload.code === 'AUTH_DENIED' && payload.clientMessageId) {
         setMessagesByConversation(prev => {
           const cid = payload.conversationId || selectedConversationIdRef.current;
@@ -1627,13 +1884,13 @@ export default function ChatPage() {
             [cid]: markLocalMessageFailed(prev[cid], payload.clientMessageId!)
           };
         });
-        toast.error('BÃ¥Â»â€¢Ã£â‚¬â€¹ khÃ§Â¹Â«ng cÃ§Â±â‚¬ quyÃ¥Â»â„¢Ã¯Â¿Â½ gÃ¥Â»â„¢Ã¨â„¢Â¹ tin nhÃ¥Â»â€¢Ã§â€“Â¸ nÃ¯Â¿Â½y.');
+        toast.error('BÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Â¹ khÃƒÂ§Ã‚Â¹Ã‚Â«ng cÃƒÂ§Ã‚Â±Ã¢â€šÂ¬ quyÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ gÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¨Ã¢â€žÂ¢Ã‚Â¹ tin nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ§Ã¢â‚¬â€œÃ‚Â¸ nÃƒÂ¯Ã‚Â¿Ã‚Â½y.');
       } else {
-        toast.error(payload.message || 'LÃ¥Â»â„¢Ã°Â¡Å¸â„¢ gÃ¥Â»â„¢Ã¨â„¢Â¹ tin nhÃ¥Â»â€¢Ã§â€“Â¸.');
+        toast.error(payload.message || 'LÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¡Ã…Â¸Ã¢â€žÂ¢ gÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¨Ã¢â€žÂ¢Ã‚Â¹ tin nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ§Ã¢â‚¬â€œÃ‚Â¸.');
       }
     },
     onConversationError: (payload) => {
-      console.error('[ChatPage] Ã¯Â¿Â½Ã¯Â¿Â½ Conversation error:', payload);
+      console.error('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ Conversation error:', payload);
       if (payload.code === 'FORBIDDEN' || payload.code === 'NOT_MEMBER' || payload.code === 'CONVERSATION_NOT_FOUND') {
         if (payload.conversationId) {
           setConversations(prev => prev.filter(c => c.id !== payload.conversationId));
@@ -1641,9 +1898,9 @@ export default function ChatPage() {
             navigate('/chat');
           }
         }
-        toast.error('BÃ¥Â»â€¢Ã£â‚¬â€¹ khÃ§Â¹Â«ng cÃ§Â±â‚¬ quyÃ¥Â»â„¢Ã¯Â¿Â½ thÃ¥Â»â„¢Ã¥Â¸Â· hiÃ¥Â»â„¢Ã°Â¡ÂµÅ¾ hÃ¯Â¿Â½nh Ã¯Â¿Â½Ã¥Â»â„¢Ã£Â·Å’g nÃ¯Â¿Â½y hoÃ¥Â»â€¢Ã¦ÂÂ¾ cuÃ¥Â»â„¢Ã§Â·Â½ trÃ§Â°Â· chuyÃ¥Â»â„¢Ã°Â¡ÂµÅ¾ khÃ§Â¹Â«ng tÃ¥Â»â„¢Ã¥Â¿â€º tÃ¥Â»â€¢Ã£â‚¬Â.');
+        toast.error('BÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Â¹ khÃƒÂ§Ã‚Â¹Ã‚Â«ng cÃƒÂ§Ã‚Â±Ã¢â€šÂ¬ quyÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ thÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¥Ã‚Â¸Ã‚Â· hiÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¡Ã‚ÂµÃ…Â¾ hÃƒÂ¯Ã‚Â¿Ã‚Â½nh ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ£Ã‚Â·Ã…â€™g nÃƒÂ¯Ã‚Â¿Ã‚Â½y hoÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¦Ã‚ÂÃ‚Â¾ cuÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ§Ã‚Â·Ã‚Â½ trÃƒÂ§Ã‚Â°Ã‚Â· chuyÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¡Ã‚ÂµÃ…Â¾ khÃƒÂ§Ã‚Â¹Ã‚Â«ng tÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¥Ã‚Â¿Ã¢â‚¬Âº tÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã‚Â.');
       } else {
-        toast.error(payload.message || 'LÃ¥Â»â„¢Ã°Â¡Å¸â„¢ cuÃ¥Â»â„¢Ã§Â·Â½ trÃ§Â°Â· chuyÃ¥Â»â„¢Ã°Â¡ÂµÅ¾.');
+        toast.error(payload.message || 'LÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¡Ã…Â¸Ã¢â€žÂ¢ cuÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ§Ã‚Â·Ã‚Â½ trÃƒÂ§Ã‚Â°Ã‚Â· chuyÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¡Ã‚ÂµÃ…Â¾.');
       }
     }
   })
@@ -1655,11 +1912,11 @@ export default function ChatPage() {
     if (!conversations || conversations.length === 0) return
 
     const ids = conversations.map(c => c.id)
-    console.log('[ChatPage] Ã¯Â¿Â½Ã¯Â¿Â½ Auto-joining conversations after inbox load:', ids.length)
+    console.log('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ Auto-joining conversations after inbox load:', ids.length)
     void joinMultipleConversations(ids)
   }, [accessToken, isSocketConnected, conversations, joinMultipleConversations])
 
-  // Ã¯Â¿Â½Ã¯Â¿Â½Ã¯Â¿Â½Ã¯Â¿Â½Ã¯Â¿Â½Ã¯Â¿Â½ GROUP CALL (SEPARATE LAYER - does not touch single call) Ã¯Â¿Â½Ã¯Â¿Â½Ã¯Â¿Â½Ã¯Â¿Â½Ã¯Â¿Â½Ã¯Â¿Â½Ã¯Â¿Â½Ã¯Â¿Â½
+  // ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ GROUP CALL (SEPARATE LAYER - does not touch single call) ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½
   const {
     snapshot: groupCallSnapshot,
     incomingCall: incomingGroupCall,
@@ -1674,13 +1931,13 @@ export default function ChatPage() {
   } = useGroupCall({
     socket: getSocket(),
     currentUserId,
-    currentUserName: user?.name ?? 'Bạn',
+    currentUserName: user?.name ?? 'Báº¡n',
     currentUserAvatar: user?.avatarUrl ?? '',
     userMap,
     conversations, // Added conversations here
   })
 
-  // Caller: bÃ¥Â»â€¢Ã§Å“Â© Ã¯Â¿Â½Ã¥Â»â€¢Ã¥ÂÅ¸ cuÃ¥Â»â„¢Ã§Â·Â½ gÃ¥Â»â„¢Ã¥Â¹â€š nhÃ§Â±â‚¬m (chÃ¥Â»â„¢Ã¯Â¿Â½ broadcast, khÃ§Â¹Â«ng tÃ¥Â»â€¢Ã¯Â¸Â½ peer trÃ¢â€˜Â¹Ã¥Â»â„¢Ã°Â¢Â²Â·)
+  // Caller: bÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ§Ã…â€œÃ‚Â© ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¥Ã‚ÂÃ…Â¸ cuÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ§Ã‚Â·Ã‚Â½ gÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¥Ã‚Â¹Ã¢â‚¬Å¡ nhÃƒÂ§Ã‚Â±Ã¢â€šÂ¬m (chÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ broadcast, khÃƒÂ§Ã‚Â¹Ã‚Â«ng tÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¯Ã‚Â¸Ã‚Â½ peer trÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¢Ã‚Â²Ã‚Â·)
   const handleStartGroupCall = useCallback(
     async (audioOnly = false) => {
       if (!selectedConversationId) return
@@ -1688,7 +1945,7 @@ export default function ChatPage() {
       const conv = conversations.find((c) => c.id === selectedConversationId)
       await startGroupCall({
         conversationId: selectedConversationId,
-        conversationName: conv?.name ?? 'CuÃ¥Â»â„¢Ã§Â·Â½ gÃ¥Â»â„¢Ã¥Â¹â€š nhÃ§Â±â‚¬m',
+        conversationName: conv?.name ?? 'CuÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ§Ã‚Â·Ã‚Â½ gÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¥Ã‚Â¹Ã¢â‚¬Å¡ nhÃƒÂ§Ã‚Â±Ã¢â€šÂ¬m',
         callId,
         audioOnly,
       })
@@ -1696,7 +1953,7 @@ export default function ChatPage() {
     [selectedConversationId, conversations, startGroupCall]
   )
 
-  // RÃ¥Â»â„¢Ã°Â©Â¥â€° cuÃ¥Â»â„¢Ã§Â·Â½ gÃ¥Â»â„¢Ã¥Â¹â€š nhÃ§Â±â‚¬m + tÃ¥Â»â€¢Ã¯Â¸Â½ call log message
+  // RÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° cuÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ§Ã‚Â·Ã‚Â½ gÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¥Ã‚Â¹Ã¢â‚¬Å¡ nhÃƒÂ§Ã‚Â±Ã¢â€šÂ¬m + tÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¯Ã‚Â¸Ã‚Â½ call log message
   const handleLeaveGroupCall = useCallback(async () => {
     const snap = groupCallSnapshot
     const convId = snap?.conversationId
@@ -1707,28 +1964,28 @@ export default function ChatPage() {
 
     const callId = snap?.callId ?? ''
     const duration = groupCallElapsed
-    // SÃ¥Â»â„¢Ã¯Â¿Â½ peers cÃ§Â°Â·n lÃ¥Â»â€¢Ã£â‚¬Â trÃ¢â€˜Â¹Ã¥Â»â„¢Ã°Â¢Â²Â· khi rÃ¥Â»â„¢Ã°Â©Â¥â€° (khÃ§Â¹Â«ng tÃ§Â©Â©nh bÃ¥Â»â€¢Ãâ€ž thÃ§â€™Â½n)
+    // SÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ peers cÃƒÂ§Ã‚Â°Ã‚Â·n lÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã‚Â trÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¢Ã‚Â²Ã‚Â· khi rÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° (khÃƒÂ§Ã‚Â¹Ã‚Â«ng tÃƒÂ§Ã‚Â©Ã‚Â©nh bÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂÃ¢â‚¬Å¾ thÃƒÂ§Ã¢â‚¬â„¢Ã‚Â½n)
     const remainingPeers = snap?.peers.length ?? 0
 
-    // 1. Stop WebRTC (luÃ§Â¹Â«n lÃ¯Â¿Â½m, bÃ¥Â»â€¢Ã¥ÂÂ¦ kÃ¥Â»â„¢Ã¯Â¿Â½ cÃ§Â±â‚¬ phÃ¥Â»â€¢ÃŽÂ¾ ngÃ¢â€˜Â¹Ã¥Â»â„¢Ã°Â©Â¥â€° cuÃ¥Â»â„¢Ã©Â­â‚¬ khÃ§Â¹Â«ng)
+    // 1. Stop WebRTC (luÃƒÂ§Ã‚Â¹Ã‚Â«n lÃƒÂ¯Ã‚Â¿Ã‚Â½m, bÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¥Ã‚ÂÃ‚Â¦ kÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ cÃƒÂ§Ã‚Â±Ã¢â€šÂ¬ phÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÅ½Ã‚Â¾ ngÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° cuÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ©Ã‚Â­Ã¢â€šÂ¬ khÃƒÂ§Ã‚Â¹Ã‚Â«ng)
     leaveGroupCall()
 
-    // Ã¯Â¿Â½Ã°Â©Â¤Æ’Ã¯Â¿Â½ CHÃ¥Â»â„¢Ã¯Â¿Â½ tÃ¥Â»â€¢Ã¯Â¸Â½ call log nÃ¥Â»â€¢Ã§Â°â€˜ khÃ§Â¹Â«ng cÃ§Â°Â·n ai khÃ§ÂÂºc trong cuÃ¥Â»â„¢Ã§Â·Â½ gÃ¥Â»â„¢Ã¥Â¹â€š.
-    // NÃ¥Â»â€¢Ã§Â°â€˜ vÃ¥Â»â€¢Ã¥Ââ€” cÃ§Â°Â·n ngÃ¢â€˜Â¹Ã¥Â»â„¢Ã°Â©Â¥â€° khÃ§ÂÂºc Ã¯Â¿Â½Ã¯Â¿Â½ hÃ¥Â»â„¢Ã¯Â¿Â½ sÃ¥Â»â€¢Ã¯Â¿Â½ lÃ¯Â¿Â½ ngÃ¢â€˜Â¹Ã¥Â»â„¢Ã°Â©Â¥â€° tÃ¥Â»â€¢Ã¯Â¸Â½ log khi rÃ¥Â»â„¢Ã°Â©Â¥â€° sau cÃ§Â¾â€¦ng.
+    // ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ°Ã‚Â©Ã‚Â¤Ã†â€™ÃƒÂ¯Ã‚Â¿Ã‚Â½ CHÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ tÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¯Ã‚Â¸Ã‚Â½ call log nÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ§Ã‚Â°Ã¢â‚¬Ëœ khÃƒÂ§Ã‚Â¹Ã‚Â«ng cÃƒÂ§Ã‚Â°Ã‚Â·n ai khÃƒÂ§Ã‚ÂÃ‚Âºc trong cuÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ§Ã‚Â·Ã‚Â½ gÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¥Ã‚Â¹Ã¢â‚¬Å¡.
+    // NÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ§Ã‚Â°Ã¢â‚¬Ëœ vÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¥Ã‚ÂÃ¢â‚¬â€ cÃƒÂ§Ã‚Â°Ã‚Â·n ngÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° khÃƒÂ§Ã‚ÂÃ‚Âºc ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ hÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ sÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ lÃƒÂ¯Ã‚Â¿Ã‚Â½ ngÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° tÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¯Ã‚Â¸Ã‚Â½ log khi rÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° sau cÃƒÂ§Ã‚Â¾Ã¢â‚¬Â¦ng.
     if (remainingPeers > 0) {
-      console.log(`[GROUP_CALL_LOG] Skipping log Ã¯Â¿Â½Ã¯Â¿Â½ ${remainingPeers} peer(s) still in call`)
+      console.log(`[GROUP_CALL_LOG] Skipping log ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ ${remainingPeers} peer(s) still in call`)
       return
     }
 
-    // 2. Broadcast group-call:ended Ã¯Â¿Â½Ã¥Â»â„¢Ã¯Â¿Â½ dismiss banner cÃ¥Â»â„¢Ã¥ÂÂ§ nhÃ¥Â»â„¢Ã§â€“Â¸g ngÃ¢â€˜Â¹Ã¥Â»â„¢Ã°Â©Â¥â€° chÃ¢â€˜Â¹a bÃ¥Â»â€¢Ã§Å“Â© mÃ§ÂÂºy
-    console.log(`[GROUP_CALL_LOG] Last person leaving Ã¯Â¿Â½Ã¯Â¿Â½ broadcasting group-call:ended`)
+    // 2. Broadcast group-call:ended ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ dismiss banner cÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¥Ã‚ÂÃ‚Â§ nhÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ§Ã¢â‚¬â€œÃ‚Â¸g ngÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° chÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹a bÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ§Ã…â€œÃ‚Â© mÃƒÂ§Ã‚ÂÃ‚Âºy
+    console.log(`[GROUP_CALL_LOG] Last person leaving ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ broadcasting group-call:ended`)
     getSocket()?.emit('group-call:ended', {
       conversationId: convId,
       callId,
       endedByUserId: currentUserId,
     })
 
-    // 3. TÃ¥Â»â€¢Ã¯Â¸Â½ CALL_LOG message (chÃ¥Â»â„¢Ã¯Â¿Â½ ngÃ¢â€˜Â¹Ã¥Â»â„¢Ã°Â©Â¥â€° cuÃ¥Â»â„¢Ã©Â­â‚¬ cÃ§Â¾â€¦ng rÃ¥Â»â„¢Ã°Â©Â¥â€°)
+    // 3. TÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¯Ã‚Â¸Ã‚Â½ CALL_LOG message (chÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ ngÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° cuÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ©Ã‚Â­Ã¢â€šÂ¬ cÃƒÂ§Ã‚Â¾Ã¢â‚¬Â¦ng rÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â°)
     console.log(`[GROUP_CALL_LOG] Creating call log. duration=${duration}s`)
     const logData = {
       v: 1,
@@ -1766,7 +2023,7 @@ export default function ChatPage() {
     }))
     updateConversationAfterMessage(convId, optimisticLog, true)
 
-      // 4. LÃ¢â€˜Â¹u qua Socket vÃ¥Â»â„¢Ã°Â¢Â¹â€š fallback REST
+      // 4. LÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹u qua Socket vÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¢Ã‚Â¹Ã¢â‚¬Å¡ fallback REST
       ; (async () => {
         let success = false
         for (let attempt = 1; attempt <= 2; attempt++) {
@@ -1887,33 +2144,124 @@ export default function ChatPage() {
         }
 
         await addMessageReaction(accessToken, messageId, emoji)
+
+        // Optimistic local update for normal reactions so sender sees change immediately
+        setReactionStatesByMessage(prev => {
+          const current = prev[messageId] || { reactions: {} };
+          const nextReactions = { ...current.reactions } as MessageReactionMap
+          const key = (Object.keys(nextReactions) as ReactionKey[]).find(k => REACTION_OPTIONS.find(o => o.key === k)?.emoji === emoji) || EMOJI_TO_REACTION_KEY[emoji] || undefined
+
+          if (key) {
+            const cur = nextReactions[key] ?? { count: 0, myCount: 0, userIds: [] }
+            if (!cur.userIds.includes(user?.id || '')) {
+              nextReactions[key] = {
+                count: cur.count + 1,
+                myCount: (cur.myCount || 0) + 1,
+                userIds: [...cur.userIds, user?.id || '']
+              }
+            }
+          }
+
+          return {
+            ...prev,
+            [messageId]: {
+              ...current,
+              reactions: nextReactions,
+              lastUsedReaction: key ?? current.lastUsedReaction,
+            }
+          }
+        })
+
         await syncMessageReaction(messageId)
 
-        // Emit signal to sync other clients (Mobile-friendly format)
-        // Note: Mobile uses a strict .contains('"action":"UPDATE_MESSAGE_REACTIONS"') check
-        // on the RAW string. We must ensure NO WHITESPACE anywhere (colons OR commas).
+        // Emit both a system signal (already used by mobile) and a socket reaction event
         if (user?.id) {
           const reactionSignal = {
             action: 'UPDATE_MESSAGE_REACTIONS',
             messageId,
+            message_id: messageId,
             conversationId: selectedConversationId,
+            conversation_id: selectedConversationId,
             actorId: user.id,
+            actor_id: user.id,
+            userId: user.id,
+            user_id: user.id,
             type: 'ADD',
             emoji: emoji
           };
 
-          void emitSendMessage({
-            conversationId: selectedConversationId,
-            content: JSON.stringify(reactionSignal).replace(/\s/g, ''),
-            messageType: 'SYSTEM',
-            clientMessageId: crypto.randomUUID()
-          });
+          // Ensure we're in the room before emitting low-level socket event and system signal
+          try {
+            console.log('[ChatPage.emit] join before reaction.added', { conversationId: selectedConversationId, messageId, actorId: user.id, emoji })
+            await joinConversation(selectedConversationId)
+            const socket = getSocket()
+            console.log('[ChatPage.emit] join done for reaction.added', { connected: socket?.connected, socketId: socket?.id, conversationId: selectedConversationId })
+
+            const reactionContent = JSON.stringify(reactionSignal).replace(/\s/g, '')
+            try {
+              console.log('[ChatPage.emit] sending reaction via socket primary (ADD)', reactionSignal)
+              if (socket?.connected) {
+                try {
+                  const ack = await emitSendMessage({
+                    conversationId: selectedConversationId,
+                    content: reactionContent,
+                    messageType: 'TEXT',
+                    clientMessageId: crypto.randomUUID(),
+                  })
+                  console.log('[ChatPage.emit] send ACK (ADD):', ack)
+                  if (!ack || ack.event === 'message.error') {
+                    console.warn('[ChatPage.emit] message.send ack error, falling back to REST', ack)
+                    void sendMessageViaRest(accessToken, {
+                      conversationId: selectedConversationId,
+                      content: reactionContent,
+                      messageType: 'SYSTEM',
+                      clientMessageId: crypto.randomUUID(),
+                    })
+                  }
+                } catch (innerErr) {
+                  console.warn('[ChatPage.emit] emitSendMessage threw, fallback to REST (ADD)', innerErr)
+                  void sendMessageViaRest(accessToken, {
+                    conversationId: selectedConversationId,
+                    content: reactionContent,
+                    messageType: 'SYSTEM',
+                    clientMessageId: crypto.randomUUID(),
+                  })
+                }
+              } else {
+                console.warn('[ChatPage.emit] socket not connected, fallback to REST for ADD')
+                void sendMessageViaRest(accessToken, {
+                  conversationId: selectedConversationId,
+                  content: reactionContent,
+                  messageType: 'SYSTEM',
+                  clientMessageId: crypto.randomUUID()
+                })
+              }
+            } catch (e) {
+              console.warn('[ChatPage.emit] failed to send reaction signal via socket', e)
+            }
+
+            // Also emit low-level socket event to encourage immediate broadcast
+            console.log('[ChatPage.emit] emitting message.reaction.added', { messageId, conversationId: selectedConversationId, actorId: user.id, userId: user.id, emoji })
+            socket?.emit && socket.emit('message.reaction.added', {
+              messageId,
+              message_id: messageId,
+              conversationId: selectedConversationId,
+              conversation_id: selectedConversationId,
+              actorId: user.id,
+              actor_id: user.id,
+              userId: user.id,
+              user_id: user.id,
+              emoji,
+            })
+          } catch (e) {
+            console.warn('[ChatPage.emit] failed to emit reaction.added', e)
+          }
         }
       } catch (error) {
         console.error('[ChatPage.handleAddReaction] Failed to add reaction', { messageId, reactionKey, error })
       }
     },
-    [accessToken, selectedConversationId, (user ? user.id : ""), emitSendMessage, syncMessageReaction],
+    [accessToken, selectedConversationId, (user ? user.id : ""), emitSendMessage, syncMessageReaction, getSocket],
   )
 
   const handleRemoveReaction = useCallback(
@@ -1938,31 +2286,125 @@ export default function ChatPage() {
 
       try {
         await removeMessageReaction(accessToken, messageId)
+
+        // Optimistic local update for removal
+        setReactionStatesByMessage(prev => {
+          const current = prev[messageId] || { reactions: {} };
+          const nextReactions = { ...current.reactions } as MessageReactionMap
+          const key = (Object.keys(nextReactions) as ReactionKey[]).find(k => REACTION_OPTIONS.find(o => o.key === k)?.emoji === emoji) || EMOJI_TO_REACTION_KEY[emoji] || undefined
+
+          if (key) {
+            const cur = nextReactions[key]
+            if (cur) {
+              const nextUserIds = cur.userIds.filter(id => id !== user?.id)
+              const nextCount = Math.max(0, cur.count - (cur.userIds.includes(user?.id || '') ? 1 : 0))
+              const nextMyCount = user?.id && cur.myCount > 0 && cur.userIds.includes(user.id) ? Math.max(0, cur.myCount - 1) : cur.myCount
+
+              if (nextCount <= 0 && nextMyCount <= 0 && nextUserIds.length === 0) {
+                delete nextReactions[key]
+              } else {
+                nextReactions[key] = { count: nextCount, myCount: nextMyCount, userIds: nextUserIds }
+              }
+            }
+          }
+
+          return {
+            ...prev,
+            [messageId]: {
+              ...current,
+              reactions: nextReactions,
+            }
+          }
+        })
+
         await syncMessageReaction(messageId)
 
-        // Emit signal to sync other clients (Mobile-friendly format)
         if (user?.id) {
           const reactionSignal = {
             action: 'UPDATE_MESSAGE_REACTIONS',
             messageId,
+            message_id: messageId,
             conversationId: selectedConversationId,
+            conversation_id: selectedConversationId,
             actorId: user.id,
+            actor_id: user.id,
+            userId: user.id,
+            user_id: user.id,
             type: 'REMOVE',
             emoji: emoji
           };
 
-          void emitSendMessage({
-            conversationId: selectedConversationId,
-            content: JSON.stringify(reactionSignal).replace(/\s/g, ''),
-            messageType: 'SYSTEM',
-            clientMessageId: crypto.randomUUID()
-          });
+          // Ensure we're in the room before emitting low-level socket event and system signal
+          try {
+            console.log('[ChatPage.emit] join before reaction.removed', { conversationId: selectedConversationId, messageId, actorId: user.id, emoji })
+            await joinConversation(selectedConversationId)
+            const socket = getSocket()
+            console.log('[ChatPage.emit] join done for reaction.removed', { connected: socket?.connected, socketId: socket?.id, conversationId: selectedConversationId })
+
+            const reactionContent = JSON.stringify(reactionSignal).replace(/\s/g, '')
+            try {
+              console.log('[ChatPage.emit] sending reaction via socket primary (REMOVE)', reactionSignal)
+              if (socket?.connected) {
+                try {
+                  const ack = await emitSendMessage({
+                    conversationId: selectedConversationId,
+                    content: reactionContent,
+                    messageType: 'TEXT',
+                    clientMessageId: crypto.randomUUID(),
+                  })
+                  console.log('[ChatPage.emit] send ACK (REMOVE):', ack)
+                  if (!ack || ack.event === 'message.error') {
+                    console.warn('[ChatPage.emit] message.send ack error, falling back to REST', ack)
+                    void sendMessageViaRest(accessToken, {
+                      conversationId: selectedConversationId,
+                      content: reactionContent,
+                      messageType: 'SYSTEM',
+                      clientMessageId: crypto.randomUUID(),
+                    })
+                  }
+                } catch (innerErr) {
+                  console.warn('[ChatPage.emit] emitSendMessage threw, fallback to REST (REMOVE)', innerErr)
+                  void sendMessageViaRest(accessToken, {
+                    conversationId: selectedConversationId,
+                    content: reactionContent,
+                    messageType: 'SYSTEM',
+                    clientMessageId: crypto.randomUUID(),
+                  })
+                }
+              } else {
+                console.warn('[ChatPage.emit] socket not connected, fallback to REST for REMOVE')
+                void sendMessageViaRest(accessToken, {
+                  conversationId: selectedConversationId,
+                  content: reactionContent,
+                  messageType: 'SYSTEM',
+                  clientMessageId: crypto.randomUUID()
+                })
+              }
+            } catch (e) {
+              console.warn('[ChatPage.emit] failed to send reaction signal via socket', e)
+            }
+
+            console.log('[ChatPage.emit] emitting message.reaction.removed', { messageId, conversationId: selectedConversationId, actorId: user.id, userId: user.id, emoji })
+            socket?.emit && socket.emit('message.reaction.removed', {
+              messageId,
+              message_id: messageId,
+              conversationId: selectedConversationId,
+              conversation_id: selectedConversationId,
+              actorId: user.id,
+              actor_id: user.id,
+              userId: user.id,
+              user_id: user.id,
+              emoji,
+            })
+          } catch (e) {
+            console.warn('[ChatPage.emit] failed to emit reaction.removed', e)
+          }
         }
       } catch (error) {
         console.error('[ChatPage.handleRemoveReaction] Failed to remove reaction', { messageId, reactionKey, error })
       }
     },
-    [accessToken, selectedConversationId, (user ? user.id : ""), emitSendMessage, reactionStatesByMessage, syncMessageReaction],
+    [accessToken, selectedConversationId, (user ? user.id : ""), emitSendMessage, reactionStatesByMessage, syncMessageReaction, getSocket],
   )
 
   const handleDeleteForMe = useCallback(
@@ -2049,7 +2491,7 @@ export default function ChatPage() {
         const canPin = isModerator || currentConv.allowMemberPin
 
         if (!canPin) {
-          toast.error('Bạn không có quyền ghim tin nhắn trong nhóm này')
+          toast.error('Báº¡n khÃ´ng cÃ³ quyá»n ghim tin nháº¯n trong nhÃ³m nÃ y')
           return
         }
       }
@@ -2074,12 +2516,26 @@ export default function ChatPage() {
           });
 
           const clientMessageId = crypto.randomUUID();
-          void sendMessageViaRest(accessToken, {
-            conversationId,
-            content: systemPayload,
-            messageType: 'TEXT',
-            clientMessageId
-          });
+          void (async () => {
+            try {
+              await sendMessageViaRest(accessToken, {
+                conversationId,
+                content: systemPayload,
+                messageType: 'TEXT',
+                clientMessageId,
+              })
+
+              // Also attempt to emit via socket so gateway broadcasts to other clients in realtime
+              try {
+                await joinConversation(conversationId)
+                await emitSendMessage({ conversationId, content: systemPayload, messageType: 'TEXT', clientMessageId: crypto.randomUUID() })
+              } catch (e) {
+                // ignore socket errors; REST is source-of-truth
+              }
+            } catch (e) {
+              // ignore REST errors here; handled by outer catch
+            }
+          })();
 
           // Optimistic UI Update
           const optimisticSystemMessage: ChatMessage = {
@@ -2101,7 +2557,7 @@ export default function ChatPage() {
         }
 
         if (currentPins.length >= 3) {
-          toast.error('Chỉ được phép ghim tối đa 3 tin nhắn')
+          toast.error('Chá»‰ Ä‘Æ°á»£c phÃ©p ghim tá»‘i Ä‘a 3 tin nháº¯n')
           return
         }
 
@@ -2121,12 +2577,26 @@ export default function ChatPage() {
         });
 
         const clientMessageId = crypto.randomUUID();
-        void sendMessageViaRest(accessToken, {
-          conversationId,
-          content: systemPayload,
-          messageType: 'TEXT',
-          clientMessageId
-        });
+        void (async () => {
+          try {
+            await sendMessageViaRest(accessToken, {
+              conversationId,
+              content: systemPayload,
+              messageType: 'TEXT',
+              clientMessageId,
+            })
+
+            // Also attempt to emit via socket so gateway broadcasts to other clients in realtime
+            try {
+              await joinConversation(conversationId)
+              await emitSendMessage({ conversationId, content: systemPayload, messageType: 'TEXT', clientMessageId: crypto.randomUUID() })
+            } catch (e) {
+              // ignore socket errors; REST is source-of-truth
+            }
+          } catch (e) {
+            // ignore REST errors here; handled by outer catch
+          }
+        })();
 
         // Optimistic UI Update
         const optimisticSystemMessage: ChatMessage = {
@@ -2150,9 +2620,9 @@ export default function ChatPage() {
           ...prev,
           [conversationId]: previousPins,
         }))
-        const action = isPinned ? 'bỏ ghim' : 'ghim'
+        const action = isPinned ? 'bá» ghim' : 'ghim'
         console.error(`[ChatPage.handleTogglePinMessage] Failed to ${action} message`, error)
-        toast.error(`Không thể ${action} tin nhắn. Vui lòng thử lại sau.`)
+        toast.error(`KhÃ´ng thá»ƒ ${action} tin nháº¯n. Vui lÃ²ng thá»­ láº¡i sau.`)
       }
     },
     [accessToken, pinnedMessageIds, user, emitSendMessage],
@@ -2338,13 +2808,13 @@ export default function ChatPage() {
   const handleInitiateCall = useCallback(async (type: 'audio' | 'video') => {
     if (!selectedConversationId) return;
 
-    // 📞 GROUP CALL routing 📞 delegate to separate group call layer
+    // ðŸ“ž GROUP CALL routing ðŸ“ž delegate to separate group call layer
     if (selectedConversation?.isGroup) {
       await handleStartGroupCall(type === 'audio')
       return;
     }
 
-    // 📞 Single call (1-1) 📞 DO NOT MODIFY 📞
+    // ðŸ“ž Single call (1-1) ðŸ“ž DO NOT MODIFY ðŸ“ž
     const callId = `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const socket = getSocket();
     if (!socket) return;
@@ -2789,9 +3259,37 @@ export default function ChatPage() {
         const missingIds = Array.from(proactiveIds).filter(id => !items.some(it => it.id === id));
 
         if (missingIds.length > 0) {
-          console.log("⚡ [ChatPage] Proactively fetching missing conversations:", missingIds);
+          console.log("âš¡ [ChatPage] Proactively fetching missing conversations:", missingIds);
           const fetchedResults = await Promise.all(
-            missingIds.map(id => fetchConversation(token, id).catch(() => null))
+            missingIds.map(async (id) => {
+              try {
+                const result = await fetchConversation(token, id);
+                return result;
+              } catch (err: any) {
+                const status = err.response?.status;
+                // If it's a 404/403, cleanup localStorage so we don't keep trying forever
+                if (status === 404 || status === 403) {
+                  console.log(`[ChatPage] ðŸ§¹ Purging ghost group ID: ${id}`);
+                  
+                  // 1. Cleanup localStorage
+                  const stored = localStorage.getItem(`vnalo_pending_groups_${user?.id}`);
+                  if (stored) {
+                    try {
+                      const ids: string[] = JSON.parse(stored);
+                      const filtered = ids.filter(pid => pid !== id);
+                      localStorage.setItem(`vnalo_pending_groups_${user?.id}`, JSON.stringify(filtered));
+                    } catch (e) { /* ignore */ }
+                  }
+
+                  // 2. If this is the active conversation in URL, it's dead. Redirect!
+                  if (id === targetId) {
+                    console.warn(`[ChatPage] âš ï¸ Current URL points to dead conversation ${id}. Redirecting to /chat.`);
+                    navigate('/chat');
+                  }
+                }
+                return null;
+              }
+            })
           );
 
           const myId = String(user?.id ?? '').trim();
@@ -2808,9 +3306,9 @@ export default function ChatPage() {
               const freshConvo: ConversationSummary = {
                 id: inner.id || c.id,
                 isGroup,
-                name: inner.title || c.title || (isGroup ? "Nhóm mới" : "Người dùng mới"),
+                name: inner.title || c.title || (isGroup ? "NhÃ³m má»›i" : "NgÆ°á»i dÃ¹ng má»›i"),
                 avatarUrl: inner.avatarUrl || c.avatarUrl || null,
-                lastMessage: isGroup ? "Nhóm mới tạo" : "[Thiết bị] Gửi lời chào",
+                lastMessage: isGroup ? "NhÃ³m má»›i táº¡o" : "[Thiáº¿t bá»‹] Gá»­i lá»i chÃ o",
                 unreadCount: 0,
                 participantUserIds: participantIds,
                 memberCount: members.length,
@@ -2905,7 +3403,7 @@ export default function ChatPage() {
             it.conversation.members.forEach((m: any) => {
               const mid = String(m.userId ?? '').trim()
               const realName = (m.nickname || m.displayName || m.name || '').trim();
-              if (mid && realName && realName !== 'Người dùng mới' && realName !== (mid === user?.id ? 'Bạn' : 'Người dùng mới')) {
+              if (mid && realName && realName !== 'NgÆ°á»i dÃ¹ng má»›i' && realName !== (mid === user?.id ? 'Báº¡n' : 'NgÆ°á»i dÃ¹ng má»›i')) {
                 upsertUser(mid, {
                   displayName: realName,
                   avatarUrl: m.avatarUrl || null
@@ -2927,8 +3425,8 @@ export default function ChatPage() {
             ? (previewNameById.get(item.lastMessageSenderId) ?? null)
             : null
           const getName = (id: string) => {
-            if (id === user?.id) return 'Bạn'
-            return userMapRef.current[id]?.displayName || previewNameById.get(id) || 'Người dùng mới'
+            if (id === user?.id) return 'Báº¡n'
+            return userMapRef.current[id]?.displayName || previewNameById.get(id) || 'NgÆ°á»i dÃ¹ng má»›i'
           }
           const formattedLastMessage = formatConversationPreview(
             resolvedLastMessageSenderName,
@@ -2963,7 +3461,7 @@ export default function ChatPage() {
           })
         }
         setIsRestrictedMode(false)
-        console.log('⚡ [DEBUG] Inbox items from API:', mappedItems);
+        console.log('âš¡ [DEBUG] Inbox items from API:', mappedItems);
 
         const deduplicateById = (items: ConversationSummary[]): ConversationSummary[] => {
           const seen = new Set<string>()
@@ -3084,6 +3582,21 @@ export default function ChatPage() {
               (incoming.unreadCount ?? 0) !== (conversation.unreadCount ?? 0)
             )
 
+            // 1. If incoming summary is older than local, ignore it entirely
+            if (isStaleSummary) {
+              return conversation
+            }
+
+            // 2. If timestamps are exactly equal, trust the local state (prevents optimistic UI flickering)
+            if (incomingTime === currentTime && incomingTime > 0) {
+              // Only check for unread count if everything else is equal
+              if ((incoming.unreadCount ?? 0) !== (conversation.unreadCount ?? 0)) {
+                changed = true;
+                return { ...conversation, unreadCount: incoming.unreadCount };
+              }
+              return conversation;
+            }
+
             if (!hasNewerSummary) {
               const metadataChanged =
                 nextName !== conversation.name ||
@@ -3098,7 +3611,7 @@ export default function ChatPage() {
               }
             } else {
                // Newer summary detected, trigger message sync (Mobile-like fallback)
-               console.log('[ChatPage] 🔄 Out-of-sync summary for:', conversation.id, 'Triggering message sync');
+               console.log('[ChatPage] ðŸ”„ Out-of-sync summary for:', conversation.id, 'Triggering message sync');
                void syncLatestMessages(conversation.id);
             }
 
@@ -3165,7 +3678,7 @@ export default function ChatPage() {
   const handleCreateGroup = useCallback(
     async (groupName: string, avatarUrl: string | null, memberIds: string[]) => {
       if (!accessToken || !user) {
-        toast.error("Vui lòng đăng nhập lại");
+        toast.error("Vui lÃ²ng Ä‘Äƒng nháº­p láº¡i");
         return;
       }
 
@@ -3199,7 +3712,7 @@ export default function ChatPage() {
           name: groupName,
           isGroup: true,
           avatarUrl: finalAvatarUrl,
-          lastMessage: "Bạn đã tạo nhóm",
+          lastMessage: "Báº¡n Ä‘Ã£ táº¡o nhÃ³m",
           unreadCount: 0,
           participantUserIds: memberIds,
           memberCount: memberIds.length + 1,
@@ -3216,7 +3729,7 @@ export default function ChatPage() {
 
         // Seed cache for myself too
         upsertUser(user.id, {
-          displayName: user.name || "Bạn",
+          displayName: user.name || "Báº¡n",
           avatarUrl: user.avatarUrl || null
         });
 
@@ -3270,8 +3783,8 @@ export default function ChatPage() {
         navigate(`/chat/${groupId}`);
         setIsCreateGroupOpen(false);
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Không thể tạo nhóm. Vui lòng thử lại.";
-        console.error("⚡ [CREATE GROUP] Lỗi:", error);
+        const errorMessage = error instanceof Error ? error.message : "KhÃ´ng thá»ƒ táº¡o nhÃ³m. Vui lÃ²ng thá»­ láº¡i.";
+        console.error("âš¡ [CREATE GROUP] Lá»—i:", error);
         toast.error(errorMessage);
       } finally {
         setIsCreatingGroup(false);
@@ -3555,7 +4068,7 @@ export default function ChatPage() {
 
         const isVirtualCloud = conversationId === `vnalo_cloud_${user.id}`
         const rawMessages = isVirtualCloud ? [] : await fetchMessages(accessToken, conversationId)
-        console.log('Dữ liệu tin nhắn nhận được:', rawMessages)
+        console.log('Dá»¯ liá»‡u tin nháº¯n nháº­n Ä‘Æ°á»£c:', rawMessages)
         const mapped = sortMessages(
           rawMessages
             .map((message) => applyRestrictedMessage(normalizeMessage(mapRawMessage(message, user.id)), isRestrictedMode))
@@ -3610,14 +4123,22 @@ export default function ChatPage() {
       return
     }
 
-    // REMOVED REACTION POLLING: It was causing O(N) requests every 2.5s, 
-    // which flooded the network and caused Socket ACK timeouts (the 4-5s delay).
-    // Reactions are now handled via real-time socket events instead.
+    // Lightweight fallback polling for the active conversation only.
+    // This keeps reactions in sync even when the gateway does not emit
+    // message.reaction.* events for some sessions.
     void syncConversationReactions()
+
+    const interval = window.setInterval(() => {
+      void syncConversationReactions()
+    }, 4000)
+
+    return () => {
+      window.clearInterval(interval)
+    }
   }, [accessToken, isSocketConnected, selectedConversationId, syncConversationReactions])
 
   useEffect(() => {
-    console.log('Danh sách ID sau khi mapping:', conversations.map((conv) => conv.userId))
+    console.log('[ChatPage.onPresenceChanged] Conversation IDs:', conversations.map((conv) => conv.userId))
   }, [conversations])
 
   const conversationIdsSignature = useMemo(
@@ -3632,8 +4153,8 @@ export default function ChatPage() {
       return
     }
 
-    console.log('--- ĐANG THỰC HIỆN JOIN ROOM CHO', list.length, 'HỘI THOẠI ---')
-    console.log('Tự động Join về các room:', conversationIds)
+    console.log('--- ÄANG THá»°C HIá»†N JOIN ROOM CHO', list.length, 'Há»˜I THOáº I ---')
+    console.log('Tá»± Ä‘á»™ng Join vá» cÃ¡c room:', conversationIds)
 
     await joinMultipleConversations(conversationIds)
   }, [joinMultipleConversations])
@@ -3645,7 +4166,7 @@ export default function ChatPage() {
     const currentConnected = Boolean(socket?.connected)
 
     if (!previousSocketConnectedRef.current && currentConnected && conversations.length > 0) {
-      console.log('[ChatPage.retryJoin] Socket vừa chuyển false -> true, join lại rooms')
+      console.log('[ChatPage.retryJoin] Socket vá»«a chuyá»ƒn false -> true, join láº¡i rooms')
       void joinAllConversations(conversations)
     }
 
@@ -3686,7 +4207,7 @@ export default function ChatPage() {
         setSelectedConversationId(conversationId)
         navigate(`/chat/${conversationId}`)
         await joinConversation(conversationId)
-        console.log('[ChatPage.openDirectConversation] ⚡ Joined conversation:', conversationId)
+        console.log('[ChatPage.openDirectConversation] âš¡ Joined conversation:', conversationId)
         await loadInbox(accessToken, conversationId)
       } catch (error) {
         console.error('Failed to open direct conversation', error)
@@ -3735,20 +4256,20 @@ export default function ChatPage() {
     // If socket ID changed (reconnect), we MUST clear the joined cache
     // because server-side room membership is lost on reconnect.
     if (currentSocketId !== lastJoinedSocketIdRef.current) {
-      console.log(`[ChatPage.join] ⚡ Socket ID changed from ${lastJoinedSocketIdRef.current} to ${currentSocketId}, clearing joined cache`);
+      console.log(`[ChatPage.join] âš¡ Socket ID changed from ${lastJoinedSocketIdRef.current} to ${currentSocketId}, clearing joined cache`);
       joinedIdsRef.current.clear();
       lastJoinedSocketIdRef.current = currentSocketId;
     }
 
     if (actualConnected && !isSocketConnected) {
-      console.log('[ChatPage.join] ⚡ Fixing connection state (out of sync)');
+      console.log('[ChatPage.join] âš¡ Fixing connection state (out of sync)');
       setIsSocketConnected(true);
       return;
     }
 
     if (!actualConnected || !isSocketConnected) {
       if (joinedIdsRef.current.size > 0) {
-        console.log('[ChatPage.join] ⚡ Socket disconnected, clearing joined cache');
+        console.log('[ChatPage.join] âš¡ Socket disconnected, clearing joined cache');
         joinedIdsRef.current.clear();
       }
       return;
@@ -3758,10 +4279,16 @@ export default function ChatPage() {
     const newIds = currentIds.filter((id) => id && !joinedIdsRef.current.has(id));
 
     if (newIds.length > 0) {
-      console.log(`[ChatPage.join] ⚡ Joining ${newIds.length} new rooms for socket ${currentSocketId}`);
+      console.log(`[ChatPage.join] âš¡ Joining ${newIds.length} new rooms for socket ${currentSocketId}`);
       newIds.forEach((id) => {
-        joinedIdsRef.current.add(id);
-        void joinConversation(id);
+        void (async () => {
+          const joined = await joinConversation(id);
+          if (joined) {
+            joinedIdsRef.current.add(id);
+          } else {
+            console.warn('[ChatPage.join] Join failed, will retry on next effect run:', id);
+          }
+        })();
       });
     }
   }, [conversations, isSocketConnected, joinConversation, getSocket]);
@@ -4044,7 +4571,7 @@ export default function ChatPage() {
           // We keep attachments in local state only for the UI to potentially group them
           attachments: [{
             url: res.url,
-            name: allFiles[i]?.name || "Tệp",
+            name: allFiles[i]?.name || "Tá»‡p",
             mimeType: res.mimeType,
             sizeBytes: res.sizeBytes,
             thumbnailUrl: res.thumbnailUrl
@@ -4119,7 +4646,7 @@ export default function ChatPage() {
         senderId: user.id,
         type: 'poll',
         isLocal: false,
-        text: `📊 Bình chọn: ${poll.question}`,
+        text: `ðŸ“Š BÃ¬nh chá»n: ${poll.question}`,
         pollData: poll,
         timestamp: formatMessageTimestamp(),
         deliveryState: 'sending',
@@ -4319,7 +4846,7 @@ export default function ChatPage() {
       const role = String(myMember?.role || '').toUpperCase()
       const isModerator = role === 'ADMIN' || role === 'DEPUTY'
       if (!isModerator && !selectedConversation.allowMemberEditInfo) {
-        toast.error('Bạn không có quyền thay đổi tên nhóm')
+        toast.error('Báº¡n khÃ´ng cÃ³ quyá»n thay Ä‘á»•i tÃªn nhÃ³m')
         return
       }
     }
@@ -4330,7 +4857,7 @@ export default function ChatPage() {
           c.id === selectedConversationId ? { ...c, name: newName } : c
         )
       )
-      toast.success('Cập nhật tên nhóm thành công')
+      toast.success('Cáº­p nháº­t tÃªn nhÃ³m thÃ nh cÃ´ng')
 
       const systemPayload = JSON.stringify({
         action: 'UPDATE_GROUP_INFO',
@@ -4371,7 +4898,7 @@ export default function ChatPage() {
         [selectedConversationId]: upsertMessage(prev[selectedConversationId] ?? [], optimisticSystemMessage)
       }));
     } catch (err) {
-      toast.error('Có lỗi xảy ra khi cập nhật tên nhóm')
+      toast.error('CÃ³ lá»—i xáº£y ra khi cáº­p nháº­t tÃªn nhÃ³m')
       console.error(err)
     }
   }
@@ -4385,7 +4912,7 @@ export default function ChatPage() {
       const isModerator = (currentConv?.members?.find(m => m.userId === user?.id)?.role || '').toUpperCase() === 'ADMIN' || (currentConv?.members?.find(m => m.userId === user?.id)?.role || '').toUpperCase() === 'DEPUTY'
       if (currentConv?.isGroup) {
         if (!isModerator && !currentConv.allowMemberEditInfo) {
-          toast.error('Bạn không có quyền thay đổi ảnh nhóm')
+          toast.error('Báº¡n khÃ´ng cÃ³ quyá»n thay Ä‘á»•i áº£nh nhÃ³m')
           return
         }
       }
@@ -4438,7 +4965,7 @@ export default function ChatPage() {
       // 5. Success - Silent per user request
     } catch (err: any) {
       console.error('Failed to update group avatar:', err);
-      toast.error(err.message || 'CÃ¥Â»â€¢Ã¨Â¨Ë† nhÃ¥Â»â€¢Ã¨Â²Â  Ã¥Â»â€¢Ãâ€žh Ã¯Â¿Â½Ã¥Â»â€¢Ã£â‚¬Â diÃ¥Â»â„¢Ã°Â¡ÂµÅ¾ thÃ¥Â»â€¢Ã¥ÂÂ¦ bÃ¥Â»â€¢Ã£â‚¬Â');
+      toast.error(err.message || 'CÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â¨Ã‹â€  nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â²Ã‚Â  ÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂÃ¢â‚¬Å¾h ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã‚Â diÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¡Ã‚ÂµÃ…Â¾ thÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¥Ã‚ÂÃ‚Â¦ bÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã‚Â');
     }
   };
 
@@ -4446,7 +4973,7 @@ export default function ChatPage() {
     if (!selectedConversationId || !accessToken) return
     const targetUserId = selectedConversation?.userId || selectedConversation?.participantUserIds?.[0]
     if (!targetUserId) {
-      toast.error('KhÃ§Â¹Â«ng tÃ§Â©Â«m thÃ¥Â»â€¢Ã¥ÂÂ¥ ngÃ¢â€˜Â¹Ã¥Â»â„¢Ã°Â©Â¥â€° dÃ§Â¾â€¦ng Ã¯Â¿Â½Ã¥Â»â„¢Ã¯Â¿Â½ cÃ¥Â»â€¢Ã¨Â¨Ë† nhÃ¥Â»â€¢Ã¨Â²Â  tÃ§Â¤â„¢n gÃ¥Â»â„¢ÃŽÂ¾ nhÃ¥Â»â„¢Ã¯Â¿Â½')
+      toast.error('KhÃƒÂ§Ã‚Â¹Ã‚Â«ng tÃƒÂ§Ã‚Â©Ã‚Â«m thÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¥Ã‚ÂÃ‚Â¥ ngÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° dÃƒÂ§Ã‚Â¾Ã¢â‚¬Â¦ng ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ cÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â¨Ã‹â€  nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â²Ã‚Â  tÃƒÂ§Ã‚Â¤Ã¢â€žÂ¢n gÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÅ½Ã‚Â¾ nhÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½')
       return;
     }
     try {
@@ -4456,9 +4983,9 @@ export default function ChatPage() {
           c.id === selectedConversationId ? { ...c, name: newNickname } : c
         )
       )
-      toast.success('CÃ¥Â»â€¢Ã¨Â¨Ë† nhÃ¥Â»â€¢Ã¨Â²Â  tÃ§Â¤â„¢n gÃ¥Â»â„¢ÃŽÂ¾ nhÃ¥Â»â„¢Ã¯Â¿Â½ thÃ¯Â¿Â½nh cÃ§Â¹Â«ng')
+      toast.success('CÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â¨Ã‹â€  nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â²Ã‚Â  tÃƒÂ§Ã‚Â¤Ã¢â€žÂ¢n gÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÅ½Ã‚Â¾ nhÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ thÃƒÂ¯Ã‚Â¿Ã‚Â½nh cÃƒÂ§Ã‚Â¹Ã‚Â«ng')
     } catch (err) {
-      toast.error('CÃ§Â±â‚¬ lÃ¥Â»â„¢Ã°Â¡Å¸â„¢ xÃ¥Â»â€¢Ã£â€žÅ  ra khi cÃ¥Â»â€¢Ã¨Â¨Ë† nhÃ¥Â»â€¢Ã¨Â²Â  tÃ§Â¤â„¢n gÃ¥Â»â„¢ÃŽÂ¾ nhÃ¥Â»â„¢Ã¯Â¿Â½')
+      toast.error('CÃƒÂ§Ã‚Â±Ã¢â€šÂ¬ lÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¡Ã…Â¸Ã¢â€žÂ¢ xÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â‚¬Å¾Ã…Â  ra khi cÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â¨Ã‹â€  nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â²Ã‚Â  tÃƒÂ§Ã‚Â¤Ã¢â€žÂ¢n gÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÅ½Ã‚Â¾ nhÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½')
       console.error(err)
     }
   }
@@ -4508,7 +5035,7 @@ export default function ChatPage() {
       setIsAddMembersOpen(false);
     } catch (error) {
       console.error('Failed to add members:', error);
-      toast.error('ThÃ§Â¤â„¢m thÃ¯Â¿Â½nh viÃ§Â¤â„¢n thÃ¥Â»â€¢Ã¥ÂÂ¦ bÃ¥Â»â€¢Ã£â‚¬Â');
+      toast.error('ThÃƒÂ§Ã‚Â¤Ã¢â€žÂ¢m thÃƒÂ¯Ã‚Â¿Ã‚Â½nh viÃƒÂ§Ã‚Â¤Ã¢â€žÂ¢n thÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¥Ã‚ÂÃ‚Â¦ bÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã‚Â');
     } finally {
       setIsAddingMembers(false);
     }
@@ -4563,10 +5090,10 @@ export default function ChatPage() {
       navigate('/chat');
     } catch (error: any) {
       console.error('Failed to leave group:', error);
-      if (error.message === 'Bạn chưa chuyển quyền trưởng nhóm khi rời nhóm') {
-        toast.error('Bạn chưa chuyển quyền trưởng nhóm khi rời nhóm');
+      if (error.message === 'Báº¡n chÆ°a chuyá»ƒn quyá»n trÆ°á»Ÿng nhÃ³m khi rá»i nhÃ³m') {
+        toast.error('Báº¡n chÆ°a chuyá»ƒn quyá»n trÆ°á»Ÿng nhÃ³m khi rá»i nhÃ³m');
       } else {
-        toast.error('Rời nhóm thất bại');
+        toast.error('Rá»i nhÃ³m tháº¥t báº¡i');
       }
     }
   };
@@ -4579,7 +5106,7 @@ export default function ChatPage() {
       // Update local state
       setConversations(prev => prev.map(conv => {
         if (conv.id !== selectedConversationId) return conv;
-        return { ...conv, ...settings };
+        return { ...conv, ...settings, updatedAt: new Date().toISOString() };
       }));
       // Emit SYSTEM notification for realtime sync
       const systemPayload = JSON.stringify({
@@ -4588,15 +5115,21 @@ export default function ChatPage() {
         metadata: settings
       });
 
-      // Emit as transient socket signal only (not a persistent message)
-      emitSendMessage({
-        conversationId: selectedConversationId,
-        messageType: 'system',
-        content: systemPayload
-      });
+      // Emit as SYSTEM signal (using SYSTEM type for maximum priority)
+      try {
+        await emitSendMessage({
+          conversationId: selectedConversationId,
+          messageType: 'SYSTEM', 
+          content: systemPayload,
+          clientMessageId: crypto.randomUUID()
+        });
+        console.log('[ChatPage] ðŸ“¤ Group sync signal sent successfully');
+      } catch (e) {
+        console.warn('[ChatPage] âš ï¸ Failed to emit group sync signal');
+      }
     } catch (error) {
       console.error('Failed to update group settings', error);
-      toast.error('Không thể cập nhật cài đặt nhóm');
+      toast.error('KhÃ´ng thá»ƒ cáº­p nháº­t cÃ i Ä‘áº·t nhÃ³m');
     }
   };
 
@@ -4622,7 +5155,7 @@ export default function ChatPage() {
 
       // Then call API
       await disbandConversation(accessToken, selectedConversationId);
-      toast.success('Giải tán nhóm thành công');
+      toast.success('Giáº£i tÃ¡n nhÃ³m thÃ nh cÃ´ng');
 
       // Update local state
       setConversations(prev => prev.filter(conv => conv.id !== selectedConversationId));
@@ -4630,7 +5163,7 @@ export default function ChatPage() {
       setRightSidebarContent(null);
       navigate('/chat');
     } catch (err) {
-      console.error('Không thể giải tán nhóm', err);
+      console.error('KhÃ´ng thá»ƒ giáº£i tÃ¡n nhÃ³m', err);
     }
   };
 
@@ -4641,7 +5174,7 @@ export default function ChatPage() {
       const selectedConv = conversations.find(c => c.id === selectedConversationId);
       if (!selectedConv) return;
 
-      const targetDisplayName = userMap[targetUserId]?.displayName || 'Thành viên';
+      const targetDisplayName = userMap[targetUserId]?.displayName || 'ThÃ nh viÃªn';
 
       // Emit SYSTEM message for UI
       const systemPayload = JSON.stringify({
@@ -4694,10 +5227,10 @@ export default function ChatPage() {
         return c;
       }));
 
-      toast.success(`Ã¯Â¿Â½Ã§â€œÅ  xÃ§Â±â‚¬a ${targetDisplayName} khÃ¥Â»â„¢Ã¨â€™Â¨ nhÃ§Â±â‚¬m`);
+      toast.success(`ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ§Ã¢â‚¬Å“Ã…Â  xÃƒÂ§Ã‚Â±Ã¢â€šÂ¬a ${targetDisplayName} khÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¨Ã¢â‚¬â„¢Ã‚Â¨ nhÃƒÂ§Ã‚Â±Ã¢â€šÂ¬m`);
     } catch (error) {
       console.error('Failed to remove member:', error);
-      toast.error('KhÃ§Â¹Â«ng thÃ¥Â»â„¢Ã¯Â¿Â½ xÃ§Â±â‚¬a thÃ¯Â¿Â½nh viÃ§Â¤â„¢n');
+      toast.error('KhÃƒÂ§Ã‚Â¹Ã‚Â«ng thÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ xÃƒÂ§Ã‚Â±Ã¢â€šÂ¬a thÃƒÂ¯Ã‚Â¿Ã‚Â½nh viÃƒÂ§Ã‚Â¤Ã¢â€žÂ¢n');
     }
   };
 
@@ -4751,11 +5284,11 @@ export default function ChatPage() {
         return c;
       }));
 
-      const roleDisplay = role === 'DEPUTY' ? 'phÃ§Â±â‚¬ nhÃ§Â±â‚¬m' : 'thÃ¯Â¿Â½nh viÃ§Â¤â„¢n';
-      toast.success(`Ã¯Â¿Â½Ã§â€œÅ  cÃ¥Â»â€¢Ã¨Â¨Ë† nhÃ¥Â»â€¢Ã¨Â²Â  vai trÃ§Â°Â· thÃ¯Â¿Â½nh ${roleDisplay}`);
+      const roleDisplay = role === 'DEPUTY' ? 'phÃƒÂ§Ã‚Â±Ã¢â€šÂ¬ nhÃƒÂ§Ã‚Â±Ã¢â€šÂ¬m' : 'thÃƒÂ¯Ã‚Â¿Ã‚Â½nh viÃƒÂ§Ã‚Â¤Ã¢â€žÂ¢n';
+      toast.success(`ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ§Ã¢â‚¬Å“Ã…Â  cÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â¨Ã‹â€  nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â²Ã‚Â  vai trÃƒÂ§Ã‚Â°Ã‚Â· thÃƒÂ¯Ã‚Â¿Ã‚Â½nh ${roleDisplay}`);
     } catch (error) {
       console.error('Failed to update member role:', error);
-      toast.error('CÃ¥Â»â€¢Ã¨Â¨Ë† nhÃ¥Â»â€¢Ã¨Â²Â  vai trÃ§Â°Â· thÃ¥Â»â€¢Ã¥ÂÂ¦ bÃ¥Â»â€¢Ã£â‚¬Â');
+      toast.error('CÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â¨Ã‹â€  nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â²Ã‚Â  vai trÃƒÂ§Ã‚Â°Ã‚Â· thÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¥Ã‚ÂÃ‚Â¦ bÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã‚Â');
     }
   };
 
@@ -4801,7 +5334,7 @@ export default function ChatPage() {
       await doLeaveGroup();
     } catch (error) {
       console.error('Failed to transfer ownership and leave:', error);
-      toast.error('ChuyÃ¥Â»â„¢Ã¯Â¿Â½ quyÃ¥Â»â„¢Ã¯Â¿Â½ vÃ¯Â¿Â½ rÃ¥Â»â„¢Ã°Â©Â¥â€° nhÃ§Â±â‚¬m thÃ¥Â»â€¢Ã¥ÂÂ¦ bÃ¥Â»â€¢Ã£â‚¬Â');
+      toast.error('ChuyÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ quyÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ vÃƒÂ¯Ã‚Â¿Ã‚Â½ rÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° nhÃƒÂ§Ã‚Â±Ã¢â€šÂ¬m thÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¥Ã‚ÂÃ‚Â¦ bÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã‚Â');
     }
   };
 
@@ -4816,7 +5349,7 @@ export default function ChatPage() {
       if (lastMsgTime <= deleteTime) {
         return {
           ...conv,
-          lastMessage: t('chat.historyDeletedPreview') || 'Bạn đã xóa lịch sử trò chuyện',
+          lastMessage: t('chat.historyDeletedPreview') || 'Báº¡n Ä‘Ã£ xÃ³a lá»‹ch sá»­ trÃ² chuyá»‡n',
           unreadCount: 0 // Hide unread count for deleted history conversations
         };
       }
@@ -5064,7 +5597,7 @@ export default function ChatPage() {
       <Modal
         isOpen={confirmLeaveGroupOpen}
         onClose={() => setConfirmLeaveGroupOpen(false)}
-        title="Rời nhóm và xóa trò chuyện"
+        title="Rá»i nhÃ³m vÃ  xÃ³a trÃ² chuyá»‡n"
         variant="confirm"
         footer={
           <div className="flex gap-3 justify-end w-full">
@@ -5072,20 +5605,20 @@ export default function ChatPage() {
               className="px-6 py-2 rounded-lg bg-[var(--surface-muted)] text-[var(--text)] font-bold text-[15px] hover:bg-[var(--surface-hover)] border-0 outline-none cursor-pointer"
               onClick={() => setConfirmLeaveGroupOpen(false)}
             >
-              Hủy
+              Há»§y
             </button>
             <button
               className="px-6 py-2 rounded-lg bg-red-600 text-white font-bold text-[15px] hover:bg-red-700 border-0 outline-none cursor-pointer"
               onClick={doLeaveGroup}
             >
-              Rời nhóm
+              Rá»i nhÃ³m
             </button>
           </div>
         }
       >
         <div className="py-2 space-y-5">
           <p className="text-[15px] text-[var(--text)] leading-relaxed">
-            Bạn sẽ không thể xem lại tin nhắn trong nhóm này sau khi rời nhóm.
+            Báº¡n sáº½ khÃ´ng thá»ƒ xem láº¡i tin nháº¯n trong nhÃ³m nÃ y sau khi rá»i nhÃ³m.
           </p>
 
           <div
@@ -5093,8 +5626,8 @@ export default function ChatPage() {
             onClick={() => setLeaveGroupSilently(!leaveGroupSilently)}
           >
             <div className="space-y-1">
-              <p className="text-[15px] font-semibold text-[var(--text)]">Rời nhóm trong im lặng</p>
-              <p className="text-[13px] text-[var(--text-secondary)]">Chỉ trưởng/phó nhóm biết bạn rời nhóm.</p>
+              <p className="text-[15px] font-semibold text-[var(--text)]">Rá»i nhÃ³m trong im láº·ng</p>
+              <p className="text-[13px] text-[var(--text-secondary)]">Chá»‰ trÆ°á»Ÿng/phÃ³ nhÃ³m biáº¿t báº¡n rá»i nhÃ³m.</p>
             </div>
             <div
               className={`relative h-6 w-11 rounded-full transition-all duration-200 ${leaveGroupSilently ? 'bg-[#0091FF]' : 'bg-gray-400 shadow-inner'
@@ -5122,7 +5655,7 @@ export default function ChatPage() {
         isOpen={callState.isOpen}
         type={callState.type}
         status={callState.status}
-        peerName={callState.peerId ? (userMap[callState.peerId]?.displayName || "Người dùng") : (selectedConversation?.name || "Người dùng")}
+        peerName={callState.peerId ? (userMap[callState.peerId]?.displayName || "NgÆ°á»i dÃ¹ng") : (selectedConversation?.name || "NgÆ°á»i dÃ¹ng")}
         peerAvatar={callState.peerId ? userMap[callState.peerId]?.avatarUrl : selectedConversation?.avatarUrl}
         localStream={callState.localStream}
         remoteStream={callState.remoteStream}
@@ -5136,7 +5669,7 @@ export default function ChatPage() {
         onToggleCamera={handleToggleCamera}
       />
 
-      {/* INCOMING GROUP CALL NOTIFICATION Ã¯Â¿Â½Ã¯Â¿Â½ shown to non-callers */}
+      {/* INCOMING GROUP CALL NOTIFICATION ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ shown to non-callers */}
       {incomingGroupCall && !isInGroupCall && (
         <IncomingGroupCallBanner
           info={incomingGroupCall}
@@ -5145,12 +5678,12 @@ export default function ChatPage() {
         />
       )}
 
-      {/* GROUP CALL MODAL Ã¯Â¿Â½Ã¯Â¿Â½ independent of 1-1 CallModal */}
+      {/* GROUP CALL MODAL ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ independent of 1-1 CallModal */}
       {isInGroupCall && groupCallSnapshot && (
         <GroupCallModal
           isOpen={isInGroupCall}
           snapshot={groupCallSnapshot}
-          localUserName={user?.name ?? 'Bạn'}
+          localUserName={user?.name ?? 'Báº¡n'}
           localUserAvatar={user?.avatarUrl ?? undefined}
           onLeave={handleLeaveGroupCall}
           onToggleMic={groupToggleMic}
@@ -5185,10 +5718,18 @@ function PinnedLogicHooks({
 }: any) {
   // ISOLATED PINNED FETCH (NO loadInbox call)
   useEffect(() => {
-    if (!accessToken || isBootstrapping || !selectedConversationId) return
+    console.log('[PinnedLogicHooks.effect] Checking pinned fetch conditions', { accessToken: !!accessToken, isBootstrapping, selectedConversationId, lastConv: lastConvRef.current });
+    if (!accessToken || isBootstrapping || !selectedConversationId) {
+      console.log('[PinnedLogicHooks.effect] Skipping pinned fetch due to missing conditions');
+      return;
+    }
 
     // Avoid re-fetching same conversation (Double Guard)
-    if (lastConvRef.current === selectedConversationId) return
+    if (lastConvRef.current === selectedConversationId) {
+      console.log('[PinnedLogicHooks.effect] Skipping pinned fetch - same conversation');
+      return;
+    }
+    console.log('[PinnedLogicHooks.effect] Calling loadPinnedMessages for conversation', selectedConversationId);
     lastConvRef.current = selectedConversationId
 
     void loadPinnedMessages(selectedConversationId)
@@ -5201,6 +5742,8 @@ function PinnedLogicHooks({
     const ids = pinnedMessageIds[selectedConversationId] || []
     const convMessages = messagesByConversation[selectedConversationId] || []
 
+    console.log('[PinnedLogicHooks] mapping pinned ids -> messages', { conversationId: selectedConversationId, ids, convCount: convMessages.length })
+
     const mapped = ids.map((id: string) => {
       const found = convMessages.find((m: any) => m.id === id)
       if (found) return found
@@ -5209,8 +5752,8 @@ function PinnedLogicHooks({
       return {
         id,
         conversationId: selectedConversationId,
-        content: 'Tin nhÃ¥Â»â€¢Ã§â€“Â¸ Ã¯Â¿Â½Ã§â€œÅ  ghim',
-        text: 'Tin nhÃ¥Â»â€¢Ã§â€“Â¸ Ã¯Â¿Â½Ã§â€œÅ  ghim',
+        content: 'Tin nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ§Ã¢â‚¬â€œÃ‚Â¸ ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ§Ã¢â‚¬Å“Ã…Â  ghim',
+        text: 'Tin nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ§Ã¢â‚¬â€œÃ‚Â¸ ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ§Ã¢â‚¬Å“Ã…Â  ghim',
         type: 'text' as any,
         sender: 'system' as any,
         senderId: 'system',
@@ -5219,6 +5762,8 @@ function PinnedLogicHooks({
         isPlaceholder: true, // Custom flag for UI
       }
     })
+
+    console.log('[PinnedLogicHooks] mapped pinned messages count:', mapped.length)
 
     setPinnedMessages((prev: any) => ({
       ...prev,
@@ -5247,6 +5792,9 @@ function PinnedLogicHooks({
 
   return null;
 }
+
+
+
 
 
 

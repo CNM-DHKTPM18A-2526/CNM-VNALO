@@ -59,13 +59,33 @@ export function MessageReactionBar({ reactions, onAddReaction, onRemoveReaction,
 type MessageReactionSummaryProps = {
   reactions: MessageReactionMap
   onRemoveReaction: (reactionKey: ReactionKey) => void
+  isIncoming?: boolean
 }
 
-export function MessageReactionSummary({ reactions, onRemoveReaction }: MessageReactionSummaryProps) {
+export function MessageReactionSummary({ reactions, onRemoveReaction, isIncoming = true }: MessageReactionSummaryProps) {
   const { user } = useAuth()
   const { userMap } = useUserStore()
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
+  const [hoveredReactionKey, setHoveredReactionKey] = useState<ReactionKey | null>(null)
+  const [tooltipPlacement, setTooltipPlacement] = useState<'top' | 'bottom'>('bottom')
   const activeReactions = REACTION_OPTIONS.filter((item) => (reactions[item.key]?.count ?? 0) > 0)
+
+  const getReactionNames = (userIds: string[] | undefined) => {
+    const names = (userIds ?? [])
+      .map((uid) => (uid === user?.id ? 'Bạn' : (userMap[uid]?.displayName || 'Người dùng')))
+      .filter(Boolean)
+
+    if (names.length === 0) {
+      return ['Chưa có ai thả biểu cảm']
+    }
+
+    const uniqueNames = Array.from(new Set(names))
+    if (uniqueNames.includes('Bạn')) {
+      return ['Bạn', ...uniqueNames.filter((name) => name !== 'Bạn')]
+    }
+
+    return uniqueNames
+  }
 
   if (activeReactions.length === 0) {
     return null
@@ -74,7 +94,7 @@ export function MessageReactionSummary({ reactions, onRemoveReaction }: MessageR
   return (
     <>
       <div 
-        className='mt-1.5 flex flex-wrap gap-1.5 cursor-pointer'
+        className='mt-1.5 flex flex-wrap gap-1.5 cursor-pointer overflow-visible'
         onClick={(e) => {
           e.stopPropagation()
           setIsDetailModalOpen(true)
@@ -84,22 +104,71 @@ export function MessageReactionSummary({ reactions, onRemoveReaction }: MessageR
           const state = reactions[reaction.key]
           const count = state?.count ?? 0
           const reactedByMe = (state?.myCount ?? 0) > 0
-          const userNames = state.userIds
-            .map(uid => uid === user?.id ? 'Bạn' : (userMap[uid]?.displayName || 'Người dùng'))
-            .join('\n')
+          const userNames = getReactionNames(state?.userIds)
+
+          // Tooltip position handling
+          const handleMouseEnter = (e: React.MouseEvent) => {
+            const rect = e.currentTarget.getBoundingClientRect()
+            
+            // Check space relative to the chat scroll container if possible
+            const scrollContainer = e.currentTarget.closest('.chat-window-messages')
+            const containerBottom = scrollContainer ? scrollContainer.getBoundingClientRect().bottom : window.innerHeight
+            
+            const spaceBelow = containerBottom - rect.bottom
+            const spaceAbove = rect.top
+            
+            // If space below is less than 160px (to account for input bar + tooltip), flip to top
+            if (spaceBelow < 160 && spaceAbove > spaceBelow) {
+              setTooltipPlacement('top')
+            } else {
+              setTooltipPlacement('bottom')
+            }
+            setHoveredReactionKey(reaction.key)
+          }
 
           return (
             <div
               key={reaction.key}
-              title={userNames}
-              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs shadow-sm transition group relative ${
+              className={`group relative inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs shadow-sm transition ${
                 reactedByMe
                   ? 'border-sky-200 bg-sky-50 text-sky-700'
                   : 'border-slate-200 bg-white text-slate-600'
               }`}
+              onMouseEnter={handleMouseEnter}
+              onMouseLeave={() => setHoveredReactionKey(null)}
             >
               <span className='text-sm'>{reaction.emoji}</span>
               <span className='font-semibold'>{count}</span>
+
+              {hoveredReactionKey === reaction.key && (
+                <div 
+                  className={`pointer-events-none absolute z-[100] rounded-xl bg-[#1f4fbf] px-3 py-2 text-left text-xs font-medium text-white shadow-[0_12px_28px_rgba(15,23,42,0.28)] whitespace-nowrap min-w-[max-content] animate-in fade-in zoom-in duration-150 ${
+                    tooltipPlacement === 'top' 
+                      ? 'bottom-full mb-2' 
+                      : 'top-full mt-2'
+                  } ${
+                    isIncoming ? 'left-1/2 -translate-x-1/2' : 'right-0'
+                  }`}
+                >
+                  <div className='flex flex-col gap-1'>
+                    {userNames.map((name) => (
+                      <span key={name} className='leading-tight'>
+                        {name}
+                      </span>
+                    ))}
+                  </div>
+                  {/* Tooltip Arrow */}
+                  <div 
+                    className={`absolute border-4 border-transparent ${
+                      isIncoming ? 'left-1/2 -translate-x-1/2' : 'right-3'
+                    } ${
+                      tooltipPlacement === 'top'
+                        ? 'top-full border-t-[#1f4fbf]'
+                        : 'bottom-full border-b-[#1f4fbf]'
+                    }`} 
+                  />
+                </div>
+              )}
             </div>
           )
         })}

@@ -90,7 +90,7 @@ export const MessageContextMenu = forwardRef<HTMLDivElement, MessageContextMenuP
     [position.left, position.top],
   )
 
-  const isModerator = userRole === 'ADMIN' || userRole === 'DEPUTY';
+  const isModerator = String(userRole || '').toUpperCase() === 'ADMIN' || String(userRole || '').toUpperCase() === 'DEPUTY';
 
   const visibleItems = MENU_ITEMS.filter((item) => {
     // Pin logic: ADMIN/DEPUTY always, MEMBER depends on group setting

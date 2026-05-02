@@ -699,7 +699,7 @@
   justify-content: flex-end;
 }
 
-.message-stack:hover .message-action-toolbar,
+.message-stack-hover-active .message-action-toolbar,
 .message-stack:focus-within .message-action-toolbar {
   opacity: 1;
 }
@@ -879,7 +879,7 @@
   color: var(--primary);
 }
 
-.message-stack:hover .message-action-toolbar > button,
+.message-stack-hover-active .message-action-toolbar > button,
 .message-stack:focus-within .message-action-toolbar > button {
   transform: none;
 }

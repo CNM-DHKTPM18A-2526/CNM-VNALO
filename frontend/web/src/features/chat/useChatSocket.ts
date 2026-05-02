@@ -165,18 +165,7 @@ export function useChatSocket(options: UseChatSocketOptions) {
     })
 
     // Only attach listeners ONCE to socket to prevent race conditions
-    const socket = service.getSocket()
-    if (!globalListenersAttached && socket) {
-      globalListenersAttached = true
-      console.log('[useChatSocket] 🎯 Attaching listeners to socket (one-time)')
-      service.attachEventListeners()
-
-      // Reset flag on disconnect so listeners are re-attached on reconnect
-      socket.on('disconnect', () => {
-        console.log('[useChatSocket] Reset listener flag on disconnect for next reconnect')
-        globalListenersAttached = false
-      })
-    }
+    // IMPORTANT: This must run in the connect effect (next), not here, because socket might not exist yet
   }, [])
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -205,6 +194,19 @@ export function useChatSocket(options: UseChatSocketOptions) {
     }
 
     console.log('[useChatSocket.effect] Socket obtained, ID:', socket.id, 'Connected:', socket.connected)
+
+    // NOW attach listeners when socket is guaranteed to exist
+    if (!globalListenersAttached) {
+      globalListenersAttached = true
+      console.log('[useChatSocket] 🎯 Attaching listeners to socket (one-time, post-connect)')
+      service.attachEventListeners()
+
+      // Reset flag on disconnect so listeners are re-attached on reconnect
+      socket.on('disconnect', () => {
+        console.log('[useChatSocket] Reset listener flag on disconnect for next reconnect')
+        globalListenersAttached = false
+      })
+    }
 
     // If already connected, replay onConnected callback
     if (socket.connected && socket.id) {
