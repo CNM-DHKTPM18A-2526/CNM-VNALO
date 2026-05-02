@@ -1,4 +1,4 @@
-import { io, type Socket } from 'socket.io-client'
+﻿import { io, type Socket } from 'socket.io-client'
 import type { RawMessage } from './chat.api'
 import type { ChatMessageType, ReplyMetadata } from './chat.types'
 
@@ -40,7 +40,7 @@ export type RecallMessageAck = {
   message?: string
 }
 
-const SEND_ACK_TIMEOUT_MS = 3000 // Tăng tốc độ timeout để báo lỗi nhanh hơn
+const SEND_ACK_TIMEOUT_MS = 3000 // TÄƒng tá»‘c Ä‘á»™ timeout Ä‘á»ƒ bÃ¡o lá»—i nhanh hÆ¡n
 
 export type MessageReadPayload = {
   conversationId: string
@@ -53,9 +53,9 @@ export type PresenceChangedPayload = {
   lastSeen?: string | null
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 // SOCKET SINGLETON
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 let globalSocketManager: any = null
 let globalSocketToken: string | null = null
 
@@ -81,7 +81,7 @@ export function getOrCreateSocketManager(token: string): { chat: Socket; root: S
     // Clear room tracking on token change (logout/re-login)
     joinedRooms.clear()
     pendingRoomJoins.clear()
-    console.log('[SocketManager] 🧹 Cleared all joined rooms on token change')
+    console.log('[SocketManager] ðŸ§¹ Cleared all joined rooms on token change')
   }
 
   if (globalChatSocket && globalSocketToken === incomingToken) {
@@ -93,7 +93,7 @@ export function getOrCreateSocketManager(token: string): { chat: Socket; root: S
     globalSocketToken = incomingToken
 
     const options = {
-      transports: ['websocket'], //Ưu tiên websocket để giảm độ trễ
+      transports: ['websocket'], //Æ¯u tiÃªn websocket Ä‘á»ƒ giáº£m Ä‘á»™ trá»…
       auth: { token },
       reconnection: true,
       reconnectionAttempts: Infinity,
@@ -106,21 +106,21 @@ export function getOrCreateSocketManager(token: string): { chat: Socket; root: S
     globalRootSocket = globalSocketManager
 
     globalChatSocket?.on('connect', () => {
-      console.log('[Socket.CHAT] ✅ Connected ID:', globalChatSocket?.id)
+      console.log('[Socket.CHAT] âœ… Connected ID:', globalChatSocket?.id)
       
       // AUTO-REJOIN all rooms after reconnect (like mobile)
-      console.log('[Socket.CHAT] 🔄 Auto-rejoin started - rejoining', joinedRooms.size, 'rooms')
+      console.log('[Socket.CHAT] ðŸ”„ Auto-rejoin started - rejoining', joinedRooms.size, 'rooms')
       for (const room of joinedRooms) {
-        console.log('[Socket.CHAT]   → Auto-rejoin room:', room)
+        console.log('[Socket.CHAT]   â†’ Auto-rejoin room:', room)
         globalChatSocket?.emit('conversation.join', { conversationId: room })
       }
       
       // Process pending room joins
       if (pendingRoomJoins.size > 0) {
-        console.log('[Socket.CHAT] 🔄 Processing', pendingRoomJoins.size, 'pending room joins')
+        console.log('[Socket.CHAT] ðŸ”„ Processing', pendingRoomJoins.size, 'pending room joins')
         for (const room of pendingRoomJoins) {
           if (!joinedRooms.has(room)) {
-            console.log('[Socket.CHAT]   → Joining pending room:', room)
+            console.log('[Socket.CHAT]   â†’ Joining pending room:', room)
             globalChatSocket?.emit('conversation.join', { conversationId: room })
             joinedRooms.add(room)
           }
@@ -130,19 +130,19 @@ export function getOrCreateSocketManager(token: string): { chat: Socket; root: S
     })
 
     globalChatSocket?.on('disconnect', (reason) => {
-      console.warn('[Socket.CHAT] ⚪ Disconnected:', reason)
+      console.warn('[Socket.CHAT] âšª Disconnected:', reason)
       // Keep joinedRooms for auto-rejoin on reconnect
       // Notify all services to clear their room cache
       onDisconnectCallbacks.forEach(cb => cb())
     })
 
     globalChatSocket?.on('message.error', (payload: any) => {
-      console.error('[Socket.CHAT] ❌ message.error:', payload)
+      console.error('[Socket.CHAT] âŒ message.error:', payload)
       window.dispatchEvent(new CustomEvent('vnalo:socket:message-error', { detail: payload }))
     })
 
     globalChatSocket?.on('conversation.error', (payload: any) => {
-      console.error('[Socket.CHAT] ❌ conversation.error:', payload)
+      console.error('[Socket.CHAT] âŒ conversation.error:', payload)
       window.dispatchEvent(new CustomEvent('vnalo:socket:conversation-error', { detail: payload }))
     })
   }
@@ -162,7 +162,7 @@ export function disconnectSocket() {
   // Clear all room tracking on full disconnect (logout)
   joinedRooms.clear()
   pendingRoomJoins.clear()
-  console.log('[Socket] 🧹 Cleared all joined rooms on disconnect')
+  console.log('[Socket] ðŸ§¹ Cleared all joined rooms on disconnect')
   
   onDisconnectCallbacks.forEach(cb => cb())
 }
@@ -234,94 +234,95 @@ export class ChatSocketService {
 
     // Wrapper functions that call registered handlers
     const handleConnect = () => {
-      console.log('[Socket] ✅ Connected')
+      console.log('[Socket] âœ… Connected')
       this.eventHandlers.onConnected?.()
     }
 
     const handleDisconnect = () => {
-      console.log('[Socket] ⚪ Disconnected')
+      console.log('[Socket] âšª Disconnected')
       this.listenersAttached = false // Reset flag on disconnect
       this.eventHandlers.onDisconnected?.()
     }
 
     const handleMessageReceived = (payload: RawMessage) => {
-      console.log('[Socket] 📨 message.received:', payload.id)
+      console.log('[Socket] ðŸ“¨ message.received:', payload.id)
       this.eventHandlers.onMessageReceived?.(payload)
     }
 
     const handleMessageSent = (payload: RawMessage) => {
-      console.log('[Socket] 📨 message.sent:', payload.id)
+      console.log('[Socket] ðŸ“¨ message.sent:', payload.id)
       // Treat 'message.sent' same as 'message.received' for redundancy
       this.eventHandlers.onMessageReceived?.(payload)
     }
 
     const handleMessageRecalled = (payload: any) => {
-      console.log('[Socket] 🔄 message.recalled:', payload.messageId)
+      console.log('[ChatSocketService] message.recalled socket event received:', { messageId: payload?.messageId, conversationId: payload?.conversationId })
+      console.log('[Socket] ðŸ”„ message.recalled:', payload.messageId)
       this.eventHandlers.onMessageRecalled?.(payload)
     }
 
     const handleMessageRead = (payload: any) => {
-      console.log('[Socket] ✓ message.read from', payload.userId)
+      console.log('[Socket] âœ“ message.read from', payload.userId)
       this.eventHandlers.onMessageRead?.(payload)
     }
 
     const handleMessagePinned = (payload: any) => {
-      console.log('[Socket] 📌 message.pinned:', payload.messageId)
+      console.log('[Socket] ðŸ“Œ message.pinned:', payload.messageId)
       this.eventHandlers.onMessagePinned?.(payload)
     }
 
     const handleMessageUnpinned = (payload: any) => {
-      console.log('[Socket] 📍 message.unpinned:', payload.messageId)
+      console.log('[Socket] ðŸ“ message.unpinned:', payload.messageId)
       this.eventHandlers.onMessageUnpinned?.(payload)
     }
 
     const handleReactionAdded = (payload: any) => {
-      console.log('[Socket] 😀 reaction.added:', payload.emoji)
+      console.log('[Socket] ðŸ˜€ reaction.added:', payload.emoji)
       this.eventHandlers.onReactionAdded?.(payload)
     }
 
     const handleReactionRemoved = (payload: any) => {
-      console.log('[Socket] ❌ reaction.removed:', payload.emoji)
+      console.log('[Socket] âŒ reaction.removed:', payload.emoji)
       this.eventHandlers.onReactionRemoved?.(payload)
     }
 
     const handlePresenceChanged = (payload: any) => {
-      console.log('[Socket] 👤 presence.changed:', payload.userId, payload.status)
+      console.log('[Socket] ðŸ‘¤ presence.changed:', payload.userId, payload.status)
       this.eventHandlers.onPresenceChanged?.(payload)
     }
 
     const handleGroupMemberAdded = (payload: any) => {
-      console.log('[Socket] 👥 group.memberAdded')
+      console.log('[Socket] ðŸ‘¥ group.memberAdded')
       this.eventHandlers.onGroupMemberAdded?.(payload)
     }
 
     const handleGroupMemberRemoved = (payload: any) => {
-      console.log('[Socket] 👥 group.memberRemoved')
+      console.log('[Socket] ðŸ‘¥ group.memberRemoved')
       this.eventHandlers.onGroupMemberRemoved?.(payload)
     }
 
     const handleGroupMemberLeft = (payload: any) => {
-      console.log('[Socket] 👥 group.memberLeft')
+      console.log('[Socket] ðŸ‘¥ group.memberLeft')
       this.eventHandlers.onGroupMemberLeft?.(payload)
     }
 
     const handleGroupRoleChanged = (payload: any) => {
-      console.log('[Socket] 👥 group.roleChanged')
+      console.log('[Socket] ðŸ‘¥ group.roleChanged')
       this.eventHandlers.onGroupRoleChanged?.(payload)
     }
 
     const handleGroupDisbanded = (payload: any) => {
-      console.log('[Socket] 👥 group.disbanded')
+      console.log('[Socket] ðŸ‘¥ group.disbanded')
       this.eventHandlers.onGroupDisbanded?.(payload)
     }
 
     const handleGroupUpdated = (payload: any) => {
-      console.log('[Socket] 👥 group.updated')
+      console.log('[Socket] ðŸ‘¥ group.updated')
       this.eventHandlers.onGroupUpdated?.(payload)
     }
 
     const handleFriendshipUpdated = (payload: any) => {
-      console.log('[Socket] 🤝 friendship.updated:', payload.friendId)
+      console.log('[Socket] ðŸ¤ friendship.updated:', payload.friendId)
       this.eventHandlers.onFriendshipUpdated?.(payload)
     }
 
@@ -345,7 +346,7 @@ export class ChatSocketService {
     this.socket.on('group.updated', handleGroupUpdated)
     this.socket.on('friendship.updated', handleFriendshipUpdated)
 
-    console.log('[ChatSocketService] ✅ All event listeners attached')
+    console.log('[ChatSocketService] âœ… All event listeners attached')
   }
 
   connect(token: string): Socket {
@@ -364,7 +365,7 @@ export class ChatSocketService {
 
   clearJoinedConversations() {
     this.joinedConversations.clear()
-    console.log('[ChatSocketService] 🧹 Cache cleared due to disconnect/reset')
+    console.log('[ChatSocketService] ðŸ§¹ Cache cleared due to disconnect/reset')
   }
 
   isConnected(): boolean { return Boolean(this.socket?.connected) }
@@ -378,10 +379,10 @@ export class ChatSocketService {
 
     // Ensure we're in the room BEFORE sending message (wait for server ack)
     if (!joinedRooms.has(payload.conversationId)) {
-      console.log('[SEND] ⚡ Ensuring room join before send:', payload.conversationId)
+      console.log('[SEND] âš¡ Ensuring room join before send:', payload.conversationId)
       const joined = await this.joinConversation(payload.conversationId)
       if (!joined) {
-        console.warn('[SEND] ❌ Failed to join room, cannot send')
+        console.warn('[SEND] âŒ Failed to join room, cannot send')
         return { event: 'message.error', message: 'Failed to join conversation' }
       }
     }
@@ -391,7 +392,7 @@ export class ChatSocketService {
       const timeoutId = window.setTimeout(() => {
         if (settled) return
         settled = true
-        console.warn('[SEND] ⚠️ Socket stalling, switching to REST API...')
+        console.warn('[SEND] âš ï¸ Socket stalling, switching to REST API...')
         resolve({ event: 'message.error', message: 'Timeout' })
       }, 1000)
 
@@ -428,24 +429,24 @@ export class ChatSocketService {
   async joinConversation(conversationId: string): Promise<boolean> {
     const socket = this.socket || globalChatSocket;
     if (!socket) {
-      console.warn('[JOIN] ❌ Socket is null, cannot join')
+      console.warn('[JOIN] âŒ Socket is null, cannot join')
       return false
     }
 
     // Check if already joined (globally tracked)
     if (joinedRooms.has(conversationId)) {
-      console.log('[JOIN] ℹ️ Already in room:', conversationId)
+      console.log('[JOIN] â„¹ï¸ Already in room:', conversationId)
       return true
     }
 
     // If socket not connected, queue for later
     if (!socket.connected) {
-      console.log('[JOIN] ⚠️ Socket not connected, queuing join:', conversationId)
+      console.log('[JOIN] âš ï¸ Socket not connected, queuing join:', conversationId)
       pendingRoomJoins.add(conversationId)
       return false
     }
 
-    console.log('[JOIN] 🚀 Joining:', conversationId)
+    console.log('[JOIN] ðŸš€ Joining:', conversationId)
     
     // Wait for server ACK before marking as joined
     return new Promise((resolve) => {
@@ -453,7 +454,7 @@ export class ChatSocketService {
       const timeoutId = window.setTimeout(() => {
         if (settled) return
         settled = true
-        console.warn('[JOIN] ⚠️ Join timeout, fallback to optimistic join')
+        console.warn('[JOIN] âš ï¸ Join timeout, fallback to optimistic join')
         joinedRooms.add(conversationId)
         this.joinedConversations.add(conversationId)
         resolve(true)
@@ -464,16 +465,25 @@ export class ChatSocketService {
         settled = true
         window.clearTimeout(timeoutId)
         
-        const response = ack as { success?: boolean; joined?: boolean } | null
-        const success = response?.success === true || response?.joined === true
+        const response = ack as {
+          success?: boolean
+          joined?: boolean
+          event?: string
+          data?: { conversationId?: string }
+        } | null
+        const success =
+          response?.success === true ||
+          response?.joined === true ||
+          response?.event === 'conversation.joined' ||
+          response?.data?.conversationId === conversationId
         
         if (success) {
-          console.log('[JOIN] ✅ Server confirmed join:', conversationId)
+          console.log('[JOIN] âœ… Server confirmed join:', conversationId)
           joinedRooms.add(conversationId)
           this.joinedConversations.add(conversationId)
           resolve(true)
         } else {
-          console.warn('[JOIN] ❌ Server rejected join:', conversationId)
+          console.warn('[JOIN] âŒ Server rejected join:', conversationId)
           resolve(false)
         }
       })
@@ -496,14 +506,14 @@ export class ChatSocketService {
     const toJoin = conversationIds.filter(id => !this.joinedConversations.has(id))
     if (toJoin.length === 0) return
 
-    console.log('[JOIN] 🚀 Batch joining', toJoin.length, 'conversations with acks')
+    console.log('[JOIN] ðŸš€ Batch joining', toJoin.length, 'conversations with acks')
     
     // Join all conversations in parallel and wait for all to complete
     const joinPromises = toJoin.map(conversationId => this.joinConversation(conversationId))
     const results = await Promise.all(joinPromises)
     
     const successCount = results.filter(r => r).length
-    console.log(`[JOIN] ✅ Successfully joined ${successCount}/${toJoin.length} conversations`)
+    console.log(`[JOIN] âœ… Successfully joined ${successCount}/${toJoin.length} conversations`)
   }
 
   markAsRead(payload: MessageReadPayload): boolean {
@@ -552,3 +562,4 @@ export function emitSendMessage(socket: Socket, payload: SocketMessagePayload): 
     })
   })
 }
+

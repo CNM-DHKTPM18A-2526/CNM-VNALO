@@ -506,7 +506,6 @@ export function mapRawMessage(raw: RawMessageLike, currentUserId: string): ChatM
     }
   }
 
-  console.log('Mapped type debug:', (raw as any).type, raw.messageType)
   const type = detectedTypeFromContent || normalizeMessageType((raw as any).type || raw.messageType || (raw as any).message_type, raw)
   const mediaUrl = mediaUrlFromPayload ?? ((type === 'image' || type === 'file' || type === 'sticker') ? mediaUrlFromContent : null)
   let messageText = mediaUrlFromContent && content.trim() === mediaUrlFromContent ? '' : content

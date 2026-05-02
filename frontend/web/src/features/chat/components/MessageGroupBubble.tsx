@@ -32,6 +32,8 @@ type MessageGroupBubbleProps = {
   userRole?: string
   allowMemberPin?: boolean
   onVotePoll?: (messageId: string, optionId: string) => void
+  hoveredMessageId?: string | null
+  setHoveredMessageId?: (messageId: string | null) => void
 }
 
 export function MessageGroupBubble({
@@ -61,6 +63,8 @@ export function MessageGroupBubble({
   userRole,
   allowMemberPin,
   onVotePoll,
+  hoveredMessageId = null,
+  setHoveredMessageId,
 }: MessageGroupBubbleProps) {
   if (messages.length === 0) return null;
 
@@ -129,6 +133,8 @@ export function MessageGroupBubble({
       userRole={userRole}
       allowMemberPin={allowMemberPin}
       onVotePoll={onVotePoll}
+      hoveredMessageId={hoveredMessageId}
+      setHoveredMessageId={setHoveredMessageId}
     />
   );
 }
