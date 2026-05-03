@@ -41,8 +41,8 @@ export class Message {
   @Column({ name: 'server_seq', type: 'bigint' })
   serverSeq: number;
 
-  @Column({ name: 'sender_id', type: 'uuid', nullable: true })
-  senderId: string | null;
+  @Column({ name: 'sender_id', type: 'uuid', nullable: false })
+  senderId: string;
 
   /** Client-generated UUID for idempotency */
   @Column({ name: 'client_message_id', type: 'uuid', nullable: true })

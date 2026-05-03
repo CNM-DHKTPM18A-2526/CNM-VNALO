@@ -876,7 +876,7 @@ export class MessageService {
       const msg = manager.create(Message, {
         conversationId,
         serverSeq,
-        senderId: null,
+        senderId: '00000000-0000-0000-0000-000000000000', // System virtual sender ID
         clientMessageId: null,
         messageType: MessageType.SYSTEM,
         content,
