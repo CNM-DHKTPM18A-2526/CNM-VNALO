@@ -351,12 +351,12 @@ export function MessageInput({
       )}
 
       {replyMessage && (
-        <div className="flex items-center gap-3 bg-slate-50 border-t border-slate-100 px-4 py-2 animate-in fade-in slide-in-from-bottom-1">
+        <div className="flex items-center gap-3 bg-[var(--surface)] border-t border-[var(--border)] px-4 py-2 animate-in fade-in slide-in-from-bottom-1">
           <div className="flex-1 min-w-0 border-l-2 border-blue-500 pl-3">
-            <p className="text-xs font-bold text-blue-600 truncate">
+            <p className="text-xs font-bold text-blue-600 dark:text-sky-400 truncate">
               Đang trả lời {replyMessage.sender === 'me' ? 'chính mình' : replyMessage.senderName}
             </p>
-            <p className="text-sm text-slate-500 truncate">
+            <p className="text-sm text-[var(--muted)] truncate">
               {replyMessage.type === 'image' ? '[Hình ảnh]' : 
                replyMessage.type === 'sticker' ? '[Sticker]' : 
                replyMessage.type === 'file' ? '[Tệp tin]' : 
@@ -365,7 +365,7 @@ export function MessageInput({
           </div>
           <button 
             onClick={onCancelReply}
-            className="p-1 hover:bg-slate-200 rounded-full transition-colors text-slate-400"
+            className="p-1 hover:bg-[var(--surface-hover)] rounded-full transition-colors text-[var(--muted)]"
           >
             <X size={16} />
           </button>

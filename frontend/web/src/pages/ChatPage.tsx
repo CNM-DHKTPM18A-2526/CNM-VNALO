@@ -5628,6 +5628,7 @@ export default function ChatPage() {
               <ConversationInfo
                 conversation={selectedConversation}
                 messages={selectedMessages}
+                reactionStates={reactionStatesByMessage}
                 onAddMembersClick={() => setIsAddMembersOpen(true)}
                 onDeleteHistoryClick={() => setConfirmDeleteHistoryId(selectedConversationId || routedConversationId)}
                 onLeaveGroupClick={handleLeaveGroupClick}

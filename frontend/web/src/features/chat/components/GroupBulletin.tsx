@@ -15,9 +15,11 @@ interface GroupBulletinProps {
   onClose: () => void;
   onJumpToMessage: (messageId: string) => void;
   onSendPoll?: (poll: PollMetadata) => void;
+  currentUserId?: string;
+  reactionStates?: Record<string, any>;
 }
 
-export function GroupBulletin({ conversationId, token, messages, onClose, onJumpToMessage, onSendPoll }: GroupBulletinProps) {
+export function GroupBulletin({ conversationId, token, messages, onClose, onJumpToMessage, onSendPoll, currentUserId, reactionStates }: GroupBulletinProps) {
   const { userMap } = useUserStore();
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [pinnedItems, setPinnedItems] = useState<RawPinnedMessage[]>([]);
@@ -27,7 +29,6 @@ export function GroupBulletin({ conversationId, token, messages, onClose, onJump
   useEffect(() => {
     const loadPinned = async () => {
       try {
-        setIsLoading(true);
         const data = await fetchPinnedMessages(token, conversationId);
         setPinnedItems(Array.isArray(data) ? data : []);
       } catch (error) {
@@ -37,7 +38,7 @@ export function GroupBulletin({ conversationId, token, messages, onClose, onJump
       }
     };
     loadPinned();
-  }, [conversationId, token]);
+  }, [conversationId, token, messages.length]); // Refetch when messages change (realtime)
 
   const formatRelativeDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -68,35 +69,8 @@ export function GroupBulletin({ conversationId, token, messages, onClose, onJump
     return messages.find(m => m.id === msgId);
   };
 
-  // Mock Polls for demonstration (until backend supports them)
-  const mockPolls = [
-    {
-      id: 'poll-1',
-      title: 'Nhóm thực thể',
-      description: 'Chọn nhiều phương án',
-      voterCount: 3,
-      options: [
-        { label: 'Đỏ', votes: 1, percent: 33, selected: false },
-        { label: 'Vàng', votes: 1, percent: 33, selected: false },
-        { label: 'Xanh', votes: 1, percent: 33, selected: true },
-      ],
-      creatorId: 'user-1',
-      createdAt: '2026-04-26T10:00:00Z'
-    }
-  ];
-
-  const mockNotes = [
-    {
-      id: 'note-1',
-      type: 'note',
-      senderId: 'user-2',
-      content: 'Chào mừng dự án VNALO chính thức ra mắt! 🚀',
-      createdAt: '2026-04-25T14:30:00Z',
-    }
-  ];
-
   const renderContent = () => {
-    if (isLoading) return <div className="p-10 text-center text-slate-400 font-medium">Đang tải bảng tin...</div>;
+    if (isLoading && pinnedItems.length === 0) return <div className="p-10 text-center text-slate-400 font-medium">Đang tải bảng tin...</div>;
 
     let itemsToRender: any[] = [];
 
@@ -108,7 +82,7 @@ export function GroupBulletin({ conversationId, token, messages, onClose, onJump
           id: pin.id,
           messageId: pin.messageId,
           senderId: msg?.senderId || pin.pinnedBy || '',
-          content: msg?.text || (msg?.type === 'file' ? 'Tệp tin' : 'Hội thoại'),
+          content: msg?.text || (msg?.type === 'file' ? 'Tệp tin' : msg?.type === 'image' ? 'Hình ảnh' : 'Hội thoại'),
           createdAt: pin.pinnedAt || msg?.createdAt,
         };
       });
@@ -116,12 +90,89 @@ export function GroupBulletin({ conversationId, token, messages, onClose, onJump
     }
 
     if (activeTab === 'all' || activeTab === 'poll') {
-      const polls = mockPolls.map(p => ({ ...p, type: 'poll' }));
-      itemsToRender = [...itemsToRender, ...polls];
+      const realPolls = messages
+        .filter(m => m.type === 'poll' && m.pollData)
+        .map(m => {
+          const pData = m.pollData!;
+          const messageReactions = reactionStates?.[m.id]?.reactions;
+
+          const getVotesCountForOption = (optionId: string, optVotes: string[]) => {
+            if (!messageReactions) return optVotes.length;
+            
+            let count = 0;
+            const optionMatch = optionId.match(/\d+/);
+            const optionNum = optionMatch ? optionMatch[0] : optionId;
+            
+            Object.entries(messageReactions).forEach(([key, reaction]: [string, any]) => {
+              const keyMatch = key.match(/\d+/g);
+              if (key.startsWith('vote:') && keyMatch && keyMatch[0] === optionNum) {
+                count += reaction.count;
+              } else if (key.startsWith('v:') && keyMatch) {
+                if (keyMatch.includes(optionNum)) {
+                  count += reaction.count;
+                }
+              }
+            });
+            return count;
+          };
+
+          const isUserVotedOption = (optionId: string, optVotes: string[]) => {
+            if (!messageReactions) return currentUserId ? optVotes.includes(currentUserId) : false;
+            
+            const optionMatch = optionId.match(/\d+/);
+            const optionNum = optionMatch ? optionMatch[0] : optionId;
+            let isVoted = false;
+            
+            Object.entries(messageReactions).forEach(([key, reaction]: [string, any]) => {
+              if (reaction.userIds?.includes(currentUserId) || reaction.myCount > 0) {
+                const keyMatch = key.match(/\d+/g);
+                if (key.startsWith('vote:') && keyMatch && keyMatch[0] === optionNum) {
+                  isVoted = true;
+                } else if (key.startsWith('v:') && keyMatch) {
+                  if (keyMatch.includes(optionNum)) {
+                    isVoted = true;
+                  }
+                }
+              }
+            });
+            return isVoted;
+          };
+
+          let computedOptions = pData.options.map((opt: any) => {
+             const votesCount = getVotesCountForOption(opt.id, opt.votes || []);
+             const selected = isUserVotedOption(opt.id, opt.votes || []);
+             return {
+               id: opt.id,
+               label: opt.label || opt.text || 'Lựa chọn',
+               votes: votesCount,
+               selected
+             }
+          });
+
+          const totalVotes = computedOptions.reduce((acc: number, cur: any) => acc + cur.votes, 0);
+
+          return {
+            type: 'poll',
+            id: m.id,
+            title: pData.question || 'Bình chọn',
+            description: pData.allowMultiple ? 'Chọn nhiều phương án' : 'Chọn một phương án',
+            voterCount: totalVotes,
+            options: computedOptions.map((opt: any) => ({
+               ...opt,
+               percent: totalVotes > 0 ? Math.round((opt.votes / totalVotes) * 100) : 0
+            })),
+            createdAt: m.createdAt,
+            senderId: m.senderId
+          };
+        });
+      itemsToRender = [...itemsToRender, ...realPolls];
     }
 
     if (activeTab === 'all' || activeTab === 'note') {
-      itemsToRender = [...itemsToRender, ...mockNotes];
+      // Notes are considered any text message that is pinned, or any mock notes if we want to fallback
+      // Since backend doesn't have a "note" type, we can filter pinned messages that are just text.
+      // But actually, we don't need mock notes anymore. If empty, it'll just show "Chưa có bảng tin".
+      // Let's just leave it empty for now, or you can implement if a custom type exists.
     }
 
     // Sort items by date descending
@@ -230,8 +281,11 @@ export function GroupBulletin({ conversationId, token, messages, onClose, onJump
                   ))}
                 </div>
 
-                <button className="w-full py-2 text-[14px] font-semibold text-[#005ae0] bg-[#e5efff] dark:bg-blue-900/20 rounded-md hover:bg-[#d0e3ff] dark:hover:bg-blue-900/30 transition-colors">
-                  Đổi lựa chọn
+                <button 
+                  className="w-full py-2 text-[14px] font-semibold text-[#005ae0] bg-[#e5efff] dark:bg-blue-900/20 rounded-md hover:bg-[#d0e3ff] dark:hover:bg-blue-900/30 transition-colors"
+                  onClick={() => onJumpToMessage(item.id)}
+                >
+                  Xem chi tiết bình chọn
                 </button>
               </div>
             )}

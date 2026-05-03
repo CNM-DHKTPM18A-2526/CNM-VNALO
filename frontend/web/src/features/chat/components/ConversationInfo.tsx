@@ -46,6 +46,7 @@ import { GroupBulletin } from './GroupBulletin';
 type ConversationInfoProps = {
   conversation: ConversationSummary;
   messages: ChatMessage[];
+  reactionStates?: Record<string, any>;
   onAddMembersClick?: () => void;
   onLeaveGroupClick?: () => void;
   onEditGroupName?: () => void;
@@ -67,6 +68,7 @@ type SectionKey = 'media' | 'files' | 'links' | 'security' | 'bulletin';
 export function ConversationInfo({
   conversation,
   messages,
+  reactionStates,
   onAddMembersClick,
   onLeaveGroupClick,
   onEditGroupName,
@@ -243,6 +245,8 @@ export function ConversationInfo({
           onClose={() => setShowBulletinView(false)}
           onJumpToMessage={onJumpToMessage}
           onSendPoll={onSendPoll}
+          currentUserId={currentUserId}
+          reactionStates={reactionStates}
         />
       ) : showMembersView ? (
         <MemberListView 
@@ -328,23 +332,6 @@ export function ConversationInfo({
                 <p className="text-[14px] text-[var(--muted)] leading-relaxed">
                   Lưu trữ và truy cập nhanh những nội dung quan trọng của bạn ngay trên VNALO
                 </p>
-                <div className="mt-6 text-left">
-                  <div className="flex justify-between text-[13px] mb-2 font-medium">
-                    <span className="text-[var(--text)]">Dung lượng</span>
-                    <span className="text-[var(--muted)]">291 MB / 500 MB</span>
-                  </div>
-                  <div className="h-2 w-full bg-[var(--bg)] rounded-full overflow-hidden flex">
-                    <div className="h-full bg-orange-400" style={{ width: '40%' }}></div>
-                    <div className="h-full bg-green-400" style={{ width: '15%' }}></div>
-                  </div>
-                  <div className="mt-2 flex gap-3 text-[11px] text-[var(--muted)]">
-                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-400"></span>Ảnh</span>
-                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400"></span>Video</span>
-                  </div>
-                  <button className="w-full mt-4 py-2 border border-[var(--border)] rounded-lg text-[14px] font-medium hover:bg-[var(--surface-hover)] text-[var(--text)] transition-colors cursor-pointer bg-transparent">
-                    Xem và dọn dẹp My Documents
-                  </button>
-                </div>
               </div>
             ) : (
               <div className={`mt-6 grid ${conversation.isGroup ? 'grid-cols-4' : 'grid-cols-3'} gap-3`}>
