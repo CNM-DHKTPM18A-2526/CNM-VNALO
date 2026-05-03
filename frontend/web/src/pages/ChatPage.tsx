@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { getSyncPolicy } from '../features/auth/auth.api'
@@ -547,7 +547,7 @@ export default function ChatPage() {
   const callServiceRef = useRef<WebRtcCallService | null>(null)
 
   // SYNC CALL STATE TO REF FOR LISTENERS
-  const callStateRef = useRef(callState)
+  const callStateRef = React.useRef(callState)
   const currentCallIdRef = useRef<string | null>(null) // Immediate sync ref for signal routing
   useEffect(() => {
     callStateRef.current = callState
@@ -583,12 +583,12 @@ export default function ChatPage() {
   }
 
 
-  const routedConversationIdRef = useRef('')
-  const selectedConversationIdRef = useRef('')
+  const routedConversationIdRef = React.useRef('')
+  const selectedConversationIdRef = React.useRef('')
   const selectedMessagesRef = useRef<ChatMessage[]>([])
   const conversationsRef = useRef<ConversationSummary[]>([])
   const friendIdSetRef = useRef<Set<string>>(new Set())
-  const lastLoadedMessagesKeyRef = useRef('')
+  const lastLoadedMessagesKeyRef = React.useRef('')
   const userMapRef = useRef<Record<string, { displayName: string; avatarUrl: string | null }>>({})
 
   // Hard guards for pinned messages
@@ -601,7 +601,7 @@ export default function ChatPage() {
   useEffect(() => {
     userMapRef.current = userMap
   }, [userMap])
-  const messageLoadRequestSeqRef = useRef(0)
+  const messageLoadRequestSeqRef = React.useRef(0)
   const pendingMetadataFetches = useRef<Set<string>>(new Set())
   const processedMessageIds = useRef<Set<string>>(new Set())
   const lastPinnedSyncTimeRef = useRef<Record<string, number>>({})
@@ -3012,7 +3012,7 @@ export default function ChatPage() {
     }
   }, [selectedConversation, currentUserId, emitSendMessage, accessToken, updateConversationAfterMessage]);
 
-  const isAnsweringRef = useRef(false);
+  const isAnsweringRef = React.useRef(false);
   const handleAnswerCall = useCallback(async () => {
     if (!callServiceRef.current || !callStateRef.current.isOpen || isAnsweringRef.current) return;
     if (callStateRef.current.status === 'connected') return;
@@ -3150,10 +3150,10 @@ export default function ChatPage() {
   // ------------------------------------------------------------------------------------------------------------------------------------------------------------------
   // STABLE SIGNALING HANDLERS (using Refs to prevent listener churn)
   // ------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  const handleEndCallRef = useRef(handleEndCall);
+  const handleEndCallRef = React.useRef(handleEndCall);
   useEffect(() => { handleEndCallRef.current = handleEndCall; }, [handleEndCall]);
 
-  const signalHandlersRef = useRef({
+  const signalHandlersRef = React.useRef({
     handleCallOffer,
     handleCallAnswer,
     handleCallIce,
@@ -3527,7 +3527,7 @@ export default function ChatPage() {
   )
 
 
-  const inboxSummarySyncingRef = useRef(false)
+  const inboxSummarySyncingRef = React.useRef(false)
 
   useEffect(() => {
     if (!accessToken || !user?.id || !isSocketConnected || conversations.length === 0) {
@@ -4163,7 +4163,7 @@ export default function ChatPage() {
     await joinMultipleConversations(conversationIds)
   }, [joinMultipleConversations])
 
-  const previousSocketConnectedRef = useRef(false)
+  const previousSocketConnectedRef = React.useRef(false)
 
   useEffect(() => {
     const socket = getSocket()
@@ -5800,8 +5800,8 @@ function PinnedLogicHooks({
       return {
         id,
         conversationId: selectedConversationId,
-        content: 'Tin nhÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â§ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“Ãƒâ€šÃ‚Â¸ ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â§ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€¦Ã‚Â  ghim',
-        text: 'Tin nhÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â§ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“Ãƒâ€šÃ‚Â¸ ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â§ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€¦Ã‚Â  ghim',
+        content: 'Tin nhắn được ghim',
+        text: 'Tin nhắn được ghim',
         type: 'text' as any,
         sender: 'system' as any,
         senderId: 'system',
@@ -5840,15 +5840,3 @@ function PinnedLogicHooks({
 
   return null;
 }
-
-
-
-
-
-
-
-
-
-
-
-

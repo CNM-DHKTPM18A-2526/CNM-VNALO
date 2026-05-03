@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { resolveMediaUrl } from '../../../utils/mediaUtils'
 import { PremiumVideoTile, PremiumCallControls } from './PremiumCallUI'
 

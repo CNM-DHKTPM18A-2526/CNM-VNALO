@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect } from 'react'
 import { 
   Mic, MicOff, Video, VideoOff, PhoneOff, 
   Maximize2, Minimize2, 
@@ -31,7 +31,7 @@ export const PremiumVideoTile: React.FC<PremiumVideoTileProps> = ({
   isSpeaking = false,
   size = 'md'
 }) => {
-  const videoRef = useRef<HTMLVideoElement>(null)
+  const videoRef = React.useRef<HTMLVideoElement>(null)
   const resolvedAvatar = avatarUrl ? resolveMediaUrl(avatarUrl) : null
 
   useEffect(() => {
@@ -265,7 +265,7 @@ export const MiniCallWindow: React.FC<MiniCallWindowProps> = ({
   onMaximize,
   onEnd
 }) => {
-  const videoRef = useRef<HTMLVideoElement>(null)
+  const videoRef = React.useRef<HTMLVideoElement>(null)
   const resolvedAvatar = peerAvatar ? resolveMediaUrl(peerAvatar) : null
 
   useEffect(() => {
