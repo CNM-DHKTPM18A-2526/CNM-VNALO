@@ -16,7 +16,6 @@ interface CallModalProps {
   hasRemoteDescription?: boolean
   error?: string | null
   onEnd: () => void
-  onAnswer?: () => void
   onToggleMic?: () => void
   onToggleCamera?: () => void
   onMinimize?: () => void
@@ -34,7 +33,6 @@ export const CallModal: React.FC<CallModalProps> = ({
   isCameraOn = true,
   isRemoteCameraOn = true,
   onEnd,
-  onAnswer,
   onToggleMic,
   onToggleCamera,
   onMinimize,
@@ -107,6 +105,7 @@ export const CallModal: React.FC<CallModalProps> = ({
                 isCameraOn={status === 'connected' ? isRemoteCameraOn : false}
                 isMicOn={true} // We don't have remote mic state in 1-1 props currently
                 isSpeaking={false}
+                statusText={status === 'connecting' ? 'Đang gọi...' : undefined}
              />
            </div>
 

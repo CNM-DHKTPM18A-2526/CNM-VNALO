@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { getSyncPolicy } from '../features/auth/auth.api'
@@ -10,7 +10,8 @@ import { MessageShareModal } from '../features/chat/components/MessageShareModal
 import { ChatWindow } from '../features/chat/components/ChatWindow'
 import { UserProfileModal } from '../features/chat/components/UserProfileModal'
 import { CallModal } from '../features/chat/components/CallModal'
-import { GroupCallModal, IncomingGroupCallBanner, useGroupCall } from '../features/chat/components/GroupCallModal'
+import { GroupCallModal, useGroupCall } from '../features/chat/components/GroupCallModal'
+import { IncomingCallBanner } from '../features/chat/components/PremiumCallUI'
 import type { MessageContextMenuAction } from '../features/chat/components/MessageContextMenu'
 import {
   addMessageReaction,
@@ -1943,16 +1944,6 @@ export default function ChatPage() {
         }
         return c;
       }))
-    },
-    onConversationError: (payload) => {
-      console.error('[ChatPage] ❌ Conversation error:', payload);
-      if (payload.conversationId && (payload.code?.includes('FORBIDDEN') || payload.code?.includes('NOT_FOUND') || payload.code?.includes('ACCESS_DENIED'))) {
-        const cid = payload.conversationId;
-        setConversations(prev => prev.filter(c => c.id !== cid));
-        if (selectedConversationIdRef.current === cid) {
-          navigate('/chat');
-        }
-      }
     },
     onMessageError: (payload) => {
       console.error('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ Message error:', payload);
@@ -5757,7 +5748,7 @@ export default function ChatPage() {
       />
 
       <CallModal
-        isOpen={callState.isOpen}
+        isOpen={callState.isOpen && !((callState as any).direction === 'incoming' && callState.status === 'connecting')}
         type={callState.type}
         status={callState.status}
         peerName={callState.peerId ? (userMap[callState.peerId]?.displayName || "NgÆ°á»i dÃ¹ng") : (selectedConversation?.name || "NgÆ°á»i dÃ¹ng")}
@@ -5769,19 +5760,31 @@ export default function ChatPage() {
         isRemoteCameraOn={(callState as any).isRemoteCameraOn}
         hasRemoteDescription={callState.hasRemoteDescription}
         onEnd={handleEndCall}
-        onAnswer={handleAnswerCall}
         onToggleMic={handleToggleMic}
         onToggleCamera={handleToggleCamera}
       />
 
       {/* INCOMING GROUP CALL NOTIFICATION ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ shown to non-callers */}
-      {incomingGroupCall && !isInGroupCall && (
-        <IncomingGroupCallBanner
-          info={incomingGroupCall}
-          onJoin={() => joinGroupCall(incomingGroupCall)}
+      {(incomingGroupCall && !isInGroupCall) ? (
+        <IncomingCallBanner
+          peerName={incomingGroupCall.callerName}
+          peerAvatar={incomingGroupCall.callerAvatar}
+          isGroup={true}
+          conversationName={incomingGroupCall.conversationName}
+          isAudioOnly={incomingGroupCall.audioOnly}
+          onAnswer={() => joinGroupCall(incomingGroupCall)}
           onDecline={declineGroupCall}
         />
-      )}
+      ) : (callState.isOpen && (callState as any).direction === 'incoming' && callState.status === 'connecting') ? (
+        <IncomingCallBanner
+          peerName={callState.peerId ? (userMap[callState.peerId]?.displayName || "Người dùng") : (selectedConversation?.name || "Người dùng")}
+          peerAvatar={callState.peerId ? userMap[callState.peerId]?.avatarUrl : selectedConversation?.avatarUrl}
+          isGroup={false}
+          isAudioOnly={callState.type === 'audio'}
+          onAnswer={handleAnswerCall}
+          onDecline={() => handleEndCall('reject')}
+        />
+      ) : null}
 
       {/* GROUP CALL MODAL ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ independent of 1-1 CallModal */}
       {isInGroupCall && groupCallSnapshot && (

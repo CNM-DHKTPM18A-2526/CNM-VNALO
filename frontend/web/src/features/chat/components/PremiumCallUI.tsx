@@ -2,7 +2,7 @@ import React from 'react'
 import { 
   Mic, MicOff, Video, VideoOff, PhoneOff, 
   Maximize2, Minimize2, 
-  PhoneIncoming
+  Phone
 } from 'lucide-react'
 import { resolveMediaUrl } from '../../../utils/mediaUtils'
 
@@ -19,6 +19,7 @@ interface PremiumVideoTileProps {
   isLocal?: boolean
   isSpeaking?: boolean
   size?: 'sm' | 'md' | 'lg' | 'full'
+  statusText?: string
 }
 
 export const PremiumVideoTile: React.FC<PremiumVideoTileProps> = ({
@@ -29,7 +30,8 @@ export const PremiumVideoTile: React.FC<PremiumVideoTileProps> = ({
   isCameraOn,
   isLocal = false,
   isSpeaking = false,
-  size = 'md'
+  size = 'md',
+  statusText
 }) => {
   const videoRef = React.useRef<HTMLVideoElement>(null)
   const resolvedAvatar = avatarUrl ? resolveMediaUrl(avatarUrl) : null
@@ -43,14 +45,14 @@ export const PremiumVideoTile: React.FC<PremiumVideoTileProps> = ({
   const initials = displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
 
   return (
-    <div className={`relative overflow-hidden rounded-3xl bg-[#131313]/60 backdrop-blur-md border border-white/10 shadow-2xl transition-all duration-500 ${isSpeaking ? 'ring-2 ring-[#22C55E] shadow-[0_0_30px_rgba(34,197,94,0.3)]' : ''} ${size === 'full' ? 'w-full h-full' : 'aspect-[3/4] sm:aspect-video'}`}>
+    <div className={`relative overflow-hidden bg-[#1C1C2E] transition-all duration-500 ${isSpeaking ? 'ring-2 ring-[#22C55E]' : ''} ${size === 'full' ? 'w-full h-full' : 'w-full h-full'}`}>
       {/* Background Blur */}
       {!isCameraOn && (
-        <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 z-0 bg-[#1C1C2E]">
           {resolvedAvatar ? (
             <img src={resolvedAvatar} alt="" className="w-full h-full object-cover blur-2xl opacity-40 scale-110" />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-[#131313] to-[#000000]" />
+            <div className="w-full h-full bg-gradient-to-br from-[#1C1C2E] to-[#131313]" />
           )}
           <div className="absolute inset-0 bg-black/20" />
         </div>
@@ -69,9 +71,9 @@ export const PremiumVideoTile: React.FC<PremiumVideoTileProps> = ({
         <div className="relative z-20 flex flex-col items-center justify-center h-full gap-4">
           <div className="relative">
             {resolvedAvatar ? (
-              <img src={resolvedAvatar} alt={displayName} className="w-24 h-24 rounded-full object-cover border-4 border-white/20 shadow-2xl" />
+              <img src={resolvedAvatar} alt={displayName} className="w-24 h-24 rounded-full object-cover shadow-2xl" />
             ) : (
-              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#007BFF] to-[#0050CC] flex items-center justify-center text-white text-3xl font-bold border-4 border-white/20 shadow-2xl">
+              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#007BFF] to-[#0050CC] flex items-center justify-center text-white text-3xl font-bold shadow-2xl">
                 {initials}
               </div>
             )}
@@ -79,14 +81,21 @@ export const PremiumVideoTile: React.FC<PremiumVideoTileProps> = ({
                <div className="absolute -inset-2 rounded-full border-2 border-[#22C55E] animate-ping opacity-50" />
             )}
           </div>
+          {statusText && (
+            <span className="text-white/80 text-sm font-medium animate-pulse drop-shadow-md">
+              {statusText}
+            </span>
+          )}
         </div>
       )}
 
       {/* Info Overlay */}
-      <div className="absolute bottom-4 left-4 right-4 z-30 flex items-center justify-between">
-        <div className="px-3 py-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center gap-2">
-          <span className="text-white text-xs font-semibold">{isLocal ? 'Bạn' : displayName}</span>
-          {!isMicOn && <MicOff size={12} className="text-red-400" />}
+      <div className="absolute bottom-4 left-4 right-4 z-30 flex flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <span className="text-white text-sm font-semibold drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+            {isLocal ? 'Bạn' : displayName}
+          </span>
+          {!isMicOn && <MicOff size={14} className="text-red-500 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" />}
         </div>
       </div>
     </div>
@@ -201,44 +210,68 @@ export const IncomingCallBanner: React.FC<IncomingCallBannerProps> = ({
   const resolvedAvatar = peerAvatar ? resolveMediaUrl(peerAvatar) : null
 
   return (
-    <div className="fixed top-6 right-6 z-[1000] w-80 animate-in fade-in slide-in-from-right-10 duration-500">
-      <div className="bg-[#131313]/95 backdrop-blur-2xl border border-[#007BFF]/40 rounded-3xl p-5 shadow-[0_20px_50px_rgba(0,0,0,0.6)] flex flex-col gap-4">
-        <div className="flex items-center gap-4">
+    <div className="fixed bottom-5 right-5 z-[1000] w-[320px] animate-in slide-in-from-bottom-10 duration-300 ease-out">
+      <div className="bg-[#1C1C2E]/98 backdrop-blur-xl rounded-2xl p-4 shadow-[0_8px_32px_rgba(0,0,0,0.6)] flex flex-col gap-4 border border-white/5">
+        
+        {/* Header - Avatar & Info */}
+        <div className="flex items-center gap-3">
           <div className="relative">
             {resolvedAvatar ? (
-              <img src={resolvedAvatar} alt="" className="w-14 h-14 rounded-full object-cover border-2 border-[#007BFF]/30" />
+              <img src={resolvedAvatar} alt="" className="w-12 h-12 rounded-full object-cover" />
             ) : (
-              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#007BFF] to-[#0050CC] flex items-center justify-center text-white font-bold shadow-lg">
+              <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-white text-lg font-semibold">
                 {peerName[0].toUpperCase()}
               </div>
             )}
-            <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-[#22C55E] rounded-full flex items-center justify-center border-2 border-[#131313] shadow-sm">
-               <PhoneIncoming size={12} className="text-white animate-pulse" />
-            </div>
           </div>
           
           <div className="flex-1 overflow-hidden">
-            <p className="text-white font-bold truncate text-lg tracking-tight">{isGroup ? conversationName : peerName}</p>
-            <p className="text-[#00A2ED] text-xs font-semibold uppercase tracking-widest opacity-90">
-              {isGroup ? `Nhóm • ${peerName}` : isAudioOnly ? 'Cuộc gọi thoại...' : 'Cuộc gọi video...'}
+            <p className="text-white font-semibold truncate text-[14px]">
+              {isGroup && conversationName ? conversationName : peerName}
+            </p>
+            <p className="text-gray-400 text-[12px] truncate">
+              {isGroup ? `Nhóm • ${peerName}` : isAudioOnly ? 'Cuộc gọi thoại đến...' : 'Cuộc gọi video đến...'}
             </p>
           </div>
+
+          <button onClick={onDecline} className="w-6 h-6 flex items-center justify-center rounded-full bg-white/10 text-gray-400 hover:text-white hover:bg-white/20 transition-colors">
+            <span className="text-lg leading-none mt-[-2px]">&times;</span>
+          </button>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* Action Buttons */}
+        <div className="flex items-center justify-center gap-4 mt-2">
           <button
             onClick={onDecline}
-            className="flex-1 py-3 rounded-2xl bg-[#EF4444]/15 hover:bg-[#EF4444]/25 text-[#EF4444] text-sm font-bold transition-all border border-[#EF4444]/20 active:scale-95"
+            className="w-12 h-12 rounded-full bg-[#FF3B30] hover:bg-[#e03328] flex items-center justify-center text-white transition-transform active:scale-90"
+            title="Từ chối"
           >
-            Từ chối
+            <PhoneOff size={22} />
           </button>
+
+          {!isAudioOnly && (
+            <button
+              onClick={() => {
+                // If we need a 'no camera' option, it should technically set camera off before answering.
+                // For now, it invokes onAnswer. We might need to pass an additional callback later.
+                onAnswer()
+              }}
+              className="w-12 h-12 rounded-full bg-[#3A3A3C] hover:bg-[#4a4a4d] flex items-center justify-center text-white transition-transform active:scale-90"
+              title="Trả lời không có camera"
+            >
+              <VideoOff size={22} />
+            </button>
+          )}
+
           <button
             onClick={onAnswer}
-            className="flex-[1.5] py-3 px-6 rounded-2xl bg-[#22C55E] hover:bg-[#1eb354] text-white text-sm font-extrabold transition-all shadow-[0_8px_20px_rgba(34,197,94,0.4)] animate-pulse hover:animate-none active:scale-95"
+            className="w-12 h-12 rounded-full bg-[#34C759] hover:bg-[#2eaa4e] flex items-center justify-center text-white transition-transform active:scale-90"
+            title="Trả lời"
           >
-            Trả lời
+            <Phone size={22} />
           </button>
         </div>
+
       </div>
     </div>
   )

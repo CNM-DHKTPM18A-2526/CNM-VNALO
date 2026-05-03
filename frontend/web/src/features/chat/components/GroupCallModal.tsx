@@ -10,23 +10,17 @@
  */
 
 import React, { useEffect, useRef, useCallback, useState } from 'react'
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Users, Phone, PhoneIncoming } from 'lucide-react'
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Users } from 'lucide-react'
 import type { GroupCallSnapshot, GroupPeerState, IncomingGroupCallInfo } from '../webrtcGroupCallService'
 import type { ConversationSummary } from '../chat.types'
 import { WebRtcGroupCallService } from '../webrtcGroupCallService'
 import type { Socket } from 'socket.io-client'
-import { resolveMediaUrl } from '../../../utils/mediaUtils'
+// import { resolveMediaUrl } from '../../../utils/mediaUtils' // removed as unused in this file now
+import { PremiumVideoTile } from './PremiumCallUI'
 
 // ─────────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────────
-
-function getGridCols(totalTiles: number): string {
-  if (totalTiles <= 1) return 'grid-cols-1'
-  if (totalTiles <= 2) return 'grid-cols-2'
-  if (totalTiles <= 4) return 'grid-cols-2'
-  return 'grid-cols-3'
-}
 
 function formatTime(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600)
@@ -36,258 +30,6 @@ function formatTime(totalSeconds: number): string {
     .filter((v) => v !== null)
     .map((v) => String(v!).padStart(2, '0'))
     .join(':')
-}
-
-// ─────────────────────────────────────────────────────────────────
-// VIDEO TILE
-// ─────────────────────────────────────────────────────────────────
-
-interface VideoTileProps {
-  stream: MediaStream | null
-  displayName: string
-  avatarUrl?: string
-  isSpeaking: boolean
-  isMicOn: boolean
-  isCameraOn: boolean
-  isLocal?: boolean
-  audioOnly?: boolean
-}
-
-const VideoTile: React.FC<VideoTileProps> = ({
-  stream,
-  displayName,
-  avatarUrl,
-  isSpeaking,
-  isMicOn,
-  isCameraOn,
-  isLocal = false,
-  audioOnly = false,
-}) => {
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const audioRef = useRef<HTMLAudioElement>(null)
-
-  useEffect(() => {
-    if (videoRef.current && stream && isCameraOn && !audioOnly) {
-      videoRef.current.srcObject = stream
-    }
-    if (!isLocal && audioRef.current && stream) {
-      audioRef.current.srcObject = stream
-      audioRef.current.play().catch(() => {})
-    }
-  }, [stream, isLocal, isCameraOn, audioOnly])
-
-  const initials = (displayName || 'Người dùng')
-    .split(' ')
-    .map((w) => w[0] ?? '')
-    .join('')
-    .slice(0, 2)
-    .toUpperCase()
-
-  const resolvedAvatar = resolveMediaUrl(avatarUrl)
-
-  // Logic to determine if we should show active video or avatar
-  const videoTrack = stream?.getVideoTracks().find(t => t.enabled && t.readyState === 'live')
-  const showVideo = !!(videoTrack && isCameraOn && !audioOnly)
-
-  return (
-    <div className={`relative w-full h-full bg-slate-800 rounded-2xl overflow-hidden shadow-inner flex items-center justify-center transition-all duration-300 ${isSpeaking ? 'ring-2 ring-green-500' : ''}`} style={{ minHeight: '120px', aspectRatio: '16/10' }}>
-      {!isLocal && <audio ref={audioRef} autoPlay className="hidden" />}
-
-      {/* BACKGROUND AVATAR (BLURRED) - Show when camera is off or it's an audio call */}
-      {!showVideo && (
-        <div className="absolute inset-0 z-0">
-          {avatarUrl ? (
-            <img src={resolvedAvatar!} alt="" className="w-full h-full object-cover blur-2xl opacity-40 scale-110" />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-slate-700 to-slate-900" />
-          )}
-          <div className="absolute inset-0 bg-black/30" />
-        </div>
-      )}
-
-      {/* VIDEO OR AVATAR CENTER */}
-      {showVideo ? (
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted={isLocal}
-          className={`absolute inset-0 w-full h-full object-cover z-10 ${isLocal ? 'scale-x-[-1]' : ''}`}
-        />
-      ) : (
-        <div className="relative z-20 flex flex-col items-center">
-          {avatarUrl ? (
-            <div className="relative">
-               <img src={resolvedAvatar!} alt={displayName}
-                className="w-20 h-20 rounded-full object-cover border-4 border-white/10 shadow-2xl" />
-               <div className="absolute inset-0 rounded-full border border-white/20" />
-            </div>
-          ) : (
-            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-2xl font-bold border-4 border-white/10 shadow-2xl">
-              {initials}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/70 to-transparent z-10 pointer-events-none" />
-
-      <div className="absolute bottom-2 left-3 right-3 flex items-center justify-between z-20">
-        <span className="text-white text-xs font-semibold truncate drop-shadow">
-          {isLocal ? 'Bạn' : displayName}
-        </span>
-        <span className={`ml-2 flex-shrink-0 ${isMicOn ? 'text-white/70' : 'text-red-400'}`}>
-          {isMicOn ? <Mic size={14} /> : <MicOff size={14} />}
-        </span>
-      </div>
-
-      {isSpeaking && (
-        <div className="absolute top-2 left-2 z-20 bg-green-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">
-          Đang nói
-        </div>
-      )}
-
-      {isLocal && (
-        <div className="absolute top-2 right-2 z-20 bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-          Bạn
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────
-// INCOMING GROUP CALL BANNER
-// ─────────────────────────────────────────────────────────────────
-
-interface IncomingGroupCallBannerProps {
-  info: IncomingGroupCallInfo
-  onJoin: () => void
-  onDecline: () => void
-}
-
-export const IncomingGroupCallBanner: React.FC<IncomingGroupCallBannerProps> = ({
-  info,
-  onJoin,
-  onDecline,
-}) => {
-  const initials = (info.callerName || 'Người dùng').split(' ').map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase()
-  const resolvedCallerAvatar = resolveMediaUrl(info.callerAvatar)
-  const resolvedGroupAvatar = resolveMediaUrl(info.groupAvatar)
-
-  // Prioritize showing Group Avatar in the center if it's a group call
-  const mainAvatar = resolvedGroupAvatar || resolvedCallerAvatar
-
-  return (
-    <div className="fixed inset-0 z-[500] flex flex-col items-center justify-between py-20 bg-slate-950 overflow-hidden">
-      <style>{`
-        @keyframes pulseRing {
-          0% { transform: scale(1); opacity: 0.5; }
-          100% { transform: scale(2.5); opacity: 0; }
-        }
-        @keyframes fadeInDown {
-          from { transform: translateY(-20px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        @keyframes fadeInUp {
-          from { transform: translateY(20px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        @keyframes shake {
-          0%, 100% { transform: rotate(0); }
-          25% { transform: rotate(-10deg); }
-          75% { transform: rotate(10deg); }
-        }
-      `}</style>
-
-      {/* BACKGROUND BACKDROP */}
-      <div className="absolute inset-0 z-0">
-        {mainAvatar ? (
-          <img src={mainAvatar} alt="" className="w-full h-full object-cover blur-3xl opacity-30 scale-110" />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-b from-blue-900 to-slate-950" />
-        )}
-        <div className="absolute inset-0 bg-black/40" />
-      </div>
-
-      {/* TOP SECTION: GROUP INFO */}
-      <div className="relative z-10 flex flex-col items-center gap-2 px-6 text-center" style={{ animation: 'fadeInDown 0.6s ease-out' }}>
-        <div className="flex items-center gap-2 bg-white/10 px-4 py-1.5 rounded-full backdrop-blur-md border border-white/10">
-          <Users size={16} className="text-blue-400" />
-          <span className="text-white/80 text-sm font-medium">{info.conversationName}</span>
-        </div>
-        <h2 className="text-white text-3xl font-bold mt-4">Cuộc gọi nhóm đến</h2>
-        <p className="text-blue-400 text-lg font-medium animate-pulse">
-          {info.audioOnly ? '🎙️ Cuộc gọi thoại' : '📹 Cuộc gọi video'}
-        </p>
-      </div>
-
-      {/* MIDDLE SECTION: CALLER/GROUP AVATAR */}
-      <div className="relative z-10 flex flex-col items-center">
-        {/* Pulsing Rings */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-32 h-32 rounded-full border-2 border-green-500/30" style={{ animation: 'pulseRing 2s linear infinite' }} />
-          <div className="w-32 h-32 rounded-full border-2 border-green-500/20" style={{ animation: 'pulseRing 2s linear infinite 0.7s' }} />
-          <div className="w-32 h-32 rounded-full border-2 border-green-500/10" style={{ animation: 'pulseRing 2s linear infinite 1.4s' }} />
-        </div>
-
-        <div className="relative">
-          {mainAvatar ? (
-            <img 
-              src={mainAvatar} 
-              alt={info.callerName}
-              className="w-40 h-40 rounded-full object-cover border-4 border-white/20 shadow-[0_0_50px_rgba(34,197,94,0.3)]" 
-            />
-          ) : (
-            <div className="w-40 h-40 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-5xl font-bold border-4 border-white/20 shadow-2xl">
-              {initials}
-            </div>
-          )}
-          
-          {/* Small badge for caller if we are showing group avatar */}
-          {resolvedGroupAvatar && resolvedCallerAvatar && (
-            <div className="absolute -top-2 -right-2 w-14 h-14 rounded-full border-4 border-slate-950 overflow-hidden shadow-lg">
-               <img src={resolvedCallerAvatar} alt={info.callerName} className="w-full h-full object-cover" />
-            </div>
-          )}
-
-          <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-green-500 rounded-full flex items-center justify-center border-4 border-slate-950 text-white shadow-xl">
-             <PhoneIncoming size={24} className="animate-bounce" />
-          </div>
-        </div>
-        
-        <p className="text-white text-2xl font-bold mt-8 tracking-wide">{info.callerName}</p>
-        <p className="text-white/50 text-sm mt-2">Đang chờ bạn trả lời...</p>
-      </div>
-
-      {/* BOTTOM SECTION: ACTIONS */}
-      <div className="relative z-10 flex gap-12 sm:gap-24 px-6 pb-10" style={{ animation: 'fadeInUp 0.8s ease-out' }}>
-        <div className="flex flex-col items-center gap-3">
-          <button
-            onClick={onDecline}
-            className="w-20 h-20 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-all active:scale-90 shadow-[0_10px_30px_rgba(239,68,68,0.4)] group"
-          >
-            <PhoneOff size={32} className="text-white group-hover:scale-110 transition-transform" />
-          </button>
-          <span className="text-white/70 text-sm font-semibold uppercase tracking-widest">Từ chối</span>
-        </div>
-
-        <div className="flex flex-col items-center gap-3">
-          <button
-            onClick={onJoin}
-            className="w-20 h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all active:scale-90 shadow-[0_10px_30px_rgba(34,197,94,0.4)] group"
-            style={{ animation: 'shake 2s infinite ease-in-out' }}
-          >
-            <Phone size={32} className="text-white group-hover:scale-110 transition-transform" />
-          </button>
-          <span className="text-white/70 text-sm font-semibold uppercase tracking-widest">Tham gia</span>
-        </div>
-      </div>
-
-      {/* AUDIO ELEMENT FOR RINGING (Optional: if we had a ringtone file) */}
-      {/* <audio src="/assets/sounds/ringtone.mp3" autoPlay loop /> */}
-    </div>
-  )
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -318,62 +60,148 @@ export const GroupCallModal: React.FC<GroupCallModalProps> = ({
   if (!isOpen) return null
 
   const totalTiles = 1 + snapshot.peers.length
-  const gridCols = getGridCols(totalTiles)
+  
+  // Custom grid rendering logic
+  const renderTiles = () => {
+    const allTiles = [
+      {
+        id: 'local',
+        stream: snapshot.localStream,
+        displayName: localUserName,
+        avatarUrl: localUserAvatar,
+        isSpeaking: false,
+        isMicOn: snapshot.isMicOn,
+        isCameraOn: snapshot.isCameraOn,
+        isLocal: true,
+        audioOnly: snapshot.audioOnly
+      },
+      ...snapshot.peers.map((peer: GroupPeerState) => ({
+        id: peer.userId,
+        stream: peer.remoteStream,
+        displayName: peer.displayName,
+        avatarUrl: peer.avatarUrl,
+        isSpeaking: peer.isSpeaking,
+        isMicOn: peer.isMicOn,
+        isCameraOn: peer.isCameraOn,
+        isLocal: false,
+        audioOnly: snapshot.audioOnly
+      }))
+    ];
+
+    if (allTiles.length === 1) {
+      const tile = allTiles[0];
+      return (
+        <div className="w-full h-full">
+          <PremiumVideoTile
+            stream={tile.stream}
+            displayName={tile.displayName}
+            avatarUrl={tile.avatarUrl}
+            isSpeaking={tile.isSpeaking}
+            isMicOn={tile.isMicOn}
+            isCameraOn={tile.isCameraOn}
+            isLocal={tile.isLocal}
+            size="full"
+          />
+        </div>
+      );
+    }
+
+    if (allTiles.length === 2) {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 h-full">
+          {allTiles.map(tile => (
+            <PremiumVideoTile
+              key={tile.id}
+              stream={tile.stream}
+              displayName={tile.displayName}
+              avatarUrl={tile.avatarUrl}
+              isSpeaking={tile.isSpeaking}
+              isMicOn={tile.isMicOn}
+              isCameraOn={tile.isCameraOn}
+              isLocal={tile.isLocal}
+              size="full"
+            />
+          ))}
+        </div>
+      );
+    }
+
+    if (allTiles.length === 3) {
+      return (
+        <div className="grid grid-cols-2 gap-3 h-full grid-rows-2">
+          {allTiles.map((tile, idx) => (
+            <div key={tile.id} className={idx === 2 ? 'col-span-2' : ''}>
+              <PremiumVideoTile
+                stream={tile.stream}
+                displayName={tile.displayName}
+                avatarUrl={tile.avatarUrl}
+                isSpeaking={tile.isSpeaking}
+                isMicOn={tile.isMicOn}
+                isCameraOn={tile.isCameraOn}
+                isLocal={tile.isLocal}
+                size="full"
+              />
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // 4+ people
+    const cols = allTiles.length <= 4 ? 'grid-cols-2' : 'grid-cols-3';
+    return (
+      <div className={`grid ${cols} gap-3 h-full`}>
+        {allTiles.map(tile => (
+          <PremiumVideoTile
+            key={tile.id}
+            stream={tile.stream}
+            displayName={tile.displayName}
+            avatarUrl={tile.avatarUrl}
+            isSpeaking={tile.isSpeaking}
+            isMicOn={tile.isMicOn}
+            isCameraOn={tile.isCameraOn}
+            isLocal={tile.isLocal}
+            size="full"
+          />
+        ))}
+      </div>
+    );
+  }
 
   return (
-    <div className="fixed inset-0 z-[200] flex flex-col bg-slate-900">
+    <div className="fixed inset-0 z-[200] flex flex-col bg-[#1C1C2E]">
       {/* ── HEADER ── */}
-      <div className="flex items-center justify-between px-6 py-3 bg-black/30 backdrop-blur-sm border-b border-white/10">
-        <div className="flex items-center gap-2 text-white">
-          <Users size={18} className="text-blue-400" />
-          <span className="font-semibold text-sm">Cuộc gọi nhóm</span>
-          <span className="text-xs text-slate-400 ml-2">{totalTiles} người</span>
+      <div className="flex items-center justify-between px-6 py-4 bg-[#131313]/90 backdrop-blur-md border-b border-white/5">
+        <div className="flex items-center gap-3 text-white">
+          <Users size={20} className="text-[#00A2ED]" />
+          <span className="font-bold text-[15px]">Cuộc gọi nhóm</span>
+          <span className="text-sm font-semibold text-white/50">{totalTiles} người</span>
         </div>
         {elapsedSeconds > 0 && (
-          <div className="text-green-400 text-sm font-mono font-semibold">
+          <div className="text-white/80 text-[15px] font-mono font-bold tracking-widest">
             {formatTime(elapsedSeconds)}
           </div>
         )}
         {snapshot.error && (
-          <div className="text-red-400 text-xs font-medium px-3 py-1 bg-red-500/20 rounded-full">
+          <div className="text-[#FF3B30] text-xs font-bold px-3 py-1 bg-[#FF3B30]/20 rounded-full border border-[#FF3B30]/30">
             {snapshot.error}
           </div>
         )}
       </div>
 
       {/* ── GRID ── */}
-      <div className="flex-1 overflow-y-auto p-3">
-        <div className={`grid ${gridCols} gap-3`}>
-          {/* LOCAL TILE */}
-          <VideoTile
-            stream={snapshot.localStream}
-            displayName={localUserName}
-            avatarUrl={localUserAvatar}
-            isSpeaking={false}
-            isMicOn={snapshot.isMicOn}
-            isCameraOn={snapshot.isCameraOn}
-            isLocal
-            audioOnly={snapshot.audioOnly}
-          />
-          {/* REMOTE TILES */}
-          {snapshot.peers.map((peer: GroupPeerState) => (
-            <VideoTile
-              key={peer.userId}
-              stream={peer.remoteStream}
-              displayName={peer.displayName}
-              avatarUrl={peer.avatarUrl}
-              isSpeaking={peer.isSpeaking}
-              isMicOn={peer.isMicOn}
-              isCameraOn={peer.isCameraOn}
-              audioOnly={snapshot.audioOnly}
-            />
-          ))}
-        </div>
+      <div className="flex-1 overflow-y-auto p-4 flex flex-col justify-center bg-[#000000]">
+        {renderTiles()}
 
         {snapshot.peers.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-10 text-slate-500 text-sm gap-2 mt-4">
-            <Users size={32} className="opacity-40" />
-            <p>Đang chờ người khác tham gia...</p>
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-50">
+            <div className="bg-black/50 backdrop-blur-md px-6 py-3 rounded-full flex items-center gap-3">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+              </span>
+              <p className="text-white font-medium text-sm">Đang chờ người khác tham gia...</p>
+            </div>
           </div>
         )}
       </div>
