@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Icon } from '../../../shared/components/Icon'
-import { UserAvatar } from '../../../shared/components/UserAvatar'
 import { resolveMediaUrl } from '../../../utils/mediaUtils'
+import { PremiumVideoTile, PremiumCallControls } from './PremiumCallUI'
 
 interface CallModalProps {
   isOpen: boolean
@@ -20,6 +19,7 @@ interface CallModalProps {
   onAnswer?: () => void
   onToggleMic?: () => void
   onToggleCamera?: () => void
+  onMinimize?: () => void
 }
 
 export const CallModal: React.FC<CallModalProps> = ({
@@ -33,44 +33,14 @@ export const CallModal: React.FC<CallModalProps> = ({
   isMicOn = true,
   isCameraOn = true,
   isRemoteCameraOn = true,
-  hasRemoteDescription = false,
   onEnd,
   onAnswer,
   onToggleMic,
   onToggleCamera,
+  onMinimize,
   error,
 }) => {
   const [seconds, setSeconds] = useState(0)
-  const [isAnswering, setIsAnswering] = useState(false)
-  const localVideoRef = useRef<HTMLVideoElement>(null)
-  const remoteVideoRef = useRef<HTMLVideoElement>(null)
-  const remoteAudioRef = useRef<HTMLAudioElement>(null)
-
-  const resolvedPeerAvatar = peerAvatar ? resolveMediaUrl(peerAvatar) : null
-
-  // Attach local stream
-  useEffect(() => {
-    if (localVideoRef.current && localStream) {
-      localVideoRef.current.srcObject = localStream
-    }
-  }, [localStream, isOpen])
-
-  // Attach remote stream to audio (always) and video (when camera on)
-  useEffect(() => {
-    if (!remoteStream) return
-
-    // Always attach to audio element
-    if (remoteAudioRef.current) {
-      remoteAudioRef.current.srcObject = remoteStream
-      remoteAudioRef.current.play().catch(e => console.warn('[CallModal] Audio play failed:', e))
-    }
-
-    // Attach to video element always — visibility is controlled by CSS opacity
-    if (remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = remoteStream
-      remoteVideoRef.current.play().catch(e => console.warn('[CallModal] Video play failed:', e))
-    }
-  }, [remoteStream, isOpen])
 
   useEffect(() => {
     let interval: any
@@ -84,12 +54,6 @@ export const CallModal: React.FC<CallModalProps> = ({
     return () => clearInterval(interval)
   }, [status])
 
-  useEffect(() => {
-    if (status === 'failed' || status === 'connected' || error) {
-      setIsAnswering(false)
-    }
-  }, [status, error])
-
   if (!isOpen) return null
 
   const formatTime = (totalSeconds: number) => {
@@ -98,151 +62,84 @@ export const CallModal: React.FC<CallModalProps> = ({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
 
-  // Show avatar when:
-  // - it's an audio call, OR
-  // - remote camera is off, OR
-  // - still connecting (no video yet)
-  const showAvatar = type === 'audio' || !isRemoteCameraOn || status === 'connecting'
+  const resolvedPeerAvatar = peerAvatar ? resolveMediaUrl(peerAvatar) : null
 
   return (
-    <div className='call-modal-overlay overflow-hidden'>
-      {/* ── BACKGROUND ── */}
-      <div className="absolute inset-0 bg-slate-900 z-0">
-        {/* Blurred avatar background — visible when no remote video */}
-        <div
-          className="absolute inset-0 transition-opacity duration-500"
-          style={{ opacity: showAvatar ? 1 : 0 }}
-        >
-          {resolvedPeerAvatar ? (
-            <img
-              src={resolvedPeerAvatar}
-              alt=""
-              className="w-full h-full object-cover blur-3xl scale-110"
-              style={{ opacity: 0.35 }}
-            />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-slate-800 to-slate-950" />
-          )}
-          <div className="absolute inset-0 bg-black/50" />
-        </div>
-
-        {/* Remote video — always mounted, opacity controls visibility */}
-        <video
-          ref={remoteVideoRef}
-          autoPlay
-          playsInline
-          className="absolute inset-0 w-full h-full object-cover z-10 transition-opacity duration-500"
-          style={{ opacity: !showAvatar && remoteStream ? 1 : 0 }}
-        />
-      </div>
-
-      {/* Audio element (always hidden) */}
-      <audio ref={remoteAudioRef} autoPlay />
-
-      {/* Local preview (PiP) */}
-      <div
-        className="absolute top-6 right-6 w-32 h-44 rounded-2xl overflow-hidden shadow-2xl z-50 border-2 border-white/20 transition-all duration-500"
-        style={{ opacity: type === 'video' && localStream && isCameraOn ? 1 : 0, pointerEvents: type === 'video' && localStream && isCameraOn ? 'auto' : 'none' }}
-      >
-        <video
-          ref={localVideoRef}
-          autoPlay
-          playsInline
-          muted
-          className="w-full h-full object-cover mirror-mode"
-        />
-      </div>
-
-      {/* Peer info / avatar — shown when no remote video */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center z-30 pointer-events-none">
-        <div
-          className="flex flex-col items-center transition-all duration-500"
-          style={{ opacity: showAvatar ? 1 : 0, transform: showAvatar ? 'scale(1)' : 'scale(0.95)' }}
-        >
-          <div className="relative mb-12">
-            {/* Pulsing Rings */}
-            {status === 'connecting' && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <style>{`
-                  @keyframes pulseRing {
-                    0% { transform: scale(1); opacity: 0.4; }
-                    50% { transform: scale(1.5); opacity: 0.2; }
-                    100% { transform: scale(2); opacity: 0; }
-                  }
-                `}</style>
-                <div className="w-32 h-32 rounded-full border-2 border-white/30" style={{ animation: 'pulseRing 2s ease-out infinite' }} />
-                <div className="w-32 h-32 rounded-full border-2 border-white/20" style={{ animation: 'pulseRing 2s ease-out infinite 0.6s' }} />
-                <div className="w-32 h-32 rounded-full border-2 border-white/10" style={{ animation: 'pulseRing 2s ease-out infinite 1.2s' }} />
-              </div>
-            )}
-            
-            <UserAvatar
-              name={peerName}
-              imageUrl={peerAvatar}
-              size='xl'
-              className='border-4 border-white/20 shadow-[0_0_50px_rgba(34,197,94,0.3)] relative z-10'
-              style={{ width: 140, height: 140 } as any}
-            />
-          </div>
-
-          <h2 className='text-3xl font-bold text-white mb-2 drop-shadow-xl'>{peerName}</h2>
-          <p className={`text-lg transition-colors duration-300 ${(error || status === 'failed') ? 'text-red-400 font-bold' : 'text-slate-200 opacity-80'}`}>
-            {status === 'failed'
-              ? 'Kết nối thất bại'
-              : error
-              ? error
-              : status === 'connecting'
-              ? 'Đang nối máy...'
-              : formatTime(seconds)}
-          </p>
-        </div>
-      </div>
-
-      {/* Controls — always fixed at bottom */}
-      <div className="absolute bottom-10 left-0 right-0 flex flex-col items-center gap-6 z-40">
-        {/* Answer button (for incoming calls) */}
-        {status === 'connecting' && onAnswer && (
-          <button
-            className={`bg-green-500 hover:bg-green-600 text-white px-10 py-3 rounded-full font-bold text-lg transition-all shadow-xl shadow-green-500/30 ${isAnswering || !hasRemoteDescription ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}`}
-            onClick={() => {
-              if (isAnswering || !hasRemoteDescription) return
-              setIsAnswering(true)
-              onAnswer?.()
-            }}
-            disabled={isAnswering || !hasRemoteDescription}
-          >
-            {isAnswering ? 'Đang nhận...' : !hasRemoteDescription ? 'Đang tải...' : 'Trả lời'}
-          </button>
+    <div className="fixed inset-0 z-[500] bg-[#000000] flex flex-col items-center justify-center overflow-hidden">
+      {/* ── BACKGROUND BACKDROP (Blurred Avatar) ── */}
+      <div className="absolute inset-0 z-0">
+        {resolvedPeerAvatar ? (
+          <img
+            src={resolvedPeerAvatar}
+            alt=""
+            className="w-full h-full object-cover blur-3xl opacity-20 scale-110"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-[#001A33] via-[#000000] to-black" />
         )}
+        <div className="absolute inset-0 bg-[#000000]/40" />
+      </div>
 
-        <div className="flex items-center gap-5 px-6 py-4 rounded-3xl backdrop-blur-xl bg-white/5 border border-white/10 shadow-2xl">
-          {type === 'video' && (
-            <button
-              className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isCameraOn ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-red-500 text-white shadow-lg shadow-red-500/30'}`}
-              onClick={onToggleCamera}
-              title={isCameraOn ? 'Tắt camera' : 'Bật camera'}
-            >
-              <Icon name={isCameraOn ? 'video' : 'cameraOff'} size={22} />
-            </button>
-          )}
+      {/* ── MAIN CONTENT ── */}
+      <div className="relative z-10 w-full max-w-6xl h-full flex flex-col p-4 sm:p-8">
+        {/* Header Info */}
+        <div className="flex flex-col items-center mb-8 animate-fade-in">
+           {status === 'connecting' ? (
+             <div className="bg-blue-500/20 text-blue-400 px-4 py-1.5 rounded-full backdrop-blur-md border border-blue-500/30 text-sm font-medium animate-pulse mb-4">
+               {type === 'audio' ? 'Đang kết nối cuộc gọi thoại...' : 'Đang kết nối cuộc gọi video...'}
+             </div>
+           ) : (
+             <div className="bg-green-500/20 text-green-400 px-4 py-1.5 rounded-full backdrop-blur-md border border-green-500/30 text-sm font-mono font-bold mb-4">
+               {formatTime(seconds)}
+             </div>
+           )}
+           {error && <div className="text-red-400 text-sm font-medium mb-4 bg-red-500/10 px-4 py-2 rounded-lg border border-red-500/20">{error}</div>}
+        </div>
 
-          <button
-            className="w-16 h-16 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-all shadow-xl shadow-red-500/40 hover:scale-110 active:scale-90"
-            onClick={onEnd}
-            title="Kết thúc"
-          >
-            <Icon name="phoneOff" size={30} />
-          </button>
+        {/* Video Grid */}
+        <div className="flex-1 flex items-center justify-center gap-4 sm:gap-8 flex-col md:flex-row w-full h-full">
+           {/* Remote User */}
+           <div className="flex-1 w-full h-full max-h-[70vh]">
+             <PremiumVideoTile
+                stream={remoteStream || null}
+                displayName={peerName}
+                avatarUrl={peerAvatar || undefined}
+                isCameraOn={status === 'connected' ? isRemoteCameraOn : false}
+                isMicOn={true} // We don't have remote mic state in 1-1 props currently
+                isSpeaking={false}
+             />
+           </div>
 
-          <button
-            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isMicOn ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-red-500 text-white shadow-lg shadow-red-500/30'}`}
-            onClick={onToggleMic}
-            title={isMicOn ? 'Tắt mic' : 'Bật mic'}
-          >
-            <Icon name={isMicOn ? 'mic' : 'micOff'} size={22} />
-          </button>
+           {/* Local User (Smaller on mobile, side-by-side or overlay on desktop) */}
+           {type === 'video' && (
+             <div className="w-full md:w-1/3 h-48 md:h-full md:max-h-[70vh] animate-fade-in delay-300">
+                <PremiumVideoTile
+                  stream={localStream || null}
+                  displayName="Bạn"
+                  isCameraOn={isCameraOn}
+                  isMicOn={isMicOn}
+                  isSpeaking={false}
+                  isLocal={true}
+                />
+             </div>
+           )}
+        </div>
+
+        {/* Controls */}
+        <div className="mt-auto py-8">
+          <PremiumCallControls
+             isMicOn={isMicOn}
+             isCameraOn={isCameraOn}
+             isAudioOnly={type === 'audio'}
+             onToggleMic={onToggleMic || (() => {})}
+             onToggleCamera={onToggleCamera || (() => {})}
+             onEnd={onEnd}
+             onMinimize={onMinimize}
+          />
         </div>
       </div>
     </div>
+  )
+}
   )
 }
