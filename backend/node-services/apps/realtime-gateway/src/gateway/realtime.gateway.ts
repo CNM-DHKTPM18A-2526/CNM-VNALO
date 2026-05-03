@@ -213,7 +213,7 @@ export class RealtimeGateway
   async handlePresenceSet(@ConnectedSocket() client: Socket, @MessageBody() data: { isOnline: boolean }) {
     const userId = client.data?.user?.userId;
     if (userId && data.isOnline) {
-      await this.presenceService.heartbeat(userId);
+      await this.presenceService.setOnline(userId, client.id);
     }
     return { event: 'presence.set.ack' };
   }

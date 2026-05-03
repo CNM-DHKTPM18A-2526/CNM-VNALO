@@ -66,7 +66,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       if (!mounted) return;
       final currentUserId = context.read<AuthProvider>().user?.id ?? '';
       final chatProvider = context.read<ChatProvider>();
-      chatProvider.setCurrentUserId(currentUserId);
+      chatProvider.currentUserId = currentUserId;
       chatProvider.openConversation(widget.conversation.id);
       chatProvider.loadPinnedMessages(widget.conversation.id);
 

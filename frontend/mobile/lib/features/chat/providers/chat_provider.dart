@@ -48,6 +48,8 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
   StreamSubscription<Map<String, dynamic>>? _groupAdminTransferredSub;
   StreamSubscription<Map<String, dynamic>>? _typingSub;
   StreamSubscription<Map<String, dynamic>>? _presenceSub;
+  StreamSubscription<dynamic>? _presenceListSub;
+  StreamSubscription<void>? _connectSub;
   int _lastSocketReinitCount = -1;
   final Random _random = Random.secure();
 
@@ -143,6 +145,10 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     _groupAdminTransferredSub = _socketService.onGroupAdminTransferred.listen(_handleGroupAdminTransferredEvent);
     _typingSub = _socketService.onTyping.listen(_handleTypingEvent);
     _presenceSub = _socketService.onPresence.listen(_handlePresenceEvent);
+    _presenceListSub = _socketService.onPresenceList.listen(_handlePresenceListEvent);
+    _connectSub = _socketService.onConnectStream.listen((_) {
+      _requestBulkPresence();
+    });
   }
 
   void _cancelSubscriptions() {
@@ -162,6 +168,8 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     _groupAdminTransferredSub?.cancel();
     _typingSub?.cancel();
     _presenceSub?.cancel();
+    _presenceListSub?.cancel();
+    _connectSub?.cancel();
   }
 
   @override
@@ -246,6 +254,12 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       .toList();
       await _applyLocalReadStateOverrides();
       _sortConversations();
+      _syncPresenceFromConversations();
+
+      // Request bulk presence: try immediately, then retry after 2s
+      // (handles race condition where socket connects after loadInbox finishes)
+      _requestBulkPresence();
+      Future.delayed(const Duration(seconds: 2), _requestBulkPresence);
 
       // Ensure we join all conversation rooms to receive group call signals and other events
       for (final conv in _conversations) {
@@ -342,6 +356,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       
       if (hasNewMessages) {
         _sortConversations();
+        _syncPresenceFromConversations();
         notifyListeners();
         debugPrint('[ChatProvider] _pollInbox: Updated UI with new messages');
       }
@@ -717,16 +732,17 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void update(String? userId, SocketService socketService) {
+    debugPrint('[ChatProvider] 🔄 update called: userId=$userId, socketConnected=${socketService.isConnected()}');
     bool needsReinit = false;
 
     if (_socketService != socketService) {
-      debugPrint('🟢 [ChatProvider] SocketService instance changed, updating reference');
+      debugPrint('🟢 [ChatProvider] SocketService instance changed');
       _socketService = socketService;
       needsReinit = true;
     }
 
     if (_currentUserId != userId) {
-      debugPrint('[ChatProvider] User changed: $_currentUserId -> $userId');
+      debugPrint('[ChatProvider] 🔑 User changed: $_currentUserId -> $userId');
       _currentUserId = userId;
       if (userId == null || userId.isEmpty) {
         _cancelSubscriptions();
@@ -739,15 +755,21 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       }
     }
 
-    if (userId != null && userId.isNotEmpty && (_lastSocketReinitCount != _socketService.reinitCount || needsReinit)) {
-      debugPrint('🟢 [ChatProvider] Re-initializing socket listeners and loading inbox');
+    if (_currentUserId != null && (needsReinit || _lastSocketReinitCount != _socketService.reinitCount)) {
+      debugPrint('🟢 [ChatProvider] Re-initializing socket listeners (reinitCount: ${_socketService.reinitCount})');
       _initSocketListeners();
       loadInbox();
     }
   }
 
-  void setCurrentUserId(String userId) {
-    update(userId, _socketService);
+  set currentUserId(String? value) {
+    if (_currentUserId != value) {
+      _currentUserId = value;
+      if (value != null && value.isNotEmpty) {
+        _syncPresenceFromConversations();
+        notifyListeners();
+      }
+    }
   }
 
   void closeConversation() {
@@ -1174,8 +1196,46 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  void _syncPresenceToMembers(String userId, bool isOnline, {DateTime? lastSeen}) {
+    debugPrint('[ChatProvider] 🔄 _syncPresenceToMembers: $userId -> online=$isOnline');
+    int matchCount = 0;
+    for (int i = 0; i < _conversations.length; i++) {
+      final conv = _conversations[i];
+      final memberIdx = conv.members.indexWhere((m) => m.userId.toLowerCase() == userId);
+      if (memberIdx >= 0) {
+        matchCount++;
+        final member = conv.members[memberIdx];
+        if (member.user != null && (member.user!.isOnline != isOnline || member.user!.lastSeen != lastSeen)) {
+          final updatedUser = member.user!.copyWith(
+            isOnline: isOnline,
+            lastSeen: lastSeen ?? (isOnline ? DateTime.now() : member.user!.lastSeen),
+          );
+          final updatedMember = member.copyWith(user: updatedUser);
+          final updatedMembers = List<ConversationMember>.from(conv.members);
+          updatedMembers[memberIdx] = updatedMember;
+          _conversations[i] = conv.copyWith(members: updatedMembers);
+          debugPrint('[ChatProvider] ✅ Updated member presence in conv ${conv.id}');
+        }
+      }
+    }
+    debugPrint('[ChatProvider] 🔄 _syncPresenceToMembers finished. Matches: $matchCount');
+  }
+
   void _handleIncomingMessage(Message message) {
-    final conversationId = message.conversationId;
+    final String conversationId = message.conversationId;
+    
+    // Force sender presence to online if message received (since they must be active to send)
+    if (message.senderId != _currentUserId) {
+      final String senderId = message.senderId.toLowerCase();
+      if (_userPresence[senderId] != true) {
+        debugPrint('[PRESENCE] 📡 FORCING Presence ONLINE for $senderId due to incoming message');
+        _userPresence[senderId] = true;
+        // Also update the member object in conversations if it exists
+        _syncPresenceToMembers(senderId, true);
+        debugPrint('[PRESENCE] 📡 Presence cache now: $_userPresence');
+        notifyListeners();
+      }
+    }
     debugPrint('[ChatProvider] 📩 _handleIncomingMessage: id=${message.id} conv=$conversationId sender=${message.senderId} type=${message.messageType} clientId=${message.clientMessageId} isMine=${message.senderId == _currentUserId} content=${message.content?.substring(0, min(30, message.content?.length ?? 0))}');
     // #region agent_h2_provider_entry
     debugPrint('[DEBUG][H2] ChatProvider._handleIncomingMessage ENTRY - msgId=${message.id} convId=$conversationId senderId=${message.senderId}');
@@ -1761,13 +1821,31 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
 
   // Global cache for user presence to ensure consistency across different conversation objects
   final Map<String, bool> _userPresence = {};
-  bool isUserOnline(String userId) => _userPresence[userId.toLowerCase()] ?? false;
+  bool isUserOnline(String userId) {
+    final lowerId = userId.toLowerCase();
+    return _userPresence[lowerId] ?? false;
+  }
+
+  void _syncPresenceFromConversations() {
+    // debugPrint('[PRESENCE] 🔄 _syncPresenceFromConversations starting (convs: ${_conversations.length})');
+    for (final conv in _conversations) {
+      if (conv.type == ConversationType.DIRECT) {
+        for (final member in conv.members) {
+          if (member.userId != _currentUserId && member.user != null) {
+            final uid = member.userId.toLowerCase();
+            _userPresence[uid] = member.user!.isOnline;
+            // debugPrint('[PRESENCE] 🔄 Synced $uid -> ${member.user!.isOnline} from conv ${conv.id}');
+          }
+        }
+      }
+    }
+  }
 
   void _handlePresenceEvent(Map<String, dynamic> data) {
-    debugPrint('[ChatProvider] 📡 PRESENCE EVENT: $data');
-    final rawUserId = (data['userId'] ?? data['id'])?.toString();
+    debugPrint('[PRESENCE] 📡 PRESENCE EVENT: $data');
+    final rawUserId = (data['userId'] ?? data['id'] ?? data['uid'])?.toString();
     if (rawUserId == null) {
-      debugPrint('[ChatProvider] ⚠️ Presence event ignored: No userId found');
+      debugPrint('[ChatProvider] ⚠️ Presence event ignored: No userId found in $data');
       return;
     }
 
@@ -1786,46 +1864,65 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
         ? DateTime.tryParse(lastSeenRaw.toString())
         : (isOnline ? DateTime.now() : null);
 
-    // Update global cache
+    // Update global cache and track changes
+    final bool presenceChanged = _userPresence[userId] != isOnline;
     _userPresence[userId] = isOnline;
 
-    // Update all conversations where this user is a member
-    bool changed = false;
-    for (int i = 0; i < _conversations.length; i++) {
-      final conv = _conversations[i];
-      
-      // Use case-insensitive search for members
-      final memberIdx = conv.members.indexWhere((m) => m.userId.toLowerCase() == userId);
-      if (memberIdx < 0) continue;
+    // Sync to conversation members
+    _syncPresenceToMembers(userId, isOnline, lastSeen: lastSeen);
 
-      final member = conv.members[memberIdx];
-      if (member.user == null) {
-        debugPrint('[ChatProvider] ⚠️ Member user object is null for $userId in ${conv.id}');
-        // Optional: create a dummy user if needed, but usually it should be there
-        continue;
-      }
-
-      // Check if status actually changed
-      if (member.user!.isOnline != isOnline ||
-          member.user!.lastSeen != lastSeen) {
-        
-        final updatedUser = member.user!.copyWith(
-          isOnline: isOnline,
-          lastSeen: lastSeen,
-        );
-
-        final updatedMember = member.copyWith(user: updatedUser);
-        final updatedMembers = List<ConversationMember>.from(conv.members);
-        updatedMembers[memberIdx] = updatedMember;
-        _conversations[i] = conv.copyWith(members: updatedMembers);
-        changed = true;
-        debugPrint('[ChatProvider] ✅ Updated presence for $userId in ${conv.id}: online=$isOnline');
-      }
-    }
-
-    if (changed || isOnline) {
+    if (presenceChanged || isOnline) {
       // Always notify if someone goes online to ensure UI catches it
       notifyListeners();
+    }
+  }
+
+  void _handlePresenceListEvent(dynamic data) {
+    debugPrint('[PRESENCE] 📡 PRESENCE LIST EVENT: $data');
+    if (data is List) {
+      bool changed = false;
+      for (final item in data) {
+        if (item is Map) {
+          final rawUserId = (item['userId'] ?? item['id'] ?? item['uid'])?.toString();
+          if (rawUserId != null) {
+            final String userId = rawUserId.toLowerCase();
+            final bool isOnline = item['isOnline'] == true || 
+                                  item['online'] == true ||
+                                  item['isOnline']?.toString().toLowerCase() == 'true' ||
+                                  item['online']?.toString().toLowerCase() == 'true';
+            
+            final lastSeenRaw = item['lastSeen'] ?? item['last_seen'];
+            final lastSeen = lastSeenRaw != null ? DateTime.tryParse(lastSeenRaw.toString()) : null;
+
+            if (_userPresence[userId] != isOnline) {
+              _userPresence[userId] = isOnline;
+              _syncPresenceToMembers(userId, isOnline, lastSeen: lastSeen);
+              changed = true;
+            }
+          }
+        }
+      }
+      if (changed) {
+        // debugPrint('[PRESENCE] 📡 Cache updated from LIST: $_userPresence');
+        notifyListeners();
+      }
+    }
+  }
+
+  void _requestBulkPresence() {
+    if (_currentUserId == null) return;
+    final Set<String> userIdsToFetch = {};
+    for (final conv in _conversations) {
+      if (conv.type == ConversationType.DIRECT) {
+        for (final member in conv.members) {
+          if (member.userId != _currentUserId) {
+            userIdsToFetch.add(member.userId);
+          }
+        }
+      }
+    }
+    if (userIdsToFetch.isNotEmpty) {
+      _socketService.requestPresence(userIdsToFetch.toList());
     }
   }
 

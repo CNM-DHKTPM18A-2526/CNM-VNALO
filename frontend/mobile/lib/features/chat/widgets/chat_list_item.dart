@@ -37,7 +37,6 @@ class ChatListItem extends StatelessWidget {
     final chat = context.watch<ChatProvider>();
     final otherMember = _getOtherMember(conversation, currentUserId);
     final otherUserId = otherMember?.userId;
-    
     final isOnline = otherUserId != null ? chat.isUserOnline(otherUserId) : (otherMember?.user?.isOnline ?? false);
     final lastSeen = otherMember?.user?.lastSeen;
     String? statusText;

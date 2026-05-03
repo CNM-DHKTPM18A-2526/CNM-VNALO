@@ -39,7 +39,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
       final chatProvider = context.read<ChatProvider>();
       final userId = context.read<AuthProvider>().user?.id;
       if (userId != null) {
-        chatProvider.setCurrentUserId(userId);
+        chatProvider.currentUserId = userId;
       }
       chatProvider.loadInbox();
     });
