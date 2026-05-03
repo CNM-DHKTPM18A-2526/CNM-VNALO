@@ -1,5 +1,4 @@
 import React, { type ReactNode, type TouchEvent as ReactTouchEvent, type WheelEvent as ReactWheelEvent,  } from 'react'
-import React from 'react'
 import { ChevronLeft, ChevronRight, Download, X, ZoomIn, ZoomOut } from 'lucide-react'
 
 import type { ViewerImageItem } from '../chat.types'

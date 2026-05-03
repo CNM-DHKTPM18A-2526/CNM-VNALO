@@ -1,5 +1,4 @@
 import type { ChangeEvent, KeyboardEvent as ReactKeyboardEvent } from 'react'
-import React from 'react'
 import Cropper, { type Area } from 'react-easy-crop'
 
 import { useAuth } from '../features/auth/useAuth'
