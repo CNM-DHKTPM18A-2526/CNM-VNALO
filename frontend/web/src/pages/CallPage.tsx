@@ -97,13 +97,16 @@ const CallPage: React.FC = () => {
       })
 
       // Listener for 1-1 signaling
-      socket.on('call:answer', (data) => {
+      // NOTE: We MUST listen on DOT notation ('call.answer', etc.) to match what
+      // webrtcCallService emits and what the backend gateway emits via emitToUser().
+      // The backend @SubscribeMessage handlers also use DOT notation.
+      socket.on('call.answer', (data) => {
         if (data.callId === callId) service.handleAnswer(data.sdp)
       })
-      socket.on('call:ice-candidate', (data) => {
+      socket.on('call.ice-candidate', (data) => {
         if (data.callId === callId) service.handleIceCandidate(data.candidate)
       })
-      socket.on('call:end', (data) => {
+      socket.on('call.end', (data) => {
         if (data.callId === callId) service.endCall(data.reason, false)
       })
 

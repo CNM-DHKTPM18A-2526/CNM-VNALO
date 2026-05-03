@@ -71,6 +71,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   // ─── Call Signaling ───────────────────────────────────────
 
+  // ─── 1-1 Call Signaling (both colon and dot notation for maximum compatibility) ───
+
   @SubscribeMessage('call.offer')
   async handleCallOffer(
     @ConnectedSocket() client: Socket,
@@ -83,6 +85,15 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       sdp?: Record<string, unknown>;
       audioOnly?: boolean;
     },
+  ) {
+    return this.forwardCallSignal(client, 'offer', data);
+  }
+
+  // Alias: Web frontend emits 'call:offer' (colon notation)
+  @SubscribeMessage('call:offer')
+  async handleCallOfferColon(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: any,
   ) {
     return this.forwardCallSignal(client, 'offer', data);
   }
@@ -102,6 +113,15 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return this.forwardCallSignal(client, 'answer', data);
   }
 
+  // Alias: Web frontend emits 'call:answer' (colon notation)
+  @SubscribeMessage('call:answer')
+  async handleCallAnswerColon(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: any,
+  ) {
+    return this.forwardCallSignal(client, 'answer', data);
+  }
+
   @SubscribeMessage('call.ice-candidate')
   async handleCallIceCandidate(
     @ConnectedSocket() client: Socket,
@@ -117,6 +137,15 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return this.forwardCallSignal(client, 'ice-candidate', data);
   }
 
+  // Alias: Web frontend emits 'call:ice-candidate' (colon notation)
+  @SubscribeMessage('call:ice-candidate')
+  async handleCallIceCandidateColon(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: any,
+  ) {
+    return this.forwardCallSignal(client, 'ice-candidate', data);
+  }
+
   @SubscribeMessage('call.end')
   async handleCallEnd(
     @ConnectedSocket() client: Socket,
@@ -128,6 +157,15 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       senderUserId?: string;
       reason?: string;
     },
+  ) {
+    return this.forwardCallSignal(client, 'end', data);
+  }
+
+  // Alias: Web frontend emits 'call:end' (colon notation)
+  @SubscribeMessage('call:end')
+  async handleCallEndColon(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: any,
   ) {
     return this.forwardCallSignal(client, 'end', data);
   }

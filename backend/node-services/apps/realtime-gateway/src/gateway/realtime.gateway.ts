@@ -443,8 +443,14 @@ export class RealtimeGateway
   }
 
   // ─── Minimal 1-1 Call Relay ────────────────────────────────────────
+  // Supports both colon notation (from Web webrtcCallService) and dot notation (from Mobile)
   @SubscribeMessage('call.offer')
   handleCallOffer(@ConnectedSocket() _c: Socket, @MessageBody() data: any) {
+    this.emitToUser(data.targetUserId, 'call.offer', data);
+  }
+
+  @SubscribeMessage('call:offer')
+  handleCallOfferColon(@ConnectedSocket() _c: Socket, @MessageBody() data: any) {
     this.emitToUser(data.targetUserId, 'call.offer', data);
   }
 
@@ -453,13 +459,28 @@ export class RealtimeGateway
     this.emitToUser(data.targetUserId, 'call.answer', data);
   }
 
+  @SubscribeMessage('call:answer')
+  handleCallAnswerColon(@ConnectedSocket() _c: Socket, @MessageBody() data: any) {
+    this.emitToUser(data.targetUserId, 'call.answer', data);
+  }
+
   @SubscribeMessage('call.ice-candidate')
   handleIceCandidate(@ConnectedSocket() _c: Socket, @MessageBody() data: any) {
     this.emitToUser(data.targetUserId, 'call.ice-candidate', data);
   }
 
+  @SubscribeMessage('call:ice-candidate')
+  handleIceCandidateColon(@ConnectedSocket() _c: Socket, @MessageBody() data: any) {
+    this.emitToUser(data.targetUserId, 'call.ice-candidate', data);
+  }
+
   @SubscribeMessage('call.end')
   handleCallEnd(@ConnectedSocket() _c: Socket, @MessageBody() data: any) {
+    this.emitToUser(data.targetUserId, 'call.end', data);
+  }
+
+  @SubscribeMessage('call:end')
+  handleCallEndColon(@ConnectedSocket() _c: Socket, @MessageBody() data: any) {
     this.emitToUser(data.targetUserId, 'call.end', data);
   }
 }
