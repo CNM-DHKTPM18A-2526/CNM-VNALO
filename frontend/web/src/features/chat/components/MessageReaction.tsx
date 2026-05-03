@@ -16,7 +16,7 @@ type MessageReactionBarProps = {
   onOpenFullEmoji?: () => void
 }
 
-export function MessageReactionBar({ reactions, onAddReaction, onRemoveReaction, onOpenFullEmoji }: MessageReactionBarProps) {
+export function MessageReactionBar({ reactions, onAddReaction, onRemoveReaction }: MessageReactionBarProps) {
   // Find which reaction the user has already made (if any)
   const myReactionKey = (Object.keys(reactions) as ReactionKey[]).find(
     (key) => (reactions[key]?.myCount ?? 0) > 0
@@ -62,7 +62,7 @@ type MessageReactionSummaryProps = {
   isIncoming?: boolean
 }
 
-export function MessageReactionSummary({ reactions, onRemoveReaction, isIncoming = true }: MessageReactionSummaryProps) {
+export function MessageReactionSummary({ reactions, isIncoming = true }: MessageReactionSummaryProps) {
   const { user } = useAuth()
   const { userMap } = useUserStore()
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)

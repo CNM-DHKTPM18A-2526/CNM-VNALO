@@ -92,7 +92,6 @@ type MessageBubbleProps = {
   setHoveredMessageId?: (messageId: string | null) => void
 }
 
-const HOVER_HIDE_DELAY_MS = 180
 
 export function MessageBubble({
   message,
@@ -168,7 +167,6 @@ export function MessageBubble({
 
   const hideTimerRef = useRef<number | null>(null)
   const [supportsHover, setSupportsHover] = useState(true)
-  const [isMessageHovered, setIsMessageHovered] = useState(false)
   const [isMessageTapped, setIsMessageTapped] = useState(false)
   const [isReactionBarOpen, setIsReactionBarOpen] = useState(false)
   const [isContextMenuOpen, setIsContextMenuOpen] = useState(false)

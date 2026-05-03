@@ -12,6 +12,7 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react'
 import { Mic, MicOff, Video, VideoOff, PhoneOff, Users, Phone, PhoneIncoming } from 'lucide-react'
 import type { GroupCallSnapshot, GroupPeerState, IncomingGroupCallInfo } from '../webrtcGroupCallService'
+import type { ConversationSummary } from '../chat.types'
 import { WebRtcGroupCallService } from '../webrtcGroupCallService'
 import type { Socket } from 'socket.io-client'
 import { resolveMediaUrl } from '../../../utils/mediaUtils'
@@ -49,6 +50,7 @@ interface VideoTileProps {
   isMicOn: boolean
   isCameraOn: boolean
   isLocal?: boolean
+  audioOnly?: boolean
 }
 
 const VideoTile: React.FC<VideoTileProps> = ({

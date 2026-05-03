@@ -145,15 +145,15 @@ function persistRecentResultsToStorage(results: UserLookupResult[]): void {
   }
 }
 
-export function AddFriendModal({ isOpen, onClose, initialTarget = null, onCompleted, onUserFound }: AddFriendModalProps) {
+export function AddFriendModal({ isOpen, onClose, initialTarget = null, onCompleted: _onCompleted, onUserFound }: AddFriendModalProps) {
   const { accessToken, user } = useAuth()
   const { t } = useLanguage()
 
   const [identifier, setIdentifier] = useState('')
-  const [selectedUser, setSelectedUser] = useState<UserLookupResult | null>(null)
+  const [, setSelectedUser] = useState<UserLookupResult | null>(null)
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [, setSuccessMessage] = useState<string | null>(null)
 
   const [isSearching, setIsSearching] = useState(false)
   const [isPreparingTarget, setIsPreparingTarget] = useState(false)

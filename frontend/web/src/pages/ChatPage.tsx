@@ -29,7 +29,7 @@ import {
   searchConversationMessages,
   sendMessage as sendMessageViaRest,
   unpinMessage,
-  updateMessage,
+
   uploadChatMedia,
   fetchConversation,
   addMembersToConversation,
@@ -75,8 +75,7 @@ import {
 import { CreateGroupModal } from '../features/chat/components/CreateGroupModal'
 import { EditConversationNameModal } from '../features/chat/components/EditConversationNameModal'
 import { formatMessage, renderSystemMessage, formatMessagePreview, formatMessageTimestamp, normalizeMessage } from '../features/chat/utils/messageUtils'
-import { UserStoreProvider, useUserStore } from '../features/chat/context/UserStoreContext'
-import type { SystemMessagePayload } from '../features/chat/chat.types'
+import { useUserStore } from '../features/chat/context/UserStoreContext'
 
 // Fallback toast object to prevent crashes if toast library is missing
 const toast = {
@@ -220,7 +219,7 @@ function getConversationPreview(
   message: ChatMessage,
   currentUserId: string,
   getDisplayName: (id: string) => string,
-  isModerator?: boolean
+  _isModerator?: boolean
 ): string {
   return formatMessage(message, currentUserId, getDisplayName)
 }
@@ -479,7 +478,7 @@ export default function ChatPage() {
   const [friendResults, setFriendResults] = useState<UserLookupResult[]>([])
   const [friendsDirectory, setFriendsDirectory] = useState<Friend[]>([])
   const [isSocketConnected, setIsSocketConnected] = useState(false)
-  const [isSocketInitialized, setIsSocketInitialized] = useState(false)
+  const [, setIsSocketInitialized] = useState(false)
   const [rightSidebarContent, setRightSidebarContent] = useState<'info' | 'search' | 'global-search' | null>(() => {
     const saved = localStorage.getItem('vnalo_chat_sidebar_content')
     if (!saved || saved === 'null' || saved === 'none') return null
@@ -666,12 +665,52 @@ export default function ChatPage() {
     conversationsRef.current = conversations
   }, [conversations])
 
+  const myDocumentsConversation = useMemo<ConversationSummary>(() => {
+    // Try to get last message from local storage for preview
+    let lastMsgText = 'Lưu và đồng bộ dữ liệu giữa các thiết bị';
+    let lastTime = new Date().toISOString();
+
+    if (user?.id) {
+      try {
+        const key = `vnalo_cloud_msgs_${user.id}`;
+        const saved = localStorage.getItem(key);
+        if (saved) {
+          const msgs = JSON.parse(saved);
+          if (Array.isArray(msgs) && msgs.length > 0) {
+            // In handleSend we save newest at index 0
+            const last = msgs[0];
+            lastMsgText = last.text || (last.type === 'image' ? '[Hình ảnh]' : last.type === 'file' ? '[Tệp tin]' : lastMsgText);
+            lastTime = last.createdAt || last.timestamp || lastTime;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load cloud messages for preview', e);
+      }
+    }
+
+    return {
+      id: 'my-documents',
+      isGroup: false,
+      isCloud: true,
+      name: 'My Documents',
+      avatarUrl: null,
+      lastMessage: lastMsgText,
+      unreadCount: 0,
+      participantUserIds: [],
+      memberCount: 0,
+      lastMessageAt: lastTime,
+      updatedAt: lastTime,
+    };
+  }, [user?.id, messagesByConversation['my-documents']]); // Re-run when messages change
 
   const selectedConversation = useMemo(
-    () => conversations.find((conversation) => conversation.id === (routedConversationId || selectedConversationId)),
-    [conversations, routedConversationId, selectedConversationId],
+    () => {
+      const targetId = routedConversationId || selectedConversationId;
+      if (targetId === 'my-documents') return myDocumentsConversation;
+      return conversations.find((conversation) => conversation.id === targetId);
+    },
+    [conversations, routedConversationId, selectedConversationId, myDocumentsConversation],
   )
-
   const selectedMessages = useMemo(() => {
     const resolvedConversationId = routedConversationId || selectedConversationId
     if (!resolvedConversationId) {
@@ -780,7 +819,6 @@ export default function ChatPage() {
 
       const formattedPreview = formatConversationPreview(senderName, message, user?.id || '', getName)
       // Defensive: ensure formatted preview is never empty if original message has content
-      const safePreview = formattedPreview && formattedPreview.trim() ? formattedPreview : formatMessagePreview(message.text || '', false)
 
       setConversations((prev) => {
         const index = prev.findIndex((conversation) => conversation.id === conversationId)
@@ -790,8 +828,9 @@ export default function ChatPage() {
           index === -1
             ? {
               id: conversationId,
-              name: conversationSeed?.name || senderName || fallbackUserDisplayName(message.senderId),
-              avatarUrl: conversationSeed?.avatarUrl ?? null,
+              isCloud: conversationId === 'my-documents' || conversationSeed?.isCloud,
+              name: conversationId === 'my-documents' ? 'My Documents' : (conversationSeed?.name || senderName || fallbackUserDisplayName(message.senderId)),
+              avatarUrl: conversationId === 'my-documents' ? null : (conversationSeed?.avatarUrl ?? null),
               isGroup: conversationSeed?.isGroup,
               isStranger: conversationSeed?.isStranger,
               participantUserIds: conversationSeed?.participantUserIds ?? [message.senderId],
@@ -806,6 +845,21 @@ export default function ChatPage() {
               ...next[index],
               ...(conversationSeed || {})
             };
+
+        // If this is a NEW conversation entry (index === -1), 
+        // verify it's not a "Kicked" system message for ourselves.
+        // If it is, we don't want to re-add the conversation we just removed.
+        if (index === -1 && message.type === 'system' && message.text) {
+          try {
+            const sys = JSON.parse(message.text);
+            const isMeKicked = sys.action === 'REMOVE_MEMBER' &&
+              sys.targetMemberIds?.some((id: any) => String(id) === String(user?.id));
+            if (isMeKicked) {
+              console.log('[ChatPage.updateConversationAfterMessage] Blocking re-add of kicked group');
+              return prev;
+            }
+          } catch (e) { /* ignore */ }
+        }
 
         let finalPreview = formattedPreview;
 
@@ -1240,7 +1294,7 @@ export default function ChatPage() {
 
 
   const syncPinnedMessages = loadPinnedMessages
-  
+
   const syncConversationMetadata = useCallback(async (conversationId: string) => {
     if (!accessToken) return;
     try {
@@ -1259,14 +1313,15 @@ export default function ChatPage() {
           members: data.members || c.members,
           memberCount: (data.members || []).length || c.memberCount,
           updatedAt: new Date().toISOString(),
-          _syncVersion: Date.now() 
+          _syncVersion: Date.now()
         };
         return { ...c, ...settings };
       }));
-      console.log('[ChatPage] ðŸ”„ Metadata refreshed for', conversationId);
+      console.log('[ChatPage] 🔄 Metadata refreshed for', conversationId);
     } catch (e: any) {
-      if (e.response?.status === 404) {
-        console.log('[ChatPage] ðŸ—‘ï¸ Conversation no longer exists, cleaning up:', conversationId);
+      // If 404 (Deleted) or 403 (Kicked/Forbidden)
+      if (e.response?.status === 404 || e.response?.status === 403) {
+        console.log('[ChatPage] 🚪 Access lost (Kicked or Deleted), cleaning up:', conversationId);
         setConversations(prev => prev.filter(c => c.id !== conversationId));
         if (selectedConversationIdRef.current === conversationId) {
           navigate('/chat');
@@ -1280,7 +1335,7 @@ export default function ChatPage() {
   // Fail-Safe Heartbeat: Ensure active conversation settings are always fresh
   useEffect(() => {
     if (!accessToken || !selectedConversationId || !isSocketConnected) return;
-    
+
     // Only poll if the conversation exists in our list to avoid 404 noise
     // (Wait for inbox to load first)
     if (conversations.length === 0) return;
@@ -1290,8 +1345,8 @@ export default function ChatPage() {
     // Fast poll for settings while in active chat (fallback if socket fails)
     const timer = setInterval(() => {
       void syncConversationMetadata(selectedConversationId);
-    }, 3500); 
-    
+    }, 3500);
+
     return () => clearInterval(timer);
   }, [accessToken, selectedConversationId, isSocketConnected, syncConversationMetadata, conversations]);
 
@@ -1301,14 +1356,14 @@ export default function ChatPage() {
       console.log('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¥Ã‚ÂÃ…Â¡ Socket connected event received');
       setIsSocketConnected(true)
       setIsSocketInitialized(true)
-      
+
       // AUTO-JOIN ALL CONVERSATIONS ON CONNECT
       if (conversationsRef.current.length > 0) {
         const conversationIds = conversationsRef.current.map(c => c.id);
         console.log('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ Auto-joining', conversationIds.length, 'conversations on connect');
         void joinMultipleConversations(conversationIds);
       }
-      
+
       void syncConversationReactions()
       void syncPinnedMessages(selectedConversationIdRef.current)
     },
@@ -1387,6 +1442,14 @@ export default function ChatPage() {
               if (selectedConversationIdRef.current === cid) navigate('/chat');
               return;
             }
+            const isMeKicked = sys.action === 'REMOVE_MEMBER' &&
+              sys.targetMemberIds?.some((id: any) => String(id) === String(user?.id));
+            if (isMeKicked) {
+              console.log('[ChatPage.onMessageReceived] 🚪 Kicked from group! Removing conversation:', cid);
+              setConversations(prev => prev.filter(c => c.id !== cid));
+              if (selectedConversationIdRef.current === cid) navigate('/chat');
+              return;
+            }
 
             // PIN/UNPIN Sync
             if (sys.action === 'PIN_MESSAGE') {
@@ -1415,28 +1478,28 @@ export default function ChatPage() {
             // Group Info Sync: Essential for permissions/settings
             if (sys.action === 'UPDATE_GROUP_INFO') {
               console.log('[ChatPage] ðŸ”„ Realtime Group Update Signal Received:', mapped.conversationId, sys.metadata);
-              
+
               // 1. Optimistic update from payload
               setConversations(prev => prev.map(c => {
                 if (c.id !== mapped.conversationId) return c;
                 return { ...c, ...sys.metadata, updatedAt: new Date().toISOString() };
               }));
-              
+
               // 2. Proactive Sync: Trigger a refresh of the whole inbox summary
               // to ensure we have the most authoritative state for ALL groups
-              void syncInboxSummaries();
-              
+              if (accessToken) void loadInbox(accessToken);
+
               // 3. Fallback: Specific metadata refresh
               void syncConversationMetadata(mapped.conversationId);
 
               // 4. UI Hint
               if (sys.metadata && Object.keys(sys.metadata).length > 0) {
-                toast.info('CÃ i Ä‘áº·t nhÃ³m Ä‘Ã£ Ä‘Æ°á»£c cáº­p nháº­t');
+                toast.success('CÃ i Ä‘áº·t nhÃ³m Ä‘Ã£ Ä‘Æ°á»£c cáº­p nháº­t');
               }
 
               // 5. Silent Update: If it's just settings (no rename), don't show a bubble in chat
               if (!sys.metadata?.newName && !sys.newName) {
-                return; 
+                return;
               }
             }
 
@@ -1644,7 +1707,7 @@ export default function ChatPage() {
       })
 
       // 2. Update Sidebar preview immediately
-      setConversations((prev) => 
+      setConversations((prev) =>
         prev.map((c) => {
           if (c.id === payload.conversationId) {
             // Check if this recalled message was the one showing in preview
@@ -1664,10 +1727,11 @@ export default function ChatPage() {
 
       void syncMessageReaction(payload.messageId)
     },
-    onMessageRead: (payload) => {
-      const readByUserId = String(payload?.userId ?? payload?.user_id ?? '').trim()
-      const conversationId = String(payload?.conversationId ?? payload?.conversation_id ?? '').trim()
-      const rawLastReadSeq = payload?.lastReadSeq ?? payload?.last_read_seq ?? payload?.seq ?? payload?.serverSeq ?? payload?.server_seq
+    onMessageRead: (payload: any) => {
+      const safePayload = payload as any;
+      const readByUserId = String(safePayload?.userId ?? safePayload?.user_id ?? '').trim()
+      const conversationId = String(safePayload?.conversationId ?? safePayload?.conversation_id ?? '').trim()
+      const rawLastReadSeq = safePayload?.lastReadSeq ?? safePayload?.last_read_seq ?? safePayload?.seq ?? safePayload?.serverSeq ?? safePayload?.server_seq
       const lastReadSeq = typeof rawLastReadSeq === 'string' ? Number(rawLastReadSeq) : rawLastReadSeq
 
       if (!user || !readByUserId || readByUserId === user.id || !conversationId || !Number.isFinite(lastReadSeq)) {
@@ -1720,8 +1784,8 @@ export default function ChatPage() {
 
       console.log('ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ§Ã¢â‚¬Å“Ã…Â  nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â¦Ã‚Â sÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ kiÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¡Ã‚ÂµÃ…Â¾ presence:', payload)
       console.log('ÃƒÂ¯Ã‚Â¿Ã‚Â½ang tÃƒÂ§Ã‚Â©Ã‚Â«m userId:', payload.userId, 'trong danh sÃƒÂ§Ã‚ÂÃ‚Âºch conversations...')
-        console.log('[ChatPage.onPresenceChanged] Presence updated:', payload)
-        console.log('[ChatPage.onPresenceChanged] Looking for userId:', payload.userId, 'in conversations...')
+      console.log('[ChatPage.onPresenceChanged] Presence updated:', payload)
+      console.log('[ChatPage.onPresenceChanged] Looking for userId:', payload.userId, 'in conversations...')
       setConversations((prev) => {
         let changed = false
         const next = prev.map((conv) => {
@@ -1798,14 +1862,7 @@ export default function ChatPage() {
 
       // Trigger full refresh to ensure all settings are synced correctly
       void syncConversationMetadata(conversationId);
-      void syncInboxSummaries();
-    },
-    onConversationUpdated: (payload: any) => {
-      console.log('[ChatPage.socket] ðŸ”„ Conversation Updated (Socket):', payload);
-      const conversationId = payload.conversationId || payload.id;
-      if (conversationId) {
-        void syncConversationMetadata(conversationId);
-      }
+      if (accessToken) void loadInbox(accessToken);
     },
     onGroupDisbanded: (payload) => {
       console.log('Group disbanded', payload.conversationId)
@@ -1832,31 +1889,45 @@ export default function ChatPage() {
       }))
     },
     onGroupMemberRemoved: (payload) => {
-      setConversations(prev => prev.map(c => {
-        if (c.id === payload.conversationId) {
-          return {
-            ...c,
-            participantUserIds: c.participantUserIds?.filter(id => !payload.targetMemberIds.includes(id)),
-            memberCount: Math.max(0, (c.memberCount || 1) - payload.targetMemberIds.length),
-            members: c.members?.filter(m => !payload.targetMemberIds.includes(m.userId))
-          }
+      console.log('[ChatPage.onGroupMemberRemoved] Event:', payload);
+      const isMeRemoved = user?.id && payload.targetMemberIds.some(id => String(id) === String(user.id));
+      if (isMeRemoved) {
+        console.log('[ChatPage.onGroupMemberRemoved] 🚪 Current user removed from group. Cleaning up UI.');
+        setConversations(prev => prev.filter(c => c.id !== payload.conversationId));
+        if (selectedConversationIdRef.current === payload.conversationId) {
+          navigate('/chat');
         }
-        return c;
-      }))
-
-      // If we are removed
-      if (user?.id && payload.targetMemberIds.includes(user.id) && selectedConversationIdRef.current === payload.conversationId) {
-        navigate('/chat');
+      } else {
+        setConversations(prev => prev.map(c => {
+          if (c.id === payload.conversationId) {
+            const targetIds = (payload.targetMemberIds || []).map(id => String(id));
+            return {
+              ...c,
+              participantUserIds: c.participantUserIds?.filter(id => !targetIds.includes(String(id))),
+              memberCount: Math.max(0, (c.memberCount || 1) - targetIds.length),
+              members: c.members?.filter(m => !targetIds.includes(String(m.userId)))
+            }
+          }
+          return c;
+        }))
       }
     },
     onGroupMemberLeft: (payload) => {
+      if (user?.id && String(payload.actorId) === String(user.id)) {
+        setConversations(prev => prev.filter(c => c.id !== payload.conversationId));
+        if (selectedConversationIdRef.current === payload.conversationId) {
+          navigate('/chat');
+        }
+        return;
+      }
+
       setConversations(prev => prev.map(c => {
         if (c.id === payload.conversationId) {
           return {
             ...c,
-            participantUserIds: c.participantUserIds?.filter(id => id !== payload.actorId),
+            participantUserIds: c.participantUserIds?.filter(id => String(id) !== String(payload.actorId)),
             memberCount: Math.max(0, (c.memberCount || 1) - 1),
-            members: c.members?.filter(m => m.userId !== payload.actorId)
+            members: c.members?.filter(m => String(m.userId) !== String(payload.actorId))
           }
         }
         return c;
@@ -1872,6 +1943,16 @@ export default function ChatPage() {
         }
         return c;
       }))
+    },
+    onConversationError: (payload) => {
+      console.error('[ChatPage] ❌ Conversation error:', payload);
+      if (payload.conversationId && (payload.code?.includes('FORBIDDEN') || payload.code?.includes('NOT_FOUND') || payload.code?.includes('ACCESS_DENIED'))) {
+        const cid = payload.conversationId;
+        setConversations(prev => prev.filter(c => c.id !== cid));
+        if (selectedConversationIdRef.current === cid) {
+          navigate('/chat');
+        }
+      }
     },
     onMessageError: (payload) => {
       console.error('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ Message error:', payload);
@@ -2447,15 +2528,15 @@ export default function ChatPage() {
 
         // Update local message list for sender
         setMessagesByConversation((prev) => {
-           const current = prev[conversationId] ?? []
-           return {
-             ...prev,
-             [conversationId]: current.map(m => m.id === messageId ? { ...m, isRecalled: true, text: '' } : m)
-           }
+          const current = prev[conversationId] ?? []
+          return {
+            ...prev,
+            [conversationId]: current.map(m => m.id === messageId ? { ...m, isRecalled: true, text: '' } : m)
+          }
         })
 
         // Update Sidebar preview for sender
-        setConversations((prev) => 
+        setConversations((prev) =>
           prev.map((c) => {
             if (c.id === conversationId) {
               return { ...c, lastMessage: 'Tin nhắn đã được thu hồi' }
@@ -3270,7 +3351,7 @@ export default function ChatPage() {
                 // If it's a 404/403, cleanup localStorage so we don't keep trying forever
                 if (status === 404 || status === 403) {
                   console.log(`[ChatPage] ðŸ§¹ Purging ghost group ID: ${id}`);
-                  
+
                   // 1. Cleanup localStorage
                   const stored = localStorage.getItem(`vnalo_pending_groups_${user?.id}`);
                   if (stored) {
@@ -3306,9 +3387,9 @@ export default function ChatPage() {
               const freshConvo: ConversationSummary = {
                 id: inner.id || c.id,
                 isGroup,
-                name: inner.title || c.title || (isGroup ? "NhÃ³m má»›i" : "NgÆ°á»i dÃ¹ng má»›i"),
+                name: inner.title || c.title || (isGroup ? "Nhóm mới" : "Người dùng mới"),
                 avatarUrl: inner.avatarUrl || c.avatarUrl || null,
-                lastMessage: isGroup ? "NhÃ³m má»›i táº¡o" : "[Thiáº¿t bá»‹] Gá»­i lá»i chÃ o",
+                lastMessage: isGroup ? "Nhóm mới được tạo" : "[Thông báo] Gửi lời chào",
                 unreadCount: 0,
                 participantUserIds: participantIds,
                 memberCount: members.length,
@@ -3419,6 +3500,7 @@ export default function ChatPage() {
         const mappedItems = items.map((item: any) => {
           const peerId = (item.participantUserIds ?? []).find((participantId: string) => participantId !== user?.id)
           const isGroup = item.isGroup;
+          const isCloud = !isGroup && !peerId; // My Documents flag
           const resolvedPeerName = !isGroup && peerId ? friendNameById.get(peerId) : null
           const resolvedPeerAvatar = !isGroup && peerId ? (friendAvatarById.get(peerId) ?? null) : null
           const resolvedLastMessageSenderName = item.lastMessageSenderId
@@ -3436,19 +3518,14 @@ export default function ChatPage() {
           )
           const isStranger = !isGroup && peerId ? !friendIdSet.has(peerId) : false
 
-          const withName = (!isGroup && resolvedPeerName)
-            ? {
-              ...item,
-              name: resolvedPeerName,
-              avatarUrl: resolvedPeerAvatar,
-              lastMessage: formattedLastMessage,
-              isStranger,
-            }
-            : {
-              ...item,
-              lastMessage: formattedLastMessage,
-              isStranger,
-            }
+          let withName = item;
+          if (isCloud) {
+            withName = { ...item, name: 'My Documents', avatarUrl: null, isCloud: true, lastMessage: formattedLastMessage, isStranger: false };
+          } else if (!isGroup && resolvedPeerName) {
+            withName = { ...item, name: resolvedPeerName, avatarUrl: resolvedPeerAvatar, lastMessage: formattedLastMessage, isStranger };
+          } else {
+            withName = { ...item, lastMessage: formattedLastMessage, isStranger };
+          }
 
           return applyRestrictedConversationPreview(withName, false)
         })
@@ -3463,41 +3540,29 @@ export default function ChatPage() {
         setIsRestrictedMode(false)
         console.log('âš¡ [DEBUG] Inbox items from API:', mappedItems);
 
-        const deduplicateById = (items: ConversationSummary[]): ConversationSummary[] => {
-          const seen = new Set<string>()
-          const seenPeers = new Set<string>()
-          return items.filter((item) => {
-            if (seen.has(item.id)) return false
 
-            if (!item.isGroup && !item.isCloud) {
-              const peerId = (item.participantUserIds ?? []).find(id => id !== user?.id)
-              if (peerId) {
-                if (seenPeers.has(peerId)) return false
-                seenPeers.add(peerId)
-              }
-            }
 
-            seen.add(item.id)
-            return true
-          })
+        const finalMappedItems = [...mappedItems];
+        if (!finalMappedItems.some(c => c.id === 'my-documents' || c.isCloud)) {
+          finalMappedItems.push(myDocumentsConversation);
         }
 
         setConversations((prev) => {
-          if (!targetId) return mappedItems;
+          if (!targetId) return finalMappedItems;
 
           // Try to find it in the freshly fetched items first
-          const targetInFetched = mappedItems.find(item => item.id === targetId);
+          const targetInFetched = finalMappedItems.find(item => item.id === targetId);
           if (targetInFetched) {
-            return [targetInFetched, ...mappedItems.filter(item => item.id !== targetId)];
+            return [targetInFetched, ...finalMappedItems.filter(item => item.id !== targetId)];
           }
 
           // Fallback: try to find it in previous state
           const targetInPrev = prev.find(item => item.id === targetId);
           if (targetInPrev) {
-            return [targetInPrev, ...mappedItems.filter(item => item.id !== targetId)];
+            return [targetInPrev, ...finalMappedItems.filter(item => item.id !== targetId)];
           }
 
-          return mappedItems;
+          return finalMappedItems;
         })
         setSelectedConversationId((prev) => {
           if (preferredConversationId) {
@@ -3610,9 +3675,9 @@ export default function ChatPage() {
                 return conversation
               }
             } else {
-               // Newer summary detected, trigger message sync (Mobile-like fallback)
-               console.log('[ChatPage] ðŸ”„ Out-of-sync summary for:', conversation.id, 'Triggering message sync');
-               void syncLatestMessages(conversation.id);
+              // Newer summary detected, trigger message sync (Mobile-like fallback)
+              console.log('[ChatPage] ðŸ”„ Out-of-sync summary for:', conversation.id, 'Triggering message sync');
+              void syncLatestMessages(conversation.id);
             }
 
             changed = true
@@ -3868,7 +3933,7 @@ export default function ChatPage() {
       navigate('/chat/' + conversationId)
 
       // Proactively refresh metadata for the selected conversation
-      if (accessToken && conversationId && !conversationId.startsWith('vnalo_cloud_')) {
+      if (accessToken && conversationId && conversationId !== 'my-documents') {
         try {
           const detailRaw = await fetchConversation(accessToken, conversationId).catch(() => null);
           if (detailRaw) {
@@ -4003,7 +4068,7 @@ export default function ChatPage() {
     void (async () => {
       try {
         // Proactively refresh metadata to ensure member count etc is updated
-        if (accessToken && !conversationId.startsWith('vnalo_cloud_')) {
+        if (accessToken && conversationId !== 'my-documents') {
           void (async () => {
             try {
               const detailRaw = await fetchConversation(accessToken, conversationId).catch(() => null);
@@ -4033,6 +4098,8 @@ export default function ChatPage() {
                     members: members.map((m: any) => ({
                       userId: String(m.userId ?? '').trim(),
                       role: String(m.role ?? 'MEMBER').toUpperCase(),
+                      displayName: m.displayName || m.name || m.fullName,
+                      avatarUrl: m.avatarUrl || m.avatar,
                     })),
                     participantUserIds: participantIds,
                     avatarUrl: isGroup ? (inner.avatarUrl || conv.avatarUrl) : (inner.avatarUrl || conv.avatarUrl),
@@ -4066,14 +4133,33 @@ export default function ChatPage() {
           })();
         }
 
-        const isVirtualCloud = conversationId === `vnalo_cloud_${user.id}`
-        const rawMessages = isVirtualCloud ? [] : await fetchMessages(accessToken, conversationId)
-        console.log('Dá»¯ liá»‡u tin nháº¯n nháº­n Ä‘Æ°á»£c:', rawMessages)
-        const mapped = sortMessages(
-          rawMessages
-            .map((message) => applyRestrictedMessage(normalizeMessage(mapRawMessage(message, user.id)), isRestrictedMode))
-            .filter((message) => !deletedMessageIds[message.id]),
-        )
+        const isVirtualCloud = conversationId === 'my-documents'
+        let mapped: ChatMessage[] = []
+
+        if (isVirtualCloud) {
+          try {
+            const key = `vnalo_cloud_msgs_${user.id}`;
+            const saved = localStorage.getItem(key);
+            if (saved) {
+              const rawCloudMsgs = JSON.parse(saved);
+              mapped = sortMessages(
+                (Array.isArray(rawCloudMsgs) ? rawCloudMsgs : [])
+                  .map((m) => normalizeMessage(m))
+                  .filter((m) => !deletedMessageIds[m.id])
+              );
+            }
+          } catch (e) {
+            console.error('Failed to load local cloud messages', e);
+          }
+        } else {
+          const rawMessages = await fetchMessages(accessToken, conversationId)
+          console.log('Dữ liệu tin nhắn nhận được:', rawMessages)
+          mapped = sortMessages(
+            rawMessages
+              .map((message) => applyRestrictedMessage(normalizeMessage(mapRawMessage(message, user.id)), isRestrictedMode))
+              .filter((message) => !deletedMessageIds[message.id]),
+          )
+        }
 
         // Capture all recalled messages from the fetched data
         const loadTimeRecalledIds: Record<string, true> = {};
@@ -4141,10 +4227,6 @@ export default function ChatPage() {
     console.log('[ChatPage.onPresenceChanged] Conversation IDs:', conversations.map((conv) => conv.userId))
   }, [conversations])
 
-  const conversationIdsSignature = useMemo(
-    () => conversations.map((conversation) => conversation.id).sort().join(','),
-    [conversations],
-  )
 
   const joinAllConversations = useCallback(async (list: ConversationSummary[]) => {
     const conversationIds = list.map((conversation) => conversation.id)
@@ -4364,18 +4446,10 @@ export default function ChatPage() {
 
       console.log('[ChatPage.send] Draft replyTo:', replyTo)
 
-      // Fallback resolve virtual "My Documents" to real conversation if needed
+      // Virtual "My Documents" uses local storage, no need to resolve to a real conversation
       let targetConversationId = conversationId;
-      if (conversationId === `vnalo_cloud_${user.id}`) {
-        try {
-          const realId = await getOrCreateDirectConversation(accessToken, user.id);
-          targetConversationId = realId;
-          setConversations(prev => prev.map(c => c.id === conversationId ? { ...c, id: realId } : c));
-          setSelectedConversationId(realId);
-        } catch (err) {
-          console.error('[ChatPage.send] Final attempt to resolve cloud chat failed', err);
-          return;
-        }
+      if (conversationId === 'my-documents') {
+        targetConversationId = 'my-documents';
       }
 
       const clientMessageId = generateUUID()
@@ -4486,7 +4560,7 @@ export default function ChatPage() {
           sender: 'me',
           senderId: user.id,
           type: 'text',
-          isLocal: false,
+          isLocal: true,
           text: content,
           timestamp: formatMessageTimestamp(),
           deliveryState: 'sending',
@@ -4498,6 +4572,19 @@ export default function ChatPage() {
         const nextMsgs = upsertMessage(prevMsgs, optimisticTextMessage)
         setMessagesByConversation(prev => ({ ...prev, [targetConversationId]: nextMsgs }));
         updateConversationAfterMessage(targetConversationId, optimisticTextMessage, true, nextMsgs);
+
+        // Virtual Cloud Chat: Bypass backend and save to localStorage
+        if (targetConversationId === 'my-documents') {
+          const sentMessage = { ...optimisticTextMessage, deliveryState: 'sent' as const, createdAt: new Date().toISOString() };
+          setMessagesByConversation(prev => ({ ...prev, [targetConversationId]: upsertMessage(prev[targetConversationId] ?? [], sentMessage) }));
+          updateConversationAfterMessage(targetConversationId, sentMessage, true);
+
+          const key = `vnalo_cloud_msgs_${user.id}`;
+          const existingStr = localStorage.getItem(key);
+          const existing = existingStr ? JSON.parse(existingStr) : [];
+          localStorage.setItem(key, JSON.stringify([sentMessage, ...existing]));
+          return;
+        }
 
         const ack = await emitSendMessage(payload);
         if (ack?.event === 'message.sent' && ack?.data) {
@@ -4561,7 +4648,7 @@ export default function ChatPage() {
           sender: 'me',
           senderId: user.id,
           type: resTypeStr as any,
-          isLocal: false,
+          isLocal: true,
           text: resContent,
           mediaUrl: res.url,
           mediaThumbnailUrl: res.thumbnailUrl,
@@ -4586,6 +4673,19 @@ export default function ChatPage() {
           [targetConversationId]: upsertMessage(prev[targetConversationId] ?? [], optimisticMessage)
         }));
         updateConversationAfterMessage(targetConversationId, optimisticMessage, true);
+
+        // Virtual Cloud Chat: Bypass backend and save to localStorage
+        if (targetConversationId === 'my-documents') {
+          const sentMessage = { ...optimisticMessage, deliveryState: 'sent' as const, createdAt: new Date().toISOString() };
+          setMessagesByConversation(prev => ({ ...prev, [targetConversationId]: upsertMessage(prev[targetConversationId] ?? [], sentMessage) }));
+          updateConversationAfterMessage(targetConversationId, sentMessage, true);
+
+          const key = `vnalo_cloud_msgs_${user.id}`;
+          const existingStr = localStorage.getItem(key);
+          const existing = existingStr ? JSON.parse(existingStr) : [];
+          localStorage.setItem(key, JSON.stringify([sentMessage, ...existing]));
+          continue;
+        }
 
         // Send a message using socket, then fallback to REST if needed
         const ack = await emitSendMessage(payload);
@@ -4633,7 +4733,7 @@ export default function ChatPage() {
   )
 
   const handleSendPoll = useCallback(
-    async (poll: PollMetadata) => {
+    async (poll: any) => {
       const conversationId = selectedConversationIdRef.current || selectedConversationId || routedConversationId
       if (!conversationId || !user || !accessToken) return
 
@@ -4645,7 +4745,7 @@ export default function ChatPage() {
         sender: 'me',
         senderId: user.id,
         type: 'poll',
-        isLocal: false,
+        isLocal: true,
         text: `ðŸ“Š BÃ¬nh chá»n: ${poll.question}`,
         pollData: poll,
         timestamp: formatMessageTimestamp(),
@@ -4661,7 +4761,7 @@ export default function ChatPage() {
       const pollPayload = {
         type: 'poll',
         question: poll.question,
-        options: poll.options.map(opt => ({
+        options: poll.options.map((opt: any) => ({
           id: opt.id,
           label: opt.label,
           votes: []
@@ -4869,7 +4969,7 @@ export default function ChatPage() {
       void emitSendMessage({
         conversationId: selectedConversationId,
         content: systemPayload,
-        messageType: 'system',
+        messageType: 'SYSTEM',
         clientMessageId
       });
 
@@ -5119,7 +5219,7 @@ export default function ChatPage() {
       try {
         await emitSendMessage({
           conversationId: selectedConversationId,
-          messageType: 'SYSTEM', 
+          messageType: 'SYSTEM',
           content: systemPayload,
           clientMessageId: crypto.randomUUID()
         });
@@ -5339,7 +5439,12 @@ export default function ChatPage() {
   };
 
   const sortedConversations = useMemo(() => {
-    return [...conversations].map(conv => {
+    const list = [...conversations];
+    if (!list.some(c => c.id === 'my-documents' || c.isCloud)) {
+      list.push(myDocumentsConversation);
+    }
+
+    return list.map(conv => {
       const deleteTime = deletedTimestamps[conv.id];
       if (!deleteTime) return conv;
 
@@ -5475,7 +5580,7 @@ export default function ChatPage() {
         onMessageContextMenuAction={handleMessageContextMenuAction}
         onVotePoll={handleVotePoll}
         onInitiateCall={handleInitiateCall}
-        members={selectedConversation?.members || []}
+        members={(selectedConversation?.members || []) as any}
       />
 
       <CreateGroupModal
@@ -5661,7 +5766,7 @@ export default function ChatPage() {
         remoteStream={callState.remoteStream}
         isMicOn={callState.isMicOn}
         isCameraOn={callState.isCameraOn}
-        isRemoteCameraOn={callState.isRemoteCameraOn}
+        isRemoteCameraOn={(callState as any).isRemoteCameraOn}
         hasRemoteDescription={callState.hasRemoteDescription}
         onEnd={handleEndCall}
         onAnswer={handleAnswerCall}

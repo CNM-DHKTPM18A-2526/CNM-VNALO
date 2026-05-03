@@ -14,8 +14,7 @@ export function MainLayout() {
   const { t } = useLanguage()
   const isChatWorkspace = location.pathname === '/' || location.pathname.startsWith('/chat')
   const isContactsPage = location.pathname.startsWith('/contacts')
-  const isDocumentsPage = location.pathname.startsWith('/documents')
-  const shouldShowTopbar = !isChatWorkspace && !isContactsPage && !isDocumentsPage
+  const shouldShowTopbar = !isChatWorkspace && !isContactsPage
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
   const [isCaptureModalOpen, setIsCaptureModalOpen] = useState(false)
 
@@ -78,9 +77,7 @@ export function MainLayout() {
             ? 'workspace-main workspace-main-chat page-enter' 
             : isContactsPage 
               ? 'workspace-main workspace-main-contacts page-enter'
-              : isDocumentsPage
-                ? 'workspace-main workspace-main-documents page-enter'
-                : 'workspace-main page-enter'
+              : 'workspace-main page-enter'
         }>
           <Outlet />
         </main>

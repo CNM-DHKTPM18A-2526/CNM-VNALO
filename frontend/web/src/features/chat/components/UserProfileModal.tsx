@@ -35,6 +35,7 @@ interface UserProfileModalProps {
     statusMessage?: string | null
   }
   onMessage?: (user: UserLookupResult) => void
+  onCall?: (user: UserLookupResult, type: 'audio' | 'video') => void | Promise<void>
   onCompleted?: () => void | Promise<void>
 }
 
@@ -45,6 +46,7 @@ export function UserProfileModal({
   accessToken,
   initialUser,
   onMessage,
+  onCall,
   onCompleted,
 }: UserProfileModalProps) {
   const { user: currentUser } = useAuth()
@@ -59,6 +61,7 @@ export function UserProfileModal({
   
   const [isComposingFriendRequest, setIsComposingFriendRequest] = useState(false)
   const [requestMessage, setRequestMessage] = useState('Xin chào, mình muốn kết bạn với bạn.')
+  const [isCallMenuOpen, setIsCallMenuOpen] = useState(false)
 
   // 1. Reset state when modal closes
   useEffect(() => {
@@ -69,6 +72,7 @@ export function UserProfileModal({
       setIsLoading(false)
       setIsComposingFriendRequest(false)
       setRequestMessage('Xin chào, mình muốn kết bạn với bạn.')
+      setIsCallMenuOpen(false)
     }
   }, [isOpen])
 
@@ -172,10 +176,17 @@ export function UserProfileModal({
     }
   }
 
-  const handleCall = () => {
+  const handleCall = (type: 'audio' | 'video') => {
+    if (profile?.id) {
+      void onCall?.(profile as UserLookupResult, type)
+      setIsCallMenuOpen(false)
+      return
+    }
+
     if (profile?.phone) {
       window.location.href = `tel:${profile.phone}`
     }
+    setIsCallMenuOpen(false)
   }
 
   const handleMessage = () => {
@@ -242,21 +253,79 @@ export function UserProfileModal({
             </div>
           </div>
 
-          <div className="contacts-profile-actions">
+          <div className="contacts-profile-actions" style={{ display: 'flex', gap: '8px' }}>
             {relation === 'already-friend' ? (
               <>
-                <button 
-                  type="button" 
-                  className="contacts-profile-action-btn" 
-                  onClick={handleCall}
-                  disabled={!profile.phone}
-                >
-                  Gọi điện
-                </button>
+                <div style={{ position: 'relative', flex: 1 }}>
+                  <button 
+                    type="button" 
+                    className="contacts-profile-action-btn" 
+                    onClick={() => setIsCallMenuOpen(!isCallMenuOpen)}
+                    disabled={false}
+                    style={{ width: '100%' }}
+                  >
+                    Gọi điện
+                  </button>
+                  {isCallMenuOpen && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      marginTop: '4px',
+                      backgroundColor: 'white',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '6px',
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                      minWidth: '140px',
+                      zIndex: 1000,
+                    }}>
+                      <button
+                        type="button"
+                        style={{
+                          display: 'block',
+                          width: '100%',
+                          padding: '8px 12px',
+                          textAlign: 'left',
+                          backgroundColor: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          color: '#1f2937',
+                          borderBottom: '1px solid #e5e7eb',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f3f4f6')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                        onClick={() => handleCall('audio')}
+                      >
+                        Gọi thoại
+                      </button>
+                      <button
+                        type="button"
+                        style={{
+                          display: 'block',
+                          width: '100%',
+                          padding: '8px 12px',
+                          textAlign: 'left',
+                          backgroundColor: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          color: '#1f2937',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f3f4f6')}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                        onClick={() => handleCall('video')}
+                      >
+                        Gọi video
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <button
                   type="button"
                   className="contacts-profile-action-btn contacts-profile-action-btn-primary"
                   onClick={handleMessage}
+                  style={{ flex: 1 }}
                 >
                   Nhắn tin
                 </button>
@@ -275,6 +344,7 @@ export function UserProfileModal({
                   type="button"
                   className="contacts-profile-action-btn"
                   onClick={handleMessage}
+                  style={{ flex: 1 }}
                 >
                   Nhắn tin
                 </button>
@@ -283,6 +353,7 @@ export function UserProfileModal({
                   className="contacts-profile-action-btn contacts-profile-action-btn-primary"
                   disabled={relation !== 'none' || isSubmitting}
                   onClick={() => setIsComposingFriendRequest(true)}
+                  style={{ flex: 1 }}
                 >
                   {relation === 'sent' ? 'Đã gửi lời mời' : relation === 'incoming' ? 'Phản hồi lời mời' : 'Kết bạn'}
                 </button>
@@ -301,10 +372,10 @@ export function UserProfileModal({
                 value={requestMessage}
               />
               <div className="flex justify-end gap-2 mt-3">
-                <Button size="sm" variant="subtle" onClick={() => setIsComposingFriendRequest(false)}>
+                <Button variant="subtle" onClick={() => setIsComposingFriendRequest(false)}>
                   Hủy
                 </Button>
-                <Button size="sm" variant="primary" disabled={isSubmitting} onClick={handleSendFriendRequest}>
+                <Button variant="primary" disabled={isSubmitting} onClick={handleSendFriendRequest}>
                   {isSubmitting ? 'Đang gửi...' : 'Gửi lời mời'}
                 </Button>
               </div>
