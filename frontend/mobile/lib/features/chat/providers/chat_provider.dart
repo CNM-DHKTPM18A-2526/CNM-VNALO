@@ -1913,15 +1913,14 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     if (_currentUserId == null) return;
     final Set<String> userIdsToFetch = {};
     for (final conv in _conversations) {
-      if (conv.type == ConversationType.DIRECT) {
-        for (final member in conv.members) {
-          if (member.userId != _currentUserId) {
-            userIdsToFetch.add(member.userId);
-          }
+      for (final member in conv.members) {
+        if (member.userId != _currentUserId) {
+          userIdsToFetch.add(member.userId);
         }
       }
     }
     if (userIdsToFetch.isNotEmpty) {
+      debugPrint('[ChatProvider] 📡 Requesting bulk presence for ${userIdsToFetch.length} users');
       _socketService.requestPresence(userIdsToFetch.toList());
     }
   }

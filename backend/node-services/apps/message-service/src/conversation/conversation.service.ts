@@ -185,6 +185,11 @@ export class ConversationService {
 
   /** Get conversation with active member list. Verifies user has access. */
   async getConversation(conversationId: string, userId: string) {
+    // UUID guard: reject virtual/non-UUID IDs before hitting Postgres
+    if (!this.isValidUuid(conversationId)) {
+      throw new NotFoundException('Conversation not found');
+    }
+
     const conversation = await this.conversationRepo.findOne({
       where: { id: conversationId },
     });
@@ -763,6 +768,11 @@ export class ConversationService {
   private async getConversationOrFail(
     conversationId: string,
   ): Promise<Conversation> {
+    // UUID guard: reject virtual/non-UUID IDs (e.g. "my-documents", "vnalo_cloud_*")
+    // before they reach Postgres and cause "invalid input syntax for type uuid" crash.
+    if (!this.isValidUuid(conversationId)) {
+      throw new NotFoundException('Conversation not found');
+    }
     const conversation = await this.conversationRepo.findOne({
       where: { id: conversationId },
     });
@@ -770,6 +780,11 @@ export class ConversationService {
       throw new NotFoundException('Conversation not found');
     }
     return conversation;
+  }
+
+  /** Returns true if the given string is a valid UUID v1-v5. */
+  private isValidUuid(id: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
   }
 
   async ensureUnderMemberLimit(

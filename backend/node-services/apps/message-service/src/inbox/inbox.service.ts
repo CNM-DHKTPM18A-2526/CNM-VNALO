@@ -4,7 +4,6 @@ import { Repository, In, IsNull } from 'typeorm';
 import { ConversationInbox } from '../entities/conversation-inbox.entity';
 import { Conversation } from '../entities/conversation.entity';
 import { ConversationMember } from '../entities/conversation-member.entity';
-import { PresenceService } from '../gateway/presence.service';
 
 type AccessPolicyContext = {
   clientPlatform?: string;
@@ -23,7 +22,6 @@ export class InboxService {
     private readonly conversationRepo: Repository<Conversation>,
     @InjectRepository(ConversationMember)
     private readonly memberRepo: Repository<ConversationMember>,
-    private readonly presenceService: PresenceService,
   ) {}
 
   /**
@@ -59,15 +57,17 @@ export class InboxService {
     if (inbox.length === 0) return [];
 
     // Batch fetch all conversation details in a single query (fixes N+1)
-    const convIds = inbox.map((e) => e.conversationId);
-    const conversations = await this.conversationRepo.find({
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const convIds = inbox.map((e) => e.conversationId).filter(id => uuidRegex.test(id));
+    
+    const conversations = convIds.length > 0 ? await this.conversationRepo.find({
       where: { id: In(convIds) },
-    });
+    }) : [];
 
     // Batch fetch active members for all conversations
-    const members = await this.memberRepo.find({
+    const members = convIds.length > 0 ? await this.memberRepo.find({
       where: { conversationId: In(convIds), leftAt: IsNull() },
-    });
+    }) : [];
 
     // Build O(1) lookup maps
     const convMap = new Map(conversations.map((c) => [c.id, c]));
@@ -80,11 +80,6 @@ export class InboxService {
       list.push({ userId: m.userId, role: m.role, nickname: m.nickname });
       memberMap.set(m.conversationId, list);
     }
-
-    // NEW: Fetch bulk presence for ALL members found in the inbox
-    const allMemberUserIds = members.map((m) => m.userId);
-    const presenceList = await this.presenceService.getBulkPresence(allMemberUserIds);
-    const presenceMap = new Map(presenceList.map((p) => [p.userId, p]));
 
     // Enrich inbox entries with conversation details and members
     return inbox.map((entry) => {
@@ -105,17 +100,7 @@ export class InboxService {
               title: conv.title,
               avatarUrl: conv.avatarUrl,
               status: conv.status,
-              members: (memberMap.get(conv.id) ?? []).map((m) => {
-                const p = presenceMap.get(m.userId);
-                return {
-                  ...m,
-                  user: {
-                    id: m.userId,
-                    isOnline: p?.status === 'online',
-                    lastSeen: p?.lastSeen || null,
-                  },
-                };
-              }),
+              members: (memberMap.get(conv.id) ?? []),
             }
           : null,
       };
