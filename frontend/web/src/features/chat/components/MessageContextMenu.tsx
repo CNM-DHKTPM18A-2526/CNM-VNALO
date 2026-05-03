@@ -1,3 +1,4 @@
+import React from 'react'
 import { CheckSquare2, ChevronRight, Copy, Info, Pin, RotateCcw, Star, Trash2 } from 'lucide-react'
 
 import type { CSSProperties } from 'react'
