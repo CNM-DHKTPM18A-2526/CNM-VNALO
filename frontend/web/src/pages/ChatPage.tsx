@@ -3227,12 +3227,14 @@ export default function ChatPage() {
       setIsLoadingConversations(true)
 
       try {
+        console.log('[ChatPage.loadInbox] Starting fetch:', { hasToken: !!token, userId: user?.id, routedId: routedConversationIdRef.current });
         const [itemsResult, policy, friends] = await Promise.all([
-          fetchInbox(token, user?.id),
+          fetchInbox(token, user?.id).catch(e => { console.error("fetchInbox error", e); return []; }),
           getSyncPolicy(token).catch(() => null),
           getFriends(token).catch(() => []),
         ])
         let items = itemsResult as any[];
+        console.log('[ChatPage.loadInbox] Inbox items loaded:', items.length);
 
         const targetId = preferredConversationId || routedConversationIdRef.current;
 

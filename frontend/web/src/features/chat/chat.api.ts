@@ -406,6 +406,11 @@ export async function fetchInbox(token: string, currentUserId?: string): Promise
 
   return data
     .filter((item) => {
+      // If we don't have a myId yet, don't filter (fallback to showing all for now)
+      if (!myId) {
+        return true
+      }
+
       // If we have a members list, we MUST be in it to see the conversation
       // (This filters out conversations we have left)
       const members = item.conversation?.members ?? []

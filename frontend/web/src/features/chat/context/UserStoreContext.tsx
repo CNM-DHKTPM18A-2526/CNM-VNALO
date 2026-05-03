@@ -60,8 +60,15 @@ export const UserStoreProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return fetchPromise
   }, [userMap, upsertUser])
 
+  const value = React.useMemo(() => ({
+    userMap,
+    getDisplayName,
+    upsertUser,
+    ensureUser,
+  }), [userMap, getDisplayName, upsertUser, ensureUser])
+
   return (
-    <UserStoreContext.Provider value={{ userMap, getDisplayName, upsertUser, ensureUser }}>
+    <UserStoreContext.Provider value={value}>
       {children}
     </UserStoreContext.Provider>
   )
