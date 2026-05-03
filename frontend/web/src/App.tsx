@@ -10,7 +10,6 @@ import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import ChatPage from './pages/ChatPage'
 import { ContactsPage } from './pages/ContactsPage'
 import { ProfilePage } from './pages/ProfilePage'
-import { DocumentsPage } from './pages/DocumentsPage'
 import { UserStoreProvider } from './features/chat/context/UserStoreContext'
 import { NotificationProvider } from './features/notifications/NotificationContext'
 import './styles/app.css'
@@ -37,7 +36,6 @@ function App() {
           <Route index element={<Navigate replace to='/chat' />} />
           <Route path='chat/:conversationId?' element={<ChatPage />} />
           <Route path='contacts' element={<ContactsPage />} />
-          <Route path='documents' element={<DocumentsPage />} />
           <Route path='profile' element={<ProfilePage />} />
         </Route>
         <Route path='*' element={<Navigate replace to='/chat' />} />

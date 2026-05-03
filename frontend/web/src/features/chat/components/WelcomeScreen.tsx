@@ -1,8 +1,6 @@
-import { useLanguage } from '../../../shared/i18n/LanguageContext'
 import { Icon } from '../../../shared/components/Icon'
 
 export function WelcomeScreen() {
-  const { t } = useLanguage()
 
   return (
     <div className='welcome-screen'>

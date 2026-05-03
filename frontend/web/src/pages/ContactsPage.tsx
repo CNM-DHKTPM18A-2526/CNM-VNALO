@@ -160,16 +160,16 @@ export function ContactsPage() {
   const [showAddFriendModal, setShowAddFriendModal] = useState(false)
   const [addFriendTarget, setAddFriendTarget] = useState<AddFriendTarget | null>(null)
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
-  const [isProfileLoading, setIsProfileLoading] = useState(false)
-  const [isCreatingConversationFromProfile, setIsCreatingConversationFromProfile] = useState(false)
-  const [profilePreview, setProfilePreview] = useState<UserLookupResult | null>(null)
+  const [, setIsProfileLoading] = useState(false)
+  const [, setIsCreatingConversationFromProfile] = useState(false)
+  const [, setProfilePreview] = useState<UserLookupResult | null>(null)
   const [profileTargetUserId, setProfileTargetUserId] = useState<string | null>(null)
-  const [profileError, setProfileError] = useState<string | null>(null)
+  const [, setProfileError] = useState<string | null>(null)
 
   const menuRef = useRef<HTMLDivElement | null>(null)
   const normalizedKeyword = keyword.trim().toLowerCase()
-  const normalizedPhoneKeyword = keyword.trim().replace(/\D/g, '')
-  const isPhoneQuery = normalizedPhoneKeyword.length >= 2 && normalizedPhoneKeyword.length >= Math.max(2, keyword.trim().length - 2)
+
+  // const isPhoneQuery = normalizedPhoneKeyword.length >= 2 && normalizedPhoneKeyword.length >= Math.max(2, keyword.trim().length - 2)
   const unknownUserLabel = t('contacts.common.unknownUser')
 
   useEffect(() => {
@@ -480,7 +480,7 @@ export function ContactsPage() {
     if (!query) return []
     return friends.filter((friend) => {
       const label = getFriendLabel(friend, unknownUserLabel).toLowerCase()
-      const phone = (friend.friendPhone || '').replace(/\D/g, '')
+      const phone = ((friend as any).friendPhone || '').replace(/\D/g, '')
       return label.includes(query) || phone.includes(query)
     })
   }, [friends, sidebarKeyword, unknownUserLabel])
@@ -643,30 +643,6 @@ export function ContactsPage() {
       setIsProfileLoading(false)
     }
   }
-
-  const handleSendMessageFromProfile = async () => {
-    if (!accessToken) return
-
-    const targetUserId = profilePreview?.id ?? profileTargetUserId
-    if (!targetUserId) {
-      setProfileError(t('contacts.feedback.genericError'))
-      return
-    }
-
-    setProfileError(null)
-    setIsCreatingConversationFromProfile(true)
-
-    try {
-      const conversationId = await getOrCreateDirectConversation(accessToken, targetUserId)
-      closeProfileModal()
-      navigate(`/chat/${conversationId}`)
-    } catch (error) {
-      setProfileError(error instanceof Error ? error.message : t('contacts.feedback.genericError'))
-    } finally {
-      setIsCreatingConversationFromProfile(false)
-    }
-  }
-
   const handleOpenConversationByUserId = async (targetUserId: string, loadingKey: string) => {
     if (!accessToken) return
 
@@ -689,15 +665,6 @@ export function ContactsPage() {
     } finally {
       setIsOpeningConversationId(null)
     }
-  }
-
-  const handleCallFromProfile = () => {
-    const phone = profilePreview?.phone?.trim()
-    if (!phone) {
-      setProfileError('Người dùng chưa cập nhật số điện thoại.')
-      return
-    }
-    window.location.href = `tel:${phone}`
   }
 
   const refreshAll = async (token: string) => {
