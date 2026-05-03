@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   checkFriendshipStatus,
@@ -51,17 +51,17 @@ export function UserProfileModal({
   const { upsertUser } = useUserStore()
   const navigate = useNavigate()
 
-  const [profile, setProfile] = useState<Partial<UserLookupResult> | null>(null)
-  const [relation, setRelation] = useState<RelationState>('none')
-  const [isLoading, setIsLoading] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [profile, setProfile] = React.useState<Partial<UserLookupResult> | null>(null)
+  const [relation, setRelation] = React.useState<RelationState>('none')
+  const [isLoading, setIsLoading] = React.useState(false)
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
   
-  const [isComposingFriendRequest, setIsComposingFriendRequest] = useState(false)
-  const [requestMessage, setRequestMessage] = useState('Xin chào, mình muốn kết bạn với bạn.')
+  const [isComposingFriendRequest, setIsComposingFriendRequest] = React.useState(false)
+  const [requestMessage, setRequestMessage] = React.useState('Xin chào, mình muốn kết bạn với bạn.')
 
   // 1. Reset state when modal closes
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isOpen) {
       setProfile(null)
       setRelation('none')
@@ -72,7 +72,7 @@ export function UserProfileModal({
     }
   }, [isOpen])
 
-  const getRelationForUser = useCallback(async (targetUserId: string): Promise<RelationState> => {
+  const getRelationForUser = React.useCallback(async (targetUserId: string): Promise<RelationState> => {
     if (!accessToken) {
       return 'none'
     }
@@ -109,13 +109,13 @@ export function UserProfileModal({
     }
   }, [accessToken, currentUser?.id])
 
-  const resolveRelationship = useCallback(async (targetUserId: string) => {
+  const resolveRelationship = React.useCallback(async (targetUserId: string) => {
     const relationState = await getRelationForUser(targetUserId)
     setRelation(relationState)
   }, [getRelationForUser])
 
   // 2. Initialize profile and check relation
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isOpen || !userId) return
 
     setProfile({
@@ -134,7 +134,7 @@ export function UserProfileModal({
   }, [isOpen, userId, initialUser, resolveRelationship])
 
   // 3. Trigger fetch if details are missing
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isOpen || !userId || !accessToken) return
 
     const hasFullInfo = !!(initialUser?.phone && initialUser?.email)

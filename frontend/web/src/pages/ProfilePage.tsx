@@ -1,5 +1,5 @@
 import type { ChangeEvent, KeyboardEvent as ReactKeyboardEvent } from 'react'
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import Cropper, { type Area } from 'react-easy-crop'
 
 import { useAuth } from '../features/auth/useAuth'
@@ -63,30 +63,30 @@ export function ProfilePage() {
   const fileInputRef = React.useRef<HTMLInputElement | null>(null)
   const coverInputRef = React.useRef<HTMLInputElement | null>(null)
 
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
-  const [coverUrl, setCoverUrl] = useState<string | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null)
-  const [isSavingAvatar, setIsSavingAvatar] = useState(false)
-  const [isSavingCover, setIsSavingCover] = useState(false)
-  const [isApplyingCrop, setIsApplyingCrop] = useState(false)
-  const [pendingCrop, setPendingCrop] = useState<PendingCrop | null>(null)
-  const [cropPosition, setCropPosition] = useState({ x: 0, y: 0 })
-  const [cropZoom, setCropZoom] = useState(1)
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null)
-  const [avatarErrorMessage, setAvatarErrorMessage] = useState<string | null>(null)
-  const [avatarSuccessMessage, setAvatarSuccessMessage] = useState<string | null>(null)
-  const [coverErrorMessage, setCoverErrorMessage] = useState<string | null>(null)
-  const [coverSuccessMessage, setCoverSuccessMessage] = useState<string | null>(null)
-  const [isEditingProfile, setIsEditingProfile] = useState(false)
-  const [isSavingProfile, setIsSavingProfile] = useState(false)
-  const [profileErrorMessage, setProfileErrorMessage] = useState<string | null>(null)
-  const [profileSuccessMessage, setProfileSuccessMessage] = useState<string | null>(null)
-  const [draftDisplayName, setDraftDisplayName] = useState('')
-  const [draftBio, setDraftBio] = useState('')
-  const [draftDob, setDraftDob] = useState('')
-  const [draftGender, setDraftGender] = useState<GenderDraft>('')
-  const [activePreview, setActivePreview] = useState<{ kind: PreviewImageKind; url: string } | null>(null)
+  const [avatarUrl, setAvatarUrl] = React.useState<string | null>(null)
+  const [coverUrl, setCoverUrl] = React.useState<string | null>(null)
+  const [previewUrl, setPreviewUrl] = React.useState<string | null>(null)
+  const [coverPreviewUrl, setCoverPreviewUrl] = React.useState<string | null>(null)
+  const [isSavingAvatar, setIsSavingAvatar] = React.useState(false)
+  const [isSavingCover, setIsSavingCover] = React.useState(false)
+  const [isApplyingCrop, setIsApplyingCrop] = React.useState(false)
+  const [pendingCrop, setPendingCrop] = React.useState<PendingCrop | null>(null)
+  const [cropPosition, setCropPosition] = React.useState({ x: 0, y: 0 })
+  const [cropZoom, setCropZoom] = React.useState(1)
+  const [croppedAreaPixels, setCroppedAreaPixels] = React.useState<Area | null>(null)
+  const [avatarErrorMessage, setAvatarErrorMessage] = React.useState<string | null>(null)
+  const [avatarSuccessMessage, setAvatarSuccessMessage] = React.useState<string | null>(null)
+  const [coverErrorMessage, setCoverErrorMessage] = React.useState<string | null>(null)
+  const [coverSuccessMessage, setCoverSuccessMessage] = React.useState<string | null>(null)
+  const [isEditingProfile, setIsEditingProfile] = React.useState(false)
+  const [isSavingProfile, setIsSavingProfile] = React.useState(false)
+  const [profileErrorMessage, setProfileErrorMessage] = React.useState<string | null>(null)
+  const [profileSuccessMessage, setProfileSuccessMessage] = React.useState<string | null>(null)
+  const [draftDisplayName, setDraftDisplayName] = React.useState('')
+  const [draftBio, setDraftBio] = React.useState('')
+  const [draftDob, setDraftDob] = React.useState('')
+  const [draftGender, setDraftGender] = React.useState<GenderDraft>('')
+  const [activePreview, setActivePreview] = React.useState<{ kind: PreviewImageKind; url: string } | null>(null)
 
   const resolvedName = user?.name ?? CURRENT_USER.name
   const resolvedDob = user?.dob ?? null
@@ -99,15 +99,15 @@ export function ProfilePage() {
   const canPreviewAvatar = Boolean(currentAvatarImage)
   const canPreviewCover = Boolean(currentCoverImage)
 
-  useEffect(() => {
+  React.useEffect(() => {
     setAvatarUrl(user?.avatarUrl ?? null)
   }, [user?.avatarUrl])
 
-  useEffect(() => {
+  React.useEffect(() => {
     setCoverUrl(user?.coverUrl ?? null)
   }, [user?.coverUrl])
 
-  useEffect(() => {
+  React.useEffect(() => {
     return () => {
       if (previewUrl) {
         URL.revokeObjectURL(previewUrl)

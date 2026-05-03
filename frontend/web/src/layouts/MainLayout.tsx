@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import React from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 
 import { Sidebar } from '../shared/components/Sidebar'
@@ -16,10 +16,10 @@ export function MainLayout() {
   const isContactsPage = location.pathname.startsWith('/contacts')
   const isDocumentsPage = location.pathname.startsWith('/documents')
   const shouldShowTopbar = !isChatWorkspace && !isContactsPage && !isDocumentsPage
-  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
-  const [isCaptureModalOpen, setIsCaptureModalOpen] = useState(false)
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = React.useState(false)
+  const [isCaptureModalOpen, setIsCaptureModalOpen] = React.useState(false)
 
-  const title = useMemo(() => {
+  const title = React.useMemo(() => {
     const titleMap: Record<string, string> = {
       '/chat': t('pages.chat.title'),
       '/contacts': t('pages.contacts.title'),

@@ -1,12 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-  type TouchEvent as ReactTouchEvent,
-  type WheelEvent as ReactWheelEvent,
-} from 'react'
+import React, { type ReactNode, type TouchEvent as ReactTouchEvent, type WheelEvent as ReactWheelEvent,  } from 'react'
 import React from 'react'
 import { ChevronLeft, ChevronRight, Download, X, ZoomIn, ZoomOut } from 'lucide-react'
 
@@ -24,9 +16,9 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 export function ImageViewerProvider({ images, children }: ImageViewerProviderProps) {
-  const [isOpen, setIsOpen] = useState(false)
-  const [activeIndex, setActiveIndex] = useState(0)
-  const [scale, setScale] = useState(1)
+  const [isOpen, setIsOpen] = React.useState(false)
+  const [activeIndex, setActiveIndex] = React.useState(0)
+  const [scale, setScale] = React.useState(1)
 
   const pinchDistanceRef = React.useRef<number | null>(null)
   const pinchScaleRef = React.useRef(1)
@@ -35,7 +27,7 @@ export function ImageViewerProvider({ images, children }: ImageViewerProviderPro
   const canNavigate = images.length > 1
   const activeItem = images[activeIndex] ?? null
 
-  const openByIndex = useCallback(
+  const openByIndex = React.useCallback(
     (index: number) => {
       if (images.length === 0) {
         return
@@ -48,7 +40,7 @@ export function ImageViewerProvider({ images, children }: ImageViewerProviderPro
     [images.length],
   )
 
-  const openImageViewerByMessageId = useCallback(
+  const openImageViewerByMessageId = React.useCallback(
     (messageId: string) => {
       const index = images.findIndex((item) => item.messageId === messageId)
       if (index >= 0) {
@@ -58,7 +50,7 @@ export function ImageViewerProvider({ images, children }: ImageViewerProviderPro
     [images, openByIndex],
   )
 
-  const openImageViewerByUrl = useCallback(
+  const openImageViewerByUrl = React.useCallback(
     (url: string) => {
       const index = images.findIndex((item) => item.url === url)
       if (index >= 0) {
@@ -68,14 +60,14 @@ export function ImageViewerProvider({ images, children }: ImageViewerProviderPro
     [images, openByIndex],
   )
 
-  const closeImageViewer = useCallback(() => {
+  const closeImageViewer = React.useCallback(() => {
     setIsOpen(false)
     setScale(1)
     pinchDistanceRef.current = null
     swipeStartXRef.current = null
   }, [])
 
-  const handlePrev = useCallback(() => {
+  const handlePrev = React.useCallback(() => {
     if (!canNavigate) {
       return
     }
@@ -83,7 +75,7 @@ export function ImageViewerProvider({ images, children }: ImageViewerProviderPro
     setScale(1)
   }, [canNavigate, images.length])
 
-  const handleNext = useCallback(() => {
+  const handleNext = React.useCallback(() => {
     if (!canNavigate) {
       return
     }
@@ -173,7 +165,7 @@ export function ImageViewerProvider({ images, children }: ImageViewerProviderPro
     }
   }
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isOpen) {
       return
     }
@@ -199,7 +191,7 @@ export function ImageViewerProvider({ images, children }: ImageViewerProviderPro
     }
   }, [closeImageViewer, handleNext, handlePrev, isOpen])
 
-  const contextValue = useMemo<ImageViewerContextValue>(
+  const contextValue = React.useMemo<ImageViewerContextValue>(
     () => ({
       openImageViewerByMessageId,
       openImageViewerByUrl,

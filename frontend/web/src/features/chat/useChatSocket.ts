@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react'
+import React from 'react'
 
 import type { RawMessage } from './chat.api'
 import {
@@ -81,7 +81,7 @@ export function useChatSocket(options: UseChatSocketOptions) {
   const onConversationErrorRef = React.useRef<UseChatSocketOptions['onConversationError']>(options.onConversationError)
 
   // Keep refs in sync with latest callback props (runs synchronously each render)
-  useEffect(() => {
+  React.useEffect(() => {
     onConnectedRef.current = options.onConnected
     onDisconnectedRef.current = options.onDisconnected
     onMessageReceivedRef.current = options.onMessageReceived
@@ -140,7 +140,7 @@ export function useChatSocket(options: UseChatSocketOptions) {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // REGISTER EVENT HANDLERS ON GLOBAL SERVICE (idempotent)
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  useEffect(() => {
+  React.useEffect(() => {
     const service = getOrCreateChatService()
     
     // Register handlers on service (NOT socket directly to avoid listener lifecycle issues)
@@ -171,7 +171,7 @@ export function useChatSocket(options: UseChatSocketOptions) {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // CONNECT WHEN TOKEN PROVIDED
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  useEffect(() => {
+  React.useEffect(() => {
     if (!token) {
       console.log('[useChatSocket.effect] Skipping: no token provided')
       hasConnectedRef.current = false
@@ -221,7 +221,7 @@ export function useChatSocket(options: UseChatSocketOptions) {
     }
   }, [token])
 
-  useEffect(() => {
+  React.useEffect(() => {
     const handleAuthLogout = () => {
       hasConnectedRef.current = false
       getOrCreateChatService().disconnect()
@@ -246,7 +246,7 @@ export function useChatSocket(options: UseChatSocketOptions) {
     }
   }, [])
 
-  const connect = useCallback(() => {
+  const connect = React.useCallback(() => {
     if (!token) {
       return false
     }
@@ -255,39 +255,39 @@ export function useChatSocket(options: UseChatSocketOptions) {
     return true
   }, [token])
 
-  const disconnect = useCallback(() => {
+  const disconnect = React.useCallback(() => {
     getOrCreateChatService().disconnect()
   }, [])
 
-  const emitSendMessage = useCallback(async (payload: SocketMessagePayload): Promise<SendMessageAck | null> => {
+  const emitSendMessage = React.useCallback(async (payload: SocketMessagePayload): Promise<SendMessageAck | null> => {
     return getOrCreateChatService().emitSendMessage(payload) ?? null
   }, [])
 
-  const emitRecallMessage = useCallback(async (payload: { messageId: string; conversationId: string }) => {
+  const emitRecallMessage = React.useCallback(async (payload: { messageId: string; conversationId: string }) => {
     return getOrCreateChatService().emitRecallMessage(payload) ?? null
   }, [])
 
-  const joinConversation = useCallback(async (conversationId: string): Promise<boolean> => {
+  const joinConversation = React.useCallback(async (conversationId: string): Promise<boolean> => {
     return getOrCreateChatService().joinConversation(conversationId) ?? false
   }, [])
 
-  const joinMultipleConversations = useCallback(async (conversationIds: string[]): Promise<void> => {
+  const joinMultipleConversations = React.useCallback(async (conversationIds: string[]): Promise<void> => {
     return getOrCreateChatService().joinMultipleConversations(conversationIds)
   }, [])
 
-  const markAsRead = useCallback((payload: MessageReadPayload): boolean => {
+  const markAsRead = React.useCallback((payload: MessageReadPayload): boolean => {
     return getOrCreateChatService().markAsRead(payload) ?? false
   }, [])
 
-  const isConnected = useCallback((): boolean => {
+  const isConnected = React.useCallback((): boolean => {
     return getOrCreateChatService().isConnected() ?? false
   }, [])
 
-  const getSocket = useCallback(() => {
+  const getSocket = React.useCallback(() => {
     return getOrCreateChatService().getSocket()
   }, [])
 
-  const getRootSocket = useCallback(() => {
+  const getRootSocket = React.useCallback(() => {
     if (!token) return null
     return getOrCreateChatService().getRootSocket(token)
   }, [token])

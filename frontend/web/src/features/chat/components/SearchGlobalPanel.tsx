@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, useEffect } from 'react'
+import React from 'react'
 import { ChevronRight, MessageCircle, Phone, Search, User, X } from 'lucide-react'
 import type { GlobalSearchResults, GlobalSearchResult } from '../chat.api'
 import {
@@ -30,19 +30,19 @@ export function SearchGlobalPanel({
   onSelectUser,
   onClose,
 }: SearchGlobalPanelProps) {
-  const [query, setQuery] = useState('')
-  const [isSearching, setIsSearching] = useState(false)
-  const [results, setResults] = useState<GlobalSearchResults | null>(null)
-  const [selectedIndex, setSelectedIndex] = useState(-1)
+  const [query, setQuery] = React.useState('')
+  const [isSearching, setIsSearching] = React.useState(false)
+  const [results, setResults] = React.useState<GlobalSearchResults | null>(null)
+  const [selectedIndex, setSelectedIndex] = React.useState(-1)
 
   // Determine if query looks like a phone number
-  const isPhoneQuery = useMemo(() => {
+  const isPhoneQuery = React.useMemo(() => {
     const normalized = query.replace(/\D/g, '')
     return normalized.length >= 2
   }, [query])
 
   // Perform search with hybrid approach (local + backend)
-  const performSearch = useCallback(
+  const performSearch = React.useCallback(
     async (searchQuery: string) => {
       if (!searchQuery || searchQuery.length < 2) {
         setResults(null)
@@ -219,7 +219,7 @@ export function SearchGlobalPanel({
   )
 
   // Debounced search
-  useEffect(() => {
+  React.useEffect(() => {
     const timer = setTimeout(() => {
       performSearch(query)
     }, 300)
@@ -227,7 +227,7 @@ export function SearchGlobalPanel({
     return () => clearTimeout(timer)
   }, [query, performSearch])
 
-  const handleSelectResult = useCallback(
+  const handleSelectResult = React.useCallback(
     (result: GlobalSearchResult) => {
       switch (result.type) {
         case 'message':
@@ -246,7 +246,7 @@ export function SearchGlobalPanel({
   )
 
   // Handle keyboard navigation
-  const handleKeyDown = useCallback(
+  const handleKeyDown = React.useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (!results) return
 
@@ -279,7 +279,7 @@ export function SearchGlobalPanel({
   )
 
   // Group results by type
-  const groupedResults = useMemo(() => {
+  const groupedResults = React.useMemo(() => {
     if (!results) return null
 
     return {

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React from 'react'
 import { Icon } from '../shared/components/Icon'
 import { useLanguage } from '../shared/i18n/LanguageContext'
 
@@ -24,7 +24,7 @@ const mockDocs: MockDocument[] = [
 
 export function DocumentsPage() {
   const { t } = useLanguage()
-  const [activeTab, setActiveTab] = useState<DocCategory>('all')
+  const [activeTab, setActiveTab] = React.useState<DocCategory>('all')
 
   const filteredDocs = activeTab === 'all' ? mockDocs : mockDocs.filter(d => d.type === activeTab)
 

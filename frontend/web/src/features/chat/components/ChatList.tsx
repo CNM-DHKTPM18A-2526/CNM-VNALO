@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useState } from 'react'
+import React, { memo } from 'react'
 
 import { SearchInput } from '../../../shared/components/SearchInput'
 import { Icon } from '../../../shared/components/Icon'
@@ -47,15 +47,15 @@ export const ChatList = memo(function ChatList({
   const { accessToken } = useAuth()
   const navigate = useNavigate()
   const { t } = useLanguage()
-  const [keyword, setKeyword] = useState('')
-  const [debouncedKeyword, setDebouncedKeyword] = useState('')
-  const [isAddFriendOpen, setIsAddFriendOpen] = useState(false)
-  const [selectedProfileUserId, setSelectedProfileUserId] = useState<string | null>(null)
-  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false)
-  const [groupName, setGroupName] = useState('')
-  const [groupMembers, setGroupMembers] = useState('')
+  const [keyword, setKeyword] = React.useState('')
+  const [debouncedKeyword, setDebouncedKeyword] = React.useState('')
+  const [isAddFriendOpen, setIsAddFriendOpen] = React.useState(false)
+  const [selectedProfileUserId, setSelectedProfileUserId] = React.useState<string | null>(null)
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = React.useState(false)
+  const [groupName, setGroupName] = React.useState('')
+  const [groupMembers, setGroupMembers] = React.useState('')
 
-  useEffect(() => {
+  React.useEffect(() => {
     const timer = window.setTimeout(() => {
       setDebouncedKeyword(keyword.trim())
     }, 300)
@@ -65,7 +65,7 @@ export const ChatList = memo(function ChatList({
     }
   }, [keyword])
 
-  useEffect(() => {
+  React.useEffect(() => {
     onSearchFriends(debouncedKeyword)
   }, [debouncedKeyword, onSearchFriends])
 
@@ -73,7 +73,7 @@ export const ChatList = memo(function ChatList({
   const normalizedPhone = normalizedKeyword.replace(/\D/g, '')
   const isPhoneQuery = normalizedPhone.length >= 2 && normalizedPhone.length >= Math.max(2, normalizedKeyword.length - 2)
 
-  const localConversationMatches = useMemo(() => {
+  const localConversationMatches = React.useMemo(() => {
     if (!normalizedKeyword) {
       return conversations
     }
@@ -117,7 +117,7 @@ export const ChatList = memo(function ChatList({
     return results
   }, [conversations, normalizedKeyword, t])
 
-  const localUserLookupItems = useMemo<SearchUserEntry[]>(() => {
+  const localUserLookupItems = React.useMemo<SearchUserEntry[]>(() => {
     if (!normalizedKeyword) {
       return []
     }
@@ -150,7 +150,7 @@ export const ChatList = memo(function ChatList({
     })
   }, [isPhoneQuery, normalizedKeyword, normalizedPhone, t])
 
-  const backendUserLookupItems = useMemo<SearchUserEntry[]>(() => {
+  const backendUserLookupItems = React.useMemo<SearchUserEntry[]>(() => {
     const seenIds = new Set<string>()
     const results: SearchUserEntry[] = []
 
@@ -178,7 +178,7 @@ export const ChatList = memo(function ChatList({
     return results
   }, [friendResults, t])
 
-  const friendLookupItems = useMemo(() => {
+  const friendLookupItems = React.useMemo(() => {
     const seenIds = new Set<string>()
     const merged: SearchUserEntry[] = []
 
@@ -206,7 +206,7 @@ export const ChatList = memo(function ChatList({
     setIsAddFriendOpen(true)
   }
 
-  const addFriendInitialTarget = useMemo(
+  const addFriendInitialTarget = React.useMemo(
     () => {
       const seedQuery = keyword.trim()
       return seedQuery ? { seedQuery } : null

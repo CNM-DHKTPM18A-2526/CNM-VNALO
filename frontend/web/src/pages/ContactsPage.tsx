@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../features/auth/useAuth'
@@ -121,50 +121,50 @@ export function ContactsPage() {
   const { t } = useLanguage()
   const navigate = useNavigate()
 
-  const [section, setSection] = useState<ContactsSection>(() => {
+  const [section, setSection] = React.useState<ContactsSection>(() => {
     if (typeof window === 'undefined') {
       return 'friends'
     }
     return (window.localStorage.getItem(SECTION_STORAGE_KEY) as ContactsSection | null) ?? 'friends'
   })
-  const [keyword, setKeyword] = useState('')
-  const [sidebarKeyword, setSidebarKeyword] = useState('')
-  const [sortMode, setSortMode] = useState<SortMode>('az')
-  const [friendFilter, setFriendFilter] = useState<FriendFilter>('all')
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [activeFriendMenuId, setActiveFriendMenuId] = useState<string | null>(null)
-  const [isOpeningConversationId, setIsOpeningConversationId] = useState<string | null>(null)
-  const [searchUserResults, setSearchUserResults] = useState<UserLookupResult[]>([])
-  const [isSearchingUsers, setIsSearchingUsers] = useState(false)
+  const [keyword, setKeyword] = React.useState('')
+  const [sidebarKeyword, setSidebarKeyword] = React.useState('')
+  const [sortMode, setSortMode] = React.useState<SortMode>('az')
+  const [friendFilter, setFriendFilter] = React.useState<FriendFilter>('all')
+  const [isSidebarOpen, setIsSidebarOpen] = React.useState(false)
+  const [activeFriendMenuId, setActiveFriendMenuId] = React.useState<string | null>(null)
+  const [isOpeningConversationId, setIsOpeningConversationId] = React.useState<string | null>(null)
+  const [searchUserResults, setSearchUserResults] = React.useState<UserLookupResult[]>([])
+  const [isSearchingUsers, setIsSearchingUsers] = React.useState(false)
 
-  const [friends, setFriends] = useState<Friend[]>([])
-  const [incomingRequests, setIncomingRequests] = useState<FriendRequest[]>([])
-  const [sentRequests, setSentRequests] = useState<FriendRequest[]>([])
-  const [stats, setStats] = useState<FriendStats | null>(null)
-  const [allConversations, setAllConversations] = useState<ConversationSummary[]>([])
-  const [groups, setGroups] = useState<ConversationSummary[]>([])
-  const [isLoadingGroups, setIsLoadingGroups] = useState(true)
+  const [friends, setFriends] = React.useState<Friend[]>([])
+  const [incomingRequests, setIncomingRequests] = React.useState<FriendRequest[]>([])
+  const [sentRequests, setSentRequests] = React.useState<FriendRequest[]>([])
+  const [stats, setStats] = React.useState<FriendStats | null>(null)
+  const [allConversations, setAllConversations] = React.useState<ConversationSummary[]>([])
+  const [groups, setGroups] = React.useState<ConversationSummary[]>([])
+  const [isLoadingGroups, setIsLoadingGroups] = React.useState(true)
 
-  const [isLoadingFriends, setIsLoadingFriends] = useState(true)
-  const [isLoadingIncoming, setIsLoadingIncoming] = useState(true)
-  const [isLoadingSent, setIsLoadingSent] = useState(true)
+  const [isLoadingFriends, setIsLoadingFriends] = React.useState(true)
+  const [isLoadingIncoming, setIsLoadingIncoming] = React.useState(true)
+  const [isLoadingSent, setIsLoadingSent] = React.useState(true)
 
-  const [feedback, setFeedback] = useState<FeedbackState | null>(null)
-  const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
-  const [isConfirmSubmitting, setIsConfirmSubmitting] = useState(false)
-  const [activeAction, setActiveAction] = useState<{ id: string | null; type: string | null }>({
+  const [feedback, setFeedback] = React.useState<FeedbackState | null>(null)
+  const [confirmAction, setConfirmAction] = React.useState<ConfirmAction>(null)
+  const [isConfirmSubmitting, setIsConfirmSubmitting] = React.useState(false)
+  const [activeAction, setActiveAction] = React.useState<{ id: string | null; type: string | null }>({
     id: null,
     type: null,
   })
 
-  const [showAddFriendModal, setShowAddFriendModal] = useState(false)
-  const [addFriendTarget, setAddFriendTarget] = useState<AddFriendTarget | null>(null)
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
-  const [isProfileLoading, setIsProfileLoading] = useState(false)
-  const [isCreatingConversationFromProfile, setIsCreatingConversationFromProfile] = useState(false)
-  const [profilePreview, setProfilePreview] = useState<UserLookupResult | null>(null)
-  const [profileTargetUserId, setProfileTargetUserId] = useState<string | null>(null)
-  const [profileError, setProfileError] = useState<string | null>(null)
+  const [showAddFriendModal, setShowAddFriendModal] = React.useState(false)
+  const [addFriendTarget, setAddFriendTarget] = React.useState<AddFriendTarget | null>(null)
+  const [isProfileModalOpen, setIsProfileModalOpen] = React.useState(false)
+  const [isProfileLoading, setIsProfileLoading] = React.useState(false)
+  const [isCreatingConversationFromProfile, setIsCreatingConversationFromProfile] = React.useState(false)
+  const [profilePreview, setProfilePreview] = React.useState<UserLookupResult | null>(null)
+  const [profileTargetUserId, setProfileTargetUserId] = React.useState<string | null>(null)
+  const [profileError, setProfileError] = React.useState<string | null>(null)
 
   const menuRef = React.useRef<HTMLDivElement | null>(null)
   const normalizedKeyword = keyword.trim().toLowerCase()
@@ -172,17 +172,17 @@ export function ContactsPage() {
   const isPhoneQuery = normalizedPhoneKeyword.length >= 2 && normalizedPhoneKeyword.length >= Math.max(2, keyword.trim().length - 2)
   const unknownUserLabel = t('contacts.common.unknownUser')
 
-  useEffect(() => {
+  React.useEffect(() => {
     initializeSearchIndex()
   }, [])
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(SECTION_STORAGE_KEY, section)
     }
   }, [section])
 
-  useEffect(() => {
+  React.useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
       if (!menuRef.current?.contains(event.target as Node)) {
         setActiveFriendMenuId(null)
@@ -244,7 +244,7 @@ export function ContactsPage() {
     }
   }
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!accessToken) {
       setFriends([])
       setIncomingRequests([])
@@ -285,7 +285,7 @@ export function ContactsPage() {
     })
   }, [accessToken, t])
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (friends.length === 0) {
       return
     }
@@ -293,7 +293,7 @@ export function ContactsPage() {
     updateSearchIndexUsers(friends.map((friend) => toCachedUserFromFriend(friend, unknownUserLabel)))
   }, [friends, unknownUserLabel])
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!accessToken) {
       return
     }
@@ -336,7 +336,7 @@ export function ContactsPage() {
     }
   }, [accessToken])
 
-  useEffect(() => {
+  React.useEffect(() => {
     const query = sidebarKeyword.trim()
 
     if (!query) {
@@ -411,7 +411,7 @@ export function ContactsPage() {
     }
   }, [accessToken, sidebarKeyword])
 
-  const filteredFriends = useMemo(() => {
+  const filteredFriends = React.useMemo(() => {
     return friends.filter((friend) => {
       const displayName = getFriendLabel(friend, unknownUserLabel)
       const searchable = `${displayName} ${friend.friendId} ${friend.statusMessage ?? ''}`.toLowerCase()
@@ -421,9 +421,9 @@ export function ContactsPage() {
     })
   }, [friendFilter, friends, normalizedKeyword, unknownUserLabel])
 
-  const sortedFriends = useMemo(() => sortByName(filteredFriends, unknownUserLabel, sortMode), [filteredFriends, sortMode, unknownUserLabel])
+  const sortedFriends = React.useMemo(() => sortByName(filteredFriends, unknownUserLabel, sortMode), [filteredFriends, sortMode, unknownUserLabel])
 
-  const groupedFriends = useMemo(() => {
+  const groupedFriends = React.useMemo(() => {
     const groups = new Map<string, Friend[]>()
 
     for (const friend of sortedFriends) {
@@ -447,7 +447,7 @@ export function ContactsPage() {
 
   const incomingCount = stats?.pendingRequestCount ?? incomingRequests.length
 
-  const filteredIncomingRequests = useMemo(
+  const filteredIncomingRequests = React.useMemo(
     () =>
       incomingRequests.filter((item) => {
         const searchable = `${item.fromUserDisplayName ?? ''} ${item.fromUserId} ${item.message ?? ''}`.toLowerCase()
@@ -456,7 +456,7 @@ export function ContactsPage() {
     [incomingRequests, normalizedKeyword],
   )
 
-  const filteredSentRequests = useMemo(
+  const filteredSentRequests = React.useMemo(
     () =>
       sentRequests.filter((item) => {
         const searchable = `${item.toUserDisplayName ?? ''} ${item.toUserId} ${item.message ?? ''}`.toLowerCase()
@@ -465,7 +465,7 @@ export function ContactsPage() {
     [normalizedKeyword, sentRequests],
   )
 
-  const filteredGroups = useMemo(
+  const filteredGroups = React.useMemo(
     () =>
       groups.filter(
         (item) =>
@@ -475,7 +475,7 @@ export function ContactsPage() {
     [groups, normalizedKeyword],
   )
 
-  const sidebarFilteredFriends = useMemo(() => {
+  const sidebarFilteredFriends = React.useMemo(() => {
     const query = sidebarKeyword.trim().toLowerCase()
     if (!query) return []
     return friends.filter((friend) => {
@@ -485,7 +485,7 @@ export function ContactsPage() {
     })
   }, [friends, sidebarKeyword, unknownUserLabel])
 
-  const sidebarFilteredGroups = useMemo(() => {
+  const sidebarFilteredGroups = React.useMemo(() => {
     const query = sidebarKeyword.trim().toLowerCase()
     if (!query) return []
     return groups.filter((group) => {
@@ -493,7 +493,7 @@ export function ContactsPage() {
     })
   }, [groups, sidebarKeyword])
 
-  const sidebarFilteredConversations = useMemo(() => {
+  const sidebarFilteredConversations = React.useMemo(() => {
     const query = sidebarKeyword.trim().toLowerCase()
     if (!query) return []
 

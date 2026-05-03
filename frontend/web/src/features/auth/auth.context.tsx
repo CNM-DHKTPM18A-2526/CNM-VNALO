@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import React from 'react'
 
 import { getMe, login as loginApi } from './auth.api'
 import { AuthContext } from './auth.context-value'
@@ -15,11 +15,11 @@ type AuthProviderProps = {
 export function AuthProvider({ children }: AuthProviderProps) {
   const initialToken = localStorage.getItem(ACCESS_TOKEN_KEY)
 
-  const [user, setUser] = useState<AuthUser | null>(null)
-  const [accessToken, setAccessToken] = useState<string | null>(initialToken)
-  const [isBootstrapping, setIsBootstrapping] = useState(Boolean(initialToken))
+  const [user, setUser] = React.useState<AuthUser | null>(null)
+  const [accessToken, setAccessToken] = React.useState<string | null>(initialToken)
+  const [isBootstrapping, setIsBootstrapping] = React.useState(Boolean(initialToken))
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!accessToken) {
       return
     }
@@ -38,7 +38,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       })
   }, [accessToken])
 
-  useEffect(() => {
+  React.useEffect(() => {
     const handleRevoked = () => {
       console.log('[AuthContext] Auth revoked (401/403), logging out...');
       logout();
@@ -50,7 +50,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
   }, []);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const handleStorage = (event: StorageEvent) => {
       if (event.key !== ACCESS_TOKEN_KEY) {
         return
@@ -111,7 +111,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     window.dispatchEvent(new CustomEvent(AUTH_LOGOUT_EVENT))
   }
 
-  const value = useMemo<AuthContextValue>(
+  const value = React.useMemo<AuthContextValue>(
     () => ({
       user,
       accessToken,

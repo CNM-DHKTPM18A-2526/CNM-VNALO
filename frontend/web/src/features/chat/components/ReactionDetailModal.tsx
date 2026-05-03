@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import React from 'react'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { UserAvatar } from '../../../shared/components/UserAvatar'
 import { REACTION_OPTIONS } from '../chat.constants'
@@ -15,10 +15,10 @@ type ReactionDetailModalProps = {
 export function ReactionDetailModal({ isOpen, onClose, reactions }: ReactionDetailModalProps) {
   const { accessToken, user: currentUser } = useAuth()
   const { userMap, ensureUser } = useUserStore()
-  const [activeTab, setActiveTab] = useState<'all' | ReactionKey>('all')
+  const [activeTab, setActiveTab] = React.useState<'all' | ReactionKey>('all')
 
   // Fetch missing users on mount/open
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isOpen || !accessToken) return
 
     const allUserIds = Object.values(reactions).flatMap(r => r.userIds)
@@ -31,15 +31,15 @@ export function ReactionDetailModal({ isOpen, onClose, reactions }: ReactionDeta
     })
   }, [isOpen, reactions, accessToken, userMap, ensureUser])
 
-  const activeReactions = useMemo(() => {
+  const activeReactions = React.useMemo(() => {
     return REACTION_OPTIONS.filter((opt) => (reactions[opt.key]?.count ?? 0) > 0)
   }, [reactions])
 
-  const totalCount = useMemo(() => {
+  const totalCount = React.useMemo(() => {
     return Object.values(reactions).reduce((sum, r) => sum + (r.count || 0), 0)
   }, [reactions])
 
-  const displayedUserIds = useMemo(() => {
+  const displayedUserIds = React.useMemo(() => {
     if (activeTab === 'all') {
       const all: string[] = []
       // Combine all userIds, but keep track of which emoji they used

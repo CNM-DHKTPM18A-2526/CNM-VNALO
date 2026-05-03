@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React from 'react'
 import { resolveMediaUrl } from '../../../utils/mediaUtils'
 import { PremiumVideoTile, PremiumCallControls } from './PremiumCallUI'
 
@@ -40,9 +40,9 @@ export const CallModal: React.FC<CallModalProps> = ({
   onMinimize,
   error,
 }) => {
-  const [seconds, setSeconds] = useState(0)
+  const [seconds, setSeconds] = React.useState(0)
 
-  useEffect(() => {
+  React.useEffect(() => {
     let interval: any
     if (status === 'connected') {
       interval = setInterval(() => {

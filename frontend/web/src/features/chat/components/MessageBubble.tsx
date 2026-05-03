@@ -1,5 +1,5 @@
 import { MoreHorizontal, Pin, Reply, Share2, Star } from 'lucide-react'
-import React, { useEffect, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import React, { type MouseEvent as ReactMouseEvent } from 'react'
 
 import type { ChatMessage, MessageReactionMap, ReactionKey } from '../chat.types'
 import { REACTION_OPTIONS } from '../chat.constants'
@@ -146,9 +146,9 @@ export function MessageBubble({
     !isVideoAttachment(attachment.mimeType, attachment.url, attachment.name)
   )
 
-  const stackRef = useRef<HTMLDivElement | null>(null)
-  const contextMenuTriggerRef = useRef<HTMLButtonElement | null>(null)
-  const contextMenuRef = useRef<HTMLDivElement | null>(null)
+  const stackRef = React.useRef<HTMLDivElement | null>(null)
+  const contextMenuTriggerRef = React.useRef<HTMLButtonElement | null>(null)
+  const contextMenuRef = React.useRef<HTMLDivElement | null>(null)
 
   const isMyMessage = message.sender === 'me'
 
@@ -166,13 +166,13 @@ export function MessageBubble({
     }
   }
 
-  const hideTimerRef = useRef<number | null>(null)
-  const [supportsHover, setSupportsHover] = useState(true)
-  const [isMessageHovered, setIsMessageHovered] = useState(false)
-  const [isMessageTapped, setIsMessageTapped] = useState(false)
-  const [isReactionBarOpen, setIsReactionBarOpen] = useState(false)
-  const [isContextMenuOpen, setIsContextMenuOpen] = useState(false)
-  const [contextMenuPosition, setContextMenuPosition] = useState({ top: 0, left: 0 })
+  const hideTimerRef = React.useRef<number | null>(null)
+  const [supportsHover, setSupportsHover] = React.useState(true)
+  const [isMessageHovered, setIsMessageHovered] = React.useState(false)
+  const [isMessageTapped, setIsMessageTapped] = React.useState(false)
+  const [isReactionBarOpen, setIsReactionBarOpen] = React.useState(false)
+  const [isContextMenuOpen, setIsContextMenuOpen] = React.useState(false)
+  const [contextMenuPosition, setContextMenuPosition] = React.useState({ top: 0, left: 0 })
   const isHoverToolbarActive = hoveredMessageId === message.id
 
   const statusLabel = (() => {
@@ -359,7 +359,7 @@ export function MessageBubble({
     onContextMenuAction?.('share', message)
   }
 
-  useEffect(() => {
+  React.useEffect(() => {
     const mediaQuery = window.matchMedia('(hover: hover) and (pointer: fine)')
 
     const applyMode = () => {
@@ -377,14 +377,14 @@ export function MessageBubble({
     }
   }, [])
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isHoverToolbarActive) {
       setIsReactionBarOpen(false)
       setIsMessageTapped(false)
     }
   }, [isHoverToolbarActive])
 
-  useEffect(() => {
+  React.useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
       const stack = stackRef.current
       if (!stack) {
@@ -405,7 +405,7 @@ export function MessageBubble({
     }
   }, [isReactionBarOpen, isContextMenuOpen])
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isContextMenuOpen) {
       return
     }
@@ -442,7 +442,7 @@ export function MessageBubble({
     }
   }, [isContextMenuOpen])
 
-  useEffect(() => {
+  React.useEffect(() => {
     return () => {
       clearHideTimer()
     }

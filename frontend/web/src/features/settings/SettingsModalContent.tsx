@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from 'react'
+import React, { type ReactNode } from 'react'
 
 import { changePassword } from '../auth/auth.api'
 import { useAuth } from '../auth/useAuth'
@@ -73,17 +73,17 @@ export function SettingsModalContent({
   const { theme, toggleTheme } = useTheme()
   const { language, setLanguage, t } = useLanguage()
   const { notificationsEnabled, toggleNotifications } = useNotifications()
-  const [activeTab, setActiveTab] = useState<ActiveTab>('general')
-  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false)
-  const [currentPassword, setCurrentPassword] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
-  const [showNewPassword, setShowNewPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = React.useState<ActiveTab>('general')
+  const [showChangePasswordModal, setShowChangePasswordModal] = React.useState(false)
+  const [currentPassword, setCurrentPassword] = React.useState('')
+  const [newPassword, setNewPassword] = React.useState('')
+  const [confirmPassword, setConfirmPassword] = React.useState('')
+  const [showCurrentPassword, setShowCurrentPassword] = React.useState(false)
+  const [showNewPassword, setShowNewPassword] = React.useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = React.useState(false)
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = React.useState<string | null>(null)
 
   const closeChangePasswordModal = () => {
     if (isSubmitting) {

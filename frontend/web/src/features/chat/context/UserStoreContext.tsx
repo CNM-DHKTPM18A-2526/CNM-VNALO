@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useState } from 'react'
+import React, { createContext } from 'react'
 import { getUserById } from '../../friends/friends.api'
 
 type CachedUserProfile = {
@@ -16,10 +16,10 @@ type UserStoreContextType = {
 const UserStoreContext = createContext<UserStoreContextType | undefined>(undefined)
 
 export const UserStoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [userMap, setUserMap] = useState<Record<string, CachedUserProfile>>({})
+  const [userMap, setUserMap] = React.useState<Record<string, CachedUserProfile>>({})
   const pendingRequests = React.useRef(new Map<string, Promise<CachedUserProfile>>())
 
-  const upsertUser = useCallback((userId: string, profile: CachedUserProfile) => {
+  const upsertUser = React.useCallback((userId: string, profile: CachedUserProfile) => {
     setUserMap((prev) => {
       // Avoid unnecessary updates if data is identical
       if (prev[userId]?.displayName === profile.displayName && prev[userId]?.avatarUrl === profile.avatarUrl) {
@@ -30,11 +30,11 @@ export const UserStoreProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     })
   }, [])
 
-  const getDisplayName = useCallback((userId: string) => {
+  const getDisplayName = React.useCallback((userId: string) => {
     return userMap[userId]?.displayName || 'Người dùng'
   }, [userMap])
 
-  const ensureUser = useCallback(async (token: string, userId: string): Promise<CachedUserProfile> => {
+  const ensureUser = React.useCallback(async (token: string, userId: string): Promise<CachedUserProfile> => {
     if (userMap[userId] && userMap[userId].displayName !== 'Người dùng') return userMap[userId]
 
     const pending = pendingRequests.current.get(userId)
@@ -68,7 +68,7 @@ export const UserStoreProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 }
 
 export const useUserStore = () => {
-  const context = useContext(UserStoreContext)
+  const context = React.useContext(UserStoreContext)
   if (!context) throw new Error('useUserStore must be used within a UserStoreProvider')
   return context
 }

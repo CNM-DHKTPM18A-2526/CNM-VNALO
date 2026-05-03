@@ -1,5 +1,5 @@
 import { CheckSquare2, ChevronRight, Copy, Info, Pin, RotateCcw, Star, Trash2 } from 'lucide-react'
-import { forwardRef, useMemo } from 'react'
+import React, { forwardRef } from 'react'
 
 import type { CSSProperties } from 'react'
 
@@ -81,7 +81,7 @@ export const MessageContextMenu = forwardRef<HTMLDivElement, MessageContextMenuP
   { message, isMyMessage, position, onClose, onAction, isVirtualGroup, isPinned, userRole, allowMemberPin },
   ref,
 ) {
-  const menuStyle = useMemo<CSSProperties>(
+  const menuStyle = React.useMemo<CSSProperties>(
     () => ({
       top: position.top,
       left: position.left,

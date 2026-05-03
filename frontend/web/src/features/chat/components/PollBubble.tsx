@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { ChevronRight } from 'lucide-react';
 import type { PollMetadata, MessageReactionMap } from '../chat.types';
 
@@ -11,7 +11,7 @@ interface PollBubbleProps {
 }
 
 export function PollBubble({ poll, isMyMessage, currentUserId, onVote, reactions }: PollBubbleProps) {
-  const [selectedOptionIds, setSelectedOptionIds] = useState<Set<string>>(new Set());
+  const [selectedOptionIds, setSelectedOptionIds] = React.useState<Set<string>>(new Set());
 
   // Derive votes from reactions if available, otherwise fallback to pollData
   const getVotesCountForOption = (optionId: string) => {

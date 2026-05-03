@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React from 'react'
 
 import { useAuth } from '../../features/auth/useAuth'
 import { useLanguage } from '../i18n/LanguageContext'
@@ -13,11 +13,11 @@ export function SettingsMenu({
 }: SettingsMenuProps) {
   const { t } = useLanguage()
   const { logout } = useAuth()
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isMenuOpen, setIsMenuOpen] = React.useState(false)
   const menuRef = React.useRef<HTMLDivElement>(null)
   const buttonRef = React.useRef<HTMLButtonElement>(null)
 
-  const handleClickOutside = useCallback((event: MouseEvent) => {
+  const handleClickOutside = React.useCallback((event: MouseEvent) => {
     if (
       menuRef.current &&
       !menuRef.current.contains(event.target as Node) &&
@@ -28,7 +28,7 @@ export function SettingsMenu({
     }
   }, [])
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isMenuOpen) {
       return
     }
@@ -39,7 +39,7 @@ export function SettingsMenu({
     }
   }, [isMenuOpen, handleClickOutside])
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isMenuOpen) {
       return
     }

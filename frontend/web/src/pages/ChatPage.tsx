@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { getSyncPolicy } from '../features/auth/auth.api'
@@ -464,55 +464,55 @@ export default function ChatPage() {
   const navigate = useNavigate()
   const { conversationId: conversationIdFromUrl } = useParams<{ conversationId?: string }>()
   const routedConversationId = conversationIdFromUrl ?? ''
-  const [conversations, setConversations] = useState<ConversationSummary[]>([])
-  const [messagesByConversation, setMessagesByConversation] = useState<Record<string, ChatMessage[]>>({})
+  const [conversations, setConversations] = React.useState<ConversationSummary[]>([])
+  const [messagesByConversation, setMessagesByConversation] = React.useState<Record<string, ChatMessage[]>>({})
   const messagesByConversationRef = React.useRef<Record<string, ChatMessage[]>>(messagesByConversation)
-  const [selectedConversationId, setSelectedConversationId] = useState('')
-  const [isLoadingConversations, setIsLoadingConversations] = useState(false)
-  const [isLoadingMessages, setIsLoadingMessages] = useState(false)
-  const [isRestrictedMode, setIsRestrictedMode] = useState(false)
-  const [peerLastReadByConversation, setPeerLastReadByConversation] = useState<Record<string, number>>({})
-  const [reactionStatesByMessage, setReactionStatesByMessage] = useState<Record<string, MessageReactionState>>({})
-  const [friendResults, setFriendResults] = useState<UserLookupResult[]>([])
-  const [friendsDirectory, setFriendsDirectory] = useState<Friend[]>([])
-  const [isSocketConnected, setIsSocketConnected] = useState(false)
-  const [isSocketInitialized, setIsSocketInitialized] = useState(false)
-  const [rightSidebarContent, setRightSidebarContent] = useState<'info' | 'search' | 'global-search' | null>(() => {
+  const [selectedConversationId, setSelectedConversationId] = React.useState('')
+  const [isLoadingConversations, setIsLoadingConversations] = React.useState(false)
+  const [isLoadingMessages, setIsLoadingMessages] = React.useState(false)
+  const [isRestrictedMode, setIsRestrictedMode] = React.useState(false)
+  const [peerLastReadByConversation, setPeerLastReadByConversation] = React.useState<Record<string, number>>({})
+  const [reactionStatesByMessage, setReactionStatesByMessage] = React.useState<Record<string, MessageReactionState>>({})
+  const [friendResults, setFriendResults] = React.useState<UserLookupResult[]>([])
+  const [friendsDirectory, setFriendsDirectory] = React.useState<Friend[]>([])
+  const [isSocketConnected, setIsSocketConnected] = React.useState(false)
+  const [isSocketInitialized, setIsSocketInitialized] = React.useState(false)
+  const [rightSidebarContent, setRightSidebarContent] = React.useState<'info' | 'search' | 'global-search' | null>(() => {
     const saved = localStorage.getItem('vnalo_chat_sidebar_content')
     if (!saved || saved === 'null' || saved === 'none') return null
     if (['info', 'search', 'global-search'].includes(saved)) return saved as any
     return null
   })
 
-  useEffect(() => {
+  React.useEffect(() => {
     messagesByConversationRef.current = messagesByConversation
   }, [messagesByConversation])
 
-  useEffect(() => {
+  React.useEffect(() => {
     localStorage.setItem('vnalo_chat_sidebar_content', rightSidebarContent || 'none')
   }, [rightSidebarContent])
 
-  const [jumpToMessageId, setJumpToMessageId] = useState<string | null>(null)
-  const [pinnedMessageIds, setPinnedMessageIds] = useState<Record<string, string[]>>({})
-  const [pinnedMessages, setPinnedMessages] = useState<Record<string, ChatMessage[]>>({})
-  const [starredMessageIds, setStarredMessageIds] = useState<Record<string, true>>({})
-  const [recalledMessageIds, setRecalledMessageIds] = useState<Record<string, true>>({})
-  const [deletedMessageIds, setDeletedMessageIds] = useState<Record<string, true>>({})
-  const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([])
-  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false)
+  const [jumpToMessageId, setJumpToMessageId] = React.useState<string | null>(null)
+  const [pinnedMessageIds, setPinnedMessageIds] = React.useState<Record<string, string[]>>({})
+  const [pinnedMessages, setPinnedMessages] = React.useState<Record<string, ChatMessage[]>>({})
+  const [starredMessageIds, setStarredMessageIds] = React.useState<Record<string, true>>({})
+  const [recalledMessageIds, setRecalledMessageIds] = React.useState<Record<string, true>>({})
+  const [deletedMessageIds, setDeletedMessageIds] = React.useState<Record<string, true>>({})
+  const [selectedMessageIds, setSelectedMessageIds] = React.useState<string[]>([])
+  const [isMultiSelectMode, setIsMultiSelectMode] = React.useState(false)
 
-  const [shareModalMessage, setShareModalMessage] = useState<ChatMessage | null>(null)
-  const [isShareSubmitting, setIsShareSubmitting] = useState(false)
-  const [deletedTimestamps, setDeletedTimestamps] = useState<Record<string, number>>({})
-  const [pinnedConversationIds, setPinnedConversationIds] = useState<Record<string, boolean>>({})
-  const [confirmDeleteHistoryId, setConfirmDeleteHistoryId] = useState<string | null>(null)
-  const [confirmLeaveGroupOpen, setConfirmLeaveGroupOpen] = useState(false)
-  const [leaveGroupSilently, setLeaveGroupSilently] = useState(false)
-  const [selectedProfileUserId, setSelectedProfileUserId] = useState<string | null>(null)
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
+  const [shareModalMessage, setShareModalMessage] = React.useState<ChatMessage | null>(null)
+  const [isShareSubmitting, setIsShareSubmitting] = React.useState(false)
+  const [deletedTimestamps, setDeletedTimestamps] = React.useState<Record<string, number>>({})
+  const [pinnedConversationIds, setPinnedConversationIds] = React.useState<Record<string, boolean>>({})
+  const [confirmDeleteHistoryId, setConfirmDeleteHistoryId] = React.useState<string | null>(null)
+  const [confirmLeaveGroupOpen, setConfirmLeaveGroupOpen] = React.useState(false)
+  const [leaveGroupSilently, setLeaveGroupSilently] = React.useState(false)
+  const [selectedProfileUserId, setSelectedProfileUserId] = React.useState<string | null>(null)
+  const [isProfileModalOpen, setIsProfileModalOpen] = React.useState(false)
 
   // CALL STATE
-  const [callState, setCallState] = useState<{
+  const [callState, setCallState] = React.useState<{
     isOpen: boolean
     type: 'audio' | 'video'
     direction: 'outgoing' | 'incoming'
@@ -536,8 +536,8 @@ export default function ChatPage() {
     isCameraOn: true,
   })
 
-  const [isCallMinimized, setIsCallMinimized] = useState(false)
-  const [isGroupCallMinimized, setIsGroupCallMinimized] = useState(false)
+  const [isCallMinimized, setIsCallMinimized] = React.useState(false)
+  const [isGroupCallMinimized, setIsGroupCallMinimized] = React.useState(false)
 
   // WEBRTC SERVICE REF
   const callServiceRef = React.useRef<WebRtcCallService | null>(null)
@@ -545,7 +545,7 @@ export default function ChatPage() {
   // SYNC CALL STATE TO REF FOR LISTENERS
   const callStateRef = React.useRef(callState)
   const currentCallIdRef = React.useRef<string | null>(null) // Immediate sync ref for signal routing
-  useEffect(() => {
+  React.useEffect(() => {
     callStateRef.current = callState
     currentCallIdRef.current = callState.callId || null
   }, [callState])
@@ -593,7 +593,7 @@ export default function ChatPage() {
   // WebRTC Signal Deduplication (prevents double-triggering from specific + generic events)
   const processedSignalsRef = React.useRef<Set<string>>(new Set())
 
-  useEffect(() => {
+  React.useEffect(() => {
     userMapRef.current = userMap
   }, [userMap])
   const messageLoadRequestSeqRef = React.useRef(0)
@@ -602,7 +602,7 @@ export default function ChatPage() {
   const lastPinnedSyncTimeRef = React.useRef<Record<string, number>>({})
 
   // Load deleted timestamps & pinned conversations from localStorage on mount
-  useEffect(() => {
+  React.useEffect(() => {
     const savedDeleted = localStorage.getItem('vnalo_deleted_timestamps')
     if (savedDeleted) {
       try {
@@ -630,7 +630,7 @@ export default function ChatPage() {
     setConfirmDeleteHistoryId(null)
   }
 
-  const handleTogglePinConversation = useCallback((conversationId: string) => {
+  const handleTogglePinConversation = React.useCallback((conversationId: string) => {
     setPinnedConversationIds((prev) => {
       const isCurrentlyPinned = !!prev[conversationId]
       const next = { ...prev }
@@ -644,33 +644,33 @@ export default function ChatPage() {
     })
   }, [])
 
-  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
-  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
-  const [isAddMembersOpen, setIsAddMembersOpen] = useState(false);
-  const [isAddingMembers, setIsAddingMembers] = useState(false);
-  const [preselectedMemberIds, setPreselectedMemberIds] = useState<string[]>([]);
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = React.useState(false);
+  const [isCreatingGroup, setIsCreatingGroup] = React.useState(false);
+  const [isAddMembersOpen, setIsAddMembersOpen] = React.useState(false);
+  const [isAddingMembers, setIsAddingMembers] = React.useState(false);
+  const [preselectedMemberIds, setPreselectedMemberIds] = React.useState<string[]>([]);
 
-  const [isEditConversationNameOpen, setIsEditConversationNameOpen] = useState(false);
-  const [editConversationNameMode, setEditConversationNameMode] = useState<'group' | 'nickname'>('group');
+  const [isEditConversationNameOpen, setIsEditConversationNameOpen] = React.useState(false);
+  const [editConversationNameMode, setEditConversationNameMode] = React.useState<'group' | 'nickname'>('group');
 
-  useEffect(() => {
+  React.useEffect(() => {
     routedConversationIdRef.current = routedConversationId
   }, [routedConversationId])
 
-  useEffect(() => {
+  React.useEffect(() => {
     selectedConversationIdRef.current = routedConversationId || selectedConversationId
   }, [routedConversationId, selectedConversationId])
 
-  useEffect(() => {
+  React.useEffect(() => {
     conversationsRef.current = conversations
   }, [conversations])
 
-  const selectedConversation = useMemo(
+  const selectedConversation = React.useMemo(
     () => conversations.find((conversation) => conversation.id === (routedConversationId || selectedConversationId)),
     [conversations, routedConversationId, selectedConversationId],
   )
 
-  const selectedMessages = useMemo(() => {
+  const selectedMessages = React.useMemo(() => {
     const resolvedConversationId = routedConversationId || selectedConversationId
     if (!resolvedConversationId) {
       return []
@@ -688,20 +688,20 @@ export default function ChatPage() {
     })
   }, [messagesByConversation, routedConversationId, selectedConversationId, deletedTimestamps])
 
-  useEffect(() => {
+  React.useEffect(() => {
     selectedMessagesRef.current = selectedMessages
   }, [selectedMessages])
 
-  useEffect(() => {
+  React.useEffect(() => {
     setIsMultiSelectMode(false)
     setSelectedMessageIds([])
   }, [routedConversationId, selectedConversationId])
 
-  useEffect(() => {
+  React.useEffect(() => {
     setDeletedMessageIds(loadDeletedMessageIds(user?.id))
   }, [(user ? user.id : "")])
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!user?.id) {
       return
     }
@@ -710,19 +710,19 @@ export default function ChatPage() {
   }, [deletedMessageIds, (user ? user.id : "")])
 
   // Initialize search index on mount
-  useEffect(() => {
+  React.useEffect(() => {
     initializeSearchIndex()
   }, [])
 
   // Update search index when conversations are loaded
-  useEffect(() => {
+  React.useEffect(() => {
     if (conversations.length > 0) {
       updateSearchIndexConversations(conversations)
     }
   }, [conversations])
 
   // Update search index when messages are loaded
-  useEffect(() => {
+  React.useEffect(() => {
     const allMessages: CachedMessage[] = []
     Object.entries(messagesByConversation).forEach(([conversationId, messages]) => {
       const conversation = conversations.find((c) => c.id === conversationId)
@@ -744,7 +744,7 @@ export default function ChatPage() {
   }, [messagesByConversation, conversations])
 
   // Update search index when friends are loaded
-  useEffect(() => {
+  React.useEffect(() => {
     if (friendResults.length > 0) {
       const cachedUsers: CachedUser[] = friendResults.map((u) => ({
         id: u.id,
@@ -758,7 +758,7 @@ export default function ChatPage() {
     }
   }, [friendResults])
 
-  const updateConversationAfterMessage = useCallback(
+  const updateConversationAfterMessage = React.useCallback(
     (
       conversationId: string,
       message: ChatMessage,
@@ -871,7 +871,7 @@ export default function ChatPage() {
   const pollingIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Setup polling interval that runs on a timer
-  const syncLatestMessages = useCallback(async (targetId?: string) => {
+  const syncLatestMessages = React.useCallback(async (targetId?: string) => {
     const conversationId = targetId || selectedConversationIdRef.current
     if (!conversationId || !accessToken) return
 
@@ -967,7 +967,7 @@ export default function ChatPage() {
     }
   }, [accessToken, isRestrictedMode, updateConversationAfterMessage, (user ? user.id : "")])
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isSocketConnected || !accessToken) {
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current)
@@ -984,7 +984,7 @@ export default function ChatPage() {
       }
     }
   }, [isSocketConnected, accessToken, syncLatestMessages])
-  const toReactionState = useCallback(
+  const toReactionState = React.useCallback(
     (rows: Array<{ userId: string; emoji: string }>): MessageReactionState => {
       const reactions = {} as MessageReactionMap
 
@@ -1020,7 +1020,7 @@ export default function ChatPage() {
     [(user ? user.id : "")],
   )
 
-  const syncMessageReaction = useCallback(
+  const syncMessageReaction = React.useCallback(
     async (messageId: string): Promise<void> => {
       // Relaxed validation: ensure we have a token and an ID, but don't strictly enforce UUID 
       // if it might be a temporary or cross-platform ID format that still maps to the server.
@@ -1054,7 +1054,7 @@ export default function ChatPage() {
     [accessToken, toReactionState],
   )
 
-  const applyReactionSocketEvent = useCallback(
+  const applyReactionSocketEvent = React.useCallback(
     (messageId: string, emoji: string | undefined, actorId: string | undefined, kind: 'added' | 'removed') => {
       const normalizedEmoji = String(emoji ?? '').trim()
       const normalizedActorId = String(actorId ?? '').trim()
@@ -1127,7 +1127,7 @@ export default function ChatPage() {
     [syncMessageReaction, (user ? user.id : "")],
   )
 
-  const resolveReactionActorId = useCallback((payload: any): string | undefined => {
+  const resolveReactionActorId = React.useCallback((payload: any): string | undefined => {
     return String(
       payload?.actorId ??
       payload?.userId ??
@@ -1138,7 +1138,7 @@ export default function ChatPage() {
     ).trim() || undefined
   }, [])
 
-  const resolveReactionEmoji = useCallback((payload: any): string | undefined => {
+  const resolveReactionEmoji = React.useCallback((payload: any): string | undefined => {
     return String(
       payload?.emoji ??
       payload?.reaction ??
@@ -1148,7 +1148,7 @@ export default function ChatPage() {
     ).trim() || undefined
   }, [])
 
-  const syncConversationReactions = useCallback(async () => {
+  const syncConversationReactions = React.useCallback(async () => {
     if (!selectedConversationIdRef.current || !accessToken) return
 
     // Limit to only 10 latest messages for initial sync to avoid network flood
@@ -1165,7 +1165,7 @@ export default function ChatPage() {
     }
   }, [accessToken, syncMessageReaction])
 
-  const loadPinnedMessages = useCallback(
+  const loadPinnedMessages = React.useCallback(
     async (conversationId: string) => {
       if (!accessToken || !conversationId) return
 
@@ -1236,7 +1236,7 @@ export default function ChatPage() {
 
   const syncPinnedMessages = loadPinnedMessages
   
-  const syncConversationMetadata = useCallback(async (conversationId: string) => {
+  const syncConversationMetadata = React.useCallback(async (conversationId: string) => {
     if (!accessToken) return;
     try {
       const data = await fetchConversation(accessToken, conversationId) as any;
@@ -1273,7 +1273,7 @@ export default function ChatPage() {
   }, [accessToken]);
 
   // Fail-Safe Heartbeat: Ensure active conversation settings are always fresh
-  useEffect(() => {
+  React.useEffect(() => {
     if (!accessToken || !selectedConversationId || !isSocketConnected) return;
     
     // Only poll if the conversation exists in our list to avoid 404 noise
@@ -1901,7 +1901,7 @@ export default function ChatPage() {
   })
 
   // Ensure we join conversation rooms after conversations are loaded
-  useEffect(() => {
+  React.useEffect(() => {
     if (!accessToken) return
     if (!isSocketConnected) return
     if (!conversations || conversations.length === 0) return
@@ -1933,7 +1933,7 @@ export default function ChatPage() {
   })
 
   // Caller: bÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â§Ãƒâ€¦Ã¢â‚¬Å“Ãƒâ€šÃ‚Â© ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚ÂÃƒâ€¦Ã‚Â¸ cuÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â·Ãƒâ€šÃ‚Â½ gÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â¹ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ nhÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â±ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬m (chÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ broadcast, khÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¹Ãƒâ€šÃ‚Â«ng tÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â½ peer trÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â¢Ãƒâ€šÃ‚Â²Ãƒâ€šÃ‚Â·)
-  const handleStartGroupCall = useCallback(
+  const handleStartGroupCall = React.useCallback(
     async (audioOnly = false) => {
       if (!selectedConversationId) return
       const callId = `gc-${Date.now()}`
@@ -1949,7 +1949,7 @@ export default function ChatPage() {
   )
 
   // RÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â¥ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â° cuÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â·Ãƒâ€šÃ‚Â½ gÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â¹ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ nhÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â±ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬m + tÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â½ call log message
-  const handleLeaveGroupCall = useCallback(async () => {
+  const handleLeaveGroupCall = React.useCallback(async () => {
     const snap = groupCallSnapshot
     const convId = snap?.conversationId
     if (!convId) {
@@ -2084,7 +2084,7 @@ export default function ChatPage() {
     updateConversationAfterMessage,
   ])
 
-  const handleAddReaction = useCallback(
+  const handleAddReaction = React.useCallback(
     async (messageId: string, reactionKey: ReactionKey) => {
       if (!accessToken || !selectedConversationId || !user) {
         return
@@ -2259,7 +2259,7 @@ export default function ChatPage() {
     [accessToken, selectedConversationId, (user ? user.id : ""), emitSendMessage, syncMessageReaction, getSocket],
   )
 
-  const handleRemoveReaction = useCallback(
+  const handleRemoveReaction = React.useCallback(
     async (messageId: string, reactionKey: ReactionKey) => {
       if (!accessToken || !selectedConversationId) {
         return
@@ -2402,7 +2402,7 @@ export default function ChatPage() {
     [accessToken, selectedConversationId, (user ? user.id : ""), emitSendMessage, reactionStatesByMessage, syncMessageReaction, getSocket],
   )
 
-  const handleDeleteForMe = useCallback(
+  const handleDeleteForMe = React.useCallback(
     async (messageId: string) => {
       if (!accessToken || !messageId) {
         return
@@ -2421,7 +2421,7 @@ export default function ChatPage() {
     [accessToken],
   )
 
-  const handleRecallMessage = useCallback(
+  const handleRecallMessage = React.useCallback(
     async (messageId: string, conversationId: string) => {
       if (!accessToken) {
         return
@@ -2469,7 +2469,7 @@ export default function ChatPage() {
     [accessToken, emitRecallMessage, joinConversation, syncMessageReaction, syncPinnedMessages],
   )
 
-  const handleTogglePinMessage = useCallback(
+  const handleTogglePinMessage = React.useCallback(
     async (messageId: string, conversationId: string) => {
       if (!accessToken || !user) {
         return
@@ -2623,7 +2623,7 @@ export default function ChatPage() {
     [accessToken, pinnedMessageIds, user, emitSendMessage],
   )
 
-  const toggleMessageIdInList = useCallback((messageId: string) => {
+  const toggleMessageIdInList = React.useCallback((messageId: string) => {
     setSelectedMessageIds((prev) => {
       if (prev.includes(messageId)) {
         return prev.filter((item) => item !== messageId)
@@ -2633,12 +2633,12 @@ export default function ChatPage() {
     })
   }, [])
 
-  const handleClearMultiSelectMode = useCallback(() => {
+  const handleClearMultiSelectMode = React.useCallback(() => {
     setIsMultiSelectMode(false)
     setSelectedMessageIds([])
   }, [])
 
-  const handleMessageContextMenuAction = useCallback(
+  const handleMessageContextMenuAction = React.useCallback(
     (messageId: string, action: MessageContextMenuAction, message: ChatMessage, groupMessages?: ChatMessage[]) => {
       if (!messageId) {
         return
@@ -2694,7 +2694,7 @@ export default function ChatPage() {
     [handleDeleteForMe, handleRecallMessage, handleTogglePinMessage, toggleMessageIdInList],
   )
 
-  const handleShareMessage = useCallback(
+  const handleShareMessage = React.useCallback(
     async (targetUserIds: string[], note: string) => {
       if (!accessToken || !shareModalMessage || targetUserIds.length === 0) {
         return
@@ -2800,7 +2800,7 @@ export default function ChatPage() {
     [accessToken, emitSendMessage, joinConversation, shareModalMessage],
   )
 
-  const handleInitiateCall = useCallback(async (type: 'audio' | 'video') => {
+  const handleInitiateCall = React.useCallback(async (type: 'audio' | 'video') => {
     if (!selectedConversationId) return;
 
     // Ã°Å¸â€œÅ¾ GROUP CALL routing Ã°Å¸â€œÅ¾ delegate to separate group call layer
@@ -2840,7 +2840,7 @@ export default function ChatPage() {
     });
   }, [selectedConversationId, selectedConversation, currentUserId, getSocket, handleStartGroupCall]);
 
-  const handleEndCall = useCallback(async (reasonArg: any = 'hangup') => {
+  const handleEndCall = React.useCallback(async (reasonArg: any = 'hangup') => {
     const reason = typeof reasonArg === 'string' ? reasonArg : 'hangup';
     const currentCall = callStateRef.current;
     if (!currentCall.isOpen || !currentCall.conversationId) return;
@@ -3003,7 +3003,7 @@ export default function ChatPage() {
   }, [selectedConversation, currentUserId, emitSendMessage, accessToken, updateConversationAfterMessage]);
 
   const isAnsweringRef = React.useRef(false);
-  const handleAnswerCall = useCallback(async () => {
+  const handleAnswerCall = React.useCallback(async () => {
     if (!callServiceRef.current || !callStateRef.current.isOpen || isAnsweringRef.current) return;
     if (callStateRef.current.status === 'connected') return;
 
@@ -3032,11 +3032,11 @@ export default function ChatPage() {
     }
   }, [handleEndCall]);
 
-  const handleToggleMic = useCallback(() => {
+  const handleToggleMic = React.useCallback(() => {
     callServiceRef.current?.toggleMic();
   }, []);
 
-  const handleToggleCamera = useCallback(() => {
+  const handleToggleCamera = React.useCallback(() => {
     callServiceRef.current?.toggleCamera();
   }, []);
 
@@ -3074,7 +3074,7 @@ export default function ChatPage() {
     }
   };
 
-  const handleCallEnd = useCallback(async (data: any) => {
+  const handleCallEnd = React.useCallback(async (data: any) => {
     const signalData = Array.isArray(data) ? data[0] : data;
     console.log('[CALL][RECEIVE END]', signalData);
     if (signalData.callId === callStateRef.current.callId) {
@@ -3141,7 +3141,7 @@ export default function ChatPage() {
   // STABLE SIGNALING HANDLERS (using Refs to prevent listener churn)
   // ------------------------------------------------------------------------------------------------------------------------------------------------------------------
   const handleEndCallRef = React.useRef(handleEndCall);
-  useEffect(() => { handleEndCallRef.current = handleEndCall; }, [handleEndCall]);
+  React.useEffect(() => { handleEndCallRef.current = handleEndCall; }, [handleEndCall]);
 
   const signalHandlersRef = React.useRef({
     handleCallOffer,
@@ -3150,7 +3150,7 @@ export default function ChatPage() {
     handleCallEnd
   });
 
-  useEffect(() => {
+  React.useEffect(() => {
     signalHandlersRef.current = {
       handleCallOffer,
       handleCallAnswer,
@@ -3159,7 +3159,7 @@ export default function ChatPage() {
     };
   }, [handleCallOffer, handleCallAnswer, handleCallIce, handleCallEnd]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const socket = getSocket();
     if (!socket || !currentUserId) return;
 
@@ -3214,7 +3214,7 @@ export default function ChatPage() {
   }, [getSocket, currentUserId]);
 
   // Sync effect: Fetch profile for all group members when a conversation is opened
-  useEffect(() => {
+  React.useEffect(() => {
     if (!accessToken || !selectedConversationId) return;
     const selected = conversations.find(c => c.id === selectedConversationId);
     if (selected?.participantUserIds) {
@@ -3222,7 +3222,7 @@ export default function ChatPage() {
     }
   }, [accessToken, selectedConversationId, conversations, ensureUser]);
 
-  const loadInbox = useCallback(
+  const loadInbox = React.useCallback(
     async (token: string, preferredConversationId?: string) => {
       setIsLoadingConversations(true)
 
@@ -3516,7 +3516,7 @@ export default function ChatPage() {
 
   const inboxSummarySyncingRef = React.useRef(false)
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!accessToken || !user?.id || !isSocketConnected || conversations.length === 0) {
       return
     }
@@ -3666,7 +3666,7 @@ export default function ChatPage() {
     }
   }, [accessToken, conversations.length, isSocketConnected, (user ? user.id : "")])
 
-  const handleCreateGroup = useCallback(
+  const handleCreateGroup = React.useCallback(
     async (groupName: string, avatarUrl: string | null, memberIds: string[]) => {
       if (!accessToken || !user) {
         toast.error("Vui lÃƒÂ²ng Ã„â€˜Ã„Æ’ng nhÃ¡ÂºÂ­p lÃ¡ÂºÂ¡i");
@@ -3783,7 +3783,7 @@ export default function ChatPage() {
     [accessToken, user, navigate, loadInbox, emitSendMessage, joinConversation]
   );
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!accessToken) {
       setConversations([])
       setMessagesByConversation({})
@@ -3804,7 +3804,7 @@ export default function ChatPage() {
 
   // Removed polling fallback: rely on socket + auto-join for realtime updates
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!routedConversationId) {
       return
     }
@@ -3812,7 +3812,7 @@ export default function ChatPage() {
     setSelectedConversationId(routedConversationId)
   }, [routedConversationId])
 
-  const handleSearchFriends = useCallback(
+  const handleSearchFriends = React.useCallback(
     async (keyword: string) => {
       if (!accessToken) {
         setFriendResults([])
@@ -3850,7 +3850,7 @@ export default function ChatPage() {
     [accessToken],
   )
 
-  const handleSelectConversation = useCallback(
+  const handleSelectConversation = React.useCallback(
     async (conversationId: string) => {
       setSelectedConversationId(conversationId)
       navigate('/chat/' + conversationId)
@@ -3912,12 +3912,12 @@ export default function ChatPage() {
     [accessToken, navigate, (user ? user.id : ""), upsertUser],
   )
 
-  const handleOpenCreateGroupModal = useCallback(() => {
+  const handleOpenCreateGroupModal = React.useCallback(() => {
     setPreselectedMemberIds([]);
     setIsCreateGroupOpen(true)
   }, [])
 
-  const handleCreateGroupFromDirect = useCallback(() => {
+  const handleCreateGroupFromDirect = React.useCallback(() => {
     if (selectedConversation && !selectedConversation.isGroup) {
       const peerId = (selectedConversation.participantUserIds ?? [])[0];
       if (peerId) {
@@ -3932,7 +3932,7 @@ export default function ChatPage() {
   }, [selectedConversation]);
 
   // Handlers for global search panel
-  const handleGlobalSearchSelectMessage = useCallback(
+  const handleGlobalSearchSelectMessage = React.useCallback(
     (messageId: string, conversationId: string) => {
       setSelectedConversationId(conversationId)
       navigate(`/chat/${conversationId}`)
@@ -3942,7 +3942,7 @@ export default function ChatPage() {
     [navigate],
   )
 
-  const handleGlobalSearchSelectConversation = useCallback(
+  const handleGlobalSearchSelectConversation = React.useCallback(
     (conversationId: string) => {
       setSelectedConversationId(conversationId)
       navigate(`/chat/${conversationId}`)
@@ -3951,7 +3951,7 @@ export default function ChatPage() {
     [navigate],
   )
 
-  const handleGlobalSearchSelectUser = useCallback(
+  const handleGlobalSearchSelectUser = React.useCallback(
     async (userId: string) => {
       if (!accessToken || !user) {
         return
@@ -3967,12 +3967,12 @@ export default function ChatPage() {
     [accessToken, user, handleGlobalSearchSelectConversation],
   )
 
-  const handleOpenUserProfile = useCallback((userId: string) => {
+  const handleOpenUserProfile = React.useCallback((userId: string) => {
     setSelectedProfileUserId(userId)
     setIsProfileModalOpen(true)
   }, [])
 
-  const handleLoadConversationMessages = useCallback((conversationId: string) => {
+  const handleLoadConversationMessages = React.useCallback((conversationId: string) => {
     if (!accessToken || !conversationId || !user) {
       return
     }
@@ -4102,7 +4102,7 @@ export default function ChatPage() {
     })()
   }, [accessToken, deletedMessageIds, isRestrictedMode, syncConversationReactions, syncPinnedMessages, user, upsertUser])
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isSocketConnected || !selectedConversationId || !accessToken) {
       return
     }
@@ -4121,16 +4121,16 @@ export default function ChatPage() {
     }
   }, [accessToken, isSocketConnected, selectedConversationId, syncConversationReactions])
 
-  useEffect(() => {
+  React.useEffect(() => {
     console.log('[ChatPage.onPresenceChanged] Conversation IDs:', conversations.map((conv) => conv.userId))
   }, [conversations])
 
-  const conversationIdsSignature = useMemo(
+  const conversationIdsSignature = React.useMemo(
     () => conversations.map((conversation) => conversation.id).sort().join(','),
     [conversations],
   )
 
-  const joinAllConversations = useCallback(async (list: ConversationSummary[]) => {
+  const joinAllConversations = React.useCallback(async (list: ConversationSummary[]) => {
     const conversationIds = list.map((conversation) => conversation.id)
 
     if (conversationIds.length === 0) {
@@ -4145,7 +4145,7 @@ export default function ChatPage() {
 
   const previousSocketConnectedRef = React.useRef(false)
 
-  useEffect(() => {
+  React.useEffect(() => {
     const socket = getSocket()
     const currentConnected = Boolean(socket?.connected)
 
@@ -4157,7 +4157,7 @@ export default function ChatPage() {
     previousSocketConnectedRef.current = currentConnected
   }, [conversations, getSocket, joinAllConversations])
 
-  const handleOpenFriendChat = useCallback(
+  const handleOpenFriendChat = React.useCallback(
     async (friend: UserLookupResult) => {
       if (!accessToken) {
         return
@@ -4200,7 +4200,7 @@ export default function ChatPage() {
     [accessToken, joinConversation, loadInbox, navigate, t],
   )
 
-  useEffect(() => {
+  React.useEffect(() => {
     // Only redirect if we are at the root /chat path AND we have a previously selected ID
     // but we ARE NOT already on that routed path.
     if (!routedConversationId && selectedConversationId) {
@@ -4209,14 +4209,14 @@ export default function ChatPage() {
   }, [navigate, routedConversationId, selectedConversationId])
 
   // Save selection to localStorage whenever it changes
-  useEffect(() => {
+  React.useEffect(() => {
     if (selectedConversationId) {
       localStorage.setItem('vnalo_last_conv_id', selectedConversationId);
     }
   }, [selectedConversationId])
 
   // Load last selection on mount if we are at the root
-  useEffect(() => {
+  React.useEffect(() => {
     if (!routedConversationId) {
       const lastId = localStorage.getItem('vnalo_last_conv_id');
       if (lastId && conversations.some(c => c.id === lastId)) {
@@ -4231,7 +4231,7 @@ export default function ChatPage() {
   const joinedIdsRef = React.useRef<Set<string>>(new Set())
   const lastJoinedSocketIdRef = React.useRef<string | null>(null)
 
-  useEffect(() => {
+  React.useEffect(() => {
     // Hard check every time conversations or connection state changes
     const socket = getSocket();
     const actualConnected = Boolean(socket?.connected);
@@ -4281,7 +4281,7 @@ export default function ChatPage() {
   // 1. Mark as read on conversation change or new messages (with guard)
   const lastEmittedReadRef = React.useRef<Record<string, number>>({})
 
-  useEffect(() => {
+  React.useEffect(() => {
     const activeConversationId = routedConversationId || selectedConversationId
 
     if (!accessToken || !activeConversationId) {
@@ -4304,7 +4304,7 @@ export default function ChatPage() {
       refreshNotificationBadges()
     }
   }, [accessToken, markAsRead, messagesByConversation, routedConversationId, selectedConversationId])
-  useEffect(() => {
+  React.useEffect(() => {
     if (!accessToken || !selectedConversationId) {
       return
     }
@@ -4313,7 +4313,7 @@ export default function ChatPage() {
   }, [accessToken, selectedConversationId, syncPinnedMessages])
 
   // Auto-update presence status every 60 seconds to refresh time-based text
-  useEffect(() => {
+  React.useEffect(() => {
     const interval = setInterval(() => {
       setConversations((prev) => [...prev])
     }, 60000)
@@ -4321,7 +4321,7 @@ export default function ChatPage() {
     return () => clearInterval(interval)
   }, [])
 
-  const handleSend = useCallback(
+  const handleSend = React.useCallback(
     async (draft: ChatComposePayload) => {
       const conversationId = selectedConversationIdRef.current || selectedConversationId || routedConversationId
 
@@ -4616,7 +4616,7 @@ export default function ChatPage() {
     [accessToken, emitSendMessage, isRestrictedMode, routedConversationId, selectedConversationId, updateConversationAfterMessage, user],
   )
 
-  const handleSendPoll = useCallback(
+  const handleSendPoll = React.useCallback(
     async (poll: PollMetadata) => {
       const conversationId = selectedConversationIdRef.current || selectedConversationId || routedConversationId
       if (!conversationId || !user || !accessToken) return
@@ -4686,7 +4686,7 @@ export default function ChatPage() {
     [accessToken, emitSendMessage, routedConversationId, selectedConversationId, updateConversationAfterMessage, upsertMessage, user]
   )
 
-  const handleVotePoll = useCallback(
+  const handleVotePoll = React.useCallback(
     async (messageId: string, optionId: string) => {
       const conversationId = selectedConversationIdRef.current || selectedConversationId || routedConversationId
       if (!conversationId || !user || !accessToken) return
@@ -4705,7 +4705,7 @@ export default function ChatPage() {
     [accessToken, handleAddReaction, routedConversationId, selectedConversationId, user]
   )
 
-  const handleSearchConversation = useCallback(
+  const handleSearchConversation = React.useCallback(
     async (conversationId: string, keyword: string) => {
       if (!accessToken || !user) {
         return { messages: [] as ChatMessage[], files: [] as ChatMessage[] }
@@ -4794,7 +4794,7 @@ export default function ChatPage() {
     [accessToken, messagesByConversation, user],
   )
 
-  const handleToggleSearchSidebar = useCallback(() => {
+  const handleToggleSearchSidebar = React.useCallback(() => {
     // If there's a selected conversation, toggle in-conversation search
     // Otherwise, toggle global search
     if (selectedConversationIdRef.current) {
@@ -4804,12 +4804,12 @@ export default function ChatPage() {
     }
   }, [])
 
-  const handleToggleInfoSidebar = useCallback(() => {
+  const handleToggleInfoSidebar = React.useCallback(() => {
     setRightSidebarContent((prev) => (prev === 'info' ? null : 'info'))
   }, [])
 
   // Add keyboard shortcut Cmd/Ctrl+K for global search
-  useEffect(() => {
+  React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault()
@@ -5322,7 +5322,7 @@ export default function ChatPage() {
     }
   };
 
-  const sortedConversations = useMemo(() => {
+  const sortedConversations = React.useMemo(() => {
     return [...conversations].map(conv => {
       const deleteTime = deletedTimestamps[conv.id];
       if (!deleteTime) return conv;
@@ -5352,7 +5352,7 @@ export default function ChatPage() {
     })
   }, [conversations, deletedTimestamps, pinnedConversationIds, t])
 
-  const visibleConversations = useMemo(() => {
+  const visibleConversations = React.useMemo(() => {
     return sortedConversations.map(conv => ({
       ...conv,
       isPinned: !!pinnedConversationIds[conv.id]
@@ -5745,7 +5745,7 @@ function PinnedLogicHooks({
   lastConvRef
 }: any) {
   // ISOLATED PINNED FETCH (NO loadInbox call)
-  useEffect(() => {
+  React.useEffect(() => {
     console.log('[PinnedLogicHooks.effect] Checking pinned fetch conditions', { accessToken: !!accessToken, isBootstrapping, selectedConversationId, lastConv: lastConvRef.current });
     if (!accessToken || isBootstrapping || !selectedConversationId) {
       console.log('[PinnedLogicHooks.effect] Skipping pinned fetch due to missing conditions');
@@ -5764,7 +5764,7 @@ function PinnedLogicHooks({
   }, [accessToken, isBootstrapping, selectedConversationId, loadPinnedMessages, lastConvRef])
 
   // Mapping Pinned IDs -> Message Objects (with placeholder support)
-  useEffect(() => {
+  React.useEffect(() => {
     if (!selectedConversationId) return
 
     const ids = pinnedMessageIds[selectedConversationId] || []
@@ -5800,7 +5800,7 @@ function PinnedLogicHooks({
   }, [messagesByConversation, pinnedMessageIds, selectedConversationId, setPinnedMessages])
 
   // Auto clean pinned IDs when messages are recalled
-  useEffect(() => {
+  React.useEffect(() => {
     if (!selectedConversationId) return
     const ids = pinnedMessageIds[selectedConversationId] || []
     const convMessages = messagesByConversation[selectedConversationId] || []

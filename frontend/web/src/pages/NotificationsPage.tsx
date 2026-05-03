@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import React from 'react'
 
 import { NotificationList } from '../features/notifications/components/NotificationList'
 import { Skeleton } from '../shared/components/ui/Skeleton'
@@ -6,10 +6,10 @@ import { useLanguage } from '../shared/i18n/LanguageContext'
 import { notifications } from '../shared/mock/data'
 
 export function NotificationsPage() {
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = React.useState(true)
   const { t } = useLanguage()
 
-  useEffect(() => {
+  React.useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setIsLoading(false)
     }, 220)

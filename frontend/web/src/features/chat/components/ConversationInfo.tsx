@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import React from 'react';
 import {
   AlarmClock,
   BellOff,
@@ -93,37 +93,37 @@ export function ConversationInfo({
 }) {
   const { userMap, ensureUser } = useUserStore();
   const { accessToken } = useAuth();
-  const [expanded, setExpanded] = useState<Record<SectionKey, boolean>>({
+  const [expanded, setExpanded] = React.useState<Record<SectionKey, boolean>>({
     media: true,
     files: true,
     links: true,
     security: false,
     bulletin: true,
   });
-  const [isHidden, setIsHidden] = useState(false);
-  const [membersExpanded, setMembersExpanded] = useState(true);
-  const [showGroupManagement, setShowGroupManagement] = useState(false);
-  const [showMembersView, setShowMembersView] = useState(false);
-  const [showLeaderDeputyView, setShowLeaderDeputyView] = useState(false);
-  const [showBulletinView, setShowBulletinView] = useState(false);
-  const [showKickModal, setShowKickModal] = useState(false);
-  const [targetKickUserId, setTargetKickUserId] = useState<string | null>(null);
-  const [blockOnKick, setBlockOnKick] = useState(false);
-  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [isHidden, setIsHidden] = React.useState(false);
+  const [membersExpanded, setMembersExpanded] = React.useState(true);
+  const [showGroupManagement, setShowGroupManagement] = React.useState(false);
+  const [showMembersView, setShowMembersView] = React.useState(false);
+  const [showLeaderDeputyView, setShowLeaderDeputyView] = React.useState(false);
+  const [showBulletinView, setShowBulletinView] = React.useState(false);
+  const [showKickModal, setShowKickModal] = React.useState(false);
+  const [targetKickUserId, setTargetKickUserId] = React.useState<string | null>(null);
+  const [blockOnKick, setBlockOnKick] = React.useState(false);
+  const [showTransferModal, setShowTransferModal] = React.useState(false);
 
-  const isModerator = useMemo(() => {
+  const isModerator = React.useMemo(() => {
     if (!currentUserId || !conversation.members) return false;
     const role = String(conversation.members.find(m => m.userId === currentUserId)?.role || '').toUpperCase();
     return role === 'ADMIN' || role === 'DEPUTY';
   }, [currentUserId, conversation.members]);
 
-  const isOwner = useMemo(() => {
+  const isOwner = React.useMemo(() => {
     if (!currentUserId || !conversation.members) return false;
     const role = String(conversation.members.find(m => m.userId === currentUserId)?.role || '').toUpperCase();
     return role === 'ADMIN';
   }, [currentUserId, conversation.members]);
 
-  const allDisplayMemberIds = useMemo(() => {
+  const allDisplayMemberIds = React.useMemo(() => {
     const ids = [...(conversation.participantUserIds || [])];
     if (currentUserId && !ids.includes(currentUserId)) {
       ids.unshift(currentUserId);
@@ -132,7 +132,7 @@ export function ConversationInfo({
   }, [conversation.participantUserIds, currentUserId]);
 
   // Proactively fetch profiles for all members shown in the list
-  useEffect(() => {
+  React.useEffect(() => {
     if (!accessToken || allDisplayMemberIds.length === 0) return;
     allDisplayMemberIds.forEach((id) => {
       if (!userMap[id]) {
@@ -141,7 +141,7 @@ export function ConversationInfo({
     });
   }, [accessToken, allDisplayMemberIds, ensureUser]); 
 
-  const mediaItems = useMemo(() => {
+  const mediaItems = React.useMemo(() => {
     return messages
       .filter((m) => m.type === 'image')
       .map((m) => ({
@@ -152,7 +152,7 @@ export function ConversationInfo({
       .slice(0, 6);
   }, [messages]);
 
-  const fileItems = useMemo(() => {
+  const fileItems = React.useMemo(() => {
     return messages
       .filter((m) => m.type === 'file')
       .map((m) => {
@@ -169,7 +169,7 @@ export function ConversationInfo({
       .slice(0, 5);
   }, [messages]);
 
-  const linkItems = useMemo(() => {
+  const linkItems = React.useMemo(() => {
     const links: Array<{ id: string; url: string }> = [];
     for (const msg of messages) {
       const matches = msg.text?.match(/https?:\/\/[^\s]+/g) ?? [];
@@ -184,12 +184,12 @@ export function ConversationInfo({
     setExpanded((prev) => ({ ...prev, [section]: !prev[section] }));
   };
 
-  const peerId = useMemo(() => {
+  const peerId = React.useMemo(() => {
     if (conversation.isGroup || conversation.isCloud) return null;
     return conversation.userId || (conversation.participantUserIds || []).find(id => id !== currentUserId);
   }, [conversation, currentUserId]);
 
-  const resolvedName = useMemo(() => {
+  const resolvedName = React.useMemo(() => {
     if (conversation.isGroup) return conversation.name;
     if (conversation.isCloud) return 'My Cloud';
     return userMap[peerId || '']?.displayName || conversation.name;
@@ -606,12 +606,12 @@ function TransferOwnerModal({
   currentUserId?: string; 
   onConfirm: (newOwnerId: string) => void; 
 }) {
-  const [step, setStep] = useState<1 | 2>(1);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [step, setStep] = React.useState<1 | 2>(1);
+  const [searchTerm, setSearchTerm] = React.useState('');
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const { userMap } = useUserStore();
 
-  const otherMembers = useMemo(() => {
+  const otherMembers = React.useMemo(() => {
     return members
       .filter(m => m.userId !== currentUserId)
       .filter(m => {
@@ -621,7 +621,7 @@ function TransferOwnerModal({
       });
   }, [members, currentUserId, searchTerm, userMap]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (isOpen) {
       setStep(1);
       setSearchTerm('');
@@ -629,7 +629,7 @@ function TransferOwnerModal({
     }
   }, [isOpen]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (step === 2 && otherMembers.length > 0 && !selectedId) {
       setSelectedId(otherMembers[0].userId);
     }
@@ -753,7 +753,7 @@ function GroupManagementView({
   onShowLeaderDeputy: () => void;
   currentUserId?: string;
 }) {
-  const [showDisbandConfirm, setShowDisbandConfirm] = useState(false);
+  const [showDisbandConfirm, setShowDisbandConfirm] = React.useState(false);
 
   const handleToggle = (key: string, value: any) => {
     if (!isModerator) return;
@@ -1138,13 +1138,13 @@ function LeaderDeputyView({
   currentUserId?: string;
   userMap: any;
 }) {
-  const [showAdjustModal, setShowAdjustModal] = useState(false);
-  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [showAdjustModal, setShowAdjustModal] = React.useState(false);
+  const [showTransferModal, setShowTransferModal] = React.useState(false);
 
   const admin = conversation.members?.find(m => String(m.role || '').toUpperCase() === 'ADMIN');
   const deputies = conversation.members?.filter(m => String(m.role || '').toUpperCase() === 'DEPUTY') || [];
 
-  const currentUserRole = useMemo(() => {
+  const currentUserRole = React.useMemo(() => {
     const me = conversation.members?.find(m => m.userId === currentUserId);
     return String(me?.role || 'MEMBER').toUpperCase();
   }, [conversation.members, currentUserId]);
@@ -1279,10 +1279,10 @@ function AdjustDeputyModal({
   userMap: any;
   onConfirm: (ids: string[]) => void;
 }) {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [searchTerm, setSearchTerm] = React.useState('');
+  const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (isOpen) {
       setSelectedIds(currentDeputies.map(d => d.userId));
       setSearchTerm('');
@@ -1432,13 +1432,13 @@ function MemberListView({ conversation, currentUserId, onAddMembers, onKickMembe
   friends?: Friend[];
 }) {
   const { userMap } = useUserStore();
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = React.useState('');
 
-  const members = useMemo(() => {
+  const members = React.useMemo(() => {
     return (conversation.members || []).filter(m => !m.leftAt);
   }, [conversation.members]);
 
-  const filteredMembers = useMemo(() => {
+  const filteredMembers = React.useMemo(() => {
     if (!searchTerm) return members;
     return members.filter(m => {
       const name = (userMap[m.userId]?.displayName || m.displayName || '').toLowerCase();
@@ -1446,7 +1446,7 @@ function MemberListView({ conversation, currentUserId, onAddMembers, onKickMembe
     });
   }, [members, searchTerm, userMap]);
 
-  const currentUserRole = useMemo(() => {
+  const currentUserRole = React.useMemo(() => {
     const me = conversation.members?.find(m => m.userId === currentUserId);
     return String(me?.role || 'MEMBER').toUpperCase();
   }, [conversation.members, currentUserId]);

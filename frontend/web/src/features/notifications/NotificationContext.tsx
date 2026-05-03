@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import React, { createContext } from 'react'
 import { useAuth } from '../../features/auth/useAuth'
 import { fetchInbox } from '../../features/chat/chat.api'
 import { getFriendStats } from '../../features/friends/friends.api'
@@ -20,11 +20,11 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { accessToken, user } = useAuth()
-  const [unreadMessageCount, setUnreadMessageCount] = useState(0)
-  const [pendingFriendRequestCount, setPendingFriendRequestCount] = useState(0)
+  const [unreadMessageCount, setUnreadMessageCount] = React.useState(0)
+  const [pendingFriendRequestCount, setPendingFriendRequestCount] = React.useState(0)
   const refreshInFlightRef = React.useRef<Promise<void> | null>(null)
 
-  const refreshCounts = useCallback(async () => {
+  const refreshCounts = React.useCallback(async () => {
     if (!accessToken) return
 
     if (refreshInFlightRef.current) {
@@ -53,7 +53,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, [accessToken, user?.id])
 
   // Initial fetch and polling fallback for friend requests if socket doesn't support it
-  useEffect(() => {
+  React.useEffect(() => {
     if (accessToken) {
       refreshCounts()
       
@@ -96,7 +96,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   })
 
-  useEffect(() => {
+  React.useEffect(() => {
     const handleRefresh = () => {
       void refreshCounts()
     }
@@ -112,7 +112,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 }
 
 export const useNotifications = () => {
-  const context = useContext(NotificationContext)
+  const context = React.useContext(NotificationContext)
   if (!context) {
     throw new Error('useNotifications must be used within a NotificationProvider')
   }

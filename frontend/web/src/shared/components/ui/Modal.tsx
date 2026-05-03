@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import React from 'react'
 import { createPortal } from 'react-dom'
 
 type ModalVariant = 'default' | 'image' | 'confirm' | 'none' | 'custom'
@@ -24,7 +24,7 @@ export function Modal({
   closeAriaLabel,
   variant = 'default',
 }: ModalProps) {
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isOpen) {
       return
     }

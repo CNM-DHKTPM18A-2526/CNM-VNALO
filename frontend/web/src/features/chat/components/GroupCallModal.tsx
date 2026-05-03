@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import type { GroupCallSnapshot, GroupPeerState, IncomingGroupCallInfo } from '../webrtcGroupCallService'
 import { WebRtcGroupCallService } from '../webrtcGroupCallService'
 import type { Socket } from 'socket.io-client'
@@ -158,9 +158,9 @@ export function useGroupCall({
   userMap,
   conversations,
 }: UseGroupCallOptions) {
-  const [snapshot, setSnapshot] = useState<GroupCallSnapshot | null>(null)
-  const [incomingCall, setIncomingCall] = useState<IncomingGroupCallInfo | null>(null)
-  const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const [snapshot, setSnapshot] = React.useState<GroupCallSnapshot | null>(null)
+  const [incomingCall, setIncomingCall] = React.useState<IncomingGroupCallInfo | null>(null)
+  const [elapsedSeconds, setElapsedSeconds] = React.useState(0)
   const serviceRef = React.useRef<WebRtcGroupCallService | null>(null)
   const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -173,7 +173,7 @@ export function useGroupCall({
   }, [userMap])
 
   // Listen for incoming group-call:started from OTHER users
-  useEffect(() => {
+  React.useEffect(() => {
     if (!socket) return
 
     const onGroupCallStarted = (payload: any) => {
@@ -210,7 +210,7 @@ export function useGroupCall({
   }, [socket, currentUserId, snapshot, resolveName, userMap, conversations])
 
   // Clear incoming when ended or joined elsewhere
-  useEffect(() => {
+  React.useEffect(() => {
     if (!socket) return
     const onGroupCallEnded = (payload: any) => {
       setIncomingCall((prev) => (prev && prev.callId === payload.callId ? null : prev))
