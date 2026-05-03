@@ -135,21 +135,21 @@ class ChatListItem extends StatelessWidget {
             ],
           ),
           subtitle: Row(
-            children: [
-              if (statusText != null) ...[
-                Text(
-                  statusText,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isOnline
-                        ? AppColors.online
-                        : (isDarkMode ? DarkColors.textHint : LightColors.textHint),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Text('·', style: TextStyle(color: isDarkMode ? DarkColors.textHint : LightColors.textHint)),
-                const SizedBox(width: 6),
-              ],
+            // children: [
+            //   if (statusText != null) ...[
+            //     Text(
+            //       statusText,
+            //       style: TextStyle(
+            //         fontSize: 12,
+            //         color: isOnline
+            //             ? AppColors.online
+            //             : (isDarkMode ? DarkColors.textHint : LightColors.textHint),
+            //       ),
+            //     ),
+            //     const SizedBox(width: 6),
+            //     Text('·', style: TextStyle(color: isDarkMode ? DarkColors.textHint : LightColors.textHint)),
+            //     const SizedBox(width: 6),
+            //   ],
               Expanded(
                 child: Text(
                   lastPreview ??

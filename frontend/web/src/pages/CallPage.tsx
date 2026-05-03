@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useParams } from 'react-router-dom'
 import { io, Socket } from 'socket.io-client'
 import { CallModal } from '../features/chat/components/CallModal'
 import { GroupCallModal } from '../features/chat/components/GroupCallModal'
@@ -15,7 +15,8 @@ const CallPage: React.FC = () => {
   const { user, accessToken } = useAuth()
   
   const type = searchParams.get('type') as 'direct' | 'group'
-  const callId = searchParams.get('callId')
+  const { callId: pathCallId } = useParams<{ callId: string }>()
+  const callId = pathCallId || searchParams.get('callId')
   const conversationId = searchParams.get('conversationId')
   const peerId = searchParams.get('peerId')
   const audioOnly = searchParams.get('audioOnly') === 'true'

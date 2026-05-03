@@ -106,22 +106,22 @@ class _AvatarWidgetState extends State<AvatarWidget> {
             right: 0,
             bottom: 0,
             child: Container(
-              width: widget.size * 0.28,
-              height: widget.size * 0.28,
+              width: widget.size * 0.24,
+              height: widget.size * 0.24,
               decoration: BoxDecoration(
                 color: widget.isOnline ? const Color(0xFF34D399) : Colors.grey.shade500, // Emerald-400
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: isDarkMode ? DarkColors.surface : Colors.white,
-                  width: 2.0,
+                  width: 0.0,
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 2,
-                    spreadRadius: 1,
-                  ),
-                ],
+                // boxShadow: [
+                //   BoxShadow(
+                //     color: Colors.black.withValues(alpha: 0.1),
+                //     blurRadius: 2,
+                //     spreadRadius: 1,
+                //   ),
+                // ],
               ),
             ),
           ),
