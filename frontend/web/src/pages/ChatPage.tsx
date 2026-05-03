@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { getSyncPolicy } from '../features/auth/auth.api'
@@ -10,12 +10,11 @@ import { MessageShareModal } from '../features/chat/components/MessageShareModal
 import { ChatWindow } from '../features/chat/components/ChatWindow'
 import { UserProfileModal } from '../features/chat/components/UserProfileModal'
 import { CallModal } from '../features/chat/components/CallModal'
-import { GroupCallModal, useGroupCall } from '../features/chat/components/GroupCallModal'
-import { IncomingCallBanner, MiniCallWindow } from '../features/chat/components/PremiumCallUI'
+import { GroupCallModal, IncomingGroupCallBanner, useGroupCall } from '../features/chat/components/GroupCallModal'
 import type { MessageContextMenuAction } from '../features/chat/components/MessageContextMenu'
 import {
   addMessageReaction,
-  createGroupConversation,           // ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ NEW
+  createGroupConversation,           // ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ NEW
   deleteMessageForMe,
   fetchMessageReactions,
   fetchInbox,
@@ -30,7 +29,7 @@ import {
   searchConversationMessages,
   sendMessage as sendMessageViaRest,
   unpinMessage,
-  updateMessage,
+
   uploadChatMedia,
   fetchConversation,
   addMembersToConversation,
@@ -76,8 +75,7 @@ import {
 import { CreateGroupModal } from '../features/chat/components/CreateGroupModal'
 import { EditConversationNameModal } from '../features/chat/components/EditConversationNameModal'
 import { formatMessage, renderSystemMessage, formatMessagePreview, formatMessageTimestamp, normalizeMessage } from '../features/chat/utils/messageUtils'
-import { UserStoreProvider, useUserStore } from '../features/chat/context/UserStoreContext'
-import type { SystemMessagePayload } from '../features/chat/chat.types'
+import { useUserStore } from '../features/chat/context/UserStoreContext'
 
 // Fallback toast object to prevent crashes if toast library is missing
 const toast = {
@@ -214,16 +212,20 @@ function toSocketMessageType(type: ChatMessageType): Uppercase<ChatMessageType> 
   return type.toUpperCase() as Uppercase<ChatMessageType>
 }
 
+
 // Removed local normalizeMessage, now imported from ../features/chat/utils/messageUtils
 
 function getConversationPreview(
   message: ChatMessage,
   currentUserId: string,
   getDisplayName: (id: string) => string,
-  isModerator?: boolean
+  _isModerator?: boolean
 ): string {
   return formatMessage(message, currentUserId, getDisplayName)
 }
+
+
+
 
 function formatConversationPreview(
   senderName: string | null | undefined,
@@ -356,7 +358,7 @@ function persistDeletedMessageIds(userId: string, deletedMap: Record<string, tru
 }
 
 function fallbackUserDisplayName(_userId: string): string {
-  return 'Người dùng'
+  return 'NgÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° dÃƒÂ§Ã‚Â¾Ã¢â‚¬Â¦ng'
 }
 
 function applyRestrictedMessage(message: ChatMessage, restricted: boolean): ChatMessage {
@@ -451,7 +453,7 @@ function generateUUID(): string {
 
 const isGenericDirectName = (value: string | undefined | null) => {
   const normalized = String(value ?? '').trim()
-  const isGenericLabel = !normalized || normalized === 'NgÃ†Â°Ã¡Â»Âi dÃƒÂ¹ng' || /^NgÃ†Â°Ã¡Â»Âi dÃƒÂ¹ng\s+[0-9a-f]{6,}$/i.test(normalized)
+  const isGenericLabel = !normalized || normalized === 'NgÆ°á»i dÃ¹ng' || /^NgÆ°á»i dÃ¹ng\s+[0-9a-f]{6,}$/i.test(normalized)
   const isRawId = /^[0-9a-f]{24}$/i.test(normalized) // Common MongoDB ID format
   return isGenericLabel || isRawId
 }
@@ -464,55 +466,55 @@ export default function ChatPage() {
   const navigate = useNavigate()
   const { conversationId: conversationIdFromUrl } = useParams<{ conversationId?: string }>()
   const routedConversationId = conversationIdFromUrl ?? ''
-  const [conversations, setConversations] = React.useState<ConversationSummary[]>([])
-  const [messagesByConversation, setMessagesByConversation] = React.useState<Record<string, ChatMessage[]>>({})
-  const messagesByConversationRef = React.useRef<Record<string, ChatMessage[]>>(messagesByConversation)
-  const [selectedConversationId, setSelectedConversationId] = React.useState('')
-  const [isLoadingConversations, setIsLoadingConversations] = React.useState(false)
-  const [isLoadingMessages, setIsLoadingMessages] = React.useState(false)
-  const [isRestrictedMode, setIsRestrictedMode] = React.useState(false)
-  const [peerLastReadByConversation, setPeerLastReadByConversation] = React.useState<Record<string, number>>({})
-  const [reactionStatesByMessage, setReactionStatesByMessage] = React.useState<Record<string, MessageReactionState>>({})
-  const [friendResults, setFriendResults] = React.useState<UserLookupResult[]>([])
-  const [friendsDirectory, setFriendsDirectory] = React.useState<Friend[]>([])
-  const [isSocketConnected, setIsSocketConnected] = React.useState(false)
-  const [isSocketInitialized, setIsSocketInitialized] = React.useState(false)
-  const [rightSidebarContent, setRightSidebarContent] = React.useState<'info' | 'search' | 'global-search' | null>(() => {
+  const [conversations, setConversations] = useState<ConversationSummary[]>([])
+  const [messagesByConversation, setMessagesByConversation] = useState<Record<string, ChatMessage[]>>({})
+  const messagesByConversationRef = useRef<Record<string, ChatMessage[]>>(messagesByConversation)
+  const [selectedConversationId, setSelectedConversationId] = useState('')
+  const [isLoadingConversations, setIsLoadingConversations] = useState(false)
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false)
+  const [isRestrictedMode, setIsRestrictedMode] = useState(false)
+  const [peerLastReadByConversation, setPeerLastReadByConversation] = useState<Record<string, number>>({})
+  const [reactionStatesByMessage, setReactionStatesByMessage] = useState<Record<string, MessageReactionState>>({})
+  const [friendResults, setFriendResults] = useState<UserLookupResult[]>([])
+  const [friendsDirectory, setFriendsDirectory] = useState<Friend[]>([])
+  const [isSocketConnected, setIsSocketConnected] = useState(false)
+  const [, setIsSocketInitialized] = useState(false)
+  const [rightSidebarContent, setRightSidebarContent] = useState<'info' | 'search' | 'global-search' | null>(() => {
     const saved = localStorage.getItem('vnalo_chat_sidebar_content')
     if (!saved || saved === 'null' || saved === 'none') return null
     if (['info', 'search', 'global-search'].includes(saved)) return saved as any
     return null
   })
 
-  React.useEffect(() => {
+  useEffect(() => {
     messagesByConversationRef.current = messagesByConversation
   }, [messagesByConversation])
 
-  React.useEffect(() => {
+  useEffect(() => {
     localStorage.setItem('vnalo_chat_sidebar_content', rightSidebarContent || 'none')
   }, [rightSidebarContent])
 
-  const [jumpToMessageId, setJumpToMessageId] = React.useState<string | null>(null)
-  const [pinnedMessageIds, setPinnedMessageIds] = React.useState<Record<string, string[]>>({})
-  const [pinnedMessages, setPinnedMessages] = React.useState<Record<string, ChatMessage[]>>({})
-  const [starredMessageIds, setStarredMessageIds] = React.useState<Record<string, true>>({})
-  const [recalledMessageIds, setRecalledMessageIds] = React.useState<Record<string, true>>({})
-  const [deletedMessageIds, setDeletedMessageIds] = React.useState<Record<string, true>>({})
-  const [selectedMessageIds, setSelectedMessageIds] = React.useState<string[]>([])
-  const [isMultiSelectMode, setIsMultiSelectMode] = React.useState(false)
+  const [jumpToMessageId, setJumpToMessageId] = useState<string | null>(null)
+  const [pinnedMessageIds, setPinnedMessageIds] = useState<Record<string, string[]>>({})
+  const [pinnedMessages, setPinnedMessages] = useState<Record<string, ChatMessage[]>>({})
+  const [starredMessageIds, setStarredMessageIds] = useState<Record<string, true>>({})
+  const [recalledMessageIds, setRecalledMessageIds] = useState<Record<string, true>>({})
+  const [deletedMessageIds, setDeletedMessageIds] = useState<Record<string, true>>({})
+  const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([])
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false)
 
-  const [shareModalMessage, setShareModalMessage] = React.useState<ChatMessage | null>(null)
-  const [isShareSubmitting, setIsShareSubmitting] = React.useState(false)
-  const [deletedTimestamps, setDeletedTimestamps] = React.useState<Record<string, number>>({})
-  const [pinnedConversationIds, setPinnedConversationIds] = React.useState<Record<string, boolean>>({})
-  const [confirmDeleteHistoryId, setConfirmDeleteHistoryId] = React.useState<string | null>(null)
-  const [confirmLeaveGroupOpen, setConfirmLeaveGroupOpen] = React.useState(false)
-  const [leaveGroupSilently, setLeaveGroupSilently] = React.useState(false)
-  const [selectedProfileUserId, setSelectedProfileUserId] = React.useState<string | null>(null)
-  const [isProfileModalOpen, setIsProfileModalOpen] = React.useState(false)
+  const [shareModalMessage, setShareModalMessage] = useState<ChatMessage | null>(null)
+  const [isShareSubmitting, setIsShareSubmitting] = useState(false)
+  const [deletedTimestamps, setDeletedTimestamps] = useState<Record<string, number>>({})
+  const [pinnedConversationIds, setPinnedConversationIds] = useState<Record<string, boolean>>({})
+  const [confirmDeleteHistoryId, setConfirmDeleteHistoryId] = useState<string | null>(null)
+  const [confirmLeaveGroupOpen, setConfirmLeaveGroupOpen] = useState(false)
+  const [leaveGroupSilently, setLeaveGroupSilently] = useState(false)
+  const [selectedProfileUserId, setSelectedProfileUserId] = useState<string | null>(null)
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
 
   // CALL STATE
-  const [callState, setCallState] = React.useState<{
+  const [callState, setCallState] = useState<{
     isOpen: boolean
     type: 'audio' | 'video'
     direction: 'outgoing' | 'incoming'
@@ -536,16 +538,13 @@ export default function ChatPage() {
     isCameraOn: true,
   })
 
-  const [isCallMinimized, setIsCallMinimized] = React.useState(false)
-  const [isGroupCallMinimized, setIsGroupCallMinimized] = React.useState(false)
-
   // WEBRTC SERVICE REF
-  const callServiceRef = React.useRef<WebRtcCallService | null>(null)
+  const callServiceRef = useRef<WebRtcCallService | null>(null)
 
   // SYNC CALL STATE TO REF FOR LISTENERS
-  const callStateRef = React.useRef(callState)
-  const currentCallIdRef = React.useRef<string | null>(null) // Immediate sync ref for signal routing
-  React.useEffect(() => {
+  const callStateRef = useRef(callState)
+  const currentCallIdRef = useRef<string | null>(null) // Immediate sync ref for signal routing
+  useEffect(() => {
     callStateRef.current = callState
     currentCallIdRef.current = callState.callId || null
   }, [callState])
@@ -578,31 +577,32 @@ export default function ChatPage() {
     })
   }
 
-  const routedConversationIdRef = React.useRef('')
-  const selectedConversationIdRef = React.useRef('')
-  const selectedMessagesRef = React.useRef<ChatMessage[]>([])
-  const conversationsRef = React.useRef<ConversationSummary[]>([])
-  const friendIdSetRef = React.useRef<Set<string>>(new Set())
-  const lastLoadedMessagesKeyRef = React.useRef('')
-  const userMapRef = React.useRef<Record<string, { displayName: string; avatarUrl: string | null }>>({})
+
+  const routedConversationIdRef = useRef('')
+  const selectedConversationIdRef = useRef('')
+  const selectedMessagesRef = useRef<ChatMessage[]>([])
+  const conversationsRef = useRef<ConversationSummary[]>([])
+  const friendIdSetRef = useRef<Set<string>>(new Set())
+  const lastLoadedMessagesKeyRef = useRef('')
+  const userMapRef = useRef<Record<string, { displayName: string; avatarUrl: string | null }>>({})
 
   // Hard guards for pinned messages
-  const loadingPinnedRef = React.useRef<Record<string, boolean>>({})
-  const lastConvRef = React.useRef<string | null>(null)
+  const loadingPinnedRef = useRef<Record<string, boolean>>({})
+  const lastConvRef = useRef<string | null>(null)
 
   // WebRTC Signal Deduplication (prevents double-triggering from specific + generic events)
-  const processedSignalsRef = React.useRef<Set<string>>(new Set())
+  const processedSignalsRef = useRef<Set<string>>(new Set())
 
-  React.useEffect(() => {
+  useEffect(() => {
     userMapRef.current = userMap
   }, [userMap])
-  const messageLoadRequestSeqRef = React.useRef(0)
-  const pendingMetadataFetches = React.useRef<Set<string>>(new Set())
-  const processedMessageIds = React.useRef<Set<string>>(new Set())
-  const lastPinnedSyncTimeRef = React.useRef<Record<string, number>>({})
+  const messageLoadRequestSeqRef = useRef(0)
+  const pendingMetadataFetches = useRef<Set<string>>(new Set())
+  const processedMessageIds = useRef<Set<string>>(new Set())
+  const lastPinnedSyncTimeRef = useRef<Record<string, number>>({})
 
   // Load deleted timestamps & pinned conversations from localStorage on mount
-  React.useEffect(() => {
+  useEffect(() => {
     const savedDeleted = localStorage.getItem('vnalo_deleted_timestamps')
     if (savedDeleted) {
       try {
@@ -630,7 +630,7 @@ export default function ChatPage() {
     setConfirmDeleteHistoryId(null)
   }
 
-  const handleTogglePinConversation = React.useCallback((conversationId: string) => {
+  const handleTogglePinConversation = useCallback((conversationId: string) => {
     setPinnedConversationIds((prev) => {
       const isCurrentlyPinned = !!prev[conversationId]
       const next = { ...prev }
@@ -644,33 +644,74 @@ export default function ChatPage() {
     })
   }, [])
 
-  const [isCreateGroupOpen, setIsCreateGroupOpen] = React.useState(false);
-  const [isCreatingGroup, setIsCreatingGroup] = React.useState(false);
-  const [isAddMembersOpen, setIsAddMembersOpen] = React.useState(false);
-  const [isAddingMembers, setIsAddingMembers] = React.useState(false);
-  const [preselectedMemberIds, setPreselectedMemberIds] = React.useState<string[]>([]);
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
+  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+  const [isAddMembersOpen, setIsAddMembersOpen] = useState(false);
+  const [isAddingMembers, setIsAddingMembers] = useState(false);
+  const [preselectedMemberIds, setPreselectedMemberIds] = useState<string[]>([]);
 
-  const [isEditConversationNameOpen, setIsEditConversationNameOpen] = React.useState(false);
-  const [editConversationNameMode, setEditConversationNameMode] = React.useState<'group' | 'nickname'>('group');
+  const [isEditConversationNameOpen, setIsEditConversationNameOpen] = useState(false);
+  const [editConversationNameMode, setEditConversationNameMode] = useState<'group' | 'nickname'>('group');
 
-  React.useEffect(() => {
+  useEffect(() => {
     routedConversationIdRef.current = routedConversationId
   }, [routedConversationId])
 
-  React.useEffect(() => {
+  useEffect(() => {
     selectedConversationIdRef.current = routedConversationId || selectedConversationId
   }, [routedConversationId, selectedConversationId])
 
-  React.useEffect(() => {
+  useEffect(() => {
     conversationsRef.current = conversations
   }, [conversations])
 
-  const selectedConversation = React.useMemo(
-    () => conversations.find((conversation) => conversation.id === (routedConversationId || selectedConversationId)),
-    [conversations, routedConversationId, selectedConversationId],
-  )
+  const myDocumentsConversation = useMemo<ConversationSummary>(() => {
+    // Try to get last message from local storage for preview
+    let lastMsgText = 'Lưu và đồng bộ dữ liệu giữa các thiết bị';
+    let lastTime = new Date().toISOString();
 
-  const selectedMessages = React.useMemo(() => {
+    if (user?.id) {
+      try {
+        const key = `vnalo_cloud_msgs_${user.id}`;
+        const saved = localStorage.getItem(key);
+        if (saved) {
+          const msgs = JSON.parse(saved);
+          if (Array.isArray(msgs) && msgs.length > 0) {
+            // In handleSend we save newest at index 0
+            const last = msgs[0];
+            lastMsgText = last.text || (last.type === 'image' ? '[Hình ảnh]' : last.type === 'file' ? '[Tệp tin]' : lastMsgText);
+            lastTime = last.createdAt || last.timestamp || lastTime;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load cloud messages for preview', e);
+      }
+    }
+
+    return {
+      id: 'my-documents',
+      isGroup: false,
+      isCloud: true,
+      name: 'My Documents',
+      avatarUrl: null,
+      lastMessage: lastMsgText,
+      unreadCount: 0,
+      participantUserIds: [],
+      memberCount: 0,
+      lastMessageAt: lastTime,
+      updatedAt: lastTime,
+    };
+  }, [user?.id, messagesByConversation['my-documents']]); // Re-run when messages change
+
+  const selectedConversation = useMemo(
+    () => {
+      const targetId = routedConversationId || selectedConversationId;
+      if (targetId === 'my-documents') return myDocumentsConversation;
+      return conversations.find((conversation) => conversation.id === targetId);
+    },
+    [conversations, routedConversationId, selectedConversationId, myDocumentsConversation],
+  )
+  const selectedMessages = useMemo(() => {
     const resolvedConversationId = routedConversationId || selectedConversationId
     if (!resolvedConversationId) {
       return []
@@ -688,20 +729,20 @@ export default function ChatPage() {
     })
   }, [messagesByConversation, routedConversationId, selectedConversationId, deletedTimestamps])
 
-  React.useEffect(() => {
+  useEffect(() => {
     selectedMessagesRef.current = selectedMessages
   }, [selectedMessages])
 
-  React.useEffect(() => {
+  useEffect(() => {
     setIsMultiSelectMode(false)
     setSelectedMessageIds([])
   }, [routedConversationId, selectedConversationId])
 
-  React.useEffect(() => {
+  useEffect(() => {
     setDeletedMessageIds(loadDeletedMessageIds(user?.id))
   }, [(user ? user.id : "")])
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!user?.id) {
       return
     }
@@ -710,19 +751,19 @@ export default function ChatPage() {
   }, [deletedMessageIds, (user ? user.id : "")])
 
   // Initialize search index on mount
-  React.useEffect(() => {
+  useEffect(() => {
     initializeSearchIndex()
   }, [])
 
   // Update search index when conversations are loaded
-  React.useEffect(() => {
+  useEffect(() => {
     if (conversations.length > 0) {
       updateSearchIndexConversations(conversations)
     }
   }, [conversations])
 
   // Update search index when messages are loaded
-  React.useEffect(() => {
+  useEffect(() => {
     const allMessages: CachedMessage[] = []
     Object.entries(messagesByConversation).forEach(([conversationId, messages]) => {
       const conversation = conversations.find((c) => c.id === conversationId)
@@ -744,7 +785,7 @@ export default function ChatPage() {
   }, [messagesByConversation, conversations])
 
   // Update search index when friends are loaded
-  React.useEffect(() => {
+  useEffect(() => {
     if (friendResults.length > 0) {
       const cachedUsers: CachedUser[] = friendResults.map((u) => ({
         id: u.id,
@@ -758,7 +799,8 @@ export default function ChatPage() {
     }
   }, [friendResults])
 
-  const updateConversationAfterMessage = React.useCallback(
+
+  const updateConversationAfterMessage = useCallback(
     (
       conversationId: string,
       message: ChatMessage,
@@ -777,7 +819,6 @@ export default function ChatPage() {
 
       const formattedPreview = formatConversationPreview(senderName, message, user?.id || '', getName)
       // Defensive: ensure formatted preview is never empty if original message has content
-      const safePreview = formattedPreview && formattedPreview.trim() ? formattedPreview : formatMessagePreview(message.text || '', false)
 
       setConversations((prev) => {
         const index = prev.findIndex((conversation) => conversation.id === conversationId)
@@ -787,8 +828,9 @@ export default function ChatPage() {
           index === -1
             ? {
               id: conversationId,
-              name: conversationSeed?.name || senderName || fallbackUserDisplayName(message.senderId),
-              avatarUrl: conversationSeed?.avatarUrl ?? null,
+              isCloud: conversationId === 'my-documents' || conversationSeed?.isCloud,
+              name: conversationId === 'my-documents' ? 'My Documents' : (conversationSeed?.name || senderName || fallbackUserDisplayName(message.senderId)),
+              avatarUrl: conversationId === 'my-documents' ? null : (conversationSeed?.avatarUrl ?? null),
               isGroup: conversationSeed?.isGroup,
               isStranger: conversationSeed?.isStranger,
               participantUserIds: conversationSeed?.participantUserIds ?? [message.senderId],
@@ -803,6 +845,21 @@ export default function ChatPage() {
               ...next[index],
               ...(conversationSeed || {})
             };
+
+        // If this is a NEW conversation entry (index === -1), 
+        // verify it's not a "Kicked" system message for ourselves.
+        // If it is, we don't want to re-add the conversation we just removed.
+        if (index === -1 && message.type === 'system' && message.text) {
+          try {
+            const sys = JSON.parse(message.text);
+            const isMeKicked = sys.action === 'REMOVE_MEMBER' &&
+              sys.targetMemberIds?.some((id: any) => String(id) === String(user?.id));
+            if (isMeKicked) {
+              console.log('[ChatPage.updateConversationAfterMessage] Blocking re-add of kicked group');
+              return prev;
+            }
+          } catch (e) { /* ignore */ }
+        }
 
         let finalPreview = formattedPreview;
 
@@ -867,11 +924,11 @@ export default function ChatPage() {
 
   // PERIODIC SYNC (POLLING FALLBACK)
   const SYNC_INTERVAL_MS = 2000
-  const lastSyncTimeRef = React.useRef<Record<string, number>>({})
-  const pollingIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null)
+  const lastSyncTimeRef = useRef<Record<string, number>>({})
+  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Setup polling interval that runs on a timer
-  const syncLatestMessages = React.useCallback(async (targetId?: string) => {
+  const syncLatestMessages = useCallback(async (targetId?: string) => {
     const conversationId = targetId || selectedConversationIdRef.current
     if (!conversationId || !accessToken) return
 
@@ -967,7 +1024,7 @@ export default function ChatPage() {
     }
   }, [accessToken, isRestrictedMode, updateConversationAfterMessage, (user ? user.id : "")])
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isSocketConnected || !accessToken) {
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current)
@@ -984,7 +1041,7 @@ export default function ChatPage() {
       }
     }
   }, [isSocketConnected, accessToken, syncLatestMessages])
-  const toReactionState = React.useCallback(
+  const toReactionState = useCallback(
     (rows: Array<{ userId: string; emoji: string }>): MessageReactionState => {
       const reactions = {} as MessageReactionMap
 
@@ -1020,7 +1077,7 @@ export default function ChatPage() {
     [(user ? user.id : "")],
   )
 
-  const syncMessageReaction = React.useCallback(
+  const syncMessageReaction = useCallback(
     async (messageId: string): Promise<void> => {
       // Relaxed validation: ensure we have a token and an ID, but don't strictly enforce UUID 
       // if it might be a temporary or cross-platform ID format that still maps to the server.
@@ -1054,7 +1111,7 @@ export default function ChatPage() {
     [accessToken, toReactionState],
   )
 
-  const applyReactionSocketEvent = React.useCallback(
+  const applyReactionSocketEvent = useCallback(
     (messageId: string, emoji: string | undefined, actorId: string | undefined, kind: 'added' | 'removed') => {
       const normalizedEmoji = String(emoji ?? '').trim()
       const normalizedActorId = String(actorId ?? '').trim()
@@ -1127,7 +1184,7 @@ export default function ChatPage() {
     [syncMessageReaction, (user ? user.id : "")],
   )
 
-  const resolveReactionActorId = React.useCallback((payload: any): string | undefined => {
+  const resolveReactionActorId = useCallback((payload: any): string | undefined => {
     return String(
       payload?.actorId ??
       payload?.userId ??
@@ -1138,7 +1195,7 @@ export default function ChatPage() {
     ).trim() || undefined
   }, [])
 
-  const resolveReactionEmoji = React.useCallback((payload: any): string | undefined => {
+  const resolveReactionEmoji = useCallback((payload: any): string | undefined => {
     return String(
       payload?.emoji ??
       payload?.reaction ??
@@ -1148,7 +1205,7 @@ export default function ChatPage() {
     ).trim() || undefined
   }, [])
 
-  const syncConversationReactions = React.useCallback(async () => {
+  const syncConversationReactions = useCallback(async () => {
     if (!selectedConversationIdRef.current || !accessToken) return
 
     // Limit to only 10 latest messages for initial sync to avoid network flood
@@ -1165,7 +1222,7 @@ export default function ChatPage() {
     }
   }, [accessToken, syncMessageReaction])
 
-  const loadPinnedMessages = React.useCallback(
+  const loadPinnedMessages = useCallback(
     async (conversationId: string) => {
       if (!accessToken || !conversationId) return
 
@@ -1234,9 +1291,11 @@ export default function ChatPage() {
     [accessToken, isRestrictedMode, user?.id],
   )
 
+
+
   const syncPinnedMessages = loadPinnedMessages
-  
-  const syncConversationMetadata = React.useCallback(async (conversationId: string) => {
+
+  const syncConversationMetadata = useCallback(async (conversationId: string) => {
     if (!accessToken) return;
     try {
       const data = await fetchConversation(accessToken, conversationId) as any;
@@ -1254,14 +1313,15 @@ export default function ChatPage() {
           members: data.members || c.members,
           memberCount: (data.members || []).length || c.memberCount,
           updatedAt: new Date().toISOString(),
-          _syncVersion: Date.now() 
+          _syncVersion: Date.now()
         };
         return { ...c, ...settings };
       }));
-      console.log('[ChatPage] Ã°Å¸â€â€ž Metadata refreshed for', conversationId);
+      console.log('[ChatPage] 🔄 Metadata refreshed for', conversationId);
     } catch (e: any) {
-      if (e.response?.status === 404) {
-        console.log('[ChatPage] Ã°Å¸â€”â€˜Ã¯Â¸Â Conversation no longer exists, cleaning up:', conversationId);
+      // If 404 (Deleted) or 403 (Kicked/Forbidden)
+      if (e.response?.status === 404 || e.response?.status === 403) {
+        console.log('[ChatPage] 🚪 Access lost (Kicked or Deleted), cleaning up:', conversationId);
         setConversations(prev => prev.filter(c => c.id !== conversationId));
         if (selectedConversationIdRef.current === conversationId) {
           navigate('/chat');
@@ -1273,9 +1333,9 @@ export default function ChatPage() {
   }, [accessToken]);
 
   // Fail-Safe Heartbeat: Ensure active conversation settings are always fresh
-  React.useEffect(() => {
+  useEffect(() => {
     if (!accessToken || !selectedConversationId || !isSocketConnected) return;
-    
+
     // Only poll if the conversation exists in our list to avoid 404 noise
     // (Wait for inbox to load first)
     if (conversations.length === 0) return;
@@ -1285,25 +1345,25 @@ export default function ChatPage() {
     // Fast poll for settings while in active chat (fallback if socket fails)
     const timer = setInterval(() => {
       void syncConversationMetadata(selectedConversationId);
-    }, 3500); 
-    
+    }, 3500);
+
     return () => clearInterval(timer);
   }, [accessToken, selectedConversationId, isSocketConnected, syncConversationMetadata, conversations]);
 
   const { emitSendMessage, emitRecallMessage, joinConversation, joinMultipleConversations, markAsRead, getSocket } = useChatSocket({
     token: accessToken,
     onConnected: async () => {
-      console.log('[ChatPage] ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚ÂÃƒâ€¦Ã‚Â¡ Socket connected event received');
+      console.log('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¥Ã‚ÂÃ…Â¡ Socket connected event received');
       setIsSocketConnected(true)
       setIsSocketInitialized(true)
-      
+
       // AUTO-JOIN ALL CONVERSATIONS ON CONNECT
       if (conversationsRef.current.length > 0) {
         const conversationIds = conversationsRef.current.map(c => c.id);
-        console.log('[ChatPage] ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ Auto-joining', conversationIds.length, 'conversations on connect');
+        console.log('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ Auto-joining', conversationIds.length, 'conversations on connect');
         void joinMultipleConversations(conversationIds);
       }
-      
+
       void syncConversationReactions()
       void syncPinnedMessages(selectedConversationIdRef.current)
     },
@@ -1312,7 +1372,7 @@ export default function ChatPage() {
     },
     onFriendshipUpdated: async (payload) => {
       if (!user || !accessToken || !payload.friendId) return;
-      console.log('[ChatPage] ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ Friendship updated via socket for friendId:', payload.friendId);
+      console.log('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ Friendship updated via socket for friendId:', payload.friendId);
 
       try {
         // 1. Ensure conversation is created in message-service
@@ -1339,7 +1399,7 @@ export default function ChatPage() {
       // - Server auto-joined us, OR
       // - This is a message from our own send
 
-      // ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ 0. SYSTEM MESSAGES (CRITICAL SIGNALS) ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½
+      // ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ 0. SYSTEM MESSAGES (CRITICAL SIGNALS) ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½
       // Handle both SYSTEM messages and TEXT messages that contain JSON signals (like poll sync)
       if (mapped.type === 'system' || (mapped.text && (mapped.text.includes('"action":') || mapped.text.startsWith('{')))) {
         try {
@@ -1382,6 +1442,14 @@ export default function ChatPage() {
               if (selectedConversationIdRef.current === cid) navigate('/chat');
               return;
             }
+            const isMeKicked = sys.action === 'REMOVE_MEMBER' &&
+              sys.targetMemberIds?.some((id: any) => String(id) === String(user?.id));
+            if (isMeKicked) {
+              console.log('[ChatPage.onMessageReceived] 🚪 Kicked from group! Removing conversation:', cid);
+              setConversations(prev => prev.filter(c => c.id !== cid));
+              if (selectedConversationIdRef.current === cid) navigate('/chat');
+              return;
+            }
 
             // PIN/UNPIN Sync
             if (sys.action === 'PIN_MESSAGE') {
@@ -1409,35 +1477,35 @@ export default function ChatPage() {
 
             // Group Info Sync: Essential for permissions/settings
             if (sys.action === 'UPDATE_GROUP_INFO') {
-              console.log('[ChatPage] Ã°Å¸â€â€ž Realtime Group Update Signal Received:', mapped.conversationId, sys.metadata);
-              
+              console.log('[ChatPage] ðŸ”„ Realtime Group Update Signal Received:', mapped.conversationId, sys.metadata);
+
               // 1. Optimistic update from payload
               setConversations(prev => prev.map(c => {
                 if (c.id !== mapped.conversationId) return c;
                 return { ...c, ...sys.metadata, updatedAt: new Date().toISOString() };
               }));
-              
+
               // 2. Proactive Sync: Trigger a refresh of the whole inbox summary
               // to ensure we have the most authoritative state for ALL groups
-              void syncInboxSummaries();
-              
+              if (accessToken) void loadInbox(accessToken);
+
               // 3. Fallback: Specific metadata refresh
               void syncConversationMetadata(mapped.conversationId);
 
               // 4. UI Hint
               if (sys.metadata && Object.keys(sys.metadata).length > 0) {
-                toast.info('CÃƒÂ i Ã„â€˜Ã¡ÂºÂ·t nhÃƒÂ³m Ã„â€˜ÃƒÂ£ Ã„â€˜Ã†Â°Ã¡Â»Â£c cÃ¡ÂºÂ­p nhÃ¡ÂºÂ­t');
+                toast.success('CÃ i Ä‘áº·t nhÃ³m Ä‘Ã£ Ä‘Æ°á»£c cáº­p nháº­t');
               }
 
               // 5. Silent Update: If it's just settings (no rename), don't show a bubble in chat
               if (!sys.metadata?.newName && !sys.newName) {
-                return; 
+                return;
               }
             }
 
             // Reaction Sync (Poll Voting)
             if (sys.action === 'UPDATE_MESSAGE_REACTIONS') {
-              console.log('[ChatPage] ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ Handling UPDATE_MESSAGE_REACTIONS signal for poll sync');
+              console.log('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ Handling UPDATE_MESSAGE_REACTIONS signal for poll sync');
               if (sys.messageId) {
                 applyReactionSocketEvent(
                   sys.messageId,
@@ -1450,7 +1518,7 @@ export default function ChatPage() {
 
             // FRIEND_ACCEPTED Sync: Proactively fetch and show the new conversation
             if (sys.action === 'FRIEND_ACCEPTED' || mapped.text.includes('FRIEND_ACCEPTED')) {
-              console.log('[ChatPage] ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ Handling FRIEND_ACCEPTED signal');
+              console.log('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ Handling FRIEND_ACCEPTED signal');
               void loadInbox(accessToken);
             }
           }
@@ -1471,19 +1539,19 @@ export default function ChatPage() {
         }
       }
 
-      // ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ 1. DEDUPLICATION (PREVENT DOUBLE RENDERING) ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½
+      // ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ 1. DEDUPLICATION (PREVENT DOUBLE RENDERING) ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½
       if (mapped.id && processedMessageIds.current.has(mapped.id)) {
-        console.log('[ChatPage] ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¥ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â¨ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ Skipping duplicate message:', mapped.id);
+        console.log('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¥Ã¢â‚¬Å“Ã‚Â¨ÃƒÂ¯Ã‚Â¿Ã‚Â½ Skipping duplicate message:', mapped.id);
         return;
       }
       if (mapped.id) processedMessageIds.current.add(mapped.id);
 
-      console.log('[ChatPage] ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¦Ãƒâ€¦Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â· Processing new message:', { id: mapped.id, type: mapped.type, conversationId: mapped.conversationId });
+      console.log('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¦Ã…â€™Ã‚Â· Processing new message:', { id: mapped.id, type: mapped.type, conversationId: mapped.conversationId });
 
-      // ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ 2. INSTANT UI UPDATE (FAST PATH) ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½
+      // ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ 2. INSTANT UI UPDATE (FAST PATH) ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½
       const senderId = mapped.senderId;
       const senderProfile = userMapRef.current[senderId];
-      const senderDisplayName = senderId === user.id ? 'BÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â£ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¹' : (senderProfile?.displayName || 'NgÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â¥ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â° dÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¾ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ng');
+      const senderDisplayName = senderId === user.id ? 'BÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Â¹' : (senderProfile?.displayName || 'NgÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° dÃƒÂ§Ã‚Â¾Ã¢â‚¬Â¦ng');
 
       // Fast conversation update (Blind Discovery)
       const exists = conversationsRef.current.some(c => c.id === mapped.conversationId);
@@ -1526,7 +1594,7 @@ export default function ChatPage() {
         conversationSeed,
       );
 
-      // ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ 3. BACKGROUND SYNC ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½
+      // ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ 3. BACKGROUND SYNC ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½
       if (isActive && mapped.serverSeq !== undefined) {
         markAsRead({ conversationId: mapped.conversationId, lastReadSeq: mapped.serverSeq });
         refreshNotificationBadges();
@@ -1639,7 +1707,7 @@ export default function ChatPage() {
       })
 
       // 2. Update Sidebar preview immediately
-      setConversations((prev) => 
+      setConversations((prev) =>
         prev.map((c) => {
           if (c.id === payload.conversationId) {
             // Check if this recalled message was the one showing in preview
@@ -1659,10 +1727,11 @@ export default function ChatPage() {
 
       void syncMessageReaction(payload.messageId)
     },
-    onMessageRead: (payload) => {
-      const readByUserId = String(payload?.userId ?? payload?.user_id ?? '').trim()
-      const conversationId = String(payload?.conversationId ?? payload?.conversation_id ?? '').trim()
-      const rawLastReadSeq = payload?.lastReadSeq ?? payload?.last_read_seq ?? payload?.seq ?? payload?.serverSeq ?? payload?.server_seq
+    onMessageRead: (payload: any) => {
+      const safePayload = payload as any;
+      const readByUserId = String(safePayload?.userId ?? safePayload?.user_id ?? '').trim()
+      const conversationId = String(safePayload?.conversationId ?? safePayload?.conversation_id ?? '').trim()
+      const rawLastReadSeq = safePayload?.lastReadSeq ?? safePayload?.last_read_seq ?? safePayload?.seq ?? safePayload?.serverSeq ?? safePayload?.server_seq
       const lastReadSeq = typeof rawLastReadSeq === 'string' ? Number(rawLastReadSeq) : rawLastReadSeq
 
       if (!user || !readByUserId || readByUserId === user.id || !conversationId || !Number.isFinite(lastReadSeq)) {
@@ -1713,10 +1782,10 @@ export default function ChatPage() {
         return
       }
 
-      console.log('ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â§ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€¦Ã‚Â  nhÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¨Ãƒâ€šÃ‚Â¦Ãƒâ€šÃ‚Â sÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ kiÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â¡Ãƒâ€šÃ‚ÂµÃƒâ€¦Ã‚Â¾ presence:', payload)
-      console.log('ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ang tÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â«m userId:', payload.userId, 'trong danh sÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Âºch conversations...')
-        console.log('[ChatPage.onPresenceChanged] Presence updated:', payload)
-        console.log('[ChatPage.onPresenceChanged] Looking for userId:', payload.userId, 'in conversations...')
+      console.log('ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ§Ã¢â‚¬Å“Ã…Â  nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â¦Ã‚Â sÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ kiÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¡Ã‚ÂµÃ…Â¾ presence:', payload)
+      console.log('ÃƒÂ¯Ã‚Â¿Ã‚Â½ang tÃƒÂ§Ã‚Â©Ã‚Â«m userId:', payload.userId, 'trong danh sÃƒÂ§Ã‚ÂÃ‚Âºch conversations...')
+      console.log('[ChatPage.onPresenceChanged] Presence updated:', payload)
+      console.log('[ChatPage.onPresenceChanged] Looking for userId:', payload.userId, 'in conversations...')
       setConversations((prev) => {
         let changed = false
         const next = prev.map((conv) => {
@@ -1787,20 +1856,13 @@ export default function ChatPage() {
       void syncPinnedMessages(conversationId)
     },
     onGroupUpdated: (payload: any) => {
-      console.log('[ChatPage.socket] Ã°Å¸â€˜Â¥ Group Updated (Socket):', payload);
+      console.log('[ChatPage.socket] ðŸ‘¥ Group Updated (Socket):', payload);
       const conversationId = payload.conversationId || payload.conversation_id;
       if (!conversationId) return;
 
       // Trigger full refresh to ensure all settings are synced correctly
       void syncConversationMetadata(conversationId);
-      void syncInboxSummaries();
-    },
-    onConversationUpdated: (payload: any) => {
-      console.log('[ChatPage.socket] Ã°Å¸â€â€ž Conversation Updated (Socket):', payload);
-      const conversationId = payload.conversationId || payload.id;
-      if (conversationId) {
-        void syncConversationMetadata(conversationId);
-      }
+      if (accessToken) void loadInbox(accessToken);
     },
     onGroupDisbanded: (payload) => {
       console.log('Group disbanded', payload.conversationId)
@@ -1827,31 +1889,45 @@ export default function ChatPage() {
       }))
     },
     onGroupMemberRemoved: (payload) => {
-      setConversations(prev => prev.map(c => {
-        if (c.id === payload.conversationId) {
-          return {
-            ...c,
-            participantUserIds: c.participantUserIds?.filter(id => !payload.targetMemberIds.includes(id)),
-            memberCount: Math.max(0, (c.memberCount || 1) - payload.targetMemberIds.length),
-            members: c.members?.filter(m => !payload.targetMemberIds.includes(m.userId))
-          }
+      console.log('[ChatPage.onGroupMemberRemoved] Event:', payload);
+      const isMeRemoved = user?.id && payload.targetMemberIds.some(id => String(id) === String(user.id));
+      if (isMeRemoved) {
+        console.log('[ChatPage.onGroupMemberRemoved] 🚪 Current user removed from group. Cleaning up UI.');
+        setConversations(prev => prev.filter(c => c.id !== payload.conversationId));
+        if (selectedConversationIdRef.current === payload.conversationId) {
+          navigate('/chat');
         }
-        return c;
-      }))
-
-      // If we are removed
-      if (user?.id && payload.targetMemberIds.includes(user.id) && selectedConversationIdRef.current === payload.conversationId) {
-        navigate('/chat');
+      } else {
+        setConversations(prev => prev.map(c => {
+          if (c.id === payload.conversationId) {
+            const targetIds = (payload.targetMemberIds || []).map(id => String(id));
+            return {
+              ...c,
+              participantUserIds: c.participantUserIds?.filter(id => !targetIds.includes(String(id))),
+              memberCount: Math.max(0, (c.memberCount || 1) - targetIds.length),
+              members: c.members?.filter(m => !targetIds.includes(String(m.userId)))
+            }
+          }
+          return c;
+        }))
       }
     },
     onGroupMemberLeft: (payload) => {
+      if (user?.id && String(payload.actorId) === String(user.id)) {
+        setConversations(prev => prev.filter(c => c.id !== payload.conversationId));
+        if (selectedConversationIdRef.current === payload.conversationId) {
+          navigate('/chat');
+        }
+        return;
+      }
+
       setConversations(prev => prev.map(c => {
         if (c.id === payload.conversationId) {
           return {
             ...c,
-            participantUserIds: c.participantUserIds?.filter(id => id !== payload.actorId),
+            participantUserIds: c.participantUserIds?.filter(id => String(id) !== String(payload.actorId)),
             memberCount: Math.max(0, (c.memberCount || 1) - 1),
-            members: c.members?.filter(m => m.userId !== payload.actorId)
+            members: c.members?.filter(m => String(m.userId) !== String(payload.actorId))
           }
         }
         return c;
@@ -1868,8 +1944,18 @@ export default function ChatPage() {
         return c;
       }))
     },
+    onConversationError: (payload) => {
+      console.error('[ChatPage] ❌ Conversation error:', payload);
+      if (payload.conversationId && (payload.code?.includes('FORBIDDEN') || payload.code?.includes('NOT_FOUND') || payload.code?.includes('ACCESS_DENIED'))) {
+        const cid = payload.conversationId;
+        setConversations(prev => prev.filter(c => c.id !== cid));
+        if (selectedConversationIdRef.current === cid) {
+          navigate('/chat');
+        }
+      }
+    },
     onMessageError: (payload) => {
-      console.error('[ChatPage] ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ Message error:', payload);
+      console.error('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ Message error:', payload);
       if (payload.code === 'AUTH_DENIED' && payload.clientMessageId) {
         setMessagesByConversation(prev => {
           const cid = payload.conversationId || selectedConversationIdRef.current;
@@ -1879,13 +1965,13 @@ export default function ChatPage() {
             [cid]: markLocalMessageFailed(prev[cid], payload.clientMessageId!)
           };
         });
-        toast.error('BÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â£ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¹ khÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¹Ãƒâ€šÃ‚Â«ng cÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â±ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ quyÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ gÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¨ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢Ãƒâ€šÃ‚Â¹ tin nhÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â§ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“Ãƒâ€šÃ‚Â¸ nÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½y.');
+        toast.error('BÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Â¹ khÃƒÂ§Ã‚Â¹Ã‚Â«ng cÃƒÂ§Ã‚Â±Ã¢â€šÂ¬ quyÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ gÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¨Ã¢â€žÂ¢Ã‚Â¹ tin nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ§Ã¢â‚¬â€œÃ‚Â¸ nÃƒÂ¯Ã‚Â¿Ã‚Â½y.');
       } else {
-        toast.error(payload.message || 'LÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â¡Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ gÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¨ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢Ãƒâ€šÃ‚Â¹ tin nhÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â§ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“Ãƒâ€šÃ‚Â¸.');
+        toast.error(payload.message || 'LÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¡Ã…Â¸Ã¢â€žÂ¢ gÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¨Ã¢â€žÂ¢Ã‚Â¹ tin nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ§Ã¢â‚¬â€œÃ‚Â¸.');
       }
     },
     onConversationError: (payload) => {
-      console.error('[ChatPage] ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ Conversation error:', payload);
+      console.error('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ Conversation error:', payload);
       if (payload.code === 'FORBIDDEN' || payload.code === 'NOT_MEMBER' || payload.code === 'CONVERSATION_NOT_FOUND') {
         if (payload.conversationId) {
           setConversations(prev => prev.filter(c => c.id !== payload.conversationId));
@@ -1893,25 +1979,25 @@ export default function ChatPage() {
             navigate('/chat');
           }
         }
-        toast.error('BÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â£ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¹ khÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¹Ãƒâ€šÃ‚Â«ng cÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â±ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ quyÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ thÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â· hiÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â¡Ãƒâ€šÃ‚ÂµÃƒâ€¦Ã‚Â¾ hÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½nh ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â£Ãƒâ€šÃ‚Â·Ãƒâ€¦Ã¢â‚¬â„¢g nÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½y hoÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¦Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â¾ cuÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â·Ãƒâ€šÃ‚Â½ trÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â°Ãƒâ€šÃ‚Â· chuyÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â¡Ãƒâ€šÃ‚ÂµÃƒâ€¦Ã‚Â¾ khÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¹Ãƒâ€šÃ‚Â«ng tÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â¿ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº tÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â£ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â.');
+        toast.error('BÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Â¹ khÃƒÂ§Ã‚Â¹Ã‚Â«ng cÃƒÂ§Ã‚Â±Ã¢â€šÂ¬ quyÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ thÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¥Ã‚Â¸Ã‚Â· hiÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¡Ã‚ÂµÃ…Â¾ hÃƒÂ¯Ã‚Â¿Ã‚Â½nh ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ£Ã‚Â·Ã…â€™g nÃƒÂ¯Ã‚Â¿Ã‚Â½y hoÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¦Ã‚ÂÃ‚Â¾ cuÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ§Ã‚Â·Ã‚Â½ trÃƒÂ§Ã‚Â°Ã‚Â· chuyÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¡Ã‚ÂµÃ…Â¾ khÃƒÂ§Ã‚Â¹Ã‚Â«ng tÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¥Ã‚Â¿Ã¢â‚¬Âº tÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã‚Â.');
       } else {
-        toast.error(payload.message || 'LÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â¡Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ cuÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â·Ãƒâ€šÃ‚Â½ trÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â°Ãƒâ€šÃ‚Â· chuyÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â¡Ãƒâ€šÃ‚ÂµÃƒâ€¦Ã‚Â¾.');
+        toast.error(payload.message || 'LÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¡Ã…Â¸Ã¢â€žÂ¢ cuÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ§Ã‚Â·Ã‚Â½ trÃƒÂ§Ã‚Â°Ã‚Â· chuyÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¡Ã‚ÂµÃ…Â¾.');
       }
     }
   })
 
   // Ensure we join conversation rooms after conversations are loaded
-  React.useEffect(() => {
+  useEffect(() => {
     if (!accessToken) return
     if (!isSocketConnected) return
     if (!conversations || conversations.length === 0) return
 
     const ids = conversations.map(c => c.id)
-    console.log('[ChatPage] ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ Auto-joining conversations after inbox load:', ids.length)
+    console.log('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ Auto-joining conversations after inbox load:', ids.length)
     void joinMultipleConversations(ids)
   }, [accessToken, isSocketConnected, conversations, joinMultipleConversations])
 
-  // ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ GROUP CALL (SEPARATE LAYER - does not touch single call) ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½
+  // ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ GROUP CALL (SEPARATE LAYER - does not touch single call) ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½
   const {
     snapshot: groupCallSnapshot,
     incomingCall: incomingGroupCall,
@@ -1926,21 +2012,21 @@ export default function ChatPage() {
   } = useGroupCall({
     socket: getSocket(),
     currentUserId,
-    currentUserName: user?.name ?? 'BÃ¡ÂºÂ¡n',
+    currentUserName: user?.name ?? 'Báº¡n',
     currentUserAvatar: user?.avatarUrl ?? '',
     userMap,
     conversations, // Added conversations here
   })
 
-  // Caller: bÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â§Ãƒâ€¦Ã¢â‚¬Å“Ãƒâ€šÃ‚Â© ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚ÂÃƒâ€¦Ã‚Â¸ cuÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â·Ãƒâ€šÃ‚Â½ gÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â¹ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ nhÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â±ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬m (chÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ broadcast, khÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¹Ãƒâ€šÃ‚Â«ng tÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â½ peer trÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â¢Ãƒâ€šÃ‚Â²Ãƒâ€šÃ‚Â·)
-  const handleStartGroupCall = React.useCallback(
+  // Caller: bÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ§Ã…â€œÃ‚Â© ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¥Ã‚ÂÃ…Â¸ cuÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ§Ã‚Â·Ã‚Â½ gÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¥Ã‚Â¹Ã¢â‚¬Å¡ nhÃƒÂ§Ã‚Â±Ã¢â€šÂ¬m (chÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ broadcast, khÃƒÂ§Ã‚Â¹Ã‚Â«ng tÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¯Ã‚Â¸Ã‚Â½ peer trÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¢Ã‚Â²Ã‚Â·)
+  const handleStartGroupCall = useCallback(
     async (audioOnly = false) => {
       if (!selectedConversationId) return
       const callId = `gc-${Date.now()}`
       const conv = conversations.find((c) => c.id === selectedConversationId)
       await startGroupCall({
         conversationId: selectedConversationId,
-        conversationName: conv?.name ?? 'CuÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â·Ãƒâ€šÃ‚Â½ gÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â¹ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ nhÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â±ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬m',
+        conversationName: conv?.name ?? 'CuÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ§Ã‚Â·Ã‚Â½ gÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¥Ã‚Â¹Ã¢â‚¬Å¡ nhÃƒÂ§Ã‚Â±Ã¢â€šÂ¬m',
         callId,
         audioOnly,
       })
@@ -1948,8 +2034,8 @@ export default function ChatPage() {
     [selectedConversationId, conversations, startGroupCall]
   )
 
-  // RÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â¥ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â° cuÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â·Ãƒâ€šÃ‚Â½ gÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â¹ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ nhÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â±ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬m + tÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â½ call log message
-  const handleLeaveGroupCall = React.useCallback(async () => {
+  // RÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° cuÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ§Ã‚Â·Ã‚Â½ gÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¥Ã‚Â¹Ã¢â‚¬Å¡ nhÃƒÂ§Ã‚Â±Ã¢â€šÂ¬m + tÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¯Ã‚Â¸Ã‚Â½ call log message
+  const handleLeaveGroupCall = useCallback(async () => {
     const snap = groupCallSnapshot
     const convId = snap?.conversationId
     if (!convId) {
@@ -1959,28 +2045,28 @@ export default function ChatPage() {
 
     const callId = snap?.callId ?? ''
     const duration = groupCallElapsed
-    // SÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ peers cÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â°Ãƒâ€šÃ‚Â·n lÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â£ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â trÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â¢Ãƒâ€šÃ‚Â²Ãƒâ€šÃ‚Â· khi rÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â¥ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â° (khÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¹Ãƒâ€šÃ‚Â«ng tÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â©nh bÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾ thÃƒÆ’Ã‚Â§ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢Ãƒâ€šÃ‚Â½n)
+    // SÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ peers cÃƒÂ§Ã‚Â°Ã‚Â·n lÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã‚Â trÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¢Ã‚Â²Ã‚Â· khi rÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° (khÃƒÂ§Ã‚Â¹Ã‚Â«ng tÃƒÂ§Ã‚Â©Ã‚Â©nh bÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂÃ¢â‚¬Å¾ thÃƒÂ§Ã¢â‚¬â„¢Ã‚Â½n)
     const remainingPeers = snap?.peers.length ?? 0
 
-    // 1. Stop WebRTC (luÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¹Ãƒâ€šÃ‚Â«n lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½m, bÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â¦ kÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ cÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â±ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ phÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã…Â½Ãƒâ€šÃ‚Â¾ ngÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â¥ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â° cuÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â©Ãƒâ€šÃ‚Â­ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ khÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¹Ãƒâ€šÃ‚Â«ng)
+    // 1. Stop WebRTC (luÃƒÂ§Ã‚Â¹Ã‚Â«n lÃƒÂ¯Ã‚Â¿Ã‚Â½m, bÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¥Ã‚ÂÃ‚Â¦ kÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ cÃƒÂ§Ã‚Â±Ã¢â€šÂ¬ phÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÅ½Ã‚Â¾ ngÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° cuÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ©Ã‚Â­Ã¢â€šÂ¬ khÃƒÂ§Ã‚Â¹Ã‚Â«ng)
     leaveGroupCall()
 
-    // ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â¤Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ CHÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ tÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â½ call log nÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ khÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¹Ãƒâ€šÃ‚Â«ng cÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â°Ãƒâ€šÃ‚Â·n ai khÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Âºc trong cuÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â·Ãƒâ€šÃ‚Â½ gÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â¹ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡.
-    // NÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ vÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â cÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â°Ãƒâ€šÃ‚Â·n ngÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â¥ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â° khÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Âºc ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ hÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ sÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ ngÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â¥ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â° tÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â½ log khi rÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â¥ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â° sau cÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¾ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ng.
+    // ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ°Ã‚Â©Ã‚Â¤Ã†â€™ÃƒÂ¯Ã‚Â¿Ã‚Â½ CHÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ tÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¯Ã‚Â¸Ã‚Â½ call log nÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ§Ã‚Â°Ã¢â‚¬Ëœ khÃƒÂ§Ã‚Â¹Ã‚Â«ng cÃƒÂ§Ã‚Â°Ã‚Â·n ai khÃƒÂ§Ã‚ÂÃ‚Âºc trong cuÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ§Ã‚Â·Ã‚Â½ gÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¥Ã‚Â¹Ã¢â‚¬Å¡.
+    // NÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ§Ã‚Â°Ã¢â‚¬Ëœ vÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¥Ã‚ÂÃ¢â‚¬â€ cÃƒÂ§Ã‚Â°Ã‚Â·n ngÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° khÃƒÂ§Ã‚ÂÃ‚Âºc ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ hÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ sÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ lÃƒÂ¯Ã‚Â¿Ã‚Â½ ngÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° tÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¯Ã‚Â¸Ã‚Â½ log khi rÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° sau cÃƒÂ§Ã‚Â¾Ã¢â‚¬Â¦ng.
     if (remainingPeers > 0) {
-      console.log(`[GROUP_CALL_LOG] Skipping log ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ ${remainingPeers} peer(s) still in call`)
+      console.log(`[GROUP_CALL_LOG] Skipping log ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ ${remainingPeers} peer(s) still in call`)
       return
     }
 
-    // 2. Broadcast group-call:ended ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ dismiss banner cÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â§ nhÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â§ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“Ãƒâ€šÃ‚Â¸g ngÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â¥ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â° chÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¹a bÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â§Ãƒâ€¦Ã¢â‚¬Å“Ãƒâ€šÃ‚Â© mÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Âºy
-    console.log(`[GROUP_CALL_LOG] Last person leaving ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ broadcasting group-call:ended`)
+    // 2. Broadcast group-call:ended ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ dismiss banner cÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¥Ã‚ÂÃ‚Â§ nhÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ§Ã¢â‚¬â€œÃ‚Â¸g ngÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° chÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹a bÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ§Ã…â€œÃ‚Â© mÃƒÂ§Ã‚ÂÃ‚Âºy
+    console.log(`[GROUP_CALL_LOG] Last person leaving ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ broadcasting group-call:ended`)
     getSocket()?.emit('group-call:ended', {
       conversationId: convId,
       callId,
       endedByUserId: currentUserId,
     })
 
-    // 3. TÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â½ CALL_LOG message (chÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ ngÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â¥ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â° cuÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â©Ãƒâ€šÃ‚Â­ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ cÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¾ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ng rÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â¥ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°)
+    // 3. TÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¯Ã‚Â¸Ã‚Â½ CALL_LOG message (chÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ ngÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° cuÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ©Ã‚Â­Ã¢â€šÂ¬ cÃƒÂ§Ã‚Â¾Ã¢â‚¬Â¦ng rÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â°)
     console.log(`[GROUP_CALL_LOG] Creating call log. duration=${duration}s`)
     const logData = {
       v: 1,
@@ -2018,7 +2104,7 @@ export default function ChatPage() {
     }))
     updateConversationAfterMessage(convId, optimisticLog, true)
 
-      // 4. LÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¹u qua Socket vÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â¢Ãƒâ€šÃ‚Â¹ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ fallback REST
+      // 4. LÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹u qua Socket vÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¢Ã‚Â¹Ã¢â‚¬Å¡ fallback REST
       ; (async () => {
         let success = false
         for (let attempt = 1; attempt <= 2; attempt++) {
@@ -2084,7 +2170,7 @@ export default function ChatPage() {
     updateConversationAfterMessage,
   ])
 
-  const handleAddReaction = React.useCallback(
+  const handleAddReaction = useCallback(
     async (messageId: string, reactionKey: ReactionKey) => {
       if (!accessToken || !selectedConversationId || !user) {
         return
@@ -2259,7 +2345,7 @@ export default function ChatPage() {
     [accessToken, selectedConversationId, (user ? user.id : ""), emitSendMessage, syncMessageReaction, getSocket],
   )
 
-  const handleRemoveReaction = React.useCallback(
+  const handleRemoveReaction = useCallback(
     async (messageId: string, reactionKey: ReactionKey) => {
       if (!accessToken || !selectedConversationId) {
         return
@@ -2402,7 +2488,7 @@ export default function ChatPage() {
     [accessToken, selectedConversationId, (user ? user.id : ""), emitSendMessage, reactionStatesByMessage, syncMessageReaction, getSocket],
   )
 
-  const handleDeleteForMe = React.useCallback(
+  const handleDeleteForMe = useCallback(
     async (messageId: string) => {
       if (!accessToken || !messageId) {
         return
@@ -2421,7 +2507,7 @@ export default function ChatPage() {
     [accessToken],
   )
 
-  const handleRecallMessage = React.useCallback(
+  const handleRecallMessage = useCallback(
     async (messageId: string, conversationId: string) => {
       if (!accessToken) {
         return
@@ -2442,15 +2528,15 @@ export default function ChatPage() {
 
         // Update local message list for sender
         setMessagesByConversation((prev) => {
-           const current = prev[conversationId] ?? []
-           return {
-             ...prev,
-             [conversationId]: current.map(m => m.id === messageId ? { ...m, isRecalled: true, text: '' } : m)
-           }
+          const current = prev[conversationId] ?? []
+          return {
+            ...prev,
+            [conversationId]: current.map(m => m.id === messageId ? { ...m, isRecalled: true, text: '' } : m)
+          }
         })
 
         // Update Sidebar preview for sender
-        setConversations((prev) => 
+        setConversations((prev) =>
           prev.map((c) => {
             if (c.id === conversationId) {
               return { ...c, lastMessage: 'Tin nhắn đã được thu hồi' }
@@ -2469,7 +2555,7 @@ export default function ChatPage() {
     [accessToken, emitRecallMessage, joinConversation, syncMessageReaction, syncPinnedMessages],
   )
 
-  const handleTogglePinMessage = React.useCallback(
+  const handleTogglePinMessage = useCallback(
     async (messageId: string, conversationId: string) => {
       if (!accessToken || !user) {
         return
@@ -2486,7 +2572,7 @@ export default function ChatPage() {
         const canPin = isModerator || currentConv.allowMemberPin
 
         if (!canPin) {
-          toast.error('BÃ¡ÂºÂ¡n khÃƒÂ´ng cÃƒÂ³ quyÃ¡Â»Ân ghim tin nhÃ¡ÂºÂ¯n trong nhÃƒÂ³m nÃƒÂ y')
+          toast.error('Báº¡n khÃ´ng cÃ³ quyá»n ghim tin nháº¯n trong nhÃ³m nÃ y')
           return
         }
       }
@@ -2552,7 +2638,7 @@ export default function ChatPage() {
         }
 
         if (currentPins.length >= 3) {
-          toast.error('ChÃ¡Â»â€° Ã„â€˜Ã†Â°Ã¡Â»Â£c phÃƒÂ©p ghim tÃ¡Â»â€˜i Ã„â€˜a 3 tin nhÃ¡ÂºÂ¯n')
+          toast.error('Chá»‰ Ä‘Æ°á»£c phÃ©p ghim tá»‘i Ä‘a 3 tin nháº¯n')
           return
         }
 
@@ -2615,15 +2701,15 @@ export default function ChatPage() {
           ...prev,
           [conversationId]: previousPins,
         }))
-        const action = isPinned ? 'bÃ¡Â»Â ghim' : 'ghim'
+        const action = isPinned ? 'bá» ghim' : 'ghim'
         console.error(`[ChatPage.handleTogglePinMessage] Failed to ${action} message`, error)
-        toast.error(`KhÃƒÂ´ng thÃ¡Â»Æ’ ${action} tin nhÃ¡ÂºÂ¯n. Vui lÃƒÂ²ng thÃ¡Â»Â­ lÃ¡ÂºÂ¡i sau.`)
+        toast.error(`KhÃ´ng thá»ƒ ${action} tin nháº¯n. Vui lÃ²ng thá»­ láº¡i sau.`)
       }
     },
     [accessToken, pinnedMessageIds, user, emitSendMessage],
   )
 
-  const toggleMessageIdInList = React.useCallback((messageId: string) => {
+  const toggleMessageIdInList = useCallback((messageId: string) => {
     setSelectedMessageIds((prev) => {
       if (prev.includes(messageId)) {
         return prev.filter((item) => item !== messageId)
@@ -2633,12 +2719,12 @@ export default function ChatPage() {
     })
   }, [])
 
-  const handleClearMultiSelectMode = React.useCallback(() => {
+  const handleClearMultiSelectMode = useCallback(() => {
     setIsMultiSelectMode(false)
     setSelectedMessageIds([])
   }, [])
 
-  const handleMessageContextMenuAction = React.useCallback(
+  const handleMessageContextMenuAction = useCallback(
     (messageId: string, action: MessageContextMenuAction, message: ChatMessage, groupMessages?: ChatMessage[]) => {
       if (!messageId) {
         return
@@ -2694,7 +2780,7 @@ export default function ChatPage() {
     [handleDeleteForMe, handleRecallMessage, handleTogglePinMessage, toggleMessageIdInList],
   )
 
-  const handleShareMessage = React.useCallback(
+  const handleShareMessage = useCallback(
     async (targetUserIds: string[], note: string) => {
       if (!accessToken || !shareModalMessage || targetUserIds.length === 0) {
         return
@@ -2800,16 +2886,16 @@ export default function ChatPage() {
     [accessToken, emitSendMessage, joinConversation, shareModalMessage],
   )
 
-  const handleInitiateCall = React.useCallback(async (type: 'audio' | 'video') => {
+  const handleInitiateCall = useCallback(async (type: 'audio' | 'video') => {
     if (!selectedConversationId) return;
 
-    // Ã°Å¸â€œÅ¾ GROUP CALL routing Ã°Å¸â€œÅ¾ delegate to separate group call layer
+    // ðŸ“ž GROUP CALL routing ðŸ“ž delegate to separate group call layer
     if (selectedConversation?.isGroup) {
       await handleStartGroupCall(type === 'audio')
       return;
     }
 
-    // Ã°Å¸â€œÅ¾ Single call (1-1) Ã°Å¸â€œÅ¾ DO NOT MODIFY Ã°Å¸â€œÅ¾
+    // ðŸ“ž Single call (1-1) ðŸ“ž DO NOT MODIFY ðŸ“ž
     const callId = `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const socket = getSocket();
     if (!socket) return;
@@ -2840,7 +2926,8 @@ export default function ChatPage() {
     });
   }, [selectedConversationId, selectedConversation, currentUserId, getSocket, handleStartGroupCall]);
 
-  const handleEndCall = React.useCallback(async (reasonArg: any = 'hangup') => {
+
+  const handleEndCall = useCallback(async (reasonArg: any = 'hangup') => {
     const reason = typeof reasonArg === 'string' ? reasonArg : 'hangup';
     const currentCall = callStateRef.current;
     if (!currentCall.isOpen || !currentCall.conversationId) return;
@@ -3002,8 +3089,8 @@ export default function ChatPage() {
     }
   }, [selectedConversation, currentUserId, emitSendMessage, accessToken, updateConversationAfterMessage]);
 
-  const isAnsweringRef = React.useRef(false);
-  const handleAnswerCall = React.useCallback(async () => {
+  const isAnsweringRef = useRef(false);
+  const handleAnswerCall = useCallback(async () => {
     if (!callServiceRef.current || !callStateRef.current.isOpen || isAnsweringRef.current) return;
     if (callStateRef.current.status === 'connected') return;
 
@@ -3032,11 +3119,11 @@ export default function ChatPage() {
     }
   }, [handleEndCall]);
 
-  const handleToggleMic = React.useCallback(() => {
+  const handleToggleMic = useCallback(() => {
     callServiceRef.current?.toggleMic();
   }, []);
 
-  const handleToggleCamera = React.useCallback(() => {
+  const handleToggleCamera = useCallback(() => {
     callServiceRef.current?.toggleCamera();
   }, []);
 
@@ -3074,7 +3161,7 @@ export default function ChatPage() {
     }
   };
 
-  const handleCallEnd = React.useCallback(async (data: any) => {
+  const handleCallEnd = useCallback(async (data: any) => {
     const signalData = Array.isArray(data) ? data[0] : data;
     console.log('[CALL][RECEIVE END]', signalData);
     if (signalData.callId === callStateRef.current.callId) {
@@ -3140,17 +3227,17 @@ export default function ChatPage() {
   // ------------------------------------------------------------------------------------------------------------------------------------------------------------------
   // STABLE SIGNALING HANDLERS (using Refs to prevent listener churn)
   // ------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  const handleEndCallRef = React.useRef(handleEndCall);
-  React.useEffect(() => { handleEndCallRef.current = handleEndCall; }, [handleEndCall]);
+  const handleEndCallRef = useRef(handleEndCall);
+  useEffect(() => { handleEndCallRef.current = handleEndCall; }, [handleEndCall]);
 
-  const signalHandlersRef = React.useRef({
+  const signalHandlersRef = useRef({
     handleCallOffer,
     handleCallAnswer,
     handleCallIce,
     handleCallEnd
   });
 
-  React.useEffect(() => {
+  useEffect(() => {
     signalHandlersRef.current = {
       handleCallOffer,
       handleCallAnswer,
@@ -3159,7 +3246,7 @@ export default function ChatPage() {
     };
   }, [handleCallOffer, handleCallAnswer, handleCallIce, handleCallEnd]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const socket = getSocket();
     if (!socket || !currentUserId) return;
 
@@ -3213,8 +3300,10 @@ export default function ChatPage() {
     };
   }, [getSocket, currentUserId]);
 
+
+
   // Sync effect: Fetch profile for all group members when a conversation is opened
-  React.useEffect(() => {
+  useEffect(() => {
     if (!accessToken || !selectedConversationId) return;
     const selected = conversations.find(c => c.id === selectedConversationId);
     if (selected?.participantUserIds) {
@@ -3222,19 +3311,17 @@ export default function ChatPage() {
     }
   }, [accessToken, selectedConversationId, conversations, ensureUser]);
 
-  const loadInbox = React.useCallback(
+  const loadInbox = useCallback(
     async (token: string, preferredConversationId?: string) => {
       setIsLoadingConversations(true)
 
       try {
-        console.log('[ChatPage.loadInbox] Starting fetch:', { hasToken: !!token, userId: user?.id, routedId: routedConversationIdRef.current });
         const [itemsResult, policy, friends] = await Promise.all([
-          fetchInbox(token, user?.id).catch(e => { console.error("fetchInbox error", e); return []; }),
+          fetchInbox(token, user?.id),
           getSyncPolicy(token).catch(() => null),
           getFriends(token).catch(() => []),
         ])
         let items = itemsResult as any[];
-        console.log('[ChatPage.loadInbox] Inbox items loaded:', items.length);
 
         const targetId = preferredConversationId || routedConversationIdRef.current;
 
@@ -3253,7 +3340,7 @@ export default function ChatPage() {
         const missingIds = Array.from(proactiveIds).filter(id => !items.some(it => it.id === id));
 
         if (missingIds.length > 0) {
-          console.log("Ã¢Å¡Â¡ [ChatPage] Proactively fetching missing conversations:", missingIds);
+          console.log("âš¡ [ChatPage] Proactively fetching missing conversations:", missingIds);
           const fetchedResults = await Promise.all(
             missingIds.map(async (id) => {
               try {
@@ -3263,8 +3350,8 @@ export default function ChatPage() {
                 const status = err.response?.status;
                 // If it's a 404/403, cleanup localStorage so we don't keep trying forever
                 if (status === 404 || status === 403) {
-                  console.log(`[ChatPage] Ã°Å¸Â§Â¹ Purging ghost group ID: ${id}`);
-                  
+                  console.log(`[ChatPage] ðŸ§¹ Purging ghost group ID: ${id}`);
+
                   // 1. Cleanup localStorage
                   const stored = localStorage.getItem(`vnalo_pending_groups_${user?.id}`);
                   if (stored) {
@@ -3277,7 +3364,7 @@ export default function ChatPage() {
 
                   // 2. If this is the active conversation in URL, it's dead. Redirect!
                   if (id === targetId) {
-                    console.warn(`[ChatPage] Ã¢Å¡Â Ã¯Â¸Â Current URL points to dead conversation ${id}. Redirecting to /chat.`);
+                    console.warn(`[ChatPage] âš ï¸ Current URL points to dead conversation ${id}. Redirecting to /chat.`);
                     navigate('/chat');
                   }
                 }
@@ -3300,9 +3387,9 @@ export default function ChatPage() {
               const freshConvo: ConversationSummary = {
                 id: inner.id || c.id,
                 isGroup,
-                name: inner.title || c.title || (isGroup ? "NhÃƒÂ³m mÃ¡Â»â€ºi" : "NgÃ†Â°Ã¡Â»Âi dÃƒÂ¹ng mÃ¡Â»â€ºi"),
+                name: inner.title || c.title || (isGroup ? "Nhóm mới" : "Người dùng mới"),
                 avatarUrl: inner.avatarUrl || c.avatarUrl || null,
-                lastMessage: isGroup ? "NhÃƒÂ³m mÃ¡Â»â€ºi tÃ¡ÂºÂ¡o" : "[ThiÃ¡ÂºÂ¿t bÃ¡Â»â€¹] GÃ¡Â»Â­i lÃ¡Â»Âi chÃƒÂ o",
+                lastMessage: isGroup ? "Nhóm mới được tạo" : "[Thông báo] Gửi lời chào",
                 unreadCount: 0,
                 participantUserIds: participantIds,
                 memberCount: members.length,
@@ -3397,7 +3484,7 @@ export default function ChatPage() {
             it.conversation.members.forEach((m: any) => {
               const mid = String(m.userId ?? '').trim()
               const realName = (m.nickname || m.displayName || m.name || '').trim();
-              if (mid && realName && realName !== 'NgÃ†Â°Ã¡Â»Âi dÃƒÂ¹ng mÃ¡Â»â€ºi' && realName !== (mid === user?.id ? 'BÃ¡ÂºÂ¡n' : 'NgÃ†Â°Ã¡Â»Âi dÃƒÂ¹ng mÃ¡Â»â€ºi')) {
+              if (mid && realName && realName !== 'NgÆ°á»i dÃ¹ng má»›i' && realName !== (mid === user?.id ? 'Báº¡n' : 'NgÆ°á»i dÃ¹ng má»›i')) {
                 upsertUser(mid, {
                   displayName: realName,
                   avatarUrl: m.avatarUrl || null
@@ -3413,14 +3500,15 @@ export default function ChatPage() {
         const mappedItems = items.map((item: any) => {
           const peerId = (item.participantUserIds ?? []).find((participantId: string) => participantId !== user?.id)
           const isGroup = item.isGroup;
+          const isCloud = !isGroup && !peerId; // My Documents flag
           const resolvedPeerName = !isGroup && peerId ? friendNameById.get(peerId) : null
           const resolvedPeerAvatar = !isGroup && peerId ? (friendAvatarById.get(peerId) ?? null) : null
           const resolvedLastMessageSenderName = item.lastMessageSenderId
             ? (previewNameById.get(item.lastMessageSenderId) ?? null)
             : null
           const getName = (id: string) => {
-            if (id === user?.id) return 'Bạn'
-            return userMapRef.current[id]?.displayName || previewNameById.get(id) || 'NgÃ†Â°Ã¡Â»Âi dÃƒÂ¹ng mÃ¡Â»â€ºi'
+            if (id === user?.id) return 'Báº¡n'
+            return userMapRef.current[id]?.displayName || previewNameById.get(id) || 'NgÆ°á»i dÃ¹ng má»›i'
           }
           const formattedLastMessage = formatConversationPreview(
             resolvedLastMessageSenderName,
@@ -3430,19 +3518,14 @@ export default function ChatPage() {
           )
           const isStranger = !isGroup && peerId ? !friendIdSet.has(peerId) : false
 
-          const withName = (!isGroup && resolvedPeerName)
-            ? {
-              ...item,
-              name: resolvedPeerName,
-              avatarUrl: resolvedPeerAvatar,
-              lastMessage: formattedLastMessage,
-              isStranger,
-            }
-            : {
-              ...item,
-              lastMessage: formattedLastMessage,
-              isStranger,
-            }
+          let withName = item;
+          if (isCloud) {
+            withName = { ...item, name: 'My Documents', avatarUrl: null, isCloud: true, lastMessage: formattedLastMessage, isStranger: false };
+          } else if (!isGroup && resolvedPeerName) {
+            withName = { ...item, name: resolvedPeerName, avatarUrl: resolvedPeerAvatar, lastMessage: formattedLastMessage, isStranger };
+          } else {
+            withName = { ...item, lastMessage: formattedLastMessage, isStranger };
+          }
 
           return applyRestrictedConversationPreview(withName, false)
         })
@@ -3455,43 +3538,31 @@ export default function ChatPage() {
           })
         }
         setIsRestrictedMode(false)
-        console.log('Ã¢Å¡Â¡ [DEBUG] Inbox items from API:', mappedItems);
+        console.log('âš¡ [DEBUG] Inbox items from API:', mappedItems);
 
-        const deduplicateById = (items: ConversationSummary[]): ConversationSummary[] => {
-          const seen = new Set<string>()
-          const seenPeers = new Set<string>()
-          return items.filter((item) => {
-            if (seen.has(item.id)) return false
 
-            if (!item.isGroup && !item.isCloud) {
-              const peerId = (item.participantUserIds ?? []).find(id => id !== user?.id)
-              if (peerId) {
-                if (seenPeers.has(peerId)) return false
-                seenPeers.add(peerId)
-              }
-            }
 
-            seen.add(item.id)
-            return true
-          })
+        const finalMappedItems = [...mappedItems];
+        if (!finalMappedItems.some(c => c.id === 'my-documents' || c.isCloud)) {
+          finalMappedItems.push(myDocumentsConversation);
         }
 
         setConversations((prev) => {
-          if (!targetId) return mappedItems;
+          if (!targetId) return finalMappedItems;
 
           // Try to find it in the freshly fetched items first
-          const targetInFetched = mappedItems.find(item => item.id === targetId);
+          const targetInFetched = finalMappedItems.find(item => item.id === targetId);
           if (targetInFetched) {
-            return [targetInFetched, ...mappedItems.filter(item => item.id !== targetId)];
+            return [targetInFetched, ...finalMappedItems.filter(item => item.id !== targetId)];
           }
 
           // Fallback: try to find it in previous state
           const targetInPrev = prev.find(item => item.id === targetId);
           if (targetInPrev) {
-            return [targetInPrev, ...mappedItems.filter(item => item.id !== targetId)];
+            return [targetInPrev, ...finalMappedItems.filter(item => item.id !== targetId)];
           }
 
-          return mappedItems;
+          return finalMappedItems;
         })
         setSelectedConversationId((prev) => {
           if (preferredConversationId) {
@@ -3516,9 +3587,10 @@ export default function ChatPage() {
     [(user ? user.id : ""), user?.name, upsertUser],
   )
 
-  const inboxSummarySyncingRef = React.useRef(false)
 
-  React.useEffect(() => {
+  const inboxSummarySyncingRef = useRef(false)
+
+  useEffect(() => {
     if (!accessToken || !user?.id || !isSocketConnected || conversations.length === 0) {
       return
     }
@@ -3603,9 +3675,9 @@ export default function ChatPage() {
                 return conversation
               }
             } else {
-               // Newer summary detected, trigger message sync (Mobile-like fallback)
-               console.log('[ChatPage] Ã°Å¸â€â€ž Out-of-sync summary for:', conversation.id, 'Triggering message sync');
-               void syncLatestMessages(conversation.id);
+              // Newer summary detected, trigger message sync (Mobile-like fallback)
+              console.log('[ChatPage] ðŸ”„ Out-of-sync summary for:', conversation.id, 'Triggering message sync');
+              void syncLatestMessages(conversation.id);
             }
 
             changed = true
@@ -3668,10 +3740,10 @@ export default function ChatPage() {
     }
   }, [accessToken, conversations.length, isSocketConnected, (user ? user.id : "")])
 
-  const handleCreateGroup = React.useCallback(
+  const handleCreateGroup = useCallback(
     async (groupName: string, avatarUrl: string | null, memberIds: string[]) => {
       if (!accessToken || !user) {
-        toast.error("Vui lÃƒÂ²ng Ã„â€˜Ã„Æ’ng nhÃ¡ÂºÂ­p lÃ¡ÂºÂ¡i");
+        toast.error("Vui lÃ²ng Ä‘Äƒng nháº­p láº¡i");
         return;
       }
 
@@ -3705,7 +3777,7 @@ export default function ChatPage() {
           name: groupName,
           isGroup: true,
           avatarUrl: finalAvatarUrl,
-          lastMessage: "BÃ¡ÂºÂ¡n Ã„â€˜ÃƒÂ£ tÃ¡ÂºÂ¡o nhÃƒÂ³m",
+          lastMessage: "Báº¡n Ä‘Ã£ táº¡o nhÃ³m",
           unreadCount: 0,
           participantUserIds: memberIds,
           memberCount: memberIds.length + 1,
@@ -3722,7 +3794,7 @@ export default function ChatPage() {
 
         // Seed cache for myself too
         upsertUser(user.id, {
-          displayName: user.name || "BÃ¡ÂºÂ¡n",
+          displayName: user.name || "Báº¡n",
           avatarUrl: user.avatarUrl || null
         });
 
@@ -3772,11 +3844,12 @@ export default function ChatPage() {
         // Refresh conversation list to sync with backend
         await loadInbox(accessToken, groupId);
 
+
         navigate(`/chat/${groupId}`);
         setIsCreateGroupOpen(false);
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "KhÃƒÂ´ng thÃ¡Â»Æ’ tÃ¡ÂºÂ¡o nhÃƒÂ³m. Vui lÃƒÂ²ng thÃ¡Â»Â­ lÃ¡ÂºÂ¡i.";
-        console.error("Ã¢Å¡Â¡ [CREATE GROUP] LÃ¡Â»â€”i:", error);
+        const errorMessage = error instanceof Error ? error.message : "KhÃ´ng thá»ƒ táº¡o nhÃ³m. Vui lÃ²ng thá»­ láº¡i.";
+        console.error("âš¡ [CREATE GROUP] Lá»—i:", error);
         toast.error(errorMessage);
       } finally {
         setIsCreatingGroup(false);
@@ -3785,7 +3858,9 @@ export default function ChatPage() {
     [accessToken, user, navigate, loadInbox, emitSendMessage, joinConversation]
   );
 
-  React.useEffect(() => {
+
+
+  useEffect(() => {
     if (!accessToken) {
       setConversations([])
       setMessagesByConversation({})
@@ -3806,7 +3881,7 @@ export default function ChatPage() {
 
   // Removed polling fallback: rely on socket + auto-join for realtime updates
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!routedConversationId) {
       return
     }
@@ -3814,7 +3889,7 @@ export default function ChatPage() {
     setSelectedConversationId(routedConversationId)
   }, [routedConversationId])
 
-  const handleSearchFriends = React.useCallback(
+  const handleSearchFriends = useCallback(
     async (keyword: string) => {
       if (!accessToken) {
         setFriendResults([])
@@ -3852,13 +3927,13 @@ export default function ChatPage() {
     [accessToken],
   )
 
-  const handleSelectConversation = React.useCallback(
+  const handleSelectConversation = useCallback(
     async (conversationId: string) => {
       setSelectedConversationId(conversationId)
       navigate('/chat/' + conversationId)
 
       // Proactively refresh metadata for the selected conversation
-      if (accessToken && conversationId && !conversationId.startsWith('vnalo_cloud_')) {
+      if (accessToken && conversationId && conversationId !== 'my-documents') {
         try {
           const detailRaw = await fetchConversation(accessToken, conversationId).catch(() => null);
           if (detailRaw) {
@@ -3914,12 +3989,12 @@ export default function ChatPage() {
     [accessToken, navigate, (user ? user.id : ""), upsertUser],
   )
 
-  const handleOpenCreateGroupModal = React.useCallback(() => {
+  const handleOpenCreateGroupModal = useCallback(() => {
     setPreselectedMemberIds([]);
     setIsCreateGroupOpen(true)
   }, [])
 
-  const handleCreateGroupFromDirect = React.useCallback(() => {
+  const handleCreateGroupFromDirect = useCallback(() => {
     if (selectedConversation && !selectedConversation.isGroup) {
       const peerId = (selectedConversation.participantUserIds ?? [])[0];
       if (peerId) {
@@ -3934,7 +4009,7 @@ export default function ChatPage() {
   }, [selectedConversation]);
 
   // Handlers for global search panel
-  const handleGlobalSearchSelectMessage = React.useCallback(
+  const handleGlobalSearchSelectMessage = useCallback(
     (messageId: string, conversationId: string) => {
       setSelectedConversationId(conversationId)
       navigate(`/chat/${conversationId}`)
@@ -3944,7 +4019,7 @@ export default function ChatPage() {
     [navigate],
   )
 
-  const handleGlobalSearchSelectConversation = React.useCallback(
+  const handleGlobalSearchSelectConversation = useCallback(
     (conversationId: string) => {
       setSelectedConversationId(conversationId)
       navigate(`/chat/${conversationId}`)
@@ -3953,7 +4028,7 @@ export default function ChatPage() {
     [navigate],
   )
 
-  const handleGlobalSearchSelectUser = React.useCallback(
+  const handleGlobalSearchSelectUser = useCallback(
     async (userId: string) => {
       if (!accessToken || !user) {
         return
@@ -3969,12 +4044,14 @@ export default function ChatPage() {
     [accessToken, user, handleGlobalSearchSelectConversation],
   )
 
-  const handleOpenUserProfile = React.useCallback((userId: string) => {
+  const handleOpenUserProfile = useCallback((userId: string) => {
     setSelectedProfileUserId(userId)
     setIsProfileModalOpen(true)
   }, [])
 
-  const handleLoadConversationMessages = React.useCallback((conversationId: string) => {
+
+
+  const handleLoadConversationMessages = useCallback((conversationId: string) => {
     if (!accessToken || !conversationId || !user) {
       return
     }
@@ -3991,7 +4068,7 @@ export default function ChatPage() {
     void (async () => {
       try {
         // Proactively refresh metadata to ensure member count etc is updated
-        if (accessToken && !conversationId.startsWith('vnalo_cloud_')) {
+        if (accessToken && conversationId !== 'my-documents') {
           void (async () => {
             try {
               const detailRaw = await fetchConversation(accessToken, conversationId).catch(() => null);
@@ -4021,6 +4098,8 @@ export default function ChatPage() {
                     members: members.map((m: any) => ({
                       userId: String(m.userId ?? '').trim(),
                       role: String(m.role ?? 'MEMBER').toUpperCase(),
+                      displayName: m.displayName || m.name || m.fullName,
+                      avatarUrl: m.avatarUrl || m.avatar,
                     })),
                     participantUserIds: participantIds,
                     avatarUrl: isGroup ? (inner.avatarUrl || conv.avatarUrl) : (inner.avatarUrl || conv.avatarUrl),
@@ -4054,14 +4133,33 @@ export default function ChatPage() {
           })();
         }
 
-        const isVirtualCloud = conversationId === `vnalo_cloud_${user.id}`
-        const rawMessages = isVirtualCloud ? [] : await fetchMessages(accessToken, conversationId)
-        console.log('DÃ¡Â»Â¯ liÃ¡Â»â€¡u tin nhÃ¡ÂºÂ¯n nhÃ¡ÂºÂ­n Ã„â€˜Ã†Â°Ã¡Â»Â£c:', rawMessages)
-        const mapped = sortMessages(
-          rawMessages
-            .map((message) => applyRestrictedMessage(normalizeMessage(mapRawMessage(message, user.id)), isRestrictedMode))
-            .filter((message) => !deletedMessageIds[message.id]),
-        )
+        const isVirtualCloud = conversationId === 'my-documents'
+        let mapped: ChatMessage[] = []
+
+        if (isVirtualCloud) {
+          try {
+            const key = `vnalo_cloud_msgs_${user.id}`;
+            const saved = localStorage.getItem(key);
+            if (saved) {
+              const rawCloudMsgs = JSON.parse(saved);
+              mapped = sortMessages(
+                (Array.isArray(rawCloudMsgs) ? rawCloudMsgs : [])
+                  .map((m) => normalizeMessage(m))
+                  .filter((m) => !deletedMessageIds[m.id])
+              );
+            }
+          } catch (e) {
+            console.error('Failed to load local cloud messages', e);
+          }
+        } else {
+          const rawMessages = await fetchMessages(accessToken, conversationId)
+          console.log('Dữ liệu tin nhắn nhận được:', rawMessages)
+          mapped = sortMessages(
+            rawMessages
+              .map((message) => applyRestrictedMessage(normalizeMessage(mapRawMessage(message, user.id)), isRestrictedMode))
+              .filter((message) => !deletedMessageIds[message.id]),
+          )
+        }
 
         // Capture all recalled messages from the fetched data
         const loadTimeRecalledIds: Record<string, true> = {};
@@ -4104,7 +4202,9 @@ export default function ChatPage() {
     })()
   }, [accessToken, deletedMessageIds, isRestrictedMode, syncConversationReactions, syncPinnedMessages, user, upsertUser])
 
-  React.useEffect(() => {
+
+
+  useEffect(() => {
     if (!isSocketConnected || !selectedConversationId || !accessToken) {
       return
     }
@@ -4123,43 +4223,39 @@ export default function ChatPage() {
     }
   }, [accessToken, isSocketConnected, selectedConversationId, syncConversationReactions])
 
-  React.useEffect(() => {
+  useEffect(() => {
     console.log('[ChatPage.onPresenceChanged] Conversation IDs:', conversations.map((conv) => conv.userId))
   }, [conversations])
 
-  const conversationIdsSignature = React.useMemo(
-    () => conversations.map((conversation) => conversation.id).sort().join(','),
-    [conversations],
-  )
 
-  const joinAllConversations = React.useCallback(async (list: ConversationSummary[]) => {
+  const joinAllConversations = useCallback(async (list: ConversationSummary[]) => {
     const conversationIds = list.map((conversation) => conversation.id)
 
     if (conversationIds.length === 0) {
       return
     }
 
-    console.log('--- Ã„ÂANG THÃ¡Â»Â°C HIÃ¡Â»â€ N JOIN ROOM CHO', list.length, 'HÃ¡Â»ËœI THOÃ¡ÂºÂ I ---')
-    console.log('TÃ¡Â»Â± Ã„â€˜Ã¡Â»â„¢ng Join vÃ¡Â»Â cÃƒÂ¡c room:', conversationIds)
+    console.log('--- ÄANG THá»°C HIá»†N JOIN ROOM CHO', list.length, 'Há»˜I THOáº I ---')
+    console.log('Tá»± Ä‘á»™ng Join vá» cÃ¡c room:', conversationIds)
 
     await joinMultipleConversations(conversationIds)
   }, [joinMultipleConversations])
 
-  const previousSocketConnectedRef = React.useRef(false)
+  const previousSocketConnectedRef = useRef(false)
 
-  React.useEffect(() => {
+  useEffect(() => {
     const socket = getSocket()
     const currentConnected = Boolean(socket?.connected)
 
     if (!previousSocketConnectedRef.current && currentConnected && conversations.length > 0) {
-      console.log('[ChatPage.retryJoin] Socket vÃ¡Â»Â«a chuyÃ¡Â»Æ’n false -> true, join lÃ¡ÂºÂ¡i rooms')
+      console.log('[ChatPage.retryJoin] Socket vá»«a chuyá»ƒn false -> true, join láº¡i rooms')
       void joinAllConversations(conversations)
     }
 
     previousSocketConnectedRef.current = currentConnected
   }, [conversations, getSocket, joinAllConversations])
 
-  const handleOpenFriendChat = React.useCallback(
+  const handleOpenFriendChat = useCallback(
     async (friend: UserLookupResult) => {
       if (!accessToken) {
         return
@@ -4193,7 +4289,7 @@ export default function ChatPage() {
         setSelectedConversationId(conversationId)
         navigate(`/chat/${conversationId}`)
         await joinConversation(conversationId)
-        console.log('[ChatPage.openDirectConversation] Ã¢Å¡Â¡ Joined conversation:', conversationId)
+        console.log('[ChatPage.openDirectConversation] âš¡ Joined conversation:', conversationId)
         await loadInbox(accessToken, conversationId)
       } catch (error) {
         console.error('Failed to open direct conversation', error)
@@ -4202,7 +4298,7 @@ export default function ChatPage() {
     [accessToken, joinConversation, loadInbox, navigate, t],
   )
 
-  React.useEffect(() => {
+  useEffect(() => {
     // Only redirect if we are at the root /chat path AND we have a previously selected ID
     // but we ARE NOT already on that routed path.
     if (!routedConversationId && selectedConversationId) {
@@ -4211,14 +4307,14 @@ export default function ChatPage() {
   }, [navigate, routedConversationId, selectedConversationId])
 
   // Save selection to localStorage whenever it changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (selectedConversationId) {
       localStorage.setItem('vnalo_last_conv_id', selectedConversationId);
     }
   }, [selectedConversationId])
 
   // Load last selection on mount if we are at the root
-  React.useEffect(() => {
+  useEffect(() => {
     if (!routedConversationId) {
       const lastId = localStorage.getItem('vnalo_last_conv_id');
       if (lastId && conversations.some(c => c.id === lastId)) {
@@ -4230,10 +4326,10 @@ export default function ChatPage() {
   // ------------------------------------------------------------------------------------------------------------------------------------------------------------------
   // SMART JOIN ROOMS (Only join once per session/reconnect)
   // ------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  const joinedIdsRef = React.useRef<Set<string>>(new Set())
-  const lastJoinedSocketIdRef = React.useRef<string | null>(null)
+  const joinedIdsRef = useRef<Set<string>>(new Set())
+  const lastJoinedSocketIdRef = useRef<string | null>(null)
 
-  React.useEffect(() => {
+  useEffect(() => {
     // Hard check every time conversations or connection state changes
     const socket = getSocket();
     const actualConnected = Boolean(socket?.connected);
@@ -4242,20 +4338,20 @@ export default function ChatPage() {
     // If socket ID changed (reconnect), we MUST clear the joined cache
     // because server-side room membership is lost on reconnect.
     if (currentSocketId !== lastJoinedSocketIdRef.current) {
-      console.log(`[ChatPage.join] Ã¢Å¡Â¡ Socket ID changed from ${lastJoinedSocketIdRef.current} to ${currentSocketId}, clearing joined cache`);
+      console.log(`[ChatPage.join] âš¡ Socket ID changed from ${lastJoinedSocketIdRef.current} to ${currentSocketId}, clearing joined cache`);
       joinedIdsRef.current.clear();
       lastJoinedSocketIdRef.current = currentSocketId;
     }
 
     if (actualConnected && !isSocketConnected) {
-      console.log('[ChatPage.join] Ã¢Å¡Â¡ Fixing connection state (out of sync)');
+      console.log('[ChatPage.join] âš¡ Fixing connection state (out of sync)');
       setIsSocketConnected(true);
       return;
     }
 
     if (!actualConnected || !isSocketConnected) {
       if (joinedIdsRef.current.size > 0) {
-        console.log('[ChatPage.join] Ã¢Å¡Â¡ Socket disconnected, clearing joined cache');
+        console.log('[ChatPage.join] âš¡ Socket disconnected, clearing joined cache');
         joinedIdsRef.current.clear();
       }
       return;
@@ -4265,7 +4361,7 @@ export default function ChatPage() {
     const newIds = currentIds.filter((id) => id && !joinedIdsRef.current.has(id));
 
     if (newIds.length > 0) {
-      console.log(`[ChatPage.join] Ã¢Å¡Â¡ Joining ${newIds.length} new rooms for socket ${currentSocketId}`);
+      console.log(`[ChatPage.join] âš¡ Joining ${newIds.length} new rooms for socket ${currentSocketId}`);
       newIds.forEach((id) => {
         void (async () => {
           const joined = await joinConversation(id);
@@ -4281,9 +4377,9 @@ export default function ChatPage() {
 
   // 1. Mark as read on conversation change or new messages (with guard)
   // 1. Mark as read on conversation change or new messages (with guard)
-  const lastEmittedReadRef = React.useRef<Record<string, number>>({})
+  const lastEmittedReadRef = useRef<Record<string, number>>({})
 
-  React.useEffect(() => {
+  useEffect(() => {
     const activeConversationId = routedConversationId || selectedConversationId
 
     if (!accessToken || !activeConversationId) {
@@ -4306,7 +4402,7 @@ export default function ChatPage() {
       refreshNotificationBadges()
     }
   }, [accessToken, markAsRead, messagesByConversation, routedConversationId, selectedConversationId])
-  React.useEffect(() => {
+  useEffect(() => {
     if (!accessToken || !selectedConversationId) {
       return
     }
@@ -4315,7 +4411,7 @@ export default function ChatPage() {
   }, [accessToken, selectedConversationId, syncPinnedMessages])
 
   // Auto-update presence status every 60 seconds to refresh time-based text
-  React.useEffect(() => {
+  useEffect(() => {
     const interval = setInterval(() => {
       setConversations((prev) => [...prev])
     }, 60000)
@@ -4323,7 +4419,7 @@ export default function ChatPage() {
     return () => clearInterval(interval)
   }, [])
 
-  const handleSend = React.useCallback(
+  const handleSend = useCallback(
     async (draft: ChatComposePayload) => {
       const conversationId = selectedConversationIdRef.current || selectedConversationId || routedConversationId
 
@@ -4350,18 +4446,10 @@ export default function ChatPage() {
 
       console.log('[ChatPage.send] Draft replyTo:', replyTo)
 
-      // Fallback resolve virtual "My Documents" to real conversation if needed
+      // Virtual "My Documents" uses local storage, no need to resolve to a real conversation
       let targetConversationId = conversationId;
-      if (conversationId === `vnalo_cloud_${user.id}`) {
-        try {
-          const realId = await getOrCreateDirectConversation(accessToken, user.id);
-          targetConversationId = realId;
-          setConversations(prev => prev.map(c => c.id === conversationId ? { ...c, id: realId } : c));
-          setSelectedConversationId(realId);
-        } catch (err) {
-          console.error('[ChatPage.send] Final attempt to resolve cloud chat failed', err);
-          return;
-        }
+      if (conversationId === 'my-documents') {
+        targetConversationId = 'my-documents';
       }
 
       const clientMessageId = generateUUID()
@@ -4472,7 +4560,7 @@ export default function ChatPage() {
           sender: 'me',
           senderId: user.id,
           type: 'text',
-          isLocal: false,
+          isLocal: true,
           text: content,
           timestamp: formatMessageTimestamp(),
           deliveryState: 'sending',
@@ -4484,6 +4572,19 @@ export default function ChatPage() {
         const nextMsgs = upsertMessage(prevMsgs, optimisticTextMessage)
         setMessagesByConversation(prev => ({ ...prev, [targetConversationId]: nextMsgs }));
         updateConversationAfterMessage(targetConversationId, optimisticTextMessage, true, nextMsgs);
+
+        // Virtual Cloud Chat: Bypass backend and save to localStorage
+        if (targetConversationId === 'my-documents') {
+          const sentMessage = { ...optimisticTextMessage, deliveryState: 'sent' as const, createdAt: new Date().toISOString() };
+          setMessagesByConversation(prev => ({ ...prev, [targetConversationId]: upsertMessage(prev[targetConversationId] ?? [], sentMessage) }));
+          updateConversationAfterMessage(targetConversationId, sentMessage, true);
+
+          const key = `vnalo_cloud_msgs_${user.id}`;
+          const existingStr = localStorage.getItem(key);
+          const existing = existingStr ? JSON.parse(existingStr) : [];
+          localStorage.setItem(key, JSON.stringify([sentMessage, ...existing]));
+          return;
+        }
 
         const ack = await emitSendMessage(payload);
         if (ack?.event === 'message.sent' && ack?.data) {
@@ -4547,7 +4648,7 @@ export default function ChatPage() {
           sender: 'me',
           senderId: user.id,
           type: resTypeStr as any,
-          isLocal: false,
+          isLocal: true,
           text: resContent,
           mediaUrl: res.url,
           mediaThumbnailUrl: res.thumbnailUrl,
@@ -4557,7 +4658,7 @@ export default function ChatPage() {
           // We keep attachments in local state only for the UI to potentially group them
           attachments: [{
             url: res.url,
-            name: allFiles[i]?.name || "TÃ¡Â»â€¡p",
+            name: allFiles[i]?.name || "Tá»‡p",
             mimeType: res.mimeType,
             sizeBytes: res.sizeBytes,
             thumbnailUrl: res.thumbnailUrl
@@ -4572,6 +4673,19 @@ export default function ChatPage() {
           [targetConversationId]: upsertMessage(prev[targetConversationId] ?? [], optimisticMessage)
         }));
         updateConversationAfterMessage(targetConversationId, optimisticMessage, true);
+
+        // Virtual Cloud Chat: Bypass backend and save to localStorage
+        if (targetConversationId === 'my-documents') {
+          const sentMessage = { ...optimisticMessage, deliveryState: 'sent' as const, createdAt: new Date().toISOString() };
+          setMessagesByConversation(prev => ({ ...prev, [targetConversationId]: upsertMessage(prev[targetConversationId] ?? [], sentMessage) }));
+          updateConversationAfterMessage(targetConversationId, sentMessage, true);
+
+          const key = `vnalo_cloud_msgs_${user.id}`;
+          const existingStr = localStorage.getItem(key);
+          const existing = existingStr ? JSON.parse(existingStr) : [];
+          localStorage.setItem(key, JSON.stringify([sentMessage, ...existing]));
+          continue;
+        }
 
         // Send a message using socket, then fallback to REST if needed
         const ack = await emitSendMessage(payload);
@@ -4618,8 +4732,8 @@ export default function ChatPage() {
     [accessToken, emitSendMessage, isRestrictedMode, routedConversationId, selectedConversationId, updateConversationAfterMessage, user],
   )
 
-  const handleSendPoll = React.useCallback(
-    async (poll: PollMetadata) => {
+  const handleSendPoll = useCallback(
+    async (poll: any) => {
       const conversationId = selectedConversationIdRef.current || selectedConversationId || routedConversationId
       if (!conversationId || !user || !accessToken) return
 
@@ -4631,8 +4745,8 @@ export default function ChatPage() {
         sender: 'me',
         senderId: user.id,
         type: 'poll',
-        isLocal: false,
-        text: `Ã°Å¸â€œÅ  BÃƒÂ¬nh chÃ¡Â»Ân: ${poll.question}`,
+        isLocal: true,
+        text: `ðŸ“Š BÃ¬nh chá»n: ${poll.question}`,
         pollData: poll,
         timestamp: formatMessageTimestamp(),
         deliveryState: 'sending',
@@ -4647,7 +4761,7 @@ export default function ChatPage() {
       const pollPayload = {
         type: 'poll',
         question: poll.question,
-        options: poll.options.map(opt => ({
+        options: poll.options.map((opt: any) => ({
           id: opt.id,
           label: opt.label,
           votes: []
@@ -4688,7 +4802,7 @@ export default function ChatPage() {
     [accessToken, emitSendMessage, routedConversationId, selectedConversationId, updateConversationAfterMessage, upsertMessage, user]
   )
 
-  const handleVotePoll = React.useCallback(
+  const handleVotePoll = useCallback(
     async (messageId: string, optionId: string) => {
       const conversationId = selectedConversationIdRef.current || selectedConversationId || routedConversationId
       if (!conversationId || !user || !accessToken) return
@@ -4707,7 +4821,7 @@ export default function ChatPage() {
     [accessToken, handleAddReaction, routedConversationId, selectedConversationId, user]
   )
 
-  const handleSearchConversation = React.useCallback(
+  const handleSearchConversation = useCallback(
     async (conversationId: string, keyword: string) => {
       if (!accessToken || !user) {
         return { messages: [] as ChatMessage[], files: [] as ChatMessage[] }
@@ -4796,7 +4910,7 @@ export default function ChatPage() {
     [accessToken, messagesByConversation, user],
   )
 
-  const handleToggleSearchSidebar = React.useCallback(() => {
+  const handleToggleSearchSidebar = useCallback(() => {
     // If there's a selected conversation, toggle in-conversation search
     // Otherwise, toggle global search
     if (selectedConversationIdRef.current) {
@@ -4806,12 +4920,12 @@ export default function ChatPage() {
     }
   }, [])
 
-  const handleToggleInfoSidebar = React.useCallback(() => {
+  const handleToggleInfoSidebar = useCallback(() => {
     setRightSidebarContent((prev) => (prev === 'info' ? null : 'info'))
   }, [])
 
   // Add keyboard shortcut Cmd/Ctrl+K for global search
-  React.useEffect(() => {
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault()
@@ -4832,7 +4946,7 @@ export default function ChatPage() {
       const role = String(myMember?.role || '').toUpperCase()
       const isModerator = role === 'ADMIN' || role === 'DEPUTY'
       if (!isModerator && !selectedConversation.allowMemberEditInfo) {
-        toast.error('BÃ¡ÂºÂ¡n khÃƒÂ´ng cÃƒÂ³ quyÃ¡Â»Ân thay Ã„â€˜Ã¡Â»â€¢i tÃƒÂªn nhÃƒÂ³m')
+        toast.error('Báº¡n khÃ´ng cÃ³ quyá»n thay Ä‘á»•i tÃªn nhÃ³m')
         return
       }
     }
@@ -4843,7 +4957,7 @@ export default function ChatPage() {
           c.id === selectedConversationId ? { ...c, name: newName } : c
         )
       )
-      toast.success('CÃ¡ÂºÂ­p nhÃ¡ÂºÂ­t tÃƒÂªn nhÃƒÂ³m thÃƒÂ nh cÃƒÂ´ng')
+      toast.success('Cáº­p nháº­t tÃªn nhÃ³m thÃ nh cÃ´ng')
 
       const systemPayload = JSON.stringify({
         action: 'UPDATE_GROUP_INFO',
@@ -4855,7 +4969,7 @@ export default function ChatPage() {
       void emitSendMessage({
         conversationId: selectedConversationId,
         content: systemPayload,
-        messageType: 'system',
+        messageType: 'SYSTEM',
         clientMessageId
       });
 
@@ -4884,7 +4998,7 @@ export default function ChatPage() {
         [selectedConversationId]: upsertMessage(prev[selectedConversationId] ?? [], optimisticSystemMessage)
       }));
     } catch (err) {
-      toast.error('CÃƒÂ³ lÃ¡Â»â€”i xÃ¡ÂºÂ£y ra khi cÃ¡ÂºÂ­p nhÃ¡ÂºÂ­t tÃƒÂªn nhÃƒÂ³m')
+      toast.error('CÃ³ lá»—i xáº£y ra khi cáº­p nháº­t tÃªn nhÃ³m')
       console.error(err)
     }
   }
@@ -4898,7 +5012,7 @@ export default function ChatPage() {
       const isModerator = (currentConv?.members?.find(m => m.userId === user?.id)?.role || '').toUpperCase() === 'ADMIN' || (currentConv?.members?.find(m => m.userId === user?.id)?.role || '').toUpperCase() === 'DEPUTY'
       if (currentConv?.isGroup) {
         if (!isModerator && !currentConv.allowMemberEditInfo) {
-          toast.error('BÃ¡ÂºÂ¡n khÃƒÂ´ng cÃƒÂ³ quyÃ¡Â»Ân thay Ã„â€˜Ã¡Â»â€¢i Ã¡ÂºÂ£nh nhÃƒÂ³m')
+          toast.error('Báº¡n khÃ´ng cÃ³ quyá»n thay Ä‘á»•i áº£nh nhÃ³m')
           return
         }
       }
@@ -4951,7 +5065,7 @@ export default function ChatPage() {
       // 5. Success - Silent per user request
     } catch (err: any) {
       console.error('Failed to update group avatar:', err);
-      toast.error(err.message || 'CÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¨Ãƒâ€šÃ‚Â¨Ãƒâ€¹Ã¢â‚¬Â  nhÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¨Ãƒâ€šÃ‚Â²Ãƒâ€šÃ‚Â  ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾h ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â£ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â diÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â¡Ãƒâ€šÃ‚ÂµÃƒâ€¦Ã‚Â¾ thÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â¦ bÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â£ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â');
+      toast.error(err.message || 'CÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â¨Ã‹â€  nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â²Ã‚Â  ÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂÃ¢â‚¬Å¾h ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã‚Â diÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¡Ã‚ÂµÃ…Â¾ thÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¥Ã‚ÂÃ‚Â¦ bÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã‚Â');
     }
   };
 
@@ -4959,7 +5073,7 @@ export default function ChatPage() {
     if (!selectedConversationId || !accessToken) return
     const targetUserId = selectedConversation?.userId || selectedConversation?.participantUserIds?.[0]
     if (!targetUserId) {
-      toast.error('KhÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¹Ãƒâ€šÃ‚Â«ng tÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â«m thÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â¥ ngÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â¥ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â° dÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¾ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ng ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ cÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¨Ãƒâ€šÃ‚Â¨Ãƒâ€¹Ã¢â‚¬Â  nhÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¨Ãƒâ€šÃ‚Â²Ãƒâ€šÃ‚Â  tÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¤ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢n gÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã…Â½Ãƒâ€šÃ‚Â¾ nhÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½')
+      toast.error('KhÃƒÂ§Ã‚Â¹Ã‚Â«ng tÃƒÂ§Ã‚Â©Ã‚Â«m thÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¥Ã‚ÂÃ‚Â¥ ngÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° dÃƒÂ§Ã‚Â¾Ã¢â‚¬Â¦ng ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ cÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â¨Ã‹â€  nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â²Ã‚Â  tÃƒÂ§Ã‚Â¤Ã¢â€žÂ¢n gÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÅ½Ã‚Â¾ nhÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½')
       return;
     }
     try {
@@ -4969,9 +5083,9 @@ export default function ChatPage() {
           c.id === selectedConversationId ? { ...c, name: newNickname } : c
         )
       )
-      toast.success('CÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¨Ãƒâ€šÃ‚Â¨Ãƒâ€¹Ã¢â‚¬Â  nhÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¨Ãƒâ€šÃ‚Â²Ãƒâ€šÃ‚Â  tÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¤ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢n gÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã…Â½Ãƒâ€šÃ‚Â¾ nhÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ thÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½nh cÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¹Ãƒâ€šÃ‚Â«ng')
+      toast.success('CÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â¨Ã‹â€  nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â²Ã‚Â  tÃƒÂ§Ã‚Â¤Ã¢â€žÂ¢n gÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÅ½Ã‚Â¾ nhÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ thÃƒÂ¯Ã‚Â¿Ã‚Â½nh cÃƒÂ§Ã‚Â¹Ã‚Â«ng')
     } catch (err) {
-      toast.error('CÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â±ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ lÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â¡Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ xÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â£ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€¦Ã‚Â  ra khi cÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¨Ãƒâ€šÃ‚Â¨Ãƒâ€¹Ã¢â‚¬Â  nhÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¨Ãƒâ€šÃ‚Â²Ãƒâ€šÃ‚Â  tÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¤ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢n gÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã…Â½Ãƒâ€šÃ‚Â¾ nhÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½')
+      toast.error('CÃƒÂ§Ã‚Â±Ã¢â€šÂ¬ lÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¡Ã…Â¸Ã¢â€žÂ¢ xÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â‚¬Å¾Ã…Â  ra khi cÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â¨Ã‹â€  nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â²Ã‚Â  tÃƒÂ§Ã‚Â¤Ã¢â€žÂ¢n gÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÅ½Ã‚Â¾ nhÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½')
       console.error(err)
     }
   }
@@ -5021,7 +5135,7 @@ export default function ChatPage() {
       setIsAddMembersOpen(false);
     } catch (error) {
       console.error('Failed to add members:', error);
-      toast.error('ThÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¤ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢m thÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½nh viÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¤ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢n thÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â¦ bÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â£ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â');
+      toast.error('ThÃƒÂ§Ã‚Â¤Ã¢â€žÂ¢m thÃƒÂ¯Ã‚Â¿Ã‚Â½nh viÃƒÂ§Ã‚Â¤Ã¢â€žÂ¢n thÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¥Ã‚ÂÃ‚Â¦ bÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã‚Â');
     } finally {
       setIsAddingMembers(false);
     }
@@ -5076,10 +5190,10 @@ export default function ChatPage() {
       navigate('/chat');
     } catch (error: any) {
       console.error('Failed to leave group:', error);
-      if (error.message === 'BÃ¡ÂºÂ¡n chÃ†Â°a chuyÃ¡Â»Æ’n quyÃ¡Â»Ân trÃ†Â°Ã¡Â»Å¸ng nhÃƒÂ³m khi rÃ¡Â»Âi nhÃƒÂ³m') {
-        toast.error('BÃ¡ÂºÂ¡n chÃ†Â°a chuyÃ¡Â»Æ’n quyÃ¡Â»Ân trÃ†Â°Ã¡Â»Å¸ng nhÃƒÂ³m khi rÃ¡Â»Âi nhÃƒÂ³m');
+      if (error.message === 'Báº¡n chÆ°a chuyá»ƒn quyá»n trÆ°á»Ÿng nhÃ³m khi rá»i nhÃ³m') {
+        toast.error('Báº¡n chÆ°a chuyá»ƒn quyá»n trÆ°á»Ÿng nhÃ³m khi rá»i nhÃ³m');
       } else {
-        toast.error('RÃ¡Â»Âi nhÃƒÂ³m thÃ¡ÂºÂ¥t bÃ¡ÂºÂ¡i');
+        toast.error('Rá»i nhÃ³m tháº¥t báº¡i');
       }
     }
   };
@@ -5105,17 +5219,17 @@ export default function ChatPage() {
       try {
         await emitSendMessage({
           conversationId: selectedConversationId,
-          messageType: 'SYSTEM', 
+          messageType: 'SYSTEM',
           content: systemPayload,
           clientMessageId: crypto.randomUUID()
         });
-        console.log('[ChatPage] Ã°Å¸â€œÂ¤ Group sync signal sent successfully');
+        console.log('[ChatPage] ðŸ“¤ Group sync signal sent successfully');
       } catch (e) {
-        console.warn('[ChatPage] Ã¢Å¡Â Ã¯Â¸Â Failed to emit group sync signal');
+        console.warn('[ChatPage] âš ï¸ Failed to emit group sync signal');
       }
     } catch (error) {
       console.error('Failed to update group settings', error);
-      toast.error('KhÃƒÂ´ng thÃ¡Â»Æ’ cÃ¡ÂºÂ­p nhÃ¡ÂºÂ­t cÃƒÂ i Ã„â€˜Ã¡ÂºÂ·t nhÃƒÂ³m');
+      toast.error('KhÃ´ng thá»ƒ cáº­p nháº­t cÃ i Ä‘áº·t nhÃ³m');
     }
   };
 
@@ -5141,7 +5255,7 @@ export default function ChatPage() {
 
       // Then call API
       await disbandConversation(accessToken, selectedConversationId);
-      toast.success('GiÃ¡ÂºÂ£i tÃƒÂ¡n nhÃƒÂ³m thÃƒÂ nh cÃƒÂ´ng');
+      toast.success('Giáº£i tÃ¡n nhÃ³m thÃ nh cÃ´ng');
 
       // Update local state
       setConversations(prev => prev.filter(conv => conv.id !== selectedConversationId));
@@ -5149,7 +5263,7 @@ export default function ChatPage() {
       setRightSidebarContent(null);
       navigate('/chat');
     } catch (err) {
-      console.error('KhÃƒÂ´ng thÃ¡Â»Æ’ giÃ¡ÂºÂ£i tÃƒÂ¡n nhÃƒÂ³m', err);
+      console.error('KhÃ´ng thá»ƒ giáº£i tÃ¡n nhÃ³m', err);
     }
   };
 
@@ -5160,7 +5274,7 @@ export default function ChatPage() {
       const selectedConv = conversations.find(c => c.id === selectedConversationId);
       if (!selectedConv) return;
 
-      const targetDisplayName = userMap[targetUserId]?.displayName || 'ThÃƒÂ nh viÃƒÂªn';
+      const targetDisplayName = userMap[targetUserId]?.displayName || 'ThÃ nh viÃªn';
 
       // Emit SYSTEM message for UI
       const systemPayload = JSON.stringify({
@@ -5213,10 +5327,10 @@ export default function ChatPage() {
         return c;
       }));
 
-      toast.success(`ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â§ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€¦Ã‚Â  xÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â±ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬a ${targetDisplayName} khÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¨ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢Ãƒâ€šÃ‚Â¨ nhÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â±ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬m`);
+      toast.success(`ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ§Ã¢â‚¬Å“Ã…Â  xÃƒÂ§Ã‚Â±Ã¢â€šÂ¬a ${targetDisplayName} khÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¨Ã¢â‚¬â„¢Ã‚Â¨ nhÃƒÂ§Ã‚Â±Ã¢â€šÂ¬m`);
     } catch (error) {
       console.error('Failed to remove member:', error);
-      toast.error('KhÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¹Ãƒâ€šÃ‚Â«ng thÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ xÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â±ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬a thÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½nh viÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¤ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢n');
+      toast.error('KhÃƒÂ§Ã‚Â¹Ã‚Â«ng thÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ xÃƒÂ§Ã‚Â±Ã¢â€šÂ¬a thÃƒÂ¯Ã‚Â¿Ã‚Â½nh viÃƒÂ§Ã‚Â¤Ã¢â€žÂ¢n');
     }
   };
 
@@ -5270,11 +5384,11 @@ export default function ChatPage() {
         return c;
       }));
 
-      const roleDisplay = role === 'DEPUTY' ? 'phÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â±ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ nhÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â±ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬m' : 'thÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½nh viÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¤ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢n';
-      toast.success(`ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â§ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€¦Ã‚Â  cÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¨Ãƒâ€šÃ‚Â¨Ãƒâ€¹Ã¢â‚¬Â  nhÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¨Ãƒâ€šÃ‚Â²Ãƒâ€šÃ‚Â  vai trÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â°Ãƒâ€šÃ‚Â· thÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½nh ${roleDisplay}`);
+      const roleDisplay = role === 'DEPUTY' ? 'phÃƒÂ§Ã‚Â±Ã¢â€šÂ¬ nhÃƒÂ§Ã‚Â±Ã¢â€šÂ¬m' : 'thÃƒÂ¯Ã‚Â¿Ã‚Â½nh viÃƒÂ§Ã‚Â¤Ã¢â€žÂ¢n';
+      toast.success(`ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ§Ã¢â‚¬Å“Ã…Â  cÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â¨Ã‹â€  nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â²Ã‚Â  vai trÃƒÂ§Ã‚Â°Ã‚Â· thÃƒÂ¯Ã‚Â¿Ã‚Â½nh ${roleDisplay}`);
     } catch (error) {
       console.error('Failed to update member role:', error);
-      toast.error('CÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¨Ãƒâ€šÃ‚Â¨Ãƒâ€¹Ã¢â‚¬Â  nhÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¨Ãƒâ€šÃ‚Â²Ãƒâ€šÃ‚Â  vai trÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â°Ãƒâ€šÃ‚Â· thÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â¦ bÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â£ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â');
+      toast.error('CÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â¨Ã‹â€  nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¨Ã‚Â²Ã‚Â  vai trÃƒÂ§Ã‚Â°Ã‚Â· thÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¥Ã‚ÂÃ‚Â¦ bÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã‚Â');
     }
   };
 
@@ -5320,12 +5434,17 @@ export default function ChatPage() {
       await doLeaveGroup();
     } catch (error) {
       console.error('Failed to transfer ownership and leave:', error);
-      toast.error('ChuyÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ quyÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ vÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ rÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â¥ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â° nhÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â±ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬m thÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â¦ bÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â£ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â');
+      toast.error('ChuyÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ quyÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ vÃƒÂ¯Ã‚Â¿Ã‚Â½ rÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° nhÃƒÂ§Ã‚Â±Ã¢â€šÂ¬m thÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¥Ã‚ÂÃ‚Â¦ bÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã‚Â');
     }
   };
 
-  const sortedConversations = React.useMemo(() => {
-    return [...conversations].map(conv => {
+  const sortedConversations = useMemo(() => {
+    const list = [...conversations];
+    if (!list.some(c => c.id === 'my-documents' || c.isCloud)) {
+      list.push(myDocumentsConversation);
+    }
+
+    return list.map(conv => {
       const deleteTime = deletedTimestamps[conv.id];
       if (!deleteTime) return conv;
 
@@ -5335,7 +5454,7 @@ export default function ChatPage() {
       if (lastMsgTime <= deleteTime) {
         return {
           ...conv,
-          lastMessage: t('chat.historyDeletedPreview') || 'BÃ¡ÂºÂ¡n Ã„â€˜ÃƒÂ£ xÃƒÂ³a lÃ¡Â»â€¹ch sÃ¡Â»Â­ trÃƒÂ² chuyÃ¡Â»â€¡n',
+          lastMessage: t('chat.historyDeletedPreview') || 'Báº¡n Ä‘Ã£ xÃ³a lá»‹ch sá»­ trÃ² chuyá»‡n',
           unreadCount: 0 // Hide unread count for deleted history conversations
         };
       }
@@ -5354,7 +5473,7 @@ export default function ChatPage() {
     })
   }, [conversations, deletedTimestamps, pinnedConversationIds, t])
 
-  const visibleConversations = React.useMemo(() => {
+  const visibleConversations = useMemo(() => {
     return sortedConversations.map(conv => ({
       ...conv,
       isPinned: !!pinnedConversationIds[conv.id]
@@ -5461,7 +5580,7 @@ export default function ChatPage() {
         onMessageContextMenuAction={handleMessageContextMenuAction}
         onVotePoll={handleVotePoll}
         onInitiateCall={handleInitiateCall}
-        members={selectedConversation?.members || []}
+        members={(selectedConversation?.members || []) as any}
       />
 
       <CreateGroupModal
@@ -5583,7 +5702,7 @@ export default function ChatPage() {
       <Modal
         isOpen={confirmLeaveGroupOpen}
         onClose={() => setConfirmLeaveGroupOpen(false)}
-        title="RÃ¡Â»Âi nhÃƒÂ³m vÃƒÂ  xÃƒÂ³a trÃƒÂ² chuyÃ¡Â»â€¡n"
+        title="Rá»i nhÃ³m vÃ  xÃ³a trÃ² chuyá»‡n"
         variant="confirm"
         footer={
           <div className="flex gap-3 justify-end w-full">
@@ -5591,20 +5710,20 @@ export default function ChatPage() {
               className="px-6 py-2 rounded-lg bg-[var(--surface-muted)] text-[var(--text)] font-bold text-[15px] hover:bg-[var(--surface-hover)] border-0 outline-none cursor-pointer"
               onClick={() => setConfirmLeaveGroupOpen(false)}
             >
-              HÃ¡Â»Â§y
+              Há»§y
             </button>
             <button
               className="px-6 py-2 rounded-lg bg-red-600 text-white font-bold text-[15px] hover:bg-red-700 border-0 outline-none cursor-pointer"
               onClick={doLeaveGroup}
             >
-              RÃ¡Â»Âi nhÃƒÂ³m
+              Rá»i nhÃ³m
             </button>
           </div>
         }
       >
         <div className="py-2 space-y-5">
           <p className="text-[15px] text-[var(--text)] leading-relaxed">
-            BÃ¡ÂºÂ¡n sÃ¡ÂºÂ½ khÃƒÂ´ng thÃ¡Â»Æ’ xem lÃ¡ÂºÂ¡i tin nhÃ¡ÂºÂ¯n trong nhÃƒÂ³m nÃƒÂ y sau khi rÃ¡Â»Âi nhÃƒÂ³m.
+            Báº¡n sáº½ khÃ´ng thá»ƒ xem láº¡i tin nháº¯n trong nhÃ³m nÃ y sau khi rá»i nhÃ³m.
           </p>
 
           <div
@@ -5612,8 +5731,8 @@ export default function ChatPage() {
             onClick={() => setLeaveGroupSilently(!leaveGroupSilently)}
           >
             <div className="space-y-1">
-              <p className="text-[15px] font-semibold text-[var(--text)]">RÃ¡Â»Âi nhÃƒÂ³m trong im lÃ¡ÂºÂ·ng</p>
-              <p className="text-[13px] text-[var(--text-secondary)]">ChÃ¡Â»â€° trÃ†Â°Ã¡Â»Å¸ng/phÃƒÂ³ nhÃƒÂ³m biÃ¡ÂºÂ¿t bÃ¡ÂºÂ¡n rÃ¡Â»Âi nhÃƒÂ³m.</p>
+              <p className="text-[15px] font-semibold text-[var(--text)]">Rá»i nhÃ³m trong im láº·ng</p>
+              <p className="text-[13px] text-[var(--text-secondary)]">Chá»‰ trÆ°á»Ÿng/phÃ³ nhÃ³m biáº¿t báº¡n rá»i nhÃ³m.</p>
             </div>
             <div
               className={`relative h-6 w-11 rounded-full transition-all duration-200 ${leaveGroupSilently ? 'bg-[#0091FF]' : 'bg-gray-400 shadow-inner'
@@ -5637,66 +5756,35 @@ export default function ChatPage() {
         onMessage={handleOpenFriendChat}
       />
 
-      {/* INCOMING 1-1 CALL BANNER */}
-      {callState.isOpen && callState.direction === 'incoming' && callState.status === 'connecting' && (
-        <IncomingCallBanner
-          peerName={callState.peerId ? (userMap[callState.peerId]?.displayName || "NgÆ°á»i dÃ¹ng") : "NgÆ°á»i dÃ¹ng"}
-          peerAvatar={callState.peerId ? userMap[callState.peerId]?.avatarUrl : null}
-          isAudioOnly={callState.type === 'audio'}
-          onAnswer={handleAnswerCall}
-          onDecline={handleEndCall}
-        />
-      )}
+      <CallModal
+        isOpen={callState.isOpen}
+        type={callState.type}
+        status={callState.status}
+        peerName={callState.peerId ? (userMap[callState.peerId]?.displayName || "NgÆ°á»i dÃ¹ng") : (selectedConversation?.name || "NgÆ°á»i dÃ¹ng")}
+        peerAvatar={callState.peerId ? userMap[callState.peerId]?.avatarUrl : selectedConversation?.avatarUrl}
+        localStream={callState.localStream}
+        remoteStream={callState.remoteStream}
+        isMicOn={callState.isMicOn}
+        isCameraOn={callState.isCameraOn}
+        isRemoteCameraOn={(callState as any).isRemoteCameraOn}
+        hasRemoteDescription={callState.hasRemoteDescription}
+        onEnd={handleEndCall}
+        onAnswer={handleAnswerCall}
+        onToggleMic={handleToggleMic}
+        onToggleCamera={handleToggleCamera}
+      />
 
-      {/* 1-1 CALL MODAL (Only show if not minimized) */}
-      {callState.isOpen && !isCallMinimized && (callState.direction === 'outgoing' || callState.status !== 'connecting') && (
-        <CallModal
-          isOpen={callState.isOpen}
-          type={callState.type}
-          status={callState.status}
-          peerName={callState.peerId ? (userMap[callState.peerId]?.displayName || "Người dùng") : (selectedConversation?.name || "Người dùng")}
-          peerAvatar={callState.peerId ? userMap[callState.peerId]?.avatarUrl : selectedConversation?.avatarUrl}
-          localStream={callState.localStream}
-          remoteStream={callState.remoteStream}
-          isMicOn={callState.isMicOn}
-          isCameraOn={callState.isCameraOn}
-          isRemoteCameraOn={callState.isRemoteCameraOn}
-          hasRemoteDescription={callState.hasRemoteDescription}
-          onEnd={handleEndCall}
-          onAnswer={handleAnswerCall}
-          onToggleMic={handleToggleMic}
-          onToggleCamera={handleToggleCamera}
-          onMinimize={() => setIsCallMinimized(true)}
-        />
-      )}
-
-      {/* 1-1 MINI CALL WINDOW */}
-      {callState.isOpen && isCallMinimized && (
-        <MiniCallWindow
-          stream={callState.remoteStream || callState.localStream || null}
-          peerName={callState.peerId ? (userMap[callState.peerId]?.displayName || "Người dùng") : "Người dùng"}
-          peerAvatar={callState.peerId ? userMap[callState.peerId]?.avatarUrl : null}
-          isCameraOn={Boolean(callState.isRemoteCameraOn || (callState.localStream && callState.isCameraOn))}
-          onMaximize={() => setIsCallMinimized(false)}
-          onEnd={handleEndCall}
-        />
-      )}
-
-      {/* INCOMING GROUP CALL BANNER */}
+      {/* INCOMING GROUP CALL NOTIFICATION ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ shown to non-callers */}
       {incomingGroupCall && !isInGroupCall && (
-        <IncomingCallBanner
-          peerName={incomingGroupCall.callerName}
-          peerAvatar={incomingGroupCall.callerAvatar}
-          isGroup={true}
-          conversationName={incomingGroupCall.conversationName}
-          isAudioOnly={incomingGroupCall.audioOnly}
-          onAnswer={() => joinGroupCall(incomingGroupCall)}
+        <IncomingGroupCallBanner
+          info={incomingGroupCall}
+          onJoin={() => joinGroupCall(incomingGroupCall)}
           onDecline={declineGroupCall}
         />
       )}
 
-      {/* GROUP CALL MODAL (Only show if not minimized) */}
-      {isInGroupCall && groupCallSnapshot && !isGroupCallMinimized && (
+      {/* GROUP CALL MODAL ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ independent of 1-1 CallModal */}
+      {isInGroupCall && groupCallSnapshot && (
         <GroupCallModal
           isOpen={isInGroupCall}
           snapshot={groupCallSnapshot}
@@ -5706,19 +5794,6 @@ export default function ChatPage() {
           onToggleMic={groupToggleMic}
           onToggleCamera={groupToggleCamera}
           elapsedSeconds={groupCallElapsed}
-          onMinimize={() => setIsGroupCallMinimized(true)}
-        />
-      )}
-
-      {/* GROUP MINI CALL WINDOW */}
-      {isInGroupCall && groupCallSnapshot && isGroupCallMinimized && (
-        <MiniCallWindow
-          stream={groupCallSnapshot.peers[0]?.remoteStream || groupCallSnapshot.localStream}
-          peerName={groupCallSnapshot.peers[0]?.displayName || "Cuá»™c gá»i nhÃ³m"}
-          peerAvatar={groupCallSnapshot.peers[0]?.avatarUrl}
-          isCameraOn={Boolean(groupCallSnapshot.isCameraOn)}
-          onMaximize={() => setIsGroupCallMinimized(false)}
-          onEnd={handleLeaveGroupCall}
         />
       )}
 
@@ -5747,7 +5822,7 @@ function PinnedLogicHooks({
   lastConvRef
 }: any) {
   // ISOLATED PINNED FETCH (NO loadInbox call)
-  React.useEffect(() => {
+  useEffect(() => {
     console.log('[PinnedLogicHooks.effect] Checking pinned fetch conditions', { accessToken: !!accessToken, isBootstrapping, selectedConversationId, lastConv: lastConvRef.current });
     if (!accessToken || isBootstrapping || !selectedConversationId) {
       console.log('[PinnedLogicHooks.effect] Skipping pinned fetch due to missing conditions');
@@ -5766,7 +5841,7 @@ function PinnedLogicHooks({
   }, [accessToken, isBootstrapping, selectedConversationId, loadPinnedMessages, lastConvRef])
 
   // Mapping Pinned IDs -> Message Objects (with placeholder support)
-  React.useEffect(() => {
+  useEffect(() => {
     if (!selectedConversationId) return
 
     const ids = pinnedMessageIds[selectedConversationId] || []
@@ -5782,8 +5857,8 @@ function PinnedLogicHooks({
       return {
         id,
         conversationId: selectedConversationId,
-        content: 'Tin nhắn được ghim',
-        text: 'Tin nhắn được ghim',
+        content: 'Tin nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ§Ã¢â‚¬â€œÃ‚Â¸ ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ§Ã¢â‚¬Å“Ã…Â  ghim',
+        text: 'Tin nhÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ§Ã¢â‚¬â€œÃ‚Â¸ ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ§Ã¢â‚¬Å“Ã…Â  ghim',
         type: 'text' as any,
         sender: 'system' as any,
         senderId: 'system',
@@ -5802,7 +5877,7 @@ function PinnedLogicHooks({
   }, [messagesByConversation, pinnedMessageIds, selectedConversationId, setPinnedMessages])
 
   // Auto clean pinned IDs when messages are recalled
-  React.useEffect(() => {
+  useEffect(() => {
     if (!selectedConversationId) return
     const ids = pinnedMessageIds[selectedConversationId] || []
     const convMessages = messagesByConversation[selectedConversationId] || []
@@ -5822,3 +5897,15 @@ function PinnedLogicHooks({
 
   return null;
 }
+
+
+
+
+
+
+
+
+
+
+
+

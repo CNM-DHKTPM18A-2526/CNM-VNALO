@@ -28,7 +28,7 @@ export function Sidebar({ onOpenSettingsModal, onOpenCaptureModal }: SidebarProp
       labelKey: 'sidebar.cloud', 
       icon: 'cloud' as const 
     },
-    { to: '/documents', labelKey: 'sidebar.documents', icon: 'folder' as const },
+    { to: '/chat/my-documents', labelKey: 'sidebar.documents', icon: 'folder' as const },
     { labelKey: 'sidebar.todo', icon: 'capture' as const, onClick: onOpenCaptureModal },
     { to: '/tools', labelKey: 'sidebar.tools', icon: 'briefcase' as const },
   ]

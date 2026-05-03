@@ -48,7 +48,7 @@ const MENU_ITEMS: MenuItemConfig[] = [
 const MENU_WIDTH = 256
 
 // Helper to check if message was sent within 24 hours
-const isWithin24Hours = (createdAt?: string) => {
+const isWithin24Hours = (createdAt?: string | null) => {
   if (!createdAt) return true;
   const time = Date.parse(createdAt);
   const now = Date.now();

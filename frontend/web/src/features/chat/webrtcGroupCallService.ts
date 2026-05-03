@@ -366,10 +366,12 @@ export class WebRtcGroupCallService {
     targetUserId: string
     callId: string
     conversationId: string
+    userId?: string
     displayName?: string
     name?: string
     fullName?: string
     full_name?: string
+    callerName?: string
     avatarUrl?: string
     callerAvatar?: string
     isMicOn?: boolean
@@ -381,7 +383,7 @@ export class WebRtcGroupCallService {
 
     console.log('[GroupCall] 📥 Offer from:', payload.senderUserId)
 
-    const senderUserId = payload.senderUserId || payload.userId
+    const senderUserId = payload.senderUserId || payload.userId || ''
     if (!this.state.peers.has(senderUserId)) {
       const isId = (s: any) => typeof s === 'string' && s.length > 20 && /^[0-9a-fA-F-]/.test(s)
       let name = payload.displayName || payload.name || payload.fullName || payload.full_name || payload.callerName
@@ -396,7 +398,7 @@ export class WebRtcGroupCallService {
 
       this.createPeerState({
         userId: senderUserId,
-        displayName: name,
+        displayName: name || '',
         avatarUrl: avatarUrl,
         isMicOn: payload.isMicOn ?? true,
         isCameraOn: payload.isCameraOn ?? true,

@@ -4,7 +4,7 @@ import { QRCodeCanvas } from 'qrcode.react'
 
 import { useAuth } from '../features/auth/useAuth'
 import { createQrLoginSession, pollQrLoginSession } from '../features/auth/auth.api'
-import { PasswordToggleIcon } from '../features/settings/SettingsModalContent'
+
 import { useLanguage } from '../shared/i18n/LanguageContext'
 import { useTheme } from '../shared/contexts/ThemeContext'
 

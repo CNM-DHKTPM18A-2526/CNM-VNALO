@@ -1,4 +1,4 @@
-import React from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../auth/useAuth'
 import {
   getUserById,
@@ -145,22 +145,22 @@ function persistRecentResultsToStorage(results: UserLookupResult[]): void {
   }
 }
 
-export function AddFriendModal({ isOpen, onClose, initialTarget = null, onCompleted, onUserFound }: AddFriendModalProps) {
+export function AddFriendModal({ isOpen, onClose, initialTarget = null, onCompleted: _onCompleted, onUserFound }: AddFriendModalProps) {
   const { accessToken, user } = useAuth()
   const { t } = useLanguage()
 
-  const [identifier, setIdentifier] = React.useState('')
-  const [selectedUser, setSelectedUser] = React.useState<UserLookupResult | null>(null)
+  const [identifier, setIdentifier] = useState('')
+  const [, setSelectedUser] = useState<UserLookupResult | null>(null)
 
-  const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
-  const [successMessage, setSuccessMessage] = React.useState<string | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [, setSuccessMessage] = useState<string | null>(null)
 
-  const [isSearching, setIsSearching] = React.useState(false)
-  const [isPreparingTarget, setIsPreparingTarget] = React.useState(false)
-  const [isAutoSearching, setIsAutoSearching] = React.useState(false)
-  const [isLoadingSuggestions, setIsLoadingSuggestions] = React.useState(false)
-  const [recentResults, setRecentResults] = React.useState<UserLookupResult[]>([])
-  const [suggestedResults, setSuggestedResults] = React.useState<UserLookupResult[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [isPreparingTarget, setIsPreparingTarget] = useState(false)
+  const [isAutoSearching, setIsAutoSearching] = useState(false)
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
+  const [recentResults, setRecentResults] = useState<UserLookupResult[]>([])
+  const [suggestedResults, setSuggestedResults] = useState<UserLookupResult[]>([])
 
   const resetModalState = () => {
     setIdentifier('')
@@ -178,7 +178,7 @@ export function AddFriendModal({ isOpen, onClose, initialTarget = null, onComple
     onClose()
   }
 
-  const pushRecentResult = React.useCallback((target: UserLookupResult) => {
+  const pushRecentResult = useCallback((target: UserLookupResult) => {
     setRecentResults((prev) => {
       const next = [target, ...prev.filter((item) => item.id !== target.id)].slice(0, 4)
       persistRecentResultsToStorage(next)
@@ -186,7 +186,7 @@ export function AddFriendModal({ isOpen, onClose, initialTarget = null, onComple
     })
   }, [])
 
-  const findUserByIdentifier = React.useCallback(async (query: string): Promise<UserLookupResult | null> => {
+  const findUserByIdentifier = useCallback(async (query: string): Promise<UserLookupResult | null> => {
     if (!accessToken) {
       return null
     }
@@ -249,7 +249,7 @@ export function AddFriendModal({ isOpen, onClose, initialTarget = null, onComple
     }
   }
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isOpen) {
       return
     }
@@ -257,7 +257,7 @@ export function AddFriendModal({ isOpen, onClose, initialTarget = null, onComple
     setRecentResults(loadRecentResultsFromStorage())
   }, [isOpen, t])
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isOpen || !accessToken) {
       return
     }
@@ -302,7 +302,7 @@ export function AddFriendModal({ isOpen, onClose, initialTarget = null, onComple
     }
   }, [accessToken, identifier, isOpen, recentResults, user?.id])
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isOpen || !accessToken) {
       return
     }
@@ -393,11 +393,11 @@ export function AddFriendModal({ isOpen, onClose, initialTarget = null, onComple
     }
   }, [accessToken, findUserByIdentifier, initialTarget, isOpen, onUserFound, t])
 
-  const visibleRecentResults = React.useMemo(() => {
+  const visibleRecentResults = useMemo(() => {
     return recentResults
   }, [recentResults])
 
-  const visibleSuggestedResults = React.useMemo(() => {
+  const visibleSuggestedResults = useMemo(() => {
     return suggestedResults
       .filter((item) => !visibleRecentResults.some((recent) => recent.id === item.id))
       .slice(0, 4)
