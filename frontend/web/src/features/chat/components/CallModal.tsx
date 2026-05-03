@@ -141,5 +141,3 @@ export const CallModal: React.FC<CallModalProps> = ({
     </div>
   )
 }
-  )
-}
