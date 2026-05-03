@@ -2756,8 +2756,8 @@ export default function ChatPage() {
 
     const logText = `CALL_LOG::${JSON.stringify(logData)}`;
     // 3. Robust Send Pipeline (Shadow Process)
-    // ONLY the Caller (outgoing) or receiver of a missed call is responsible for saving & showing optimistic log
-    if (direction === 'outgoing' || (outcome !== 'completed' && direction === 'incoming')) {
+    // Both sides should see the call log if it was completed, or if it was missed/canceled.
+    if (direction === 'outgoing' || direction === 'incoming') {
       // 2. OPTIMISTIC UI: Add to chat immediately for caller
       const clientMessageId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
 
@@ -2769,6 +2769,7 @@ export default function ChatPage() {
         senderId: currentUserId,
         type: 'call',
         text: logText,
+        textType: 'call',
         timestamp: formatMessageTimestamp(),
         createdAt: new Date().toISOString(),
         deliveryState: 'sending',

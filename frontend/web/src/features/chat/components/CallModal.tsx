@@ -61,10 +61,10 @@ export const CallModal: React.FC<CallModalProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-[500] bg-black flex flex-col overflow-hidden">
-      {/* ── MAIN CONTENT (Immersive Video) ── */}
-      <div className="relative flex-1 w-full h-full">
-        {/* Remote Video Tile (Full Screen) */}
+    <div className="fixed inset-0 z-[500] bg-black flex flex-col overflow-hidden select-none">
+      {/* ── IMMERSIVE BACKGROUND & VIDEO ── */}
+      <div className="relative flex-1 w-full h-full flex items-center justify-center">
+        {/* Remote Content (Video or Blurred Avatar) */}
         <PremiumVideoTile
           stream={remoteStream || null}
           displayName={peerName}
@@ -77,8 +77,8 @@ export const CallModal: React.FC<CallModalProps> = ({
         />
 
         {/* Local Video Overlay (Zalo style: top-right) */}
-        {type === 'video' && status === 'connected' && (
-          <div className="absolute top-8 right-8 w-40 h-60 z-40 rounded-xl overflow-hidden border border-white/20 shadow-2xl animate-in fade-in zoom-in duration-500">
+        {status === 'connected' && (
+          <div className="absolute top-10 right-10 w-44 h-64 z-40 rounded-2xl overflow-hidden border border-white/10 shadow-2xl animate-in fade-in zoom-in duration-700">
             <PremiumVideoTile
               stream={localStream || null}
               displayName="Bạn"
@@ -90,23 +90,28 @@ export const CallModal: React.FC<CallModalProps> = ({
           </div>
         )}
 
-        {/* Top Info (Time/Status) */}
-        <div className="absolute top-10 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-2">
-          {status === 'connected' && (
-            <div className="bg-black/20 backdrop-blur-md px-4 py-1 rounded-full border border-white/10 text-white font-mono text-lg">
+        {/* Top Centered Status/Time Info */}
+        <div className="absolute top-12 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-3">
+          {status === 'connected' ? (
+            <div className="bg-black/30 backdrop-blur-xl px-5 py-2 rounded-full border border-white/10 text-white font-mono text-xl shadow-lg animate-fade-in">
               {formatTime(seconds)}
             </div>
+          ) : (
+             <div className="flex flex-col items-center animate-pulse">
+                <span className="text-white/40 text-xs font-bold uppercase tracking-[0.2em] mb-1">Mã hóa đầu cuối</span>
+                <span className="text-white/60 text-[10px]">Cuộc gọi đang được bảo mật</span>
+             </div>
           )}
           {error && (
-            <div className="bg-red-500/80 backdrop-blur-md px-4 py-2 rounded-lg text-white text-sm font-medium border border-red-400/50">
+            <div className="bg-red-500/90 backdrop-blur-xl px-6 py-3 rounded-xl text-white text-sm font-semibold border border-red-400/30 shadow-2xl">
               {error}
             </div>
           )}
         </div>
       </div>
 
-      {/* ── DOCKED BOTTOM BAR ── */}
-      <div className="h-[110px] bg-[#131313] border-t border-white/5 flex items-center justify-center relative z-50">
+      {/* ── DOCKED TRANSLUCENT BOTTOM BAR ── */}
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex items-center justify-center z-50 pb-8 px-10">
         <PremiumCallControls
            isMicOn={isMicOn}
            isCameraOn={isCameraOn}

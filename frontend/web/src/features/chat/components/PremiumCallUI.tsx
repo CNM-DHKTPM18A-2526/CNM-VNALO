@@ -139,48 +139,48 @@ export const PremiumCallControls: React.FC<PremiumCallControlsProps> = ({
       {!isAudioOnly && (
         <button
           onClick={onToggleCamera}
-          className="group flex flex-col items-center gap-2 transition-transform active:scale-90"
+          className="group flex flex-col items-center gap-2 transition-all active:scale-95"
         >
-          <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors ${
-            !isCameraOn ? 'bg-red-500' : 'bg-[#2F2F2F] hover:bg-[#3F3F3F]'
-          }`}>
-            {isCameraOn ? <Video size={24} className="text-white" /> : <VideoOff size={24} className="text-white" />}
+          <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 ${
+            !isCameraOn ? 'bg-[#FF3B30] shadow-[0_0_15px_rgba(255,59,48,0.4)]' : 'bg-[#2D2D2D] hover:bg-[#404040]'
+          } border border-white/5`}>
+            {isCameraOn ? <Video size={20} className="text-white" /> : <VideoOff size={20} className="text-white" />}
           </div>
-          <span className="text-[10px] text-white/60 font-medium tracking-tight">Camera</span>
+          <span className="text-[10px] text-white/50 font-medium tracking-tight group-hover:text-white/80 transition-colors uppercase">Camera</span>
         </button>
       )}
 
       <button
         onClick={onToggleMic}
-        className="group flex flex-col items-center gap-2 transition-transform active:scale-90"
+        className="group flex flex-col items-center gap-2 transition-all active:scale-95"
       >
-        <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors ${
-          !isMicOn ? 'bg-red-500' : 'bg-[#2F2F2F] hover:bg-[#3F3F3F]'
-        }`}>
-          {isMicOn ? <Mic size={24} className="text-white" /> : <MicOff size={24} className="text-white" />}
+        <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 ${
+          !isMicOn ? 'bg-[#FF3B30] shadow-[0_0_15px_rgba(255,59,48,0.4)]' : 'bg-[#2D2D2D] hover:bg-[#404040]'
+        } border border-white/5`}>
+          {isMicOn ? <Mic size={20} className="text-white" /> : <MicOff size={20} className="text-white" />}
         </div>
-        <span className="text-[10px] text-white/60 font-medium tracking-tight">Micro</span>
+        <span className="text-[10px] text-white/50 font-medium tracking-tight group-hover:text-white/80 transition-colors uppercase">Micro</span>
       </button>
 
       <button
         onClick={onEnd}
-        className="group flex flex-col items-center gap-2 transition-transform active:scale-90"
+        className="group flex flex-col items-center gap-2 transition-all active:scale-90"
       >
-        <div className="w-16 h-16 rounded-full bg-[#FF3B30] hover:bg-[#E03328] flex items-center justify-center shadow-lg">
+        <div className="w-16 h-16 rounded-full bg-[#FF3B30] hover:bg-[#E03328] flex items-center justify-center shadow-[0_0_25px_rgba(255,59,48,0.5)] border border-white/10 transition-all duration-300">
           <PhoneOff size={28} className="text-white" />
         </div>
-        <span className="text-[10px] text-white/60 font-medium tracking-tight">Gác máy</span>
+        <span className="text-[11px] text-[#FF3B30] font-black tracking-widest uppercase drop-shadow-md">Kết thúc</span>
       </button>
 
       {onMinimize && (
         <button
           onClick={onMinimize}
-          className="group flex flex-col items-center gap-2 transition-transform active:scale-90"
+          className="group flex flex-col items-center gap-2 transition-all active:scale-95"
         >
-          <div className="w-14 h-14 rounded-full bg-[#2F2F2F] hover:bg-[#3F3F3F] flex items-center justify-center transition-colors">
-            <Minimize2 size={24} className="text-white" />
+          <div className="w-14 h-14 rounded-full bg-[#2D2D2D] hover:bg-[#404040] flex items-center justify-center border border-white/5 transition-all duration-300">
+            <Minimize2 size={20} className="text-white" />
           </div>
-          <span className="text-[10px] text-white/60 font-medium tracking-tight">Thu nhỏ</span>
+          <span className="text-[10px] text-white/50 font-medium tracking-tight group-hover:text-white/80 transition-colors uppercase">Thu nhỏ</span>
         </button>
       )}
     </div>
