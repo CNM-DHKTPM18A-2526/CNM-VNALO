@@ -8,6 +8,7 @@ interface CallModalProps {
   status: 'connecting' | 'connected' | 'failed'
   peerName: string
   peerAvatar?: string | null
+  localAvatar?: string | null      // user's own avatar shown in local preview when camera is off
   localStream?: MediaStream | null
   remoteStream?: MediaStream | null
   isMicOn?: boolean
@@ -113,9 +114,10 @@ export const CallModal: React.FC<CallModalProps> = ({
         </div>
       </div>
 
-      {/* ── DOCKED TRANSLUCENT BOTTOM BAR ── */}
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex items-center justify-center z-50 pb-8 px-10">
-        <PremiumCallControls
+      {/* ── DOCKED GLASSMORPHISM BOTTOM BAR ── */}
+      <div className="absolute bottom-0 left-0 right-0 z-50 pb-8 pt-4 px-8">
+        <div className="mx-auto max-w-lg">
+          <PremiumCallControls
            isMicOn={isMicOn}
            isCameraOn={isCameraOn}
            isAudioOnly={type === 'audio'}
@@ -123,7 +125,10 @@ export const CallModal: React.FC<CallModalProps> = ({
            onToggleCamera={onToggleCamera || (() => {})}
            onEnd={onEnd}
            onMinimize={onMinimize}
-        />
+          />
+        </div>
+        {/* Glassmorphism backdrop gradient */}
+        <div className="absolute -top-24 left-0 right-0 h-24 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none" />
       </div>
     </div>
   )

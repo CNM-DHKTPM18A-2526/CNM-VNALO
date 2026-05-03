@@ -2712,28 +2712,53 @@ export default function ChatPage() {
   const handleEndCall = useCallback(async (data: any = 'hangup') => {
     const signalData = typeof data === 'object' ? data : { reason: data };
     const reason = signalData.reason || 'hangup';
+
+    // BUG FIX: Extract all fields from signalData FIRST (popup-passed data),
+    // then fall back to callStateRef (which may be stale after popup took over).
+    // The popup owns the call lifecycle once it opens, so its signalData is authoritative.
+    const fromSignal = {
+      callId: signalData.callId ?? signalData.callId,
+      conversationId: signalData.conversationId ?? signalData.roomId,
+      direction: signalData.direction ?? callStateRef.current.direction,
+      type: signalData.type ?? callStateRef.current.type,
+      startedAt: signalData.startedAt ?? callStateRef.current.startedAt,
+      peerId: signalData.senderUserId ?? signalData.targetUserId
+                ?? callStateRef.current.peerId
+                ?? selectedConversation?.userId,
+    };
+
+    // Use callStateRef as secondary source only when signalData doesn't provide it
     const currentCall = callStateRef.current;
-    
-    // If the call was handled in a popup, we might receive duration/outcome via signalData
-    const externalDuration = signalData.duration;
-    const externalOutcome = signalData.outcome;
+    const callId    = fromSignal.callId    ?? currentCall.callId;
+    const targetConvId = fromSignal.conversationId ?? currentCall.conversationId;
+    const direction  = fromSignal.direction  ?? currentCall.direction;
+    const type       = fromSignal.type       ?? currentCall.type;
+    const startedAt  = fromSignal.startedAt  ?? currentCall.startedAt;
+    const peerId     = fromSignal.peerId     ?? currentCall.peerId;
 
+    // BUG FIX: Check signalData.callId instead of currentCall.callId.
+    // When popup sends call:end back, currentCall.callId may be undefined
+    // (popup took over but ChatPage state never updated with callId).
     if (!currentCall.isOpen && !signalData.callId) return;
+    if (!targetConvId) return;
 
-    const { type, direction, startedAt, callId, peerId } = currentCall;
-    const duration = externalDuration !== undefined ? externalDuration : (startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0);
+    const externalDuration = signalData.duration;
+    const externalOutcome  = signalData.outcome;
+    const duration = externalDuration !== undefined
+      ? externalDuration
+      : (startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0);
 
     let outcome: 'completed' | 'canceled' | 'missed' = externalOutcome || 'completed';
     if (externalOutcome === undefined && !startedAt) {
       outcome = direction === 'outgoing' ? 'canceled' : 'missed';
     }
 
-    console.log(`[CALL_LOG] Ending call. Reason: ${reason}, Outcome: ${outcome}, Duration: ${duration}s, CallId: ${callId || signalData.callId}`);
+    console.log(`[CALL_LOG] Ending call. Reason: ${reason}, Outcome: ${outcome}, Duration: ${duration}s, CallId: ${callId}`);
 
     // WebRTC logic moved to popup window
 
-    const targetConvId = currentCall.conversationId || signalData.conversationId || signalData.roomId;
-    if (!targetConvId) return;
+    // BUG FIX: Use the extracted local variables (authoritative source),
+    // not the stale destructured object from the top of the function.
     const peerUserId = peerId || selectedConversation?.userId || targetConvId;
 
     // Reset UI State immediately
@@ -2741,6 +2766,7 @@ export default function ChatPage() {
       ...prev,
       isOpen: false,
       status: 'connecting',
+      callId: undefined,
     }));
 
     if (callId) {
