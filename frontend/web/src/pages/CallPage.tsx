@@ -25,7 +25,20 @@ const CallPage: React.FC = () => {
   const peerAvatar = searchParams.get('peerAvatar')
 
   const [socket, setSocket] = useState<Socket | null>(null)
-  const [callState, setCallState] = useState<WebRTCCallState | null>(null)
+  const [callState, setCallState] = useState<WebRTCCallState>({
+    pc: null,
+    localStream: null,
+    remoteStream: null,
+    isConnected: false,
+    isEnded: false,
+    isMicOn: true,
+    isCameraOn: !audioOnly,
+    isRemoteMicOn: true,
+    isRemoteCameraOn: !audioOnly,
+    hasRemoteDescription: false,
+    pendingCandidates: [],
+    error: null,
+  })
   const [groupSnapshot, setGroupSnapshot] = useState<GroupCallSnapshot | null>(null)
   
   const callServiceRef = useRef<WebRtcCallService | null>(null)
@@ -143,9 +156,19 @@ const CallPage: React.FC = () => {
 
   if (!callId) return <div className="h-screen bg-black flex items-center justify-center text-white">Invalid Call ID</div>
 
+  if (!accessToken) return <div className="h-screen bg-black flex flex-col items-center justify-center text-white gap-4">
+    <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+    <p>Đang xác thực phiên làm việc...</p>
+  </div>
+
+  if (!user) return <div className="h-screen bg-black flex flex-col items-center justify-center text-white gap-4">
+    <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+    <p>Đang tải thông tin người dùng...</p>
+  </div>
+
   return (
-    <div className="h-screen w-screen bg-black">
-      {type === 'direct' && callState && (
+    <div className="h-screen w-screen bg-black overflow-hidden">
+      {type === 'direct' && (
         <CallModal
           isOpen={true}
           type={audioOnly ? 'audio' : 'video'}
