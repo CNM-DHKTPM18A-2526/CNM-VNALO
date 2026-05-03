@@ -166,7 +166,7 @@ export function ContactsPage() {
   const [profileTargetUserId, setProfileTargetUserId] = useState<string | null>(null)
   const [profileError, setProfileError] = useState<string | null>(null)
 
-  const menuRef = useRef<HTMLDivElement | null>(null)
+  const menuRef = React.useRef<HTMLDivElement | null>(null)
   const normalizedKeyword = keyword.trim().toLowerCase()
   const normalizedPhoneKeyword = keyword.trim().replace(/\D/g, '')
   const isPhoneQuery = normalizedPhoneKeyword.length >= 2 && normalizedPhoneKeyword.length >= Math.max(2, keyword.trim().length - 2)

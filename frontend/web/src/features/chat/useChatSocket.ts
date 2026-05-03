@@ -57,28 +57,28 @@ export function useChatSocket(options: UseChatSocketOptions) {
   // CALLBACK REFS — Updated on every render so handlers always have
   // fresh closures without being recreated themselves.
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const hasConnectedRef = useRef(false)
+  const hasConnectedRef = React.useRef(false)
 
-  const onConnectedRef = useRef<UseChatSocketOptions['onConnected']>(onConnected)
-  const onDisconnectedRef = useRef<UseChatSocketOptions['onDisconnected']>(onDisconnected)
-  const onMessageReceivedRef = useRef<UseChatSocketOptions['onMessageReceived']>(onMessageReceived)
-  const onMessageRecalledRef = useRef<UseChatSocketOptions['onMessageRecalled']>(onMessageRecalled)
-  const onMessageReadRef = useRef<UseChatSocketOptions['onMessageRead']>(onMessageRead)
-  const onPresenceChangedRef = useRef<UseChatSocketOptions['onPresenceChanged']>(onPresenceChanged)
-  const onMessagePinnedRef = useRef<UseChatSocketOptions['onMessagePinned']>(options.onMessagePinned)
-  const onMessageUnpinnedRef = useRef<UseChatSocketOptions['onMessageUnpinned']>(options.onMessageUnpinned)
-  const onReactionAddedRef = useRef<UseChatSocketOptions['onReactionAdded']>(options.onReactionAdded)
-  const onReactionRemovedRef = useRef<UseChatSocketOptions['onReactionRemoved']>(options.onReactionRemoved)
-  const onGroupMemberAddedRef = useRef<UseChatSocketOptions['onGroupMemberAdded']>(options.onGroupMemberAdded)
-  const onGroupMemberRemovedRef = useRef<UseChatSocketOptions['onGroupMemberRemoved']>(options.onGroupMemberRemoved)
-  const onGroupMemberLeftRef = useRef<UseChatSocketOptions['onGroupMemberLeft']>(options.onGroupMemberLeft)
-  const onGroupRoleChangedRef = useRef<UseChatSocketOptions['onGroupRoleChanged']>(options.onGroupRoleChanged)
-  const onGroupDisbandedRef = useRef<UseChatSocketOptions['onGroupDisbanded']>(options.onGroupDisbanded)
-  const onGroupUpdatedRef = useRef<UseChatSocketOptions['onGroupUpdated']>(options.onGroupUpdated)
+  const onConnectedRef = React.useRef<UseChatSocketOptions['onConnected']>(onConnected)
+  const onDisconnectedRef = React.useRef<UseChatSocketOptions['onDisconnected']>(onDisconnected)
+  const onMessageReceivedRef = React.useRef<UseChatSocketOptions['onMessageReceived']>(onMessageReceived)
+  const onMessageRecalledRef = React.useRef<UseChatSocketOptions['onMessageRecalled']>(onMessageRecalled)
+  const onMessageReadRef = React.useRef<UseChatSocketOptions['onMessageRead']>(onMessageRead)
+  const onPresenceChangedRef = React.useRef<UseChatSocketOptions['onPresenceChanged']>(onPresenceChanged)
+  const onMessagePinnedRef = React.useRef<UseChatSocketOptions['onMessagePinned']>(options.onMessagePinned)
+  const onMessageUnpinnedRef = React.useRef<UseChatSocketOptions['onMessageUnpinned']>(options.onMessageUnpinned)
+  const onReactionAddedRef = React.useRef<UseChatSocketOptions['onReactionAdded']>(options.onReactionAdded)
+  const onReactionRemovedRef = React.useRef<UseChatSocketOptions['onReactionRemoved']>(options.onReactionRemoved)
+  const onGroupMemberAddedRef = React.useRef<UseChatSocketOptions['onGroupMemberAdded']>(options.onGroupMemberAdded)
+  const onGroupMemberRemovedRef = React.useRef<UseChatSocketOptions['onGroupMemberRemoved']>(options.onGroupMemberRemoved)
+  const onGroupMemberLeftRef = React.useRef<UseChatSocketOptions['onGroupMemberLeft']>(options.onGroupMemberLeft)
+  const onGroupRoleChangedRef = React.useRef<UseChatSocketOptions['onGroupRoleChanged']>(options.onGroupRoleChanged)
+  const onGroupDisbandedRef = React.useRef<UseChatSocketOptions['onGroupDisbanded']>(options.onGroupDisbanded)
+  const onGroupUpdatedRef = React.useRef<UseChatSocketOptions['onGroupUpdated']>(options.onGroupUpdated)
 
-  const onFriendshipUpdatedRef = useRef<UseChatSocketOptions['onFriendshipUpdated']>(options.onFriendshipUpdated)
-  const onMessageErrorRef = useRef<UseChatSocketOptions['onMessageError']>(options.onMessageError)
-  const onConversationErrorRef = useRef<UseChatSocketOptions['onConversationError']>(options.onConversationError)
+  const onFriendshipUpdatedRef = React.useRef<UseChatSocketOptions['onFriendshipUpdated']>(options.onFriendshipUpdated)
+  const onMessageErrorRef = React.useRef<UseChatSocketOptions['onMessageError']>(options.onMessageError)
+  const onConversationErrorRef = React.useRef<UseChatSocketOptions['onConversationError']>(options.onConversationError)
 
   // Keep refs in sync with latest callback props (runs synchronously each render)
   useEffect(() => {
@@ -103,38 +103,38 @@ export function useChatSocket(options: UseChatSocketOptions) {
     onConversationErrorRef.current = options.onConversationError
   }, [options])
 
-  const stableHandleConnect = useRef(() => {
+  const stableHandleConnect = React.useRef(() => {
     console.log('[useChatSocket] ✅ CONNECTED')
     onConnectedRef.current?.()
   })
-  const stableHandleDisconnect = useRef(() => {
+  const stableHandleDisconnect = React.useRef(() => {
     console.log('[useChatSocket] ⚪ DISCONNECTED')
     getOrCreateChatService().clearJoinedConversations()
     onDisconnectedRef.current?.()
   })
-  const stableHandleMessageReceived = useRef((payload: RawMessage) => {
+  const stableHandleMessageReceived = React.useRef((payload: RawMessage) => {
     onMessageReceivedRef.current?.(payload)
   })
-  const stableHandleMessageRecalled = useRef((payload: { messageId: string; conversationId: string; recalledBy: string }) => {
+  const stableHandleMessageRecalled = React.useRef((payload: { messageId: string; conversationId: string; recalledBy: string }) => {
     onMessageRecalledRef.current?.(payload)
   })
-  const stableHandleMessageRead = useRef((payload: { userId: string; conversationId: string; lastReadSeq: number }) => {
+  const stableHandleMessageRead = React.useRef((payload: { userId: string; conversationId: string; lastReadSeq: number }) => {
     onMessageReadRef.current?.(payload)
   })
-  const stableHandlePresenceChanged = useRef((payload: PresenceChangedPayload) => {
+  const stableHandlePresenceChanged = React.useRef((payload: PresenceChangedPayload) => {
     onPresenceChangedRef.current?.(payload)
   })
-  const stableHandleMessagePinned = useRef((payload: any) => onMessagePinnedRef.current?.(payload))
-  const stableHandleMessageUnpinned = useRef((payload: any) => onMessageUnpinnedRef.current?.(payload))
-  const stableHandleReactionAdded = useRef((payload: any) => onReactionAddedRef.current?.(payload))
-  const stableHandleReactionRemoved = useRef((payload: any) => onReactionRemovedRef.current?.(payload))
-  const stableHandleGroupMemberAdded = useRef((payload: any) => onGroupMemberAddedRef.current?.(payload))
-  const stableHandleGroupMemberRemoved = useRef((payload: any) => onGroupMemberRemovedRef.current?.(payload))
-  const stableHandleGroupMemberLeft = useRef((payload: any) => onGroupMemberLeftRef.current?.(payload))
-  const stableHandleGroupRoleChanged = useRef((payload: any) => onGroupRoleChangedRef.current?.(payload))
-  const stableHandleGroupDisbanded = useRef((payload: any) => onGroupDisbandedRef.current?.(payload))
-  const stableHandleGroupUpdated = useRef((payload: any) => onGroupUpdatedRef.current?.(payload))
-  const stableHandleFriendshipUpdated = useRef((payload: any) => onFriendshipUpdatedRef.current?.(payload))
+  const stableHandleMessagePinned = React.useRef((payload: any) => onMessagePinnedRef.current?.(payload))
+  const stableHandleMessageUnpinned = React.useRef((payload: any) => onMessageUnpinnedRef.current?.(payload))
+  const stableHandleReactionAdded = React.useRef((payload: any) => onReactionAddedRef.current?.(payload))
+  const stableHandleReactionRemoved = React.useRef((payload: any) => onReactionRemovedRef.current?.(payload))
+  const stableHandleGroupMemberAdded = React.useRef((payload: any) => onGroupMemberAddedRef.current?.(payload))
+  const stableHandleGroupMemberRemoved = React.useRef((payload: any) => onGroupMemberRemovedRef.current?.(payload))
+  const stableHandleGroupMemberLeft = React.useRef((payload: any) => onGroupMemberLeftRef.current?.(payload))
+  const stableHandleGroupRoleChanged = React.useRef((payload: any) => onGroupRoleChangedRef.current?.(payload))
+  const stableHandleGroupDisbanded = React.useRef((payload: any) => onGroupDisbandedRef.current?.(payload))
+  const stableHandleGroupUpdated = React.useRef((payload: any) => onGroupUpdatedRef.current?.(payload))
+  const stableHandleFriendshipUpdated = React.useRef((payload: any) => onFriendshipUpdatedRef.current?.(payload))
 
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

@@ -161,8 +161,8 @@ export function useGroupCall({
   const [snapshot, setSnapshot] = useState<GroupCallSnapshot | null>(null)
   const [incomingCall, setIncomingCall] = useState<IncomingGroupCallInfo | null>(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
-  const serviceRef = useRef<WebRtcGroupCallService | null>(null)
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const serviceRef = React.useRef<WebRtcGroupCallService | null>(null)
+  const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null)
 
   const resolveName = React.useCallback((uid: string) => {
     return userMap?.[uid]?.displayName || userMap?.[uid]?.name

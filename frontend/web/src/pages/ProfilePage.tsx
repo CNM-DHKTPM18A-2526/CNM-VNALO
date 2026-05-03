@@ -60,8 +60,8 @@ const COVER_ASPECT = 16 / 6
 export function ProfilePage() {
   const { accessToken, isBootstrapping, user, updateUser } = useAuth()
   const { t } = useLanguage()
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const coverInputRef = useRef<HTMLInputElement | null>(null)
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null)
+  const coverInputRef = React.useRef<HTMLInputElement | null>(null)
 
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [coverUrl, setCoverUrl] = useState<string | null>(null)

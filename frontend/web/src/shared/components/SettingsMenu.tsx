@@ -14,8 +14,8 @@ export function SettingsMenu({
   const { t } = useLanguage()
   const { logout } = useAuth()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
-  const buttonRef = useRef<HTMLButtonElement>(null)
+  const menuRef = React.useRef<HTMLDivElement>(null)
+  const buttonRef = React.useRef<HTMLButtonElement>(null)
 
   const handleClickOutside = useCallback((event: MouseEvent) => {
     if (

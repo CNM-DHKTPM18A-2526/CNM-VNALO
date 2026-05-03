@@ -16,8 +16,8 @@ type TopbarProps = {
 
 export function Topbar({ title, userName, userAvatarUrl, onLogout, onOpenSettingsModal }: TopbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement | null>(null)
-  const menuItemRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const menuRef = React.useRef<HTMLDivElement | null>(null)
+  const menuItemRefs = React.useRef<Array<HTMLButtonElement | null>>([])
   const { t } = useLanguage()
   const navigate = useNavigate()
 

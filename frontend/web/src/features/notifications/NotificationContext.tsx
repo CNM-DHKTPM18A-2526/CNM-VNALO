@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../features/auth/useAuth'
 import { fetchInbox } from '../../features/chat/chat.api'
 import { getFriendStats } from '../../features/friends/friends.api'
@@ -22,7 +22,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const { accessToken, user } = useAuth()
   const [unreadMessageCount, setUnreadMessageCount] = useState(0)
   const [pendingFriendRequestCount, setPendingFriendRequestCount] = useState(0)
-  const refreshInFlightRef = useRef<Promise<void> | null>(null)
+  const refreshInFlightRef = React.useRef<Promise<void> | null>(null)
 
   const refreshCounts = useCallback(async () => {
     if (!accessToken) return
