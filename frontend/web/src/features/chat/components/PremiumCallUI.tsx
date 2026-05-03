@@ -135,48 +135,52 @@ export const PremiumCallControls: React.FC<PremiumCallControlsProps> = ({
   onMaximize
 }) => {
   return (
-    <div className="flex items-center justify-center gap-8 w-full">
+    <div className="flex items-center justify-center gap-10">
       {!isAudioOnly && (
         <button
           onClick={onToggleCamera}
-          className={`group flex flex-col items-center gap-2 transition-all duration-300 active:scale-95`}
+          className="group flex flex-col items-center gap-2 transition-transform active:scale-90"
         >
-          <div className={`p-4 rounded-full ${!isCameraOn ? 'bg-red-500' : 'bg-white/10 hover:bg-white/20'} border border-white/10 transition-colors`}>
+          <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors ${
+            !isCameraOn ? 'bg-red-500' : 'bg-[#2F2F2F] hover:bg-[#3F3F3F]'
+          }`}>
             {isCameraOn ? <Video size={24} className="text-white" /> : <VideoOff size={24} className="text-white" />}
           </div>
-          <span className="text-[11px] text-white/70 font-medium uppercase tracking-wider">{isCameraOn ? 'Tắt Cam' : 'Bật Cam'}</span>
+          <span className="text-[10px] text-white/60 font-medium tracking-tight">Camera</span>
         </button>
       )}
 
       <button
         onClick={onToggleMic}
-        className="group flex flex-col items-center gap-2 transition-all duration-300 active:scale-95"
+        className="group flex flex-col items-center gap-2 transition-transform active:scale-90"
       >
-        <div className={`p-4 rounded-full ${!isMicOn ? 'bg-red-500' : 'bg-white/10 hover:bg-white/20'} border border-white/10 transition-colors`}>
+        <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-colors ${
+          !isMicOn ? 'bg-red-500' : 'bg-[#2F2F2F] hover:bg-[#3F3F3F]'
+        }`}>
           {isMicOn ? <Mic size={24} className="text-white" /> : <MicOff size={24} className="text-white" />}
         </div>
-        <span className="text-[11px] text-white/70 font-medium uppercase tracking-wider">{isMicOn ? 'Tắt Mic' : 'Bật Mic'}</span>
+        <span className="text-[10px] text-white/60 font-medium tracking-tight">Micro</span>
       </button>
 
       <button
         onClick={onEnd}
-        className="group flex flex-col items-center gap-2 transition-all duration-300 active:scale-95"
+        className="group flex flex-col items-center gap-2 transition-transform active:scale-90"
       >
-        <div className="p-5 rounded-full bg-[#FF3B30] hover:bg-[#D32F2F] shadow-[0_0_20px_rgba(255,59,48,0.4)] transition-all">
+        <div className="w-16 h-16 rounded-full bg-[#FF3B30] hover:bg-[#E03328] flex items-center justify-center shadow-lg">
           <PhoneOff size={28} className="text-white" />
         </div>
-        <span className="text-[11px] text-white/70 font-medium uppercase tracking-wider">Kết thúc</span>
+        <span className="text-[10px] text-white/60 font-medium tracking-tight">Gác máy</span>
       </button>
 
       {onMinimize && (
         <button
           onClick={onMinimize}
-          className="group flex flex-col items-center gap-2 transition-all duration-300 active:scale-95"
+          className="group flex flex-col items-center gap-2 transition-transform active:scale-90"
         >
-          <div className="p-4 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 transition-colors">
+          <div className="w-14 h-14 rounded-full bg-[#2F2F2F] hover:bg-[#3F3F3F] flex items-center justify-center transition-colors">
             <Minimize2 size={24} className="text-white" />
           </div>
-          <span className="text-[11px] text-white/70 font-medium uppercase tracking-wider">Thu nhỏ</span>
+          <span className="text-[10px] text-white/60 font-medium tracking-tight">Thu nhỏ</span>
         </button>
       )}
     </div>

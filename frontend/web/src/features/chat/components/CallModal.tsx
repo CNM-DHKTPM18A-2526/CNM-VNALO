@@ -106,31 +106,16 @@ export const CallModal: React.FC<CallModalProps> = ({
       </div>
 
       {/* ── DOCKED BOTTOM BAR ── */}
-      <div className="h-32 bg-[#000000] border-t border-white/5 flex items-center px-10 relative z-50">
-        <div className="flex-1">
-           {/* Left section: can add call settings or info */}
-        </div>
-
-        <div className="flex-[2] flex justify-center">
-          <PremiumCallControls
-             isMicOn={isMicOn}
-             isCameraOn={isCameraOn}
-             isAudioOnly={type === 'audio'}
-             onToggleMic={onToggleMic || (() => {})}
-             onToggleCamera={onToggleCamera || (() => {})}
-             onEnd={onEnd}
-             onMinimize={onMinimize}
-          />
-        </div>
-
-        <div className="flex-1 flex justify-end items-center gap-4">
-           {/* Right section: Zalo icons (settings, layout) */}
-           <button className="p-3 text-white/50 hover:text-white transition-colors">
-              <div className="w-6 h-6 border-2 border-current rounded-sm flex items-center justify-center opacity-50">
-                 <div className="w-3 h-3 bg-current" />
-              </div>
-           </button>
-        </div>
+      <div className="h-[110px] bg-[#131313] border-t border-white/5 flex items-center justify-center relative z-50">
+        <PremiumCallControls
+           isMicOn={isMicOn}
+           isCameraOn={isCameraOn}
+           isAudioOnly={type === 'audio'}
+           onToggleMic={onToggleMic || (() => {})}
+           onToggleCamera={onToggleCamera || (() => {})}
+           onEnd={onEnd}
+           onMinimize={onMinimize}
+        />
       </div>
     </div>
   )
