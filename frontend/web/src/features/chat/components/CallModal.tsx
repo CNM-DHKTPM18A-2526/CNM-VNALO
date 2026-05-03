@@ -76,9 +76,9 @@ export const CallModal: React.FC<CallModalProps> = ({
           size="full"
         />
 
-        {/* Local Video Overlay (Zalo style: top-right) */}
-        {status === 'connected' && (
-          <div className="absolute top-10 right-10 w-44 h-64 z-40 rounded-2xl overflow-hidden border border-white/10 shadow-2xl animate-in fade-in zoom-in duration-700">
+        {/* Local Video Overlay (Zalo style: visible even when connecting for video calls) */}
+        {(type === 'video' || isCameraOn) && (
+          <div className={`absolute ${status === 'connected' ? 'top-10 right-10 w-44 h-64' : 'inset-0 w-full h-full'} z-40 rounded-2xl overflow-hidden border border-white/10 shadow-2xl transition-all duration-700`}>
             <PremiumVideoTile
               stream={localStream || null}
               displayName="Bạn"
@@ -86,6 +86,7 @@ export const CallModal: React.FC<CallModalProps> = ({
               isMicOn={isMicOn}
               isSpeaking={false}
               isLocal={true}
+              size={status === 'connected' ? 'md' : 'full'}
             />
           </div>
         )}

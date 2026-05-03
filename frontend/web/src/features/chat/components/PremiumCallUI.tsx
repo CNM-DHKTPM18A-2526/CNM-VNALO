@@ -2,7 +2,7 @@ import React from 'react'
 import { 
   Mic, MicOff, Video, VideoOff, PhoneOff, 
   Maximize2, Minimize2, 
-  Phone
+  Phone, Settings, ChevronUp
 } from 'lucide-react'
 import { resolveMediaUrl } from '../../../utils/mediaUtils'
 
@@ -70,26 +70,28 @@ export const PremiumVideoTile: React.FC<PremiumVideoTileProps> = ({
           className={`absolute inset-0 w-full h-full object-cover z-10 ${isLocal ? 'scale-x-[-1]' : ''}`}
         />
       ) : (
-        <div className="relative z-20 flex flex-col items-center justify-center gap-6">
-          <div className="relative">
-            {resolvedAvatar ? (
-              <img src={resolvedAvatar} alt={displayName} className="w-32 h-32 rounded-full object-cover border-2 border-white/20 shadow-2xl" />
-            ) : (
-              <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white text-4xl font-bold shadow-2xl">
-                {initials}
-              </div>
-            )}
-            {isSpeaking && (
-               <div className="absolute -inset-4 rounded-full border-4 border-green-500/50 animate-ping" />
+        <div className="relative z-10 flex flex-col items-center justify-center animate-in fade-in duration-700">
+          <div className="relative mb-4">
+            {/* White border ring like Zalo */}
+            <div className="w-24 h-24 rounded-full border-[1.5px] border-white/30 overflow-hidden shadow-2xl relative z-10">
+              {resolvedAvatar ? (
+                <img src={resolvedAvatar} alt={displayName} className="w-full h-full object-cover scale-105" />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-3xl font-bold">
+                  {initials}
+                </div>
+              )}
+            </div>
+            {isSpeaking && isMicOn && (
+               <div className="absolute -inset-2 rounded-full border-2 border-white/10 animate-ping opacity-20" />
             )}
           </div>
-          <div className="flex flex-col items-center gap-1">
-             <span className="text-white text-2xl font-semibold drop-shadow-lg">{isLocal ? 'Bạn' : displayName}</span>
-             {statusText && (
-               <span className="text-white/70 text-base font-medium animate-pulse">
-                 {statusText}
-               </span>
-             )}
+          
+          <div className="flex flex-col items-center">
+            <h3 className="text-white text-lg font-medium drop-shadow-md mb-0.5">{isLocal ? 'Bạn' : displayName}</h3>
+            {statusText && (
+              <span className="text-white/60 text-[13px] font-light tracking-wide">{statusText}</span>
+            )}
           </div>
         </div>
       )}
@@ -135,54 +137,59 @@ export const PremiumCallControls: React.FC<PremiumCallControlsProps> = ({
   onMaximize
 }) => {
   return (
-    <div className="flex items-center justify-center gap-10">
-      {!isAudioOnly && (
+    <div className="w-full flex items-center justify-between px-8">
+      {/* Spacer to balance settings icon on right */}
+      <div className="hidden md:block w-12" />
+
+      {/* Main Controls Group */}
+      <div className="flex items-center justify-center gap-8">
+        {!isAudioOnly && (
+          <button
+            onClick={onToggleCamera}
+            className={`relative w-11 h-11 rounded-full flex items-center justify-center transition-all ${
+              !isCameraOn ? 'bg-[#FF3B30]' : 'bg-white/10 hover:bg-white/20'
+            } border border-white/5 active:scale-90`}
+          >
+            {isCameraOn ? <Video size={18} className="text-white" /> : <VideoOff size={18} className="text-white" />}
+            {/* Zalo small chevron indicator */}
+            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-white/20 rounded-full flex items-center justify-center border border-black/20">
+              <ChevronUp size={10} className="text-white" />
+            </div>
+          </button>
+        )}
+
         <button
-          onClick={onToggleCamera}
-          className="group flex flex-col items-center gap-2 transition-all active:scale-95"
+          onClick={onEnd}
+          className="w-14 h-14 rounded-full bg-[#FF3B30] hover:bg-[#E03328] flex items-center justify-center shadow-[0_0_25px_rgba(255,59,48,0.3)] border border-white/10 transition-all active:scale-90"
         >
-          <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 ${
-            !isCameraOn ? 'bg-[#FF3B30] shadow-[0_0_15px_rgba(255,59,48,0.4)]' : 'bg-[#2D2D2D] hover:bg-[#404040]'
-          } border border-white/5`}>
-            {isCameraOn ? <Video size={20} className="text-white" /> : <VideoOff size={20} className="text-white" />}
-          </div>
-          <span className="text-[10px] text-white/50 font-medium tracking-tight group-hover:text-white/80 transition-colors uppercase">Camera</span>
+          <PhoneOff size={24} className="text-white" />
         </button>
-      )}
 
-      <button
-        onClick={onToggleMic}
-        className="group flex flex-col items-center gap-2 transition-all active:scale-95"
-      >
-        <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 ${
-          !isMicOn ? 'bg-[#FF3B30] shadow-[0_0_15px_rgba(255,59,48,0.4)]' : 'bg-[#2D2D2D] hover:bg-[#404040]'
-        } border border-white/5`}>
-          {isMicOn ? <Mic size={20} className="text-white" /> : <MicOff size={20} className="text-white" />}
-        </div>
-        <span className="text-[10px] text-white/50 font-medium tracking-tight group-hover:text-white/80 transition-colors uppercase">Micro</span>
-      </button>
-
-      <button
-        onClick={onEnd}
-        className="group flex flex-col items-center gap-2 transition-all active:scale-90"
-      >
-        <div className="w-16 h-16 rounded-full bg-[#FF3B30] hover:bg-[#E03328] flex items-center justify-center shadow-[0_0_25px_rgba(255,59,48,0.5)] border border-white/10 transition-all duration-300">
-          <PhoneOff size={28} className="text-white" />
-        </div>
-        <span className="text-[11px] text-[#FF3B30] font-black tracking-widest uppercase drop-shadow-md">Kết thúc</span>
-      </button>
-
-      {onMinimize && (
         <button
-          onClick={onMinimize}
-          className="group flex flex-col items-center gap-2 transition-all active:scale-95"
+          onClick={onToggleMic}
+          className={`relative w-11 h-11 rounded-full flex items-center justify-center transition-all ${
+            !isMicOn ? 'bg-[#FF3B30]' : 'bg-white/10 hover:bg-white/20'
+          } border border-white/5 active:scale-90`}
         >
-          <div className="w-14 h-14 rounded-full bg-[#2D2D2D] hover:bg-[#404040] flex items-center justify-center border border-white/5 transition-all duration-300">
-            <Minimize2 size={20} className="text-white" />
+          {isMicOn ? <Mic size={18} className="text-white" /> : <MicOff size={18} className="text-white" />}
+          {/* Zalo small chevron indicator */}
+          <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-white/20 rounded-full flex items-center justify-center border border-black/20">
+            <ChevronUp size={10} className="text-white" />
           </div>
-          <span className="text-[10px] text-white/50 font-medium tracking-tight group-hover:text-white/80 transition-colors uppercase">Thu nhỏ</span>
         </button>
-      )}
+      </div>
+
+      {/* Settings / Extra Options (Far Right like Zalo) */}
+      <div className="flex items-center gap-4">
+        {onMinimize && (
+          <button onClick={onMinimize} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors text-white/50">
+            <Minimize2 size={18} />
+          </button>
+        )}
+        <button className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors text-white/80">
+          <Settings size={20} />
+        </button>
+      </div>
     </div>
   )
 }
