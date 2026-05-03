@@ -1,4 +1,4 @@
-import React, { createContext } from 'react'
+import React from 'react'
 import { getUserById } from '../../friends/friends.api'
 
 type CachedUserProfile = {
@@ -13,7 +13,7 @@ type UserStoreContextType = {
   ensureUser: (token: string, userId: string) => Promise<CachedUserProfile>
 }
 
-const UserStoreContext = createContext<UserStoreContextType | undefined>(undefined)
+const UserStoreContext = React.createContext<UserStoreContextType | undefined>(undefined)
 
 export const UserStoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [userMap, setUserMap] = React.useState<Record<string, CachedUserProfile>>({})

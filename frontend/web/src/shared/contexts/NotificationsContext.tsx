@@ -1,4 +1,4 @@
-import React, { createContext } from 'react'
+import React from 'react'
 /* eslint-disable react-refresh/only-export-components */
 
 type NotificationsContextType = {
@@ -6,7 +6,7 @@ type NotificationsContextType = {
   toggleNotifications: () => void
 }
 
-const NotificationsContext = createContext<NotificationsContextType | null>(null)
+const NotificationsContext = React.createContext<NotificationsContextType | null>(null)
 
 export function NotificationsProvider({ children }: { children: React.ReactNode }) {
   const [notificationsEnabled, setNotificationsEnabled] = React.useState(() => {

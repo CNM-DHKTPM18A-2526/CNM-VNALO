@@ -1,4 +1,4 @@
-import React, { memo } from 'react'
+import React from 'react'
 
 import { SearchInput } from '../../../shared/components/SearchInput'
 import { Icon } from '../../../shared/components/Icon'
@@ -35,7 +35,7 @@ type ChatListProps = {
   onCreateGroupClick?: () => void
 }
 
-export const ChatList = memo(function ChatList({
+export const ChatList = React.memo(function ChatList({
   conversations,
   friendResults,
   activeConversationId,

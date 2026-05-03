@@ -1,4 +1,4 @@
-import React, { createContext } from 'react'
+import React from 'react'
 
 export type ImageViewerContextValue = {
   openImageViewerByMessageId: (messageId: string) => void
@@ -6,7 +6,7 @@ export type ImageViewerContextValue = {
   closeImageViewer: () => void
 }
 
-export const ImageViewerContext = createContext<ImageViewerContextValue | null>(null)
+export const ImageViewerContext = React.createContext<ImageViewerContextValue | null>(null)
 
 export function useImageViewer(): ImageViewerContextValue {
   const context = React.useContext(ImageViewerContext)

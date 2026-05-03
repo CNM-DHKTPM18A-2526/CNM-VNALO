@@ -1,4 +1,4 @@
-import React, { createContext } from 'react'
+import React from 'react'
 import { useAuth } from '../../features/auth/useAuth'
 import { fetchInbox } from '../../features/chat/chat.api'
 import { getFriendStats } from '../../features/friends/friends.api'
@@ -16,7 +16,7 @@ type NotificationContextType = {
   refreshCounts: () => Promise<void>
 }
 
-const NotificationContext = createContext<NotificationContextType | undefined>(undefined)
+const NotificationContext = React.createContext<NotificationContextType | undefined>(undefined)
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { accessToken, user } = useAuth()

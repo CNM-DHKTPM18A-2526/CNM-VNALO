@@ -1,4 +1,4 @@
-import React, { createContext } from 'react'
+import React from 'react'
 /* eslint-disable react-refresh/only-export-components */
 
 type Theme = 'light' | 'dark'
@@ -8,7 +8,7 @@ type ThemeContextType = {
   toggleTheme: () => void
 }
 
-const ThemeContext = createContext<ThemeContextType | null>(null)
+const ThemeContext = React.createContext<ThemeContextType | null>(null)
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = React.useState<Theme>(() => {

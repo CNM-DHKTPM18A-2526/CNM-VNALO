@@ -1,4 +1,4 @@
-import React, { createContext } from 'react'
+import React from 'react'
 /* eslint-disable react-refresh/only-export-components */
 
 import { type Language, translations } from './translations'
@@ -9,7 +9,7 @@ type LanguageContextType = {
   t: (key: string) => string
 }
 
-const LanguageContext = createContext<LanguageContextType | null>(null)
+const LanguageContext = React.createContext<LanguageContextType | null>(null)
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = React.useState<Language>(() => {

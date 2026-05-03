@@ -76,7 +76,7 @@ async function copyMessageToClipboard(text: string) {
   document.body.removeChild(fallbackInput)
 }
 
-export const MessageContextMenu = forwardRef<HTMLDivElement, MessageContextMenuProps>(function MessageContextMenu(
+export const MessageContextMenu = React.forwardRef<HTMLDivElement, MessageContextMenuProps>(function MessageContextMenu(
   { message, isMyMessage, position, onClose, onAction, isVirtualGroup, isPinned, userRole, allowMemberPin },
   ref,
 ) {
