@@ -3,8 +3,10 @@ import { useSearchParams } from 'react-router-dom'
 import { io, Socket } from 'socket.io-client'
 import { CallModal } from '../features/chat/components/CallModal'
 import { GroupCallModal } from '../features/chat/components/GroupCallModal'
-import { WebRtcCallService, WebRTCCallState } from '../features/chat/webrtcCallService'
-import { WebRtcGroupCallService, GroupCallSnapshot } from '../features/chat/webrtcGroupCallService'
+import { WebRtcCallService } from '../features/chat/webrtcCallService'
+import type { WebRTCCallState } from '../features/chat/webrtcCallService'
+import { WebRtcGroupCallService } from '../features/chat/webrtcGroupCallService'
+import type { GroupCallSnapshot } from '../features/chat/webrtcGroupCallService'
 import { useAuth } from '../features/auth/useAuth'
 import { WS_BASE_URL as SOCKET_URL } from '../api.client'
 
@@ -106,7 +108,7 @@ const CallPage: React.FC = () => {
           callId,
           currentUserId: user.id,
           currentUserName: user.name || 'Bạn',
-          currentUserAvatar: user.avatarUrl,
+          currentUserAvatar: user.avatarUrl || undefined,
           audioOnly,
         })
       } else {
@@ -116,7 +118,7 @@ const CallPage: React.FC = () => {
           callId,
           currentUserId: user.id,
           currentUserName: user.name || 'Bạn',
-          currentUserAvatar: user.avatarUrl,
+          currentUserAvatar: user.avatarUrl || undefined,
           audioOnly,
         })
       }

@@ -260,7 +260,7 @@ export const IncomingCallBanner: React.FC<IncomingCallBannerProps> = ({
           )}
 
           <button
-            onClick={onAnswer}
+            onClick={() => onAnswer(false)}
             className="w-12 h-12 rounded-full bg-[#34C759] hover:bg-[#2eaa4e] flex items-center justify-center text-white transition-transform active:scale-90"
             title="Trả lời"
           >
