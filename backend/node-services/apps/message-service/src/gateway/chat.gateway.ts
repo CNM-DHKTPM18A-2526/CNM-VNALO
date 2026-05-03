@@ -14,6 +14,7 @@ import { MessageService } from '../message/message.service';
 import { SendMessageDto } from '../dto/send-message.dto';
 import { WsJwtGuard } from '../auth/ws-jwt.guard';
 import { ConversationService } from '../conversation/conversation.service';
+import { PresenceService } from './presence.service';
 
 const allowedOrigins = (
   process.env.CORS_ALLOWED_ORIGINS ??
@@ -65,6 +66,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly jwtService: JwtService,
     private readonly messageService: MessageService,
     private readonly conversationService: ConversationService,
+    private readonly presenceService: PresenceService,
   ) {}
 
   // ─── Call Signaling ───────────────────────────────────────
@@ -172,8 +174,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Join Redis-backed user room so emitToUser works cross-node (via Redis adapter)
       await client.join(`user:${userId}`);
 
-      // Broadcast presence
-      this.server.emit('presence.changed', { userId, status: 'online' });
+      // Save presence to Redis (shared with realtime-gateway)
+      await this.presenceService.setOnline(userId, client.id);
+
+      // Broadcast presence to all connected clients
+      this.server.emit('presence.changed', { userId, status: 'online', isOnline: true });
     } catch (err) {
       this.logger.warn(`[Gateway.conn] Connection rejected: ${err.message}`);
       client.disconnect();
@@ -187,7 +192,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (this.userSockets.get(userId)?.size === 0) {
         this.userSockets.delete(userId);
         // Only emit offline if no more sockets for this user
-        this.server.emit('presence.changed', { userId, status: 'offline' });
+        // Save to Redis first (shared with realtime-gateway)
+        this.presenceService.setOffline(userId).catch((err) =>
+          this.logger.warn(`Failed to save offline presence for ${userId}: ${err.message}`),
+        );
+        this.server.emit('presence.changed', { userId, status: 'offline', isOnline: false });
       }
       // Leave Redis-backed user room (Redis adapter cleans socket from room on disconnect automatically,
       // but explicit leave ensures consistency)

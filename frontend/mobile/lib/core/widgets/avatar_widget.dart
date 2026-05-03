@@ -103,17 +103,17 @@ class _AvatarWidgetState extends State<AvatarWidget> {
         ),
         if (widget.showOnline)
           Positioned(
-            right: 2,
-            bottom: 2,
+            right: 0,
+            bottom: 0,
             child: Container(
-              width: widget.size * 0.25,
-              height: widget.size * 0.25,
+              width: widget.size * 0.28,
+              height: widget.size * 0.28,
               decoration: BoxDecoration(
-                color: widget.isOnline ? AppColors.online : Colors.grey.shade500,
+                color: widget.isOnline ? const Color(0xFF34D399) : Colors.grey.shade500, // Emerald-400
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: isDarkMode ? DarkColors.surface : Colors.white,
-                  width: 2.5,
+                  width: 2.0,
                 ),
                 boxShadow: [
                   BoxShadow(

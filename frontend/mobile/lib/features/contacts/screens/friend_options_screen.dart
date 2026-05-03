@@ -206,7 +206,7 @@ class _FriendOptionsScreenState extends State<FriendOptionsScreen> {
                   backgroundColor: AppColors.primary.withValues(alpha: 0.15),
                   foregroundColor: AppColors.primary,
                   elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
                 ),
                 child: Text(common.doneLabel, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
               ),

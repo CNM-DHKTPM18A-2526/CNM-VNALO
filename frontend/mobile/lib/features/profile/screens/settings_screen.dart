@@ -181,7 +181,7 @@ class SettingsScreen extends StatelessWidget {
           foregroundColor: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
           elevation: 0,
           shape: RoundedRectangleBorder(
-             borderRadius: BorderRadius.circular(24),
+             borderRadius: BorderRadius.circular(999),
           ),
           padding: const EdgeInsets.symmetric(vertical: 14),
         ),

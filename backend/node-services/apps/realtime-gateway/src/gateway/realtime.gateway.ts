@@ -113,6 +113,7 @@ export class RealtimeGateway
         const presenceEvent = {
           userId,
           status: 'offline',
+          isOnline: false,
           lastSeen: presence.lastSeen,
         };
         for (const room of client.rooms) {
@@ -152,6 +153,7 @@ export class RealtimeGateway
     this.server.to(room).emit('presence.changed', {
       userId: client.data.user.userId,
       status: 'online',
+      isOnline: true,
       lastSeen: new Date().toISOString(),
     });
 
@@ -177,11 +179,33 @@ export class RealtimeGateway
   // ─── Presence ─────────────────────────────────────────────────────────
 
   @SubscribeMessage('presence.get')
-  async handleGetPresence(@MessageBody() data: { userIds: string[] }) {
-    const presenceList = await this.presenceService.getBulkPresence(
-      data.userIds,
-    );
-    return { event: 'presence.list', data: presenceList };
+  async handleGetPresence(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: string[] | { userIds: string[] },
+  ) {
+    // Accept both raw array format (mobile: emit('presence.get', [...]))
+    // and object format (emit('presence.get', { userIds: [...] }))
+    const userIds: string[] = Array.isArray(data) ? data : data?.userIds ?? [];
+
+    this.logger.debug(`[presence.get] requested for ${userIds.length} users`);
+
+    if (userIds.length === 0) {
+      client.emit('presence.list', []);
+      return;
+    }
+
+    const presenceList = await this.presenceService.getBulkPresence(userIds);
+
+    // Normalize to { userId, isOnline, lastSeen } for Flutter client
+    const normalized = presenceList.map((p) => ({
+      userId: p.userId,
+      isOnline: p.status === 'online',
+      lastSeen: p.lastSeen,
+    }));
+
+    // Emit directly to the requesting socket (not ACK return, which is unreliable)
+    client.emit('presence.list', normalized);
+    this.logger.debug(`[presence.get] emitted presence.list with ${normalized.length} entries`);
   }
 
   // Handles 'presence.set' emitted by Flutter client (also extends Redis TTL like heartbeat)
@@ -189,7 +213,7 @@ export class RealtimeGateway
   async handlePresenceSet(@ConnectedSocket() client: Socket, @MessageBody() data: { isOnline: boolean }) {
     const userId = client.data?.user?.userId;
     if (userId && data.isOnline) {
-      await this.presenceService.heartbeat(userId);
+      await this.presenceService.setOnline(userId, client.id);
     }
     return { event: 'presence.set.ack' };
   }

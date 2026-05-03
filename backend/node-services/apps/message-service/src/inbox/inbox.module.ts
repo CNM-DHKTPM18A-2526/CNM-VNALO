@@ -5,6 +5,7 @@ import { Conversation } from '../entities/conversation.entity';
 import { ConversationMember } from '../entities/conversation-member.entity';
 import { InboxService } from './inbox.service';
 import { InboxController } from './inbox.controller';
+import { GatewayModule } from '../gateway/gateway.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { InboxController } from './inbox.controller';
       Conversation,
       ConversationMember,
     ]),
+    GatewayModule,
   ],
   controllers: [InboxController],
   providers: [InboxService],

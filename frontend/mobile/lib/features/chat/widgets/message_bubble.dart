@@ -542,8 +542,8 @@ class MessageBubble extends StatelessWidget {
 
     final labelColor =
         isDarkMode
-            ? DarkColors.textSecondary
-            : (isMine ? AppColors.iconSubtle : LightColors.textSecondary);
+            ? DarkColors.textPrimary
+            : (isMine ? Colors.black87 : Colors.black54);
     final dividerColor =
         isDarkMode
             ? Colors.white.withValues(alpha: 0.1)
@@ -568,6 +568,13 @@ class MessageBubble extends StatelessWidget {
         border: isDarkMode
             ? Border.all(color: Colors.white.withValues(alpha: 0.1), width: 0.5)
             : null,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDarkMode ? 0.12 : 0.06),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: IntrinsicWidth(
         child: Column(
@@ -583,8 +590,8 @@ class MessageBubble extends StatelessWidget {
                     title,
                     style: TextStyle(
                       color: titleColor,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
+                      fontWeight: FontWeight.w900, // Even bolder
+                      fontSize: 15, // Slightly larger
                       height: 1.15,
                     ),
                   ),

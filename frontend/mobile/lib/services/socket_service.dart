@@ -31,6 +31,7 @@ class SocketService with ChangeNotifier {
   StreamController<Message> _messageController = StreamController<Message>.broadcast();
   StreamController<Map<String, dynamic>> _typingController = StreamController<Map<String, dynamic>>.broadcast();
   StreamController<Map<String, dynamic>> _presenceController = StreamController<Map<String, dynamic>>.broadcast();
+  StreamController<dynamic> _presenceListController = StreamController<dynamic>.broadcast();
   StreamController<Map<String, dynamic>> _readController = StreamController<Map<String, dynamic>>.broadcast();
   StreamController<Map<String, dynamic>> _deliveredController = StreamController<Map<String, dynamic>>.broadcast();
   StreamController<Map<String, dynamic>> _recalledController = StreamController<Map<String, dynamic>>.broadcast();
@@ -57,6 +58,7 @@ class SocketService with ChangeNotifier {
     _messageController.close();
     _typingController.close();
     _presenceController.close();
+    _presenceListController.close();
     _readController.close();
     _deliveredController.close();
     _recalledController.close();
@@ -85,6 +87,7 @@ class SocketService with ChangeNotifier {
       _typingController.stream; // Stream for typing indicators
   Stream<Map<String, dynamic>> get onPresence =>
       _presenceController.stream; // Stream for presence updates
+  Stream<dynamic> get onPresenceList => _presenceListController.stream;
   Stream<Map<String, dynamic>> get onRead => _readController.stream;
   Stream<Map<String, dynamic>> get onDelivered => _deliveredController.stream;
   Stream<Map<String, dynamic>> get onRecalled => _recalledController.stream;
@@ -279,9 +282,11 @@ class SocketService with ChangeNotifier {
     });
 
     _socket!.on('presence.changed', (data) {
-      _presenceController.add(
-        Map<String, dynamic>.from(data),
-      ); // Add presence update data to the stream (e.g., user online/offline status)
+      _presenceController.add(Map<String, dynamic>.from(data));
+    });
+
+    _socket!.on('presence.list', (data) {
+      _presenceListController.add(data);
     });
 
     _socket!.on('message.read', (data) {
@@ -546,9 +551,16 @@ class SocketService with ChangeNotifier {
   }
 
   void emitPresence(bool isOnline) {
-    if (_socket == null || !_socket!.connected) return;
-    debugPrint('[SocketService] 📡 Emitting presence: ${isOnline ? 'ONLINE' : 'OFFLINE'}');
     _socket?.emit('presence.set', {'isOnline': isOnline});
+  }
+
+  void requestPresence(List<String> userIds) {
+    if (_socket == null || !_socket!.connected) {
+      return;
+    }
+    if (userIds.isEmpty) return;
+    
+    _socket?.emit('presence.get', userIds);
   }
 
   void _startHeartbeat() {

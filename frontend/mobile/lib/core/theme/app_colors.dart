@@ -53,7 +53,7 @@ class DarkColors {
 
 class LightColors {
   LightColors._();
-  static const Color scaffold = Color(0xFFF0F2F5); // Zalo light background (light grey)
+  static const Color scaffold = Color(0xFFF0F2F5); // Reverted to original light gray
   static const Color surface = Color(0xFFFFFFFF);
   static const Color surfaceLight = Color(0xFFF6F7F8);
   static const Color textPrimary = Color(0xFF1A1A1A);
@@ -61,7 +61,7 @@ class LightColors {
   static const Color textHint = Color(0xFF999999);
   static const Color divider = Color(0xFFE0E0E0);
   static const Color chatBubbleSent = Color(0xFFDDF2FF); // Vnalo light blue
-  static const Color chatBubbleReceived = Color(0xFFFFFFFF); // Vnalo white
+  static const Color chatBubbleReceived = Color(0xFFFFFFFF); // Keep white
   static const Color callLogSent = chatBubbleSent;
   static const Color callLogReceived = chatBubbleReceived;
   static const Color appBarBg = Color(0xFF0068FF);
