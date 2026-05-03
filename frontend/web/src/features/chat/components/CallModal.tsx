@@ -60,72 +60,58 @@ export const CallModal: React.FC<CallModalProps> = ({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
 
-  const resolvedPeerAvatar = peerAvatar ? resolveMediaUrl(peerAvatar) : null
-
   return (
-    <div className="fixed inset-0 z-[500] bg-[#000000] flex flex-col items-center justify-center overflow-hidden">
-      {/* ── BACKGROUND BACKDROP (Blurred Avatar) ── */}
-      <div className="absolute inset-0 z-0">
-        {resolvedPeerAvatar ? (
-          <img
-            src={resolvedPeerAvatar}
-            alt=""
-            className="w-full h-full object-cover blur-3xl opacity-20 scale-110"
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-[#001A33] via-[#000000] to-black" />
+    <div className="fixed inset-0 z-[500] bg-black flex flex-col overflow-hidden">
+      {/* ── MAIN CONTENT (Immersive Video) ── */}
+      <div className="relative flex-1 w-full h-full">
+        {/* Remote Video Tile (Full Screen) */}
+        <PremiumVideoTile
+          stream={remoteStream || null}
+          displayName={peerName}
+          avatarUrl={peerAvatar || undefined}
+          isCameraOn={status === 'connected' ? isRemoteCameraOn : false}
+          isMicOn={true}
+          isSpeaking={false}
+          statusText={status === 'connecting' ? 'Đang đổ chuông...' : undefined}
+          size="full"
+        />
+
+        {/* Local Video Overlay (Zalo style: top-right) */}
+        {type === 'video' && status === 'connected' && (
+          <div className="absolute top-8 right-8 w-40 h-60 z-40 rounded-xl overflow-hidden border border-white/20 shadow-2xl animate-in fade-in zoom-in duration-500">
+            <PremiumVideoTile
+              stream={localStream || null}
+              displayName="Bạn"
+              isCameraOn={isCameraOn}
+              isMicOn={isMicOn}
+              isSpeaking={false}
+              isLocal={true}
+            />
+          </div>
         )}
-        <div className="absolute inset-0 bg-[#000000]/40" />
+
+        {/* Top Info (Time/Status) */}
+        <div className="absolute top-10 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-2">
+          {status === 'connected' && (
+            <div className="bg-black/20 backdrop-blur-md px-4 py-1 rounded-full border border-white/10 text-white font-mono text-lg">
+              {formatTime(seconds)}
+            </div>
+          )}
+          {error && (
+            <div className="bg-red-500/80 backdrop-blur-md px-4 py-2 rounded-lg text-white text-sm font-medium border border-red-400/50">
+              {error}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* ── MAIN CONTENT ── */}
-      <div className="relative z-10 w-full max-w-6xl h-full flex flex-col p-4 sm:p-8">
-        {/* Header Info */}
-        <div className="flex flex-col items-center mb-8 animate-fade-in">
-           {status === 'connecting' ? (
-             <div className="bg-blue-500/20 text-blue-400 px-4 py-1.5 rounded-full backdrop-blur-md border border-blue-500/30 text-sm font-medium animate-pulse mb-4">
-               {type === 'audio' ? 'Đang kết nối cuộc gọi thoại...' : 'Đang kết nối cuộc gọi video...'}
-             </div>
-           ) : (
-             <div className="bg-green-500/20 text-green-400 px-4 py-1.5 rounded-full backdrop-blur-md border border-green-500/30 text-sm font-mono font-bold mb-4">
-               {formatTime(seconds)}
-             </div>
-           )}
-           {error && <div className="text-red-400 text-sm font-medium mb-4 bg-red-500/10 px-4 py-2 rounded-lg border border-red-500/20">{error}</div>}
+      {/* ── DOCKED BOTTOM BAR ── */}
+      <div className="h-32 bg-[#000000] border-t border-white/5 flex items-center px-10 relative z-50">
+        <div className="flex-1">
+           {/* Left section: can add call settings or info */}
         </div>
 
-        {/* Video Grid */}
-        <div className="flex-1 flex items-center justify-center gap-4 sm:gap-8 flex-col md:flex-row w-full h-full">
-           {/* Remote User */}
-           <div className="flex-1 w-full h-full max-h-[70vh]">
-             <PremiumVideoTile
-                stream={remoteStream || null}
-                displayName={peerName}
-                avatarUrl={peerAvatar || undefined}
-                isCameraOn={status === 'connected' ? isRemoteCameraOn : false}
-                isMicOn={true} // We don't have remote mic state in 1-1 props currently
-                isSpeaking={false}
-                statusText={status === 'connecting' ? 'Đang gọi...' : undefined}
-             />
-           </div>
-
-           {/* Local User (Smaller on mobile, side-by-side or overlay on desktop) */}
-           {type === 'video' && (
-             <div className="w-full md:w-1/3 h-48 md:h-full md:max-h-[70vh] animate-fade-in delay-300">
-                <PremiumVideoTile
-                  stream={localStream || null}
-                  displayName="Bạn"
-                  isCameraOn={isCameraOn}
-                  isMicOn={isMicOn}
-                  isSpeaking={false}
-                  isLocal={true}
-                />
-             </div>
-           )}
-        </div>
-
-        {/* Controls */}
-        <div className="mt-auto py-8">
+        <div className="flex-[2] flex justify-center">
           <PremiumCallControls
              isMicOn={isMicOn}
              isCameraOn={isCameraOn}
@@ -135,6 +121,15 @@ export const CallModal: React.FC<CallModalProps> = ({
              onEnd={onEnd}
              onMinimize={onMinimize}
           />
+        </div>
+
+        <div className="flex-1 flex justify-end items-center gap-4">
+           {/* Right section: Zalo icons (settings, layout) */}
+           <button className="p-3 text-white/50 hover:text-white transition-colors">
+              <div className="w-6 h-6 border-2 border-current rounded-sm flex items-center justify-center opacity-50">
+                 <div className="w-3 h-3 bg-current" />
+              </div>
+           </button>
         </div>
       </div>
     </div>

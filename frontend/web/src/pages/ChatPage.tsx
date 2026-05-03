@@ -2702,7 +2702,9 @@ export default function ChatPage() {
     const peerAvatar = selectedConversation?.avatarUrl || "";
     const url = `/call/${callId}?type=${isGroup ? "group" : "direct"}&conversationId=${selectedConversationId}&peerId=${peerUserId}&audioOnly=${type === "audio"}&isCaller=true&peerName=${encodeURIComponent(peerName)}&peerAvatar=${encodeURIComponent(peerAvatar)}`;
     console.log("[CALL][INITIATE-POPUP]", { url });
-    window.open(url, "VnaloCall", "width=1000,height=700,menubar=no,toolbar=no,location=no,status=no");
+    const width = window.screen.availWidth;
+    const height = window.screen.availHeight;
+    window.open(url, "VnaloCall", `width=${width},height=${height},menubar=no,toolbar=no,location=no,status=no`);
     setCallState(prev => ({ ...prev, isOpen: false }));
   }, [selectedConversationId, selectedConversation]);
 
@@ -2873,7 +2875,9 @@ export default function ChatPage() {
     const peerAvatar = callState.peerId ? userMap[callState.peerId]?.avatarUrl : "";
     const url = `/call/${callState.callId}?type=direct&conversationId=${callState.conversationId}&peerId=${callState.peerId}&audioOnly=${audioOnlyParam === true || callState.type === "audio"}&isCaller=false&peerName=${encodeURIComponent(peerName)}&peerAvatar=${encodeURIComponent(peerAvatar || "")}`;
     console.log("[CALL][ANSWER-POPUP]", { url });
-    window.open(url, "VnaloCall", "width=1000,height=700,menubar=no,toolbar=no,location=no,status=no");
+    const width = window.screen.availWidth;
+    const height = window.screen.availHeight;
+    window.open(url, "VnaloCall", `width=${width},height=${height},menubar=no,toolbar=no,location=no,status=no`);
     setCallState(prev => ({ ...prev, isOpen: false }));
   }, [callState, userMap]);
 
@@ -5496,7 +5500,9 @@ export default function ChatPage() {
           isAudioOnly={incomingGroupCall.audioOnly}
           onAnswer={() => {
             const url = `/call/${incomingGroupCall.callId}?type=group&conversationId=${incomingGroupCall.conversationId}&audioOnly=${incomingGroupCall.audioOnly}&isCaller=false&peerName=${encodeURIComponent(incomingGroupCall.conversationName)}&peerAvatar=${encodeURIComponent(incomingGroupCall.callerAvatar || "")}`;
-            window.open(url, "VnaloCall", "width=1000,height=700,menubar=no,toolbar=no,location=no,status=no");
+            const width = window.screen.availWidth;
+            const height = window.screen.availHeight;
+            window.open(url, "VnaloCall", `width=${width},height=${height},menubar=no,toolbar=no,location=no,status=no`);
             declineGroupCall();
           }}
           onDecline={declineGroupCall}

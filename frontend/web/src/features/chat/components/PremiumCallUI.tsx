@@ -45,16 +45,18 @@ export const PremiumVideoTile: React.FC<PremiumVideoTileProps> = ({
   const initials = displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
 
   return (
-    <div className={`relative overflow-hidden bg-[#1C1C2E] transition-all duration-500 ${isSpeaking ? 'ring-2 ring-[#22C55E]' : ''} ${size === 'full' ? 'w-full h-full' : 'w-full h-full'}`}>
-      {/* Background Blur */}
+    <div className={`relative w-full h-full overflow-hidden bg-black flex items-center justify-center`}>
+      {/* Background for no camera (Blurred Avatar) */}
       {!isCameraOn && (
-        <div className="absolute inset-0 z-0 bg-[#1C1C2E]">
+        <div className="absolute inset-0 z-0">
           {resolvedAvatar ? (
-            <img src={resolvedAvatar} alt="" className="w-full h-full object-cover blur-2xl opacity-40 scale-110" />
+            <>
+              <img src={resolvedAvatar} alt="" className="w-full h-full object-cover blur-[100px] opacity-40 scale-125" />
+              <div className="absolute inset-0 bg-black/60" />
+            </>
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-[#1C1C2E] to-[#131313]" />
+            <div className="w-full h-full bg-[#1C1C2E]" />
           )}
-          <div className="absolute inset-0 bg-black/20" />
         </div>
       )}
 
@@ -68,36 +70,39 @@ export const PremiumVideoTile: React.FC<PremiumVideoTileProps> = ({
           className={`absolute inset-0 w-full h-full object-cover z-10 ${isLocal ? 'scale-x-[-1]' : ''}`}
         />
       ) : (
-        <div className="relative z-20 flex flex-col items-center justify-center h-full gap-4">
+        <div className="relative z-20 flex flex-col items-center justify-center gap-6">
           <div className="relative">
             {resolvedAvatar ? (
-              <img src={resolvedAvatar} alt={displayName} className="w-24 h-24 rounded-full object-cover shadow-2xl" />
+              <img src={resolvedAvatar} alt={displayName} className="w-32 h-32 rounded-full object-cover border-2 border-white/20 shadow-2xl" />
             ) : (
-              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#007BFF] to-[#0050CC] flex items-center justify-center text-white text-3xl font-bold shadow-2xl">
+              <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white text-4xl font-bold shadow-2xl">
                 {initials}
               </div>
             )}
             {isSpeaking && (
-               <div className="absolute -inset-2 rounded-full border-2 border-[#22C55E] animate-ping opacity-50" />
+               <div className="absolute -inset-4 rounded-full border-4 border-green-500/50 animate-ping" />
             )}
           </div>
-          {statusText && (
-            <span className="text-white/80 text-sm font-medium animate-pulse drop-shadow-md">
-              {statusText}
-            </span>
-          )}
+          <div className="flex flex-col items-center gap-1">
+             <span className="text-white text-2xl font-semibold drop-shadow-lg">{isLocal ? 'Bạn' : displayName}</span>
+             {statusText && (
+               <span className="text-white/70 text-base font-medium animate-pulse">
+                 {statusText}
+               </span>
+             )}
+          </div>
         </div>
       )}
 
-      {/* Info Overlay */}
-      <div className="absolute bottom-4 left-4 right-4 z-30 flex flex-col gap-1">
-        <div className="flex items-center gap-2">
-          <span className="text-white text-sm font-semibold drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+      {/* Name Overlay (Only if video is on) */}
+      {isCameraOn && (
+        <div className="absolute bottom-6 left-6 z-30 flex items-center gap-2 bg-black/30 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10">
+          <span className="text-white text-sm font-medium">
             {isLocal ? 'Bạn' : displayName}
           </span>
-          {!isMicOn && <MicOff size={14} className="text-red-500 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" />}
+          {!isMicOn && <MicOff size={14} className="text-red-500" />}
         </div>
-      </div>
+      )}
     </div>
   )
 }
@@ -130,54 +135,48 @@ export const PremiumCallControls: React.FC<PremiumCallControlsProps> = ({
   onMaximize
 }) => {
   return (
-    <div className={`flex items-center gap-4 px-6 py-4 rounded-full backdrop-blur-2xl bg-black/40 border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all duration-500 ${isMinimized ? 'scale-75' : ''}`}>
+    <div className="flex items-center justify-center gap-8 w-full">
       {!isAudioOnly && (
         <button
           onClick={onToggleCamera}
-          className={`p-4 rounded-full transition-all duration-300 ${
-            !isCameraOn ? 'bg-[#EF4444] text-white' : 'bg-white/10 hover:bg-white/20 text-white'
-          } border border-white/5 shadow-lg active:scale-90`}
-          title={isCameraOn ? 'Tắt camera' : 'Bật camera'}
+          className={`group flex flex-col items-center gap-2 transition-all duration-300 active:scale-95`}
         >
-          {isCameraOn ? <Video size={24} /> : <VideoOff size={24} />}
+          <div className={`p-4 rounded-full ${!isCameraOn ? 'bg-red-500' : 'bg-white/10 hover:bg-white/20'} border border-white/10 transition-colors`}>
+            {isCameraOn ? <Video size={24} className="text-white" /> : <VideoOff size={24} className="text-white" />}
+          </div>
+          <span className="text-[11px] text-white/70 font-medium uppercase tracking-wider">{isCameraOn ? 'Tắt Cam' : 'Bật Cam'}</span>
         </button>
       )}
 
       <button
         onClick={onToggleMic}
-        className={`p-4 rounded-full transition-all duration-300 ${
-          !isMicOn ? 'bg-[#EF4444] text-white' : 'bg-white/10 hover:bg-white/20 text-white'
-        } border border-white/5 shadow-lg active:scale-90`}
-        title={isMicOn ? 'Tắt mic' : 'Bật mic'}
+        className="group flex flex-col items-center gap-2 transition-all duration-300 active:scale-95"
       >
-        {isMicOn ? <Mic size={24} /> : <MicOff size={24} />}
+        <div className={`p-4 rounded-full ${!isMicOn ? 'bg-red-500' : 'bg-white/10 hover:bg-white/20'} border border-white/10 transition-colors`}>
+          {isMicOn ? <Mic size={24} className="text-white" /> : <MicOff size={24} className="text-white" />}
+        </div>
+        <span className="text-[11px] text-white/70 font-medium uppercase tracking-wider">{isMicOn ? 'Tắt Mic' : 'Bật Mic'}</span>
       </button>
 
       <button
         onClick={onEnd}
-        className="p-4 rounded-full bg-[#EF4444] hover:bg-[#D32F2F] text-white transition-all duration-300 shadow-[0_10px_30px_rgba(239,68,68,0.4)] active:scale-90"
-        title="Kết thúc cuộc gọi"
+        className="group flex flex-col items-center gap-2 transition-all duration-300 active:scale-95"
       >
-        <PhoneOff size={24} />
+        <div className="p-5 rounded-full bg-[#FF3B30] hover:bg-[#D32F2F] shadow-[0_0_20px_rgba(255,59,48,0.4)] transition-all">
+          <PhoneOff size={28} className="text-white" />
+        </div>
+        <span className="text-[11px] text-white/70 font-medium uppercase tracking-wider">Kết thúc</span>
       </button>
 
-      {onMinimize && !isMinimized && (
+      {onMinimize && (
         <button
           onClick={onMinimize}
-          className="w-12 h-12 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-all"
-          title="Thu nhỏ"
+          className="group flex flex-col items-center gap-2 transition-all duration-300 active:scale-95"
         >
-          <Minimize2 size={20} />
-        </button>
-      )}
-
-      {onMaximize && isMinimized && (
-        <button
-          onClick={onMaximize}
-          className="w-12 h-12 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-all"
-          title="Phóng to"
-        >
-          <Maximize2 size={20} />
+          <div className="p-4 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 transition-colors">
+            <Minimize2 size={24} className="text-white" />
+          </div>
+          <span className="text-[11px] text-white/70 font-medium uppercase tracking-wider">Thu nhỏ</span>
         </button>
       )}
     </div>
