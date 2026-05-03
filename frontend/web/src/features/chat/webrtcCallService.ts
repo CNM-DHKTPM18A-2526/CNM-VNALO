@@ -250,6 +250,10 @@ export class WebRtcCallService {
         video: stream.getVideoTracks().length
       })
       this.updateState({ localStream: stream })
+      
+      if (this.state.pc && this.state.isConnected) {
+         this.updateState({ startedAt: Date.now() })
+      }
 
       stream.getTracks().forEach((track) => {
         if (this.state.pc) {
@@ -477,6 +481,9 @@ export class WebRtcCallService {
     this.updateState({ isEnded: true, isConnected: false })
 
     if (notifyPeer && this.socket) {
+      const duration = this.state.startedAt ? Math.floor((Date.now() - this.state.startedAt) / 1000) : 0
+      const outcome = this.state.isConnected ? 'completed' : (this.isCaller ? 'canceled' : 'missed')
+
       const endPayload = {
         conversationId: this.conversationId,
         callId: this.callId,
@@ -486,6 +493,8 @@ export class WebRtcCallService {
         calleeId: this.isCaller ? this.peerUserId : this.currentUserId,
         roomId: this.conversationId,
         reason: safeReason,
+        duration: duration,
+        outcome: outcome
       }
       this.socket.emit('call.end', endPayload)
       this.socket.emit('call:end', endPayload)

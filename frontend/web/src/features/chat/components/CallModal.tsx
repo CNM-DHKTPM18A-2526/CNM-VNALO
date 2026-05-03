@@ -36,6 +36,7 @@ export const CallModal: React.FC<CallModalProps> = ({
   onToggleMic,
   onToggleCamera,
   onMinimize,
+  localAvatar,
   error,
 }) => {
   const [seconds, setSeconds] = React.useState(0)
@@ -82,6 +83,7 @@ export const CallModal: React.FC<CallModalProps> = ({
             <PremiumVideoTile
               stream={localStream || null}
               displayName="Bạn"
+              avatarUrl={localAvatar}
               isCameraOn={isCameraOn}
               isMicOn={isMicOn}
               isSpeaking={false}

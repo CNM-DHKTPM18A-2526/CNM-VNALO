@@ -2709,24 +2709,31 @@ export default function ChatPage() {
   }, [selectedConversationId, selectedConversation]);
 
 
-  const handleEndCall = useCallback(async (reasonArg: any = 'hangup') => {
-    const reason = typeof reasonArg === 'string' ? reasonArg : 'hangup';
+  const handleEndCall = useCallback(async (data: any = 'hangup') => {
+    const signalData = typeof data === 'object' ? data : { reason: data };
+    const reason = signalData.reason || 'hangup';
     const currentCall = callStateRef.current;
-    if (!currentCall.isOpen || !currentCall.conversationId) return;
+    
+    // If the call was handled in a popup, we might receive duration/outcome via signalData
+    const externalDuration = signalData.duration;
+    const externalOutcome = signalData.outcome;
+
+    if (!currentCall.isOpen && !signalData.callId) return;
 
     const { type, direction, startedAt, callId, peerId } = currentCall;
-    const duration = startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0;
+    const duration = externalDuration !== undefined ? externalDuration : (startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0);
 
-    let outcome: 'completed' | 'canceled' | 'missed' = 'completed';
-    if (!startedAt) {
+    let outcome: 'completed' | 'canceled' | 'missed' = externalOutcome || 'completed';
+    if (externalOutcome === undefined && !startedAt) {
       outcome = direction === 'outgoing' ? 'canceled' : 'missed';
     }
 
-    console.log(`[CALL_LOG] Ending call. Reason: ${reason}, Outcome: ${outcome}, Duration: ${duration}s`);
+    console.log(`[CALL_LOG] Ending call. Reason: ${reason}, Outcome: ${outcome}, Duration: ${duration}s, CallId: ${callId || signalData.callId}`);
 
     // WebRTC logic moved to popup window
 
-    const targetConvId = currentCall.conversationId;
+    const targetConvId = currentCall.conversationId || signalData.conversationId || signalData.roomId;
+    if (!targetConvId) return;
     const peerUserId = peerId || selectedConversation?.userId || targetConvId;
 
     // Reset UI State immediately
@@ -2889,9 +2896,7 @@ export default function ChatPage() {
   const handleCallEnd = useCallback(async (data: any) => {
     const signalData = Array.isArray(data) ? data[0] : data;
     console.log('[CALL][RECEIVE END]', signalData);
-    if (signalData.callId === callStateRef.current.callId) {
-      handleEndCall(signalData.reason || 'remote-ended');
-    }
+    handleEndCall(signalData);
   }, [handleEndCall]);
 
   const handleCallOffer = async (data: any) => {

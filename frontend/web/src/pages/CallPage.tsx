@@ -175,6 +175,7 @@ const CallPage: React.FC = () => {
           status={callState.isConnected ? 'connected' : callState.error ? 'failed' : 'connecting'}
           peerName={peerName}
           peerAvatar={peerAvatar}
+          localAvatar={user?.avatarUrl}
           localStream={callState.localStream}
           remoteStream={callState.remoteStream}
           isMicOn={callState.isMicOn}

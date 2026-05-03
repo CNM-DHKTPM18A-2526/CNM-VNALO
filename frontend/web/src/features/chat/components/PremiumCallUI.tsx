@@ -45,60 +45,69 @@ export const PremiumVideoTile: React.FC<PremiumVideoTileProps> = ({
   const initials = displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
 
   return (
-    <div className={`relative w-full h-full overflow-hidden bg-black flex items-center justify-center`}>
-      {/* Background for no camera (Blurred Avatar) */}
-      {!isCameraOn && (
-        <div className="absolute inset-0 z-0">
-          {resolvedAvatar ? (
-            <>
-              <img src={resolvedAvatar} alt="" className="w-full h-full object-cover blur-[100px] opacity-40 scale-125" />
-              <div className="absolute inset-0 bg-black/60" />
-            </>
-          ) : (
-            <div className="w-full h-full bg-[#1C1C2E]" />
-          )}
-        </div>
-      )}
+    <div className={`relative w-full h-full overflow-hidden bg-[#0a0a0b] flex items-center justify-center select-none`}>
+      {/* ── PERSISTENT BLURRED BACKGROUND (Always visible as base) ── */}
+      <div className="absolute inset-0 z-0 overflow-hidden">
+        {resolvedAvatar ? (
+          <div className="relative w-full h-full">
+            <img 
+              src={resolvedAvatar} 
+              alt="" 
+              className="w-full h-full object-cover blur-[120px] opacity-50 scale-150 transform-gpu" 
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/60" />
+          </div>
+        ) : (
+          <div className="w-full h-full bg-[#13131a]" />
+        )}
+      </div>
 
-      {/* Video Content */}
-      {isCameraOn && stream ? (
+      {/* ── VIDEO CONTENT ── */}
+      {isCameraOn && stream && (
         <video
           ref={videoRef}
           autoPlay
           playsInline
           muted={isLocal}
-          className={`absolute inset-0 w-full h-full object-cover z-10 ${isLocal ? 'scale-x-[-1]' : ''}`}
+          className={`absolute inset-0 w-full h-full object-cover z-10 animate-in fade-in duration-1000 ${isLocal ? 'scale-x-[-1]' : ''}`}
         />
-      ) : (
-        <div className="relative z-10 flex flex-col items-center justify-center animate-in fade-in duration-700">
-          <div className="relative mb-4">
-            {/* White border ring like Zalo */}
-            <div className="w-24 h-24 rounded-full border-[1.5px] border-white/30 overflow-hidden shadow-2xl relative z-10">
+      )}
+
+      {/* ── AVATAR OVERLAY (Visible when camera is off OR video is loading) ── */}
+      {(!isCameraOn || !stream) && (
+        <div className="relative z-20 flex flex-col items-center justify-center animate-in fade-in zoom-in duration-500">
+          <div className="relative mb-6">
+            {/* Soft pulse rings */}
+            <div className="absolute -inset-4 rounded-full bg-white/5 animate-pulse" />
+            <div className="absolute -inset-8 rounded-full bg-white/[0.02] animate-pulse delay-75" />
+            
+            <div className="w-24 h-24 rounded-full border-[1.5px] border-white/30 overflow-hidden shadow-[0_0_40px_rgba(0,0,0,0.5)] relative z-10 bg-slate-900">
               {resolvedAvatar ? (
                 <img src={resolvedAvatar} alt={displayName} className="w-full h-full object-cover scale-105" />
               ) : (
-                <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-3xl font-bold">
+                <div className="w-full h-full bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white text-3xl font-bold">
                   {initials}
                 </div>
               )}
             </div>
-            {isSpeaking && isMicOn && (
-               <div className="absolute -inset-2 rounded-full border-2 border-white/10 animate-ping opacity-20" />
-            )}
           </div>
           
-          <div className="flex flex-col items-center">
-            <h3 className="text-white text-lg font-medium drop-shadow-md mb-0.5">{isLocal ? 'Bạn' : displayName}</h3>
+          <div className="flex flex-col items-center gap-1.5">
+            <h3 className="text-white text-xl font-semibold tracking-tight drop-shadow-xl">
+              {isLocal ? 'Bạn' : displayName}
+            </h3>
             {statusText && (
-              <span className="text-white/60 text-[13px] font-light tracking-wide">{statusText}</span>
+              <span className="text-white/60 text-sm font-light tracking-widest uppercase animate-pulse">
+                {statusText}
+              </span>
             )}
           </div>
         </div>
       )}
 
-      {/* Name Overlay (Only if video is on) */}
-      {isCameraOn && (
-        <div className="absolute bottom-6 left-6 z-30 flex items-center gap-2 bg-black/30 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10">
+      {/* ── NAME OVERLAY (Bottom left, only if video is on) ── */}
+      {isCameraOn && stream && (
+        <div className="absolute bottom-10 left-8 z-30 flex items-center gap-2 bg-black/40 backdrop-blur-xl px-4 py-2 rounded-xl border border-white/10 shadow-2xl">
           <span className="text-white text-sm font-medium">
             {isLocal ? 'Bạn' : displayName}
           </span>
