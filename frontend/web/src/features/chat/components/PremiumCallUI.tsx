@@ -194,7 +194,7 @@ interface IncomingCallBannerProps {
   isGroup?: boolean
   conversationName?: string
   isAudioOnly?: boolean
-  onAnswer: () => void
+  onAnswer: (audioOnly?: boolean) => void
   onDecline: () => void
 }
 
@@ -251,11 +251,7 @@ export const IncomingCallBanner: React.FC<IncomingCallBannerProps> = ({
 
           {!isAudioOnly && (
             <button
-              onClick={() => {
-                // If we need a 'no camera' option, it should technically set camera off before answering.
-                // For now, it invokes onAnswer. We might need to pass an additional callback later.
-                onAnswer()
-              }}
+              onClick={() => onAnswer(true)}
               className="w-12 h-12 rounded-full bg-[#3A3A3C] hover:bg-[#4a4a4d] flex items-center justify-center text-white transition-transform active:scale-90"
               title="Trả lời không có camera"
             >
