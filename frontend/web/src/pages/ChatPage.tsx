@@ -214,7 +214,6 @@ function toSocketMessageType(type: ChatMessageType): Uppercase<ChatMessageType> 
   return type.toUpperCase() as Uppercase<ChatMessageType>
 }
 
-
 // Removed local normalizeMessage, now imported from ../features/chat/utils/messageUtils
 
 function getConversationPreview(
@@ -225,9 +224,6 @@ function getConversationPreview(
 ): string {
   return formatMessage(message, currentUserId, getDisplayName)
 }
-
-
-
 
 function formatConversationPreview(
   senderName: string | null | undefined,
@@ -470,7 +466,7 @@ export default function ChatPage() {
   const routedConversationId = conversationIdFromUrl ?? ''
   const [conversations, setConversations] = useState<ConversationSummary[]>([])
   const [messagesByConversation, setMessagesByConversation] = useState<Record<string, ChatMessage[]>>({})
-  const messagesByConversationRef = useRef<Record<string, ChatMessage[]>>(messagesByConversation)
+  const messagesByConversationRef = React.useRef<Record<string, ChatMessage[]>>(messagesByConversation)
   const [selectedConversationId, setSelectedConversationId] = useState('')
   const [isLoadingConversations, setIsLoadingConversations] = useState(false)
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
@@ -544,11 +540,11 @@ export default function ChatPage() {
   const [isGroupCallMinimized, setIsGroupCallMinimized] = useState(false)
 
   // WEBRTC SERVICE REF
-  const callServiceRef = useRef<WebRtcCallService | null>(null)
+  const callServiceRef = React.useRef<WebRtcCallService | null>(null)
 
   // SYNC CALL STATE TO REF FOR LISTENERS
   const callStateRef = React.useRef(callState)
-  const currentCallIdRef = useRef<string | null>(null) // Immediate sync ref for signal routing
+  const currentCallIdRef = React.useRef<string | null>(null) // Immediate sync ref for signal routing
   useEffect(() => {
     callStateRef.current = callState
     currentCallIdRef.current = callState.callId || null
@@ -582,29 +578,28 @@ export default function ChatPage() {
     })
   }
 
-
   const routedConversationIdRef = React.useRef('')
   const selectedConversationIdRef = React.useRef('')
-  const selectedMessagesRef = useRef<ChatMessage[]>([])
-  const conversationsRef = useRef<ConversationSummary[]>([])
-  const friendIdSetRef = useRef<Set<string>>(new Set())
+  const selectedMessagesRef = React.useRef<ChatMessage[]>([])
+  const conversationsRef = React.useRef<ConversationSummary[]>([])
+  const friendIdSetRef = React.useRef<Set<string>>(new Set())
   const lastLoadedMessagesKeyRef = React.useRef('')
-  const userMapRef = useRef<Record<string, { displayName: string; avatarUrl: string | null }>>({})
+  const userMapRef = React.useRef<Record<string, { displayName: string; avatarUrl: string | null }>>({})
 
   // Hard guards for pinned messages
-  const loadingPinnedRef = useRef<Record<string, boolean>>({})
-  const lastConvRef = useRef<string | null>(null)
+  const loadingPinnedRef = React.useRef<Record<string, boolean>>({})
+  const lastConvRef = React.useRef<string | null>(null)
 
   // WebRTC Signal Deduplication (prevents double-triggering from specific + generic events)
-  const processedSignalsRef = useRef<Set<string>>(new Set())
+  const processedSignalsRef = React.useRef<Set<string>>(new Set())
 
   useEffect(() => {
     userMapRef.current = userMap
   }, [userMap])
   const messageLoadRequestSeqRef = React.useRef(0)
-  const pendingMetadataFetches = useRef<Set<string>>(new Set())
-  const processedMessageIds = useRef<Set<string>>(new Set())
-  const lastPinnedSyncTimeRef = useRef<Record<string, number>>({})
+  const pendingMetadataFetches = React.useRef<Set<string>>(new Set())
+  const processedMessageIds = React.useRef<Set<string>>(new Set())
+  const lastPinnedSyncTimeRef = React.useRef<Record<string, number>>({})
 
   // Load deleted timestamps & pinned conversations from localStorage on mount
   useEffect(() => {
@@ -669,7 +664,6 @@ export default function ChatPage() {
   useEffect(() => {
     conversationsRef.current = conversations
   }, [conversations])
-
 
   const selectedConversation = useMemo(
     () => conversations.find((conversation) => conversation.id === (routedConversationId || selectedConversationId)),
@@ -763,7 +757,6 @@ export default function ChatPage() {
       updateSearchIndexUsers(cachedUsers)
     }
   }, [friendResults])
-
 
   const updateConversationAfterMessage = useCallback(
     (
@@ -874,8 +867,8 @@ export default function ChatPage() {
 
   // PERIODIC SYNC (POLLING FALLBACK)
   const SYNC_INTERVAL_MS = 2000
-  const lastSyncTimeRef = useRef<Record<string, number>>({})
-  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const lastSyncTimeRef = React.useRef<Record<string, number>>({})
+  const pollingIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Setup polling interval that runs on a timer
   const syncLatestMessages = useCallback(async (targetId?: string) => {
@@ -1240,8 +1233,6 @@ export default function ChatPage() {
     },
     [accessToken, isRestrictedMode, user?.id],
   )
-
-
 
   const syncPinnedMessages = loadPinnedMessages
   
@@ -2849,7 +2840,6 @@ export default function ChatPage() {
     });
   }, [selectedConversationId, selectedConversation, currentUserId, getSocket, handleStartGroupCall]);
 
-
   const handleEndCall = useCallback(async (reasonArg: any = 'hangup') => {
     const reason = typeof reasonArg === 'string' ? reasonArg : 'hangup';
     const currentCall = callStateRef.current;
@@ -3223,8 +3213,6 @@ export default function ChatPage() {
     };
   }, [getSocket, currentUserId]);
 
-
-
   // Sync effect: Fetch profile for all group members when a conversation is opened
   useEffect(() => {
     if (!accessToken || !selectedConversationId) return;
@@ -3526,7 +3514,6 @@ export default function ChatPage() {
     [(user ? user.id : ""), user?.name, upsertUser],
   )
 
-
   const inboxSummarySyncingRef = React.useRef(false)
 
   useEffect(() => {
@@ -3783,7 +3770,6 @@ export default function ChatPage() {
         // Refresh conversation list to sync with backend
         await loadInbox(accessToken, groupId);
 
-
         navigate(`/chat/${groupId}`);
         setIsCreateGroupOpen(false);
       } catch (error) {
@@ -3796,8 +3782,6 @@ export default function ChatPage() {
     },
     [accessToken, user, navigate, loadInbox, emitSendMessage, joinConversation]
   );
-
-
 
   useEffect(() => {
     if (!accessToken) {
@@ -3988,8 +3972,6 @@ export default function ChatPage() {
     setIsProfileModalOpen(true)
   }, [])
 
-
-
   const handleLoadConversationMessages = useCallback((conversationId: string) => {
     if (!accessToken || !conversationId || !user) {
       return
@@ -4120,8 +4102,6 @@ export default function ChatPage() {
     })()
   }, [accessToken, deletedMessageIds, isRestrictedMode, syncConversationReactions, syncPinnedMessages, user, upsertUser])
 
-
-
   useEffect(() => {
     if (!isSocketConnected || !selectedConversationId || !accessToken) {
       return
@@ -4248,8 +4228,8 @@ export default function ChatPage() {
   // ------------------------------------------------------------------------------------------------------------------------------------------------------------------
   // SMART JOIN ROOMS (Only join once per session/reconnect)
   // ------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  const joinedIdsRef = useRef<Set<string>>(new Set())
-  const lastJoinedSocketIdRef = useRef<string | null>(null)
+  const joinedIdsRef = React.useRef<Set<string>>(new Set())
+  const lastJoinedSocketIdRef = React.useRef<string | null>(null)
 
   useEffect(() => {
     // Hard check every time conversations or connection state changes
@@ -4299,7 +4279,7 @@ export default function ChatPage() {
 
   // 1. Mark as read on conversation change or new messages (with guard)
   // 1. Mark as read on conversation change or new messages (with guard)
-  const lastEmittedReadRef = useRef<Record<string, number>>({})
+  const lastEmittedReadRef = React.useRef<Record<string, number>>({})
 
   useEffect(() => {
     const activeConversationId = routedConversationId || selectedConversationId
