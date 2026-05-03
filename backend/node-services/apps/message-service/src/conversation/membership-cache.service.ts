@@ -74,6 +74,13 @@ export class MembershipCacheService {
   }
 
   private async fetchFromDb(conversationId: string, userId: string): Promise<ConversationMember | null> {
+    // Validate UUID format to prevent Postgres crash (e.g. for vnalo_cloud_ virtual IDs)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(conversationId)) {
+      this.logger.debug(`Skipping DB fetch for non-UUID conversationId: ${conversationId}`);
+      return null;
+    }
+
     return this.memberRepo.findOne({
       where: { conversationId, userId, leftAt: IsNull() },
     });

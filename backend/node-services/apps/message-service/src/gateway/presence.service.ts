@@ -1,5 +1,5 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 
 const PRESENCE_KEY = (userId: string) => `presence:${userId}`;
@@ -9,15 +9,11 @@ const TTL_SECONDS = 60;
 @Injectable()
 export class PresenceService {
   private readonly logger = new Logger(PresenceService.name);
-  private readonly redis: Redis;
 
   constructor(
-    private readonly configService: ConfigService,
+    @InjectRedis() private readonly redis: Redis,
   ) {
-    const host = this.configService.get<string>('redis.host') ?? 'localhost';
-    const port = this.configService.get<number>('redis.port') ?? 6379;
-    this.redis = new Redis({ host, port, lazyConnect: true, retryStrategy: () => null });
-    this.logger.log(`PresenceService connected to Redis ${host}:${port}`);
+    this.logger.log(`PresenceService initialized with shared Redis client`);
   }
 
   /** Mark a user as online and save their socketId */

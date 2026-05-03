@@ -59,15 +59,17 @@ export class InboxService {
     if (inbox.length === 0) return [];
 
     // Batch fetch all conversation details in a single query (fixes N+1)
-    const convIds = inbox.map((e) => e.conversationId);
-    const conversations = await this.conversationRepo.find({
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const convIds = inbox.map((e) => e.conversationId).filter(id => uuidRegex.test(id));
+    
+    const conversations = convIds.length > 0 ? await this.conversationRepo.find({
       where: { id: In(convIds) },
-    });
+    }) : [];
 
     // Batch fetch active members for all conversations
-    const members = await this.memberRepo.find({
+    const members = convIds.length > 0 ? await this.memberRepo.find({
       where: { conversationId: In(convIds), leftAt: IsNull() },
-    });
+    }) : [];
 
     // Build O(1) lookup maps
     const convMap = new Map(conversations.map((c) => [c.id, c]));
