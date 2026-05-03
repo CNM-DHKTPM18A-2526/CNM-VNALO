@@ -1,5 +1,5 @@
 import { Info, UserPlus, MoreHorizontal } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import React from 'react'
 
 import { EmptyState } from '../../../shared/components/EmptyState'
 import { Icon } from '../../../shared/components/Icon'
@@ -102,14 +102,14 @@ export function ChatWindow({
 }: ChatWindowProps) {
   const { userMap } = useUserStore()
   const { t } = useLanguage()
-  const messagesContainerRef = useRef<HTMLDivElement | null>(null)
-  const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null)
-  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null)
-  const [replyMessage, setReplyMessage] = useState<ChatMessage | null>(null)
-  const [isPinnedExpanded, setIsPinnedExpanded] = useState(false)
-  const lastHandledJumpIdRef = useRef<string | null>(null)
+  const messagesContainerRef = React.useRef<HTMLDivElement | null>(null)
+  const [hoveredMessageId, setHoveredMessageId] = React.useState<string | null>(null)
+  const [highlightedMessageId, setHighlightedMessageId] = React.useState<string | null>(null)
+  const [replyMessage, setReplyMessage] = React.useState<ChatMessage | null>(null)
+  const [isPinnedExpanded, setIsPinnedExpanded] = React.useState(false)
+  const lastHandledJumpIdRef = React.useRef<string | null>(null)
 
-  const conversationMessages = useMemo(() => {
+  const conversationMessages = React.useMemo(() => {
     if (!conversation) {
       return []
     }
@@ -117,7 +117,7 @@ export function ChatWindow({
     return messages.filter((message) => message.conversationId === conversation.id && !deletedMessageIds[message.id])
   }, [conversation, deletedMessageIds, messages])
 
-  const viewerImages = useMemo<ViewerImageItem[]>(() => {
+  const viewerImages = React.useMemo<ViewerImageItem[]>(() => {
     if (!conversation) {
       return []
     }
@@ -140,7 +140,7 @@ export function ChatWindow({
       .filter((item): item is ViewerImageItem => Boolean(item))
   }, [conversation, conversationMessages])
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!conversation?.id) {
       return
     }
@@ -149,7 +149,7 @@ export function ChatWindow({
   }, [conversation?.id, onLoadConversationMessages])
 
   // 1. Initial scroll to bottom when switching conversation or finishing initial load
-  useEffect(() => {
+  React.useEffect(() => {
     if (!conversation || isLoadingMessages) {
       return
     }
@@ -161,7 +161,7 @@ export function ChatWindow({
   }, [conversation?.id, isLoadingMessages])
 
   // 2. Smart scroll for new messages in the CURRENT conversation
-  useEffect(() => {
+  React.useEffect(() => {
     if (!conversation || isLoadingMessages) {
       return
     }
@@ -177,7 +177,7 @@ export function ChatWindow({
     }
   }, [conversationMessages.length])
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!jumpToMessageId || lastHandledJumpIdRef.current === jumpToMessageId) {
       return
     }
@@ -205,7 +205,7 @@ export function ChatWindow({
     onJumpToMessageHandled?.()
   }, [conversationMessages, jumpToMessageId, onJumpToMessageHandled])
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!highlightedMessageId) {
       return
     }

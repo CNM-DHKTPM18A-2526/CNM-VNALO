@@ -2000,3 +2000,63 @@
     flex-wrap: wrap;
   }
 }
+/* ── PREMIUM CALL UI ── */
+@keyframes pulseRing {
+  0% { transform: scale(1); opacity: 0.5; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+@keyframes fadeInDown {
+  from { transform: translateY(-20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes shake {
+  0%, 100% { transform: rotate(0); }
+  25% { transform: rotate(-10deg); }
+  75% { transform: rotate(10deg); }
+}
+
+.call-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: #0f172a;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+}
+
+.mirror-mode {
+  transform: scaleX(-1);
+}
+
+/* ── VNALO BRAND COLORS (MATCHING MOBILE CONFIG) ── */
+:root {
+  --vnalo-primary: #007BFF;
+  --vnalo-primary-light: #00A2ED;
+  --vnalo-primary-dark: #0050CC;
+  --vnalo-success: #22C55E;
+  --vnalo-error: #EF4444;
+  --vnalo-warning: #F59E0B;
+  --vnalo-dark-bg: #000000;
+  --vnalo-dark-surface: #131313;
+}
+
+.glass-morphism-premium {
+  background: rgba(19, 19, 19, 0.8);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+}

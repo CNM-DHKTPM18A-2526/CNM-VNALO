@@ -136,20 +136,6 @@ class ChatListItem extends StatelessWidget {
           ),
           subtitle: Row(
             children: [
-              if (statusText != null) ...[
-                Text(
-                  statusText,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isOnline
-                        ? AppColors.online
-                        : (isDarkMode ? DarkColors.textHint : LightColors.textHint),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Text('·', style: TextStyle(color: isDarkMode ? DarkColors.textHint : LightColors.textHint)),
-                const SizedBox(width: 6),
-              ],
               Expanded(
                 child: Text(
                   lastPreview ??
@@ -170,6 +156,7 @@ class ChatListItem extends StatelessWidget {
                 Icon(Icons.notifications_off, size: 14, color: hintColor),
               if (conversation.unreadCount > 0)
                 Container(
+                  margin: const EdgeInsets.only(left: 4),
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: AppColors.unreadBadge,

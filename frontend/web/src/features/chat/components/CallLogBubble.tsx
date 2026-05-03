@@ -1,4 +1,4 @@
-import React, { memo } from 'react'
+import React from 'react'
 import { Phone, Video, ArrowUpRight, Users } from 'lucide-react'
 import type { ChatMessage } from '../chat.types'
 import { parseCallLog, formatDurationZalo } from '../utils/messageUtils'
@@ -13,7 +13,7 @@ type CallLogBubbleProps = {
  * Zalo-style Call Log Bubble component.
  * Displays call direction, type icon, duration, and a "Gọi lại" (Call back) button.
  */
-export const CallLogBubble = memo(function CallLogBubble({ message, currentUserId, onInitiateCall }: CallLogBubbleProps) {
+export const CallLogBubble = React.memo(function CallLogBubble({ message, currentUserId, onInitiateCall }: CallLogBubbleProps) {
   const logData = parseCallLog(message.text)
   const isMyMessage = message.sender === 'me'
   

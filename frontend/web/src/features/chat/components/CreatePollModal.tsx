@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { X, Plus, Settings } from 'lucide-react';
 import type { PollMetadata } from '../chat.types';
 
@@ -8,12 +8,12 @@ interface CreatePollModalProps {
 }
 
 export function CreatePollModal({ onClose, onCreate }: CreatePollModalProps) {
-  const [question, setQuestion] = useState('');
-  const [options, setOptions] = useState(['', '']);
-  const [allowMultiple, setAllowMultiple] = useState(false);
-  const [allowAddOption, setAllowAddOption] = useState(false);
-  const [isAnonymous, setIsAnonymous] = useState(false);
-  const [expiresAt, setExpiresAt] = useState<string | null>(null);
+  const [question, setQuestion] = React.useState('');
+  const [options, setOptions] = React.useState(['', '']);
+  const [allowMultiple, setAllowMultiple] = React.useState(false);
+  const [allowAddOption, setAllowAddOption] = React.useState(false);
+  const [isAnonymous, setIsAnonymous] = React.useState(false);
+  const [expiresAt, setExpiresAt] = React.useState<string | null>(null);
 
   const handleAddField = () => {
     setOptions([...options, '']);

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import React from 'react'
 
 import { UserAvatar } from '../../../shared/components/UserAvatar'
 import { Button } from '../../../shared/components/ui/Button'
@@ -27,11 +27,11 @@ export function MessageShareModal({
   onClose,
   onShare,
 }: MessageShareModalProps) {
-  const [searchKeyword, setSearchKeyword] = useState('')
-  const [note, setNote] = useState('')
-  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
+  const [searchKeyword, setSearchKeyword] = React.useState('')
+  const [note, setNote] = React.useState('')
+  const [selectedUserIds, setSelectedUserIds] = React.useState<string[]>([])
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isOpen) {
       return
     }
@@ -44,7 +44,7 @@ export function MessageShareModal({
     })
   }, [isOpen, message?.id])
 
-  const filteredFriends = useMemo(() => {
+  const filteredFriends = React.useMemo(() => {
     const normalized = searchKeyword.trim().toLowerCase()
 
     if (!normalized) {

@@ -1,5 +1,5 @@
+import React from 'react'
 import { CheckSquare2, ChevronRight, Copy, Info, Pin, RotateCcw, Star, Trash2 } from 'lucide-react'
-import { forwardRef, useMemo } from 'react'
 
 import type { CSSProperties } from 'react'
 
@@ -77,11 +77,11 @@ async function copyMessageToClipboard(text: string) {
   document.body.removeChild(fallbackInput)
 }
 
-export const MessageContextMenu = forwardRef<HTMLDivElement, MessageContextMenuProps>(function MessageContextMenu(
+export const MessageContextMenu = React.forwardRef<HTMLDivElement, MessageContextMenuProps>(function MessageContextMenu(
   { message, isMyMessage, position, onClose, onAction, isVirtualGroup, isPinned, userRole, allowMemberPin },
   ref,
 ) {
-  const menuStyle = useMemo<CSSProperties>(
+  const menuStyle = React.useMemo<CSSProperties>(
     () => ({
       top: position.top,
       left: position.left,

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React from 'react'
 import { X } from 'lucide-react'
 import { REACTION_OPTIONS } from '../chat.constants'
 import type {
@@ -65,9 +65,9 @@ type MessageReactionSummaryProps = {
 export function MessageReactionSummary({ reactions, isIncoming = true }: MessageReactionSummaryProps) {
   const { user } = useAuth()
   const { userMap } = useUserStore()
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
-  const [hoveredReactionKey, setHoveredReactionKey] = useState<ReactionKey | null>(null)
-  const [tooltipPlacement, setTooltipPlacement] = useState<'top' | 'bottom'>('bottom')
+  const [isDetailModalOpen, setIsDetailModalOpen] = React.useState(false)
+  const [hoveredReactionKey, setHoveredReactionKey] = React.useState<ReactionKey | null>(null)
+  const [tooltipPlacement, setTooltipPlacement] = React.useState<'top' | 'bottom'>('bottom')
   const activeReactions = REACTION_OPTIONS.filter((item) => (reactions[item.key]?.count ?? 0) > 0)
 
   const getReactionNames = (userIds: string[] | undefined) => {

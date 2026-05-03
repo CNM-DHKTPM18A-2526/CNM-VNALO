@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react'
+import React from 'react'
 /* eslint-disable react-refresh/only-export-components */
 
 type NotificationsContextType = {
@@ -6,10 +6,10 @@ type NotificationsContextType = {
   toggleNotifications: () => void
 }
 
-const NotificationsContext = createContext<NotificationsContextType | null>(null)
+const NotificationsContext = React.createContext<NotificationsContextType | null>(null)
 
 export function NotificationsProvider({ children }: { children: React.ReactNode }) {
-  const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
+  const [notificationsEnabled, setNotificationsEnabled] = React.useState(() => {
     const saved = localStorage.getItem('vnalo_notifications_enabled')
     return saved !== null ? JSON.parse(saved) : true
   })
@@ -30,7 +30,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 }
 
 export function useNotifications() {
-  const context = useContext(NotificationsContext)
+  const context = React.useContext(NotificationsContext)
   if (!context) {
     throw new Error('useNotifications must be used within NotificationsProvider')
   }

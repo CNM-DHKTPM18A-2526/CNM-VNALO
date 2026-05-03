@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import React from 'react'
 
 import { Icon } from './Icon'
 import { useTheme } from '../contexts/ThemeContext'
@@ -57,7 +57,7 @@ type SegmentedControlProps = {
 }
 
 export function SegmentedControl({ options, value, onChange, disabled = false }: SegmentedControlProps) {
-  const isSelected = useMemo(
+  const isSelected = React.useMemo(
     () => (optValue: string) => optValue === value,
     [value]
   )

@@ -234,11 +234,23 @@ export class WebRtcCallService {
         },
         video: this.audioOnly ? false : { facingMode: 'user', width: 1280, height: 720 },
       }
-      
+
       console.log('[WebRTC] Requesting media:', constraints)
-      
+
+      // ── INSECURE ORIGIN HANDLING ─────────────────────────────────────
+      // getUserMedia requires HTTPS in production. On localhost or http:// IP,
+      // Chrome will throw NotAllowedError. Detect early and surface a clear
+      // user-friendly message instead of a cryptic error.
+      const isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+      if (!isSecure) {
+        const msg = 'Vui lòng sử dụng HTTPS để truy cập micro và camera. Ví dụ: https://' + location.hostname
+        console.error('[WebRTC] Insecure origin:', location.protocol, location.hostname)
+        this.updateState({ error: msg })
+        throw new Error(msg)
+      }
+
       const mediaPromise = navigator.mediaDevices.getUserMedia(constraints)
-      const timeoutPromise = new Promise<never>((_, reject) => 
+      const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('Media request timed out (10s)')), 10000)
       )
 
@@ -250,6 +262,10 @@ export class WebRtcCallService {
         video: stream.getVideoTracks().length
       })
       this.updateState({ localStream: stream })
+      
+      if (this.state.pc && this.state.isConnected) {
+         this.updateState({ startedAt: Date.now() })
+      }
 
       stream.getTracks().forEach((track) => {
         if (this.state.pc) {
@@ -477,6 +493,9 @@ export class WebRtcCallService {
     this.updateState({ isEnded: true, isConnected: false })
 
     if (notifyPeer && this.socket) {
+      const duration = this.state.startedAt ? Math.floor((Date.now() - this.state.startedAt) / 1000) : 0
+      const outcome = this.state.isConnected ? 'completed' : (this.isCaller ? 'canceled' : 'missed')
+
       const endPayload = {
         conversationId: this.conversationId,
         callId: this.callId,
@@ -486,6 +505,10 @@ export class WebRtcCallService {
         calleeId: this.isCaller ? this.peerUserId : this.currentUserId,
         roomId: this.conversationId,
         reason: safeReason,
+        duration: duration,
+        outcome: outcome,
+        startedAt: this.state.startedAt ?? null,
+        direction: this.isCaller ? 'outgoing' : 'incoming',
       }
       this.socket.emit('call.end', endPayload)
       this.socket.emit('call:end', endPayload)
@@ -507,5 +530,27 @@ export class WebRtcCallService {
       pendingCandidates: [],
       hasRemoteDescription: false,
     })
+  }
+
+  toggleMic() {
+    if (this.state.localStream) {
+      const audioTracks = this.state.localStream.getAudioTracks()
+      const newStatus = !this.state.isMicOn
+      audioTracks.forEach(track => {
+        track.enabled = newStatus
+      })
+      this.updateState({ isMicOn: newStatus })
+    }
+  }
+
+  toggleCamera() {
+    if (this.state.localStream && !this.audioOnly) {
+      const videoTracks = this.state.localStream.getVideoTracks()
+      const newStatus = !this.state.isCameraOn
+      videoTracks.forEach(track => {
+        track.enabled = newStatus
+      })
+      this.updateState({ isCameraOn: newStatus })
+    }
   }
 }

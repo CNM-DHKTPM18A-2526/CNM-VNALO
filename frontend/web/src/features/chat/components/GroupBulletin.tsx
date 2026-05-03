@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { ArrowLeft, Plus, MessageCircle, Link, AlarmClock, FileText, ChevronRight } from 'lucide-react';
 import { UserAvatar } from '../../../shared/components/UserAvatar';
 import { useUserStore } from '../context/UserStoreContext';
@@ -19,12 +19,12 @@ interface GroupBulletinProps {
 
 export function GroupBulletin({ conversationId, token, messages, onClose, onJumpToMessage, onSendPoll }: GroupBulletinProps) {
   const { userMap } = useUserStore();
-  const [activeTab, setActiveTab] = useState<TabType>('all');
-  const [pinnedItems, setPinnedItems] = useState<RawPinnedMessage[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [showCreatePoll, setShowCreatePoll] = useState(false);
+  const [activeTab, setActiveTab] = React.useState<TabType>('all');
+  const [pinnedItems, setPinnedItems] = React.useState<RawPinnedMessage[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [showCreatePoll, setShowCreatePoll] = React.useState(false);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const loadPinned = async () => {
       try {
         setIsLoading(true);

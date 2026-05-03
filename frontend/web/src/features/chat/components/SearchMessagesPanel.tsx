@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import React from 'react'
 
 import { Icon } from '../../../shared/components/Icon'
 import { UserAvatar } from '../../../shared/components/UserAvatar'
@@ -74,17 +74,17 @@ function matchDateFilter(message: ChatMessage, filter: SearchDateFilter): boolea
 }
 
 export function SearchMessagesPanel({ conversation, onSearchConversation, onSelectMessage }: SearchMessagesPanelProps) {
-  const [searchKeyword, setSearchKeyword] = useState('')
-  const [debouncedKeyword, setDebouncedKeyword] = useState('')
-  const [searchMessages, setSearchMessages] = useState<ChatMessage[]>([])
-  const [searchFiles, setSearchFiles] = useState<ChatMessage[]>([])
-  const [isSearching, setIsSearching] = useState(false)
-  const [searchError, setSearchError] = useState('')
-  const [showAllResults, setShowAllResults] = useState(false)
-  const [senderFilter, setSenderFilter] = useState<SearchSenderFilter>('all')
-  const [dateFilter, setDateFilter] = useState<SearchDateFilter>('all')
+  const [searchKeyword, setSearchKeyword] = React.useState('')
+  const [debouncedKeyword, setDebouncedKeyword] = React.useState('')
+  const [searchMessages, setSearchMessages] = React.useState<ChatMessage[]>([])
+  const [searchFiles, setSearchFiles] = React.useState<ChatMessage[]>([])
+  const [isSearching, setIsSearching] = React.useState(false)
+  const [searchError, setSearchError] = React.useState('')
+  const [showAllResults, setShowAllResults] = React.useState(false)
+  const [senderFilter, setSenderFilter] = React.useState<SearchSenderFilter>('all')
+  const [dateFilter, setDateFilter] = React.useState<SearchDateFilter>('all')
 
-  useEffect(() => {
+  React.useEffect(() => {
     const timerId = window.setTimeout(() => {
       setDebouncedKeyword(searchKeyword.trim())
     }, 260)
@@ -94,7 +94,7 @@ export function SearchMessagesPanel({ conversation, onSearchConversation, onSele
     }
   }, [searchKeyword])
 
-  useEffect(() => {
+  React.useEffect(() => {
     let active = true
     
     // Set loading state in next tick to avoid cascading render warning
@@ -133,7 +133,7 @@ export function SearchMessagesPanel({ conversation, onSearchConversation, onSele
     }
   }, [conversation.id, debouncedKeyword, onSearchConversation])
 
-  const filteredSearchMessages = useMemo(
+  const filteredSearchMessages = React.useMemo(
     () =>
       searchMessages.filter((message) => {
         const senderOk = senderFilter === 'all' || message.sender === senderFilter
@@ -143,7 +143,7 @@ export function SearchMessagesPanel({ conversation, onSearchConversation, onSele
     [dateFilter, searchMessages, senderFilter],
   )
 
-  const filteredSearchFiles = useMemo(
+  const filteredSearchFiles = React.useMemo(
     () =>
       searchFiles.filter((message) => {
         const senderOk = senderFilter === 'all' || message.sender === senderFilter
@@ -154,7 +154,7 @@ export function SearchMessagesPanel({ conversation, onSearchConversation, onSele
     [dateFilter, debouncedKeyword, searchFiles, senderFilter],
   )
 
-  const visibleMessageResults = useMemo(() => {
+  const visibleMessageResults = React.useMemo(() => {
     if (showAllResults) {
       return filteredSearchMessages
     }

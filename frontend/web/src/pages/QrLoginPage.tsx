@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import React from 'react'
 import { QRCodeCanvas } from 'qrcode.react'
 import { Link, useNavigate } from 'react-router-dom'
 
@@ -12,14 +12,14 @@ export function QrLoginPage() {
   const navigate = useNavigate()
   const { loginWithAccessToken } = useAuth()
 
-  const [token, setToken] = useState<string | null>(null)
-  const [qrPayload, setQrPayload] = useState<string | null>(null)
-  const [expiresAt, setExpiresAt] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [token, setToken] = React.useState<string | null>(null)
+  const [qrPayload, setQrPayload] = React.useState<string | null>(null)
+  const [expiresAt, setExpiresAt] = React.useState<string | null>(null)
+  const [error, setError] = React.useState<string | null>(null)
+  const [isLoading, setIsLoading] = React.useState(true)
 
 
-  useEffect(() => {
+  React.useEffect(() => {
     let disposed = false
 
     const initialize = async () => {
@@ -55,7 +55,7 @@ export function QrLoginPage() {
     }
   }, [])
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!token || error) {
       return
     }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React from 'react';
 import { Modal } from '../../../shared/components/ui/Modal';
 import { UserAvatar } from '../../../shared/components/UserAvatar';
 
@@ -21,11 +21,11 @@ export function EditConversationNameModal({
   onClose,
   onSubmit,
 }: EditConversationNameModalProps) {
-  const [name, setName] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [name, setName] = React.useState('');
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   // Reset/sync value when modal opens
-  useEffect(() => {
+  React.useEffect(() => {
     if (isOpen) {
       setName(defaultValue || '');
     }

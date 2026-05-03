@@ -1,4 +1,4 @@
-﻿import { io, type Socket } from 'socket.io-client'
+import { io, type Socket } from 'socket.io-client'
 import type { RawMessage } from './chat.api'
 import type { ChatMessageType, ReplyMetadata } from './chat.types'
 

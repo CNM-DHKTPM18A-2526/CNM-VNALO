@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import React from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { QRCodeCanvas } from 'qrcode.react'
 
@@ -17,20 +17,20 @@ export function LoginPage() {
   const { setLanguage, language, t } = useLanguage()
   const { theme, toggleTheme } = useTheme()
 
-  const [loginMode, setLoginMode] = useState<'qr' | 'password'>('qr')
-  const [showMenu, setShowMenu] = useState(false)
+  const [loginMode, setLoginMode] = React.useState<'qr' | 'password'>('qr')
+  const [showMenu, setShowMenu] = React.useState(false)
   
   // Password login states
-  const [identifier, setIdentifier] = useState('')
-  const [password, setPassword] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [identifier, setIdentifier] = React.useState('')
+  const [password, setPassword] = React.useState('')
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
 
   // QR States
-  const [qrToken, setQrToken] = useState<string | null>(null)
-  const [qrPayload, setQrPayload] = useState<string | null>(null)
-  const [qrLoading, setQrLoading] = useState(false)
-  const [qrExpired, setQrExpired] = useState(false)
+  const [qrToken, setQrToken] = React.useState<string | null>(null)
+  const [qrPayload, setQrPayload] = React.useState<string | null>(null)
+  const [qrLoading, setQrLoading] = React.useState(false)
+  const [qrExpired, setQrExpired] = React.useState(false)
 
   const fromPath =
     typeof (location.state as { from?: unknown } | null)?.from === 'string'
@@ -53,14 +53,14 @@ export function LoginPage() {
     }
   }
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (loginMode === 'qr') {
         void initializeQr()
     }
   }, [loginMode])
 
   // Poll QR Session
-  useEffect(() => {
+  React.useEffect(() => {
     if (loginMode !== 'qr' || !qrToken || qrExpired) return
 
     let disposed = false

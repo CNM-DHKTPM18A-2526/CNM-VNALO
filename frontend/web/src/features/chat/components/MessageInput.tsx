@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import React, { type ChangeEvent } from 'react'
 import {
   AtSign,
   Ellipsis,
@@ -55,11 +55,11 @@ export function MessageInput({
   members = [],
 }: MessageInputProps) {
   const { accessToken } = useAuth()
-  const [messageText, setMessageText] = useState('')
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [messageText, setMessageText] = React.useState('')
+  const [selectedFiles, setSelectedFiles] = React.useState<File[]>([])
 
   // Mention State
-  const [mentionState, setMentionState] = useState<{
+  const [mentionState, setMentionState] = React.useState<{
     isOpen: boolean;
     filter: string;
     cursorPos: number;
@@ -71,23 +71,23 @@ export function MessageInput({
     left: 0
   });
 
-  const messageInputRef = useRef<HTMLInputElement>(null);
+  const messageInputRef = React.useRef<HTMLInputElement>(null);
 
   // Unified Picker State
-  const [isPickerOpen, setIsPickerOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<PickerTab>('STICKER')
+  const [isPickerOpen, setIsPickerOpen] = React.useState(false)
+  const [activeTab, setActiveTab] = React.useState<PickerTab>('STICKER')
 
   // Asset States
-  const [stickerPacks, setStickerPacks] = useState<any[]>([])
-  const [selectedPack, setSelectedPack] = useState<any | null>(null)
-  const [emojis, setEmojis] = useState<any[]>([])
-  const [gifs, setGifs] = useState<any[]>([])
-  const [isLoadingAssets, setIsLoadingAssets] = useState(false)
-  const [assetError, setAssetError] = useState<string | null>(null)
+  const [stickerPacks, setStickerPacks] = React.useState<any[]>([])
+  const [selectedPack, setSelectedPack] = React.useState<any | null>(null)
+  const [emojis, setEmojis] = React.useState<any[]>([])
+  const [gifs, setGifs] = React.useState<any[]>([])
+  const [isLoadingAssets, setIsLoadingAssets] = React.useState(false)
+  const [assetError, setAssetError] = React.useState<string | null>(null)
 
-  const [error, setError] = useState('')
-  const [isFocused, setIsFocused] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const [error, setError] = React.useState('')
+  const [isFocused, setIsFocused] = React.useState(false)
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null)
   
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -130,16 +130,16 @@ export function MessageInput({
       messageInputRef.current?.setSelectionRange(newPos, newPos);
     }, 0);
   };
-  const pickerPanelRef = useRef<HTMLDivElement | null>(null)
-  const stickerTriggerRef = useRef<HTMLButtonElement | null>(null)
-  const emojiTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const pickerPanelRef = React.useRef<HTMLDivElement | null>(null)
+  const stickerTriggerRef = React.useRef<HTMLButtonElement | null>(null)
+  const emojiTriggerRef = React.useRef<HTMLButtonElement | null>(null)
 
   const dynamicPlaceholder = placeholder || `Nhập @, tin nhắn tới ${recipientName?.trim() || 'người nhận'}`
   const hasAttachments = selectedFiles.length > 0
 
-  const canSend = useMemo(() => Boolean(messageText.trim() || hasAttachments), [messageText, hasAttachments])
+  const canSend = React.useMemo(() => Boolean(messageText.trim() || hasAttachments), [messageText, hasAttachments])
 
-  const filePreviewItems = useMemo<FilePreviewItem[]>(
+  const filePreviewItems = React.useMemo<FilePreviewItem[]>(
     () =>
       selectedFiles.map((file) => ({
         file,
@@ -149,7 +149,7 @@ export function MessageInput({
   )
 
   // Close picker when clicking outside
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isPickerOpen) return
 
     const onPointerDown = (event: PointerEvent) => {
@@ -166,7 +166,7 @@ export function MessageInput({
   }, [isPickerOpen])
 
   // Fetch Assets when tab changes or picker opens
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isPickerOpen || !accessToken) return
 
     const loadAssets = async () => {

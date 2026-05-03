@@ -1,5 +1,4 @@
-import type { KeyboardEvent } from 'react'
-import { useEffect, useRef, useState } from 'react'
+import React, { type KeyboardEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { useLanguage } from '../i18n/LanguageContext'
@@ -15,9 +14,9 @@ type TopbarProps = {
 }
 
 export function Topbar({ title, userName, userAvatarUrl, onLogout, onOpenSettingsModal }: TopbarProps) {
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement | null>(null)
-  const menuItemRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const [isMenuOpen, setIsMenuOpen] = React.useState(false)
+  const menuRef = React.useRef<HTMLDivElement | null>(null)
+  const menuItemRefs = React.useRef<Array<HTMLButtonElement | null>>([])
   const { t } = useLanguage()
   const navigate = useNavigate()
 
@@ -48,7 +47,7 @@ export function Topbar({ title, userName, userAvatarUrl, onLogout, onOpenSetting
     menuItemRefs.current[clamped]?.focus()
   }
 
-  useEffect(() => {
+  React.useEffect(() => {
     const handleOutsideClick = (event: PointerEvent) => {
       if (!menuRef.current) {
         return
@@ -65,7 +64,7 @@ export function Topbar({ title, userName, userAvatarUrl, onLogout, onOpenSetting
     }
   }, [])
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isMenuOpen) {
       return
     }

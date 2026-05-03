@@ -8,6 +8,7 @@ import { QrLoginPage } from './pages/QrLoginPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import ChatPage from './pages/ChatPage'
+import CallPage from './pages/CallPage'
 import { ContactsPage } from './pages/ContactsPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { UserStoreProvider } from './features/chat/context/UserStoreContext'
@@ -38,6 +39,7 @@ function App() {
           <Route path='contacts' element={<ContactsPage />} />
           <Route path='profile' element={<ProfilePage />} />
         </Route>
+        <Route path='/call/:callId' element={<ProtectedRoute><CallPage /></ProtectedRoute>} />
         <Route path='*' element={<Navigate replace to='/chat' />} />
       </Routes>
       </NotificationProvider>

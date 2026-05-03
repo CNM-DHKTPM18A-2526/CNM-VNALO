@@ -1,4 +1,4 @@
-import { createContext } from 'react'
+import React from 'react'
 
 import type { AuthUser, LoginPayload } from './auth.types'
 
@@ -13,4 +13,4 @@ export type AuthContextValue = {
   logout: () => void
 }
 
-export const AuthContext = createContext<AuthContextValue | null>(null)
+export const AuthContext = React.createContext<AuthContextValue | null>(null)

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react'
+import React from 'react'
 /* eslint-disable react-refresh/only-export-components */
 
 import { type Language, translations } from './translations'
@@ -9,10 +9,10 @@ type LanguageContextType = {
   t: (key: string) => string
 }
 
-const LanguageContext = createContext<LanguageContextType | null>(null)
+const LanguageContext = React.createContext<LanguageContextType | null>(null)
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguageState] = useState<Language>(() => {
+  const [language, setLanguageState] = React.useState<Language>(() => {
     const saved = localStorage.getItem('vnalo_language')
     return (saved as Language) || 'vi'
   })
@@ -41,7 +41,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function useLanguage() {
-  const context = useContext(LanguageContext)
+  const context = React.useContext(LanguageContext)
   if (!context) {
     throw new Error('useLanguage must be used within LanguageProvider')
   }

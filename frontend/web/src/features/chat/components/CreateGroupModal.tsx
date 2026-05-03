@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React from 'react';
 import { Camera, Check, ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
 
 import { UserAvatar } from '../../../shared/components/UserAvatar';
@@ -67,20 +67,20 @@ export function CreateGroupModal({
   initialMemberIds = [],
   existingMemberIds = [],
 }: CreateGroupModalProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const [groupName, setGroupName] = useState('');
-  const [searchKeyword, setSearchKeyword] = useState('');
-  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
-  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
-  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
+  const [groupName, setGroupName] = React.useState('');
+  const [searchKeyword, setSearchKeyword] = React.useState('');
+  const [selectedMemberIds, setSelectedMemberIds] = React.useState<string[]>([]);
+  const [activeFilter, setActiveFilter] = React.useState<FilterType>('all');
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = React.useState<string | null>(null);
   
-  const filterScrollRef = useRef<HTMLDivElement>(null);
-  const [showLeftArrow, setShowLeftArrow] = useState(false);
-  const [showRightArrow, setShowRightArrow] = useState(true);
+  const filterScrollRef = React.useRef<HTMLDivElement>(null);
+  const [showLeftArrow, setShowLeftArrow] = React.useState(false);
+  const [showRightArrow, setShowRightArrow] = React.useState(true);
 
   // Reset khi mở modal
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isOpen) return;
 
     // Use requestAnimationFrame to avoid synchronous setState in effect warning
@@ -102,7 +102,7 @@ export function CreateGroupModal({
     { id: 'later', label: 'Trả lời sau' },
   ];
 
-  const filteredFriends = useMemo(() => {
+  const filteredFriends = React.useMemo(() => {
     const keyword = searchKeyword.trim().toLowerCase();
     if (!keyword) return friends;
     return friends.filter((friend) => {
@@ -112,12 +112,12 @@ export function CreateGroupModal({
     });
   }, [friends, searchKeyword]);
 
-  const groupedFriends = useMemo(() => groupFriendsAlphabetically(filteredFriends), [filteredFriends]);
-  const sortedGroupKeys = useMemo(() => Object.keys(groupedFriends).sort((a, b) => (a === '#' ? 1 : a.localeCompare(b))), [groupedFriends]);
+  const groupedFriends = React.useMemo(() => groupFriendsAlphabetically(filteredFriends), [filteredFriends]);
+  const sortedGroupKeys = React.useMemo(() => Object.keys(groupedFriends).sort((a, b) => (a === '#' ? 1 : a.localeCompare(b))), [groupedFriends]);
 
-  const selectedMembers = useMemo(() => friends.filter((f) => selectedMemberIds.includes(f.friendId)), [friends, selectedMemberIds]);
+  const selectedMembers = React.useMemo(() => friends.filter((f) => selectedMemberIds.includes(f.friendId)), [friends, selectedMemberIds]);
 
-  const newSelectedMemberIds = useMemo(() => 
+  const newSelectedMemberIds = React.useMemo(() => 
     selectedMemberIds.filter(id => !existingMemberIds.includes(id)), 
   [selectedMemberIds, existingMemberIds]);
 
@@ -127,7 +127,7 @@ export function CreateGroupModal({
 
   const canSubmit = isValid && !isSubmitting;
 
-  const toggleMemberSelection = useCallback((friendId: string) => {
+  const toggleMemberSelection = React.useCallback((friendId: string) => {
     if (existingMemberIds.includes(friendId)) return;
     setSelectedMemberIds((prev) =>
       prev.includes(friendId) ? prev.filter((id) => id !== friendId) : [...prev, friendId]

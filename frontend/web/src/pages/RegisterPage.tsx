@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { sendRegisterOtp, register as registerAccount } from '../features/auth/auth.api'
@@ -80,8 +80,8 @@ export function RegisterPage() {
   const navigate = useNavigate()
   const { setLanguage, language } = useLanguage()
   const { t } = useLanguage()
-  const [step, setStep] = useState<RegisterStep>('form')
-  const [form, setForm] = useState<RegisterFormState>({
+  const [step, setStep] = React.useState<RegisterStep>('form')
+  const [form, setForm] = React.useState<RegisterFormState>({
     displayName: '',
     phone: '',
     email: '',
@@ -90,13 +90,13 @@ export function RegisterPage() {
     password: '',
     confirmPassword: '',
   })
-  const [otpCode, setOtpCode] = useState('')
-  const [normalizedPhone, setNormalizedPhone] = useState('')
-  const [normalizedEmail, setNormalizedEmail] = useState('')
-  const [errors, setErrors] = useState<RegisterErrors>({})
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [otpCode, setOtpCode] = React.useState('')
+  const [normalizedPhone, setNormalizedPhone] = React.useState('')
+  const [normalizedEmail, setNormalizedEmail] = React.useState('')
+  const [errors, setErrors] = React.useState<RegisterErrors>({})
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = React.useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
 
   const setField = <T extends keyof RegisterFormState>(field: T, value: RegisterFormState[T]) => {
     setForm((prev) => ({ ...prev, [field]: value }))

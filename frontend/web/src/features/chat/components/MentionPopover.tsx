@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { UserAvatar } from '../../../shared/components/UserAvatar';
 
 interface MentionPopoverProps {
@@ -16,7 +16,7 @@ export const MentionPopover: React.FC<MentionPopoverProps> = ({
   onClose,
   position 
 }) => {
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedIndex, setSelectedIndex] = React.useState(0);
 
   const specialOptions = [
     { userId: 'all', displayName: 'All', subText: 'Báo cho cả nhóm', icon: 'at' },
@@ -31,11 +31,11 @@ export const MentionPopover: React.FC<MentionPopoverProps> = ({
     ...filteredMembers
   ];
 
-  useEffect(() => {
+  React.useEffect(() => {
     setSelectedIndex(0);
   }, [filter]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowDown') {
         e.preventDefault();

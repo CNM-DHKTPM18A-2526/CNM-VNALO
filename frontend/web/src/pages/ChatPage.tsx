@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { getSyncPolicy } from '../features/auth/auth.api'
@@ -9,8 +9,8 @@ import { SearchGlobalPanel } from '../features/chat/components/SearchGlobalPanel
 import { MessageShareModal } from '../features/chat/components/MessageShareModal'
 import { ChatWindow } from '../features/chat/components/ChatWindow'
 import { UserProfileModal } from '../features/chat/components/UserProfileModal'
-import { CallModal } from '../features/chat/components/CallModal'
-import { GroupCallModal, IncomingGroupCallBanner, useGroupCall } from '../features/chat/components/GroupCallModal'
+import { useGroupCall } from '../features/chat/components/GroupCallModal'
+import { IncomingCallBanner } from '../features/chat/components/PremiumCallUI'
 import type { MessageContextMenuAction } from '../features/chat/components/MessageContextMenu'
 import {
   addMessageReaction,
@@ -59,7 +59,7 @@ import { refreshNotificationBadges } from '../features/notifications/Notificatio
 import { getUserByPhone } from '../features/friends/friends.api'
 import type { Friend, UserLookupResult } from '../features/friends/friends.types'
 import { useAuth } from '../features/auth/useAuth'
-import { WebRtcCallService } from '../features/chat/webrtcCallService'
+import type { WebRTCCallState } from '../features/chat/webrtcCallService'
 import { Skeleton } from '../shared/components/ui/Skeleton'
 import { Card } from '../shared/components/ui/Card'
 import { Modal } from '../shared/components/ui/Modal'
@@ -514,32 +514,27 @@ export default function ChatPage() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
 
   // CALL STATE
-  const [callState, setCallState] = useState<{
-    isOpen: boolean
-    type: 'audio' | 'video'
-    direction: 'outgoing' | 'incoming'
-    status: 'connecting' | 'connected' | 'failed'
-    peerId?: string
-    conversationId?: string
-    startedAt?: number
-    callId?: string
-    localStream?: MediaStream | null
-    remoteStream?: MediaStream | null
-    isMicOn?: boolean
-    isCameraOn?: boolean
-    hasRemoteDescription?: boolean
-    error?: string | null
-  }>({
+  const [callState, setCallState] = useState<WebRTCCallState & { isOpen: boolean, type: 'audio' | 'video', direction: 'outgoing' | 'incoming', status: 'connecting' | 'connected' | 'failed', peerId?: string, conversationId?: string, callId?: string }>({
+    pc: null,
+    localStream: null,
+    remoteStream: null,
+    isConnected: false,
+    isEnded: false,
+    isMicOn: true,
+    isCameraOn: true,
+    isRemoteMicOn: true,
+    isRemoteCameraOn: true,
+    pendingCandidates: [],
+    hasRemoteDescription: false,
+    error: null,
     isOpen: false,
     type: 'audio',
     direction: 'outgoing',
     status: 'connecting',
-    isMicOn: true,
-    isCameraOn: true,
   })
 
   // WEBRTC SERVICE REF
-  const callServiceRef = useRef<WebRtcCallService | null>(null)
+
 
   // SYNC CALL STATE TO REF FOR LISTENERS
   const callStateRef = useRef(callState)
@@ -550,32 +545,6 @@ export default function ChatPage() {
   }, [callState])
 
   // Initialize call service with state syncing
-  if (!callServiceRef.current) {
-    callServiceRef.current = new WebRtcCallService((serviceState) => {
-      setCallState((prev) => {
-        let status: 'connecting' | 'connected' | 'failed' = 'connecting'
-        if (serviceState.isConnected) status = 'connected'
-        else if (serviceState.error) status = 'failed'
-        else if (prev.status === 'failed') status = 'failed' // Maintain failure state
-
-        return {
-          ...prev,
-          status,
-          startedAt: serviceState.startedAt,
-          localStream: serviceState.localStream,
-          remoteStream: serviceState.remoteStream,
-          isMicOn: serviceState.isMicOn,
-          isCameraOn: serviceState.isCameraOn,
-          hasRemoteDescription: serviceState.hasRemoteDescription,
-          error: serviceState.error,
-        }
-      })
-
-      if (serviceState.isEnded && callState.isOpen) {
-        // We'll handle termination in the component logic or here
-      }
-    })
-  }
 
 
   const routedConversationIdRef = useRef('')
@@ -1944,16 +1913,6 @@ export default function ChatPage() {
         return c;
       }))
     },
-    onConversationError: (payload) => {
-      console.error('[ChatPage] ❌ Conversation error:', payload);
-      if (payload.conversationId && (payload.code?.includes('FORBIDDEN') || payload.code?.includes('NOT_FOUND') || payload.code?.includes('ACCESS_DENIED'))) {
-        const cid = payload.conversationId;
-        setConversations(prev => prev.filter(c => c.id !== cid));
-        if (selectedConversationIdRef.current === cid) {
-          navigate('/chat');
-        }
-      }
-    },
     onMessageError: (payload) => {
       console.error('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ Message error:', payload);
       if (payload.code === 'AUTH_DENIED' && payload.clientMessageId) {
@@ -1999,15 +1958,15 @@ export default function ChatPage() {
 
   // ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ GROUP CALL (SEPARATE LAYER - does not touch single call) ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½
   const {
-    snapshot: groupCallSnapshot,
+
     incomingCall: incomingGroupCall,
-    elapsedSeconds: groupCallElapsed,
-    startGroupCall,
-    joinGroupCall,
+
+
+
     declineGroupCall,
-    leaveGroupCall,
-    toggleMic: groupToggleMic,
-    toggleCamera: groupToggleCamera,
+
+
+
     isInGroupCall,
   } = useGroupCall({
     socket: getSocket(),
@@ -2017,158 +1976,6 @@ export default function ChatPage() {
     userMap,
     conversations, // Added conversations here
   })
-
-  // Caller: bÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ§Ã…â€œÃ‚Â© ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¥Ã‚ÂÃ…Â¸ cuÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ§Ã‚Â·Ã‚Â½ gÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¥Ã‚Â¹Ã¢â‚¬Å¡ nhÃƒÂ§Ã‚Â±Ã¢â€šÂ¬m (chÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ broadcast, khÃƒÂ§Ã‚Â¹Ã‚Â«ng tÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¯Ã‚Â¸Ã‚Â½ peer trÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¢Ã‚Â²Ã‚Â·)
-  const handleStartGroupCall = useCallback(
-    async (audioOnly = false) => {
-      if (!selectedConversationId) return
-      const callId = `gc-${Date.now()}`
-      const conv = conversations.find((c) => c.id === selectedConversationId)
-      await startGroupCall({
-        conversationId: selectedConversationId,
-        conversationName: conv?.name ?? 'CuÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ§Ã‚Â·Ã‚Â½ gÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¥Ã‚Â¹Ã¢â‚¬Å¡ nhÃƒÂ§Ã‚Â±Ã¢â€šÂ¬m',
-        callId,
-        audioOnly,
-      })
-    },
-    [selectedConversationId, conversations, startGroupCall]
-  )
-
-  // RÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° cuÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ§Ã‚Â·Ã‚Â½ gÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¥Ã‚Â¹Ã¢â‚¬Å¡ nhÃƒÂ§Ã‚Â±Ã¢â€šÂ¬m + tÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¯Ã‚Â¸Ã‚Â½ call log message
-  const handleLeaveGroupCall = useCallback(async () => {
-    const snap = groupCallSnapshot
-    const convId = snap?.conversationId
-    if (!convId) {
-      leaveGroupCall()
-      return
-    }
-
-    const callId = snap?.callId ?? ''
-    const duration = groupCallElapsed
-    // SÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ peers cÃƒÂ§Ã‚Â°Ã‚Â·n lÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã‚Â trÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¢Ã‚Â²Ã‚Â· khi rÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° (khÃƒÂ§Ã‚Â¹Ã‚Â«ng tÃƒÂ§Ã‚Â©Ã‚Â©nh bÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂÃ¢â‚¬Å¾ thÃƒÂ§Ã¢â‚¬â„¢Ã‚Â½n)
-    const remainingPeers = snap?.peers.length ?? 0
-
-    // 1. Stop WebRTC (luÃƒÂ§Ã‚Â¹Ã‚Â«n lÃƒÂ¯Ã‚Â¿Ã‚Â½m, bÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¥Ã‚ÂÃ‚Â¦ kÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ cÃƒÂ§Ã‚Â±Ã¢â€šÂ¬ phÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÅ½Ã‚Â¾ ngÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° cuÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ©Ã‚Â­Ã¢â€šÂ¬ khÃƒÂ§Ã‚Â¹Ã‚Â«ng)
-    leaveGroupCall()
-
-    // ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ°Ã‚Â©Ã‚Â¤Ã†â€™ÃƒÂ¯Ã‚Â¿Ã‚Â½ CHÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ tÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¯Ã‚Â¸Ã‚Â½ call log nÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ§Ã‚Â°Ã¢â‚¬Ëœ khÃƒÂ§Ã‚Â¹Ã‚Â«ng cÃƒÂ§Ã‚Â°Ã‚Â·n ai khÃƒÂ§Ã‚ÂÃ‚Âºc trong cuÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ§Ã‚Â·Ã‚Â½ gÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¥Ã‚Â¹Ã¢â‚¬Å¡.
-    // NÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ§Ã‚Â°Ã¢â‚¬Ëœ vÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¥Ã‚ÂÃ¢â‚¬â€ cÃƒÂ§Ã‚Â°Ã‚Â·n ngÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° khÃƒÂ§Ã‚ÂÃ‚Âºc ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ hÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ sÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ lÃƒÂ¯Ã‚Â¿Ã‚Â½ ngÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° tÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¯Ã‚Â¸Ã‚Â½ log khi rÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° sau cÃƒÂ§Ã‚Â¾Ã¢â‚¬Â¦ng.
-    if (remainingPeers > 0) {
-      console.log(`[GROUP_CALL_LOG] Skipping log ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ ${remainingPeers} peer(s) still in call`)
-      return
-    }
-
-    // 2. Broadcast group-call:ended ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ dismiss banner cÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¥Ã‚ÂÃ‚Â§ nhÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ§Ã¢â‚¬â€œÃ‚Â¸g ngÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° chÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹a bÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ§Ã…â€œÃ‚Â© mÃƒÂ§Ã‚ÂÃ‚Âºy
-    console.log(`[GROUP_CALL_LOG] Last person leaving ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ broadcasting group-call:ended`)
-    getSocket()?.emit('group-call:ended', {
-      conversationId: convId,
-      callId,
-      endedByUserId: currentUserId,
-    })
-
-    // 3. TÃƒÂ¥Ã‚Â»Ã¢â‚¬Â¢ÃƒÂ¯Ã‚Â¸Ã‚Â½ CALL_LOG message (chÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¿Ã‚Â½ ngÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹ÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â° cuÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ©Ã‚Â­Ã¢â€šÂ¬ cÃƒÂ§Ã‚Â¾Ã¢â‚¬Â¦ng rÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â©Ã‚Â¥Ã¢â‚¬Â°)
-    console.log(`[GROUP_CALL_LOG] Creating call log. duration=${duration}s`)
-    const logData = {
-      v: 1,
-      callId,
-      conversationId: convId,
-      callerId: currentUserId,
-      calleeId: 'group',
-      mediaType: snap?.audioOnly ? 'voice' : 'video',
-      outcome: duration > 0 ? 'completed' : 'canceled',
-      durationSeconds: duration,
-      participantCount: (snap?.peers.length ?? 0) + 1,
-      isGroup: true,
-      createdAt: new Date().toISOString(),
-    }
-    const logText = `CALL_LOG::${JSON.stringify(logData)}`
-    const clientMessageId = crypto.randomUUID()
-
-    // 3. Optimistic UI
-    const optimisticLog: ChatMessage = {
-      id: clientMessageId,
-      clientMessageId,
-      conversationId: convId,
-      sender: 'me',
-      senderId: currentUserId,
-      type: 'call',
-      text: logText,
-      timestamp: formatMessageTimestamp(),
-      createdAt: new Date().toISOString(),
-      deliveryState: 'sending',
-      isLocal: true,
-    }
-    setMessagesByConversation((prev) => ({
-      ...prev,
-      [convId]: upsertMessage(prev[convId] ?? [], optimisticLog),
-    }))
-    updateConversationAfterMessage(convId, optimisticLog, true)
-
-      // 4. LÃƒÂ¢Ã¢â‚¬ËœÃ‚Â¹u qua Socket vÃƒÂ¥Ã‚Â»Ã¢â€žÂ¢ÃƒÂ°Ã‚Â¢Ã‚Â¹Ã¢â‚¬Å¡ fallback REST
-      ; (async () => {
-        let success = false
-        for (let attempt = 1; attempt <= 2; attempt++) {
-          try {
-            const ack = await Promise.race([
-              emitSendMessage({ conversationId: convId, content: logText, messageType: 'TEXT', clientMessageId }),
-              new Promise<null>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 4000)),
-            ])
-            if (ack?.event === 'message.sent' && ack?.data) {
-              const serverMsg = {
-                ...normalizeMessage(mapRawMessage(ack.data, currentUserId)),
-                clientMessageId,
-                deliveryState: 'sent' as const,
-              }
-              setMessagesByConversation((prev) => ({
-                ...prev,
-                [convId]: upsertMessage(prev[convId] ?? [], serverMsg),
-              }))
-              updateConversationAfterMessage(convId, serverMsg, true)
-              success = true
-              break
-            }
-          } catch { }
-        }
-        if (!success) {
-          try {
-            const restRes = await sendMessageViaRest(accessToken || '', {
-              conversationId: convId,
-              content: logText,
-              messageType: 'TEXT',
-              clientMessageId,
-            })
-            if (restRes?.id) {
-              const serverMsg = {
-                ...normalizeMessage(mapRawMessage(restRes, currentUserId)),
-                clientMessageId,
-                deliveryState: 'sent' as const,
-              }
-              setMessagesByConversation((prev) => ({
-                ...prev,
-                [convId]: upsertMessage(prev[convId] ?? [], serverMsg),
-              }))
-              updateConversationAfterMessage(convId, serverMsg, true)
-              success = true
-            }
-          } catch { }
-        }
-        if (!success) {
-          setMessagesByConversation((prev) => ({
-            ...prev,
-            [convId]: markLocalMessageFailed(prev[convId] ?? [], clientMessageId),
-          }))
-        }
-      })()
-  }, [
-    groupCallSnapshot,
-    groupCallElapsed,
-    selectedConversationId,
-    currentUserId,
-    leaveGroupCall,
-    emitSendMessage,
-    accessToken,
-    updateConversationAfterMessage,
-  ])
 
   const handleAddReaction = useCallback(
     async (messageId: string, reactionKey: ReactionKey) => {
@@ -2888,74 +2695,79 @@ export default function ChatPage() {
 
   const handleInitiateCall = useCallback(async (type: 'audio' | 'video') => {
     if (!selectedConversationId) return;
-
-    // ðŸ“ž GROUP CALL routing ðŸ“ž delegate to separate group call layer
-    if (selectedConversation?.isGroup) {
-      await handleStartGroupCall(type === 'audio')
-      return;
-    }
-
-    // ðŸ“ž Single call (1-1) ðŸ“ž DO NOT MODIFY ðŸ“ž
-    const callId = `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const socket = getSocket();
-    if (!socket) return;
-
+    const isGroup = !!selectedConversation?.isGroup;
+    const callId = `call_${Date.now()}`;
     const peerUserId = selectedConversation?.userId || selectedConversationId;
-    console.log('[CALL][INITIATE]', { type, conversationId: selectedConversationId, peerUserId });
-
-    setCallState({
-      isOpen: true,
-      type,
-      direction: 'outgoing',
-      status: 'connecting',
-      peerId: peerUserId,
-      conversationId: selectedConversationId,
-      callId,
-      isMicOn: true,
-      isCameraOn: type === 'video',
-    });
-
-    await callServiceRef.current?.initialize({
-      socket,
-      conversationId: selectedConversationId,
-      callId,
-      currentUserId,
-      peerUserId: peerUserId,
-      audioOnly: type === 'audio',
-      isCaller: true,
-    });
-  }, [selectedConversationId, selectedConversation, currentUserId, getSocket, handleStartGroupCall]);
+    const peerName = selectedConversation?.name || "Người dùng";
+    const peerAvatar = selectedConversation?.avatarUrl || "";
+    const url = `/call/${callId}?type=${isGroup ? "group" : "direct"}&conversationId=${selectedConversationId}&peerId=${peerUserId}&audioOnly=${type === "audio"}&isCaller=true&peerName=${encodeURIComponent(peerName)}&peerAvatar=${encodeURIComponent(peerAvatar)}`;
+    console.log("[CALL][INITIATE-POPUP]", { url });
+    const width = window.screen.availWidth;
+    const height = window.screen.availHeight;
+    window.open(url, "VnaloCall", `width=${width},height=${height},menubar=no,toolbar=no,location=no,status=no`);
+    setCallState(prev => ({ ...prev, isOpen: false }));
+  }, [selectedConversationId, selectedConversation]);
 
 
-  const handleEndCall = useCallback(async (reasonArg: any = 'hangup') => {
-    const reason = typeof reasonArg === 'string' ? reasonArg : 'hangup';
+  const handleEndCall = useCallback(async (data: any = 'hangup') => {
+    const signalData = typeof data === 'object' ? data : { reason: data };
+    const reason = signalData.reason || 'hangup';
+
+    // BUG FIX: Extract all fields from signalData FIRST (popup-passed data),
+    // then fall back to callStateRef (which may be stale after popup took over).
+    // The popup owns the call lifecycle once it opens, so its signalData is authoritative.
+    const fromSignal = {
+      callId: signalData.callId ?? signalData.callId,
+      conversationId: signalData.conversationId ?? signalData.roomId,
+      direction: signalData.direction ?? callStateRef.current.direction,
+      type: signalData.type ?? callStateRef.current.type,
+      startedAt: signalData.startedAt ?? callStateRef.current.startedAt,
+      peerId: signalData.senderUserId ?? signalData.targetUserId
+                ?? callStateRef.current.peerId
+                ?? selectedConversation?.userId,
+    };
+
+    // Use callStateRef as secondary source only when signalData doesn't provide it
     const currentCall = callStateRef.current;
-    if (!currentCall.isOpen || !currentCall.conversationId) return;
+    const callId    = fromSignal.callId    ?? currentCall.callId;
+    const targetConvId = fromSignal.conversationId ?? currentCall.conversationId;
+    const direction  = fromSignal.direction  ?? currentCall.direction;
+    const type       = fromSignal.type       ?? currentCall.type;
+    const startedAt  = fromSignal.startedAt  ?? currentCall.startedAt;
+    const peerId     = fromSignal.peerId     ?? currentCall.peerId;
 
-    const { type, direction, startedAt, callId, peerId } = currentCall;
-    const duration = startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0;
+    // BUG FIX: Check signalData.callId instead of currentCall.callId.
+    // When popup sends call:end back, currentCall.callId may be undefined
+    // (popup took over but ChatPage state never updated with callId).
+    if (!currentCall.isOpen && !signalData.callId) return;
+    if (!targetConvId) return;
 
-    let outcome: 'completed' | 'canceled' | 'missed' = 'completed';
-    if (!startedAt) {
+    const externalDuration = signalData.duration;
+    const externalOutcome  = signalData.outcome;
+    const duration = externalDuration !== undefined
+      ? externalDuration
+      : (startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0);
+
+    let outcome: 'completed' | 'canceled' | 'missed' = externalOutcome || 'completed';
+    if (externalOutcome === undefined && !startedAt) {
       outcome = direction === 'outgoing' ? 'canceled' : 'missed';
     }
 
-    console.log(`[CALL_LOG] Ending call. Reason: ${reason}, Outcome: ${outcome}, Duration: ${duration}s`);
+    console.log(`[CALL_LOG] Ending call. Reason: ${reason}, Outcome: ${outcome}, Duration: ${duration}s, CallId: ${callId}`);
 
-    // Stop WebRTC service
-    const shouldNotify = reason !== 'remote-ended';
-    callServiceRef.current?.endCall(reason, shouldNotify);
+    // WebRTC logic moved to popup window
 
-    const targetConvId = currentCall.conversationId;
+    // BUG FIX: Use the extracted local variables (authoritative source),
+    // not the stale destructured object from the top of the function.
     const peerUserId = peerId || selectedConversation?.userId || targetConvId;
 
     // Reset UI State immediately
-    setCallState({
+    setCallState(prev => ({
+      ...prev,
       isOpen: false,
-      type: 'audio',
-      direction: 'outgoing',
       status: 'connecting',
-    });
+      callId: undefined,
+    }));
 
     if (callId) {
       const keysToDelete = Array.from(processedSignalsRef.current).filter(k => k.startsWith(callId));
@@ -2977,8 +2789,8 @@ export default function ChatPage() {
 
     const logText = `CALL_LOG::${JSON.stringify(logData)}`;
     // 3. Robust Send Pipeline (Shadow Process)
-    // ONLY the Caller (outgoing) or receiver of a missed call is responsible for saving & showing optimistic log
-    if (direction === 'outgoing' || (outcome !== 'completed' && direction === 'incoming')) {
+    // Both sides should see the call log if it was completed, or if it was missed/canceled.
+    if (direction === 'outgoing' || direction === 'incoming') {
       // 2. OPTIMISTIC UI: Add to chat immediately for caller
       const clientMessageId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
 
@@ -2990,6 +2802,7 @@ export default function ChatPage() {
         senderId: currentUserId,
         type: 'call',
         text: logText,
+        textType: 'call',
         timestamp: formatMessageTimestamp(),
         createdAt: new Date().toISOString(),
         deliveryState: 'sending',
@@ -3089,144 +2902,80 @@ export default function ChatPage() {
     }
   }, [selectedConversation, currentUserId, emitSendMessage, accessToken, updateConversationAfterMessage]);
 
-  const isAnsweringRef = useRef(false);
-  const handleAnswerCall = useCallback(async () => {
-    if (!callServiceRef.current || !callStateRef.current.isOpen || isAnsweringRef.current) return;
-    if (callStateRef.current.status === 'connected') return;
+  // const isAnsweringRef = useRef(false); // removed as unused
+  const handleAnswerCall = useCallback(async (audioOnlyParam?: boolean) => {
+    if (!callState.callId) return;
+    const peerName = callState.peerId ? (userMap[callState.peerId]?.displayName || "Người dùng") : "Người dùng";
+    const peerAvatar = callState.peerId ? userMap[callState.peerId]?.avatarUrl : "";
+    const url = `/call/${callState.callId}?type=direct&conversationId=${callState.conversationId}&peerId=${callState.peerId}&audioOnly=${audioOnlyParam === true || callState.type === "audio"}&isCaller=false&peerName=${encodeURIComponent(peerName)}&peerAvatar=${encodeURIComponent(peerAvatar || "")}`;
+    console.log("[CALL][ANSWER-POPUP]", { url });
+    const width = window.screen.availWidth;
+    const height = window.screen.availHeight;
+    window.open(url, "VnaloCall", `width=${width},height=${height},menubar=no,toolbar=no,location=no,status=no`);
+    setCallState(prev => ({ ...prev, isOpen: false }));
+  }, [callState, userMap]);
 
-    isAnsweringRef.current = true;
-    console.log('[ChatPage.handleAnswerCall] Answering call...');
 
-    // Safety watchdog: If it takes more than 15s to answer, fail the call to unstick UI
-    const watchdog = setTimeout(() => {
-      if (isAnsweringRef.current && callStateRef.current.status !== 'connected') {
-        console.warn('[ChatPage.handleAnswerCall] Watchdog triggered: Answer taking too long, resetting.');
-        handleEndCall('handshake-timeout');
-        isAnsweringRef.current = false;
-      }
-    }, 15000);
 
-    try {
-      setCallState(prev => ({ ...prev, status: 'connecting' }));
-      await callServiceRef.current.acceptCall();
-      // Status will be updated to 'connected' by WebRTC event listeners
-    } catch (error) {
-      console.error('[ChatPage.handleAnswerCall] Failed to answer call:', error);
-      handleEndCall('media-failed');
-    } finally {
-      clearTimeout(watchdog);
-      isAnsweringRef.current = false;
-    }
-  }, [handleEndCall]);
 
-  const handleToggleMic = useCallback(() => {
-    callServiceRef.current?.toggleMic();
-  }, []);
-
-  const handleToggleCamera = useCallback(() => {
-    callServiceRef.current?.toggleCamera();
-  }, []);
-
-  const handleCallAnswer = async (data: any) => {
-    const signalData = Array.isArray(data) ? data[0] : data;
-    const callId = signalData.callId;
-    if (!callId) return;
-
-    const sigKey = `${callId}_answer`;
-    if (processedSignalsRef.current.has(sigKey)) return;
-    processedSignalsRef.current.add(sigKey);
-
-    console.log('[CALL][RECEIVE ANSWER]', signalData);
-    if (callId === callStateRef.current.callId) {
-      await callServiceRef.current?.handleAnswer(signalData.sdp || signalData.answer?.sdp);
-    }
-  };
-
-  const handleCallIce = async (data: any) => {
-    const signalData = Array.isArray(data) ? data[0] : data;
-    const callId = signalData.callId;
-    const candidate = signalData.candidate?.candidate || signalData.candidate;
-    if (!callId || !candidate) return;
-
-    const sigKey = `${callId}_ice_${candidate}`;
-    if (processedSignalsRef.current.has(sigKey)) return;
-    processedSignalsRef.current.add(sigKey);
-
-    console.log('[CALL][RECEIVE ICE]', { callId, candidate: Boolean(candidate) });
-    // Use currentCallIdRef for immediate matching to avoid state sync race conditions
-    if (callId === currentCallIdRef.current) {
-      await callServiceRef.current?.handleIceCandidate(signalData.candidate);
-    } else {
-      console.warn('[CALL][ICE IGNORED] Call ID mismatch or call not initialized yet', { incoming: callId, current: currentCallIdRef.current });
-    }
-  };
 
   const handleCallEnd = useCallback(async (data: any) => {
     const signalData = Array.isArray(data) ? data[0] : data;
     console.log('[CALL][RECEIVE END]', signalData);
-    if (signalData.callId === callStateRef.current.callId) {
-      handleEndCall(signalData.reason || 'remote-ended');
-    }
+    handleEndCall(signalData);
   }, [handleEndCall]);
 
   const handleCallOffer = async (data: any) => {
-    // Robust unwrap: Support direct object, socket.io array-wrapping, or nested 'data'/'offer'
     let signalData = Array.isArray(data) ? data[0] : data;
     if (signalData && signalData.data) signalData = signalData.data;
     if (signalData && signalData.offer && !signalData.sdp) signalData = signalData.offer;
-
     const callId = signalData?.callId;
     if (!callId || !getSocket()) return;
-
     const sigKey = `${callId}_offer`;
     if (processedSignalsRef.current.has(sigKey)) return;
     processedSignalsRef.current.add(sigKey);
-
-    console.log('[CALL][RECEIVE OFFER] Hardened parsing:', signalData);
-
-    // Support aliased keys from mobile clients at root or in nested object
+    console.log("[CALL][RECEIVE OFFER-POPUP-READY]", signalData);
     const peerUserId = signalData.senderUserId || signalData.callerId || signalData.fromUserId;
     const conversationId = signalData.conversationId || signalData.roomId;
-
-    // Atomic Lock: Update currentCallIdRef immediately before any async work
     currentCallIdRef.current = callId;
-
     if (callStateRef.current.isOpen) {
-      console.warn('[ChatPage] Already in a call, ignoring offer');
+      console.warn("[ChatPage] Already in a call, ignoring offer");
       return;
     }
-
-    setCallState({
+    const offerSdp = signalData.sdp || signalData.offer?.sdp || signalData.data?.sdp;
+    if (offerSdp) {
+      localStorage.setItem(`pending_offer_${callId}`, JSON.stringify(offerSdp));
+    }
+    setCallState(prev => ({
+      ...prev,
       isOpen: true,
-      type: signalData.audioOnly ? 'audio' : 'video',
-      direction: 'incoming',
-      status: 'connecting',
+      type: signalData.audioOnly ? "audio" : "video",
+      direction: "incoming",
+      status: "connecting",
       peerId: peerUserId,
       conversationId: conversationId,
       callId: callId,
       isMicOn: true,
       isCameraOn: !signalData.audioOnly,
-    });
-
+    }));
     if (peerUserId && accessToken) {
       void ensureUser(accessToken, peerUserId);
     }
-
-    await callServiceRef.current?.initialize({
-      socket: getSocket()!,
-      conversationId: conversationId,
-      callId: callId,
-      currentUserId,
-      peerUserId: peerUserId,
-      audioOnly: signalData.audioOnly,
-      isCaller: false,
-      initialSdp: signalData.sdp || signalData.offer?.sdp || signalData.data?.sdp,
-    });
   };
 
   // ------------------------------------------------------------------------------------------------------------------------------------------------------------------
   // STABLE SIGNALING HANDLERS (using Refs to prevent listener churn)
   // ------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  const handleCallAnswer = async (data: any) => {
+    const signalData = Array.isArray(data) ? data[0] : data;
+    if (signalData?.callId === callStateRef.current.callId) {
+      setCallState(prev => ({ ...prev, isOpen: false }));
+    }
+  };
+  const handleCallIce = async (_data: any) => {
+    // Popup handles its own ICE
+  };
+
   const handleEndCallRef = useRef(handleEndCall);
   useEffect(() => { handleEndCallRef.current = handleEndCall; }, [handleEndCall]);
 
@@ -5756,46 +5505,64 @@ export default function ChatPage() {
         onMessage={handleOpenFriendChat}
       />
 
-      <CallModal
-        isOpen={callState.isOpen}
-        type={callState.type}
-        status={callState.status}
-        peerName={callState.peerId ? (userMap[callState.peerId]?.displayName || "NgÆ°á»i dÃ¹ng") : (selectedConversation?.name || "NgÆ°á»i dÃ¹ng")}
-        peerAvatar={callState.peerId ? userMap[callState.peerId]?.avatarUrl : selectedConversation?.avatarUrl}
-        localStream={callState.localStream}
-        remoteStream={callState.remoteStream}
-        isMicOn={callState.isMicOn}
-        isCameraOn={callState.isCameraOn}
-        isRemoteCameraOn={(callState as any).isRemoteCameraOn}
-        hasRemoteDescription={callState.hasRemoteDescription}
-        onEnd={handleEndCall}
-        onAnswer={handleAnswerCall}
-        onToggleMic={handleToggleMic}
-        onToggleCamera={handleToggleCamera}
-      />
+      {/* Call UI moved to popup window */}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
       {/* INCOMING GROUP CALL NOTIFICATION ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ shown to non-callers */}
-      {incomingGroupCall && !isInGroupCall && (
-        <IncomingGroupCallBanner
-          info={incomingGroupCall}
-          onJoin={() => joinGroupCall(incomingGroupCall)}
+      {(incomingGroupCall && !isInGroupCall) ? (
+        <IncomingCallBanner
+          peerName={incomingGroupCall.callerName}
+          peerAvatar={incomingGroupCall.callerAvatar}
+          isGroup={true}
+          conversationName={incomingGroupCall.conversationName}
+          isAudioOnly={incomingGroupCall.audioOnly}
+          onAnswer={() => {
+            const url = `/call/${incomingGroupCall.callId}?type=group&conversationId=${incomingGroupCall.conversationId}&audioOnly=${incomingGroupCall.audioOnly}&isCaller=false&peerName=${encodeURIComponent(incomingGroupCall.conversationName)}&peerAvatar=${encodeURIComponent(incomingGroupCall.callerAvatar || "")}`;
+            const width = window.screen.availWidth;
+            const height = window.screen.availHeight;
+            window.open(url, "VnaloCall", `width=${width},height=${height},menubar=no,toolbar=no,location=no,status=no`);
+            declineGroupCall();
+          }}
           onDecline={declineGroupCall}
         />
-      )}
-
-      {/* GROUP CALL MODAL ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ independent of 1-1 CallModal */}
-      {isInGroupCall && groupCallSnapshot && (
-        <GroupCallModal
-          isOpen={isInGroupCall}
-          snapshot={groupCallSnapshot}
-          localUserName={user?.name ?? 'Báº¡n'}
-          localUserAvatar={user?.avatarUrl ?? undefined}
-          onLeave={handleLeaveGroupCall}
-          onToggleMic={groupToggleMic}
-          onToggleCamera={groupToggleCamera}
-          elapsedSeconds={groupCallElapsed}
+      ) : (callState.isOpen && (callState as any).direction === 'incoming' && callState.status === 'connecting') ? (
+        <IncomingCallBanner
+          peerName={callState.peerId ? (userMap[callState.peerId]?.displayName || "Người dùng") : (selectedConversation?.name || "Người dùng")}
+          peerAvatar={callState.peerId ? userMap[callState.peerId]?.avatarUrl : selectedConversation?.avatarUrl}
+          isGroup={false}
+          isAudioOnly={callState.type === 'audio'}
+          onAnswer={handleAnswerCall}
+          onDecline={() => handleEndCall('reject')}
         />
-      )}
+      ) : null}
+
+      {/* Group Call UI moved to popup window */}
+
+
+
+
+
+
+
+
+
+
+
+
 
       {/* Pinned Messages Logic Hooks */}
       <PinnedLogicHooks

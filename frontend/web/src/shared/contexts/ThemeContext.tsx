@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import React from 'react'
 /* eslint-disable react-refresh/only-export-components */
 
 type Theme = 'light' | 'dark'
@@ -8,15 +8,15 @@ type ThemeContextType = {
   toggleTheme: () => void
 }
 
-const ThemeContext = createContext<ThemeContextType | null>(null)
+const ThemeContext = React.createContext<ThemeContextType | null>(null)
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(() => {
+  const [theme, setTheme] = React.useState<Theme>(() => {
     const saved = localStorage.getItem('vnalo_theme')
     return (saved as Theme) || 'light'
   })
 
-  useEffect(() => {
+  React.useEffect(() => {
     localStorage.setItem('vnalo_theme', theme)
     document.documentElement.setAttribute('data-theme', theme)
     document.body.className = `theme-${theme}`
@@ -30,7 +30,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function useTheme() {
-  const context = useContext(ThemeContext)
+  const context = React.useContext(ThemeContext)
   if (!context) {
     throw new Error('useTheme must be used within ThemeProvider')
   }

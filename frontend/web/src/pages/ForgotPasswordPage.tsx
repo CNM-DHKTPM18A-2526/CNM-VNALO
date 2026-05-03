@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { resetPassword, sendForgotPasswordOtp } from '../features/auth/auth.api'
@@ -12,15 +12,15 @@ export function ForgotPasswordPage() {
   const navigate = useNavigate()
   const { t, setLanguage, language } = useLanguage()
 
-  const [step, setStep] = useState<ForgotStep>('email')
-  const [emailInput, setEmailInput] = useState('')
-  const [normalizedEmail, setNormalizedEmail] = useState('')
-  const [otpCode, setOtpCode] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmNewPassword, setConfirmNewPassword] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [step, setStep] = React.useState<ForgotStep>('email')
+  const [emailInput, setEmailInput] = React.useState('')
+  const [normalizedEmail, setNormalizedEmail] = React.useState('')
+  const [otpCode, setOtpCode] = React.useState('')
+  const [newPassword, setNewPassword] = React.useState('')
+  const [confirmNewPassword, setConfirmNewPassword] = React.useState('')
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = React.useState<string | null>(null)
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault()

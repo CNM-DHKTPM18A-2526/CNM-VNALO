@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import React from 'react'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { Button } from '../../../shared/components/ui/Button'
 import { Icon } from '../../../shared/components/Icon'
@@ -10,11 +10,11 @@ type ScreenCaptureModalProps = {
 }
 
 export function ScreenCaptureModal({ isOpen, onClose, onSend }: ScreenCaptureModalProps) {
-  const [capturedImage, setCapturedImage] = useState<string | null>(null)
-  const [isCapturing, setIsCapturing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [capturedImage, setCapturedImage] = React.useState<string | null>(null)
+  const [isCapturing, setIsCapturing] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
+  const videoRef = React.useRef<HTMLVideoElement>(null)
+  const canvasRef = React.useRef<HTMLCanvasElement>(null)
 
   const handleStartCapture = async () => {
     setIsCapturing(true)
