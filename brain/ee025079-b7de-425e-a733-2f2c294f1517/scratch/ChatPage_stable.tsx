@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { getSyncPolicy } from '../features/auth/auth.api'
@@ -10,12 +10,11 @@ import { MessageShareModal } from '../features/chat/components/MessageShareModal
 import { ChatWindow } from '../features/chat/components/ChatWindow'
 import { UserProfileModal } from '../features/chat/components/UserProfileModal'
 import { CallModal } from '../features/chat/components/CallModal'
-import { GroupCallModal, useGroupCall } from '../features/chat/components/GroupCallModal'
-import { IncomingCallBanner, MiniCallWindow } from '../features/chat/components/PremiumCallUI'
+import { GroupCallModal, IncomingGroupCallBanner, useGroupCall } from '../features/chat/components/GroupCallModal'
 import type { MessageContextMenuAction } from '../features/chat/components/MessageContextMenu'
 import {
   addMessageReaction,
-  createGroupConversation,           // ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ NEW
+  createGroupConversation,           // ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ NEW
   deleteMessageForMe,
   fetchMessageReactions,
   fetchInbox,
@@ -214,6 +213,7 @@ function toSocketMessageType(type: ChatMessageType): Uppercase<ChatMessageType> 
   return type.toUpperCase() as Uppercase<ChatMessageType>
 }
 
+
 // Removed local normalizeMessage, now imported from ../features/chat/utils/messageUtils
 
 function getConversationPreview(
@@ -224,6 +224,9 @@ function getConversationPreview(
 ): string {
   return formatMessage(message, currentUserId, getDisplayName)
 }
+
+
+
 
 function formatConversationPreview(
   senderName: string | null | undefined,
@@ -356,7 +359,7 @@ function persistDeletedMessageIds(userId: string, deletedMap: Record<string, tru
 }
 
 function fallbackUserDisplayName(_userId: string): string {
-  return 'Người dùng'
+  return 'Ng├â╞Æ├é┬ó├â┬ó├óΓÇÜ┬¼├ï┼ô├âΓÇÜ├é┬╣├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬░├âΓÇÜ├é┬⌐├âΓÇÜ├é┬Ñ├â┬ó├óΓÇÜ┬¼├é┬░ d├â╞Æ├é┬º├âΓÇÜ├é┬╛├â┬ó├óΓÇÜ┬¼├é┬ªng'
 }
 
 function applyRestrictedMessage(message: ChatMessage, restricted: boolean): ChatMessage {
@@ -451,7 +454,7 @@ function generateUUID(): string {
 
 const isGenericDirectName = (value: string | undefined | null) => {
   const normalized = String(value ?? '').trim()
-  const isGenericLabel = !normalized || normalized === 'NgÃ†Â°Ã¡Â»Âi dÃƒÂ¹ng' || /^NgÃ†Â°Ã¡Â»Âi dÃƒÂ¹ng\s+[0-9a-f]{6,}$/i.test(normalized)
+  const isGenericLabel = !normalized || normalized === 'Ng├å┬░├í┬╗┬¥i d├â┬╣ng' || /^Ng├å┬░├í┬╗┬¥i d├â┬╣ng\s+[0-9a-f]{6,}$/i.test(normalized)
   const isRawId = /^[0-9a-f]{24}$/i.test(normalized) // Common MongoDB ID format
   return isGenericLabel || isRawId
 }
@@ -466,7 +469,7 @@ export default function ChatPage() {
   const routedConversationId = conversationIdFromUrl ?? ''
   const [conversations, setConversations] = useState<ConversationSummary[]>([])
   const [messagesByConversation, setMessagesByConversation] = useState<Record<string, ChatMessage[]>>({})
-  const messagesByConversationRef = React.useRef<Record<string, ChatMessage[]>>(messagesByConversation)
+  const messagesByConversationRef = useRef<Record<string, ChatMessage[]>>(messagesByConversation)
   const [selectedConversationId, setSelectedConversationId] = useState('')
   const [isLoadingConversations, setIsLoadingConversations] = useState(false)
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
@@ -536,15 +539,12 @@ export default function ChatPage() {
     isCameraOn: true,
   })
 
-  const [isCallMinimized, setIsCallMinimized] = useState(false)
-  const [isGroupCallMinimized, setIsGroupCallMinimized] = useState(false)
-
   // WEBRTC SERVICE REF
-  const callServiceRef = React.useRef<WebRtcCallService | null>(null)
+  const callServiceRef = useRef<WebRtcCallService | null>(null)
 
   // SYNC CALL STATE TO REF FOR LISTENERS
-  const callStateRef = React.useRef(callState)
-  const currentCallIdRef = React.useRef<string | null>(null) // Immediate sync ref for signal routing
+  const callStateRef = useRef(callState)
+  const currentCallIdRef = useRef<string | null>(null) // Immediate sync ref for signal routing
   useEffect(() => {
     callStateRef.current = callState
     currentCallIdRef.current = callState.callId || null
@@ -578,28 +578,29 @@ export default function ChatPage() {
     })
   }
 
-  const routedConversationIdRef = React.useRef('')
-  const selectedConversationIdRef = React.useRef('')
-  const selectedMessagesRef = React.useRef<ChatMessage[]>([])
-  const conversationsRef = React.useRef<ConversationSummary[]>([])
-  const friendIdSetRef = React.useRef<Set<string>>(new Set())
-  const lastLoadedMessagesKeyRef = React.useRef('')
-  const userMapRef = React.useRef<Record<string, { displayName: string; avatarUrl: string | null }>>({})
+
+  const routedConversationIdRef = useRef('')
+  const selectedConversationIdRef = useRef('')
+  const selectedMessagesRef = useRef<ChatMessage[]>([])
+  const conversationsRef = useRef<ConversationSummary[]>([])
+  const friendIdSetRef = useRef<Set<string>>(new Set())
+  const lastLoadedMessagesKeyRef = useRef('')
+  const userMapRef = useRef<Record<string, { displayName: string; avatarUrl: string | null }>>({})
 
   // Hard guards for pinned messages
-  const loadingPinnedRef = React.useRef<Record<string, boolean>>({})
-  const lastConvRef = React.useRef<string | null>(null)
+  const loadingPinnedRef = useRef<Record<string, boolean>>({})
+  const lastConvRef = useRef<string | null>(null)
 
   // WebRTC Signal Deduplication (prevents double-triggering from specific + generic events)
-  const processedSignalsRef = React.useRef<Set<string>>(new Set())
+  const processedSignalsRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     userMapRef.current = userMap
   }, [userMap])
-  const messageLoadRequestSeqRef = React.useRef(0)
-  const pendingMetadataFetches = React.useRef<Set<string>>(new Set())
-  const processedMessageIds = React.useRef<Set<string>>(new Set())
-  const lastPinnedSyncTimeRef = React.useRef<Record<string, number>>({})
+  const messageLoadRequestSeqRef = useRef(0)
+  const pendingMetadataFetches = useRef<Set<string>>(new Set())
+  const processedMessageIds = useRef<Set<string>>(new Set())
+  const lastPinnedSyncTimeRef = useRef<Record<string, number>>({})
 
   // Load deleted timestamps & pinned conversations from localStorage on mount
   useEffect(() => {
@@ -664,6 +665,7 @@ export default function ChatPage() {
   useEffect(() => {
     conversationsRef.current = conversations
   }, [conversations])
+
 
   const selectedConversation = useMemo(
     () => conversations.find((conversation) => conversation.id === (routedConversationId || selectedConversationId)),
@@ -758,6 +760,7 @@ export default function ChatPage() {
     }
   }, [friendResults])
 
+
   const updateConversationAfterMessage = useCallback(
     (
       conversationId: string,
@@ -771,8 +774,8 @@ export default function ChatPage() {
           ? user?.name?.trim() || fallbackUserDisplayName(message.senderId)
           : userMapRef.current[message.senderId]?.displayName || fallbackUserDisplayName(message.senderId)
       const getName = (id: string) => {
-        if (id === user?.id) return 'Bạn'
-        return userMapRef.current[id]?.displayName || 'Người dùng'
+        if (id === user?.id) return 'Bß║ín'
+        return userMapRef.current[id]?.displayName || 'Ng╞░ß╗¥i d├╣ng'
       }
 
       const formattedPreview = formatConversationPreview(senderName, message, user?.id || '', getName)
@@ -835,9 +838,9 @@ export default function ChatPage() {
           }
 
           if (count > 1) {
-            const icon = groupType === 'image' ? '🖼️' : '📎';
-            const label = groupType === 'image' ? 'hình ảnh' : 'tập tin';
-            const prefix = message.senderId === user?.id ? 'Bạn: ' : (senderName ? `${senderName}: ` : '');
+            const icon = groupType === 'image' ? '≡ƒû╝∩╕Å' : '≡ƒôÄ';
+            const label = groupType === 'image' ? 'h├¼nh ß║únh' : 'tß║¡p tin';
+            const prefix = message.senderId === user?.id ? 'Bß║ín: ' : (senderName ? `${senderName}: ` : '');
             finalPreview = `${prefix}${icon} ${count} ${label}`;
           }
         }
@@ -867,8 +870,8 @@ export default function ChatPage() {
 
   // PERIODIC SYNC (POLLING FALLBACK)
   const SYNC_INTERVAL_MS = 2000
-  const lastSyncTimeRef = React.useRef<Record<string, number>>({})
-  const pollingIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null)
+  const lastSyncTimeRef = useRef<Record<string, number>>({})
+  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Setup polling interval that runs on a timer
   const syncLatestMessages = useCallback(async (targetId?: string) => {
@@ -1234,6 +1237,8 @@ export default function ChatPage() {
     [accessToken, isRestrictedMode, user?.id],
   )
 
+
+
   const syncPinnedMessages = loadPinnedMessages
   
   const syncConversationMetadata = useCallback(async (conversationId: string) => {
@@ -1258,10 +1263,10 @@ export default function ChatPage() {
         };
         return { ...c, ...settings };
       }));
-      console.log('[ChatPage] Ã°Å¸â€â€ž Metadata refreshed for', conversationId);
+      console.log('[ChatPage] ├░┼╕ΓÇ¥ΓÇ₧ Metadata refreshed for', conversationId);
     } catch (e: any) {
       if (e.response?.status === 404) {
-        console.log('[ChatPage] Ã°Å¸â€”â€˜Ã¯Â¸Â Conversation no longer exists, cleaning up:', conversationId);
+        console.log('[ChatPage] ├░┼╕ΓÇöΓÇÿ├»┬╕┬Å Conversation no longer exists, cleaning up:', conversationId);
         setConversations(prev => prev.filter(c => c.id !== conversationId));
         if (selectedConversationIdRef.current === conversationId) {
           navigate('/chat');
@@ -1293,14 +1298,14 @@ export default function ChatPage() {
   const { emitSendMessage, emitRecallMessage, joinConversation, joinMultipleConversations, markAsRead, getSocket } = useChatSocket({
     token: accessToken,
     onConnected: async () => {
-      console.log('[ChatPage] ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚ÂÃƒâ€¦Ã‚Â¡ Socket connected event received');
+      console.log('[ChatPage] ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬Ñ├âΓÇÜ├é┬Å├âΓÇª├é┬í Socket connected event received');
       setIsSocketConnected(true)
       setIsSocketInitialized(true)
       
       // AUTO-JOIN ALL CONVERSATIONS ON CONNECT
       if (conversationsRef.current.length > 0) {
         const conversationIds = conversationsRef.current.map(c => c.id);
-        console.log('[ChatPage] ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ Auto-joining', conversationIds.length, 'conversations on connect');
+        console.log('[ChatPage] ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ Auto-joining', conversationIds.length, 'conversations on connect');
         void joinMultipleConversations(conversationIds);
       }
       
@@ -1312,7 +1317,7 @@ export default function ChatPage() {
     },
     onFriendshipUpdated: async (payload) => {
       if (!user || !accessToken || !payload.friendId) return;
-      console.log('[ChatPage] ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ Friendship updated via socket for friendId:', payload.friendId);
+      console.log('[ChatPage] ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ Friendship updated via socket for friendId:', payload.friendId);
 
       try {
         // 1. Ensure conversation is created in message-service
@@ -1339,7 +1344,7 @@ export default function ChatPage() {
       // - Server auto-joined us, OR
       // - This is a message from our own send
 
-      // ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ 0. SYSTEM MESSAGES (CRITICAL SIGNALS) ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½
+      // ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ 0. SYSTEM MESSAGES (CRITICAL SIGNALS) ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜
       // Handle both SYSTEM messages and TEXT messages that contain JSON signals (like poll sync)
       if (mapped.type === 'system' || (mapped.text && (mapped.text.includes('"action":') || mapped.text.startsWith('{')))) {
         try {
@@ -1409,7 +1414,7 @@ export default function ChatPage() {
 
             // Group Info Sync: Essential for permissions/settings
             if (sys.action === 'UPDATE_GROUP_INFO') {
-              console.log('[ChatPage] Ã°Å¸â€â€ž Realtime Group Update Signal Received:', mapped.conversationId, sys.metadata);
+              console.log('[ChatPage] ├░┼╕ΓÇ¥ΓÇ₧ Realtime Group Update Signal Received:', mapped.conversationId, sys.metadata);
               
               // 1. Optimistic update from payload
               setConversations(prev => prev.map(c => {
@@ -1426,7 +1431,7 @@ export default function ChatPage() {
 
               // 4. UI Hint
               if (sys.metadata && Object.keys(sys.metadata).length > 0) {
-                toast.info('CÃƒÂ i Ã„â€˜Ã¡ÂºÂ·t nhÃƒÂ³m Ã„â€˜ÃƒÂ£ Ã„â€˜Ã†Â°Ã¡Â»Â£c cÃ¡ÂºÂ­p nhÃ¡ÂºÂ­t');
+                toast.info('C├â┬ái ├äΓÇÿ├í┬║┬╖t nh├â┬│m ├äΓÇÿ├â┬ú ├äΓÇÿ├å┬░├í┬╗┬úc c├í┬║┬¡p nh├í┬║┬¡t');
               }
 
               // 5. Silent Update: If it's just settings (no rename), don't show a bubble in chat
@@ -1437,7 +1442,7 @@ export default function ChatPage() {
 
             // Reaction Sync (Poll Voting)
             if (sys.action === 'UPDATE_MESSAGE_REACTIONS') {
-              console.log('[ChatPage] ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ Handling UPDATE_MESSAGE_REACTIONS signal for poll sync');
+              console.log('[ChatPage] ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ Handling UPDATE_MESSAGE_REACTIONS signal for poll sync');
               if (sys.messageId) {
                 applyReactionSocketEvent(
                   sys.messageId,
@@ -1450,7 +1455,7 @@ export default function ChatPage() {
 
             // FRIEND_ACCEPTED Sync: Proactively fetch and show the new conversation
             if (sys.action === 'FRIEND_ACCEPTED' || mapped.text.includes('FRIEND_ACCEPTED')) {
-              console.log('[ChatPage] ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ Handling FRIEND_ACCEPTED signal');
+              console.log('[ChatPage] ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ Handling FRIEND_ACCEPTED signal');
               void loadInbox(accessToken);
             }
           }
@@ -1471,19 +1476,19 @@ export default function ChatPage() {
         }
       }
 
-      // ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ 1. DEDUPLICATION (PREVENT DOUBLE RENDERING) ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½
+      // ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ 1. DEDUPLICATION (PREVENT DOUBLE RENDERING) ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜
       if (mapped.id && processedMessageIds.current.has(mapped.id)) {
-        console.log('[ChatPage] ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¥ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€šÃ‚Â¨ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ Skipping duplicate message:', mapped.id);
+        console.log('[ChatPage] ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬Ñ├â┬ó├óΓÇÜ┬¼├àΓÇ£├âΓÇÜ├é┬¿├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ Skipping duplicate message:', mapped.id);
         return;
       }
       if (mapped.id) processedMessageIds.current.add(mapped.id);
 
-      console.log('[ChatPage] ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¦Ãƒâ€¦Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â· Processing new message:', { id: mapped.id, type: mapped.type, conversationId: mapped.conversationId });
+      console.log('[ChatPage] ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬ª├âΓÇª├óΓé¼Γäó├âΓÇÜ├é┬╖ Processing new message:', { id: mapped.id, type: mapped.type, conversationId: mapped.conversationId });
 
-      // ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ 2. INSTANT UI UPDATE (FAST PATH) ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½
+      // ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ 2. INSTANT UI UPDATE (FAST PATH) ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜
       const senderId = mapped.senderId;
       const senderProfile = userMapRef.current[senderId];
-      const senderDisplayName = senderId === user.id ? 'BÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â£ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¹' : (senderProfile?.displayName || 'NgÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â¥ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â° dÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¾ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ng');
+      const senderDisplayName = senderId === user.id ? 'B├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬ú├â┬ó├óΓé¼┼í├é┬¼├â┬ó├óΓÇÜ┬¼├é┬╣' : (senderProfile?.displayName || 'Ng├â╞Æ├é┬ó├â┬ó├óΓÇÜ┬¼├ï┼ô├âΓÇÜ├é┬╣├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬░├âΓÇÜ├é┬⌐├âΓÇÜ├é┬Ñ├â┬ó├óΓÇÜ┬¼├é┬░ d├â╞Æ├é┬º├âΓÇÜ├é┬╛├â┬ó├óΓÇÜ┬¼├é┬ªng');
 
       // Fast conversation update (Blind Discovery)
       const exists = conversationsRef.current.some(c => c.id === mapped.conversationId);
@@ -1526,7 +1531,7 @@ export default function ChatPage() {
         conversationSeed,
       );
 
-      // ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ 3. BACKGROUND SYNC ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½
+      // ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ 3. BACKGROUND SYNC ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜
       if (isActive && mapped.serverSeq !== undefined) {
         markAsRead({ conversationId: mapped.conversationId, lastReadSeq: mapped.serverSeq });
         refreshNotificationBadges();
@@ -1646,7 +1651,7 @@ export default function ChatPage() {
             // We can't easily check messageId against preview text perfectly,
             // but if it's the current selected chat or recently updated, it's likely.
             // Server will eventually sync this, but for realtime we force update.
-            return { ...c, lastMessage: 'Tin nhắn đã được thu hồi' }
+            return { ...c, lastMessage: 'Tin nhß║»n ─æ├ú ─æ╞░ß╗úc thu hß╗ôi' }
           }
           return c
         })
@@ -1713,8 +1718,8 @@ export default function ChatPage() {
         return
       }
 
-      console.log('ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â§ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€¦Ã‚Â  nhÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¨Ãƒâ€šÃ‚Â¦Ãƒâ€šÃ‚Â sÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ kiÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â¡Ãƒâ€šÃ‚ÂµÃƒâ€¦Ã‚Â¾ presence:', payload)
-      console.log('ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ang tÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â«m userId:', payload.userId, 'trong danh sÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Âºch conversations...')
+      console.log('├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬º├â┬ó├óΓÇÜ┬¼├àΓÇ£├âΓÇª├é┬á nh├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬¿├âΓÇÜ├é┬ª├âΓÇÜ├é┬ü s├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ ki├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬░├âΓÇÜ├é┬í├âΓÇÜ├é┬╡├âΓÇª├é┬╛ presence:', payload)
+      console.log('├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ang t├â╞Æ├é┬º├âΓÇÜ├é┬⌐├âΓÇÜ├é┬½m userId:', payload.userId, 'trong danh s├â╞Æ├é┬º├âΓÇÜ├é┬ì├âΓÇÜ├é┬║ch conversations...')
         console.log('[ChatPage.onPresenceChanged] Presence updated:', payload)
         console.log('[ChatPage.onPresenceChanged] Looking for userId:', payload.userId, 'in conversations...')
       setConversations((prev) => {
@@ -1787,7 +1792,7 @@ export default function ChatPage() {
       void syncPinnedMessages(conversationId)
     },
     onGroupUpdated: (payload: any) => {
-      console.log('[ChatPage.socket] Ã°Å¸â€˜Â¥ Group Updated (Socket):', payload);
+      console.log('[ChatPage.socket] ├░┼╕ΓÇÿ┬Ñ Group Updated (Socket):', payload);
       const conversationId = payload.conversationId || payload.conversation_id;
       if (!conversationId) return;
 
@@ -1796,7 +1801,7 @@ export default function ChatPage() {
       void syncInboxSummaries();
     },
     onConversationUpdated: (payload: any) => {
-      console.log('[ChatPage.socket] Ã°Å¸â€â€ž Conversation Updated (Socket):', payload);
+      console.log('[ChatPage.socket] ├░┼╕ΓÇ¥ΓÇ₧ Conversation Updated (Socket):', payload);
       const conversationId = payload.conversationId || payload.id;
       if (conversationId) {
         void syncConversationMetadata(conversationId);
@@ -1869,7 +1874,7 @@ export default function ChatPage() {
       }))
     },
     onMessageError: (payload) => {
-      console.error('[ChatPage] ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ Message error:', payload);
+      console.error('[ChatPage] ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ Message error:', payload);
       if (payload.code === 'AUTH_DENIED' && payload.clientMessageId) {
         setMessagesByConversation(prev => {
           const cid = payload.conversationId || selectedConversationIdRef.current;
@@ -1879,13 +1884,13 @@ export default function ChatPage() {
             [cid]: markLocalMessageFailed(prev[cid], payload.clientMessageId!)
           };
         });
-        toast.error('BÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â£ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¹ khÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¹Ãƒâ€šÃ‚Â«ng cÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â±ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ quyÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ gÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¨ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢Ãƒâ€šÃ‚Â¹ tin nhÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â§ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“Ãƒâ€šÃ‚Â¸ nÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½y.');
+        toast.error('B├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬ú├â┬ó├óΓé¼┼í├é┬¼├â┬ó├óΓÇÜ┬¼├é┬╣ kh├â╞Æ├é┬º├âΓÇÜ├é┬╣├âΓÇÜ├é┬½ng c├â╞Æ├é┬º├âΓÇÜ├é┬▒├â┬ó├óΓé¼┼í├é┬¼ quy├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ g├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬¿├â┬ó├óΓé¼┼╛├é┬ó├âΓÇÜ├é┬╣ tin nh├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬º├â┬ó├óΓÇÜ┬¼├óΓé¼┼ô├âΓÇÜ├é┬╕ n├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜y.');
       } else {
-        toast.error(payload.message || 'LÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â¡Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ gÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¨ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢Ãƒâ€šÃ‚Â¹ tin nhÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â§ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“Ãƒâ€šÃ‚Â¸.');
+        toast.error(payload.message || 'L├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬░├âΓÇÜ├é┬í├âΓÇª├é┬╕├â┬ó├óΓé¼┼╛├é┬ó g├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬¿├â┬ó├óΓé¼┼╛├é┬ó├âΓÇÜ├é┬╣ tin nh├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬º├â┬ó├óΓÇÜ┬¼├óΓé¼┼ô├âΓÇÜ├é┬╕.');
       }
     },
     onConversationError: (payload) => {
-      console.error('[ChatPage] ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ Conversation error:', payload);
+      console.error('[ChatPage] ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ Conversation error:', payload);
       if (payload.code === 'FORBIDDEN' || payload.code === 'NOT_MEMBER' || payload.code === 'CONVERSATION_NOT_FOUND') {
         if (payload.conversationId) {
           setConversations(prev => prev.filter(c => c.id !== payload.conversationId));
@@ -1893,9 +1898,9 @@ export default function ChatPage() {
             navigate('/chat');
           }
         }
-        toast.error('BÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â£ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¹ khÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¹Ãƒâ€šÃ‚Â«ng cÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â±ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ quyÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ thÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â· hiÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â¡Ãƒâ€šÃ‚ÂµÃƒâ€¦Ã‚Â¾ hÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½nh ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â£Ãƒâ€šÃ‚Â·Ãƒâ€¦Ã¢â‚¬â„¢g nÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½y hoÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¦Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â¾ cuÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â·Ãƒâ€šÃ‚Â½ trÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â°Ãƒâ€šÃ‚Â· chuyÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â¡Ãƒâ€šÃ‚ÂµÃƒâ€¦Ã‚Â¾ khÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¹Ãƒâ€šÃ‚Â«ng tÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â¿ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âº tÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â£ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â.');
+        toast.error('B├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬ú├â┬ó├óΓé¼┼í├é┬¼├â┬ó├óΓÇÜ┬¼├é┬╣ kh├â╞Æ├é┬º├âΓÇÜ├é┬╣├âΓÇÜ├é┬½ng c├â╞Æ├é┬º├âΓÇÜ├é┬▒├â┬ó├óΓé¼┼í├é┬¼ quy├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ th├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬Ñ├âΓÇÜ├é┬╕├âΓÇÜ├é┬╖ hi├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬░├âΓÇÜ├é┬í├âΓÇÜ├é┬╡├âΓÇª├é┬╛ h├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜nh ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬ú├âΓÇÜ├é┬╖├âΓÇª├óΓé¼Γäóg n├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜y ho├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬ª├âΓÇÜ├é┬É├âΓÇÜ├é┬╛ cu├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬º├âΓÇÜ├é┬╖├âΓÇÜ├é┬╜ tr├â╞Æ├é┬º├âΓÇÜ├é┬░├âΓÇÜ├é┬╖ chuy├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬░├âΓÇÜ├é┬í├âΓÇÜ├é┬╡├âΓÇª├é┬╛ kh├â╞Æ├é┬º├âΓÇÜ├é┬╣├âΓÇÜ├é┬½ng t├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬Ñ├âΓÇÜ├é┬┐├â┬ó├óΓÇÜ┬¼├é┬║ t├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬ú├â┬ó├óΓé¼┼í├é┬¼├âΓÇÜ├é┬É.');
       } else {
-        toast.error(payload.message || 'LÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â¡Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ cuÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â·Ãƒâ€šÃ‚Â½ trÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â°Ãƒâ€šÃ‚Â· chuyÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â¡Ãƒâ€šÃ‚ÂµÃƒâ€¦Ã‚Â¾.');
+        toast.error(payload.message || 'L├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬░├âΓÇÜ├é┬í├âΓÇª├é┬╕├â┬ó├óΓé¼┼╛├é┬ó cu├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬º├âΓÇÜ├é┬╖├âΓÇÜ├é┬╜ tr├â╞Æ├é┬º├âΓÇÜ├é┬░├âΓÇÜ├é┬╖ chuy├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬░├âΓÇÜ├é┬í├âΓÇÜ├é┬╡├âΓÇª├é┬╛.');
       }
     }
   })
@@ -1907,11 +1912,11 @@ export default function ChatPage() {
     if (!conversations || conversations.length === 0) return
 
     const ids = conversations.map(c => c.id)
-    console.log('[ChatPage] ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ Auto-joining conversations after inbox load:', ids.length)
+    console.log('[ChatPage] ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ Auto-joining conversations after inbox load:', ids.length)
     void joinMultipleConversations(ids)
   }, [accessToken, isSocketConnected, conversations, joinMultipleConversations])
 
-  // ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ GROUP CALL (SEPARATE LAYER - does not touch single call) ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½
+  // ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ GROUP CALL (SEPARATE LAYER - does not touch single call) ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜
   const {
     snapshot: groupCallSnapshot,
     incomingCall: incomingGroupCall,
@@ -1926,13 +1931,13 @@ export default function ChatPage() {
   } = useGroupCall({
     socket: getSocket(),
     currentUserId,
-    currentUserName: user?.name ?? 'BÃ¡ÂºÂ¡n',
+    currentUserName: user?.name ?? 'B├í┬║┬ín',
     currentUserAvatar: user?.avatarUrl ?? '',
     userMap,
     conversations, // Added conversations here
   })
 
-  // Caller: bÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â§Ãƒâ€¦Ã¢â‚¬Å“Ãƒâ€šÃ‚Â© ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚ÂÃƒâ€¦Ã‚Â¸ cuÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â·Ãƒâ€šÃ‚Â½ gÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â¹ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ nhÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â±ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬m (chÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ broadcast, khÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¹Ãƒâ€šÃ‚Â«ng tÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â½ peer trÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â¢Ãƒâ€šÃ‚Â²Ãƒâ€šÃ‚Â·)
+  // Caller: b├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬º├âΓÇª├óΓé¼┼ô├âΓÇÜ├é┬⌐ ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬Ñ├âΓÇÜ├é┬É├âΓÇª├é┬╕ cu├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬º├âΓÇÜ├é┬╖├âΓÇÜ├é┬╜ g├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬Ñ├âΓÇÜ├é┬╣├â┬ó├óΓÇÜ┬¼├à┬í nh├â╞Æ├é┬º├âΓÇÜ├é┬▒├â┬ó├óΓé¼┼í├é┬¼m (ch├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ broadcast, kh├â╞Æ├é┬º├âΓÇÜ├é┬╣├âΓÇÜ├é┬½ng t├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬»├âΓÇÜ├é┬╕├âΓÇÜ├é┬╜ peer tr├â╞Æ├é┬ó├â┬ó├óΓÇÜ┬¼├ï┼ô├âΓÇÜ├é┬╣├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬░├âΓÇÜ├é┬ó├âΓÇÜ├é┬▓├âΓÇÜ├é┬╖)
   const handleStartGroupCall = useCallback(
     async (audioOnly = false) => {
       if (!selectedConversationId) return
@@ -1940,7 +1945,7 @@ export default function ChatPage() {
       const conv = conversations.find((c) => c.id === selectedConversationId)
       await startGroupCall({
         conversationId: selectedConversationId,
-        conversationName: conv?.name ?? 'CuÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â·Ãƒâ€šÃ‚Â½ gÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â¹ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ nhÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â±ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬m',
+        conversationName: conv?.name ?? 'Cu├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬º├âΓÇÜ├é┬╖├âΓÇÜ├é┬╜ g├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬Ñ├âΓÇÜ├é┬╣├â┬ó├óΓÇÜ┬¼├à┬í nh├â╞Æ├é┬º├âΓÇÜ├é┬▒├â┬ó├óΓé¼┼í├é┬¼m',
         callId,
         audioOnly,
       })
@@ -1948,7 +1953,7 @@ export default function ChatPage() {
     [selectedConversationId, conversations, startGroupCall]
   )
 
-  // RÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â¥ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â° cuÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â·Ãƒâ€šÃ‚Â½ gÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â¹ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ nhÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â±ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬m + tÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â½ call log message
+  // R├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬░├âΓÇÜ├é┬⌐├âΓÇÜ├é┬Ñ├â┬ó├óΓÇÜ┬¼├é┬░ cu├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬º├âΓÇÜ├é┬╖├âΓÇÜ├é┬╜ g├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬Ñ├âΓÇÜ├é┬╣├â┬ó├óΓÇÜ┬¼├à┬í nh├â╞Æ├é┬º├âΓÇÜ├é┬▒├â┬ó├óΓé¼┼í├é┬¼m + t├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬»├âΓÇÜ├é┬╕├âΓÇÜ├é┬╜ call log message
   const handleLeaveGroupCall = useCallback(async () => {
     const snap = groupCallSnapshot
     const convId = snap?.conversationId
@@ -1959,28 +1964,28 @@ export default function ChatPage() {
 
     const callId = snap?.callId ?? ''
     const duration = groupCallElapsed
-    // SÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ peers cÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â°Ãƒâ€šÃ‚Â·n lÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â£ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â trÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â¢Ãƒâ€šÃ‚Â²Ãƒâ€šÃ‚Â· khi rÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â¥ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â° (khÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¹Ãƒâ€šÃ‚Â«ng tÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â©nh bÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾ thÃƒÆ’Ã‚Â§ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢Ãƒâ€šÃ‚Â½n)
+    // S├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ peers c├â╞Æ├é┬º├âΓÇÜ├é┬░├âΓÇÜ├é┬╖n l├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬ú├â┬ó├óΓé¼┼í├é┬¼├âΓÇÜ├é┬É tr├â╞Æ├é┬ó├â┬ó├óΓÇÜ┬¼├ï┼ô├âΓÇÜ├é┬╣├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬░├âΓÇÜ├é┬ó├âΓÇÜ├é┬▓├âΓÇÜ├é┬╖ khi r├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬░├âΓÇÜ├é┬⌐├âΓÇÜ├é┬Ñ├â┬ó├óΓÇÜ┬¼├é┬░ (kh├â╞Æ├é┬º├âΓÇÜ├é┬╣├âΓÇÜ├é┬½ng t├â╞Æ├é┬º├âΓÇÜ├é┬⌐├âΓÇÜ├é┬⌐nh b├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬Å├â┬ó├óΓÇÜ┬¼├à┬╛ th├â╞Æ├é┬º├â┬ó├óΓÇÜ┬¼├óΓÇ₧┬ó├âΓÇÜ├é┬╜n)
     const remainingPeers = snap?.peers.length ?? 0
 
-    // 1. Stop WebRTC (luÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¹Ãƒâ€šÃ‚Â«n lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½m, bÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â¦ kÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ cÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â±ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ phÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã…Â½Ãƒâ€šÃ‚Â¾ ngÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â¥ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â° cuÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â©Ãƒâ€šÃ‚Â­ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ khÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¹Ãƒâ€šÃ‚Â«ng)
+    // 1. Stop WebRTC (lu├â╞Æ├é┬º├âΓÇÜ├é┬╣├âΓÇÜ├é┬½n l├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜m, b├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬Ñ├âΓÇÜ├é┬Å├âΓÇÜ├é┬ª k├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ c├â╞Æ├é┬º├âΓÇÜ├é┬▒├â┬ó├óΓé¼┼í├é┬¼ ph├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├à┬╜├âΓÇÜ├é┬╛ ng├â╞Æ├é┬ó├â┬ó├óΓÇÜ┬¼├ï┼ô├âΓÇÜ├é┬╣├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬░├âΓÇÜ├é┬⌐├âΓÇÜ├é┬Ñ├â┬ó├óΓÇÜ┬¼├é┬░ cu├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬⌐├âΓÇÜ├é┬¡├â┬ó├óΓé¼┼í├é┬¼ kh├â╞Æ├é┬º├âΓÇÜ├é┬╣├âΓÇÜ├é┬½ng)
     leaveGroupCall()
 
-    // ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â¤Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ CHÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ tÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â½ call log nÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ khÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¹Ãƒâ€šÃ‚Â«ng cÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â°Ãƒâ€šÃ‚Â·n ai khÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Âºc trong cuÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â·Ãƒâ€šÃ‚Â½ gÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â¹ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡.
-    // NÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â°ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“ vÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â cÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â°Ãƒâ€šÃ‚Â·n ngÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â¥ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â° khÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Âºc ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ hÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ sÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ lÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ ngÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â¥ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â° tÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â½ log khi rÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â¥ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â° sau cÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¾ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ng.
+    // ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬░├âΓÇÜ├é┬⌐├âΓÇÜ├é┬ñ├âΓÇá├óΓé¼Γäó├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ CH├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ t├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬»├âΓÇÜ├é┬╕├âΓÇÜ├é┬╜ call log n├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬º├âΓÇÜ├é┬░├â┬ó├óΓÇÜ┬¼├ï┼ô kh├â╞Æ├é┬º├âΓÇÜ├é┬╣├âΓÇÜ├é┬½ng c├â╞Æ├é┬º├âΓÇÜ├é┬░├âΓÇÜ├é┬╖n ai kh├â╞Æ├é┬º├âΓÇÜ├é┬ì├âΓÇÜ├é┬║c trong cu├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬º├âΓÇÜ├é┬╖├âΓÇÜ├é┬╜ g├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬Ñ├âΓÇÜ├é┬╣├â┬ó├óΓÇÜ┬¼├à┬í.
+    // N├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬º├âΓÇÜ├é┬░├â┬ó├óΓÇÜ┬¼├ï┼ô v├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬Ñ├âΓÇÜ├é┬ì├â┬ó├óΓÇÜ┬¼├óΓé¼┬¥ c├â╞Æ├é┬º├âΓÇÜ├é┬░├âΓÇÜ├é┬╖n ng├â╞Æ├é┬ó├â┬ó├óΓÇÜ┬¼├ï┼ô├âΓÇÜ├é┬╣├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬░├âΓÇÜ├é┬⌐├âΓÇÜ├é┬Ñ├â┬ó├óΓÇÜ┬¼├é┬░ kh├â╞Æ├é┬º├âΓÇÜ├é┬ì├âΓÇÜ├é┬║c ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ h├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ s├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ l├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ ng├â╞Æ├é┬ó├â┬ó├óΓÇÜ┬¼├ï┼ô├âΓÇÜ├é┬╣├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬░├âΓÇÜ├é┬⌐├âΓÇÜ├é┬Ñ├â┬ó├óΓÇÜ┬¼├é┬░ t├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬»├âΓÇÜ├é┬╕├âΓÇÜ├é┬╜ log khi r├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬░├âΓÇÜ├é┬⌐├âΓÇÜ├é┬Ñ├â┬ó├óΓÇÜ┬¼├é┬░ sau c├â╞Æ├é┬º├âΓÇÜ├é┬╛├â┬ó├óΓÇÜ┬¼├é┬ªng.
     if (remainingPeers > 0) {
-      console.log(`[GROUP_CALL_LOG] Skipping log ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ ${remainingPeers} peer(s) still in call`)
+      console.log(`[GROUP_CALL_LOG] Skipping log ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ ${remainingPeers} peer(s) still in call`)
       return
     }
 
-    // 2. Broadcast group-call:ended ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ dismiss banner cÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â§ nhÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â§ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“Ãƒâ€šÃ‚Â¸g ngÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â¥ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â° chÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¹a bÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â§Ãƒâ€¦Ã¢â‚¬Å“Ãƒâ€šÃ‚Â© mÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Âºy
-    console.log(`[GROUP_CALL_LOG] Last person leaving ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ broadcasting group-call:ended`)
+    // 2. Broadcast group-call:ended ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ dismiss banner c├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬Ñ├âΓÇÜ├é┬É├âΓÇÜ├é┬º nh├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬º├â┬ó├óΓÇÜ┬¼├óΓé¼┼ô├âΓÇÜ├é┬╕g ng├â╞Æ├é┬ó├â┬ó├óΓÇÜ┬¼├ï┼ô├âΓÇÜ├é┬╣├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬░├âΓÇÜ├é┬⌐├âΓÇÜ├é┬Ñ├â┬ó├óΓÇÜ┬¼├é┬░ ch├â╞Æ├é┬ó├â┬ó├óΓÇÜ┬¼├ï┼ô├âΓÇÜ├é┬╣a b├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬º├âΓÇª├óΓé¼┼ô├âΓÇÜ├é┬⌐ m├â╞Æ├é┬º├âΓÇÜ├é┬ì├âΓÇÜ├é┬║y
+    console.log(`[GROUP_CALL_LOG] Last person leaving ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ broadcasting group-call:ended`)
     getSocket()?.emit('group-call:ended', {
       conversationId: convId,
       callId,
       endedByUserId: currentUserId,
     })
 
-    // 3. TÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â½ CALL_LOG message (chÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ ngÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â¥ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â° cuÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â©Ãƒâ€šÃ‚Â­ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ cÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¾ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ng rÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â¥ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â°)
+    // 3. T├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬»├âΓÇÜ├é┬╕├âΓÇÜ├é┬╜ CALL_LOG message (ch├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ ng├â╞Æ├é┬ó├â┬ó├óΓÇÜ┬¼├ï┼ô├âΓÇÜ├é┬╣├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬░├âΓÇÜ├é┬⌐├âΓÇÜ├é┬Ñ├â┬ó├óΓÇÜ┬¼├é┬░ cu├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬⌐├âΓÇÜ├é┬¡├â┬ó├óΓé¼┼í├é┬¼ c├â╞Æ├é┬º├âΓÇÜ├é┬╛├â┬ó├óΓÇÜ┬¼├é┬ªng r├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬░├âΓÇÜ├é┬⌐├âΓÇÜ├é┬Ñ├â┬ó├óΓÇÜ┬¼├é┬░)
     console.log(`[GROUP_CALL_LOG] Creating call log. duration=${duration}s`)
     const logData = {
       v: 1,
@@ -2018,7 +2023,7 @@ export default function ChatPage() {
     }))
     updateConversationAfterMessage(convId, optimisticLog, true)
 
-      // 4. LÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¹u qua Socket vÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â¢Ãƒâ€šÃ‚Â¹ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ fallback REST
+      // 4. L├â╞Æ├é┬ó├â┬ó├óΓÇÜ┬¼├ï┼ô├âΓÇÜ├é┬╣u qua Socket v├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬░├âΓÇÜ├é┬ó├âΓÇÜ├é┬╣├â┬ó├óΓÇÜ┬¼├à┬í fallback REST
       ; (async () => {
         let success = false
         for (let attempt = 1; attempt <= 2; attempt++) {
@@ -2453,7 +2458,7 @@ export default function ChatPage() {
         setConversations((prev) => 
           prev.map((c) => {
             if (c.id === conversationId) {
-              return { ...c, lastMessage: 'Tin nhắn đã được thu hồi' }
+              return { ...c, lastMessage: 'Tin nhß║»n ─æ├ú ─æ╞░ß╗úc thu hß╗ôi' }
             }
             return c
           })
@@ -2486,7 +2491,7 @@ export default function ChatPage() {
         const canPin = isModerator || currentConv.allowMemberPin
 
         if (!canPin) {
-          toast.error('BÃ¡ÂºÂ¡n khÃƒÂ´ng cÃƒÂ³ quyÃ¡Â»Ân ghim tin nhÃ¡ÂºÂ¯n trong nhÃƒÂ³m nÃƒÂ y')
+          toast.error('B├í┬║┬ín kh├â┬┤ng c├â┬│ quy├í┬╗┬ün ghim tin nh├í┬║┬»n trong nh├â┬│m n├â┬áy')
           return
         }
       }
@@ -2552,7 +2557,7 @@ export default function ChatPage() {
         }
 
         if (currentPins.length >= 3) {
-          toast.error('ChÃ¡Â»â€° Ã„â€˜Ã†Â°Ã¡Â»Â£c phÃƒÂ©p ghim tÃ¡Â»â€˜i Ã„â€˜a 3 tin nhÃ¡ÂºÂ¯n')
+          toast.error('Ch├í┬╗ΓÇ░ ├äΓÇÿ├å┬░├í┬╗┬úc ph├â┬⌐p ghim t├í┬╗ΓÇÿi ├äΓÇÿa 3 tin nh├í┬║┬»n')
           return
         }
 
@@ -2615,9 +2620,9 @@ export default function ChatPage() {
           ...prev,
           [conversationId]: previousPins,
         }))
-        const action = isPinned ? 'bÃ¡Â»Â ghim' : 'ghim'
+        const action = isPinned ? 'b├í┬╗┬Å ghim' : 'ghim'
         console.error(`[ChatPage.handleTogglePinMessage] Failed to ${action} message`, error)
-        toast.error(`KhÃƒÂ´ng thÃ¡Â»Æ’ ${action} tin nhÃ¡ÂºÂ¯n. Vui lÃƒÂ²ng thÃ¡Â»Â­ lÃ¡ÂºÂ¡i sau.`)
+        toast.error(`Kh├â┬┤ng th├í┬╗╞Æ ${action} tin nh├í┬║┬»n. Vui l├â┬▓ng th├í┬╗┬¡ l├í┬║┬íi sau.`)
       }
     },
     [accessToken, pinnedMessageIds, user, emitSendMessage],
@@ -2803,13 +2808,13 @@ export default function ChatPage() {
   const handleInitiateCall = useCallback(async (type: 'audio' | 'video') => {
     if (!selectedConversationId) return;
 
-    // Ã°Å¸â€œÅ¾ GROUP CALL routing Ã°Å¸â€œÅ¾ delegate to separate group call layer
+    // ├░┼╕ΓÇ£┼╛ GROUP CALL routing ├░┼╕ΓÇ£┼╛ delegate to separate group call layer
     if (selectedConversation?.isGroup) {
       await handleStartGroupCall(type === 'audio')
       return;
     }
 
-    // Ã°Å¸â€œÅ¾ Single call (1-1) Ã°Å¸â€œÅ¾ DO NOT MODIFY Ã°Å¸â€œÅ¾
+    // ├░┼╕ΓÇ£┼╛ Single call (1-1) ├░┼╕ΓÇ£┼╛ DO NOT MODIFY ├░┼╕ΓÇ£┼╛
     const callId = `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const socket = getSocket();
     if (!socket) return;
@@ -2839,6 +2844,7 @@ export default function ChatPage() {
       isCaller: true,
     });
   }, [selectedConversationId, selectedConversation, currentUserId, getSocket, handleStartGroupCall]);
+
 
   const handleEndCall = useCallback(async (reasonArg: any = 'hangup') => {
     const reason = typeof reasonArg === 'string' ? reasonArg : 'hangup';
@@ -3002,7 +3008,7 @@ export default function ChatPage() {
     }
   }, [selectedConversation, currentUserId, emitSendMessage, accessToken, updateConversationAfterMessage]);
 
-  const isAnsweringRef = React.useRef(false);
+  const isAnsweringRef = useRef(false);
   const handleAnswerCall = useCallback(async () => {
     if (!callServiceRef.current || !callStateRef.current.isOpen || isAnsweringRef.current) return;
     if (callStateRef.current.status === 'connected') return;
@@ -3140,10 +3146,10 @@ export default function ChatPage() {
   // ------------------------------------------------------------------------------------------------------------------------------------------------------------------
   // STABLE SIGNALING HANDLERS (using Refs to prevent listener churn)
   // ------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  const handleEndCallRef = React.useRef(handleEndCall);
+  const handleEndCallRef = useRef(handleEndCall);
   useEffect(() => { handleEndCallRef.current = handleEndCall; }, [handleEndCall]);
 
-  const signalHandlersRef = React.useRef({
+  const signalHandlersRef = useRef({
     handleCallOffer,
     handleCallAnswer,
     handleCallIce,
@@ -3213,6 +3219,8 @@ export default function ChatPage() {
     };
   }, [getSocket, currentUserId]);
 
+
+
   // Sync effect: Fetch profile for all group members when a conversation is opened
   useEffect(() => {
     if (!accessToken || !selectedConversationId) return;
@@ -3251,7 +3259,7 @@ export default function ChatPage() {
         const missingIds = Array.from(proactiveIds).filter(id => !items.some(it => it.id === id));
 
         if (missingIds.length > 0) {
-          console.log("Ã¢Å¡Â¡ [ChatPage] Proactively fetching missing conversations:", missingIds);
+          console.log("├ó┼í┬í [ChatPage] Proactively fetching missing conversations:", missingIds);
           const fetchedResults = await Promise.all(
             missingIds.map(async (id) => {
               try {
@@ -3261,7 +3269,7 @@ export default function ChatPage() {
                 const status = err.response?.status;
                 // If it's a 404/403, cleanup localStorage so we don't keep trying forever
                 if (status === 404 || status === 403) {
-                  console.log(`[ChatPage] Ã°Å¸Â§Â¹ Purging ghost group ID: ${id}`);
+                  console.log(`[ChatPage] ├░┼╕┬º┬╣ Purging ghost group ID: ${id}`);
                   
                   // 1. Cleanup localStorage
                   const stored = localStorage.getItem(`vnalo_pending_groups_${user?.id}`);
@@ -3275,7 +3283,7 @@ export default function ChatPage() {
 
                   // 2. If this is the active conversation in URL, it's dead. Redirect!
                   if (id === targetId) {
-                    console.warn(`[ChatPage] Ã¢Å¡Â Ã¯Â¸Â Current URL points to dead conversation ${id}. Redirecting to /chat.`);
+                    console.warn(`[ChatPage] ├ó┼í┬á├»┬╕┬Å Current URL points to dead conversation ${id}. Redirecting to /chat.`);
                     navigate('/chat');
                   }
                 }
@@ -3298,9 +3306,9 @@ export default function ChatPage() {
               const freshConvo: ConversationSummary = {
                 id: inner.id || c.id,
                 isGroup,
-                name: inner.title || c.title || (isGroup ? "NhÃƒÂ³m mÃ¡Â»â€ºi" : "NgÃ†Â°Ã¡Â»Âi dÃƒÂ¹ng mÃ¡Â»â€ºi"),
+                name: inner.title || c.title || (isGroup ? "Nh├â┬│m m├í┬╗ΓÇ║i" : "Ng├å┬░├í┬╗┬¥i d├â┬╣ng m├í┬╗ΓÇ║i"),
                 avatarUrl: inner.avatarUrl || c.avatarUrl || null,
-                lastMessage: isGroup ? "NhÃƒÂ³m mÃ¡Â»â€ºi tÃ¡ÂºÂ¡o" : "[ThiÃ¡ÂºÂ¿t bÃ¡Â»â€¹] GÃ¡Â»Â­i lÃ¡Â»Âi chÃƒÂ o",
+                lastMessage: isGroup ? "Nh├â┬│m m├í┬╗ΓÇ║i t├í┬║┬ío" : "[Thi├í┬║┬┐t b├í┬╗ΓÇ╣] G├í┬╗┬¡i l├í┬╗┬¥i ch├â┬áo",
                 unreadCount: 0,
                 participantUserIds: participantIds,
                 memberCount: members.length,
@@ -3395,7 +3403,7 @@ export default function ChatPage() {
             it.conversation.members.forEach((m: any) => {
               const mid = String(m.userId ?? '').trim()
               const realName = (m.nickname || m.displayName || m.name || '').trim();
-              if (mid && realName && realName !== 'NgÃ†Â°Ã¡Â»Âi dÃƒÂ¹ng mÃ¡Â»â€ºi' && realName !== (mid === user?.id ? 'BÃ¡ÂºÂ¡n' : 'NgÃ†Â°Ã¡Â»Âi dÃƒÂ¹ng mÃ¡Â»â€ºi')) {
+              if (mid && realName && realName !== 'Ng├å┬░├í┬╗┬¥i d├â┬╣ng m├í┬╗ΓÇ║i' && realName !== (mid === user?.id ? 'B├í┬║┬ín' : 'Ng├å┬░├í┬╗┬¥i d├â┬╣ng m├í┬╗ΓÇ║i')) {
                 upsertUser(mid, {
                   displayName: realName,
                   avatarUrl: m.avatarUrl || null
@@ -3417,8 +3425,8 @@ export default function ChatPage() {
             ? (previewNameById.get(item.lastMessageSenderId) ?? null)
             : null
           const getName = (id: string) => {
-            if (id === user?.id) return 'Bạn'
-            return userMapRef.current[id]?.displayName || previewNameById.get(id) || 'NgÃ†Â°Ã¡Â»Âi dÃƒÂ¹ng mÃ¡Â»â€ºi'
+            if (id === user?.id) return 'B├í┬║┬ín'
+            return userMapRef.current[id]?.displayName || previewNameById.get(id) || 'Ng├å┬░├í┬╗┬¥i d├â┬╣ng m├í┬╗ΓÇ║i'
           }
           const formattedLastMessage = formatConversationPreview(
             resolvedLastMessageSenderName,
@@ -3453,7 +3461,7 @@ export default function ChatPage() {
           })
         }
         setIsRestrictedMode(false)
-        console.log('Ã¢Å¡Â¡ [DEBUG] Inbox items from API:', mappedItems);
+        console.log('├ó┼í┬í [DEBUG] Inbox items from API:', mappedItems);
 
         const deduplicateById = (items: ConversationSummary[]): ConversationSummary[] => {
           const seen = new Set<string>()
@@ -3514,7 +3522,8 @@ export default function ChatPage() {
     [(user ? user.id : ""), user?.name, upsertUser],
   )
 
-  const inboxSummarySyncingRef = React.useRef(false)
+
+  const inboxSummarySyncingRef = useRef(false)
 
   useEffect(() => {
     if (!accessToken || !user?.id || !isSocketConnected || conversations.length === 0) {
@@ -3602,7 +3611,7 @@ export default function ChatPage() {
               }
             } else {
                // Newer summary detected, trigger message sync (Mobile-like fallback)
-               console.log('[ChatPage] Ã°Å¸â€â€ž Out-of-sync summary for:', conversation.id, 'Triggering message sync');
+               console.log('[ChatPage] ├░┼╕ΓÇ¥ΓÇ₧ Out-of-sync summary for:', conversation.id, 'Triggering message sync');
                void syncLatestMessages(conversation.id);
             }
 
@@ -3669,7 +3678,7 @@ export default function ChatPage() {
   const handleCreateGroup = useCallback(
     async (groupName: string, avatarUrl: string | null, memberIds: string[]) => {
       if (!accessToken || !user) {
-        toast.error("Vui lÃƒÂ²ng Ã„â€˜Ã„Æ’ng nhÃ¡ÂºÂ­p lÃ¡ÂºÂ¡i");
+        toast.error("Vui l├â┬▓ng ├äΓÇÿ├ä╞Æng nh├í┬║┬¡p l├í┬║┬íi");
         return;
       }
 
@@ -3703,7 +3712,7 @@ export default function ChatPage() {
           name: groupName,
           isGroup: true,
           avatarUrl: finalAvatarUrl,
-          lastMessage: "BÃ¡ÂºÂ¡n Ã„â€˜ÃƒÂ£ tÃ¡ÂºÂ¡o nhÃƒÂ³m",
+          lastMessage: "B├í┬║┬ín ├äΓÇÿ├â┬ú t├í┬║┬ío nh├â┬│m",
           unreadCount: 0,
           participantUserIds: memberIds,
           memberCount: memberIds.length + 1,
@@ -3720,7 +3729,7 @@ export default function ChatPage() {
 
         // Seed cache for myself too
         upsertUser(user.id, {
-          displayName: user.name || "BÃ¡ÂºÂ¡n",
+          displayName: user.name || "B├í┬║┬ín",
           avatarUrl: user.avatarUrl || null
         });
 
@@ -3770,11 +3779,12 @@ export default function ChatPage() {
         // Refresh conversation list to sync with backend
         await loadInbox(accessToken, groupId);
 
+
         navigate(`/chat/${groupId}`);
         setIsCreateGroupOpen(false);
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "KhÃƒÂ´ng thÃ¡Â»Æ’ tÃ¡ÂºÂ¡o nhÃƒÂ³m. Vui lÃƒÂ²ng thÃ¡Â»Â­ lÃ¡ÂºÂ¡i.";
-        console.error("Ã¢Å¡Â¡ [CREATE GROUP] LÃ¡Â»â€”i:", error);
+        const errorMessage = error instanceof Error ? error.message : "Kh├â┬┤ng th├í┬╗╞Æ t├í┬║┬ío nh├â┬│m. Vui l├â┬▓ng th├í┬╗┬¡ l├í┬║┬íi.";
+        console.error("├ó┼í┬í [CREATE GROUP] L├í┬╗ΓÇöi:", error);
         toast.error(errorMessage);
       } finally {
         setIsCreatingGroup(false);
@@ -3782,6 +3792,8 @@ export default function ChatPage() {
     },
     [accessToken, user, navigate, loadInbox, emitSendMessage, joinConversation]
   );
+
+
 
   useEffect(() => {
     if (!accessToken) {
@@ -3972,6 +3984,8 @@ export default function ChatPage() {
     setIsProfileModalOpen(true)
   }, [])
 
+
+
   const handleLoadConversationMessages = useCallback((conversationId: string) => {
     if (!accessToken || !conversationId || !user) {
       return
@@ -4054,7 +4068,7 @@ export default function ChatPage() {
 
         const isVirtualCloud = conversationId === `vnalo_cloud_${user.id}`
         const rawMessages = isVirtualCloud ? [] : await fetchMessages(accessToken, conversationId)
-        console.log('DÃ¡Â»Â¯ liÃ¡Â»â€¡u tin nhÃ¡ÂºÂ¯n nhÃ¡ÂºÂ­n Ã„â€˜Ã†Â°Ã¡Â»Â£c:', rawMessages)
+        console.log('D├í┬╗┬» li├í┬╗ΓÇíu tin nh├í┬║┬»n nh├í┬║┬¡n ├äΓÇÿ├å┬░├í┬╗┬úc:', rawMessages)
         const mapped = sortMessages(
           rawMessages
             .map((message) => applyRestrictedMessage(normalizeMessage(mapRawMessage(message, user.id)), isRestrictedMode))
@@ -4102,6 +4116,8 @@ export default function ChatPage() {
     })()
   }, [accessToken, deletedMessageIds, isRestrictedMode, syncConversationReactions, syncPinnedMessages, user, upsertUser])
 
+
+
   useEffect(() => {
     if (!isSocketConnected || !selectedConversationId || !accessToken) {
       return
@@ -4137,20 +4153,20 @@ export default function ChatPage() {
       return
     }
 
-    console.log('--- Ã„ÂANG THÃ¡Â»Â°C HIÃ¡Â»â€ N JOIN ROOM CHO', list.length, 'HÃ¡Â»ËœI THOÃ¡ÂºÂ I ---')
-    console.log('TÃ¡Â»Â± Ã„â€˜Ã¡Â»â„¢ng Join vÃ¡Â»Â cÃƒÂ¡c room:', conversationIds)
+    console.log('--- ├ä┬ÉANG TH├í┬╗┬░C HI├í┬╗ΓÇáN JOIN ROOM CHO', list.length, 'H├í┬╗╦£I THO├í┬║┬áI ---')
+    console.log('T├í┬╗┬▒ ├äΓÇÿ├í┬╗Γäóng Join v├í┬╗┬ü c├â┬íc room:', conversationIds)
 
     await joinMultipleConversations(conversationIds)
   }, [joinMultipleConversations])
 
-  const previousSocketConnectedRef = React.useRef(false)
+  const previousSocketConnectedRef = useRef(false)
 
   useEffect(() => {
     const socket = getSocket()
     const currentConnected = Boolean(socket?.connected)
 
     if (!previousSocketConnectedRef.current && currentConnected && conversations.length > 0) {
-      console.log('[ChatPage.retryJoin] Socket vÃ¡Â»Â«a chuyÃ¡Â»Æ’n false -> true, join lÃ¡ÂºÂ¡i rooms')
+      console.log('[ChatPage.retryJoin] Socket v├í┬╗┬½a chuy├í┬╗╞Æn false -> true, join l├í┬║┬íi rooms')
       void joinAllConversations(conversations)
     }
 
@@ -4191,7 +4207,7 @@ export default function ChatPage() {
         setSelectedConversationId(conversationId)
         navigate(`/chat/${conversationId}`)
         await joinConversation(conversationId)
-        console.log('[ChatPage.openDirectConversation] Ã¢Å¡Â¡ Joined conversation:', conversationId)
+        console.log('[ChatPage.openDirectConversation] ├ó┼í┬í Joined conversation:', conversationId)
         await loadInbox(accessToken, conversationId)
       } catch (error) {
         console.error('Failed to open direct conversation', error)
@@ -4228,8 +4244,8 @@ export default function ChatPage() {
   // ------------------------------------------------------------------------------------------------------------------------------------------------------------------
   // SMART JOIN ROOMS (Only join once per session/reconnect)
   // ------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  const joinedIdsRef = React.useRef<Set<string>>(new Set())
-  const lastJoinedSocketIdRef = React.useRef<string | null>(null)
+  const joinedIdsRef = useRef<Set<string>>(new Set())
+  const lastJoinedSocketIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     // Hard check every time conversations or connection state changes
@@ -4240,20 +4256,20 @@ export default function ChatPage() {
     // If socket ID changed (reconnect), we MUST clear the joined cache
     // because server-side room membership is lost on reconnect.
     if (currentSocketId !== lastJoinedSocketIdRef.current) {
-      console.log(`[ChatPage.join] Ã¢Å¡Â¡ Socket ID changed from ${lastJoinedSocketIdRef.current} to ${currentSocketId}, clearing joined cache`);
+      console.log(`[ChatPage.join] ├ó┼í┬í Socket ID changed from ${lastJoinedSocketIdRef.current} to ${currentSocketId}, clearing joined cache`);
       joinedIdsRef.current.clear();
       lastJoinedSocketIdRef.current = currentSocketId;
     }
 
     if (actualConnected && !isSocketConnected) {
-      console.log('[ChatPage.join] Ã¢Å¡Â¡ Fixing connection state (out of sync)');
+      console.log('[ChatPage.join] ├ó┼í┬í Fixing connection state (out of sync)');
       setIsSocketConnected(true);
       return;
     }
 
     if (!actualConnected || !isSocketConnected) {
       if (joinedIdsRef.current.size > 0) {
-        console.log('[ChatPage.join] Ã¢Å¡Â¡ Socket disconnected, clearing joined cache');
+        console.log('[ChatPage.join] ├ó┼í┬í Socket disconnected, clearing joined cache');
         joinedIdsRef.current.clear();
       }
       return;
@@ -4263,7 +4279,7 @@ export default function ChatPage() {
     const newIds = currentIds.filter((id) => id && !joinedIdsRef.current.has(id));
 
     if (newIds.length > 0) {
-      console.log(`[ChatPage.join] Ã¢Å¡Â¡ Joining ${newIds.length} new rooms for socket ${currentSocketId}`);
+      console.log(`[ChatPage.join] ├ó┼í┬í Joining ${newIds.length} new rooms for socket ${currentSocketId}`);
       newIds.forEach((id) => {
         void (async () => {
           const joined = await joinConversation(id);
@@ -4279,7 +4295,7 @@ export default function ChatPage() {
 
   // 1. Mark as read on conversation change or new messages (with guard)
   // 1. Mark as read on conversation change or new messages (with guard)
-  const lastEmittedReadRef = React.useRef<Record<string, number>>({})
+  const lastEmittedReadRef = useRef<Record<string, number>>({})
 
   useEffect(() => {
     const activeConversationId = routedConversationId || selectedConversationId
@@ -4555,7 +4571,7 @@ export default function ChatPage() {
           // We keep attachments in local state only for the UI to potentially group them
           attachments: [{
             url: res.url,
-            name: allFiles[i]?.name || "TÃ¡Â»â€¡p",
+            name: allFiles[i]?.name || "T├í┬╗ΓÇíp",
             mimeType: res.mimeType,
             sizeBytes: res.sizeBytes,
             thumbnailUrl: res.thumbnailUrl
@@ -4630,7 +4646,7 @@ export default function ChatPage() {
         senderId: user.id,
         type: 'poll',
         isLocal: false,
-        text: `Ã°Å¸â€œÅ  BÃƒÂ¬nh chÃ¡Â»Ân: ${poll.question}`,
+        text: `├░┼╕ΓÇ£┼á B├â┬¼nh ch├í┬╗┬ìn: ${poll.question}`,
         pollData: poll,
         timestamp: formatMessageTimestamp(),
         deliveryState: 'sending',
@@ -4830,7 +4846,7 @@ export default function ChatPage() {
       const role = String(myMember?.role || '').toUpperCase()
       const isModerator = role === 'ADMIN' || role === 'DEPUTY'
       if (!isModerator && !selectedConversation.allowMemberEditInfo) {
-        toast.error('BÃ¡ÂºÂ¡n khÃƒÂ´ng cÃƒÂ³ quyÃ¡Â»Ân thay Ã„â€˜Ã¡Â»â€¢i tÃƒÂªn nhÃƒÂ³m')
+        toast.error('B├í┬║┬ín kh├â┬┤ng c├â┬│ quy├í┬╗┬ün thay ├äΓÇÿ├í┬╗ΓÇói t├â┬¬n nh├â┬│m')
         return
       }
     }
@@ -4841,7 +4857,7 @@ export default function ChatPage() {
           c.id === selectedConversationId ? { ...c, name: newName } : c
         )
       )
-      toast.success('CÃ¡ÂºÂ­p nhÃ¡ÂºÂ­t tÃƒÂªn nhÃƒÂ³m thÃƒÂ nh cÃƒÂ´ng')
+      toast.success('C├í┬║┬¡p nh├í┬║┬¡t t├â┬¬n nh├â┬│m th├â┬ánh c├â┬┤ng')
 
       const systemPayload = JSON.stringify({
         action: 'UPDATE_GROUP_INFO',
@@ -4882,7 +4898,7 @@ export default function ChatPage() {
         [selectedConversationId]: upsertMessage(prev[selectedConversationId] ?? [], optimisticSystemMessage)
       }));
     } catch (err) {
-      toast.error('CÃƒÂ³ lÃ¡Â»â€”i xÃ¡ÂºÂ£y ra khi cÃ¡ÂºÂ­p nhÃ¡ÂºÂ­t tÃƒÂªn nhÃƒÂ³m')
+      toast.error('C├â┬│ l├í┬╗ΓÇöi x├í┬║┬úy ra khi c├í┬║┬¡p nh├í┬║┬¡t t├â┬¬n nh├â┬│m')
       console.error(err)
     }
   }
@@ -4896,7 +4912,7 @@ export default function ChatPage() {
       const isModerator = (currentConv?.members?.find(m => m.userId === user?.id)?.role || '').toUpperCase() === 'ADMIN' || (currentConv?.members?.find(m => m.userId === user?.id)?.role || '').toUpperCase() === 'DEPUTY'
       if (currentConv?.isGroup) {
         if (!isModerator && !currentConv.allowMemberEditInfo) {
-          toast.error('BÃ¡ÂºÂ¡n khÃƒÂ´ng cÃƒÂ³ quyÃ¡Â»Ân thay Ã„â€˜Ã¡Â»â€¢i Ã¡ÂºÂ£nh nhÃƒÂ³m')
+          toast.error('B├í┬║┬ín kh├â┬┤ng c├â┬│ quy├í┬╗┬ün thay ├äΓÇÿ├í┬╗ΓÇói ├í┬║┬únh nh├â┬│m')
           return
         }
       }
@@ -4949,7 +4965,7 @@ export default function ChatPage() {
       // 5. Success - Silent per user request
     } catch (err: any) {
       console.error('Failed to update group avatar:', err);
-      toast.error(err.message || 'CÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¨Ãƒâ€šÃ‚Â¨Ãƒâ€¹Ã¢â‚¬Â  nhÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¨Ãƒâ€šÃ‚Â²Ãƒâ€šÃ‚Â  ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾h ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â£ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â diÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â¡Ãƒâ€šÃ‚ÂµÃƒâ€¦Ã‚Â¾ thÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â¦ bÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â£ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â');
+      toast.error(err.message || 'C├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬¿├âΓÇÜ├é┬¿├âΓÇ╣├óΓé¼┬á nh├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬¿├âΓÇÜ├é┬▓├âΓÇÜ├é┬á ├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬Å├â┬ó├óΓÇÜ┬¼├à┬╛h ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬ú├â┬ó├óΓé¼┼í├é┬¼├âΓÇÜ├é┬É di├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬░├âΓÇÜ├é┬í├âΓÇÜ├é┬╡├âΓÇª├é┬╛ th├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬Ñ├âΓÇÜ├é┬Å├âΓÇÜ├é┬ª b├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬ú├â┬ó├óΓé¼┼í├é┬¼├âΓÇÜ├é┬É');
     }
   };
 
@@ -4957,7 +4973,7 @@ export default function ChatPage() {
     if (!selectedConversationId || !accessToken) return
     const targetUserId = selectedConversation?.userId || selectedConversation?.participantUserIds?.[0]
     if (!targetUserId) {
-      toast.error('KhÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¹Ãƒâ€šÃ‚Â«ng tÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â«m thÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â¥ ngÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‹Å“Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â¥ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â° dÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¾ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ng ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ cÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¨Ãƒâ€šÃ‚Â¨Ãƒâ€¹Ã¢â‚¬Â  nhÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¨Ãƒâ€šÃ‚Â²Ãƒâ€šÃ‚Â  tÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¤ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢n gÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã…Â½Ãƒâ€šÃ‚Â¾ nhÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½')
+      toast.error('Kh├â╞Æ├é┬º├âΓÇÜ├é┬╣├âΓÇÜ├é┬½ng t├â╞Æ├é┬º├âΓÇÜ├é┬⌐├âΓÇÜ├é┬½m th├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬Ñ├âΓÇÜ├é┬Å├âΓÇÜ├é┬Ñ ng├â╞Æ├é┬ó├â┬ó├óΓÇÜ┬¼├ï┼ô├âΓÇÜ├é┬╣├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬░├âΓÇÜ├é┬⌐├âΓÇÜ├é┬Ñ├â┬ó├óΓÇÜ┬¼├é┬░ d├â╞Æ├é┬º├âΓÇÜ├é┬╛├â┬ó├óΓÇÜ┬¼├é┬ªng ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ c├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬¿├âΓÇÜ├é┬¿├âΓÇ╣├óΓé¼┬á nh├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬¿├âΓÇÜ├é┬▓├âΓÇÜ├é┬á t├â╞Æ├é┬º├âΓÇÜ├é┬ñ├â┬ó├óΓé¼┼╛├é┬ón g├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├à┬╜├âΓÇÜ├é┬╛ nh├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜')
       return;
     }
     try {
@@ -4967,9 +4983,9 @@ export default function ChatPage() {
           c.id === selectedConversationId ? { ...c, name: newNickname } : c
         )
       )
-      toast.success('CÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¨Ãƒâ€šÃ‚Â¨Ãƒâ€¹Ã¢â‚¬Â  nhÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¨Ãƒâ€šÃ‚Â²Ãƒâ€šÃ‚Â  tÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¤ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢n gÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã…Â½Ãƒâ€šÃ‚Â¾ nhÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ thÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½nh cÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¹Ãƒâ€šÃ‚Â«ng')
+      toast.success('C├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬¿├âΓÇÜ├é┬¿├âΓÇ╣├óΓé¼┬á nh├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬¿├âΓÇÜ├é┬▓├âΓÇÜ├é┬á t├â╞Æ├é┬º├âΓÇÜ├é┬ñ├â┬ó├óΓé¼┼╛├é┬ón g├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├à┬╜├âΓÇÜ├é┬╛ nh├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ th├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜nh c├â╞Æ├é┬º├âΓÇÜ├é┬╣├âΓÇÜ├é┬½ng')
     } catch (err) {
-      toast.error('CÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â±ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ lÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â¡Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ xÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â£ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€¦Ã‚Â  ra khi cÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¨Ãƒâ€šÃ‚Â¨Ãƒâ€¹Ã¢â‚¬Â  nhÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¨Ãƒâ€šÃ‚Â²Ãƒâ€šÃ‚Â  tÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¤ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢n gÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã…Â½Ãƒâ€šÃ‚Â¾ nhÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½')
+      toast.error('C├â╞Æ├é┬º├âΓÇÜ├é┬▒├â┬ó├óΓé¼┼í├é┬¼ l├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬░├âΓÇÜ├é┬í├âΓÇª├é┬╕├â┬ó├óΓé¼┼╛├é┬ó x├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬ú├â┬ó├óΓÇÜ┬¼├à┬╛├âΓÇª├é┬á ra khi c├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬¿├âΓÇÜ├é┬¿├âΓÇ╣├óΓé¼┬á nh├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬¿├âΓÇÜ├é┬▓├âΓÇÜ├é┬á t├â╞Æ├é┬º├âΓÇÜ├é┬ñ├â┬ó├óΓé¼┼╛├é┬ón g├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├à┬╜├âΓÇÜ├é┬╛ nh├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜')
       console.error(err)
     }
   }
@@ -5019,7 +5035,7 @@ export default function ChatPage() {
       setIsAddMembersOpen(false);
     } catch (error) {
       console.error('Failed to add members:', error);
-      toast.error('ThÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¤ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢m thÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½nh viÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¤ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢n thÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â¦ bÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â£ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â');
+      toast.error('Th├â╞Æ├é┬º├âΓÇÜ├é┬ñ├â┬ó├óΓé¼┼╛├é┬óm th├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜nh vi├â╞Æ├é┬º├âΓÇÜ├é┬ñ├â┬ó├óΓé¼┼╛├é┬ón th├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬Ñ├âΓÇÜ├é┬Å├âΓÇÜ├é┬ª b├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬ú├â┬ó├óΓé¼┼í├é┬¼├âΓÇÜ├é┬É');
     } finally {
       setIsAddingMembers(false);
     }
@@ -5074,10 +5090,10 @@ export default function ChatPage() {
       navigate('/chat');
     } catch (error: any) {
       console.error('Failed to leave group:', error);
-      if (error.message === 'BÃ¡ÂºÂ¡n chÃ†Â°a chuyÃ¡Â»Æ’n quyÃ¡Â»Ân trÃ†Â°Ã¡Â»Å¸ng nhÃƒÂ³m khi rÃ¡Â»Âi nhÃƒÂ³m') {
-        toast.error('BÃ¡ÂºÂ¡n chÃ†Â°a chuyÃ¡Â»Æ’n quyÃ¡Â»Ân trÃ†Â°Ã¡Â»Å¸ng nhÃƒÂ³m khi rÃ¡Â»Âi nhÃƒÂ³m');
+      if (error.message === 'B├í┬║┬ín ch├å┬░a chuy├í┬╗╞Æn quy├í┬╗┬ün tr├å┬░├í┬╗┼╕ng nh├â┬│m khi r├í┬╗┬¥i nh├â┬│m') {
+        toast.error('B├í┬║┬ín ch├å┬░a chuy├í┬╗╞Æn quy├í┬╗┬ün tr├å┬░├í┬╗┼╕ng nh├â┬│m khi r├í┬╗┬¥i nh├â┬│m');
       } else {
-        toast.error('RÃ¡Â»Âi nhÃƒÂ³m thÃ¡ÂºÂ¥t bÃ¡ÂºÂ¡i');
+        toast.error('R├í┬╗┬¥i nh├â┬│m th├í┬║┬Ñt b├í┬║┬íi');
       }
     }
   };
@@ -5107,13 +5123,13 @@ export default function ChatPage() {
           content: systemPayload,
           clientMessageId: crypto.randomUUID()
         });
-        console.log('[ChatPage] Ã°Å¸â€œÂ¤ Group sync signal sent successfully');
+        console.log('[ChatPage] ├░┼╕ΓÇ£┬ñ Group sync signal sent successfully');
       } catch (e) {
-        console.warn('[ChatPage] Ã¢Å¡Â Ã¯Â¸Â Failed to emit group sync signal');
+        console.warn('[ChatPage] ├ó┼í┬á├»┬╕┬Å Failed to emit group sync signal');
       }
     } catch (error) {
       console.error('Failed to update group settings', error);
-      toast.error('KhÃƒÂ´ng thÃ¡Â»Æ’ cÃ¡ÂºÂ­p nhÃ¡ÂºÂ­t cÃƒÂ i Ã„â€˜Ã¡ÂºÂ·t nhÃƒÂ³m');
+      toast.error('Kh├â┬┤ng th├í┬╗╞Æ c├í┬║┬¡p nh├í┬║┬¡t c├â┬ái ├äΓÇÿ├í┬║┬╖t nh├â┬│m');
     }
   };
 
@@ -5139,7 +5155,7 @@ export default function ChatPage() {
 
       // Then call API
       await disbandConversation(accessToken, selectedConversationId);
-      toast.success('GiÃ¡ÂºÂ£i tÃƒÂ¡n nhÃƒÂ³m thÃƒÂ nh cÃƒÂ´ng');
+      toast.success('Gi├í┬║┬úi t├â┬ín nh├â┬│m th├â┬ánh c├â┬┤ng');
 
       // Update local state
       setConversations(prev => prev.filter(conv => conv.id !== selectedConversationId));
@@ -5147,7 +5163,7 @@ export default function ChatPage() {
       setRightSidebarContent(null);
       navigate('/chat');
     } catch (err) {
-      console.error('KhÃƒÂ´ng thÃ¡Â»Æ’ giÃ¡ÂºÂ£i tÃƒÂ¡n nhÃƒÂ³m', err);
+      console.error('Kh├â┬┤ng th├í┬╗╞Æ gi├í┬║┬úi t├â┬ín nh├â┬│m', err);
     }
   };
 
@@ -5158,7 +5174,7 @@ export default function ChatPage() {
       const selectedConv = conversations.find(c => c.id === selectedConversationId);
       if (!selectedConv) return;
 
-      const targetDisplayName = userMap[targetUserId]?.displayName || 'ThÃƒÂ nh viÃƒÂªn';
+      const targetDisplayName = userMap[targetUserId]?.displayName || 'Th├â┬ánh vi├â┬¬n';
 
       // Emit SYSTEM message for UI
       const systemPayload = JSON.stringify({
@@ -5211,10 +5227,10 @@ export default function ChatPage() {
         return c;
       }));
 
-      toast.success(`ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â§ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€¦Ã‚Â  xÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â±ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬a ${targetDisplayName} khÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¨ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢Ãƒâ€šÃ‚Â¨ nhÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â±ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬m`);
+      toast.success(`├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬º├â┬ó├óΓÇÜ┬¼├àΓÇ£├âΓÇª├é┬á x├â╞Æ├é┬º├âΓÇÜ├é┬▒├â┬ó├óΓé¼┼í├é┬¼a ${targetDisplayName} kh├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬¿├â┬ó├óΓÇÜ┬¼├óΓÇ₧┬ó├âΓÇÜ├é┬¿ nh├â╞Æ├é┬º├âΓÇÜ├é┬▒├â┬ó├óΓé¼┼í├é┬¼m`);
     } catch (error) {
       console.error('Failed to remove member:', error);
-      toast.error('KhÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¹Ãƒâ€šÃ‚Â«ng thÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ xÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â±ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬a thÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½nh viÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¤ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢n');
+      toast.error('Kh├â╞Æ├é┬º├âΓÇÜ├é┬╣├âΓÇÜ├é┬½ng th├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ x├â╞Æ├é┬º├âΓÇÜ├é┬▒├â┬ó├óΓé¼┼í├é┬¼a th├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜nh vi├â╞Æ├é┬º├âΓÇÜ├é┬ñ├â┬ó├óΓé¼┼╛├é┬ón');
     }
   };
 
@@ -5268,11 +5284,11 @@ export default function ChatPage() {
         return c;
       }));
 
-      const roleDisplay = role === 'DEPUTY' ? 'phÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â±ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ nhÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â±ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬m' : 'thÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½nh viÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â¤ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢n';
-      toast.success(`ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ÃƒÆ’Ã‚Â§ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒâ€¦Ã‚Â  cÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¨Ãƒâ€šÃ‚Â¨Ãƒâ€¹Ã¢â‚¬Â  nhÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¨Ãƒâ€šÃ‚Â²Ãƒâ€šÃ‚Â  vai trÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â°Ãƒâ€šÃ‚Â· thÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½nh ${roleDisplay}`);
+      const roleDisplay = role === 'DEPUTY' ? 'ph├â╞Æ├é┬º├âΓÇÜ├é┬▒├â┬ó├óΓé¼┼í├é┬¼ nh├â╞Æ├é┬º├âΓÇÜ├é┬▒├â┬ó├óΓé¼┼í├é┬¼m' : 'th├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜nh vi├â╞Æ├é┬º├âΓÇÜ├é┬ñ├â┬ó├óΓé¼┼╛├é┬ón';
+      toast.success(`├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬º├â┬ó├óΓÇÜ┬¼├àΓÇ£├âΓÇª├é┬á c├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬¿├âΓÇÜ├é┬¿├âΓÇ╣├óΓé¼┬á nh├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬¿├âΓÇÜ├é┬▓├âΓÇÜ├é┬á vai tr├â╞Æ├é┬º├âΓÇÜ├é┬░├âΓÇÜ├é┬╖ th├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜nh ${roleDisplay}`);
     } catch (error) {
       console.error('Failed to update member role:', error);
-      toast.error('CÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¨Ãƒâ€šÃ‚Â¨Ãƒâ€¹Ã¢â‚¬Â  nhÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¨Ãƒâ€šÃ‚Â²Ãƒâ€šÃ‚Â  vai trÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â°Ãƒâ€šÃ‚Â· thÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â¦ bÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â£ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â');
+      toast.error('C├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬¿├âΓÇÜ├é┬¿├âΓÇ╣├óΓé¼┬á nh├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬¿├âΓÇÜ├é┬▓├âΓÇÜ├é┬á vai tr├â╞Æ├é┬º├âΓÇÜ├é┬░├âΓÇÜ├é┬╖ th├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬Ñ├âΓÇÜ├é┬Å├âΓÇÜ├é┬ª b├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬ú├â┬ó├óΓé¼┼í├é┬¼├âΓÇÜ├é┬É');
     }
   };
 
@@ -5318,7 +5334,7 @@ export default function ChatPage() {
       await doLeaveGroup();
     } catch (error) {
       console.error('Failed to transfer ownership and leave:', error);
-      toast.error('ChuyÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ quyÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ vÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¿Ãƒâ€šÃ‚Â½ rÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â°Ãƒâ€šÃ‚Â©Ãƒâ€šÃ‚Â¥ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â° nhÃƒÆ’Ã‚Â§Ãƒâ€šÃ‚Â±ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬m thÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚ÂÃƒâ€šÃ‚Â¦ bÃƒÆ’Ã‚Â¥Ãƒâ€šÃ‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÆ’Ã‚Â£ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â');
+      toast.error('Chuy├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ quy├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ v├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ r├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓé¼┼╛├é┬ó├â╞Æ├é┬░├âΓÇÜ├é┬⌐├âΓÇÜ├é┬Ñ├â┬ó├óΓÇÜ┬¼├é┬░ nh├â╞Æ├é┬º├âΓÇÜ├é┬▒├â┬ó├óΓé¼┼í├é┬¼m th├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬Ñ├âΓÇÜ├é┬Å├âΓÇÜ├é┬ª b├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬ú├â┬ó├óΓé¼┼í├é┬¼├âΓÇÜ├é┬É');
     }
   };
 
@@ -5333,7 +5349,7 @@ export default function ChatPage() {
       if (lastMsgTime <= deleteTime) {
         return {
           ...conv,
-          lastMessage: t('chat.historyDeletedPreview') || 'BÃ¡ÂºÂ¡n Ã„â€˜ÃƒÂ£ xÃƒÂ³a lÃ¡Â»â€¹ch sÃ¡Â»Â­ trÃƒÂ² chuyÃ¡Â»â€¡n',
+          lastMessage: t('chat.historyDeletedPreview') || 'B├í┬║┬ín ├äΓÇÿ├â┬ú x├â┬│a l├í┬╗ΓÇ╣ch s├í┬╗┬¡ tr├â┬▓ chuy├í┬╗ΓÇín',
           unreadCount: 0 // Hide unread count for deleted history conversations
         };
       }
@@ -5581,7 +5597,7 @@ export default function ChatPage() {
       <Modal
         isOpen={confirmLeaveGroupOpen}
         onClose={() => setConfirmLeaveGroupOpen(false)}
-        title="RÃ¡Â»Âi nhÃƒÂ³m vÃƒÂ  xÃƒÂ³a trÃƒÂ² chuyÃ¡Â»â€¡n"
+        title="R├í┬╗┬¥i nh├â┬│m v├â┬á x├â┬│a tr├â┬▓ chuy├í┬╗ΓÇín"
         variant="confirm"
         footer={
           <div className="flex gap-3 justify-end w-full">
@@ -5589,20 +5605,20 @@ export default function ChatPage() {
               className="px-6 py-2 rounded-lg bg-[var(--surface-muted)] text-[var(--text)] font-bold text-[15px] hover:bg-[var(--surface-hover)] border-0 outline-none cursor-pointer"
               onClick={() => setConfirmLeaveGroupOpen(false)}
             >
-              HÃ¡Â»Â§y
+              H├í┬╗┬ºy
             </button>
             <button
               className="px-6 py-2 rounded-lg bg-red-600 text-white font-bold text-[15px] hover:bg-red-700 border-0 outline-none cursor-pointer"
               onClick={doLeaveGroup}
             >
-              RÃ¡Â»Âi nhÃƒÂ³m
+              R├í┬╗┬¥i nh├â┬│m
             </button>
           </div>
         }
       >
         <div className="py-2 space-y-5">
           <p className="text-[15px] text-[var(--text)] leading-relaxed">
-            BÃ¡ÂºÂ¡n sÃ¡ÂºÂ½ khÃƒÂ´ng thÃ¡Â»Æ’ xem lÃ¡ÂºÂ¡i tin nhÃ¡ÂºÂ¯n trong nhÃƒÂ³m nÃƒÂ y sau khi rÃ¡Â»Âi nhÃƒÂ³m.
+            B├í┬║┬ín s├í┬║┬╜ kh├â┬┤ng th├í┬╗╞Æ xem l├í┬║┬íi tin nh├í┬║┬»n trong nh├â┬│m n├â┬áy sau khi r├í┬╗┬¥i nh├â┬│m.
           </p>
 
           <div
@@ -5610,8 +5626,8 @@ export default function ChatPage() {
             onClick={() => setLeaveGroupSilently(!leaveGroupSilently)}
           >
             <div className="space-y-1">
-              <p className="text-[15px] font-semibold text-[var(--text)]">RÃ¡Â»Âi nhÃƒÂ³m trong im lÃ¡ÂºÂ·ng</p>
-              <p className="text-[13px] text-[var(--text-secondary)]">ChÃ¡Â»â€° trÃ†Â°Ã¡Â»Å¸ng/phÃƒÂ³ nhÃƒÂ³m biÃ¡ÂºÂ¿t bÃ¡ÂºÂ¡n rÃ¡Â»Âi nhÃƒÂ³m.</p>
+              <p className="text-[15px] font-semibold text-[var(--text)]">R├í┬╗┬¥i nh├â┬│m trong im l├í┬║┬╖ng</p>
+              <p className="text-[13px] text-[var(--text-secondary)]">Ch├í┬╗ΓÇ░ tr├å┬░├í┬╗┼╕ng/ph├â┬│ nh├â┬│m bi├í┬║┬┐t b├í┬║┬ín r├í┬╗┬¥i nh├â┬│m.</p>
             </div>
             <div
               className={`relative h-6 w-11 rounded-full transition-all duration-200 ${leaveGroupSilently ? 'bg-[#0091FF]' : 'bg-gray-400 shadow-inner'
@@ -5635,88 +5651,44 @@ export default function ChatPage() {
         onMessage={handleOpenFriendChat}
       />
 
-      {/* INCOMING 1-1 CALL BANNER */}
-      {callState.isOpen && callState.direction === 'incoming' && callState.status === 'connecting' && (
-        <IncomingCallBanner
-          peerName={callState.peerId ? (userMap[callState.peerId]?.displayName || "NgÆ°á»i dÃ¹ng") : "NgÆ°á»i dÃ¹ng"}
-          peerAvatar={callState.peerId ? userMap[callState.peerId]?.avatarUrl : null}
-          isAudioOnly={callState.type === 'audio'}
-          onAnswer={handleAnswerCall}
-          onDecline={handleEndCall}
-        />
-      )}
+      <CallModal
+        isOpen={callState.isOpen}
+        type={callState.type}
+        status={callState.status}
+        peerName={callState.peerId ? (userMap[callState.peerId]?.displayName || "Ng├å┬░├í┬╗┬¥i d├â┬╣ng") : (selectedConversation?.name || "Ng├å┬░├í┬╗┬¥i d├â┬╣ng")}
+        peerAvatar={callState.peerId ? userMap[callState.peerId]?.avatarUrl : selectedConversation?.avatarUrl}
+        localStream={callState.localStream}
+        remoteStream={callState.remoteStream}
+        isMicOn={callState.isMicOn}
+        isCameraOn={callState.isCameraOn}
+        isRemoteCameraOn={callState.isRemoteCameraOn}
+        hasRemoteDescription={callState.hasRemoteDescription}
+        onEnd={handleEndCall}
+        onAnswer={handleAnswerCall}
+        onToggleMic={handleToggleMic}
+        onToggleCamera={handleToggleCamera}
+      />
 
-      {/* 1-1 CALL MODAL (Only show if not minimized) */}
-      {callState.isOpen && !isCallMinimized && (callState.direction === 'outgoing' || callState.status !== 'connecting') && (
-        <CallModal
-          isOpen={callState.isOpen}
-          type={callState.type}
-          status={callState.status}
-          peerName={callState.peerId ? (userMap[callState.peerId]?.displayName || "Người dùng") : (selectedConversation?.name || "Người dùng")}
-          peerAvatar={callState.peerId ? userMap[callState.peerId]?.avatarUrl : selectedConversation?.avatarUrl}
-          localStream={callState.localStream}
-          remoteStream={callState.remoteStream}
-          isMicOn={callState.isMicOn}
-          isCameraOn={callState.isCameraOn}
-          isRemoteCameraOn={callState.isRemoteCameraOn}
-          hasRemoteDescription={callState.hasRemoteDescription}
-          onEnd={handleEndCall}
-          onAnswer={handleAnswerCall}
-          onToggleMic={handleToggleMic}
-          onToggleCamera={handleToggleCamera}
-          onMinimize={() => setIsCallMinimized(true)}
-        />
-      )}
-
-      {/* 1-1 MINI CALL WINDOW */}
-      {callState.isOpen && isCallMinimized && (
-        <MiniCallWindow
-          stream={callState.remoteStream || callState.localStream || null}
-          peerName={callState.peerId ? (userMap[callState.peerId]?.displayName || "Người dùng") : "Người dùng"}
-          peerAvatar={callState.peerId ? userMap[callState.peerId]?.avatarUrl : null}
-          isCameraOn={Boolean(callState.isRemoteCameraOn || (callState.localStream && callState.isCameraOn))}
-          onMaximize={() => setIsCallMinimized(false)}
-          onEnd={handleEndCall}
-        />
-      )}
-
-      {/* INCOMING GROUP CALL BANNER */}
+      {/* INCOMING GROUP CALL NOTIFICATION ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ shown to non-callers */}
       {incomingGroupCall && !isInGroupCall && (
-        <IncomingCallBanner
-          peerName={incomingGroupCall.callerName}
-          peerAvatar={incomingGroupCall.callerAvatar}
-          isGroup={true}
-          conversationName={incomingGroupCall.conversationName}
-          isAudioOnly={incomingGroupCall.audioOnly}
-          onAnswer={() => joinGroupCall(incomingGroupCall)}
+        <IncomingGroupCallBanner
+          info={incomingGroupCall}
+          onJoin={() => joinGroupCall(incomingGroupCall)}
           onDecline={declineGroupCall}
         />
       )}
 
-      {/* GROUP CALL MODAL (Only show if not minimized) */}
-      {isInGroupCall && groupCallSnapshot && !isGroupCallMinimized && (
+      {/* GROUP CALL MODAL ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜ independent of 1-1 CallModal */}
+      {isInGroupCall && groupCallSnapshot && (
         <GroupCallModal
           isOpen={isInGroupCall}
           snapshot={groupCallSnapshot}
-          localUserName={user?.name ?? 'Báº¡n'}
+          localUserName={user?.name ?? 'B├í┬║┬ín'}
           localUserAvatar={user?.avatarUrl ?? undefined}
           onLeave={handleLeaveGroupCall}
           onToggleMic={groupToggleMic}
           onToggleCamera={groupToggleCamera}
           elapsedSeconds={groupCallElapsed}
-          onMinimize={() => setIsGroupCallMinimized(true)}
-        />
-      )}
-
-      {/* GROUP MINI CALL WINDOW */}
-      {isInGroupCall && groupCallSnapshot && isGroupCallMinimized && (
-        <MiniCallWindow
-          stream={groupCallSnapshot.peers[0]?.remoteStream || groupCallSnapshot.localStream}
-          peerName={groupCallSnapshot.peers[0]?.displayName || "Cuá»™c gá»i nhÃ³m"}
-          peerAvatar={groupCallSnapshot.peers[0]?.avatarUrl}
-          isCameraOn={Boolean(groupCallSnapshot.isCameraOn)}
-          onMaximize={() => setIsGroupCallMinimized(false)}
-          onEnd={handleLeaveGroupCall}
         />
       )}
 
@@ -5780,8 +5752,8 @@ function PinnedLogicHooks({
       return {
         id,
         conversationId: selectedConversationId,
-        content: 'Tin nhắn được ghim',
-        text: 'Tin nhắn được ghim',
+        content: 'Tin nh├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬º├â┬ó├óΓÇÜ┬¼├óΓé¼┼ô├âΓÇÜ├é┬╕ ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬º├â┬ó├óΓÇÜ┬¼├àΓÇ£├âΓÇª├é┬á ghim',
+        text: 'Tin nh├â╞Æ├é┬Ñ├âΓÇÜ├é┬╗├â┬ó├óΓÇÜ┬¼├é┬ó├â╞Æ├é┬º├â┬ó├óΓÇÜ┬¼├óΓé¼┼ô├âΓÇÜ├é┬╕ ├â╞Æ├é┬»├âΓÇÜ├é┬┐├âΓÇÜ├é┬╜├â╞Æ├é┬º├â┬ó├óΓÇÜ┬¼├àΓÇ£├âΓÇª├é┬á ghim',
         type: 'text' as any,
         sender: 'system' as any,
         senderId: 'system',
@@ -5820,3 +5792,15 @@ function PinnedLogicHooks({
 
   return null;
 }
+
+
+
+
+
+
+
+
+
+
+
+

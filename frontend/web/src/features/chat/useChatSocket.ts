@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import React, { useCallback, useEffect } from 'react'
 
 import type { RawMessage } from './chat.api'
 import {

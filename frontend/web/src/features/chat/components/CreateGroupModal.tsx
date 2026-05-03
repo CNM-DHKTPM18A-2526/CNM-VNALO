@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Camera, Check, ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
 
 import { UserAvatar } from '../../../shared/components/UserAvatar';

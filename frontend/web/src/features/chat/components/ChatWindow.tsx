@@ -1,5 +1,5 @@
 import { Info, UserPlus, MoreHorizontal } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 
 import { EmptyState } from '../../../shared/components/EmptyState'
 import { Icon } from '../../../shared/components/Icon'

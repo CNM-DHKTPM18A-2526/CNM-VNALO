@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useState, useRef } from 'react'
+import React, { createContext, useCallback, useContext, useState } from 'react'
 import { getUserById } from '../../friends/friends.api'
 
 type CachedUserProfile = {
@@ -17,7 +17,7 @@ const UserStoreContext = createContext<UserStoreContextType | undefined>(undefin
 
 export const UserStoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [userMap, setUserMap] = useState<Record<string, CachedUserProfile>>({})
-  const pendingRequests = useRef(new Map<string, Promise<CachedUserProfile>>())
+  const pendingRequests = React.useRef(new Map<string, Promise<CachedUserProfile>>())
 
   const upsertUser = useCallback((userId: string, profile: CachedUserProfile) => {
     setUserMap((prev) => {

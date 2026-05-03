@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import React, { useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import {
   AtSign,
   Ellipsis,

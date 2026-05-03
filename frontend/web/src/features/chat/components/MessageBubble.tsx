@@ -1,5 +1,5 @@
 import { MoreHorizontal, Pin, Reply, Share2, Star } from 'lucide-react'
-import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import React, { useEffect, useState, type MouseEvent as ReactMouseEvent } from 'react'
 
 import type { ChatMessage, MessageReactionMap, ReactionKey } from '../chat.types'
 import { REACTION_OPTIONS } from '../chat.constants'

@@ -2,12 +2,12 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
   type TouchEvent as ReactTouchEvent,
   type WheelEvent as ReactWheelEvent,
 } from 'react'
+import React from 'react'
 import { ChevronLeft, ChevronRight, Download, X, ZoomIn, ZoomOut } from 'lucide-react'
 
 import type { ViewerImageItem } from '../chat.types'
@@ -28,9 +28,9 @@ export function ImageViewerProvider({ images, children }: ImageViewerProviderPro
   const [activeIndex, setActiveIndex] = useState(0)
   const [scale, setScale] = useState(1)
 
-  const pinchDistanceRef = useRef<number | null>(null)
-  const pinchScaleRef = useRef(1)
-  const swipeStartXRef = useRef<number | null>(null)
+  const pinchDistanceRef = React.useRef<number | null>(null)
+  const pinchScaleRef = React.useRef(1)
+  const swipeStartXRef = React.useRef<number | null>(null)
 
   const canNavigate = images.length > 1
   const activeItem = images[activeIndex] ?? null

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import React, { useState } from 'react'
 import { Modal } from '../../../shared/components/ui/Modal'
 import { Button } from '../../../shared/components/ui/Button'
 import { Icon } from '../../../shared/components/Icon'
