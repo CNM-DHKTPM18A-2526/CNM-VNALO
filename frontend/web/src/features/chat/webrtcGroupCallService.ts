@@ -320,20 +320,44 @@ export class WebRtcGroupCallService {
     this.socket.off('group-call:user-left')
 
     this.socket.on('group-call:user-joined', this.onUserJoined)
+    this.socket.on('group-call.user-joined', this.onUserJoined)
+    
     this.socket.on('group-call:offer', this.onRemoteOffer)
+    this.socket.on('group-call.offer', this.onRemoteOffer)
+    
     this.socket.on('group-call:answer', this.onRemoteAnswer)
+    this.socket.on('group-call.answer', this.onRemoteAnswer)
+    
     this.socket.on('group-call:ice-candidate', this.onRemoteIceCandidate)
-    this.socket.on('group-call:media-update', this.onMediaUpdate) // New dedicated event
+    this.socket.on('group-call.ice-candidate', this.onRemoteIceCandidate)
+    
+    this.socket.on('group-call:media-update', this.onMediaUpdate)
+    this.socket.on('group-call.media-update', this.onMediaUpdate)
+    
     this.socket.on('group-call:user-left', this.onUserLeft)
+    this.socket.on('group-call.user-left', this.onUserLeft)
   }
 
   private removeSocketListeners() {
     if (!this.socket) return
+    
     this.socket.off('group-call:user-joined', this.onUserJoined)
+    this.socket.off('group-call.user-joined', this.onUserJoined)
+    
     this.socket.off('group-call:offer', this.onRemoteOffer)
+    this.socket.off('group-call.offer', this.onRemoteOffer)
+    
     this.socket.off('group-call:answer', this.onRemoteAnswer)
+    this.socket.off('group-call.answer', this.onRemoteAnswer)
+    
     this.socket.off('group-call:ice-candidate', this.onRemoteIceCandidate)
+    this.socket.off('group-call.ice-candidate', this.onRemoteIceCandidate)
+    
+    this.socket.off('group-call:media-update', this.onMediaUpdate)
+    this.socket.off('group-call.media-update', this.onMediaUpdate)
+    
     this.socket.off('group-call:user-left', this.onUserLeft)
+    this.socket.off('group-call.user-left', this.onUserLeft)
   }
 
   /**

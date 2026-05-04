@@ -3109,21 +3109,6 @@ export default function ChatPage() {
     socket.on('call.ice-candidate', onIce);
     socket.on('call.end', onEnd);
 
-    // Generic signal (fallback)
-    const onGenericSignal = (data: any) => {
-      // Robust unwrapping: check for direct payload or nested 'data', 'offer', 'answer', 'candidate' keys
-      const signalData = data.data || data.offer || data.answer || data.candidate || (Array.isArray(data) ? data[0] : data);
-      const type = data.type || signalData?.type;
-
-      console.log('[CALL][RECEIVE GENERIC SIGNAL]', { type, signalData });
-
-      if (type === 'offer') signalHandlersRef.current.handleCallOffer(signalData);
-      else if (type === 'answer') signalHandlersRef.current.handleCallAnswer(signalData);
-      else if (type === 'ice-candidate') signalHandlersRef.current.handleCallIce(signalData);
-      else if (type === 'end') signalHandlersRef.current.handleCallEnd(signalData);
-    };
-    socket.on('call:signal', onGenericSignal);
-    socket.on('call.signal', onGenericSignal);
 
     return () => {
       console.log('[ChatPage.signaling] Cleaning up listeners');

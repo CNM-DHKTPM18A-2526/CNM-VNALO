@@ -156,8 +156,6 @@ export class WebRtcCallService {
 
         this.socket.emit('call:ice-candidate', payload)
         this.socket.emit('call.ice-candidate', payload)
-        this.socket.emit('call.signal', { ...payload, type: 'ice-candidate' })
-        this.socket.emit('call:signal', { ...payload, type: 'ice-candidate' })
       }
     }
 
@@ -308,16 +306,6 @@ export class WebRtcCallService {
       this.socket.emit('call:offer', offerPayload)
       this.socket.emit('call.offer', offerPayload)
 
-      const signalPayload = {
-        ...offerPayload,
-        type: 'offer',
-        data: offerPayload,
-        offer: offerPayload,
-        sdp: offerPayload.sdp
-      }
-
-      this.socket.emit('call.signal', signalPayload)
-      this.socket.emit('call:signal', signalPayload)
     }
   }
 
@@ -358,16 +346,6 @@ export class WebRtcCallService {
         this.socket.emit('call:answer', answerPayload)
         this.socket.emit('call.answer', answerPayload)
 
-        const signalPayload = {
-          ...answerPayload,
-          type: 'answer',
-          data: answerPayload,
-          answer: answerPayload,
-          sdp: answerPayload.sdp
-        }
-
-        this.socket.emit('call.signal', signalPayload)
-        this.socket.emit('call:signal', signalPayload)
       }
     } catch (error) {
       console.error('[WebRTC] Failed to accept call', error)

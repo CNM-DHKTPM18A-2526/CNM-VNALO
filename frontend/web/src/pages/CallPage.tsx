@@ -48,13 +48,16 @@ const CallPage: React.FC = () => {
   useEffect(() => {
     if (!accessToken) return
 
-    const newSocket = io(SOCKET_URL, {
+    const url = SOCKET_URL.endsWith('/') ? `${SOCKET_URL}chat` : `${SOCKET_URL}/chat`;
+    console.log('[CallPage] Connecting to socket:', url);
+    
+    const newSocket = io(url, {
       auth: { token: accessToken },
       transports: ['websocket'],
     })
 
     newSocket.on('connect', () => {
-      console.log('[CallPage] Socket connected')
+      console.log('[CallPage] Socket connected to /chat namespace')
       setSocket(newSocket)
     })
 
@@ -75,10 +78,7 @@ const CallPage: React.FC = () => {
       callServiceRef.current = service
 
       const initialSdpStr = (() => {
-        // FIX BUG #12: Try sessionStorage first (ChatPage writes here synchronously
-        // before opening popup, so it's immediately available). Fall back to
-        // localStorage for backward compatibility. This eliminates the race condition
-        // where the popup read before the offer was stored.
+        // FIX BUG #12: Try sessionStorage first
         const callKey = `offer_${callId}`;
         const ssStr = sessionStorage.getItem(callKey);
         if (ssStr) {
@@ -109,16 +109,33 @@ const CallPage: React.FC = () => {
         initialSdp,
       })
 
-      // Listener for 1-1 signaling
-      socket.on('call:answer', (data) => {
-        if (data.callId === callId) service.handleAnswer(data.sdp)
-      })
-      socket.on('call:ice-candidate', (data) => {
-        if (data.callId === callId) service.handleIceCandidate(data.candidate)
-      })
-      socket.on('call:end', (data) => {
-        if (data.callId === callId) service.endCall(data.reason, false)
-      })
+      // Listener for 1-1 signaling (Handle both colon and dot notation)
+      const onAnswer = (data: any) => {
+        if (data.callId === callId) {
+           console.log('[CallPage] Received answer', data);
+           service.handleAnswer(data.sdp);
+        }
+      };
+      const onIce = (data: any) => {
+        if (data.callId === callId) {
+           service.handleIceCandidate(data.candidate);
+        }
+      };
+      const onEnd = (data: any) => {
+        if (data.callId === callId) {
+           console.log('[CallPage] Received end call', data);
+           service.endCall(data.reason, false);
+        }
+      };
+
+      socket.on('call:answer', onAnswer)
+      socket.on('call.answer', onAnswer)
+      
+      socket.on('call:ice-candidate', onIce)
+      socket.on('call.ice-candidate', onIce)
+      
+      socket.on('call:end', onEnd)
+      socket.on('call.end', onEnd)
 
     } else if (type === 'group') {
       const service = new WebRtcGroupCallService((snapshot) => {
