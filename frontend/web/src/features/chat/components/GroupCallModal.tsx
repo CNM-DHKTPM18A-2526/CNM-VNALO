@@ -10,7 +10,7 @@
  */
 
 import React, { useEffect, useRef, useCallback, useState } from 'react'
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Users } from 'lucide-react'
+import { Mic, MicOff, Video, VideoOff, Phone, Users } from 'lucide-react'
 import type { GroupCallSnapshot, GroupPeerState, IncomingGroupCallInfo } from '../webrtcGroupCallService'
 import type { ConversationSummary } from '../chat.types'
 import { WebRtcGroupCallService } from '../webrtcGroupCallService'
@@ -231,9 +231,9 @@ export const GroupCallModal: React.FC<GroupCallModalProps> = ({
         <button
           onClick={onLeave}
           title="Rời cuộc gọi"
-          className="w-16 h-16 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-all active:scale-90 shadow-lg shadow-red-500/40"
+          className="w-16 h-16 rounded-full bg-[#FF3B30] text-white flex items-center justify-center hover:bg-[#E03328] transition-all active:scale-90 shadow-lg shadow-[#FF3B30]/40 border border-white/10"
         >
-          <PhoneOff size={26} />
+          <Phone size={28} className="fill-white rotate-[135deg] transform-gpu" />
         </button>
       </div>
     </div>
@@ -249,10 +249,11 @@ interface UseGroupCallOptions {
   currentUserId: string
   currentUserName: string
   currentUserAvatar?: string
-  userMap?: Record<string, any>
+  userMap?: Record<string, { displayName?: string; name?: string; avatarUrl?: string }>
   conversations?: ConversationSummary[]
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useGroupCall({
   socket,
   currentUserId,
@@ -279,11 +280,30 @@ export function useGroupCall({
   useEffect(() => {
     if (!socket) return
 
-    const onGroupCallStarted = (payload: any) => {
+    const onGroupCallStarted = (payload: {
+      callerUserId?: string;
+      senderUserId?: string;
+      userId?: string;
+      callerName?: string;
+      displayName?: string;
+      name?: string;
+      fullName?: string;
+      full_name?: string;
+      conversationId?: string;
+      groupId?: string;
+      conversationName?: string;
+      groupName?: string;
+      callId: string;
+      groupAvatar?: string;
+      conversationAvatar?: string;
+      callerAvatar?: string;
+      avatarUrl?: string;
+      audioOnly?: boolean;
+    }) => {
       // Normalize payload fields (mobile might use different keys)
-      const callerUserId = payload.callerUserId || payload.senderUserId || payload.userId
+      const callerUserId = payload.callerUserId || payload.senderUserId || payload.userId || ''
       
-      const isId = (s: any) => typeof s === 'string' && s.length > 20 && /^[0-9a-fA-F-]/.test(s)
+      const isId = (s: string | undefined | null) => typeof s === 'string' && s.length > 20 && /^[0-9a-fA-F-]/.test(s)
       let callerName = payload.callerName || payload.displayName || payload.name || payload.fullName || payload.full_name
       if (!callerName || isId(callerName)) {
         callerName = resolveName(callerUserId) || callerName || 'Người dùng'
@@ -335,7 +355,7 @@ export function useGroupCall({
     }
 
     // Nếu nhận được user-joined mà ID là chính mình => mình đã bắt máy ở máy khác (mobile)
-    const onUserJoined = (payload: any) => {
+    const onUserJoined = (payload: { senderUserId?: string; userId?: string; uid?: string }) => {
       const joinedUserId = payload.senderUserId || payload.userId || payload.uid
       console.log('[useGroupCall] 👤 User joined event received:', { joinedUserId, currentUserId })
       if (joinedUserId && String(joinedUserId) === String(currentUserId)) {
@@ -345,7 +365,7 @@ export function useGroupCall({
     }
 
     // Tương tự cho user-left (nếu mình từ chối ở máy khác)
-    const onUserLeft = (payload: any) => {
+    const onUserLeft = (payload: { senderUserId?: string; userId?: string; uid?: string }) => {
       const leftUserId = payload.senderUserId || payload.userId || payload.uid
       if (leftUserId && String(leftUserId) === String(currentUserId)) {
         console.log('[useGroupCall] 📱 You left/declined from another device, dismissing web banner')

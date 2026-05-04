@@ -1,5 +1,5 @@
 import React from 'react'
-import { ShieldCheck, Loader2, MicOff } from 'lucide-react'
+import { ShieldCheck, MicOff } from 'lucide-react'
 import { PremiumVideoTile, PremiumCallControls } from './PremiumCallUI'
 
 interface CallModalProps {
@@ -43,7 +43,7 @@ export const CallModal: React.FC<CallModalProps> = ({
   const [seconds, setSeconds] = React.useState(0)
 
   React.useEffect(() => {
-    let interval: any
+    let interval: ReturnType<typeof setInterval> | undefined
     if (status === 'connected') {
       interval = setInterval(() => setSeconds((prev) => prev + 1), 1000)
     } else {
@@ -63,30 +63,34 @@ export const CallModal: React.FC<CallModalProps> = ({
   const isConnecting = status === 'connecting'
   const isConnected = status === 'connected'
   const isFailed = status === 'failed'
-  const showLocalVideo = (type === 'video' || isCameraOn) && !isFailed
-  const showLocalPiP = isConnected && showLocalVideo && localStream
+  
+  // Show local PiP only if it's a video call AND we are connected
+  const showLocalPiP = isConnected && type === 'video' && localStream
 
   return (
     <div className="fixed inset-0 z-[500] bg-black flex flex-col overflow-hidden select-none">
-      {/* ── REMOTE CONTENT (full screen) ── */}
+      {/* ── REMOTE CONTENT (full screen focus) ── */}
       <div className="relative flex-1 w-full h-full flex items-center justify-center">
-        {/* PremiumVideoTile handles both video AND avatar background automatically.
-            Pass remoteStream: it shows video when stream+camera is on, blurred avatar otherwise. */}
+        {/* 
+            PremiumVideoTile for Peer: 
+            In Voice Call: Shows peer's blurred avatar background + central avatar.
+            In Video Call: Shows peer's video stream.
+        */}
         <PremiumVideoTile
           stream={isConnected ? (remoteStream || null) : null}
           displayName={peerName}
           avatarUrl={peerAvatar || undefined}
-          isCameraOn={isConnected ? isRemoteCameraOn : false}
+          isCameraOn={isConnected ? isRemoteCameraOn : (type === 'video')}
           isMicOn={true}
           statusText={isConnecting ? 'Đang đổ chuông...' : isFailed ? 'Cuộc gọi thất bại' : undefined}
           size="full"
         />
 
-        {/* ── LOCAL VIDEO PIP (top-right, 16:9, shown only when connected) ── */}
+        {/* ── LOCAL VIDEO PIP (top-right, only for video calls) ── */}
         {showLocalPiP && (
           <div
-            className="absolute top-4 right-4 z-40 rounded-2xl overflow-hidden border border-white/15 shadow-2xl"
-            style={{ width: 120, height: 67.5 }}
+            className="absolute top-6 right-6 z-40 rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-black"
+            style={{ width: 140, height: 210 }} // Vertical PiP for modern feel
           >
             <PremiumVideoTile
               stream={localStream || null}
@@ -97,69 +101,52 @@ export const CallModal: React.FC<CallModalProps> = ({
               isLocal={true}
               size="full"
             />
-            {/* Mic muted badge */}
             {!isMicOn && (
-              <div className="absolute bottom-1.5 left-1.5 w-5 h-5 rounded-full bg-[#FF3B30] flex items-center justify-center shadow-lg z-50">
-                <MicOff size={10} className="text-white" />
+              <div className="absolute bottom-2 left-2 w-6 h-6 rounded-full bg-[#FF3B30] flex items-center justify-center shadow-lg z-50">
+                <MicOff size={12} className="text-white" />
               </div>
             )}
           </div>
         )}
 
-        {/* ── TOP STATUS BAR ── */}
-        <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-center pt-5 pb-3">
-          <div className="flex flex-col items-center gap-0.5">
-            {isConnected ? (
-              <>
-                {/* Duration timer pill */}
-                <div className="bg-black/50 backdrop-blur-2xl px-5 py-1.5 rounded-full border border-white/[0.08] shadow-2xl">
-                  <span className="text-white font-mono text-[18px] font-semibold tracking-wider drop-shadow-lg">
-                    {formatTime(seconds)}
-                  </span>
-                </div>
-                {/* Encryption indicator */}
-                <div className="flex items-center gap-1 mt-0.5">
-                  <ShieldCheck size={11} className="text-white/40" />
-                  <span className="text-white/40 text-[10px] uppercase tracking-widest font-medium">
-                    Mã hóa đầu cuối
-                  </span>
-                </div>
-              </>
-            ) : isConnecting ? (
-              <div className="flex items-center gap-2">
-                <Loader2 size={14} className="text-white/50 animate-spin" />
-                <span className="text-white/50 text-xs uppercase tracking-widest font-medium">
-                  Đang kết nối...
+        {/* ── TOP OVERLAY (Timer & Encryption) ── */}
+        <div className="absolute top-0 left-0 right-0 z-30 flex flex-col items-center pt-8">
+          {isConnected && (
+            <div className="flex flex-col items-center gap-1">
+              <div className="bg-black/20 backdrop-blur-md px-4 py-1 rounded-full border border-white/5">
+                <span className="text-white font-mono text-lg font-medium tracking-tight">
+                  {formatTime(seconds)}
                 </span>
               </div>
-            ) : null}
-          </div>
+              <div className="flex items-center gap-1 opacity-40">
+                <ShieldCheck size={10} className="text-white" />
+                <span className="text-white text-[9px] uppercase tracking-widest font-bold">
+                  Mã hóa đầu cuối
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* ── ERROR BANNER ── */}
+        {/* ── ERROR OVERLAY ── */}
         {error && (
-          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 bg-[#FF3B30]/95 backdrop-blur-xl px-6 py-3 rounded-2xl text-white text-sm font-semibold border border-white/10 shadow-2xl max-w-xs text-center">
+          <div className="absolute top-24 left-1/2 -translate-x-1/2 z-40 bg-[#FF3B30]/90 backdrop-blur-xl px-6 py-3 rounded-2xl text-white text-sm font-semibold shadow-2xl border border-white/10">
             {error}
           </div>
         )}
       </div>
 
-      {/* ── GLASSMORPHISM DOCKED BOTTOM BAR ── */}
-      <div className="relative z-50 px-4 pb-6 pt-2">
-        {/* Backdrop gradient */}
-        <div className="absolute inset-0 -mt-4 bg-gradient-to-t from-black/90 via-black/40 to-transparent pointer-events-none rounded-t-3xl" />
-
-        <div className="relative">
-          <PremiumCallControls
-            isMicOn={isMicOn}
-            isCameraOn={isCameraOn}
-            isAudioOnly={type === 'audio'}
-            onToggleMic={onToggleMic || (() => {})}
-            onToggleCamera={onToggleCamera || (() => {})}
-            onEnd={onEnd}
-            onMinimize={onMinimize}
-          />
-        </div>
+      {/* ── CONTROL BAR ── */}
+      <div className="relative z-50 px-6 pb-8 pt-4 bg-gradient-to-t from-black/80 to-transparent">
+        <PremiumCallControls
+          isMicOn={isMicOn}
+          isCameraOn={isCameraOn}
+          isAudioOnly={type === 'audio'}
+          onToggleMic={onToggleMic || (() => {})}
+          onToggleCamera={onToggleCamera || (() => {})}
+          onEnd={onEnd}
+          onMinimize={onMinimize}
+        />
       </div>
     </div>
   )

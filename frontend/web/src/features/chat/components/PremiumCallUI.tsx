@@ -1,6 +1,6 @@
 import React from 'react'
 import {
-  Mic, MicOff, Video, VideoOff, PhoneOff,
+  Mic, MicOff, Video, VideoOff,
   Maximize2, Minimize2,
   Phone, Settings, ChevronUp, ShieldCheck
 } from 'lucide-react'
@@ -33,6 +33,8 @@ export const PremiumVideoTile: React.FC<PremiumVideoTileProps> = ({
   size = 'md',
   statusText
 }) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _unused = { isSpeaking, size }; // Keep for future expansion in multi-tile grids
   const videoRef = React.useRef<HTMLVideoElement>(null)
   const resolvedAvatar = avatarUrl ? resolveMediaUrl(avatarUrl) : null
 
@@ -178,12 +180,10 @@ interface PremiumCallControlsProps {
   isMicOn: boolean
   isCameraOn: boolean
   isAudioOnly?: boolean
-  isMinimized?: boolean
   onToggleMic: () => void
   onToggleCamera: () => void
   onEnd: () => void
   onMinimize?: () => void
-  onMaximize?: () => void
 }
 
 // Standard 44px touch target (Apple HIG / Zalo standard)
@@ -194,12 +194,10 @@ export const PremiumCallControls: React.FC<PremiumCallControlsProps> = ({
   isMicOn,
   isCameraOn,
   isAudioOnly = false,
-  isMinimized = false,
   onToggleMic,
   onToggleCamera,
   onEnd,
-  onMinimize,
-  onMaximize
+  onMinimize
 }) => {
   const isOff = (on: boolean) => !on
 
@@ -238,10 +236,11 @@ export const PremiumCallControls: React.FC<PremiumCallControlsProps> = ({
         <button
           onClick={onEnd}
           title="Kết thúc"
-          className="rounded-full bg-[#FF3B30] hover:bg-[#E03328] active:scale-90 flex items-center justify-center shadow-[0_0_30px_rgba(255,59,48,0.4)] border border-white/10 transition-all"
+          className="rounded-full bg-[#FF3B30] hover:bg-[#E03328] active:scale-90 flex items-center justify-center shadow-[0_0_30px_rgba(255,59,48,0.4)] border border-white/10 transition-all group"
           style={{ width: END_CALL_SIZE, height: END_CALL_SIZE }}
         >
-          <PhoneOff size={22} className="text-white" />
+          {/* Rotate Phone icon to look like a hangup handset, no slash as requested */}
+          <Phone size={24} className="text-white fill-white rotate-[135deg] transform-gpu" />
         </button>
 
         {/* Mic Toggle */}
@@ -320,7 +319,7 @@ export const IncomingCallBanner: React.FC<IncomingCallBannerProps> = ({
   // ── SOUND: Play a ringtone using Web Audio API (no audio files needed) ──
   React.useEffect(() => {
     let audioCtx: AudioContext | null = null
-    let oscillator: OscillatorNode | null = null
+    const oscillator: OscillatorNode | null = null
     let gainNode: GainNode | null = null
     let interval: ReturnType<typeof setInterval>
 
@@ -330,7 +329,7 @@ export const IncomingCallBanner: React.FC<IncomingCallBannerProps> = ({
       const RING_FREQ_HIGH = 440  // A4
       const RING_FREQ_LOW  = 523  // C5
 
-      audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
+      audioCtx = new (window.AudioContext || (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)() as AudioContext
       gainNode = audioCtx.createGain()
       gainNode.gain.setValueAtTime(0, audioCtx.currentTime)
       gainNode.connect(audioCtx.destination)
@@ -360,14 +359,14 @@ export const IncomingCallBanner: React.FC<IncomingCallBannerProps> = ({
       if ('vibrate' in navigator) {
         navigator.vibrate([200, 100, 200, 100, 200])
       }
-    } catch (e) {
+    } catch {
       // Audio not supported — silent fallback
     }
 
     return () => {
       clearInterval(interval)
-      try { oscillator?.stop(); } catch (_) {}
-      try { audioCtx?.close(); } catch (_) {}
+      try { oscillator?.stop(); } catch { /* ignore */ }
+      try { audioCtx?.close(); } catch { /* ignore */ }
     }
   }, [])
 
