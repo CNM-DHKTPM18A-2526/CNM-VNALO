@@ -2729,28 +2729,35 @@ export default function ChatPage() {
     const signalData = typeof data === 'object' ? data : { reason: data };
     const reason = signalData.reason || 'hangup';
 
+    console.log('[CALL_LOG] handleEndCall triggered:', { 
+      reason, 
+      signalDataCallId: signalData.callId,
+      signalDataConvId: signalData.conversationId || signalData.roomId,
+      stateCallId: callStateRef.current.callId 
+    });
+
     // BUG FIX: Extract all fields from signalData FIRST (popup-passed data),
     // then fall back to callStateRef (which may be stale after popup took over).
     // The popup owns the call lifecycle once it opens, so its signalData is authoritative.
     const fromSignal = {
-      callId: signalData.callId ?? signalData.callId,
-      conversationId: signalData.conversationId ?? signalData.roomId,
-      direction: signalData.direction ?? callStateRef.current.direction,
-      type: signalData.type ?? callStateRef.current.type,
-      startedAt: signalData.startedAt ?? callStateRef.current.startedAt,
-      peerId: signalData.senderUserId ?? signalData.targetUserId
-                ?? callStateRef.current.peerId
-                ?? selectedConversation?.userId,
+      callId: signalData.callId || signalData.callId,
+      conversationId: signalData.conversationId || signalData.roomId,
+      direction: signalData.direction || callStateRef.current.direction,
+      type: signalData.type || callStateRef.current.type,
+      startedAt: signalData.startedAt || callStateRef.current.startedAt,
+      peerId: signalData.senderUserId || signalData.targetUserId
+                || callStateRef.current.peerId
+                || selectedConversation?.userId,
     };
 
     // Use callStateRef as secondary source only when signalData doesn't provide it
     const currentCall = callStateRef.current;
-    const callId    = fromSignal.callId    ?? currentCall.callId;
-    const targetConvId = fromSignal.conversationId ?? currentCall.conversationId;
-    const direction  = fromSignal.direction  ?? currentCall.direction;
-    const type       = fromSignal.type       ?? currentCall.type;
-    const startedAt  = fromSignal.startedAt  ?? currentCall.startedAt;
-    const peerId     = fromSignal.peerId     ?? currentCall.peerId;
+    const callId    = fromSignal.callId    || currentCall.callId;
+    const targetConvId = fromSignal.conversationId || currentCall.conversationId;
+    const direction  = fromSignal.direction  || currentCall.direction;
+    const type       = fromSignal.type       || currentCall.type;
+    const startedAt  = fromSignal.startedAt  || currentCall.startedAt;
+    const peerId     = fromSignal.peerId     || currentCall.peerId;
 
     // FIX: Deduplicate call.end events using callId as key.
   // Popup sends call.end directly -> caller processes -> server relays to callee.
@@ -3122,7 +3129,19 @@ export default function ChatPage() {
     };
   }, [getSocket, currentUserId]);
 
-
+  // ------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  // POPUP COMMUNICATION (Receive signals from CallPage popup)
+  // ------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'call.end') {
+        console.log('[ChatPage] Received call.end from popup', event.data.data);
+        handleEndCall(event.data.data);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [handleEndCall]);
 
   // Sync effect: Fetch profile for all group members when a conversation is opened
   useEffect(() => {

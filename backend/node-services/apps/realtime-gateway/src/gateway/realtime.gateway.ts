@@ -488,6 +488,7 @@ export class RealtimeGateway
       return;
     }
     this.emitToUser(data.targetUserId, 'call.end', data);
+    this.emitToUser(data.senderUserId, 'call.end', data);
   }
 
   // Colon notation (web client also emits these)
@@ -529,5 +530,6 @@ export class RealtimeGateway
       return;
     }
     this.emitToUser(data.targetUserId, 'call.end', data);
+    this.emitToUser(data.senderUserId, 'call.end', data);
   }
 }

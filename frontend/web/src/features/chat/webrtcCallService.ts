@@ -489,6 +489,11 @@ export class WebRtcCallService {
       }
       this.socket.emit('call.end', endPayload)
       this.socket.emit('call:end', endPayload)
+
+      // Notify opener (ChatPage) to create call log
+      if (window.opener) {
+        window.opener.postMessage({ type: 'call.end', data: endPayload }, window.location.origin)
+      }
     }
 
     // Cleanup tracks
