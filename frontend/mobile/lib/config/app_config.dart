@@ -138,10 +138,17 @@ class AppConfig {
       }
     }
 
-    return uri
+    var finalUrl = uri
         .replace(path: normalizedPath)
         .toString()
         .replaceAll(RegExp(r'/+$'), '');
+        
+    // Force HTTPS for production domain
+    if (finalUrl.contains('vnalo.fit') && finalUrl.startsWith('http://')) {
+      finalUrl = finalUrl.replaceFirst('http://', 'https://');
+    }
+    
+    return finalUrl;
   }
 
 
@@ -156,7 +163,18 @@ class AppConfig {
       return trimmed;
     }
 
-    return uri.replace(path: '').toString().replaceAll(RegExp(r'/+$'), '');
+    var finalUrl = uri.replace(path: '').toString().replaceAll(RegExp(r'/+$'), '');
+
+    // Force HTTPS/WSS for production domain
+    if (finalUrl.contains('vnalo.fit')) {
+      if (finalUrl.startsWith('http://')) {
+        finalUrl = finalUrl.replaceFirst('http://', 'https://');
+      } else if (finalUrl.startsWith('ws://')) {
+        finalUrl = finalUrl.replaceFirst('ws://', 'wss://');
+      }
+    }
+
+    return finalUrl;
   }
 
   /// Returns FirebaseOptions built from .env or --dart-define values.
