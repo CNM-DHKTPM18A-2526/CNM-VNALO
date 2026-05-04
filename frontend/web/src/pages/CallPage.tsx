@@ -66,16 +66,40 @@ const CallPage: React.FC = () => {
     }
   }, [accessToken])
 
-  // 2. Setup Call Service
+  // 2. Setup Call Services immediately to handle media ASAP
+  const callServiceRef = useRef<WebRtcCallService | null>(null)
+  const groupServiceRef = useRef<WebRtcGroupCallService | null>(null)
+
+  if (!callServiceRef.current) {
+    callServiceRef.current = new WebRtcCallService((state) => {
+      setCallState(state)
+      // Only close automatically on explicit hangup/completion, not initialization errors
+      if (state.isEnded && !state.error) window.close()
+    })
+  }
+  
+  if (!groupServiceRef.current) {
+    groupServiceRef.current = new WebRtcGroupCallService((s) => {
+      setGroupSnapshot(s)
+      if (s.isEnded) window.close()
+    })
+  }
+
+  const service = callServiceRef.current
+  const groupService = groupServiceRef.current
+
+  // Pre-request media ASAP (Concurrent with auth/socket load)
+  useEffect(() => {
+    if (type === 'direct') {
+      console.log('[CallPage] Pre-requesting local media...');
+      void service.openLocalMedia();
+    }
+  }, [type, audioOnly]);
+
   useEffect(() => {
     if (!socket || !user || !callId || !conversationId) return
 
     if (type === 'direct' && peerId) {
-      const service = new WebRtcCallService((state) => {
-        setCallState(state)
-        if (state.isEnded) window.close()
-      })
-      callServiceRef.current = service
 
       const initialSdpStr = (() => {
         // FIX BUG #12: Try sessionStorage first

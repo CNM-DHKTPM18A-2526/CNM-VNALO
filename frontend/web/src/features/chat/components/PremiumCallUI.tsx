@@ -2,7 +2,7 @@ import React from 'react'
 import {
   Mic, MicOff, Video, VideoOff,
   Maximize2, Minimize2,
-  Phone, Settings, ChevronUp, ShieldCheck
+  Phone, PhoneOff, Settings, ChevronUp, ShieldCheck
 } from 'lucide-react'
 import { resolveMediaUrl } from '../../../utils/mediaUtils'
 
@@ -80,9 +80,9 @@ export const PremiumVideoTile: React.FC<PremiumVideoTileProps> = ({
         />
       )}
 
-      {/* ── AVATAR + NAME OVERLAY (Visible when camera is off OR stream unavailable, unless hidden) ── */}
-      {(!isCameraOn || !stream) && !hideCentralIdentity && (
-        <div className="relative z-20 flex flex-col items-center justify-center animate-in fade-in zoom-in duration-500">
+      {/* ── AVATAR + NAME OVERLAY (Visible when camera is off OR stream unavailable) ── */}
+      {(!isCameraOn || !stream) && (
+        <div className={`relative z-20 flex flex-col items-center justify-center animate-in fade-in zoom-in duration-500 ${hideCentralIdentity && stream ? 'hidden' : ''}`}>
           {/* Zalo-style concentric pulse rings */}
           <div className="relative mb-6">
             <div
