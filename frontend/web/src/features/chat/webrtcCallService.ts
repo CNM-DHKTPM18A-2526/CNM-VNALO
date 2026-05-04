@@ -156,8 +156,6 @@ export class WebRtcCallService {
 
         this.socket.emit('call:ice-candidate', payload)
         this.socket.emit('call.ice-candidate', payload)
-        this.socket.emit('call.signal', { ...payload, type: 'ice-candidate' })
-        this.socket.emit('call:signal', { ...payload, type: 'ice-candidate' })
       }
     }
 
@@ -225,7 +223,8 @@ export class WebRtcCallService {
     }
   }
 
-  private async openLocalMedia() {
+  public async openLocalMedia() {
+    if (this.state.localStream) return this.state.localStream;
     try {
       const constraints = {
         audio: {
@@ -233,15 +232,16 @@ export class WebRtcCallService {
           noiseSuppression: true,
           autoGainControl: true,
         },
-        video: this.audioOnly ? false : { facingMode: 'user', width: 1280, height: 720 },
+        video: this.audioOnly ? false : { 
+          facingMode: 'user', 
+          width: { ideal: 1280 }, 
+          height: { ideal: 720 } 
+        },
       }
 
       console.log('[WebRTC] Requesting media:', constraints)
 
-      // ── INSECURE ORIGIN HANDLING ─────────────────────────────────────
-      // getUserMedia requires HTTPS in production. On localhost or http:// IP,
-      // Chrome will throw NotAllowedError. Detect early and surface a clear
-      // user-friendly message instead of a cryptic error.
+      // ── ORIGIN & BROWSER CAPABILITY CHECK ──────────────────────────
       const isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1'
       if (!isSecure) {
         const msg = 'Vui lòng sử dụng HTTPS để truy cập micro và camera. Ví dụ: https://' + location.hostname
@@ -250,9 +250,15 @@ export class WebRtcCallService {
         throw new Error(msg)
       }
 
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        const msg = 'Trình duyệt của bạn không hỗ trợ truy cập Camera/Microphone hoặc tính năng này đã bị chặn.'
+        this.updateState({ error: msg })
+        throw new Error(msg)
+      }
+
       const mediaPromise = navigator.mediaDevices.getUserMedia(constraints)
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Media request timed out (10s)')), 10000)
+        setTimeout(() => reject(new Error('Yêu cầu quyền truy cập Media bị quá hạn (30s). Vui lòng nhấn "Allow" khi trình duyệt hỏi.')), 30000)
       )
 
       const stream = await Promise.race([mediaPromise, timeoutPromise])
@@ -308,16 +314,6 @@ export class WebRtcCallService {
       this.socket.emit('call:offer', offerPayload)
       this.socket.emit('call.offer', offerPayload)
 
-      const signalPayload = {
-        ...offerPayload,
-        type: 'offer',
-        data: offerPayload,
-        offer: offerPayload,
-        sdp: offerPayload.sdp
-      }
-
-      this.socket.emit('call.signal', signalPayload)
-      this.socket.emit('call:signal', signalPayload)
     }
   }
 
@@ -358,16 +354,6 @@ export class WebRtcCallService {
         this.socket.emit('call:answer', answerPayload)
         this.socket.emit('call.answer', answerPayload)
 
-        const signalPayload = {
-          ...answerPayload,
-          type: 'answer',
-          data: answerPayload,
-          answer: answerPayload,
-          sdp: answerPayload.sdp
-        }
-
-        this.socket.emit('call.signal', signalPayload)
-        this.socket.emit('call:signal', signalPayload)
       }
     } catch (error) {
       console.error('[WebRTC] Failed to accept call', error)
@@ -425,7 +411,7 @@ export class WebRtcCallService {
       // FIX BUG #10: Deduplicate ICE candidates to prevent network replay attacks
       // and avoid double-adding when the same candidate arrives via multiple event names.
       // Use sdpMid + sdpMLineIndex as the unique key.
-      const candidateKey = `${candidate.sdpMid ?? ''}:${candidate.sdpMLineIndex ?? -1}:${candidate.credential ?? ''}`;
+      const candidateKey = `${candidate.sdpMid ?? ''}:${candidate.sdpMLineIndex ?? -1}:${candidate.candidate}`;
       if (this.processedIceCandidates.has(candidateKey)) {
         console.log('[WebRTC] Skipping duplicate ICE candidate:', candidateKey);
         return;

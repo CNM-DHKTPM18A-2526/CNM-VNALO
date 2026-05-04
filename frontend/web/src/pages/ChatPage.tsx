@@ -2765,7 +2765,7 @@ export default function ChatPage() {
     console.log('[CALL_LOG] Skipping duplicate call.end event', dedupKey);
     return;
   }
-  processedCallEndsRef.current.add(callEndKey);
+  processedCallEndsRef.current.add(dedupKey);
   // Clean up old entries to prevent memory leak (keep last 50)
   if (processedCallEndsRef.current.size > 50) {
     const entries = Array.from(processedCallEndsRef.current);
@@ -2803,7 +2803,7 @@ export default function ChatPage() {
   // The most reliable way: if direction='outgoing', callerId=currentUserId.
   // If direction='incoming', callerId=peerUserId.
   // peerUserId is the other party in the conversation.
-  const thePeerUserId = peerUserId || selectedConversation?.userId || targetConvId;
+  const thePeerUserId = peerId || selectedConversation?.userId || targetConvId;
   const theCallerId = finalDirection === 'outgoing' ? currentUserId : thePeerUserId;
   const theCalleeId = finalDirection === 'outgoing' ? thePeerUserId : currentUserId;
 
@@ -2870,10 +2870,9 @@ export default function ChatPage() {
     senderId: isThisUserTheCaller ? currentUserId : thePeerUserId,
     type: 'call',
     text: logText,
-    textType: 'call',
     timestamp: formatMessageTimestamp(),
     createdAt: new Date().toISOString(),
-    deliveryState: isThisUserTheCaller ? 'sending' : 'received',
+    deliveryState: isThisUserTheCaller ? 'sending' : 'sent',
   };
 
   console.log('[CALL_LOG] Adding optimistic message to UI', optimisticLog.id, 'sender:', optimisticLog.sender);
@@ -3109,21 +3108,6 @@ export default function ChatPage() {
     socket.on('call.ice-candidate', onIce);
     socket.on('call.end', onEnd);
 
-    // Generic signal (fallback)
-    const onGenericSignal = (data: any) => {
-      // Robust unwrapping: check for direct payload or nested 'data', 'offer', 'answer', 'candidate' keys
-      const signalData = data.data || data.offer || data.answer || data.candidate || (Array.isArray(data) ? data[0] : data);
-      const type = data.type || signalData?.type;
-
-      console.log('[CALL][RECEIVE GENERIC SIGNAL]', { type, signalData });
-
-      if (type === 'offer') signalHandlersRef.current.handleCallOffer(signalData);
-      else if (type === 'answer') signalHandlersRef.current.handleCallAnswer(signalData);
-      else if (type === 'ice-candidate') signalHandlersRef.current.handleCallIce(signalData);
-      else if (type === 'end') signalHandlersRef.current.handleCallEnd(signalData);
-    };
-    socket.on('call:signal', onGenericSignal);
-    socket.on('call.signal', onGenericSignal);
 
     return () => {
       console.log('[ChatPage.signaling] Cleaning up listeners');
@@ -3135,8 +3119,6 @@ export default function ChatPage() {
       socket.off('call.answer', onAnswer);
       socket.off('call.ice-candidate', onIce);
       socket.off('call.end', onEnd);
-      socket.off('call:signal', onGenericSignal);
-      socket.off('call.signal', onGenericSignal);
     };
   }, [getSocket, currentUserId]);
 

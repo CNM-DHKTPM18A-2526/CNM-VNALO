@@ -36,24 +36,33 @@ export function extractMessage(payload: unknown): string | null {
 // ──────────────────────────────────────────────────────────────────────────────
 const FALLBACK_HOST = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (
+const forceHttps = (url: string) => {
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:' && url.startsWith('http://')) {
+    if (url.includes('vnalo.fit') || url.includes('localhost') || url.includes('127.0.0.1')) {
+      return url.replace('http://', 'https://');
+    }
+  }
+  return url;
+};
+
+export const API_BASE_URL = forceHttps(import.meta.env.VITE_API_BASE_URL ?? (
   typeof window !== 'undefined'
     ? `${window.location.origin}/api/v1`
     : `http://${FALLBACK_HOST}/api/v1`
-);
+));
 
 if (typeof window !== 'undefined') {
   // Store the root origin (without /api/v1) for media resolution
   (window as any).__VNALO_API_ROOT__ = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
 }
 
-export const MESSAGE_API_URL = import.meta.env.VITE_MESSAGE_API_URL ?? API_BASE_URL;
+export const MESSAGE_API_URL = forceHttps(import.meta.env.VITE_MESSAGE_API_URL ?? API_BASE_URL);
 
-const rawMediaUrl = import.meta.env.VITE_MEDIA_API_URL ?? (
+const rawMediaUrl = forceHttps(import.meta.env.VITE_MEDIA_API_URL ?? (
   typeof window !== 'undefined'
     ? `${window.location.origin}/api/v1/media`
     : `http://${FALLBACK_HOST}/api/v1/media`
-);
+));
 
 // Robust normalization for Media API URL
 const normalizeMediaUrl = (url: string) => {

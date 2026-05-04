@@ -13,6 +13,7 @@ import { formatMessage, formatMessageContent } from '../utils/messageUtils'
 import { useUserStore } from '../context/UserStoreContext'
 import { CallLogBubble } from './CallLogBubble'
 import { PollBubble } from './PollBubble'
+import { resolveMediaUrl } from '../../../utils/mediaUtils'
 
 function getMessageMediaUrl(message: ChatMessage): string | null {
   return message.mediaUrl ?? message.attachments?.[0]?.url ?? null
@@ -51,10 +52,10 @@ function resolveStickerSrc(message: ChatMessage): string | null {
   if (mediaSrc?.startsWith('sticker://')) {
     const stickerId = decodeURIComponent(mediaSrc.slice('sticker://'.length))
     const sticker = DEFAULT_CHAT_STICKERS.find((item) => item.id === stickerId)
-    return sticker?.url ?? null
+    return sticker?.url ? resolveMediaUrl(sticker.url) : null
   }
 
-  return mediaSrc
+  return resolveMediaUrl(mediaSrc)
 }
 
 type MessageBubbleProps = {
@@ -671,7 +672,7 @@ export function MessageBubble({
                     aria-label={`Xem ảnh ${idx + 1}`}
                   >
                     <img
-                      src={att.url}
+                      src={resolveMediaUrl(att.url)}
                       alt='chat-image'
                       className='chat-image object-cover w-full h-full'
                       loading='eager'
@@ -720,7 +721,7 @@ export function MessageBubble({
                   <a
                     key={(att.url + idx) || originalMessageId}
                     className='message-file-card'
-                    href={att.url}
+                    href={resolveMediaUrl(att.url)}
                     target='_blank'
                     rel='noreferrer'
                   >

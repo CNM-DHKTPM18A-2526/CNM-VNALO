@@ -19,6 +19,12 @@ async function bootstrap() {
   // Global prefix for REST endpoints
   app.setGlobalPrefix('api/v1');
 
+  // Trust proxy for HTTPS detection behind Nginx
+  const expressApp = app.getHttpAdapter().getInstance();
+  if (typeof expressApp.set === 'function') {
+    expressApp.set('trust proxy', 1);
+  }
+
   // Enable CORS for mobile app
   app.enableCors({
     origin: allowedOrigins,

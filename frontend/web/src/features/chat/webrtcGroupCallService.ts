@@ -288,10 +288,16 @@ export class WebRtcGroupCallService {
 
   // ─── LOCAL MEDIA ─────────────────────────────────────────────────
 
-  private async openLocalMedia() {
+  public async openLocalMedia() {
+    if (this.state.localStream) return this.state.localStream
+
     const constraints = {
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-      video: this.state.audioOnly ? false : { facingMode: 'user', width: 1280, height: 720 },
+      video: this.state.audioOnly ? false : { 
+        facingMode: 'user', 
+        width: { ideal: 1280 }, 
+        height: { ideal: 720 } 
+      },
     }
     const isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1'
     if (!isSecure) {
@@ -300,12 +306,30 @@ export class WebRtcGroupCallService {
       throw new Error(msg)
     }
 
-    const stream = await navigator.mediaDevices.getUserMedia(constraints)
-    this.updateState({ localStream: stream })
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      const msg = 'Trình duyệt không hỗ trợ Camera/Microphone hoặc đã bị chặn.'
+      this.updateState({ error: msg })
+      throw new Error(msg)
+    }
 
-    this.localAnalyser = createSpeakerAnalyser(stream, () => {
-      // local speaking indicator placeholder
-    })
+    try {
+      const mediaPromise = navigator.mediaDevices.getUserMedia(constraints)
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Yêu cầu quyền Media bị quá hạn (30s).')), 30000)
+      )
+
+      const stream = await Promise.race([mediaPromise, timeoutPromise])
+      this.updateState({ localStream: stream })
+
+      this.localAnalyser = createSpeakerAnalyser(stream, () => {
+        // local speaking indicator placeholder
+      })
+      return stream
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err)
+      this.updateState({ error: `Lỗi Camera/Micro: ${errorMsg}` })
+      throw err
+    }
   }
 
   // ─── SOCKET LISTENERS ────────────────────────────────────────────
@@ -320,20 +344,44 @@ export class WebRtcGroupCallService {
     this.socket.off('group-call:user-left')
 
     this.socket.on('group-call:user-joined', this.onUserJoined)
+    this.socket.on('group-call.user-joined', this.onUserJoined)
+    
     this.socket.on('group-call:offer', this.onRemoteOffer)
+    this.socket.on('group-call.offer', this.onRemoteOffer)
+    
     this.socket.on('group-call:answer', this.onRemoteAnswer)
+    this.socket.on('group-call.answer', this.onRemoteAnswer)
+    
     this.socket.on('group-call:ice-candidate', this.onRemoteIceCandidate)
-    this.socket.on('group-call:media-update', this.onMediaUpdate) // New dedicated event
+    this.socket.on('group-call.ice-candidate', this.onRemoteIceCandidate)
+    
+    this.socket.on('group-call:media-update', this.onMediaUpdate)
+    this.socket.on('group-call.media-update', this.onMediaUpdate)
+    
     this.socket.on('group-call:user-left', this.onUserLeft)
+    this.socket.on('group-call.user-left', this.onUserLeft)
   }
 
   private removeSocketListeners() {
     if (!this.socket) return
+    
     this.socket.off('group-call:user-joined', this.onUserJoined)
+    this.socket.off('group-call.user-joined', this.onUserJoined)
+    
     this.socket.off('group-call:offer', this.onRemoteOffer)
+    this.socket.off('group-call.offer', this.onRemoteOffer)
+    
     this.socket.off('group-call:answer', this.onRemoteAnswer)
+    this.socket.off('group-call.answer', this.onRemoteAnswer)
+    
     this.socket.off('group-call:ice-candidate', this.onRemoteIceCandidate)
+    this.socket.off('group-call.ice-candidate', this.onRemoteIceCandidate)
+    
+    this.socket.off('group-call:media-update', this.onMediaUpdate)
+    this.socket.off('group-call.media-update', this.onMediaUpdate)
+    
     this.socket.off('group-call:user-left', this.onUserLeft)
+    this.socket.off('group-call.user-left', this.onUserLeft)
   }
 
   /**
@@ -355,6 +403,8 @@ export class WebRtcGroupCallService {
     audioOnly?: boolean;
   }) => {
     const senderUserId = payload.senderUserId || payload.userId
+    if (!senderUserId) return
+
     let displayName = payload.displayName || payload.name || payload.callerName
     let avatarUrl = payload.avatarUrl || payload.callerAvatar
     const callId = payload.callId
@@ -374,8 +424,8 @@ export class WebRtcGroupCallService {
     console.log('[GroupCall] 👤 New peer joined (resolved):', { senderUserId, displayName })
     await this.createPeerAndOffer({
       userId: senderUserId,
-      displayName: displayName,
-      avatarUrl: avatarUrl,
+      displayName: displayName || 'Người dùng',
+      avatarUrl: avatarUrl || '',
       isMicOn: payload.isMicOn ?? true,
       isCameraOn: payload.isCameraOn ?? !payload.audioOnly,
     })
@@ -419,7 +469,7 @@ export class WebRtcGroupCallService {
       this.createPeerState({
         userId: senderUserId,
         displayName: name || '',
-        avatarUrl: avatarUrl,
+        avatarUrl: avatarUrl || '',
         isMicOn: payload.isMicOn ?? true,
         isCameraOn: payload.isCameraOn ?? true,
       })
@@ -715,6 +765,7 @@ export class WebRtcGroupCallService {
     isCameraOn?: boolean;
   }) => {
     const senderUserId = payload.senderUserId || payload.userId || payload.uid
+    if (!senderUserId) return
     if (senderUserId === this.currentUserId) return
     
     const peer = this.state.peers.get(senderUserId)
