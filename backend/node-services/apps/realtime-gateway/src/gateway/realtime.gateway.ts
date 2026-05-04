@@ -530,3 +530,4 @@ export class RealtimeGateway
     }
     this.emitToUser(data.targetUserId, 'call.end', data);
   }
+}
