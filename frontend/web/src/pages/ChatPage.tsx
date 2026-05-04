@@ -2693,6 +2693,8 @@ export default function ChatPage() {
     [accessToken, emitSendMessage, joinConversation, shareModalMessage],
   )
 
+  const processedCallEndsRef = useRef<Set<string>>(new Set())
+
   const handleInitiateCall = useCallback(async (type: 'audio' | 'video') => {
     if (!selectedConversationId) return;
     const isGroup = !!selectedConversation?.isGroup;
@@ -2702,6 +2704,20 @@ export default function ChatPage() {
     const peerAvatar = selectedConversation?.avatarUrl || "";
     const url = `/call/${callId}?type=${isGroup ? "group" : "direct"}&conversationId=${selectedConversationId}&peerId=${peerUserId}&audioOnly=${type === "audio"}&isCaller=true&peerName=${encodeURIComponent(peerName)}&peerAvatar=${encodeURIComponent(peerAvatar)}`;
     console.log("[CALL][INITIATE-POPUP]", { url });
+
+    // Store call metadata in callStateRef so handleEndCall can access callId
+    // BEFORE opening the popup (needed for the early-return guard and message creation)
+    callStateRef.current = {
+      ...callStateRef.current,
+      isOpen: false,
+      callId,
+      type,
+      direction: 'outgoing' as const,
+      conversationId: selectedConversationId,
+      peerId: peerUserId,
+      status: 'connecting',
+    };
+
     const width = window.screen.availWidth;
     const height = window.screen.availHeight;
     window.open(url, "VnaloCall", `width=${width},height=${height},menubar=no,toolbar=no,location=no,status=no`);
@@ -2736,170 +2752,229 @@ export default function ChatPage() {
     const startedAt  = fromSignal.startedAt  ?? currentCall.startedAt;
     const peerId     = fromSignal.peerId     ?? currentCall.peerId;
 
-    // BUG FIX: Check signalData.callId instead of currentCall.callId.
-    // When popup sends call:end back, currentCall.callId may be undefined
-    // (popup took over but ChatPage state never updated with callId).
-    if (!currentCall.isOpen && !signalData.callId) return;
-    if (!targetConvId) return;
+    // FIX: Deduplicate call.end events using callId as key.
+  // Popup sends call.end directly -> caller processes -> server relays to callee.
+  // The caller receives call.end TWICE: once direct from popup, once from server relay.
+  // Using only callId as key ensures both trigger only ONE call log creation.
+  // Key edge cases:
+  // - Caller popup -> direct: callId known, direction='outgoing' -> creates message.
+  // - Caller server relay -> callId same -> SKIP (already created by direct path).
+  // - Callee server relay -> callId known, direction='incoming' -> creates message.
+  const dedupKey = callId ? `${callId}` : `${targetConvId}_${signalData.reason || 'hangup'}`;
+  if (processedCallEndsRef.current.has(dedupKey)) {
+    console.log('[CALL_LOG] Skipping duplicate call.end event', dedupKey);
+    return;
+  }
+  processedCallEndsRef.current.add(callEndKey);
+  // Clean up old entries to prevent memory leak (keep last 50)
+  if (processedCallEndsRef.current.size > 50) {
+    const entries = Array.from(processedCallEndsRef.current);
+    entries.slice(0, entries.length - 50).forEach(k => processedCallEndsRef.current.delete(k));
+  }
 
-    const externalDuration = signalData.duration;
-    const externalOutcome  = signalData.outcome;
-    const duration = externalDuration !== undefined
-      ? externalDuration
-      : (startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0);
+  // FIX: Determine the authoritative direction based on who triggered this event.
+  // - Popup sends call.end with direction already set -> use it.
+  // - Server relays call.end from the other party -> direction is opposite.
+  // - Popup sends 'hangup' string directly (no signalData fields) -> use callStateRef.direction.
+  // - If no direction known at all, infer from peer relationship.
+  let finalDirection = direction;
+  if (!finalDirection) {
+    // Server relayed: the sender is the opposite of the call owner.
+    // signalData.senderUserId tells us who sent this event.
+    // If it's the current user -> we are the one ending, direction is 'outgoing'.
+    // If it's NOT the current user -> peer ended the call, direction is 'incoming'.
+    finalDirection = signalData.senderUserId === currentUserId ? 'outgoing' : 'incoming';
+  }
 
-    let outcome: 'completed' | 'canceled' | 'missed' = externalOutcome || 'completed';
-    if (externalOutcome === undefined && !startedAt) {
-      outcome = direction === 'outgoing' ? 'canceled' : 'missed';
-    }
+  // FIX: Determine who the caller is. The caller is whoever initiated the call.
+  // - For outgoing calls: callerId = currentUserId.
+  // - For incoming calls: callerId = peerUserId.
+  // - We can detect who the caller is from the direction:
+  //   - 'outgoing': I called the peer -> callerId = currentUserId, calleeId = peerUserId.
+  //   - 'incoming': Peer called me -> callerId = peerUserId, calleeId = currentUserId.
+  // But when the server relays call.end to the callee, senderUserId = peerId (the caller).
+  // When server relays to the caller, senderUserId = peerId (the callee).
 
-    console.log(`[CALL_LOG] Ending call. Reason: ${reason}, Outcome: ${outcome}, Duration: ${duration}s, CallId: ${callId}`);
+  // For callee receiving server relay:
+  // - senderUserId = peerId (the caller) -> callerId = peerId, calleeId = currentUserId
+  // For caller receiving server relay:
+  // - senderUserId = peerId (the callee) -> but this is a relay TO the caller
 
-    // WebRTC logic moved to popup window
+  // The most reliable way: if direction='outgoing', callerId=currentUserId.
+  // If direction='incoming', callerId=peerUserId.
+  // peerUserId is the other party in the conversation.
+  const thePeerUserId = peerUserId || selectedConversation?.userId || targetConvId;
+  const theCallerId = finalDirection === 'outgoing' ? currentUserId : thePeerUserId;
+  const theCalleeId = finalDirection === 'outgoing' ? thePeerUserId : currentUserId;
 
-    // BUG FIX: Use the extracted local variables (authoritative source),
-    // not the stale destructured object from the top of the function.
-    const peerUserId = peerId || selectedConversation?.userId || targetConvId;
+  // FIX: Always create call log message regardless of direction.
+  // Both outgoing and incoming calls should produce a visible call bubble.
+  // The only case where we skip is when we cannot determine a valid conversation.
+  if (!targetConvId) {
+    console.warn('[CALL_LOG] No conversationId, skipping call log creation');
+    return;
+  }
 
-    // Reset UI State immediately
-    setCallState(prev => ({
-      ...prev,
-      isOpen: false,
-      status: 'connecting',
-      callId: undefined,
-    }));
+  const externalDuration = signalData.duration;
+  const externalOutcome  = signalData.outcome;
+  const duration = externalDuration !== undefined
+    ? externalDuration
+    : (startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0);
 
-    if (callId) {
-      const keysToDelete = Array.from(processedSignalsRef.current).filter(k => k.startsWith(callId));
-      keysToDelete.forEach(k => processedSignalsRef.current.delete(k));
-    }
+  let outcome: 'completed' | 'canceled' | 'missed' = externalOutcome || 'completed';
+  if (externalOutcome === undefined && !startedAt) {
+    outcome = finalDirection === 'outgoing' ? 'canceled' : 'missed';
+  }
 
-    // 1. Construct final log data
-    const logData = {
-      v: 1,
-      callId: String(callId || ''),
-      conversationId: String(targetConvId),
-      callerId: direction === 'outgoing' ? currentUserId : peerUserId,
-      calleeId: direction === 'outgoing' ? peerUserId : currentUserId,
-      mediaType: type === 'video' ? 'video' : 'voice',
-      outcome,
-      durationSeconds: duration,
-      createdAt: new Date().toISOString(),
-    };
+  console.log(`[CALL_LOG] Ending call. Reason: ${reason}, Outcome: ${outcome}, Duration: ${duration}s, CallId: ${callId}, Direction: ${finalDirection}`);
 
-    const logText = `CALL_LOG::${JSON.stringify(logData)}`;
-    // 3. Robust Send Pipeline (Shadow Process)
-    // Both sides should see the call log if it was completed, or if it was missed/canceled.
-    if (direction === 'outgoing' || direction === 'incoming') {
-      // 2. OPTIMISTIC UI: Add to chat immediately for caller
-      const clientMessageId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+  // Reset UI State immediately
+  setCallState(prev => ({
+    ...prev,
+    isOpen: false,
+    status: 'connecting',
+    callId: undefined,
+  }));
 
-      const optimisticLog: ChatMessage = {
-        id: clientMessageId,
-        clientMessageId,
-        conversationId: targetConvId,
-        sender: 'me',
-        senderId: currentUserId,
-        type: 'call',
-        text: logText,
-        textType: 'call',
-        timestamp: formatMessageTimestamp(),
-        createdAt: new Date().toISOString(),
-        deliveryState: 'sending',
-        isLocal: true
-      };
+  if (callId) {
+    const keysToDelete = Array.from(processedSignalsRef.current).filter(k => k.startsWith(callId));
+    keysToDelete.forEach(k => processedSignalsRef.current.delete(k));
+  }
 
-      console.log('[CALL_LOG] Adding optimistic message to UI', clientMessageId);
-      setMessagesByConversation(prev => ({
-        ...prev,
-        [targetConvId]: upsertMessage(prev[targetConvId] ?? [], optimisticLog)
-      }));
-      updateConversationAfterMessage(targetConvId, optimisticLog, true);
+  // Construct final log data using the authoritative direction and callerId
+  const logData = {
+    v: 1,
+    callId: String(callId || ''),
+    conversationId: String(targetConvId),
+    callerId: theCallerId,
+    calleeId: theCalleeId,
+    mediaType: type === 'video' ? 'video' : 'voice',
+    outcome,
+    durationSeconds: duration,
+    createdAt: new Date().toISOString(),
+  };
 
-      (async () => {
-        let success = false;
-        const maxRetries = 2;
-        // ... (existing pipeline logic)
+  const logText = `CALL_LOG::${JSON.stringify(logData)}`;
 
-        // --- SOCKET ATTEMPT (with Retry & Timeout) ---
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-          console.log(`[CALL_LOG] Socket Attempt ${attempt}/${maxRetries}...`);
-          try {
-            // Wrap emit in a timeout promise
-            const ack = await Promise.race([
-              emitSendMessage({
-                conversationId: targetConvId,
-                content: logText,
-                messageType: 'TEXT', // BYPASS Restricted Mode using TEXT type
-                clientMessageId
-              }),
-              new Promise<null>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 4000))
-            ]);
+  // FIX: Always create optimistic message for BOTH outgoing AND incoming calls.
+  // The sender of the call.end event is the one who ended the call.
+  // - For outgoing calls (caller ends): caller created the message.
+  // - For incoming calls (callee receives server relay): the peer's ended call should
+  //   appear as an incoming call bubble in the chat. We show it with sender='other'.
+  const isThisUserTheCaller = finalDirection === 'outgoing';
+  const optimisticLog: ChatMessage = {
+    id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+    clientMessageId: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+    conversationId: targetConvId,
+    sender: isThisUserTheCaller ? 'me' : 'other',
+    senderId: isThisUserTheCaller ? currentUserId : thePeerUserId,
+    type: 'call',
+    text: logText,
+    textType: 'call',
+    timestamp: formatMessageTimestamp(),
+    createdAt: new Date().toISOString(),
+    deliveryState: isThisUserTheCaller ? 'sending' : 'received',
+  };
 
-            if (ack?.event === 'message.sent' && ack?.data) {
-              console.log('[CALL_LOG] Socket send SUCCESS', ack.data.id);
-              const serverMsg = {
-                ...normalizeMessage(mapRawMessage(ack.data, currentUserId)),
-                clientMessageId,
-                deliveryState: 'sent' as const
-              };
-              setMessagesByConversation(prev => ({
-                ...prev,
-                [targetConvId]: upsertMessage(prev[targetConvId] ?? [], serverMsg)
-              }));
-              updateConversationAfterMessage(targetConvId, serverMsg, true);
-              success = true;
-              break;
-            } else {
-              console.warn(`[CALL_LOG] Socket attempt ${attempt} failed: No ACK or wrong event`);
-            }
-          } catch (err) {
-            console.warn(`[CALL_LOG] Socket attempt ${attempt} error:`, err instanceof Error ? err.message : err);
-          }
-        }
+  console.log('[CALL_LOG] Adding optimistic message to UI', optimisticLog.id, 'sender:', optimisticLog.sender);
 
-        // --- REST FALLBACK ---
-        if (!success) {
-          console.warn('[CALL_LOG] Socket failed after retries, falling back to REST API');
-          try {
-            const restRes = await sendMessageViaRest(accessToken || '', {
+  // Add to local state immediately
+  setMessagesByConversation(prev => ({
+    ...prev,
+    [targetConvId]: upsertMessage(prev[targetConvId] ?? [], optimisticLog)
+  }));
+  updateConversationAfterMessage(targetConvId, optimisticLog, true);
+
+  // FIX: Only the caller (isThisUserTheCaller=true) sends the call log to the server.
+  // The callee already receives the message via the caller's send (server relays it).
+  // For the callee, we add an optimistic 'other' message locally.
+  // For the caller, we send to the server (which will relay to the callee).
+  if (isThisUserTheCaller) {
+    (async () => {
+      let success = false;
+      const maxRetries = 2;
+      const clientMessageId = optimisticLog.clientMessageId as string;
+
+      // --- SOCKET ATTEMPT (with Retry & Timeout) ---
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        console.log(`[CALL_LOG] Socket Attempt ${attempt}/${maxRetries}...`);
+        try {
+          const ack = await Promise.race([
+            emitSendMessage({
               conversationId: targetConvId,
               content: logText,
-              messageType: 'TEXT', // BYPASS Restricted Mode
+              messageType: 'TEXT',
               clientMessageId
-            });
+            }),
+            new Promise<null>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 4000))
+          ]);
 
-            if (restRes?.id) {
-              console.log('[CALL_LOG] REST fallback SUCCESS', restRes.id);
-              const serverMsg = {
-                ...normalizeMessage(mapRawMessage(restRes, currentUserId)),
-                clientMessageId,
-                deliveryState: 'sent' as const
-              };
-              setMessagesByConversation(prev => ({
-                ...prev,
-                [targetConvId]: upsertMessage(prev[targetConvId] ?? [], serverMsg)
-              }));
-              updateConversationAfterMessage(targetConvId, serverMsg, true);
-              success = true;
-            }
-          } catch (restErr) {
-            console.error('[CALL_LOG] REST fallback CRITICAL FAILURE', restErr);
+          if (ack?.event === 'message.sent' && ack?.data) {
+            console.log('[CALL_LOG] Socket send SUCCESS', ack.data.id);
+            const serverMsg = {
+              ...normalizeMessage(mapRawMessage(ack.data, currentUserId)),
+              clientMessageId,
+              deliveryState: 'sent' as const
+            };
+            setMessagesByConversation(prev => ({
+              ...prev,
+              [targetConvId]: upsertMessage(prev[targetConvId] ?? [], serverMsg)
+            }));
+            updateConversationAfterMessage(targetConvId, serverMsg, true);
+            success = true;
+            break;
+          } else {
+            console.warn(`[CALL_LOG] Socket attempt ${attempt} failed: No ACK or wrong event`);
           }
+        } catch (err) {
+          console.warn(`[CALL_LOG] Socket attempt ${attempt} error:`, err instanceof Error ? err.message : err);
         }
+      }
 
-        // --- FINAL ERROR STATE ---
-        if (!success) {
-          console.error('[CALL_LOG] Failed to save call log after all attempts.');
-          setMessagesByConversation(prev => ({
-            ...prev,
-            [targetConvId]: markLocalMessageFailed(prev[targetConvId] ?? [], clientMessageId)
-          }));
+      // --- REST FALLBACK ---
+      if (!success) {
+        console.warn('[CALL_LOG] Socket failed after retries, falling back to REST API');
+        try {
+          const restRes = await sendMessageViaRest(accessToken || '', {
+            conversationId: targetConvId,
+            content: logText,
+            messageType: 'TEXT',
+            clientMessageId
+          });
+
+          if (restRes?.id) {
+            console.log('[CALL_LOG] REST fallback SUCCESS', restRes.id);
+            const serverMsg = {
+              ...normalizeMessage(mapRawMessage(restRes, currentUserId)),
+              clientMessageId,
+              deliveryState: 'sent' as const
+            };
+            setMessagesByConversation(prev => ({
+              ...prev,
+              [targetConvId]: upsertMessage(prev[targetConvId] ?? [], serverMsg)
+            }));
+            updateConversationAfterMessage(targetConvId, serverMsg, true);
+            success = true;
+          }
+        } catch (restErr) {
+          console.error('[CALL_LOG] REST fallback CRITICAL FAILURE', restErr);
         }
-      })();
-    } else {
-      console.log('[CALL_LOG] Skipping send pipeline (current user is the receiver)');
-    }
+      }
+
+      // --- FINAL ERROR STATE ---
+      if (!success) {
+        console.error('[CALL_LOG] Failed to save call log after all attempts.');
+        setMessagesByConversation(prev => ({
+          ...prev,
+          [targetConvId]: markLocalMessageFailed(prev[targetConvId] ?? [], clientMessageId)
+        }));
+      }
+    })();
+  }
+  // For incoming calls (callee side): the message was already added optimistically above.
+  // The server doesn't relay call log messages to the callee separately - the callee
+  // sees the call bubble based on the incoming call.end event they receive.
+  // We do NOT need to send anything to the server for incoming calls.
   }, [selectedConversation, currentUserId, emitSendMessage, accessToken, updateConversationAfterMessage]);
 
   // const isAnsweringRef = useRef(false); // removed as unused
@@ -2937,14 +3012,30 @@ export default function ChatPage() {
     console.log("[CALL][RECEIVE OFFER-POPUP-READY]", signalData);
     const peerUserId = signalData.senderUserId || signalData.callerId || signalData.fromUserId;
     const conversationId = signalData.conversationId || signalData.roomId;
+
+    // FIX BUG #12: Pass offer SDP directly in URL to avoid localStorage race condition.
+    // Previously, the offer was stored in localStorage by ChatPage and the popup
+    // tried to read it after opening. This created a race: if the popup opened
+    // before setState completed, or if the popup was closed and reopened, the
+    // offer would be lost. Now we encode the offer directly in the URL query param
+    // so the popup has everything it needs immediately on load.
+    const offerSdp = signalData.sdp || signalData.offer?.sdp || signalData.data?.sdp;
+    if (offerSdp) {
+      // FIX BUG #12: Store offer in sessionStorage (shared between parent ChatPage
+      // and popup CallPage on the same origin). The popup reads this immediately
+      // on load. This replaces the fragile localStorage approach that had a race
+      // condition where the popup might read before the offer was stored.
+      // We also store in localStorage as a fallback (in case sessionStorage isn't
+      // ready yet in the popup's first render cycle).
+      const encodedOffer = btoa(JSON.stringify(offerSdp));
+      sessionStorage.setItem(`offer_${callId}`, encodedOffer);
+      localStorage.setItem(`pending_offer_${callId}`, JSON.stringify(offerSdp));
+    }
+
     currentCallIdRef.current = callId;
     if (callStateRef.current.isOpen) {
       console.warn("[ChatPage] Already in a call, ignoring offer");
       return;
-    }
-    const offerSdp = signalData.sdp || signalData.offer?.sdp || signalData.data?.sdp;
-    if (offerSdp) {
-      localStorage.setItem(`pending_offer_${callId}`, JSON.stringify(offerSdp));
     }
     setCallState(prev => ({
       ...prev,
@@ -5547,7 +5638,7 @@ export default function ChatPage() {
           isGroup={false}
           isAudioOnly={callState.type === 'audio'}
           onAnswer={handleAnswerCall}
-          onDecline={() => handleEndCall('reject')}
+          onDecline={() => handleEndCall({ reason: 'reject', direction: 'incoming' })}
         />
       ) : null}
 

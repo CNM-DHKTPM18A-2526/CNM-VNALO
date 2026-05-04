@@ -6,7 +6,7 @@ import 'package:vnalo_mobile/config/env.dart';
 class AppConfig {
   static EnvConfig? _config;
 
-  static const _defaultDevCore = 'http://54.251.229.20/api/v1';
+  static const _defaultDevCore = 'https://vnalo.fit/api/v1';
 
   /// Returns the current configuration.
   /// Throws [StateError] if [initialize] has not been called yet.
@@ -67,8 +67,8 @@ class AppConfig {
 
       case Environment.staging:
       case Environment.production:
-        final base = 'http://54.251.229.20/api/v1';
-        final socketBase = 'http://54.251.229.20';
+        final base = 'https://vnalo.fit/api/v1';
+        final socketBase = 'https://vnalo.fit';
         _config = EnvConfig(
           environment: env,
           coreServiceUrl: _normalizeApiBaseUrl(coreServiceUrl ?? base),

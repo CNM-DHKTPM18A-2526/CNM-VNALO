@@ -442,45 +442,92 @@ export class RealtimeGateway
     this.server.to(room).emit('group-call:ended', data);
   }
 
-  // ─── Minimal 1-1 Call Relay ────────────────────────────────────────
-  // Supports both colon notation (from Web webrtcCallService) and dot notation (from Mobile)
-  @SubscribeMessage('call.offer')
-  handleCallOffer(@ConnectedSocket() _c: Socket, @MessageBody() data: any) {
-    this.emitToUser(data.targetUserId, 'call.offer', data);
-  }
+  // ─── 1-1 Call Relay ─────────────────────────────────────────
+  // FIX BUG #1+2: Handle both colon (call:offer) and dot (call.offer) notation.
+  // FIX BUG #9: Add sender identity validation — the socket's authenticated
+  // user must match senderUserId to prevent spoofing. Note: RealtimeGateway
+  // does NOT have ConversationModule, so full membership validation is not
+  // possible here. That validation lives in ChatGateway. This is a best-effort
+  // security layer for the low-latency relay path.
 
-  @SubscribeMessage('call:offer')
-  handleCallOfferColon(@ConnectedSocket() _c: Socket, @MessageBody() data: any) {
+  @SubscribeMessage('call.offer')
+  handleCallOffer(@ConnectedSocket() client: Socket, @MessageBody() data: any) {
+    const authUserId = client.data?.user?.userId;
+    if (authUserId && authUserId !== data.senderUserId) {
+      this.logger.warn(`[Realtime.call.offer] Sender spoofing attempt: auth=${authUserId} sent=${data.senderUserId}`);
+      return;
+    }
     this.emitToUser(data.targetUserId, 'call.offer', data);
   }
 
   @SubscribeMessage('call.answer')
-  handleCallAnswer(@ConnectedSocket() _c: Socket, @MessageBody() data: any) {
-    this.emitToUser(data.targetUserId, 'call.answer', data);
-  }
-
-  @SubscribeMessage('call:answer')
-  handleCallAnswerColon(@ConnectedSocket() _c: Socket, @MessageBody() data: any) {
+  handleCallAnswer(@ConnectedSocket() client: Socket, @MessageBody() data: any) {
+    const authUserId = client.data?.user?.userId;
+    if (authUserId && authUserId !== data.senderUserId) {
+      this.logger.warn(`[Realtime.call.answer] Sender spoofing attempt`);
+      return;
+    }
     this.emitToUser(data.targetUserId, 'call.answer', data);
   }
 
   @SubscribeMessage('call.ice-candidate')
-  handleIceCandidate(@ConnectedSocket() _c: Socket, @MessageBody() data: any) {
-    this.emitToUser(data.targetUserId, 'call.ice-candidate', data);
-  }
-
-  @SubscribeMessage('call:ice-candidate')
-  handleIceCandidateColon(@ConnectedSocket() _c: Socket, @MessageBody() data: any) {
+  handleIceCandidate(@ConnectedSocket() client: Socket, @MessageBody() data: any) {
+    const authUserId = client.data?.user?.userId;
+    if (authUserId && authUserId !== data.senderUserId) {
+      this.logger.warn(`[Realtime.call.ice-candidate] Sender spoofing attempt`);
+      return;
+    }
     this.emitToUser(data.targetUserId, 'call.ice-candidate', data);
   }
 
   @SubscribeMessage('call.end')
-  handleCallEnd(@ConnectedSocket() _c: Socket, @MessageBody() data: any) {
+  handleCallEnd(@ConnectedSocket() client: Socket, @MessageBody() data: any) {
+    const authUserId = client.data?.user?.userId;
+    if (authUserId && authUserId !== data.senderUserId) {
+      this.logger.warn(`[Realtime.call.end] Sender spoofing attempt`);
+      return;
+    }
     this.emitToUser(data.targetUserId, 'call.end', data);
   }
 
+  // Colon notation (web client also emits these)
+  @SubscribeMessage('call:offer')
+  handleCallOfferColon(@ConnectedSocket() client: Socket, @MessageBody() data: any) {
+    const authUserId = client.data?.user?.userId;
+    if (authUserId && authUserId !== data.senderUserId) {
+      this.logger.warn(`[Realtime.call:offer] Sender spoofing attempt`);
+      return;
+    }
+    this.emitToUser(data.targetUserId, 'call.offer', data);
+  }
+
+  @SubscribeMessage('call:answer')
+  handleCallAnswerColon(@ConnectedSocket() client: Socket, @MessageBody() data: any) {
+    const authUserId = client.data?.user?.userId;
+    if (authUserId && authUserId !== data.senderUserId) {
+      this.logger.warn(`[Realtime.call:answer] Sender spoofing attempt`);
+      return;
+    }
+    this.emitToUser(data.targetUserId, 'call.answer', data);
+  }
+
+  @SubscribeMessage('call:ice-candidate')
+  handleIceCandidateColon(@ConnectedSocket() client: Socket, @MessageBody() data: any) {
+    const authUserId = client.data?.user?.userId;
+    if (authUserId && authUserId !== data.senderUserId) {
+      this.logger.warn(`[Realtime.call:ice-candidate] Sender spoofing attempt`);
+      return;
+    }
+    this.emitToUser(data.targetUserId, 'call.ice-candidate', data);
+  }
+
   @SubscribeMessage('call:end')
-  handleCallEndColon(@ConnectedSocket() _c: Socket, @MessageBody() data: any) {
+  handleCallEndColon(@ConnectedSocket() client: Socket, @MessageBody() data: any) {
+    const authUserId = client.data?.user?.userId;
+    if (authUserId && authUserId !== data.senderUserId) {
+      this.logger.warn(`[Realtime.call:end] Sender spoofing attempt`);
+      return;
+    }
     this.emitToUser(data.targetUserId, 'call.end', data);
   }
 }

@@ -74,14 +74,27 @@ const CallPage: React.FC = () => {
       })
       callServiceRef.current = service
 
-      const initialSdpStr = localStorage.getItem(`pending_offer_${callId}`)
-      let initialSdp = null
+      const initialSdpStr = (() => {
+        // FIX BUG #12: Try sessionStorage first (ChatPage writes here synchronously
+        // before opening popup, so it's immediately available). Fall back to
+        // localStorage for backward compatibility. This eliminates the race condition
+        // where the popup read before the offer was stored.
+        const callKey = `offer_${callId}`;
+        const ssStr = sessionStorage.getItem(callKey);
+        if (ssStr) {
+          sessionStorage.removeItem(callKey);
+          try { return atob(ssStr); } catch { /* ignore */ }
+        }
+        const lsStr = localStorage.getItem(`pending_offer_${callId}`);
+        if (lsStr) { localStorage.removeItem(`pending_offer_${callId}`); }
+        return lsStr;
+      })();
+      let initialSdp: RTCSessionDescriptionInit | null = null;
       if (initialSdpStr) {
         try {
-          initialSdp = JSON.parse(initialSdpStr)
-          localStorage.removeItem(`pending_offer_${callId}`)
+          initialSdp = JSON.parse(initialSdpStr);
         } catch (e) {
-          console.error('[CallPage] Failed to parse initial SDP', e)
+          console.error('[CallPage] Failed to parse initial SDP', e);
         }
       }
 
@@ -97,16 +110,13 @@ const CallPage: React.FC = () => {
       })
 
       // Listener for 1-1 signaling
-      // NOTE: We MUST listen on DOT notation ('call.answer', etc.) to match what
-      // webrtcCallService emits and what the backend gateway emits via emitToUser().
-      // The backend @SubscribeMessage handlers also use DOT notation.
-      socket.on('call.answer', (data) => {
+      socket.on('call:answer', (data) => {
         if (data.callId === callId) service.handleAnswer(data.sdp)
       })
-      socket.on('call.ice-candidate', (data) => {
+      socket.on('call:ice-candidate', (data) => {
         if (data.callId === callId) service.handleIceCandidate(data.candidate)
       })
-      socket.on('call.end', (data) => {
+      socket.on('call:end', (data) => {
         if (data.callId === callId) service.endCall(data.reason, false)
       })
 
