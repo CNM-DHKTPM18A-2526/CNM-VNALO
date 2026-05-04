@@ -30,13 +30,9 @@ export const PremiumVideoTile: React.FC<PremiumVideoTileProps> = ({
   isMicOn,
   isCameraOn,
   isLocal = false,
-  isSpeaking = false,
-  size = 'md',
   statusText,
   hideCentralIdentity = false
 }) => {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _unused = { isSpeaking, size }; // Keep for future expansion in multi-tile grids
   const videoRef = React.useRef<HTMLVideoElement>(null)
   const resolvedAvatar = avatarUrl ? resolveMediaUrl(avatarUrl) : null
 
@@ -321,7 +317,6 @@ export const IncomingCallBanner: React.FC<IncomingCallBannerProps> = ({
   // ── SOUND: Play a ringtone using Web Audio API (no audio files needed) ──
   React.useEffect(() => {
     let audioCtx: AudioContext | null = null
-    const oscillator: OscillatorNode | null = null
     let gainNode: GainNode | null = null
     let interval: ReturnType<typeof setInterval>
 
@@ -367,7 +362,6 @@ export const IncomingCallBanner: React.FC<IncomingCallBannerProps> = ({
 
     return () => {
       clearInterval(interval)
-      try { oscillator?.stop(); } catch { /* ignore */ }
       try { audioCtx?.close(); } catch { /* ignore */ }
     }
   }, [])

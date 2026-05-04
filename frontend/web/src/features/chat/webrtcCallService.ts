@@ -411,7 +411,7 @@ export class WebRtcCallService {
       // FIX BUG #10: Deduplicate ICE candidates to prevent network replay attacks
       // and avoid double-adding when the same candidate arrives via multiple event names.
       // Use sdpMid + sdpMLineIndex as the unique key.
-      const candidateKey = `${candidate.sdpMid ?? ''}:${candidate.sdpMLineIndex ?? -1}:${candidate.credential ?? ''}`;
+      const candidateKey = `${candidate.sdpMid ?? ''}:${candidate.sdpMLineIndex ?? -1}:${candidate.candidate}`;
       if (this.processedIceCandidates.has(candidateKey)) {
         console.log('[WebRTC] Skipping duplicate ICE candidate:', candidateKey);
         return;

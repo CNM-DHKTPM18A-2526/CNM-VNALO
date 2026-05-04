@@ -41,8 +41,6 @@ const CallPage: React.FC = () => {
   })
   const [groupSnapshot, setGroupSnapshot] = useState<GroupCallSnapshot | null>(null)
   
-  const callServiceRef = useRef<WebRtcCallService | null>(null)
-  const groupServiceRef = useRef<WebRtcGroupCallService | null>(null)
 
   // 1. Setup Socket
   useEffect(() => {
@@ -91,10 +89,13 @@ const CallPage: React.FC = () => {
   // Pre-request media ASAP (Concurrent with auth/socket load)
   useEffect(() => {
     if (type === 'direct') {
-      console.log('[CallPage] Pre-requesting local media...');
+      console.log('[CallPage] Pre-requesting local media (1-1)...');
       void service.openLocalMedia();
+    } else if (type === 'group') {
+      console.log('[CallPage] Pre-requesting local media (Group)...');
+      void groupService.openLocalMedia();
     }
-  }, [type, audioOnly]);
+  }, [type, audioOnly, service, groupService]);
 
   useEffect(() => {
     if (!socket || !user || !callId || !conversationId) return
@@ -113,7 +114,7 @@ const CallPage: React.FC = () => {
         if (lsStr) { localStorage.removeItem(`pending_offer_${callId}`); }
         return lsStr;
       })();
-      let initialSdp: RTCSessionDescriptionInit | null = null;
+      let initialSdp: RTCSessionDescriptionInit | undefined = undefined;
       if (initialSdpStr) {
         try {
           initialSdp = JSON.parse(initialSdpStr);
@@ -162,14 +163,8 @@ const CallPage: React.FC = () => {
       socket.on('call.end', onEnd)
 
     } else if (type === 'group') {
-      const service = new WebRtcGroupCallService((snapshot) => {
-        setGroupSnapshot(snapshot)
-        if (snapshot.isEnded) window.close()
-      })
-      groupServiceRef.current = service
-
       if (isCaller) {
-        service.startCall({
+        groupService.startCall({
           socket,
           conversationId,
           conversationName: peerName, // For group, peerName param is reused as convName
@@ -180,7 +175,7 @@ const CallPage: React.FC = () => {
           audioOnly,
         })
       } else {
-        service.joinCall({
+        groupService.joinCall({
           socket,
           conversationId,
           callId,
@@ -196,7 +191,7 @@ const CallPage: React.FC = () => {
       callServiceRef.current?.endCall('hangup')
       groupServiceRef.current?.leave()
     }
-  }, [socket, user, type, callId, conversationId, peerId, audioOnly, isCaller, peerName])
+  }, [socket, user, type, callId, conversationId, peerId, audioOnly, isCaller, peerName, service, groupService])
 
   // 3. Handle window close
   useEffect(() => {
