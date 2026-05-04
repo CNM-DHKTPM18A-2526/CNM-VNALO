@@ -35,14 +35,22 @@ export function resolveMediaUrl(url?: string | null): string {
     }
   }
 
-  // Handle absolute URLs (localhost/127.0.0.1)
+  // Handle absolute URLs (force HTTPS and handle legacy IPs)
   if (url.startsWith('http://') || url.startsWith('https://')) {
     const urlObj = new URL(url);
-    if (urlObj.hostname === 'localhost' || urlObj.hostname === '127.0.0.1') {
+    const legacyIps = ['localhost', '127.0.0.1', '47.130.251.107', '13.250.2.132'];
+    
+    if (legacyIps.includes(urlObj.hostname)) {
       const base = (API_BASE_URL || '').replace(/\/api\/v1\/?$/, '');
       const finalBase = base || window.location.origin;
       return `${finalBase}${urlObj.pathname}${urlObj.search}`;
     }
+    
+    // Force HTTPS for vnalo.fit if it's somehow still http
+    if (urlObj.hostname.endsWith('vnalo.fit') && url.startsWith('http://')) {
+      return url.replace('http://', 'https://');
+    }
+    
     return url;
   }
 
