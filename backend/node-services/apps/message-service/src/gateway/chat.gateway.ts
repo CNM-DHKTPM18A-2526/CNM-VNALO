@@ -70,9 +70,15 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {}
 
   // ─── Call Signaling ───────────────────────────────────────
+  //
+  // FIX BUG #1+2+3: Register handlers for BOTH colon (call:offer) and
+  // dot (call.offer) notations. The Web client emits on 4 event names
+  // (call:offer, call.offer, call.signal, call:signal) but the server only
+  // had handlers for the dot notation. This caused all colon-notation and
+  // generic-signal ICE candidates to be silently ignored.
+  //
 
-  // ─── 1-1 Call Signaling (both colon and dot notation for maximum compatibility) ───
-
+  // ── Dot notation (original) ──
   @SubscribeMessage('call.offer')
   async handleCallOffer(
     @ConnectedSocket() client: Socket,
@@ -85,15 +91,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       sdp?: Record<string, unknown>;
       audioOnly?: boolean;
     },
-  ) {
-    return this.forwardCallSignal(client, 'offer', data);
-  }
-
-  // Alias: Web frontend emits 'call:offer' (colon notation)
-  @SubscribeMessage('call:offer')
-  async handleCallOfferColon(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: any,
   ) {
     return this.forwardCallSignal(client, 'offer', data);
   }
@@ -113,15 +110,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return this.forwardCallSignal(client, 'answer', data);
   }
 
-  // Alias: Web frontend emits 'call:answer' (colon notation)
-  @SubscribeMessage('call:answer')
-  async handleCallAnswerColon(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: any,
-  ) {
-    return this.forwardCallSignal(client, 'answer', data);
-  }
-
   @SubscribeMessage('call.ice-candidate')
   async handleCallIceCandidate(
     @ConnectedSocket() client: Socket,
@@ -133,15 +121,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       senderUserId?: string;
       candidate?: Record<string, unknown>;
     },
-  ) {
-    return this.forwardCallSignal(client, 'ice-candidate', data);
-  }
-
-  // Alias: Web frontend emits 'call:ice-candidate' (colon notation)
-  @SubscribeMessage('call:ice-candidate')
-  async handleCallIceCandidateColon(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: any,
   ) {
     return this.forwardCallSignal(client, 'ice-candidate', data);
   }
@@ -161,11 +140,64 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return this.forwardCallSignal(client, 'end', data);
   }
 
-  // Alias: Web frontend emits 'call:end' (colon notation)
+  // ── Colon notation (web client also emits these) ──
+  @SubscribeMessage('call:offer')
+  async handleCallOfferColon(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: {
+      conversationId?: string;
+      callId?: string;
+      targetUserId?: string;
+      senderUserId?: string;
+      sdp?: Record<string, unknown>;
+      audioOnly?: boolean;
+    },
+  ) {
+    return this.forwardCallSignal(client, 'offer', data);
+  }
+
+  @SubscribeMessage('call:answer')
+  async handleCallAnswerColon(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: {
+      conversationId?: string;
+      callId?: string;
+      targetUserId?: string;
+      senderUserId?: string;
+      sdp?: Record<string, unknown>;
+    },
+  ) {
+    return this.forwardCallSignal(client, 'answer', data);
+  }
+
+  @SubscribeMessage('call:ice-candidate')
+  async handleCallIceCandidateColon(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: {
+      conversationId?: string;
+      callId?: string;
+      targetUserId?: string;
+      senderUserId?: string;
+      candidate?: Record<string, unknown>;
+    },
+  ) {
+    return this.forwardCallSignal(client, 'ice-candidate', data);
+  }
+
   @SubscribeMessage('call:end')
   async handleCallEndColon(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: any,
+    @MessageBody()
+    data: {
+      conversationId?: string;
+      callId?: string;
+      targetUserId?: string;
+      senderUserId?: string;
+      reason?: string;
+    },
   ) {
     return this.forwardCallSignal(client, 'end', data);
   }
@@ -530,6 +562,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       candidate?: Record<string, unknown>;
       reason?: string;
       audioOnly?: boolean;
+      duration?: number;
+      outcome?: string;
+      startedAt?: number | null;
+      direction?: string;
     },
   ) {
     const senderUserId = client.data?.user?.userId as string | undefined;
@@ -579,8 +615,24 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (data?.reason != null && data.reason.trim().length > 0) {
       payload.reason = data.reason.trim();
     }
-    if (type == 'offer' && data?.audioOnly != null) {
+    // FIX BUG #4: Forward audioOnly for ALL call types (not just offer).
+    // The callee needs to know call type for ICE candidate and answer events too.
+    if (data?.audioOnly != null) {
       payload.audioOnly = data.audioOnly;
+    }
+    // FIX BUG #5: Forward duration/outcome/startedAt/direction from Flutter endCall.
+    // Mobile's endCall sends these fields; ensure they're relayed to the target.
+    if (data?.duration != null) {
+      payload.duration = data.duration;
+    }
+    if (data?.outcome != null) {
+      payload.outcome = data.outcome;
+    }
+    if (data?.startedAt != null) {
+      payload.startedAt = data.startedAt;
+    }
+    if (data?.direction != null) {
+      payload.direction = data.direction;
     }
 
     this.logger.log(

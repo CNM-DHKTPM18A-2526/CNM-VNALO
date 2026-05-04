@@ -421,6 +421,19 @@ export class WebRtcCallService {
         typeof candidateData === 'string' ? { candidate: candidateData } : candidateData
       )
 
+      // FIX BUG #10: Deduplicate ICE candidates to prevent network replay attacks
+      // and avoid double-adding when the same candidate arrives via multiple event names.
+      // Use sdpMid + sdpMLineIndex as the unique key.
+      const candidateKey = `${candidate.sdpMid ?? ''}:${candidate.sdpMLineIndex ?? -1}:${candidate.credential ?? ''}`;
+      if ((this as any)._processedIceCandidates?.has(candidateKey)) {
+        console.log('[WebRTC] Skipping duplicate ICE candidate:', candidateKey);
+        return;
+      }
+      if (!(this as any)._processedIceCandidates) {
+        (this as any)._processedIceCandidates = new Set<string>();
+      }
+      (this as any)._processedIceCandidates.add(candidateKey);
+
       if (!this.state.hasRemoteDescription) {
         console.log('[WebRTC] Queueing ICE candidate (remote description not ready)')
         this.updateState({ pendingCandidates: [...this.state.pendingCandidates, candidate] })
@@ -444,26 +457,6 @@ export class WebRtcCallService {
       }
     }
     this.updateState({ pendingCandidates: [] })
-  }
-
-  toggleMic() {
-    const stream = this.state.localStream
-    if (!stream) return
-    const audioTrack = stream.getAudioTracks()[0]
-    if (audioTrack) {
-      audioTrack.enabled = !audioTrack.enabled
-      this.updateState({ isMicOn: audioTrack.enabled })
-    }
-  }
-
-  toggleCamera() {
-    const stream = this.state.localStream
-    if (!stream) return
-    const videoTrack = stream.getVideoTracks()[0]
-    if (videoTrack) {
-      videoTrack.enabled = !videoTrack.enabled
-      this.updateState({ isCameraOn: videoTrack.enabled })
-    }
   }
 
   private startRingTimeout() {
@@ -529,7 +522,8 @@ export class WebRtcCallService {
       remoteStream: null,
       pendingCandidates: [],
       hasRemoteDescription: false,
-    })
+    });
+    (this as any)._processedIceCandidates?.clear();
   }
 
   toggleMic() {

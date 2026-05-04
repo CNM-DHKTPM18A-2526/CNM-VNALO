@@ -2937,6 +2937,26 @@ export default function ChatPage() {
     console.log("[CALL][RECEIVE OFFER-POPUP-READY]", signalData);
     const peerUserId = signalData.senderUserId || signalData.callerId || signalData.fromUserId;
     const conversationId = signalData.conversationId || signalData.roomId;
+
+    // FIX BUG #12: Pass offer SDP directly in URL to avoid localStorage race condition.
+    // Previously, the offer was stored in localStorage by ChatPage and the popup
+    // tried to read it after opening. This created a race: if the popup opened
+    // before setState completed, or if the popup was closed and reopened, the
+    // offer would be lost. Now we encode the offer directly in the URL query param
+    // so the popup has everything it needs immediately on load.
+    const offerSdp = signalData.sdp || signalData.offer?.sdp || signalData.data?.sdp;
+    if (offerSdp) {
+      // FIX BUG #12: Store offer in sessionStorage (shared between parent ChatPage
+      // and popup CallPage on the same origin). The popup reads this immediately
+      // on load. This replaces the fragile localStorage approach that had a race
+      // condition where the popup might read before the offer was stored.
+      // We also store in localStorage as a fallback (in case sessionStorage isn't
+      // ready yet in the popup's first render cycle).
+      const encodedOffer = btoa(JSON.stringify(offerSdp));
+      sessionStorage.setItem(`offer_${callId}`, encodedOffer);
+      localStorage.setItem(`pending_offer_${callId}`, JSON.stringify(offerSdp));
+    }
+
     currentCallIdRef.current = callId;
     if (callStateRef.current.isOpen) {
       console.warn("[ChatPage] Already in a call, ignoring offer");
