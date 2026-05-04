@@ -64,9 +64,10 @@ function buildIceServers(): RTCIceServer[] {
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
   ]
-  const turnUrl = (import.meta as any).env?.VITE_TURN_URL
-  const turnUser = (import.meta as any).env?.VITE_TURN_USERNAME
-  const turnPass = (import.meta as any).env?.VITE_TURN_PASSWORD
+  const meta = import.meta as unknown as { env: Record<string, string> }
+  const turnUrl = meta.env?.VITE_TURN_URL
+  const turnUser = meta.env?.VITE_TURN_USERNAME
+  const turnPass = meta.env?.VITE_TURN_PASSWORD
   if (turnUrl && turnUser && turnPass) {
     servers.push({ urls: turnUrl, username: turnUser, credential: turnPass })
   }
@@ -292,10 +293,17 @@ export class WebRtcGroupCallService {
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       video: this.state.audioOnly ? false : { facingMode: 'user', width: 1280, height: 720 },
     }
+    const isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+    if (!isSecure) {
+      const msg = 'Vui lòng sử dụng HTTPS để truy cập micro và camera. Ví dụ: https://' + location.hostname
+      this.updateState({ error: msg })
+      throw new Error(msg)
+    }
+
     const stream = await navigator.mediaDevices.getUserMedia(constraints)
     this.updateState({ localStream: stream })
 
-    this.localAnalyser = createSpeakerAnalyser(stream, (_speaking) => {
+    this.localAnalyser = createSpeakerAnalyser(stream, () => {
       // local speaking indicator placeholder
     })
   }
@@ -333,7 +341,19 @@ export class WebRtcGroupCallService {
    * (backend relay tới mọi người trong room),
    * người trong room tạo offer gửi tới người vừa join.
    */
-  private onUserJoined = async (payload: any) => {
+  private onUserJoined = async (payload: {
+    senderUserId?: string;
+    userId?: string;
+    displayName?: string;
+    name?: string;
+    callerName?: string;
+    avatarUrl?: string;
+    callerAvatar?: string;
+    callId: string;
+    isMicOn?: boolean;
+    isCameraOn?: boolean;
+    audioOnly?: boolean;
+  }) => {
     const senderUserId = payload.senderUserId || payload.userId
     let displayName = payload.displayName || payload.name || payload.callerName
     let avatarUrl = payload.avatarUrl || payload.callerAvatar
@@ -385,7 +405,7 @@ export class WebRtcGroupCallService {
 
     const senderUserId = payload.senderUserId || payload.userId || ''
     if (!this.state.peers.has(senderUserId)) {
-      const isId = (s: any) => typeof s === 'string' && s.length > 20 && /^[0-9a-fA-F-]/.test(s)
+      const isId = (s: string | undefined | null) => typeof s === 'string' && s.length > 20 && /^[0-9a-fA-F-]/.test(s)
       let name = payload.displayName || payload.name || payload.fullName || payload.full_name || payload.callerName
       if (!name || isId(name)) {
         name = this.resolveName?.(senderUserId) || name || senderUserId
@@ -687,7 +707,13 @@ export class WebRtcGroupCallService {
     })
   }
 
-  private onMediaUpdate = (payload: any) => {
+  private onMediaUpdate = (payload: {
+    senderUserId?: string;
+    userId?: string;
+    uid?: string;
+    isMicOn?: boolean;
+    isCameraOn?: boolean;
+  }) => {
     const senderUserId = payload.senderUserId || payload.userId || payload.uid
     if (senderUserId === this.currentUserId) return
     

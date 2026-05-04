@@ -20,6 +20,7 @@ interface PremiumVideoTileProps {
   isSpeaking?: boolean
   size?: 'sm' | 'md' | 'lg' | 'full'
   statusText?: string
+  hideCentralIdentity?: boolean
 }
 
 export const PremiumVideoTile: React.FC<PremiumVideoTileProps> = ({
@@ -31,7 +32,8 @@ export const PremiumVideoTile: React.FC<PremiumVideoTileProps> = ({
   isLocal = false,
   isSpeaking = false,
   size = 'md',
-  statusText
+  statusText,
+  hideCentralIdentity = false
 }) => {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _unused = { isSpeaking, size }; // Keep for future expansion in multi-tile grids
@@ -78,8 +80,8 @@ export const PremiumVideoTile: React.FC<PremiumVideoTileProps> = ({
         />
       )}
 
-      {/* ── AVATAR + NAME OVERLAY (Visible when camera is off OR stream unavailable) ── */}
-      {(!isCameraOn || !stream) && (
+      {/* ── AVATAR + NAME OVERLAY (Visible when camera is off OR stream unavailable, unless hidden) ── */}
+      {(!isCameraOn || !stream) && !hideCentralIdentity && (
         <div className="relative z-20 flex flex-col items-center justify-center animate-in fade-in zoom-in duration-500">
           {/* Zalo-style concentric pulse rings */}
           <div className="relative mb-6">

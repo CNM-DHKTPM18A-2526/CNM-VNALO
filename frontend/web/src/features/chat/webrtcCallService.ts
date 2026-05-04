@@ -51,7 +51,8 @@ export class WebRtcCallService {
   private isCaller: boolean = false
   private onStateChange: (state: WebRTCCallState) => void
 
-  private ringTimeoutTimer: any = null
+  private ringTimeoutTimer: ReturnType<typeof setTimeout> | null = null
+  private processedIceCandidates: Set<string> = new Set()
   private readonly RING_TIMEOUT_MS = 38000
 
   constructor(onStateChange: (state: WebRTCCallState) => void) {
@@ -71,7 +72,7 @@ export class WebRtcCallService {
     peerUserId: string
     audioOnly: boolean
     isCaller: boolean
-    initialSdp?: any
+    initialSdp?: RTCSessionDescriptionInit
   }) {
     console.log('[WebRTC] Initializing service', params)
     this.socket = params.socket
@@ -373,7 +374,7 @@ export class WebRtcCallService {
     }
   }
 
-  async handleOffer(offerSdp: any) {
+  async handleOffer(offerSdp: RTCSessionDescriptionInit) {
     if (this.state.hasRemoteDescription && !this.isCaller) return
 
     const pc = this.state.pc
@@ -390,7 +391,7 @@ export class WebRtcCallService {
     }
   }
 
-  async handleAnswer(answerSdp: any) {
+  async handleAnswer(answerSdp: RTCSessionDescriptionInit) {
     const pc = this.state.pc
     if (!pc) return
 
@@ -413,7 +414,7 @@ export class WebRtcCallService {
     }
   }
 
-  async handleIceCandidate(candidateData: any) {
+  async handleIceCandidate(candidateData: RTCIceCandidateInit | string) {
     if (!this.state.pc || !candidateData) return
 
     try {
@@ -425,14 +426,11 @@ export class WebRtcCallService {
       // and avoid double-adding when the same candidate arrives via multiple event names.
       // Use sdpMid + sdpMLineIndex as the unique key.
       const candidateKey = `${candidate.sdpMid ?? ''}:${candidate.sdpMLineIndex ?? -1}:${candidate.credential ?? ''}`;
-      if ((this as any)._processedIceCandidates?.has(candidateKey)) {
+      if (this.processedIceCandidates.has(candidateKey)) {
         console.log('[WebRTC] Skipping duplicate ICE candidate:', candidateKey);
         return;
       }
-      if (!(this as any)._processedIceCandidates) {
-        (this as any)._processedIceCandidates = new Set<string>();
-      }
-      (this as any)._processedIceCandidates.add(candidateKey);
+      this.processedIceCandidates.add(candidateKey);
 
       if (!this.state.hasRemoteDescription) {
         console.log('[WebRTC] Queueing ICE candidate (remote description not ready)')
@@ -523,7 +521,7 @@ export class WebRtcCallService {
       pendingCandidates: [],
       hasRemoteDescription: false,
     });
-    (this as any)._processedIceCandidates?.clear();
+    this.processedIceCandidates.clear();
   }
 
   toggleMic() {

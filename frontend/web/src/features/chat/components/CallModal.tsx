@@ -63,34 +63,64 @@ export const CallModal: React.FC<CallModalProps> = ({
   const isConnecting = status === 'connecting'
   const isConnected = status === 'connected'
   const isFailed = status === 'failed'
+  const isVideoCall = type === 'video'
   
   // Show local PiP only if it's a video call AND we are connected
-  const showLocalPiP = isConnected && type === 'video' && localStream
+  const showLocalPiP = isConnected && isVideoCall && localStream
 
   return (
     <div className="fixed inset-0 z-[500] bg-black flex flex-col overflow-hidden select-none">
-      {/* ── REMOTE CONTENT (full screen focus) ── */}
+      {/* ── MAIN CONTENT AREA ── */}
       <div className="relative flex-1 w-full h-full flex items-center justify-center">
         {/* 
-            PremiumVideoTile for Peer: 
-            In Voice Call: Shows peer's blurred avatar background + central avatar.
-            In Video Call: Shows peer's video stream.
+            BACKGROUND LOGIC:
+            - Connecting + Video: Show local camera (to check yourself)
+            - Connected + Video: Show remote camera
+            - Audio Call: Show blurred avatar
         */}
         <PremiumVideoTile
-          stream={isConnected ? (remoteStream || null) : null}
+          stream={
+            isConnected 
+              ? (remoteStream || null) 
+              : (isConnecting && isVideoCall ? (localStream || null) : null)
+          }
           displayName={peerName}
           avatarUrl={peerAvatar || undefined}
-          isCameraOn={isConnected ? isRemoteCameraOn : (type === 'video')}
+          isCameraOn={
+            isConnected 
+              ? isRemoteCameraOn 
+              : (isConnecting && isVideoCall ? isCameraOn : false)
+          }
           isMicOn={true}
-          statusText={isConnecting ? 'Đang đổ chuông...' : isFailed ? 'Cuộc gọi thất bại' : undefined}
+          isLocal={isConnecting && isVideoCall} // Mirror if showing local cam as background
+          statusText={isFailed ? 'Cuộc gọi thất bại' : undefined}
           size="full"
+          hideCentralIdentity={isConnecting && isVideoCall} // New prop to hide center info
         />
 
-        {/* ── LOCAL VIDEO PIP (top-right, only for video calls) ── */}
+        {/* ── TOP CENTER IDENTITY (For Video Call Connecting state) ── */}
+        {isConnecting && isVideoCall && (
+          <div className="absolute top-12 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-2 animate-in fade-in slide-in-from-top-4 duration-700">
+            <div className="w-16 h-16 rounded-full border-2 border-white/20 overflow-hidden shadow-2xl">
+              {peerAvatar ? (
+                <img src={peerAvatar} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white text-xl font-bold">
+                  {peerName[0].toUpperCase() || 'P'}
+                </div>
+              )}
+            </div>
+            <span className="text-white text-sm font-medium drop-shadow-lg animate-pulse">
+              Đang đổ chuông...
+            </span>
+          </div>
+        )}
+
+        {/* ── LOCAL VIDEO PIP (For Connected Video Calls) ── */}
         {showLocalPiP && (
           <div
             className="absolute top-6 right-6 z-40 rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-black"
-            style={{ width: 140, height: 210 }} // Vertical PiP for modern feel
+            style={{ width: 140, height: 210 }}
           >
             <PremiumVideoTile
               stream={localStream || null}
@@ -109,7 +139,7 @@ export const CallModal: React.FC<CallModalProps> = ({
           </div>
         )}
 
-        {/* ── TOP OVERLAY (Timer & Encryption) ── */}
+        {/* ── TOP OVERLAY (Timer & Encryption - Visible when connected) ── */}
         <div className="absolute top-0 left-0 right-0 z-30 flex flex-col items-center pt-8">
           {isConnected && (
             <div className="flex flex-col items-center gap-1">

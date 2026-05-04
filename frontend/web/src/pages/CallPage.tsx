@@ -83,13 +83,13 @@ const CallPage: React.FC = () => {
         const ssStr = sessionStorage.getItem(callKey);
         if (ssStr) {
           sessionStorage.removeItem(callKey);
-          try { return atob(ssStr); } catch (_) {}
+          try { return atob(ssStr); } catch { /* ignore */ }
         }
         const lsStr = localStorage.getItem(`pending_offer_${callId}`);
         if (lsStr) { localStorage.removeItem(`pending_offer_${callId}`); }
         return lsStr;
       })();
-      let initialSdp: any = null;
+      let initialSdp: RTCSessionDescriptionInit | null = null;
       if (initialSdpStr) {
         try {
           initialSdp = JSON.parse(initialSdpStr);
