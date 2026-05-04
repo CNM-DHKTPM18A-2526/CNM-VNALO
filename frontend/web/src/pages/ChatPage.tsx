@@ -3037,10 +3037,6 @@ export default function ChatPage() {
       console.warn("[ChatPage] Already in a call, ignoring offer");
       return;
     }
-    const offerSdp = signalData.sdp || signalData.offer?.sdp || signalData.data?.sdp;
-    if (offerSdp) {
-      localStorage.setItem(`pending_offer_${callId}`, JSON.stringify(offerSdp));
-    }
     setCallState(prev => ({
       ...prev,
       isOpen: true,
