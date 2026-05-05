@@ -466,9 +466,18 @@ class GroupWebRtcService extends ChangeNotifier {
 
     // Create and send offer
     debugPrint('[GroupWebRtcService] Creating offer for $odUserId');
-    final offer = await pc.createOffer();
+    // FIX: Explicitly request to receive audio AND video from remote peer.
+    // Without this, some devices may not negotiate video tracks.
+    // 'OfferToReceiveAudio' / 'OfferToReceiveVideo' are standard SDP attributes.
+    final offerOptions = <String, dynamic>{
+      'mandatory': {
+        'OfferToReceiveAudio': true,
+        'OfferToReceiveVideo': !audioOnly,
+      },
+    };
+    final offer = await pc.createOffer(offerOptions);
     await pc.setLocalDescription(offer);
-    
+
     debugPrint('[GroupWebRtcService] Sending offer to $odUserId');
     _socketService.emitGroupCallOffer(
       conversationId: conversationId,
@@ -476,6 +485,7 @@ class GroupWebRtcService extends ChangeNotifier {
       targetUserId: odUserId,
       sdp: {'type': offer.type, 'sdp': offer.sdp},
       senderUserId: currentUserId,
+      displayName: displayName,
     );
     debugPrint('[GroupWebRtcService] Offer sent to $odUserId');
   }
@@ -535,7 +545,14 @@ class GroupWebRtcService extends ChangeNotifier {
 
     // Create and send answer
     debugPrint('[GroupWebRtcService] Creating answer for $odUserId');
-    final answer = await _participants[odUserId]!.peerConnection!.createAnswer();
+    // FIX: Explicitly request to receive audio AND video from remote peer in answer.
+    final answerOptions = <String, dynamic>{
+      'mandatory': {
+        'OfferToReceiveAudio': true,
+        'OfferToReceiveVideo': !audioOnly,
+      },
+    };
+    final answer = await _participants[odUserId]!.peerConnection!.createAnswer(answerOptions);
     await _participants[odUserId]!.peerConnection!.setLocalDescription(answer);
     
     debugPrint('[GroupWebRtcService] Sending answer to $odUserId');

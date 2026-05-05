@@ -456,25 +456,40 @@ export class WebRtcGroupCallService {
     console.log('[GroupCall] 📥 Offer from:', payload.senderUserId)
 
     const senderUserId = payload.senderUserId || payload.userId || ''
-    if (!this.state.peers.has(senderUserId)) {
-      const isId = (s: string | undefined | null) => typeof s === 'string' && s.length > 20 && /^[0-9a-fA-F-]/.test(s)
-      let name = payload.displayName || payload.name || payload.fullName || payload.full_name || payload.callerName
-      if (!name || isId(name)) {
-        name = this.resolveName?.(senderUserId) || name || senderUserId
-      }
 
-      let avatarUrl = payload.avatarUrl || payload.callerAvatar
-      if (!avatarUrl) {
-        avatarUrl = this.resolveAvatar?.(senderUserId) || ''
-      }
+    // FIX: Always try to resolve displayName from the incoming offer payload first.
+    // This ensures we get the correct name even if the peer was created with a
+    // placeholder name (e.g., "Người dùng") before the userMap was populated.
+    const isId = (s: string | undefined | null) => typeof s === 'string' && s.length > 20 && /^[0-9a-fA-F-]/.test(s)
+    const payloadName = payload.displayName || payload.name || payload.fullName || payload.full_name || payload.callerName
+    const payloadNameResolved = (!payloadName || isId(payloadName)) ? undefined : payloadName
+    const resolvedAvatar = payload.avatarUrl || payload.callerAvatar
+
+    if (!this.state.peers.has(senderUserId)) {
+      let name = payloadNameResolved || this.resolveName?.(senderUserId) || senderUserId
+      let avatarUrl = resolvedAvatar || this.resolveAvatar?.(senderUserId) || ''
 
       this.createPeerState({
         userId: senderUserId,
-        displayName: name || '',
+        displayName: name || 'Người dùng',
         avatarUrl: avatarUrl || '',
         isMicOn: payload.isMicOn ?? true,
         isCameraOn: payload.isCameraOn ?? true,
       })
+    } else {
+      // FIX: Peer already exists (created from user-joined). Update displayName
+      // if the offer payload has a better name (not a generic ID).
+      const existing = this.state.peers.get(senderUserId)!
+      const existingIsPlaceholder = isId(existing.displayName) || existing.displayName === 'Người dùng'
+      if (existingIsPlaceholder && payloadNameResolved) {
+        existing.displayName = payloadNameResolved
+        existing.avatarUrl = resolvedAvatar || existing.avatarUrl
+        this.notify()
+        console.log('[GroupCall] Updated peer name from offer:', { senderUserId, displayName: payloadNameResolved })
+      } else if (!existing.avatarUrl && resolvedAvatar) {
+        existing.avatarUrl = resolvedAvatar
+        this.notify()
+      }
     }
 
     const peer = this.state.peers.get(senderUserId)!

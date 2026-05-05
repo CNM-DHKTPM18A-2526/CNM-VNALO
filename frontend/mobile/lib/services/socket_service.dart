@@ -762,14 +762,16 @@ class SocketService with ChangeNotifier {
     required String targetUserId,
     required Map<String, dynamic> sdp,
     required String senderUserId,
+    String? displayName,
   }) {
-    debugPrint('[SocketService][GROUP_CALL][SEND] offer callId=$callId target=$targetUserId');
+    debugPrint('[SocketService][GROUP_CALL][SEND] offer callId=$callId target=$targetUserId displayName=$displayName');
     _socket?.emit('group-call:offer', {
       'conversationId': conversationId,
       'callId': callId,
       'targetUserId': targetUserId,
       'sdp': sdp,
       'senderUserId': senderUserId,
+      if (displayName != null) 'displayName': displayName,
     });
   }
 

@@ -2707,6 +2707,13 @@ export default function ChatPage() {
     const url = `/call/${callId}?type=${isGroup ? "group" : "direct"}&conversationId=${selectedConversationId}&peerId=${peerUserId}&audioOnly=${type === "audio"}&isCaller=true&peerName=${encodeURIComponent(peerName)}&peerAvatar=${encodeURIComponent(peerAvatar)}`;
     console.log("[CALL][INITIATE-POPUP]", { url });
 
+    // FIX: Pre-fetch profiles for all group members BEFORE opening popup.
+    // This ensures userMap has displayNames for all participants, preventing userId display in group call UI.
+    if (isGroup && accessToken) {
+      const memberIds = selectedConversation?.participantUserIds || [];
+      await Promise.all(memberIds.map(id => ensureUser(accessToken!, id)));
+    }
+
     // Store call metadata in callStateRef so handleEndCall can access callId
     // BEFORE opening the popup (needed for the early-return guard and message creation)
     callStateRef.current = {
@@ -2724,7 +2731,7 @@ export default function ChatPage() {
     const height = window.screen.availHeight;
     window.open(url, "VnaloCall", `width=${width},height=${height},menubar=no,toolbar=no,location=no,status=no`);
     setCallState(prev => ({ ...prev, isOpen: false }));
-  }, [selectedConversationId, selectedConversation]);
+  }, [selectedConversationId, selectedConversation, userMap, accessToken]);
 
 
   const handleEndCall = useCallback(async (data: any = 'hangup') => {

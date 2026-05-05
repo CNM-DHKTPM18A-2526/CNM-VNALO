@@ -267,14 +267,23 @@ export function useGroupCall({
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const serviceRef = useRef<WebRtcGroupCallService | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const userMapRef = useRef(userMap)
 
-  const resolveName = useCallback((uid: string) => {
-    return userMap?.[uid]?.displayName || undefined
+  // Always keep userMapRef in sync with the latest userMap (avoids stale closure in service)
+  useEffect(() => {
+    userMapRef.current = userMap
   }, [userMap])
+
+  // FIX: Use userMapRef directly instead of userMap in closures.
+  // This prevents stale closures where resolveName/resolveAvatar capture
+  // an old userMap that doesn't have group members' profiles yet.
+  const resolveName = useCallback((uid: string) => {
+    return userMapRef.current?.[uid]?.displayName || undefined
+  }, [])
 
   const resolveAvatar = useCallback((uid: string) => {
-    return userMap?.[uid]?.avatarUrl || undefined
-  }, [userMap])
+    return userMapRef.current?.[uid]?.avatarUrl || undefined
+  }, [])
 
   // Listen for incoming group-call:started from OTHER users
   useEffect(() => {
@@ -329,7 +338,7 @@ export function useGroupCall({
         conversationId: conversationId,
         conversationName: conversationName,
         callerName: callerName,
-        callerAvatar: payload.callerAvatar || payload.avatarUrl || (userMap?.[callerUserId]?.avatarUrl ?? undefined),
+        callerAvatar: payload.callerAvatar || payload.avatarUrl || (userMapRef.current?.[callerUserId]?.avatarUrl ?? undefined),
         groupAvatar: groupAvatar || undefined,
         audioOnly: !!payload.audioOnly,
       })
@@ -341,7 +350,7 @@ export function useGroupCall({
     return () => {
       socket.off('group-call:started', onGroupCallStarted)
     }
-  }, [socket, currentUserId, snapshot, resolveName, userMap, conversations])
+  }, [socket, currentUserId, snapshot, conversations])
 
   // Khi cuộc gọi kết thúc hoàn toàn (người cuối rời) HOẶC chính mình đã join từ máy khác → dismiss banner
   useEffect(() => {
