@@ -413,9 +413,11 @@ export class WebRtcGroupCallService {
     if (senderUserId === this.currentUserId) return
     if (this.state.peers.has(senderUserId)) return
 
-    // Resolve identity if missing
-    if (!displayName || displayName === 'Người dùng') {
-      displayName = this.resolveName?.(senderUserId) || displayName || 'Người dùng'
+    // Resolve identity if missing or technical ID
+    const isId = (s: any) => typeof s === 'string' && s.length > 20 && /^[0-9a-fA-F-]/.test(s)
+    if (!displayName || displayName === 'Người dùng' || isId(displayName)) {
+      const resolved = this.resolveName?.(senderUserId)
+      displayName = resolved || (isId(displayName) ? 'Người dùng' : (displayName || 'Người dùng'))
     }
     if (!avatarUrl) {
       avatarUrl = this.resolveAvatar?.(senderUserId) || ''
@@ -620,9 +622,24 @@ export class WebRtcGroupCallService {
     }
 
     pc.ontrack = (event) => {
-      console.log('[GroupCall] 🎥 Remote track from:', user.userId)
-      const stream = event.streams?.[0] ?? new MediaStream([event.track])
-      peerState.remoteStream = stream
+      console.log(`[GroupCall] 🎥 Remote track (${event.track.kind}) from:`, user.userId)
+      
+      // Standard way: use the first stream provided by the event
+      if (event.streams && event.streams[0]) {
+        peerState.remoteStream = event.streams[0]
+      } else {
+        // Fallback: manually accumulate tracks if streams are not provided
+        if (!peerState.remoteStream) {
+          peerState.remoteStream = new MediaStream()
+        }
+        const existingTracks = peerState.remoteStream.getTracks()
+        if (!existingTracks.find(t => t.id === event.track.id)) {
+          peerState.remoteStream.addTrack(event.track)
+        }
+      }
+
+      const stream = peerState.remoteStream
+      if (!stream) return
 
       const existing = this.remoteAnalysers.get(user.userId)
       if (existing) destroySpeakerAnalyser(existing)

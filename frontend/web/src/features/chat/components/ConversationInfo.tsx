@@ -22,7 +22,6 @@ import {
   Plus,
   Users,
   Search,
-  MoreHorizontal,
   Camera,
   HelpCircle,
   Copy,
@@ -40,7 +39,6 @@ import { UserAvatar } from '../../../shared/components/UserAvatar';
 import { Modal } from '../../../shared/components/ui/Modal';
 import { useUserStore } from '../context/UserStoreContext';
 import { getGroupCollageData } from '../../../shared/utils/avatarUtils';
-import type { Friend } from '../../friends/friends.types';
 import { GroupBulletin } from './GroupBulletin';
 
 type ConversationInfoProps = {
@@ -60,8 +58,7 @@ type ConversationInfoProps = {
   onDisbandGroup?: () => void;
   onJumpToMessage?: (messageId: string) => void;
   onSendPoll?: (poll: any) => void;
-  friends?: Friend[];
-};
+}
 
 type SectionKey = 'media' | 'files' | 'links' | 'security' | 'bulletin';
 
@@ -84,7 +81,6 @@ export function ConversationInfo({
   onDisbandGroup,
   onJumpToMessage,
   onSendPoll,
-  friends,
   currentUserId
 }: ConversationInfoProps & {
   currentUserId?: string;
@@ -103,7 +99,6 @@ export function ConversationInfo({
     bulletin: true,
   });
   const [isHidden, setIsHidden] = React.useState(false);
-  const [membersExpanded, setMembersExpanded] = React.useState(true);
   const [showGroupManagement, setShowGroupManagement] = React.useState(false);
   const [showMembersView, setShowMembersView] = React.useState(false);
   const [showLeaderDeputyView, setShowLeaderDeputyView] = React.useState(false);
@@ -243,7 +238,7 @@ export function ConversationInfo({
           token={accessToken || ''}
           messages={messages}
           onClose={() => setShowBulletinView(false)}
-          onJumpToMessage={onJumpToMessage}
+          onJumpToMessage={onJumpToMessage!}
           onSendPoll={onSendPoll}
           currentUserId={currentUserId}
           reactionStates={reactionStates}
@@ -258,7 +253,6 @@ export function ConversationInfo({
             setShowKickModal(true);
           }}
           onPromoteDeputy={onUpdateMemberRole}
-          friends={friends}
         />
       ) : showGroupManagement ? (
         <GroupManagementView
@@ -1362,7 +1356,7 @@ function AdjustDeputyModal({
                 const avatar = userMap[id]?.avatarUrl || members.find(m => m.userId === id)?.avatarUrl;
                 return (
                   <div key={id} className="flex items-center gap-2 bg-[var(--surface-hover)] p-2 rounded-lg border border-[var(--border)] group transition-all">
-                    <UserAvatar name={name} imageUrl={avatar} size="xs" />
+                    <UserAvatar name={name} imageUrl={avatar} size="sm" />
                     <span className="text-[13px] font-medium text-blue-800 dark:text-sky-300 truncate flex-1">{name}</span>
                     <button 
                       onClick={(e) => {
@@ -1410,13 +1404,12 @@ function AdjustDeputyModal({
   );
 }
 
-function MemberListView({ conversation, currentUserId, onAddMembers, onKickMember, onPromoteDeputy, friends }: { 
+function MemberListView({ conversation, currentUserId, onAddMembers, onKickMember, onPromoteDeputy }: { 
   conversation: ConversationSummary; 
   currentUserId?: string; 
   onAddMembers?: () => void;
   onKickMember?: (userId: string) => void;
   onPromoteDeputy?: (userId: string, role: string) => void;
-  friends?: Friend[];
 }) {
   const { userMap } = useUserStore();
   const [searchTerm, setSearchTerm] = React.useState('');

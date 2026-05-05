@@ -64,13 +64,7 @@ type RawMessageLike = RawMessage & {
   recalled_at?: string | null
 }
 
-type MediaUploadResponse = {
-  url: string
-  mediaId?: string
-  mimeType: string | null
-  sizeBytes: number | null
-  thumbnailUrl: string | null
-}
+
 
 export type UploadedChatMedia = {
   url: string
@@ -430,7 +424,7 @@ export async function fetchInbox(token: string, currentUserId?: string): Promise
         ?? normalizedMembers[0]
       const partnerUserId = String(peerMember?.userId ?? '').trim() || null
       const peerNickname = peerMember?.nickname?.trim()
-      const peerFallback = partnerUserId ? `Người dùng ${partnerUserId.slice(0, 8)}` : null
+      const peerFallback = 'Người dùng'
       const normalizedPreview = normalizeInboxPreview(item.lastMessagePreview)
       const isGroup = item.conversation?.type?.toUpperCase() === 'GROUP' || (item as any).isGroup === true
       const avatarUrl = item.conversation?.avatarUrl ?? (item as any).avatarUrl ?? (item as any).avatar_url ?? null
@@ -441,7 +435,7 @@ export async function fetchInbox(token: string, currentUserId?: string): Promise
       return {
         id,
         userId: partnerUserId,
-        name: title && title.length > 0 ? title : peerNickname || peerFallback || `Trò chuyện ${id.slice(0, 8)}`,
+        name: title && title.length > 0 ? title : peerNickname || peerFallback || "Người dùng",
         lastMessage: normalizedPreview,
         lastMessagePreview: normalizedPreview,
         unreadCount: item.unreadCount ?? 0,

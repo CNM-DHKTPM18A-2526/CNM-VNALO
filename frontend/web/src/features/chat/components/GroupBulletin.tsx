@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, Plus, MessageCircle, Link, AlarmClock, FileText, ChevronRight } from 'lucide-react';
+import { MessageCircle, Link, FileText, ChevronRight } from 'lucide-react';
 import { UserAvatar } from '../../../shared/components/UserAvatar';
 import { useUserStore } from '../context/UserStoreContext';
 import { fetchPinnedMessages, type RawPinnedMessage, type ChatMessage } from '../chat.api';
@@ -19,7 +19,7 @@ interface GroupBulletinProps {
   reactionStates?: Record<string, any>;
 }
 
-export function GroupBulletin({ conversationId, token, messages, onClose, onJumpToMessage, onSendPoll, currentUserId, reactionStates }: GroupBulletinProps) {
+export function GroupBulletin({ conversationId, token, messages, onJumpToMessage, onSendPoll, currentUserId, reactionStates }: GroupBulletinProps) {
   const { userMap } = useUserStore();
   const [activeTab, setActiveTab] = React.useState<TabType>('all');
   const [pinnedItems, setPinnedItems] = React.useState<RawPinnedMessage[]>([]);

@@ -249,7 +249,7 @@ interface UseGroupCallOptions {
   currentUserId: string
   currentUserName: string
   currentUserAvatar?: string
-  userMap?: Record<string, { displayName?: string; name?: string; avatarUrl?: string }>
+  userMap?: Record<string, { displayName: string; avatarUrl: string | null; bio?: string | null }>
   conversations?: ConversationSummary[]
 }
 
@@ -269,11 +269,11 @@ export function useGroupCall({
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const resolveName = useCallback((uid: string) => {
-    return userMap?.[uid]?.displayName || userMap?.[uid]?.name
+    return userMap?.[uid]?.displayName || undefined
   }, [userMap])
 
   const resolveAvatar = useCallback((uid: string) => {
-    return userMap?.[uid]?.avatarUrl
+    return userMap?.[uid]?.avatarUrl || undefined
   }, [userMap])
 
   // Listen for incoming group-call:started from OTHER users
@@ -306,10 +306,11 @@ export function useGroupCall({
       const isId = (s: string | undefined | null) => typeof s === 'string' && s.length > 20 && /^[0-9a-fA-F-]/.test(s)
       let callerName = payload.callerName || payload.displayName || payload.name || payload.fullName || payload.full_name
       if (!callerName || isId(callerName)) {
-        callerName = resolveName(callerUserId) || callerName || 'Người dùng'
+        const resolved = resolveName(callerUserId)
+        callerName = resolved || (isId(callerName) ? 'Người dùng' : (callerName || 'Người dùng'))
       }
 
-      const conversationId = payload.conversationId || payload.groupId
+      const conversationId = (payload.conversationId || payload.groupId) as string
       const conversationName = payload.conversationName || payload.groupName || 'Cuộc gọi nhóm'
       const callId = payload.callId
 
@@ -328,8 +329,8 @@ export function useGroupCall({
         conversationId: conversationId,
         conversationName: conversationName,
         callerName: callerName,
-        callerAvatar: payload.callerAvatar || payload.avatarUrl || userMap?.[callerUserId]?.avatarUrl,
-        groupAvatar: groupAvatar,
+        callerAvatar: payload.callerAvatar || payload.avatarUrl || (userMap?.[callerUserId]?.avatarUrl ?? undefined),
+        groupAvatar: groupAvatar || undefined,
         audioOnly: !!payload.audioOnly,
       })
     }

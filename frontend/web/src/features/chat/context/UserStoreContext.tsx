@@ -4,6 +4,7 @@ import { getUserById } from '../../friends/friends.api'
 type CachedUserProfile = {
   displayName: string
   avatarUrl: string | null
+  bio?: string | null
 }
 
 type UserStoreContextType = {
@@ -22,7 +23,11 @@ export const UserStoreProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const upsertUser = React.useCallback((userId: string, profile: CachedUserProfile) => {
     setUserMap((prev) => {
       // Avoid unnecessary updates if data is identical
-      if (prev[userId]?.displayName === profile.displayName && prev[userId]?.avatarUrl === profile.avatarUrl) {
+      if (
+        prev[userId]?.displayName === profile.displayName && 
+        prev[userId]?.avatarUrl === profile.avatarUrl &&
+        prev[userId]?.bio === profile.bio
+      ) {
         return prev
       }
       console.log(`[UserStore] Seeding/Updating user ${userId}:`, profile.displayName)

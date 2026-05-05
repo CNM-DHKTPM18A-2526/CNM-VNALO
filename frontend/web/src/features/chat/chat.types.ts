@@ -19,7 +19,7 @@ export type ConversationSummary = {
   isCloud?: boolean
   memberCount?: number
   isPinned?: boolean
-  members?: Array<{ userId: string; role: string; displayName?: string; avatarUrl?: string }>
+  members?: Array<{ userId: string; role: string; displayName?: string; avatarUrl?: string; leftAt?: string | null }>
   onlyAdminCanPost?: boolean
   inviteLink?: string | null
   allowMemberEditInfo?: boolean

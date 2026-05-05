@@ -13,7 +13,7 @@ export function CreatePollModal({ onClose, onCreate }: CreatePollModalProps) {
   const [allowMultiple, setAllowMultiple] = React.useState(false);
   const [allowAddOption, setAllowAddOption] = React.useState(false);
   const [isAnonymous, setIsAnonymous] = React.useState(false);
-  const [expiresAt, setExpiresAt] = React.useState<string | null>(null);
+  // const [expiresAt, setExpiresAt] = React.useState<string | null>(null);
 
   const handleAddField = () => {
     setOptions([...options, '']);
@@ -42,7 +42,7 @@ export function CreatePollModal({ onClose, onCreate }: CreatePollModalProps) {
       allowMultiple,
       allowAddOption,
       isAnonymous,
-      expiresAt,
+      expiresAt: null,
       totalVotes: 0
     };
 

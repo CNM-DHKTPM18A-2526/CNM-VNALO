@@ -42,9 +42,10 @@ export const PremiumVideoTile: React.FC<PremiumVideoTileProps> = ({
     }
   }, [stream, isCameraOn])
 
-  const initials = displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+  const hasVideo = !!(stream && stream.getVideoTracks().length > 0)
+  const showVideo = isCameraOn && hasVideo
 
-  // Avatar size: 90px (Zalo standard)
+  const initials = displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
   const AVATAR_SIZE = 90
 
   return (
@@ -66,7 +67,7 @@ export const PremiumVideoTile: React.FC<PremiumVideoTileProps> = ({
       </div>
 
       {/* ── VIDEO CONTENT ── */}
-      {isCameraOn && stream && (
+      {showVideo && (
         <video
           ref={videoRef}
           autoPlay
@@ -76,9 +77,9 @@ export const PremiumVideoTile: React.FC<PremiumVideoTileProps> = ({
         />
       )}
 
-      {/* ── AVATAR + NAME OVERLAY (Visible when camera is off OR stream unavailable) ── */}
-      {(!isCameraOn || !stream) && (
-        <div className={`relative z-20 flex flex-col items-center justify-center animate-in fade-in zoom-in duration-500 ${hideCentralIdentity && stream ? 'hidden' : ''}`}>
+      {/* ── AVATAR + NAME OVERLAY (Visible when camera is off OR stream unavailable OR no video track) ── */}
+      {(!showVideo) && (
+        <div className={`relative z-20 flex flex-col items-center justify-center animate-in fade-in zoom-in duration-500 ${hideCentralIdentity && hasVideo ? 'hidden' : ''}`}>
           {/* Zalo-style concentric pulse rings */}
           <div className="relative mb-6">
             <div
@@ -154,7 +155,7 @@ export const PremiumVideoTile: React.FC<PremiumVideoTileProps> = ({
       )}
 
       {/* ── NAME + MIC BADGE OVERLAY (Bottom-left, visible only when video is on) ── */}
-      {isCameraOn && stream && (
+      {showVideo && (
         <div className="absolute bottom-10 left-8 z-30 flex items-center gap-2.5 bg-black/50 backdrop-blur-2xl px-4 py-2 rounded-2xl border border-white/[0.08] shadow-2xl">
           {!isMicOn && (
             <div className="w-5 h-5 rounded-full bg-[#FF3B30] flex items-center justify-center">
@@ -435,10 +436,10 @@ export const IncomingCallBanner: React.FC<IncomingCallBannerProps> = ({
           {/* Accept */}
           <button
             onClick={() => onAnswer(false)}
-            className="w-14 h-14 rounded-full bg-white hover:bg-white/90 active:scale-90 flex items-center justify-center text-[#0068FF] shadow-lg transition-all"
+            className="w-14 h-14 rounded-full bg-[#4CD964] hover:bg-[#43C259] active:scale-90 flex items-center justify-center text-white shadow-lg transition-all"
             title="Trả lời"
           >
-            <Phone size={22} className="fill-[#0068FF]" />
+            <Phone size={22} className="fill-white" />
           </button>
         </div>
 

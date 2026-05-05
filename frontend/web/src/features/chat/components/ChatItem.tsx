@@ -10,11 +10,10 @@ import { useAuth } from '../../auth/useAuth'
 type ChatItemProps = {
   conversation: ConversationSummary
   active: boolean
-  index: number
   onSelect: (conversationId: string) => void
 }
 
-export function ChatItem({ conversation, active, index, onSelect }: ChatItemProps) {
+export function ChatItem({ conversation, active, onSelect }: ChatItemProps) {
   const { user } = useAuth()
   const { userMap } = useUserStore()
   const isOnline = conversation?.online
