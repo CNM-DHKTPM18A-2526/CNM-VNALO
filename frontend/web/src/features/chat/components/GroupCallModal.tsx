@@ -249,7 +249,7 @@ interface UseGroupCallOptions {
   currentUserId: string
   currentUserName: string
   currentUserAvatar?: string
-  userMap?: Record<string, { displayName?: string; name?: string; avatarUrl?: string }>
+  userMap?: Record<string, { displayName: string; avatarUrl: string | null; bio?: string | null }>
   conversations?: ConversationSummary[]
 }
 
@@ -267,14 +267,23 @@ export function useGroupCall({
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const serviceRef = useRef<WebRtcGroupCallService | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const userMapRef = useRef(userMap)
 
-  const resolveName = useCallback((uid: string) => {
-    return userMap?.[uid]?.displayName || userMap?.[uid]?.name
+  // Always keep userMapRef in sync with the latest userMap (avoids stale closure in service)
+  useEffect(() => {
+    userMapRef.current = userMap
   }, [userMap])
+
+  // FIX: Use userMapRef directly instead of userMap in closures.
+  // This prevents stale closures where resolveName/resolveAvatar capture
+  // an old userMap that doesn't have group members' profiles yet.
+  const resolveName = useCallback((uid: string) => {
+    return userMapRef.current?.[uid]?.displayName || undefined
+  }, [])
 
   const resolveAvatar = useCallback((uid: string) => {
-    return userMap?.[uid]?.avatarUrl
-  }, [userMap])
+    return userMapRef.current?.[uid]?.avatarUrl || undefined
+  }, [])
 
   // Listen for incoming group-call:started from OTHER users
   useEffect(() => {
@@ -306,10 +315,11 @@ export function useGroupCall({
       const isId = (s: string | undefined | null) => typeof s === 'string' && s.length > 20 && /^[0-9a-fA-F-]/.test(s)
       let callerName = payload.callerName || payload.displayName || payload.name || payload.fullName || payload.full_name
       if (!callerName || isId(callerName)) {
-        callerName = resolveName(callerUserId) || callerName || 'Người dùng'
+        const resolved = resolveName(callerUserId)
+        callerName = resolved || (isId(callerName) ? 'Người dùng' : (callerName || 'Người dùng'))
       }
 
-      const conversationId = payload.conversationId || payload.groupId
+      const conversationId = (payload.conversationId || payload.groupId) as string
       const conversationName = payload.conversationName || payload.groupName || 'Cuộc gọi nhóm'
       const callId = payload.callId
 
@@ -328,8 +338,8 @@ export function useGroupCall({
         conversationId: conversationId,
         conversationName: conversationName,
         callerName: callerName,
-        callerAvatar: payload.callerAvatar || payload.avatarUrl || userMap?.[callerUserId]?.avatarUrl,
-        groupAvatar: groupAvatar,
+        callerAvatar: payload.callerAvatar || payload.avatarUrl || (userMapRef.current?.[callerUserId]?.avatarUrl ?? undefined),
+        groupAvatar: groupAvatar || undefined,
         audioOnly: !!payload.audioOnly,
       })
     }
@@ -340,7 +350,7 @@ export function useGroupCall({
     return () => {
       socket.off('group-call:started', onGroupCallStarted)
     }
-  }, [socket, currentUserId, snapshot, resolveName, userMap, conversations])
+  }, [socket, currentUserId, snapshot, conversations])
 
   // Khi cuộc gọi kết thúc hoàn toàn (người cuối rời) HOẶC chính mình đã join từ máy khác → dismiss banner
   useEffect(() => {

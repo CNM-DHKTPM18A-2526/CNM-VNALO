@@ -16,7 +16,7 @@ type MessageShareModalProps = {
 }
 
 function resolveFriendLabel(friend: Friend): string {
-  return friend.nickname?.trim() || friend.displayName?.trim() || `Người dùng ${friend.friendId.slice(0, 8)}`
+  return friend.nickname?.trim() || friend.displayName?.trim() || 'Người dùng'
 }
 
 export function MessageShareModal({

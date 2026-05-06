@@ -17,7 +17,7 @@ export function Sidebar({ onOpenSettingsModal, onOpenCaptureModal }: SidebarProp
   const { user } = useAuth()
   const { unreadMessageCount, pendingFriendRequestCount } = useNotifications()
 
-  const primaryNav = [
+  const primaryNav: Array<{ to: string; labelKey: string; icon: any; badge: number }> = [
     { to: '/chat', labelKey: 'sidebar.chat', icon: 'chat' as const, badge: unreadMessageCount },
     { to: '/contacts', labelKey: 'sidebar.contacts', icon: 'addressBook' as const, badge: pendingFriendRequestCount },
   ]
@@ -57,9 +57,9 @@ export function Sidebar({ onOpenSettingsModal, onOpenCaptureModal }: SidebarProp
           >
             <span aria-hidden className='sidebar-link-icon'>
               <Icon name={item.icon} />
-              {(item as any).badge > 0 && (
+              {item.badge > 0 && (
                 <span className='sidebar-badge'>
-                  {(item as any).badge > 99 ? '99+' : (item as any).badge}
+                  {item.badge > 99 ? '99+' : item.badge}
                 </span>
               )}
             </span>

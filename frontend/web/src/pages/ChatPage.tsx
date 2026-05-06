@@ -1971,7 +1971,7 @@ export default function ChatPage() {
   } = useGroupCall({
     socket: getSocket(),
     currentUserId,
-    currentUserName: user?.name ?? 'Báº¡n',
+    currentUserName: user?.name ?? 'Bạn',
     currentUserAvatar: user?.avatarUrl ?? '',
     userMap,
     conversations, // Added conversations here
@@ -2700,10 +2700,19 @@ export default function ChatPage() {
     const isGroup = !!selectedConversation?.isGroup;
     const callId = `call_${Date.now()}`;
     const peerUserId = selectedConversation?.userId || selectedConversationId;
-    const peerName = selectedConversation?.name || "Người dùng";
+    const peerName = (peerUserId && userMap[peerUserId]?.displayName && userMap[peerUserId].displayName !== 'Người dùng')
+      ? userMap[peerUserId].displayName
+      : (selectedConversation?.name || "Người dùng");
     const peerAvatar = selectedConversation?.avatarUrl || "";
     const url = `/call/${callId}?type=${isGroup ? "group" : "direct"}&conversationId=${selectedConversationId}&peerId=${peerUserId}&audioOnly=${type === "audio"}&isCaller=true&peerName=${encodeURIComponent(peerName)}&peerAvatar=${encodeURIComponent(peerAvatar)}`;
     console.log("[CALL][INITIATE-POPUP]", { url });
+
+    // FIX: Pre-fetch profiles for all group members BEFORE opening popup.
+    // This ensures userMap has displayNames for all participants, preventing userId display in group call UI.
+    if (isGroup && accessToken) {
+      const memberIds = selectedConversation?.participantUserIds || [];
+      await Promise.all(memberIds.map(id => ensureUser(accessToken!, id)));
+    }
 
     // Store call metadata in callStateRef so handleEndCall can access callId
     // BEFORE opening the popup (needed for the early-return guard and message creation)
@@ -2722,7 +2731,7 @@ export default function ChatPage() {
     const height = window.screen.availHeight;
     window.open(url, "VnaloCall", `width=${width},height=${height},menubar=no,toolbar=no,location=no,status=no`);
     setCallState(prev => ({ ...prev, isOpen: false }));
-  }, [selectedConversationId, selectedConversation]);
+  }, [selectedConversationId, selectedConversation, userMap, accessToken]);
 
 
   const handleEndCall = useCallback(async (data: any = 'hangup') => {
@@ -2986,7 +2995,9 @@ export default function ChatPage() {
   // const isAnsweringRef = useRef(false); // removed as unused
   const handleAnswerCall = useCallback(async (audioOnlyParam?: boolean) => {
     if (!callState.callId) return;
-    const peerName = callState.peerId ? (userMap[callState.peerId]?.displayName || "Người dùng") : "Người dùng";
+    const peerName = (callState.peerId && userMap[callState.peerId]?.displayName && userMap[callState.peerId].displayName !== 'Người dùng')
+      ? userMap[callState.peerId].displayName
+      : (selectedConversation?.name || "Người dùng");
     const peerAvatar = callState.peerId ? userMap[callState.peerId]?.avatarUrl : "";
     const url = `/call/${callState.callId}?type=direct&conversationId=${callState.conversationId}&peerId=${callState.peerId}&audioOnly=${audioOnlyParam === true || callState.type === "audio"}&isCaller=false&peerName=${encodeURIComponent(peerName)}&peerAvatar=${encodeURIComponent(peerAvatar || "")}`;
     console.log("[CALL][ANSWER-POPUP]", { url });
@@ -5421,7 +5432,6 @@ export default function ChatPage() {
         onMessageContextMenuAction={handleMessageContextMenuAction}
         onVotePoll={handleVotePoll}
         onInitiateCall={handleInitiateCall}
-        members={(selectedConversation?.members || []) as any}
       />
 
       <CreateGroupModal
@@ -5491,7 +5501,6 @@ export default function ChatPage() {
                 onDisbandGroup={handleDisbandGroup}
                 onJumpToMessage={setJumpToMessageId}
                 onSendPoll={handleSendPoll}
-                friends={friendsDirectory}
                 currentUserId={user?.id}
               />
             </>
@@ -5634,7 +5643,10 @@ export default function ChatPage() {
         />
       ) : (callState.isOpen && (callState as any).direction === 'incoming' && callState.status === 'connecting') ? (
         <IncomingCallBanner
-          peerName={callState.peerId ? (userMap[callState.peerId]?.displayName || "Người dùng") : (selectedConversation?.name || "Người dùng")}
+          peerName={(callState.peerId && userMap[callState.peerId]?.displayName && userMap[callState.peerId].displayName !== 'Người dùng')
+            ? userMap[callState.peerId].displayName
+            : (selectedConversation?.name || "Người dùng")
+          }
           peerAvatar={callState.peerId ? userMap[callState.peerId]?.avatarUrl : selectedConversation?.avatarUrl}
           isGroup={false}
           isAudioOnly={callState.type === 'audio'}

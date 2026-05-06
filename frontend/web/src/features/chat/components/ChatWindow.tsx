@@ -64,7 +64,6 @@ type ChatWindowProps = {
   onTogglePin?: (message: ChatMessage) => void
   onInitiateCall?: (type: 'audio' | 'video') => void
   onVotePoll?: (messageId: string, optionId: string) => void
-  members?: Array<{ userId: string; displayName: string; avatarUrl?: string | null }>
 }
 
 export function ChatWindow({
@@ -98,7 +97,6 @@ export function ChatWindow({
   onUnpinMessage,
   onInitiateCall,
   onVotePoll,
-  members = [],
 }: ChatWindowProps) {
   const { userMap } = useUserStore()
   const { t } = useLanguage()

@@ -413,9 +413,11 @@ export class WebRtcGroupCallService {
     if (senderUserId === this.currentUserId) return
     if (this.state.peers.has(senderUserId)) return
 
-    // Resolve identity if missing
-    if (!displayName || displayName === 'Người dùng') {
-      displayName = this.resolveName?.(senderUserId) || displayName || 'Người dùng'
+    // Resolve identity if missing or technical ID
+    const isId = (s: any) => typeof s === 'string' && s.length > 20 && /^[0-9a-fA-F-]/.test(s)
+    if (!displayName || displayName === 'Người dùng' || isId(displayName)) {
+      const resolved = this.resolveName?.(senderUserId)
+      displayName = resolved || (isId(displayName) ? 'Người dùng' : (displayName || 'Người dùng'))
     }
     if (!avatarUrl) {
       avatarUrl = this.resolveAvatar?.(senderUserId) || ''
@@ -454,25 +456,43 @@ export class WebRtcGroupCallService {
     console.log('[GroupCall] 📥 Offer from:', payload.senderUserId)
 
     const senderUserId = payload.senderUserId || payload.userId || ''
-    if (!this.state.peers.has(senderUserId)) {
-      const isId = (s: string | undefined | null) => typeof s === 'string' && s.length > 20 && /^[0-9a-fA-F-]/.test(s)
-      let name = payload.displayName || payload.name || payload.fullName || payload.full_name || payload.callerName
-      if (!name || isId(name)) {
-        name = this.resolveName?.(senderUserId) || name || senderUserId
-      }
 
-      let avatarUrl = payload.avatarUrl || payload.callerAvatar
-      if (!avatarUrl) {
-        avatarUrl = this.resolveAvatar?.(senderUserId) || ''
+    // FIX: Always try to resolve displayName from the incoming offer payload first.
+    // This ensures we get the correct name even if the peer was created with a
+    // placeholder name (e.g., "Người dùng") before the userMap was populated.
+    const isId = (s: string | undefined | null) => typeof s === 'string' && s.length > 20 && /^[0-9a-fA-F-]/.test(s)
+    const payloadName = payload.displayName || payload.name || payload.fullName || payload.full_name || payload.callerName
+    const payloadNameResolved = (!payloadName || isId(payloadName)) ? undefined : payloadName
+    const resolvedAvatar = payload.avatarUrl || payload.callerAvatar
+
+    if (!this.state.peers.has(senderUserId)) {
+      let name = payloadNameResolved || this.resolveName?.(senderUserId)
+      if (!name || isId(name)) {
+        name = 'Người dùng'
       }
+      let avatarUrl = resolvedAvatar || this.resolveAvatar?.(senderUserId) || ''
 
       this.createPeerState({
         userId: senderUserId,
-        displayName: name || '',
+        displayName: name,
         avatarUrl: avatarUrl || '',
         isMicOn: payload.isMicOn ?? true,
         isCameraOn: payload.isCameraOn ?? true,
       })
+    } else {
+      // FIX: Peer already exists (created from user-joined). Update displayName
+      // if the offer payload has a better name (not a generic ID).
+      const existing = this.state.peers.get(senderUserId)!
+      const existingIsPlaceholder = isId(existing.displayName) || existing.displayName === 'Người dùng'
+      if (existingIsPlaceholder && payloadNameResolved) {
+        existing.displayName = payloadNameResolved
+        existing.avatarUrl = resolvedAvatar || existing.avatarUrl
+        this.notify()
+        console.log('[GroupCall] Updated peer name from offer:', { senderUserId, displayName: payloadNameResolved })
+      } else if (!existing.avatarUrl && resolvedAvatar) {
+        existing.avatarUrl = resolvedAvatar
+        this.notify()
+      }
     }
 
     const peer = this.state.peers.get(senderUserId)!
@@ -620,9 +640,24 @@ export class WebRtcGroupCallService {
     }
 
     pc.ontrack = (event) => {
-      console.log('[GroupCall] 🎥 Remote track from:', user.userId)
-      const stream = event.streams?.[0] ?? new MediaStream([event.track])
-      peerState.remoteStream = stream
+      console.log(`[GroupCall] 🎥 Remote track (${event.track.kind}) from:`, user.userId)
+      
+      // Standard way: use the first stream provided by the event
+      if (event.streams && event.streams[0]) {
+        peerState.remoteStream = event.streams[0]
+      } else {
+        // Fallback: manually accumulate tracks if streams are not provided
+        if (!peerState.remoteStream) {
+          peerState.remoteStream = new MediaStream()
+        }
+        const existingTracks = peerState.remoteStream.getTracks()
+        if (!existingTracks.find(t => t.id === event.track.id)) {
+          peerState.remoteStream.addTrack(event.track)
+        }
+      }
+
+      const stream = peerState.remoteStream
+      if (!stream) return
 
       const existing = this.remoteAnalysers.get(user.userId)
       if (existing) destroySpeakerAnalyser(existing)

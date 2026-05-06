@@ -244,23 +244,21 @@ export const ChatList = React.memo(function ChatList({
       </div>
       <div className='chat-list'>
         {hasKeyword ? <p>{t('chat.searchConversationsSection')}</p> : null}
-        {localConversationMatches.map((conversation, index) => (
+        {localConversationMatches.map((conversation) => (
           <ChatItem
             key={conversation.id}
             conversation={conversation}
             active={conversation.id === activeConversationId}
-            index={index}
             onSelect={onSelectConversation}
           />
         ))}
 
         {friendLookupItems.length > 0 ? <p>{t('chat.searchFriendsSection')}</p> : null}
-        {friendLookupItems.map((entry, index) => (
+        {friendLookupItems.map((entry) => (
           <ChatItem
             key={`friend-${entry.user.id}`}
             conversation={entry.conversation}
             active={entry.conversation.id === activeConversationId}
-            index={localConversationMatches.length + index}
             onSelect={() => {
               void onOpenFriendChat(entry.user)
             }}

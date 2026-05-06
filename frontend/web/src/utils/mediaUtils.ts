@@ -30,7 +30,7 @@ export function resolveMediaUrl(url?: string | null): string {
       const base = (API_BASE_URL || '').replace(/\/api\/v1\/?$/, '');
       const finalBase = base || window.location.origin;
       return `${finalBase}/api/v1/media/public-file?key=${encodeURIComponent(objectKey)}&category=${category}`;
-    } catch (e) {
+    } catch {
       return url;
     }
   }
