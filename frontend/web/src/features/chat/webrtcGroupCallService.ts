@@ -466,12 +466,15 @@ export class WebRtcGroupCallService {
     const resolvedAvatar = payload.avatarUrl || payload.callerAvatar
 
     if (!this.state.peers.has(senderUserId)) {
-      let name = payloadNameResolved || this.resolveName?.(senderUserId) || senderUserId
+      let name = payloadNameResolved || this.resolveName?.(senderUserId)
+      if (!name || isId(name)) {
+        name = 'Người dùng'
+      }
       let avatarUrl = resolvedAvatar || this.resolveAvatar?.(senderUserId) || ''
 
       this.createPeerState({
         userId: senderUserId,
-        displayName: name || 'Người dùng',
+        displayName: name,
         avatarUrl: avatarUrl || '',
         isMicOn: payload.isMicOn ?? true,
         isCameraOn: payload.isCameraOn ?? true,

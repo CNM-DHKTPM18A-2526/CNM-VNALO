@@ -369,7 +369,7 @@ export const IncomingCallBanner: React.FC<IncomingCallBannerProps> = ({
 
   return (
     <div className="fixed bottom-6 right-6 z-[1000] w-[320px] animate-in slide-in-from-bottom-10 duration-300 ease-out">
-      <div className="bg-[#0068FF] rounded-2xl overflow-hidden shadow-[0_8px_40px_rgba(0,104,255,0.4)] flex flex-col">
+      <div className="bg-[#0068FF] rounded-none overflow-hidden shadow-[0_8px_40px_rgba(0,104,255,0.4)] flex flex-col">
 
         {/* ── ZALO BLUE HEADER ── */}
         <div className="px-4 pt-4 pb-3 flex items-center gap-3">
@@ -436,7 +436,7 @@ export const IncomingCallBanner: React.FC<IncomingCallBannerProps> = ({
           {/* Accept */}
           <button
             onClick={() => onAnswer(false)}
-            className="w-14 h-14 rounded-full bg-[#4CD964] hover:bg-[#43C259] active:scale-90 flex items-center justify-center text-white shadow-lg transition-all"
+            className="w-14 h-14 rounded-full bg-[#28A745] hover:bg-[#218838] active:scale-90 flex items-center justify-center text-white shadow-lg transition-all"
             title="Trả lời"
           >
             <Phone size={22} className="fill-white" />
