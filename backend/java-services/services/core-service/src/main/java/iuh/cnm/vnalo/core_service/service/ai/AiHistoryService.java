@@ -26,4 +26,11 @@ public class AiHistoryService {
                 .build();
         historyRepository.save(history);
     }
+
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public java.util.List<AiChatHistory> getHistory(UUID userId, UUID conversationId) {
+        return historyRepository.findByUserIdAndConversationIdOrderByCreatedAtDesc(
+                userId, conversationId, org.springframework.data.domain.PageRequest.of(0, 200)
+        ).getContent();
+    }
 }

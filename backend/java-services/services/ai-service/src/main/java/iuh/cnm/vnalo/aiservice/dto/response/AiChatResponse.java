@@ -26,4 +26,7 @@ public class AiChatResponse {
 
     // Billing/Quota limits tracking
     private int estimatedTokens;
+
+    // Stable, server-provided unique assistant conversation ID for this user session
+    private String conversationId;
 }

@@ -34,14 +34,14 @@ public class AiInteractionController {
                 request.getMascotId(), request.isAnalyzeIntent(), request.isEnableDeepSummary());
         
         try {
-            AiChatResponse response = geminiAiService.interactWithGemini(request);
+            String userId = getCurrentUserId();
+            AiChatResponse response = geminiAiService.interactWithGemini(userId, request);
             return ResponseEntity.ok(ApiResponse.ok(response));
             
+        } catch (iuh.cnm.vnalo.aiservice.exception.RateLimitExceededException e) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(ApiResponse.error(429, e.getMessage()));
         } catch (RuntimeException e) {
-            if ("QUOTA_EXCEEDED".equals(e.getMessage())) {
-                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                        .body(ApiResponse.error(429, "AI Assistant is currently overloaded. Please try again later."));
-            }
             log.error("AI Interaction error: ", e);
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body(ApiResponse.error(503, "VNALO Brain is restarting."));

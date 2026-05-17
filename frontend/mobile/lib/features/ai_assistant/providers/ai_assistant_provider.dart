@@ -26,7 +26,7 @@ class AiAssistantProvider with ChangeNotifier {
   static const Duration _sttPauseFor = Duration(seconds: 2);
   static const Duration _idleAutoHideDelay = Duration(seconds: 12);
   static const int _maxConversationEntries = 200;
-  static const String aiConversationId = 'AI_ASSISTANT_LOCAL';
+  static const String aiConversationId = '00000000-0000-0000-0000-000000000000';
 
   final AiService _aiService;
   final FlutterTts _tts = FlutterTts();
@@ -51,6 +51,7 @@ class AiAssistantProvider with ChangeNotifier {
 
   final List<Map<String, String>> _sessionHistory = [];
   final List<AiConversationEntry> _conversationHistory = [];
+  String? _serverConversationId;
   final StreamController<AiCommand> _systemActionController =
       StreamController<AiCommand>.broadcast();
 
@@ -594,12 +595,26 @@ class AiAssistantProvider with ChangeNotifier {
     await _stt.stop();
 
     try {
-      final contextPrompt = _buildContextPrompt(normalized);
+      final List<Map<String, dynamic>> structuredHistory = [];
+      // Use persisted conversation history instead of session history to support cross-restart context!
+      final historySubset = _conversationHistory.length > 10
+          ? _conversationHistory.sublist(_conversationHistory.length - 10)
+          : _conversationHistory;
+      for (final entry in historySubset) {
+        final role = entry.role == AiConversationRole.user ? 'user' : 'assistant';
+        structuredHistory.add({
+          'role': role,
+          'content': entry.text,
+        });
+      }
+
       final response = await _aiService
           .chat(
-            contextPrompt,
+            normalized,
+            contextId: _serverConversationId ?? aiConversationId,
             analyzeIntent: true,
             enableDeepSummary: _enableDeepSummary,
+            history: structuredHistory,
           )
           .timeout(_aiTimeout);
 
@@ -611,6 +626,11 @@ class AiAssistantProvider with ChangeNotifier {
       _currentEmotion = (response['emotion'] ?? 'neutral').toString();
       final actionCommand = response['actionCommand']?.toString();
       final actionParams = response['actionParams'];
+
+      // Track server-provided stable conversation ID
+      if (response['conversationId'] != null) {
+        _serverConversationId = response['conversationId'].toString();
+      }
 
       _recordHistory(userText: normalized, aiText: _aiResponse);
 
@@ -1088,7 +1108,7 @@ class AiAssistantProvider with ChangeNotifier {
         _conversationHistory.map((entry) => entry.toJson()).toList();
     try {
       await _aiService.backupConversationHistory(
-        conversationId: aiConversationId,
+        conversationId: _serverConversationId ?? aiConversationId,
         entries: payload,
       );
       _logEvent('CLOUD_BACKUP_SYNCED', data: {'entries': payload.length});
@@ -1101,19 +1121,7 @@ class AiAssistantProvider with ChangeNotifier {
     }
   }
 
-  String _buildContextPrompt(String text) {
-    if (_sessionHistory.isEmpty) {
-      return text;
-    }
 
-    final buffer = StringBuffer('Lịch sử trò chuyện gần đây:\n');
-    for (final msg in _sessionHistory) {
-      buffer.writeln('${msg['role']}: ${msg['text']}');
-    }
-    buffer.writeln('---');
-    buffer.write(text);
-    return buffer.toString();
-  }
 
   String _contextPromptLabel(String source) {
     return switch (source) {
@@ -1411,7 +1419,7 @@ class AiConversationEntry {
 
   Map<String, dynamic> toJson() => {
     'role': role.name,
-    'text': text,
+    'content': text,
     'source': source,
     'createdAt': createdAt.toIso8601String(),
   };
@@ -1428,7 +1436,7 @@ class AiConversationEntry {
 
     return AiConversationEntry(
       role: resolvedRole,
-      text: (json['text'] ?? '').toString(),
+      text: (json['content'] ?? json['text'] ?? '').toString(),
       source: (json['source'] ?? 'assistant_chat').toString(),
       createdAt: parsedCreatedAt,
     );

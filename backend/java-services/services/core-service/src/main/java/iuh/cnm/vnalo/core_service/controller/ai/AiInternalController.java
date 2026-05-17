@@ -29,6 +29,22 @@ public class AiInternalController {
         return ResponseEntity.ok().build();
     }
 
+    @GetMapping("/history")
+    public ResponseEntity<java.util.List<MessageEntry>> getHistory(@RequestParam UUID userId, @RequestParam UUID conversationId) {
+        java.util.List<iuh.cnm.vnalo.core_service.model.entity.ai.AiChatHistory> dbHistory = aiHistoryService.getHistory(userId, conversationId);
+        java.util.List<MessageEntry> response = new java.util.ArrayList<>();
+        // Reverse order so that oldest messages come first (chronological order)
+        for (int i = dbHistory.size() - 1; i >= 0; i--) {
+            iuh.cnm.vnalo.core_service.model.entity.ai.AiChatHistory entity = dbHistory.get(i);
+            MessageEntry entry = new MessageEntry();
+            entry.setRole(entity.getRole());
+            entry.setContent(entity.getContent());
+            entry.setProvider(entity.getProvider());
+            response.add(entry);
+        }
+        return ResponseEntity.ok(response);
+    }
+
     @Data
     public static class SaveHistoryRequest {
         private UUID userId;

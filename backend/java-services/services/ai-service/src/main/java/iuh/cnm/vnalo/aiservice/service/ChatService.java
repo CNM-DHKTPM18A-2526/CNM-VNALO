@@ -58,6 +58,14 @@ public class ChatService {
         this.objectMapper = new ObjectMapper();
     }
 
+    public void enforceUserRateLimit(String userId) {
+        checkRateLimit(userId);
+    }
+
+    public void enforceGlobalRateLimit() {
+        checkGlobalRateLimit();
+    }
+
     public ChatResponse ask(String userId, String message, String conversationId) {
         // 1. Check Rate Limit
         checkRateLimit(userId);
@@ -138,13 +146,31 @@ public class ChatService {
     public void backupHistory(String userId, String conversationId, List<Message> entries) {
         if (entries == null || entries.isEmpty()) return;
         saveHistory(userId, conversationId, entries);
+
+        java.util.List<java.util.Map<String, String>> messagesToSave = new java.util.ArrayList<>();
+        for (Message entry : entries) {
+            java.util.Map<String, String> msg = new java.util.HashMap<>();
+            msg.put("role", entry.getRole());
+            msg.put("content", entry.getContent());
+            msg.put("provider", entry.getProvider() != null ? entry.getProvider() : "unknown");
+            messagesToSave.add(msg);
+        }
+        coreServiceClient.saveChatHistory(userId, conversationId, messagesToSave);
     }
 
     public List<Message> getHistory(String userId, String conversationId) {
         if (conversationId == null || conversationId.isBlank()) {
             return new ArrayList<>();
         }
-        return loadHistory(userId, conversationId);
+        List<Message> history = loadHistory(userId, conversationId);
+        if (history.isEmpty()) {
+            log.info("Redis cache miss for history user {}/conv {}. Restoring from core-service Postgres...", userId, conversationId);
+            history = coreServiceClient.getChatHistory(userId, conversationId);
+            if (!history.isEmpty()) {
+                saveHistory(userId, conversationId, history);
+            }
+        }
+        return history;
     }
 
     public List<String> getUserConversations(String userId) {

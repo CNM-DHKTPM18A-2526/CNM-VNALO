@@ -11,6 +11,7 @@ class AiService {
     String? contextId,
     bool analyzeIntent = false,
     bool enableDeepSummary = false,
+    List<Map<String, dynamic>>? history,
   }) async {
     try {
       final response = await _apiService.post(
@@ -21,6 +22,7 @@ class AiService {
           'contextId': contextId,
           'analyzeIntent': analyzeIntent,
           'enableDeepSummary': enableDeepSummary,
+          if (history != null) 'history': history,
         },
       );
 

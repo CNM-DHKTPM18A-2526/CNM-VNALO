@@ -18,4 +18,11 @@ public class Message {
     @NotNull(message = "Content is required")
     @NotBlank(message = "Content cannot be blank")
     private String content;
+
+    private String provider;
+
+    public Message(String role, String content) {
+        this.role = role;
+        this.content = content;
+    }
 }
