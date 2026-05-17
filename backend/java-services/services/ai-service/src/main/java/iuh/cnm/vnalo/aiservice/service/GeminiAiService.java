@@ -108,12 +108,14 @@ public class GeminiAiService {
             Map<String, String> userMsg = new HashMap<>();
             userMsg.put("role", "user");
             userMsg.put("content", request.getPrompt());
+            userMsg.put("createdAt", java.time.OffsetDateTime.now().toString());
             messagesToSave.add(userMsg);
 
             Map<String, String> assistantMsg = new HashMap<>();
             assistantMsg.put("role", "assistant");
             assistantMsg.put("content", answer);
             assistantMsg.put("provider", provider);
+            assistantMsg.put("createdAt", java.time.OffsetDateTime.now().toString());
             messagesToSave.add(assistantMsg);
 
             coreServiceClient.saveChatHistory(userId, stableConvId, messagesToSave);
@@ -207,23 +209,49 @@ public class GeminiAiService {
                 response.setActionParams(cp);
             }
             if ("SEND_MESSAGE".equals(cmd)) {
-                if (!cp.containsKey("contactName") && !cp.containsKey("displayName")) {
+                String recipient = null;
+                if (cp.containsKey("recipient")) recipient = String.valueOf(cp.get("recipient"));
+                else if (cp.containsKey("target")) recipient = String.valueOf(cp.get("target"));
+                else if (cp.containsKey("contactName")) recipient = String.valueOf(cp.get("contactName"));
+                else if (cp.containsKey("displayName")) recipient = String.valueOf(cp.get("displayName"));
+
+                String content = null;
+                if (cp.containsKey("content")) content = String.valueOf(cp.get("content"));
+                else if (cp.containsKey("messageText")) content = String.valueOf(cp.get("messageText"));
+                else if (cp.containsKey("prefilledText")) content = String.valueOf(cp.get("prefilledText"));
+
+                if (recipient == null || recipient.trim().isEmpty() || content == null || content.trim().isEmpty()) {
                     valid = false;
-                }
-                if (!cp.containsKey("messageText") && !cp.containsKey("prefilledText")) {
-                    valid = false;
+                } else {
+                    cp.put("recipient", recipient.trim());
+                    cp.put("content", content.trim());
                 }
             } else if ("OPEN_CHAT".equals(cmd) || "START_CALL".equals(cmd)) {
-                if (!cp.containsKey("contactName") && !cp.containsKey("displayName")) {
+                String target = null;
+                if (cp.containsKey("target")) target = String.valueOf(cp.get("target"));
+                else if (cp.containsKey("recipient")) target = String.valueOf(cp.get("recipient"));
+                else if (cp.containsKey("contactName")) target = String.valueOf(cp.get("contactName"));
+                else if (cp.containsKey("displayName")) target = String.valueOf(cp.get("displayName"));
+
+                if (target == null || target.trim().isEmpty()) {
                     valid = false;
+                } else {
+                    cp.put("target", target.trim());
                 }
             } else if ("NAVIGATE_TO".equals(cmd)) {
-                if (!cp.containsKey("destination") && !cp.containsKey("screen")) {
+                String page = null;
+                if (cp.containsKey("page")) page = String.valueOf(cp.get("page"));
+                else if (cp.containsKey("destination")) page = String.valueOf(cp.get("destination"));
+                else if (cp.containsKey("screen")) page = String.valueOf(cp.get("screen"));
+
+                if (page == null || page.trim().isEmpty()) {
                     valid = false;
+                } else {
+                    cp.put("page", page.trim().toLowerCase());
                 }
             }
             if (!valid) {
-                log.warn("Blocked action command '{}' due to missing required schema fields in params: {}", cmd, cp);
+                log.warn("Blocked action command '{}' due to missing or invalid required schema fields in params: {}", cmd, cp);
                 response.setActionCommand(null);
                 response.setActionParams(null);
             }

@@ -153,6 +153,9 @@ public class ChatService {
             msg.put("role", entry.getRole());
             msg.put("content", entry.getContent());
             msg.put("provider", entry.getProvider() != null ? entry.getProvider() : "unknown");
+            if (entry.getCreatedAt() != null) {
+                msg.put("createdAt", entry.getCreatedAt());
+            }
             messagesToSave.add(msg);
         }
         coreServiceClient.saveChatHistory(userId, conversationId, messagesToSave);

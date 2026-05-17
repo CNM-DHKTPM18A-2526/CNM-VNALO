@@ -68,9 +68,11 @@ public class CoreServiceClient {
                         String role = (String) map.get("role");
                         String content = (String) map.get("content");
                         String provider = (String) map.get("provider");
+                        String createdAt = (String) map.get("createdAt");
 
                         iuh.cnm.vnalo.aiservice.dto.Message message = new iuh.cnm.vnalo.aiservice.dto.Message(role, content);
                         message.setProvider(provider);
+                        message.setCreatedAt(createdAt);
                         messages.add(message);
                     }
                 }

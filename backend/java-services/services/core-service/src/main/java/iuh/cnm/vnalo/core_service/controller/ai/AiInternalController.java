@@ -18,12 +18,19 @@ public class AiInternalController {
     @PostMapping("/history")
     public ResponseEntity<Void> saveHistory(@RequestBody SaveHistoryRequest request) {
         for (MessageEntry entry : request.getMessages()) {
+            java.time.OffsetDateTime parsedTime = null;
+            if (entry.getCreatedAt() != null && !entry.getCreatedAt().trim().isEmpty()) {
+                try {
+                    parsedTime = java.time.OffsetDateTime.parse(entry.getCreatedAt().trim());
+                } catch (Exception ignored) {}
+            }
             aiHistoryService.saveMessage(
                     request.getUserId(),
                     request.getConversationId(),
                     entry.getRole(),
                     entry.getContent(),
-                    entry.getProvider()
+                    entry.getProvider(),
+                    parsedTime
             );
         }
         return ResponseEntity.ok().build();
@@ -40,6 +47,9 @@ public class AiInternalController {
             entry.setRole(entity.getRole());
             entry.setContent(entity.getContent());
             entry.setProvider(entity.getProvider());
+            if (entity.getCreatedAt() != null) {
+                entry.setCreatedAt(entity.getCreatedAt().toString());
+            }
             response.add(entry);
         }
         return ResponseEntity.ok(response);
@@ -57,5 +67,6 @@ public class AiInternalController {
         private String role;
         private String content;
         private String provider;
+        private String createdAt;
     }
 }

@@ -144,7 +144,7 @@ class AiAssistantProvider with ChangeNotifier {
     _serverConversationId = prefs.getString(_serverConversationIdPrefKey);
     await _loadConversationHistory(prefs: prefs);
 
-    if (_conversationHistory.isEmpty && _cloudBackupEnabled && _serverConversationId != null) {
+    if (_cloudBackupEnabled && _serverConversationId != null) {
       unawaited(_restoreConversationHistoryFromServer());
     }
 
@@ -1110,23 +1110,43 @@ class AiAssistantProvider with ChangeNotifier {
     try {
       final entries = await _aiService.restoreConversationHistory(conversationId: targetId);
       if (entries.isNotEmpty) {
-        _conversationHistory.clear();
+        final List<AiConversationEntry> merged = List.from(_conversationHistory);
         for (final map in entries) {
           final roleStr = map['role']?.toString() ?? 'user';
           final content = map['content']?.toString() ?? '';
           final provider = map['provider']?.toString();
+          final rawCreatedAt = map['createdAt']?.toString();
+          final parsedCreatedAt = rawCreatedAt != null
+              ? (DateTime.tryParse(rawCreatedAt) ?? DateTime.now())
+              : DateTime.now();
 
           final role = roleStr == 'user' ? AiConversationRole.user : AiConversationRole.assistant;
 
-          _conversationHistory.add(
-            AiConversationEntry(
-              role: role,
-              text: content,
-              source: provider ?? 'restored',
-              createdAt: DateTime.now(),
-            ),
-          );
+          // Check if this message already exists in local merged history (by content, role, and timestamp close to within 3 seconds)
+          final exists = merged.any((local) =>
+              local.role == role &&
+              local.text.trim() == content.trim() &&
+              (local.createdAt.difference(parsedCreatedAt).abs().inSeconds < 3));
+
+          if (!exists) {
+            merged.add(
+              AiConversationEntry(
+                role: role,
+                text: content,
+                source: provider ?? 'restored',
+                createdAt: parsedCreatedAt,
+              ),
+            );
+          }
         }
+
+        // Sort all entries chronologically by createdAt to guarantee correct order in UI
+        merged.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+        _conversationHistory
+          ..clear()
+          ..addAll(merged);
+
         await _persistConversationHistory();
         notifyListeners();
         _logEvent('CLOUD_HISTORY_RESTORED', data: {'entries': _conversationHistory.length});

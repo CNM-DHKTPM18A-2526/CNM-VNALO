@@ -67,7 +67,7 @@ jwt:
   refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:604800000} # 7 days
 
 ai:
-  internal-secret: ${AI_INTERNAL_SECRET:?AI_INTERNAL_SECRET is required}
+  internal-secret: ${AI_INTERNAL_SECRET}
 
 logging:
   level:

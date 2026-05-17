@@ -15,9 +15,15 @@ public class AiHistoryService {
     private final AiChatHistoryRepository historyRepository;
 
     @Transactional
-    public void saveMessage(UUID userId, UUID conversationId, String role, String content, String provider) {
+    public void saveMessage(UUID userId, UUID conversationId, String role, String content, String provider, java.time.OffsetDateTime createdAt) {
         if (content == null) return;
-        boolean exists = historyRepository.existsByUserIdAndConversationIdAndRoleAndContent(userId, conversationId, role, content.trim());
+        java.time.OffsetDateTime stableCreatedAt = createdAt != null ? createdAt : java.time.OffsetDateTime.now();
+        java.time.OffsetDateTime minTime = stableCreatedAt.minusSeconds(2);
+        java.time.OffsetDateTime maxTime = stableCreatedAt.plusSeconds(2);
+
+        boolean exists = historyRepository.existsByUserIdAndConversationIdAndRoleAndContentAndCreatedAtBetween(
+                userId, conversationId, role, content.trim(), minTime, maxTime
+        );
         if (exists) {
             return; // Avoid duplicating existing message entries
         }
@@ -28,6 +34,7 @@ public class AiHistoryService {
                 .content(content.trim())
                 .provider(provider)
                 .messageType("text")
+                .createdAt(stableCreatedAt)
                 .build();
         historyRepository.save(history);
     }

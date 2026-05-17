@@ -21,6 +21,8 @@ public class Message {
 
     private String provider;
 
+    private String createdAt;
+
     public Message(String role, String content) {
         this.role = role;
         this.content = content;
