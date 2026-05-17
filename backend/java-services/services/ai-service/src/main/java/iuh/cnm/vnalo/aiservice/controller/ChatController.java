@@ -4,6 +4,7 @@ import iuh.cnm.vnalo.aiservice.dto.ApiResponse;
 import iuh.cnm.vnalo.aiservice.dto.AskRequest;
 import iuh.cnm.vnalo.aiservice.dto.Message;
 import iuh.cnm.vnalo.aiservice.dto.ChatResponse;
+import iuh.cnm.vnalo.aiservice.dto.SuggestRepliesRequest;
 import iuh.cnm.vnalo.aiservice.service.ChatService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,12 @@ public class ChatController {
         String userId = getCurrentUserId();
         ChatResponse response = chatService.ask(userId, request.getMessage(), request.getConversationId());
         return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    @PostMapping("/suggest-replies")
+    public ResponseEntity<ApiResponse<List<String>>> suggestReplies(@Valid @RequestBody SuggestRepliesRequest request) {
+        List<String> suggestions = chatService.suggestReplies(request.getHistory());
+        return ResponseEntity.ok(ApiResponse.ok(suggestions));
     }
 
     @GetMapping("/history")

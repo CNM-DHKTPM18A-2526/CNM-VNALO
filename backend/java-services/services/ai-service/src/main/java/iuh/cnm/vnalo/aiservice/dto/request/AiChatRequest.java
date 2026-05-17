@@ -2,6 +2,7 @@ package iuh.cnm.vnalo.aiservice.dto.request;
 
 import iuh.cnm.vnalo.aiservice.dto.Message;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -26,7 +27,7 @@ public class AiChatRequest {
     private boolean analyzeIntent = false;
 
     // Deep Alignment: Structured history instead of prompt hacking
-    @jakarta.validation.constraints.Size(max = 50, message = "History cannot exceed 50 messages")
+    @Size(max = 50, message = "History cannot exceed 50 messages")
     @jakarta.validation.Valid
     private List<@jakarta.validation.constraints.NotNull Message> history;
 
@@ -36,4 +37,11 @@ public class AiChatRequest {
 
     // Deep Alignment: Sync mascot preference
     private String mascotId;
+
+    // Stable client-generated ids for idempotent mobile history sync.
+    @Size(max = 100, message = "Client user entry id cannot exceed 100 characters")
+    private String clientUserEntryId;
+
+    @Size(max = 100, message = "Client assistant entry id cannot exceed 100 characters")
+    private String clientAssistantEntryId;
 }

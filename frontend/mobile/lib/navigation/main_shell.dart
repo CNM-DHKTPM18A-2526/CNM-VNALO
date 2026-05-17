@@ -171,7 +171,7 @@ class MainShellState extends State<MainShell> {
         await _handleNavigateTo({'page': 'timeline'});
         break;
 
-      case 'OPEN_CHAT':
+       case 'OPEN_CHAT':
       case 'SEND_MESSAGE':
       case 'START_CALL':
         final targetName =
@@ -199,8 +199,11 @@ class MainShellState extends State<MainShell> {
         final peerUserId = peerMember?.userId ?? '';
         final peerName = conversation.getDisplayName(currentUserId);
 
+        final rawPrefilled = params?['content']?.toString().trim();
         final prefilledText =
-            command == 'SEND_MESSAGE' ? (params?['content'] as String?) : null;
+            (command == 'SEND_MESSAGE' && rawPrefilled != null && rawPrefilled.isNotEmpty)
+                ? rawPrefilled
+                : null;
 
         if (command == 'OPEN_CHAT' || command == 'SEND_MESSAGE') {
           final isAlreadyInConversation =
@@ -218,6 +221,25 @@ class MainShellState extends State<MainShell> {
             );
             setState(() => _currentIndex = 0);
             return;
+          }
+
+          if (command == 'SEND_MESSAGE') {
+            if (prefilledText == null || prefilledText.isEmpty) {
+              _logAiFlow(
+                'AI_SEND_MSG_FALLBACK',
+                aiCommand: aiCmd,
+                extra: {'reason': 'empty_content'},
+              );
+            } else {
+              final confirmed = await _showConfirmationDialog(
+                'Xác nhận mở cuộc trò chuyện',
+                'Bạn có đồng ý để trợ lý ảo mở phòng chat và chuẩn bị sẵn tin nhắn "$prefilledText" tới "$peerName" không?',
+              );
+              if (!confirmed) {
+                _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
+                return;
+              }
+            }
           }
 
           _activeAiConversationId = conversation.id;
@@ -260,6 +282,17 @@ class MainShellState extends State<MainShell> {
           }
 
           final isVideo = params?['callType'] == 'video';
+          final callTypeName = isVideo ? 'video' : 'thoại';
+
+          final confirmed = await _showConfirmationDialog(
+            'Xác nhận gọi điện',
+            'Bạn có đồng ý để trợ lý ảo thực hiện cuộc gọi $callTypeName tới "$peerName" không?',
+          );
+          if (!confirmed) {
+            _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
+            return;
+          }
+
           final callId = generateCallId(
             conversationId: conversation.id,
             callerUserId: currentUserId,
@@ -316,6 +349,16 @@ class MainShellState extends State<MainShell> {
             final lastMsg = chatProvider.messages.firstWhere(
               (m) => m.senderId == chatProvider.currentUserId,
             );
+
+            final confirmed = await _showConfirmationDialog(
+              'Xác nhận thu hồi tin nhắn',
+              'Bạn có đồng ý để trợ lý ảo thu hồi tin nhắn cuối cùng của mình không?',
+            );
+            if (!confirmed) {
+              _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
+              return;
+            }
+
             chatProvider.recallMessage(
               lastMsg.id,
               chatProvider.activeConversationId!,
@@ -337,6 +380,31 @@ class MainShellState extends State<MainShell> {
           extra: {'command': command},
         );
     }
+  }
+
+  Future<bool> _showConfirmationDialog(String title, String content) async {
+    return await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        content: Text(content),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).primaryColor,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Đồng ý'),
+          ),
+        ],
+      ),
+    ) ?? false;
   }
 
   void _logAiFlow(
@@ -365,6 +433,11 @@ class MainShellState extends State<MainShell> {
     }
     final output = <String, dynamic>{};
     input.forEach((key, value) {
+      const sensitiveKeys = {'content', 'prefilledText', 'messageText'};
+      if (sensitiveKeys.contains(key)) {
+        output[key] = '<redacted>';
+        return;
+      }
       if (value == null || value is num || value is bool || value is String) {
         output[key] = value;
       } else {

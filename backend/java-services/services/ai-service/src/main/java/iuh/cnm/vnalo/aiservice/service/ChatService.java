@@ -17,6 +17,7 @@ import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisCallback;
 
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -58,18 +59,31 @@ public class ChatService {
         this.objectMapper = new ObjectMapper();
     }
 
+    public void enforceUserRateLimit(String userId) {
+        checkRateLimit(userId);
+    }
+
+    public void enforceGlobalRateLimit() {
+        checkGlobalRateLimit();
+    }
+
     public ChatResponse ask(String userId, String message, String conversationId) {
         // 1. Check Rate Limit
         checkRateLimit(userId);
 
         // 2. Initialize conversation ID
         String convId = (conversationId != null && !conversationId.isBlank()) ? conversationId : UUID.randomUUID().toString();
+        String userEntryId = UUID.randomUUID().toString();
+        OffsetDateTime userCreatedAt = OffsetDateTime.now(ZoneOffset.UTC);
 
         // 3. Load history
         List<Message> history = loadHistory(userId, convId);
         
         // 4. Add user message
-        history.add(new Message("user", message));
+        Message userHistoryMessage = new Message("user", message);
+        userHistoryMessage.setClientEntryId(userEntryId);
+        userHistoryMessage.setCreatedAt(userCreatedAt.toString());
+        history.add(userHistoryMessage);
 
         // Keep last N messages
         List<Message> trimmedHistory = trimHistory(history);
@@ -107,22 +121,32 @@ public class ChatService {
 
         // 7. Persist to Postgres (Async-like via internal API)
         java.util.List<java.util.Map<String, String>> messagesToSave = new java.util.ArrayList<>();
+        OffsetDateTime assistantCreatedAt = OffsetDateTime.now(ZoneOffset.UTC);
+        String assistantEntryId = UUID.randomUUID().toString();
         
         java.util.Map<String, String> userMsg = new java.util.HashMap<>();
         userMsg.put("role", "user");
         userMsg.put("content", message);
+        userMsg.put("createdAt", userCreatedAt.toString());
+        userMsg.put("clientEntryId", userEntryId);
         messagesToSave.add(userMsg);
         
         java.util.Map<String, String> assistantMsg = new java.util.HashMap<>();
         assistantMsg.put("role", "assistant");
         assistantMsg.put("content", answer);
         assistantMsg.put("provider", provider != null ? provider : "unknown");
+        assistantMsg.put("createdAt", assistantCreatedAt.toString());
+        assistantMsg.put("clientEntryId", assistantEntryId);
         messagesToSave.add(assistantMsg);
         
         coreServiceClient.saveChatHistory(userId, convId, messagesToSave);
 
         // 8. Save answer to history (Redis)
-        trimmedHistory.add(new Message("assistant", answer));
+        Message assistantHistoryMessage = new Message("assistant", answer);
+        assistantHistoryMessage.setProvider(provider);
+        assistantHistoryMessage.setClientEntryId(assistantEntryId);
+        assistantHistoryMessage.setCreatedAt(assistantCreatedAt.toString());
+        trimmedHistory.add(assistantHistoryMessage);
         saveHistory(userId, convId, trimHistory(trimmedHistory));
 
 
@@ -132,17 +156,40 @@ public class ChatService {
                 .conversationId(convId)
                 .provider(provider)
                 .timestamp(DateTimeFormatter.ISO_INSTANT.format(Instant.now()))
+                .userEntryId(userEntryId)
+                .assistantEntryId(assistantEntryId)
                 .build();
     }
 
     public void backupHistory(String userId, String conversationId, List<Message> entries) {
         if (entries == null || entries.isEmpty()) return;
         saveHistory(userId, conversationId, entries);
+
+        java.util.List<java.util.Map<String, String>> messagesToSave = new java.util.ArrayList<>();
+        for (Message entry : entries) {
+            java.util.Map<String, String> msg = new java.util.HashMap<>();
+            msg.put("role", entry.getRole());
+            msg.put("content", entry.getContent());
+            msg.put("provider", entry.getProvider() != null ? entry.getProvider() : "unknown");
+            if (entry.getCreatedAt() != null) {
+                msg.put("createdAt", entry.getCreatedAt());
+            }
+            if (entry.getClientEntryId() != null) {
+                msg.put("clientEntryId", entry.getClientEntryId());
+            }
+            messagesToSave.add(msg);
+        }
+        coreServiceClient.saveChatHistory(userId, conversationId, messagesToSave);
     }
 
     public List<Message> getHistory(String userId, String conversationId) {
         if (conversationId == null || conversationId.isBlank()) {
             return new ArrayList<>();
+        }
+        List<Message> persistedHistory = coreServiceClient.getChatHistory(userId, conversationId);
+        if (!persistedHistory.isEmpty()) {
+            saveHistory(userId, conversationId, persistedHistory);
+            return persistedHistory;
         }
         return loadHistory(userId, conversationId);
     }
@@ -167,6 +214,48 @@ public class ChatService {
                 redisTemplate.delete(keys);
             }
         }
+    }
+
+    public List<String> suggestReplies(List<Message> history) {
+        if (history == null || history.isEmpty()) {
+            return List.of("Chào bạn!", "Dạ vâng ạ", "Ok cậu nhé");
+        }
+
+        String systemPrompt = "Bạn là trợ lý ảo phân tích tin nhắn của VNALO. Hãy phân tích ngữ cảnh hội thoại được cung cấp (đặc biệt là tin nhắn cuối cùng) và đưa ra chính xác 3 gợi ý phản hồi tự nhiên, ngắn gọn bằng tiếng Việt phù hợp nhất. Trả về kết quả dưới dạng JSON Array phẳng duy nhất, ví dụ: [\"Ok luôn!\", \"Mấy giờ đi thế bạn?\", \"Tối nay tớ bận mất rồi.\"]. Tuyệt đối không trả thêm bất kỳ văn bản phụ hay markdown tag nào khác ngoài chuỗi JSON Array này.";
+
+        try {
+            String rawResponse = "";
+            if (geminiProvider.isAvailable()) {
+                rawResponse = geminiProvider.generate(systemPrompt, history);
+            } else if (ollamaProvider.isAvailable()) {
+                rawResponse = ollamaProvider.generate(systemPrompt, history);
+            }
+
+            if (rawResponse != null && !rawResponse.isBlank()) {
+                String cleanJson = extractJsonArray(rawResponse);
+                if (cleanJson != null) {
+                    try {
+                        return objectMapper.readValue(cleanJson, new TypeReference<List<String>>() {});
+                    } catch (Exception e) {
+                        log.warn("Failed to parse suggest replies JSON: {}, Raw: {}", e.getMessage(), rawResponse);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to generate suggest replies: {}", e.getMessage());
+        }
+
+        return List.of("Dạ vâng ạ", "Ok cậu nhé", "Để mình xem lại nha");
+    }
+
+    private String extractJsonArray(String text) {
+        if (text == null) return null;
+        int start = text.indexOf("[");
+        int end = text.lastIndexOf("]");
+        if (start != -1 && end != -1 && start < end) {
+            return text.substring(start, end + 1);
+        }
+        return null;
     }
 
     // --- Helpers ---

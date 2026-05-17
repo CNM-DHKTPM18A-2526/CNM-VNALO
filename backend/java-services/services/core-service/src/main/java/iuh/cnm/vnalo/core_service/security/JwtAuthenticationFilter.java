@@ -24,10 +24,35 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtTokenProvider jwtTokenProvider;
     private final UserDetailsServiceImpl userDetailsService;
 
+    @org.springframework.beans.factory.annotation.Value("${ai.internal-secret}")
+    private String internalSecret;
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         try {
+            String path = request.getServletPath();
+            // Handle service-to-service authentication for internal endpoints
+            if (path.startsWith("/api/v1/ai/internal/") || path.startsWith("/api/v1/ai/mascot/internal/")) {
+                String secret = request.getHeader("X-Internal-Secret");
+                if (internalSecret != null && internalSecret.equals(secret)) {
+                    UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken("internal-service", null,
+                                    org.springframework.security.core.authority.AuthorityUtils.createAuthorityList("ROLE_INTERNAL"));
+                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                    log.debug("Internal microservice authenticated for path {}", path);
+                    filterChain.doFilter(request, response);
+                    return;
+                } else {
+                    log.warn("Unauthorized attempt to access internal path {} without valid service secret", path);
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"status\":\"error\",\"message\":\"Access Denied: Invalid Microservice Secret\"}");
+                    return;
+                }
+            }
+
             String token = extractTokenFromRequest(request);
             if (StringUtils.hasText(token)) {
                 if (jwtTokenProvider.validateToken(token)) {

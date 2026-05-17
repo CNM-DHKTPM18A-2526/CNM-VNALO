@@ -1,7 +1,7 @@
 export type { ChatAttachment, ChatMessage, ChatMessageType, ConversationSummary, ReplyMetadata } from './chat.types'
 import type { ChatAttachment, ChatMessage, ChatMessageType, ConversationSummary, ReplyMetadata } from './chat.types'
 import { formatMessageContent } from './utils/messageUtils'
-import { extractMessage, messageApi, mediaApi } from '../../api.client'
+import { extractMessage, messageApi, mediaApi, aiApi } from '../../api.client'
 import { resolveMediaUrl } from '../../utils/mediaUtils'
 
 type InboxItem = {
@@ -1096,5 +1096,36 @@ export async function updateConversation(token: string, conversationId: string, 
     method: 'PATCH',
     body: JSON.stringify(settings),
   })
+}
+
+export async function fetchSuggestedReplies(
+  token: string,
+  history: Array<{ role: 'user' | 'assistant'; content: string }>
+): Promise<string[]> {
+  try {
+    const response = await aiApi.post('chat/suggest-replies', { history }, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data?.data ?? [];
+  } catch (error) {
+    console.error('[fetchSuggestedReplies] failed:', error);
+    return [];
+  }
+}
+
+export async function sendAiChatMessage(
+  token: string,
+  prompt: string,
+  history: Array<{ role: 'user' | 'assistant'; content: string }>
+): Promise<string> {
+  try {
+    const response = await aiApi.post('chat', { prompt, history }, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data?.data?.textReply ?? '';
+  } catch (error) {
+    console.error('[sendAiChatMessage] failed:', error);
+    throw error;
+  }
 }
 

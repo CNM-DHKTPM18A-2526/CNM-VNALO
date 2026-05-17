@@ -18,6 +18,7 @@ export const translations = {
       todo: 'To-do',
       cloud: 'Cloud',
       tools: 'Tools',
+      ai: 'AI Assistant',
     },
     topbar: {
       subtitle: 'Fast, clean, and clear for daily team chat flows',
@@ -458,6 +459,7 @@ export const translations = {
       todo: 'To-do',
       cloud: 'Cloud',
       tools: 'Công cụ',
+      ai: 'Trợ lý AI',
     },
     topbar: {
       subtitle: 'Nhanh, gọn, rõ ràng cho luồng chat đội nhóm hằng ngày',

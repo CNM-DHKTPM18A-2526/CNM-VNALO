@@ -115,7 +115,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "8081:8081"
+      - "127.0.0.1:8081:8081"
     env_file:
       - ../config/environments/.env
       - .env
@@ -376,6 +376,7 @@ services:
       AI_RATE_LIMIT: ${AI_RATE_LIMIT:-5}
       AI_RATE_LIMIT_GLOBAL: ${AI_RATE_LIMIT_GLOBAL:-10}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      AI_INTERNAL_SECRET: ${AI_INTERNAL_SECRET}
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xss256k"
     depends_on:
       redis:

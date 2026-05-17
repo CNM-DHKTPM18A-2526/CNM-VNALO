@@ -11,6 +11,9 @@ class AiService {
     String? contextId,
     bool analyzeIntent = false,
     bool enableDeepSummary = false,
+    List<Map<String, dynamic>>? history,
+    String? clientUserEntryId,
+    String? clientAssistantEntryId,
   }) async {
     try {
       final response = await _apiService.post(
@@ -21,6 +24,10 @@ class AiService {
           'contextId': contextId,
           'analyzeIntent': analyzeIntent,
           'enableDeepSummary': enableDeepSummary,
+          if (history != null) 'history': history,
+          if (clientUserEntryId != null) 'clientUserEntryId': clientUserEntryId,
+          if (clientAssistantEntryId != null)
+            'clientAssistantEntryId': clientAssistantEntryId,
         },
       );
 
@@ -47,5 +54,20 @@ class AiService {
       '/ai/history/backup',
       body: {'conversationId': conversationId, 'entries': entries},
     );
+  }
+
+  Future<List<Map<String, dynamic>>> restoreConversationHistory({
+    required String conversationId,
+  }) async {
+    final response = await _apiService.get(
+      AppConfig.instance.aiServiceUrl,
+      '/ai/history?conversationId=${Uri.encodeQueryComponent(conversationId)}',
+    );
+
+    final data = response['data'];
+    if (data is List) {
+      return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    }
+    return [];
   }
 }

@@ -302,7 +302,9 @@ class ApiService {
   // Handle HTTP response, throwing exceptions for error status codes and parsing JSON body
   Map<String, dynamic> _handleResponse(http.Response response) {
     final body = _parseResponseBody(response.body);
-    debugPrint('[ApiService] _handleResponse status=${response.statusCode} body=$body');
+    debugPrint(
+      '[ApiService] _handleResponse status=${response.statusCode} body=${_redactForLog(body)}',
+    );
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return body;
     }
@@ -326,7 +328,7 @@ class ApiService {
 
   // Parse response body, handling empty responses and non-JSON content gracefully
   Map<String, dynamic> _parseResponseBody(String rawBody) {
-    debugPrint('[ApiService] _parseResponseBody rawBody=$rawBody');
+    debugPrint('[ApiService] _parseResponseBody rawBodyLength=${rawBody.length}');
     if (rawBody.trim().isEmpty) {
       return <String, dynamic>{};
     }
@@ -342,6 +344,40 @@ class ApiService {
     } catch (_) {
       return <String, dynamic>{'raw': rawBody};
     }
+  }
+
+  Object? _redactForLog(Object? value) {
+    const sensitiveKeys = {
+      'prompt',
+      'content',
+      'text',
+      'textReply',
+      'history',
+      'entries',
+      'messages',
+      'raw',
+      'data',
+      'accessToken',
+      'refreshToken',
+      'token',
+      'password',
+    };
+
+    if (value is Map) {
+      return value.map((key, mapValue) {
+        final keyText = key.toString();
+        if (sensitiveKeys.contains(keyText)) {
+          return MapEntry(key, '<redacted>');
+        }
+        return MapEntry(key, _redactForLog(mapValue));
+      });
+    }
+
+    if (value is List) {
+      return '<list length=${value.length}>';
+    }
+
+    return value;
   }
   /// Detect MIME type from file extension to ensure backend accepts the upload.
   static MediaType _detectMediaType(String filePath) {

@@ -34,6 +34,8 @@ type MessageInputProps = {
   replyMessage?: any | null
   onCancelReply?: () => void
   members?: Array<{ userId: string; displayName: string; avatarUrl?: string | null }>
+  suggestedReplies?: string[]
+  onSelectSuggestedReply?: (reply: string) => void
 }
 
 type FilePreviewItem = {
@@ -53,10 +55,20 @@ export function MessageInput({
   replyMessage,
   onCancelReply,
   members = [],
+  suggestedReplies = [],
+  onSelectSuggestedReply,
 }: MessageInputProps) {
   const { accessToken } = useAuth()
   const [messageText, setMessageText] = React.useState('')
   const [selectedFiles, setSelectedFiles] = React.useState<File[]>([])
+
+  const handleSelectSuggestedReply = (reply: string) => {
+    setMessageText(reply)
+    onSelectSuggestedReply?.(reply)
+    setTimeout(() => {
+      messageInputRef.current?.focus()
+    }, 50)
+  }
 
   // Mention State
   const [mentionState, setMentionState] = React.useState<{
@@ -310,6 +322,20 @@ export function MessageInput({
 
   return (
     <footer className='message-input relative'>
+      {suggestedReplies && suggestedReplies.length > 0 && (
+        <div className="suggested-replies-container">
+          {suggestedReplies.map((reply, index) => (
+            <button
+              key={index}
+              type="button"
+              className="suggested-reply-chip"
+              onClick={() => handleSelectSuggestedReply(reply)}
+            >
+              {reply}
+            </button>
+          ))}
+        </div>
+      )}
       {mentionState.isOpen && (
         <MentionPopover 
           members={members}

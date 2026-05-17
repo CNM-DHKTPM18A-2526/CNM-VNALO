@@ -3,6 +3,7 @@ package iuh.cnm.vnalo.aiservice.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -18,4 +19,16 @@ public class Message {
     @NotNull(message = "Content is required")
     @NotBlank(message = "Content cannot be blank")
     private String content;
+
+    private String provider;
+
+    private String createdAt;
+
+    @Size(max = 100, message = "Client entry id cannot exceed 100 characters")
+    private String clientEntryId;
+
+    public Message(String role, String content) {
+        this.role = role;
+        this.content = content;
+    }
 }

@@ -13,6 +13,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import iuh.cnm.vnalo.aiservice.dto.ApiResponse;
+
 @Slf4j
 @RestController
 @RequestMapping("")
@@ -27,38 +29,52 @@ public class AiInteractionController {
     }
 
     @PostMapping("/chat")
-    public ResponseEntity<Object> interactWithMascot(@Valid @RequestBody AiChatRequest request) {
+    public ResponseEntity<?> interactWithMascot(@Valid @RequestBody AiChatRequest request) {
         log.info("Received AI Command for mascot {}. Analyze intent: {}, Deep summary: {}", 
                 request.getMascotId(), request.isAnalyzeIntent(), request.isEnableDeepSummary());
         
         try {
-            AiChatResponse response = geminiAiService.interactWithGemini(request);
-            return ResponseEntity.ok(response);
+            String userId = getCurrentUserId();
+            AiChatResponse response = geminiAiService.interactWithGemini(userId, request);
+            return ResponseEntity.ok(ApiResponse.ok(response));
             
+        } catch (iuh.cnm.vnalo.aiservice.exception.RateLimitExceededException e) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(ApiResponse.error(429, e.getMessage()));
         } catch (RuntimeException e) {
-            if ("QUOTA_EXCEEDED".equals(e.getMessage())) {
-                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                        .body("AI Assistant is currently overloaded. Please try again later.");
-            }
             log.error("AI Interaction error: ", e);
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body("VNALO Brain is restarting.");
+                    .body(ApiResponse.error(503, "VNALO Brain is restarting."));
         }
     }
 
     @PostMapping("/history/backup")
-    public ResponseEntity<Object> backupHistory(@Valid @RequestBody AiHistoryBackupRequest request) {
+    public ResponseEntity<?> backupHistory(@Valid @RequestBody AiHistoryBackupRequest request) {
         String userId = getCurrentUserId();
         log.info("Received history backup request for user: {}, conversation: {}. Entry count: {}", 
                 userId, request.getConversationId(), request.getEntries().size());
         
         try {
             chatService.backupHistory(userId, request.getConversationId(), request.getEntries());
-            return ResponseEntity.ok().body("History synced successfully");
+            return ResponseEntity.ok(ApiResponse.ok("History synced successfully", null));
         } catch (Exception e) {
             log.error("History backup failed: ", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Failed to backup history: " + e.getMessage());
+                    .body(ApiResponse.error(500, "Failed to backup history: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/history")
+    public ResponseEntity<?> getHistory(@RequestParam String conversationId) {
+        String userId = getCurrentUserId();
+        log.info("Received request to restore history for user: {}, conversation: {}", userId, conversationId);
+        try {
+            java.util.List<iuh.cnm.vnalo.aiservice.dto.Message> history = chatService.getHistory(userId, conversationId);
+            return ResponseEntity.ok(ApiResponse.ok(history));
+        } catch (Exception e) {
+            log.error("Failed to retrieve history: ", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error(500, "Failed to restore history: " + e.getMessage()));
         }
     }
 }
