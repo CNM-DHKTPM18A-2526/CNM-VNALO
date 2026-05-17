@@ -196,6 +196,38 @@ public class GeminiAiService {
                 response.setActionParams(null);
             }
         }
+
+        // Validate required schema params for allowed commands
+        if (response.getActionCommand() != null) {
+            String cmd = response.getActionCommand();
+            Map<String, Object> cp = response.getActionParams();
+            boolean valid = true;
+            if (cp == null) {
+                cp = new HashMap<>();
+                response.setActionParams(cp);
+            }
+            if ("SEND_MESSAGE".equals(cmd)) {
+                if (!cp.containsKey("contactName") && !cp.containsKey("displayName")) {
+                    valid = false;
+                }
+                if (!cp.containsKey("messageText") && !cp.containsKey("prefilledText")) {
+                    valid = false;
+                }
+            } else if ("OPEN_CHAT".equals(cmd) || "START_CALL".equals(cmd)) {
+                if (!cp.containsKey("contactName") && !cp.containsKey("displayName")) {
+                    valid = false;
+                }
+            } else if ("NAVIGATE_TO".equals(cmd)) {
+                if (!cp.containsKey("destination") && !cp.containsKey("screen")) {
+                    valid = false;
+                }
+            }
+            if (!valid) {
+                log.warn("Blocked action command '{}' due to missing required schema fields in params: {}", cmd, cp);
+                response.setActionCommand(null);
+                response.setActionParams(null);
+            }
+        }
     }
 
     private AiChatResponse parseFallbackResponse(String rawText, boolean isAnalyzingIntent) throws Exception {
@@ -208,7 +240,12 @@ public class GeminiAiService {
                 response.setTextReply(cmdNode.path("textReply").asText(""));
                 response.setEmotion(cmdNode.path("emotion").asText("thinking"));
 
-                sanitizeActionCommand(response, cmdNode);
+                if (isAnalyzingIntent) {
+                    sanitizeActionCommand(response, cmdNode);
+                } else {
+                    response.setActionCommand(null);
+                    response.setActionParams(null);
+                }
 
                 if (response.getActionCommand() != null && response.getTextReply().isEmpty()) {
                     response.setTextReply("Đã rõ, tôi đang thực hiện lệnh của bạn...");
@@ -266,7 +303,12 @@ public class GeminiAiService {
                 response.setTextReply(cmdNode.path("textReply").asText(""));
                 response.setEmotion(cmdNode.path("emotion").asText("thinking"));
 
-                sanitizeActionCommand(response, cmdNode);
+                if (isAnalyzingIntent) {
+                    sanitizeActionCommand(response, cmdNode);
+                } else {
+                    response.setActionCommand(null);
+                    response.setActionParams(null);
+                }
 
                 // If it's a valid action but textReply is empty, use a default acknowledgment
                 if (response.getActionCommand() != null && response.getTextReply().isEmpty()) {

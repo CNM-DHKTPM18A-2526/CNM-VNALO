@@ -24,7 +24,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtTokenProvider jwtTokenProvider;
     private final UserDetailsServiceImpl userDetailsService;
 
-    @org.springframework.beans.factory.annotation.Value("${ai.internal-secret:VNALO_AI_SECRET_2026}")
+    @org.springframework.beans.factory.annotation.Value("${ai.internal-secret}")
     private String internalSecret;
 
     @Override

@@ -16,11 +16,16 @@ public class AiHistoryService {
 
     @Transactional
     public void saveMessage(UUID userId, UUID conversationId, String role, String content, String provider) {
+        if (content == null) return;
+        boolean exists = historyRepository.existsByUserIdAndConversationIdAndRoleAndContent(userId, conversationId, role, content.trim());
+        if (exists) {
+            return; // Avoid duplicating existing message entries
+        }
         AiChatHistory history = AiChatHistory.builder()
                 .userId(userId)
                 .conversationId(conversationId)
                 .role(role)
-                .content(content)
+                .content(content.trim())
                 .provider(provider)
                 .messageType("text")
                 .build();

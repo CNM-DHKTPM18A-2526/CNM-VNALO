@@ -63,4 +63,18 @@ public class AiInteractionController {
                     .body(ApiResponse.error(500, "Failed to backup history: " + e.getMessage()));
         }
     }
+
+    @GetMapping("/history")
+    public ResponseEntity<?> getHistory(@RequestParam String conversationId) {
+        String userId = getCurrentUserId();
+        log.info("Received request to restore history for user: {}, conversation: {}", userId, conversationId);
+        try {
+            java.util.List<iuh.cnm.vnalo.aiservice.dto.Message> history = chatService.getHistory(userId, conversationId);
+            return ResponseEntity.ok(ApiResponse.ok(history));
+        } catch (Exception e) {
+            log.error("Failed to retrieve history: ", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error(500, "Failed to restore history: " + e.getMessage()));
+        }
+    }
 }

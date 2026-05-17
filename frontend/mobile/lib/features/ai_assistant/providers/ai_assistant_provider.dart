@@ -20,6 +20,8 @@ class AiAssistantProvider with ChangeNotifier {
   static const String _conversationCreatedPrefKey =
       'vnalo_ai_conversation_created';
   static const String _cloudBackupPrefKey = 'vnalo_ai_cloud_backup_enabled';
+  static const String _serverConversationIdPrefKey =
+      'vnalo_ai_server_conversation_id';
   static const String _defaultLocaleId = 'vi_VN';
   static const Duration _aiTimeout = Duration(seconds: 25);
   static const Duration _sttListenFor = Duration(seconds: 8);
@@ -139,7 +141,12 @@ class AiAssistantProvider with ChangeNotifier {
     _persistentEnabled = prefs.getBool(_visibilityPrefKey) ?? false;
     _cloudBackupEnabled = prefs.getBool(_cloudBackupPrefKey) ?? false;
     _conversationCreated = prefs.getBool(_conversationCreatedPrefKey) ?? false;
+    _serverConversationId = prefs.getString(_serverConversationIdPrefKey);
     await _loadConversationHistory(prefs: prefs);
+
+    if (_conversationHistory.isEmpty && _cloudBackupEnabled && _serverConversationId != null) {
+      unawaited(_restoreConversationHistoryFromServer());
+    }
 
     _logEvent(
       'PERSISTENCE_LOADED',
@@ -149,6 +156,7 @@ class AiAssistantProvider with ChangeNotifier {
         'cloudBackupEnabled': _cloudBackupEnabled,
         'hasConversation': hasConversation,
         'historySize': _conversationHistory.length,
+        'serverConversationId': _serverConversationId,
       },
     );
     notifyListeners();
@@ -291,6 +299,9 @@ class AiAssistantProvider with ChangeNotifier {
 
     if (enabled) {
       _scheduleCloudBackup();
+      if (_conversationHistory.isEmpty && _serverConversationId != null) {
+        unawaited(_restoreConversationHistoryFromServer());
+      }
     }
 
     notifyListeners();
@@ -1072,6 +1083,11 @@ class AiAssistantProvider with ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_conversationCreatedPrefKey, _conversationCreated);
+      if (_serverConversationId != null) {
+        await prefs.setString(_serverConversationIdPrefKey, _serverConversationId!);
+      } else {
+        await prefs.remove(_serverConversationIdPrefKey);
+      }
       await prefs.setString(
         _historyPrefKey,
         jsonEncode(
@@ -1083,6 +1099,43 @@ class AiAssistantProvider with ChangeNotifier {
         'CONVERSATION_HISTORY_PERSIST_ERROR',
         level: 'WARN',
         data: {'error': error.toString()},
+      );
+    }
+  }
+
+  Future<void> _restoreConversationHistoryFromServer() async {
+    final targetId = _serverConversationId;
+    if (targetId == null || targetId.isEmpty) return;
+
+    try {
+      final entries = await _aiService.restoreConversationHistory(conversationId: targetId);
+      if (entries.isNotEmpty) {
+        _conversationHistory.clear();
+        for (final map in entries) {
+          final roleStr = map['role']?.toString() ?? 'user';
+          final content = map['content']?.toString() ?? '';
+          final provider = map['provider']?.toString();
+
+          final role = roleStr == 'user' ? AiConversationRole.user : AiConversationRole.assistant;
+
+          _conversationHistory.add(
+            AiConversationEntry(
+              role: role,
+              text: content,
+              source: provider ?? 'restored',
+              createdAt: DateTime.now(),
+            ),
+          );
+        }
+        await _persistConversationHistory();
+        notifyListeners();
+        _logEvent('CLOUD_HISTORY_RESTORED', data: {'entries': _conversationHistory.length});
+      }
+    } catch (e) {
+      _logEvent(
+        'CLOUD_HISTORY_RESTORE_ERROR',
+        level: 'WARN',
+        data: {'error': e.toString()},
       );
     }
   }

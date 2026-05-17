@@ -23,6 +23,7 @@ spring:
 
 # AI Configuration
 ai:
+  internal-secret: ${AI_INTERNAL_SECRET:?AI_INTERNAL_SECRET is required}
   gemini:
     api-key: ${GEMINI_API_KEY:}
     model: ${GEMINI_MODEL:gemini-2.5-flash}

@@ -19,7 +19,7 @@ public class CoreServiceClient {
     @Value("${services.core-service.url:http://core-service:8081}")
     private String coreServiceUrl;
 
-    @Value("${ai.internal-secret:VNALO_AI_SECRET_2026}")
+    @Value("${ai.internal-secret}")
     private String internalSecret;
 
     public MascotSettingsDTO getUserMascotSettings(String userId) {
