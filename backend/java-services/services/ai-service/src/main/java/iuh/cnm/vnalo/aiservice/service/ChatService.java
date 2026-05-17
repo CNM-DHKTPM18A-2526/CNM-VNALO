@@ -169,6 +169,48 @@ public class ChatService {
         }
     }
 
+    public List<String> suggestReplies(List<Message> history) {
+        if (history == null || history.isEmpty()) {
+            return List.of("Chào bạn!", "Dạ vâng ạ", "Ok cậu nhé");
+        }
+
+        String systemPrompt = "Bạn là trợ lý ảo phân tích tin nhắn của VNALO. Hãy phân tích ngữ cảnh hội thoại được cung cấp (đặc biệt là tin nhắn cuối cùng) và đưa ra chính xác 3 gợi ý phản hồi tự nhiên, ngắn gọn bằng tiếng Việt phù hợp nhất. Trả về kết quả dưới dạng JSON Array phẳng duy nhất, ví dụ: [\"Ok luôn!\", \"Mấy giờ đi thế bạn?\", \"Tối nay tớ bận mất rồi.\"]. Tuyệt đối không trả thêm bất kỳ văn bản phụ hay markdown tag nào khác ngoài chuỗi JSON Array này.";
+
+        try {
+            String rawResponse = "";
+            if (geminiProvider.isAvailable()) {
+                rawResponse = geminiProvider.generate(systemPrompt, history);
+            } else if (ollamaProvider.isAvailable()) {
+                rawResponse = ollamaProvider.generate(systemPrompt, history);
+            }
+
+            if (rawResponse != null && !rawResponse.isBlank()) {
+                String cleanJson = extractJsonArray(rawResponse);
+                if (cleanJson != null) {
+                    try {
+                        return objectMapper.readValue(cleanJson, new TypeReference<List<String>>() {});
+                    } catch (Exception e) {
+                        log.warn("Failed to parse suggest replies JSON: {}, Raw: {}", e.getMessage(), rawResponse);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to generate suggest replies: {}", e.getMessage());
+        }
+
+        return List.of("Dạ vâng ạ", "Ok cậu nhé", "Để mình xem lại nha");
+    }
+
+    private String extractJsonArray(String text) {
+        if (text == null) return null;
+        int start = text.indexOf("[");
+        int end = text.lastIndexOf("]");
+        if (start != -1 && end != -1 && start < end) {
+            return text.substring(start, end + 1);
+        }
+        return null;
+    }
+
     // --- Helpers ---
 
     private String buildSystemPrompt(iuh.cnm.vnalo.aiservice.dto.external.MascotSettingsDTO mascot) {

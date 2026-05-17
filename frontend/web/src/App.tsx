@@ -11,6 +11,7 @@ import ChatPage from './pages/ChatPage'
 import CallPage from './pages/CallPage'
 import { ContactsPage } from './pages/ContactsPage'
 import { ProfilePage } from './pages/ProfilePage'
+import { AiChatPage } from './pages/AiChatPage'
 import { UserStoreProvider } from './features/chat/context/UserStoreContext'
 import { NotificationProvider } from './features/notifications/NotificationContext'
 import './styles/app.css'
@@ -38,6 +39,7 @@ function App() {
           <Route path='chat/:conversationId?' element={<ChatPage />} />
           <Route path='contacts' element={<ContactsPage />} />
           <Route path='profile' element={<ProfilePage />} />
+          <Route path='chat-ai' element={<AiChatPage />} />
         </Route>
         <Route path='/call/:callId' element={<ProtectedRoute><CallPage /></ProtectedRoute>} />
         <Route path='*' element={<Navigate replace to='/chat' />} />

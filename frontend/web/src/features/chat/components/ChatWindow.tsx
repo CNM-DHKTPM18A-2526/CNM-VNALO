@@ -25,6 +25,8 @@ import type { MessageContextMenuAction } from './MessageContextMenu'
 import { renderSystemMessage, formatMessagePreview } from '../utils/messageUtils'
 import { FriendWelcomeState } from './FriendWelcomeState'
 import { WelcomeScreen } from './WelcomeScreen'
+import { useAuth } from '../../auth/useAuth'
+import { fetchSuggestedReplies } from '../chat.api'
 
 const toast = {
   success: (msg: string) => console.log('SUCCESS:', msg),
@@ -107,6 +109,10 @@ export function ChatWindow({
   const [isPinnedExpanded, setIsPinnedExpanded] = React.useState(false)
   const lastHandledJumpIdRef = React.useRef<string | null>(null)
 
+  const { accessToken } = useAuth()
+  const [suggestedReplies, setSuggestedReplies] = React.useState<string[]>([])
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = React.useState(false)
+
   const conversationMessages = React.useMemo(() => {
     if (!conversation) {
       return []
@@ -114,6 +120,59 @@ export function ChatWindow({
 
     return messages.filter((message) => message.conversationId === conversation.id && !deletedMessageIds[message.id])
   }, [conversation, deletedMessageIds, messages])
+
+  const lastMessage = conversationMessages[conversationMessages.length - 1]
+  const lastMessageId = lastMessage?.id
+
+  React.useEffect(() => {
+    if (!conversation || !lastMessageId || !currentUserId || !accessToken) {
+      setSuggestedReplies([])
+      return
+    }
+
+    // Only suggest replies if the last message was sent by someone else
+    if (lastMessage.senderId === currentUserId) {
+      setSuggestedReplies([])
+      return
+    }
+
+    // Ignore system/call messages or placeholders
+    if (lastMessage.text?.startsWith('{"action":') || lastMessage.text?.startsWith('CALL_LOG::') || lastMessage.isPlaceholder) {
+      setSuggestedReplies([])
+      return
+    }
+
+    const fetchSuggestions = async () => {
+      setIsLoadingSuggestions(true)
+      try {
+        const formattedHistory = conversationMessages
+          .filter(m => m.text && !m.text.startsWith('{"action":') && !m.text.startsWith('CALL_LOG::'))
+          .slice(-10)
+          .map(m => ({
+            role: (m.senderId === currentUserId ? 'assistant' : 'user') as 'user' | 'assistant',
+            content: m.text
+          }))
+
+        if (formattedHistory.length > 0) {
+          const replies = await fetchSuggestedReplies(accessToken, formattedHistory)
+          setSuggestedReplies(replies)
+        } else {
+          setSuggestedReplies([])
+        }
+      } catch (error) {
+        console.error('Failed to load suggestions:', error)
+        setSuggestedReplies([])
+      } finally {
+        setIsLoadingSuggestions(false)
+      }
+    }
+
+    const timer = setTimeout(() => {
+      fetchSuggestions()
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [lastMessageId, conversation?.id, currentUserId, accessToken])
 
   const viewerImages = React.useMemo<ViewerImageItem[]>(() => {
     if (!conversation) {
@@ -681,12 +740,15 @@ export function ChatWindow({
             onSend={(payload) => {
               onSend(payload);
               setReplyMessage(null);
+              setSuggestedReplies([]);
             }}
             replyMessage={replyMessage}
             onCancelReply={() => setReplyMessage(null)}
             recipientName={displayName}
             placeholder={isRestrictedMode ? 'Tin nhắn bị khóa khi ở chế độ giới hạn' : undefined}
             disabled={isRestrictedMode}
+            suggestedReplies={suggestedReplies}
+            onSelectSuggestedReply={() => setSuggestedReplies([])}
             members={conversation.members?.map(m => ({
               userId: m.userId,
               displayName: userMap[m.userId]?.displayName || m.displayName || 'Người dùng',

@@ -93,6 +93,10 @@ export const mediaApi = axios.create({
   baseURL: MEDIA_API_URL,
 });
 
+export const aiApi = axios.create({
+  baseURL: `${API_BASE_URL}/ai`,
+});
+
 api.interceptors.request.use(req => {
   console.log('[API-CORE]', req.url);
   return req;
@@ -105,6 +109,11 @@ messageApi.interceptors.request.use(req => {
 
 mediaApi.interceptors.request.use(req => {
   console.log('[API-MEDIA]', req.url);
+  return req;
+});
+
+aiApi.interceptors.request.use(req => {
+  console.log('[API-AI]', req.url);
   return req;
 });
 
@@ -138,3 +147,4 @@ const commonResponseInterceptor = [
 api.interceptors.response.use(...commonResponseInterceptor);
 messageApi.interceptors.response.use(...commonResponseInterceptor);
 mediaApi.interceptors.response.use(...commonResponseInterceptor);
+aiApi.interceptors.response.use(...commonResponseInterceptor);
