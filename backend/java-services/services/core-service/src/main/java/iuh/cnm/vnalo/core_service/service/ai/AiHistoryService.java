@@ -6,37 +6,71 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class AiHistoryService {
 
+    private static final int CLIENT_ENTRY_ID_MAX_LENGTH = 100;
+
     private final AiChatHistoryRepository historyRepository;
 
     @Transactional
-    public void saveMessage(UUID userId, UUID conversationId, String role, String content, String provider, java.time.OffsetDateTime createdAt) {
+    public void saveMessage(UUID userId, UUID conversationId, String role, String content, String provider,
+                            OffsetDateTime createdAt, String clientEntryId) {
+        if (userId == null || conversationId == null || role == null || role.isBlank()) return;
         if (content == null) return;
-        java.time.OffsetDateTime stableCreatedAt = createdAt != null ? createdAt : java.time.OffsetDateTime.now();
-        java.time.OffsetDateTime minTime = stableCreatedAt.minusSeconds(2);
-        java.time.OffsetDateTime maxTime = stableCreatedAt.plusSeconds(2);
+        String normalizedContent = content.trim();
+        if (normalizedContent.isEmpty()) return;
+        String normalizedRole = role.trim();
 
+        String normalizedClientEntryId = normalizeClientEntryId(clientEntryId);
+
+        OffsetDateTime stableCreatedAt = createdAt != null ? createdAt : OffsetDateTime.now(ZoneOffset.UTC);
+        if (normalizedClientEntryId != null) {
+            historyRepository.insertWithClientEntryIdIfAbsent(
+                    userId,
+                    conversationId,
+                    normalizedClientEntryId,
+                    normalizedRole,
+                    normalizedContent,
+                    provider,
+                    stableCreatedAt
+            );
+            return;
+        }
+
+        OffsetDateTime minTime = stableCreatedAt.minusSeconds(2);
+        OffsetDateTime maxTime = stableCreatedAt.plusSeconds(2);
         boolean exists = historyRepository.existsByUserIdAndConversationIdAndRoleAndContentAndCreatedAtBetween(
-                userId, conversationId, role, content.trim(), minTime, maxTime
+                userId, conversationId, normalizedRole, normalizedContent, minTime, maxTime
         );
         if (exists) {
-            return; // Avoid duplicating existing message entries
+            return;
         }
+
         AiChatHistory history = AiChatHistory.builder()
                 .userId(userId)
                 .conversationId(conversationId)
-                .role(role)
-                .content(content.trim())
+                .clientEntryId(normalizedClientEntryId)
+                .role(normalizedRole)
+                .content(normalizedContent)
                 .provider(provider)
                 .messageType("text")
                 .createdAt(stableCreatedAt)
                 .build();
         historyRepository.save(history);
+    }
+
+    private String normalizeClientEntryId(String clientEntryId) {
+        if (clientEntryId == null || clientEntryId.isBlank()) {
+            return null;
+        }
+        String trimmed = clientEntryId.trim();
+        return trimmed.length() <= CLIENT_ENTRY_ID_MAX_LENGTH ? trimmed : null;
     }
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)

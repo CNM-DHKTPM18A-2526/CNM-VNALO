@@ -6,6 +6,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.UUID;
 
 @RestController
@@ -17,23 +20,41 @@ public class AiInternalController {
 
     @PostMapping("/history")
     public ResponseEntity<Void> saveHistory(@RequestBody SaveHistoryRequest request) {
+        if (request == null || request.getMessages() == null || request.getMessages().isEmpty()) {
+            return ResponseEntity.ok().build();
+        }
         for (MessageEntry entry : request.getMessages()) {
-            java.time.OffsetDateTime parsedTime = null;
-            if (entry.getCreatedAt() != null && !entry.getCreatedAt().trim().isEmpty()) {
-                try {
-                    parsedTime = java.time.OffsetDateTime.parse(entry.getCreatedAt().trim());
-                } catch (Exception ignored) {}
+            if (entry == null) {
+                continue;
             }
+            OffsetDateTime parsedTime = parseCreatedAt(entry.getCreatedAt());
             aiHistoryService.saveMessage(
                     request.getUserId(),
                     request.getConversationId(),
                     entry.getRole(),
                     entry.getContent(),
                     entry.getProvider(),
-                    parsedTime
+                    parsedTime,
+                    entry.getClientEntryId()
             );
         }
         return ResponseEntity.ok().build();
+    }
+
+    private OffsetDateTime parseCreatedAt(String rawCreatedAt) {
+        if (rawCreatedAt == null || rawCreatedAt.trim().isEmpty()) {
+            return null;
+        }
+        String value = rawCreatedAt.trim();
+        try {
+            return OffsetDateTime.parse(value);
+        } catch (Exception ignored) {
+            try {
+                return LocalDateTime.parse(value).atOffset(ZoneOffset.UTC);
+            } catch (Exception ignoredAgain) {
+                return null;
+            }
+        }
     }
 
     @GetMapping("/history")
@@ -47,6 +68,7 @@ public class AiInternalController {
             entry.setRole(entity.getRole());
             entry.setContent(entity.getContent());
             entry.setProvider(entity.getProvider());
+            entry.setClientEntryId(entity.getClientEntryId());
             if (entity.getCreatedAt() != null) {
                 entry.setCreatedAt(entity.getCreatedAt().toString());
             }
@@ -68,5 +90,6 @@ public class AiInternalController {
         private String content;
         private String provider;
         private String createdAt;
+        private String clientEntryId;
     }
 }

@@ -14,10 +14,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -58,6 +61,12 @@ public class GeminiAiService {
 
         // 3. Build Dynamic System Prompt based on Mascot Settings
         String dynamicSystemPrompt = buildSystemPrompt(mascot, request.isEnableDeepSummary());
+        String stableConvId = UUID.nameUUIDFromBytes(
+                ("AI_ASSISTANT_" + userId).getBytes(java.nio.charset.StandardCharsets.UTF_8)
+        ).toString();
+        String userEntryId = normalizeEntryId(request.getClientUserEntryId(), UUID.randomUUID().toString());
+        String assistantEntryId = normalizeEntryId(request.getClientAssistantEntryId(), UUID.randomUUID().toString());
+        OffsetDateTime userCreatedAt = OffsetDateTime.now(ZoneOffset.UTC);
 
         String url = String.format(GEMINI_REST_URL, modelName);
         Map<String, Object> payload = buildGeminiPayload(request, dynamicSystemPrompt);
@@ -96,10 +105,10 @@ public class GeminiAiService {
             }
         }
 
-        // 4. Generate stable, deterministic conversation ID per user
-        String stableConvId = java.util.UUID.nameUUIDFromBytes(("AI_ASSISTANT_" + userId).getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString();
         if (responseObj != null) {
             responseObj.setConversationId(stableConvId);
+            responseObj.setUserEntryId(userEntryId);
+            responseObj.setAssistantEntryId(assistantEntryId);
         }
 
         // 5. Save Chat History asynchronously-like to Core Service
@@ -108,14 +117,16 @@ public class GeminiAiService {
             Map<String, String> userMsg = new HashMap<>();
             userMsg.put("role", "user");
             userMsg.put("content", request.getPrompt());
-            userMsg.put("createdAt", java.time.OffsetDateTime.now().toString());
+            userMsg.put("createdAt", userCreatedAt.toString());
+            userMsg.put("clientEntryId", userEntryId);
             messagesToSave.add(userMsg);
 
             Map<String, String> assistantMsg = new HashMap<>();
             assistantMsg.put("role", "assistant");
             assistantMsg.put("content", answer);
             assistantMsg.put("provider", provider);
-            assistantMsg.put("createdAt", java.time.OffsetDateTime.now().toString());
+            assistantMsg.put("createdAt", OffsetDateTime.now(ZoneOffset.UTC).toString());
+            assistantMsg.put("clientEntryId", assistantEntryId);
             messagesToSave.add(assistantMsg);
 
             coreServiceClient.saveChatHistory(userId, stableConvId, messagesToSave);
@@ -124,6 +135,13 @@ public class GeminiAiService {
         }
 
         return responseObj;
+    }
+
+    private String normalizeEntryId(String requestedEntryId, String fallbackEntryId) {
+        if (requestedEntryId == null || requestedEntryId.isBlank()) {
+            return fallbackEntryId;
+        }
+        return requestedEntryId.trim();
     }
 
     private String buildSystemPrompt(iuh.cnm.vnalo.aiservice.dto.external.MascotSettingsDTO mascot, boolean enableDeepSummary) {

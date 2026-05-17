@@ -433,6 +433,11 @@ class MainShellState extends State<MainShell> {
     }
     final output = <String, dynamic>{};
     input.forEach((key, value) {
+      const sensitiveKeys = {'content', 'prefilledText', 'messageText'};
+      if (sensitiveKeys.contains(key)) {
+        output[key] = '<redacted>';
+        return;
+      }
       if (value == null || value is num || value is bool || value is String) {
         output[key] = value;
       } else {

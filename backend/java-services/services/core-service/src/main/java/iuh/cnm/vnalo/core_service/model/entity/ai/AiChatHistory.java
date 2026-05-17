@@ -28,6 +28,9 @@ public class AiChatHistory {
     @Column(name = "conversation_id", nullable = false)
     private UUID conversationId;
 
+    @Column(name = "client_entry_id")
+    private String clientEntryId;
+
     @Column(name = "role", nullable = false)
     private String role; // 'user' or 'assistant'
 

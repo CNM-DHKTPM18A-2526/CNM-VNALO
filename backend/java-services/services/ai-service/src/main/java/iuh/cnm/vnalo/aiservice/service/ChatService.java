@@ -17,6 +17,7 @@ import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisCallback;
 
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -72,12 +73,17 @@ public class ChatService {
 
         // 2. Initialize conversation ID
         String convId = (conversationId != null && !conversationId.isBlank()) ? conversationId : UUID.randomUUID().toString();
+        String userEntryId = UUID.randomUUID().toString();
+        OffsetDateTime userCreatedAt = OffsetDateTime.now(ZoneOffset.UTC);
 
         // 3. Load history
         List<Message> history = loadHistory(userId, convId);
         
         // 4. Add user message
-        history.add(new Message("user", message));
+        Message userHistoryMessage = new Message("user", message);
+        userHistoryMessage.setClientEntryId(userEntryId);
+        userHistoryMessage.setCreatedAt(userCreatedAt.toString());
+        history.add(userHistoryMessage);
 
         // Keep last N messages
         List<Message> trimmedHistory = trimHistory(history);
@@ -115,22 +121,32 @@ public class ChatService {
 
         // 7. Persist to Postgres (Async-like via internal API)
         java.util.List<java.util.Map<String, String>> messagesToSave = new java.util.ArrayList<>();
+        OffsetDateTime assistantCreatedAt = OffsetDateTime.now(ZoneOffset.UTC);
+        String assistantEntryId = UUID.randomUUID().toString();
         
         java.util.Map<String, String> userMsg = new java.util.HashMap<>();
         userMsg.put("role", "user");
         userMsg.put("content", message);
+        userMsg.put("createdAt", userCreatedAt.toString());
+        userMsg.put("clientEntryId", userEntryId);
         messagesToSave.add(userMsg);
         
         java.util.Map<String, String> assistantMsg = new java.util.HashMap<>();
         assistantMsg.put("role", "assistant");
         assistantMsg.put("content", answer);
         assistantMsg.put("provider", provider != null ? provider : "unknown");
+        assistantMsg.put("createdAt", assistantCreatedAt.toString());
+        assistantMsg.put("clientEntryId", assistantEntryId);
         messagesToSave.add(assistantMsg);
         
         coreServiceClient.saveChatHistory(userId, convId, messagesToSave);
 
         // 8. Save answer to history (Redis)
-        trimmedHistory.add(new Message("assistant", answer));
+        Message assistantHistoryMessage = new Message("assistant", answer);
+        assistantHistoryMessage.setProvider(provider);
+        assistantHistoryMessage.setClientEntryId(assistantEntryId);
+        assistantHistoryMessage.setCreatedAt(assistantCreatedAt.toString());
+        trimmedHistory.add(assistantHistoryMessage);
         saveHistory(userId, convId, trimHistory(trimmedHistory));
 
 
@@ -140,6 +156,8 @@ public class ChatService {
                 .conversationId(convId)
                 .provider(provider)
                 .timestamp(DateTimeFormatter.ISO_INSTANT.format(Instant.now()))
+                .userEntryId(userEntryId)
+                .assistantEntryId(assistantEntryId)
                 .build();
     }
 
@@ -156,6 +174,9 @@ public class ChatService {
             if (entry.getCreatedAt() != null) {
                 msg.put("createdAt", entry.getCreatedAt());
             }
+            if (entry.getClientEntryId() != null) {
+                msg.put("clientEntryId", entry.getClientEntryId());
+            }
             messagesToSave.add(msg);
         }
         coreServiceClient.saveChatHistory(userId, conversationId, messagesToSave);
@@ -165,15 +186,12 @@ public class ChatService {
         if (conversationId == null || conversationId.isBlank()) {
             return new ArrayList<>();
         }
-        List<Message> history = loadHistory(userId, conversationId);
-        if (history.isEmpty()) {
-            log.info("Redis cache miss for history user {}/conv {}. Restoring from core-service Postgres...", userId, conversationId);
-            history = coreServiceClient.getChatHistory(userId, conversationId);
-            if (!history.isEmpty()) {
-                saveHistory(userId, conversationId, history);
-            }
+        List<Message> persistedHistory = coreServiceClient.getChatHistory(userId, conversationId);
+        if (!persistedHistory.isEmpty()) {
+            saveHistory(userId, conversationId, persistedHistory);
+            return persistedHistory;
         }
-        return history;
+        return loadHistory(userId, conversationId);
     }
 
     public List<String> getUserConversations(String userId) {

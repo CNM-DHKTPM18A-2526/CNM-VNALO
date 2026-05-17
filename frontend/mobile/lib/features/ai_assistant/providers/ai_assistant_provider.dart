@@ -122,7 +122,7 @@ class AiAssistantProvider with ChangeNotifier {
     return _conversationHistory.map((entry) {
       final isUser = entry.role == AiConversationRole.user;
       return Message(
-        id: 'ai_msg_${entry.createdAt.millisecondsSinceEpoch}',
+        id: 'ai_msg_${entry.entryId}',
         conversationId: aiConversationId,
         senderId: isUser ? currentUserId : 'ai_assistant',
         senderName: isUser ? 'Bạn' : currentMascot.name,
@@ -334,16 +334,10 @@ class AiAssistantProvider with ChangeNotifier {
   }
 
   Future<void> deleteMessage(String messageId) async {
-    // messageId is formatted as 'ai_msg_{timestamp}' in getHistoryAsMessages
-    final timestampStr = messageId.replaceFirst('ai_msg_', '');
-    final timestamp = int.tryParse(timestampStr);
-    if (timestamp == null) return;
+    final entryId = messageId.replaceFirst('ai_msg_', '');
+    if (entryId.isEmpty) return;
 
-    final targetTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
-    
-    // Find and remove the entry with the matching timestamp (approximate to 1ms)
-    _conversationHistory.removeWhere((entry) => 
-      entry.createdAt.millisecondsSinceEpoch == targetTime.millisecondsSinceEpoch);
+    _conversationHistory.removeWhere((entry) => entry.entryId == entryId);
     
     await _persistConversationHistory();
     _logEvent('AI_MESSAGE_DELETED', data: {'messageId': messageId});
@@ -605,6 +599,9 @@ class AiAssistantProvider with ChangeNotifier {
     );
     await _stt.stop();
 
+    final userEntryId = _newEntryId();
+    final assistantEntryId = _newEntryId();
+
     try {
       final List<Map<String, dynamic>> structuredHistory = [];
       // Use persisted conversation history instead of session history to support cross-restart context!
@@ -616,6 +613,8 @@ class AiAssistantProvider with ChangeNotifier {
         structuredHistory.add({
           'role': role,
           'content': entry.text,
+          'createdAt': entry.createdAt.toUtc().toIso8601String(),
+          'clientEntryId': entry.entryId,
         });
       }
 
@@ -626,6 +625,8 @@ class AiAssistantProvider with ChangeNotifier {
             analyzeIntent: true,
             enableDeepSummary: _enableDeepSummary,
             history: structuredHistory,
+            clientUserEntryId: userEntryId,
+            clientAssistantEntryId: assistantEntryId,
           )
           .timeout(_aiTimeout);
 
@@ -643,7 +644,13 @@ class AiAssistantProvider with ChangeNotifier {
         _serverConversationId = response['conversationId'].toString();
       }
 
-      _recordHistory(userText: normalized, aiText: _aiResponse);
+      _recordHistory(
+        userText: normalized,
+        aiText: _aiResponse,
+        userEntryId: response['userEntryId']?.toString() ?? userEntryId,
+        assistantEntryId:
+            response['assistantEntryId']?.toString() ?? assistantEntryId,
+      );
 
       if (actionCommand != null && actionCommand.isNotEmpty) {
         _executeSystemAction(actionCommand, actionParams, traceId: traceId);
@@ -667,6 +674,8 @@ class AiAssistantProvider with ChangeNotifier {
           fallbackMessage: 'AI đang phản hồi chậm, vui lòng thử lại sau.',
           userText: normalized,
           source: 'assistant_chat',
+          userEntryId: userEntryId,
+          assistantEntryId: assistantEntryId,
         );
       }
     } catch (error) {
@@ -679,6 +688,8 @@ class AiAssistantProvider with ChangeNotifier {
           error: error,
           userText: normalized,
           source: 'assistant_chat',
+          userEntryId: userEntryId,
+          assistantEntryId: assistantEntryId,
         );
       }
     } finally {
@@ -772,10 +783,19 @@ class AiAssistantProvider with ChangeNotifier {
       traceId: traceId,
     );
 
+    final userEntryId = _newEntryId();
+    final assistantEntryId = _newEntryId();
+
     try {
       await _stt.stop();
       final response = await _aiService
-          .chat(prompt, analyzeIntent: false)
+          .chat(
+            prompt,
+            contextId: _serverConversationId ?? aiConversationId,
+            analyzeIntent: false,
+            clientUserEntryId: userEntryId,
+            clientAssistantEntryId: assistantEntryId,
+          )
           .timeout(_aiTimeout);
 
       if (!_isCurrentOperation(token)) {
@@ -787,10 +807,17 @@ class AiAssistantProvider with ChangeNotifier {
         _aiResponse = fallbackMessage;
       }
 
+      if (response['conversationId'] != null) {
+        _serverConversationId = response['conversationId'].toString();
+      }
+
       _recordHistory(
         userText: _contextPromptLabel(source),
         aiText: _aiResponse,
         source: source,
+        userEntryId: response['userEntryId']?.toString() ?? userEntryId,
+        assistantEntryId:
+            response['assistantEntryId']?.toString() ?? assistantEntryId,
       );
 
       _transitionTo(
@@ -809,6 +836,8 @@ class AiAssistantProvider with ChangeNotifier {
           fallbackMessage: fallbackMessage,
           userText: _contextPromptLabel(source),
           source: source,
+          userEntryId: userEntryId,
+          assistantEntryId: assistantEntryId,
         );
       }
     } catch (error) {
@@ -821,6 +850,8 @@ class AiAssistantProvider with ChangeNotifier {
           error: error,
           userText: _contextPromptLabel(source),
           source: source,
+          userEntryId: userEntryId,
+          assistantEntryId: assistantEntryId,
         );
       }
     } finally {
@@ -947,6 +978,8 @@ class AiAssistantProvider with ChangeNotifier {
     Object? error,
     String? userText,
     String source = 'assistant_chat',
+    String? userEntryId,
+    String? assistantEntryId,
   }) async {
     _logEvent(
       event,
@@ -958,7 +991,15 @@ class AiAssistantProvider with ChangeNotifier {
     _aiResponse = fallbackMessage;
     _currentEmotion = 'neutral';
     if (userText != null && userText.trim().isNotEmpty) {
-      _recordHistory(userText: userText, aiText: _aiResponse, source: source);
+      final fallbackAssistantEntryId =
+          assistantEntryId != null ? _newEntryId() : null;
+      _recordHistory(
+        userText: userText,
+        aiText: _aiResponse,
+        source: source,
+        userEntryId: userEntryId,
+        assistantEntryId: fallbackAssistantEntryId,
+      );
     }
     _transitionTo(AiState.speaking, reason: 'fallback_speak', traceId: traceId);
     notifyListeners();
@@ -1008,6 +1049,8 @@ class AiAssistantProvider with ChangeNotifier {
     required String userText,
     required String aiText,
     String source = 'assistant_chat',
+    String? userEntryId,
+    String? assistantEntryId,
   }) {
     final normalizedUser = userText.trim();
     final normalizedAi = aiText.trim();
@@ -1018,6 +1061,7 @@ class AiAssistantProvider with ChangeNotifier {
         role: AiConversationRole.user,
         text: normalizedUser,
         source: source,
+        entryId: userEntryId,
       );
     }
 
@@ -1027,6 +1071,7 @@ class AiAssistantProvider with ChangeNotifier {
         role: AiConversationRole.assistant,
         text: normalizedAi,
         source: source,
+        entryId: assistantEntryId,
       );
     }
 
@@ -1051,6 +1096,8 @@ class AiAssistantProvider with ChangeNotifier {
     required AiConversationRole role,
     required String text,
     required String source,
+    String? entryId,
+    DateTime? createdAt,
   }) {
     final normalized = text.trim();
     if (normalized.isEmpty) {
@@ -1060,10 +1107,11 @@ class AiAssistantProvider with ChangeNotifier {
     _conversationCreated = true;
     _conversationHistory.add(
       AiConversationEntry(
+        entryId: entryId ?? _newEntryId(),
         role: role,
         text: normalized,
         source: source,
-        createdAt: DateTime.now(),
+        createdAt: (createdAt ?? DateTime.now()).toUtc(),
       ),
     );
 
@@ -1114,23 +1162,33 @@ class AiAssistantProvider with ChangeNotifier {
         for (final map in entries) {
           final roleStr = map['role']?.toString() ?? 'user';
           final content = map['content']?.toString() ?? '';
+          if (content.trim().isEmpty) {
+            continue;
+          }
           final provider = map['provider']?.toString();
+          final entryId =
+              (map['clientEntryId'] ?? map['entryId'])?.toString().trim();
           final rawCreatedAt = map['createdAt']?.toString();
           final parsedCreatedAt = rawCreatedAt != null
-              ? (DateTime.tryParse(rawCreatedAt) ?? DateTime.now())
-              : DateTime.now();
+              ? (DateTime.tryParse(rawCreatedAt)?.toUtc() ??
+                  DateTime.now().toUtc())
+              : DateTime.now().toUtc();
 
           final role = roleStr == 'user' ? AiConversationRole.user : AiConversationRole.assistant;
 
-          // Check if this message already exists in local merged history (by content, role, and timestamp close to within 3 seconds)
+          // Prefer stable entry ids; keep timestamp fallback for legacy rows.
           final exists = merged.any((local) =>
-              local.role == role &&
-              local.text.trim() == content.trim() &&
-              (local.createdAt.difference(parsedCreatedAt).abs().inSeconds < 3));
+              (entryId != null && entryId.isNotEmpty && local.entryId == entryId) ||
+              (local.role == role &&
+                  local.text.trim() == content.trim() &&
+                  (local.createdAt.difference(parsedCreatedAt).abs().inSeconds <
+                      3)));
 
           if (!exists) {
             merged.add(
               AiConversationEntry(
+                entryId:
+                    entryId != null && entryId.isNotEmpty ? entryId : _newEntryId(),
                 role: role,
                 text: content,
                 source: provider ?? 'restored',
@@ -1410,6 +1468,8 @@ class AiAssistantProvider with ChangeNotifier {
 
   String _newTraceId(String scope) => '${scope}_${_uuid.v4()}';
 
+  String _newEntryId() => _uuid.v4();
+
   void _logEvent(
     String event, {
     String level = 'INFO',
@@ -1439,6 +1499,19 @@ class AiAssistantProvider with ChangeNotifier {
 
     final sanitized = <String, dynamic>{};
     data.forEach((key, value) {
+      const sensitiveKeys = {
+        'text',
+        'prompt',
+        'content',
+        'aiText',
+        'userText',
+        'entries',
+        'history',
+      };
+      if (sensitiveKeys.contains(key)) {
+        sanitized[key] = '<redacted>';
+        return;
+      }
       if (value == null || value is num || value is bool || value is String) {
         sanitized[key] = value;
       } else {
@@ -1478,12 +1551,14 @@ class AiAssistantProvider with ChangeNotifier {
 enum AiConversationRole { user, assistant, system }
 
 class AiConversationEntry {
+  final String entryId;
   final AiConversationRole role;
   final String text;
   final String source;
   final DateTime createdAt;
 
   const AiConversationEntry({
+    required this.entryId,
     required this.role,
     required this.text,
     required this.source,
@@ -1491,10 +1566,12 @@ class AiConversationEntry {
   });
 
   Map<String, dynamic> toJson() => {
+    'entryId': entryId,
+    'clientEntryId': entryId,
     'role': role.name,
     'content': text,
     'source': source,
-    'createdAt': createdAt.toIso8601String(),
+    'createdAt': createdAt.toUtc().toIso8601String(),
   };
 
   factory AiConversationEntry.fromJson(Map<String, dynamic> json) {
@@ -1504,15 +1581,35 @@ class AiConversationEntry {
       orElse: () => AiConversationRole.assistant,
     );
 
+    final content = (json['content'] ?? json['text'] ?? '').toString();
     final rawCreatedAt = (json['createdAt'] ?? '').toString();
-    final parsedCreatedAt = DateTime.tryParse(rawCreatedAt) ?? DateTime.now();
+    final parsedCreatedAt =
+        DateTime.tryParse(rawCreatedAt)?.toUtc() ?? DateTime.now().toUtc();
+    final rawEntryId = (json['entryId'] ?? json['clientEntryId'])?.toString();
 
     return AiConversationEntry(
+      entryId: rawEntryId != null && rawEntryId.isNotEmpty
+          ? rawEntryId
+          : _legacyEntryId(resolvedRole, content, parsedCreatedAt),
       role: resolvedRole,
-      text: (json['content'] ?? json['text'] ?? '').toString(),
+      text: content,
       source: (json['source'] ?? 'assistant_chat').toString(),
       createdAt: parsedCreatedAt,
     );
+  }
+
+  static String _legacyEntryId(
+    AiConversationRole role,
+    String content,
+    DateTime createdAt,
+  ) {
+    var hash = 2166136261;
+    final seed = '${role.name}|${createdAt.toUtc().microsecondsSinceEpoch}|$content';
+    for (final codeUnit in seed.codeUnits) {
+      hash ^= codeUnit;
+      hash = (hash * 16777619) & 0xffffffff;
+    }
+    return 'legacy_${hash.toRadixString(16)}';
   }
 }
 

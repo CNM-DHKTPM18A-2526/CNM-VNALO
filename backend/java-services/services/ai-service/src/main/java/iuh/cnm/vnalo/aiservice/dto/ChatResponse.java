@@ -14,4 +14,6 @@ public class ChatResponse {
     private String conversationId;
     private String provider;
     private String timestamp;
+    private String userEntryId;
+    private String assistantEntryId;
 }

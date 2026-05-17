@@ -29,4 +29,7 @@ public class AiChatResponse {
 
     // Stable, server-provided unique assistant conversation ID for this user session
     private String conversationId;
+
+    private String userEntryId;
+    private String assistantEntryId;
 }
