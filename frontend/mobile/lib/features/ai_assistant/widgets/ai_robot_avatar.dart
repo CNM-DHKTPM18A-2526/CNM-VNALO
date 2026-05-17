@@ -23,30 +23,74 @@ class AiRobotAvatar extends StatefulWidget {
 }
 
 class _AiRobotAvatarState extends State<AiRobotAvatar>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _controller;
   Timer? _blinkTimer;
+  Timer? _blinkCloseTimer;
   bool _blinkClosed = false;
+  bool _isAppActive = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1600),
-    )..repeat(reverse: true);
+    );
+    _syncAnimationState();
     _scheduleBlink();
   }
 
   @override
+  void didUpdateWidget(covariant AiRobotAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.state != widget.state) {
+      _syncAnimationState();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _isAppActive = state == AppLifecycleState.resumed;
+    _syncAnimationState();
+    if (_isAppActive) {
+      _scheduleBlink();
+    } else {
+      _blinkTimer?.cancel();
+      _blinkCloseTimer?.cancel();
+      if (_blinkClosed && mounted) {
+        setState(() {
+          _blinkClosed = false;
+        });
+      }
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _blinkTimer?.cancel();
+    _blinkCloseTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
 
+  void _syncAnimationState() {
+    final shouldAnimate = _isAppActive && widget.state != AiState.idle;
+    if (shouldAnimate && !_controller.isAnimating) {
+      _controller.repeat(reverse: true);
+    } else if (!shouldAnimate && _controller.isAnimating) {
+      _controller.stop();
+    }
+  }
+
   void _scheduleBlink() {
     _blinkTimer?.cancel();
+    _blinkCloseTimer?.cancel();
+    if (!_isAppActive) {
+      return;
+    }
     _blinkTimer = Timer(
       Duration(milliseconds: 2400 + (math.Random().nextInt(1500))),
       () {
@@ -56,7 +100,7 @@ class _AiRobotAvatarState extends State<AiRobotAvatar>
         setState(() {
           _blinkClosed = true;
         });
-        Timer(const Duration(milliseconds: 130), () {
+        _blinkCloseTimer = Timer(const Duration(milliseconds: 130), () {
           if (!mounted) {
             return;
           }
@@ -274,8 +318,7 @@ class _RobotEye extends StatelessWidget {
     final eyeHeight =
         blinkClosed ? 3.0 : 11.0 + (math.sin(pulse * math.pi) * 1.2);
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 120),
+    return Container(
       width: 16,
       height: eyeHeight,
       decoration: BoxDecoration(

@@ -53,6 +53,7 @@ class AiAssistantProvider with ChangeNotifier {
 
   final List<Map<String, String>> _sessionHistory = [];
   final List<AiConversationEntry> _conversationHistory = [];
+  final Set<String> _syncedEntryIds = <String>{};
   String? _serverConversationId;
   final StreamController<AiCommand> _systemActionController =
       StreamController<AiCommand>.broadcast();
@@ -312,6 +313,7 @@ class AiAssistantProvider with ChangeNotifier {
     String reason = 'manual',
   }) async {
     _conversationHistory.clear();
+    _syncedEntryIds.clear();
     _conversationCreated = false;
     _sessionHistory.clear();
     _lastUserPrompt = '';
@@ -338,6 +340,7 @@ class AiAssistantProvider with ChangeNotifier {
     if (entryId.isEmpty) return;
 
     _conversationHistory.removeWhere((entry) => entry.entryId == entryId);
+    _syncedEntryIds.remove(entryId);
     
     await _persistConversationHistory();
     _logEvent('AI_MESSAGE_DELETED', data: {'messageId': messageId});
@@ -1116,10 +1119,16 @@ class AiAssistantProvider with ChangeNotifier {
     );
 
     if (_conversationHistory.length > _maxConversationEntries) {
+      final overflow = _conversationHistory.length - _maxConversationEntries;
+      final removedIds = _conversationHistory
+          .take(overflow)
+          .map((entry) => entry.entryId)
+          .toList(growable: false);
       _conversationHistory.removeRange(
         0,
-        _conversationHistory.length - _maxConversationEntries,
+        overflow,
       );
+      _syncedEntryIds.removeAll(removedIds);
     }
 
     unawaited(_persistConversationHistory());
@@ -1159,15 +1168,23 @@ class AiAssistantProvider with ChangeNotifier {
       final entries = await _aiService.restoreConversationHistory(conversationId: targetId);
       if (entries.isNotEmpty) {
         final List<AiConversationEntry> merged = List.from(_conversationHistory);
-        for (final map in entries) {
+        final existingIds = merged.map((entry) => entry.entryId).toSet();
+        final restoredIds = <String>{};
+        final limitedEntries = entries.length > _maxConversationEntries
+            ? entries.sublist(entries.length - _maxConversationEntries)
+            : entries;
+
+        for (final map in limitedEntries) {
           final roleStr = map['role']?.toString() ?? 'user';
           final content = map['content']?.toString() ?? '';
           if (content.trim().isEmpty) {
             continue;
           }
           final provider = map['provider']?.toString();
-          final entryId =
+          final rawEntryId =
               (map['clientEntryId'] ?? map['entryId'])?.toString().trim();
+          final entryId =
+              rawEntryId != null && rawEntryId.isNotEmpty ? rawEntryId : null;
           final rawCreatedAt = map['createdAt']?.toString();
           final parsedCreatedAt = rawCreatedAt != null
               ? (DateTime.tryParse(rawCreatedAt)?.toUtc() ??
@@ -1177,35 +1194,51 @@ class AiAssistantProvider with ChangeNotifier {
           final role = roleStr == 'user' ? AiConversationRole.user : AiConversationRole.assistant;
 
           // Prefer stable entry ids; keep timestamp fallback for legacy rows.
-          final exists = merged.any((local) =>
-              (entryId != null && entryId.isNotEmpty && local.entryId == entryId) ||
-              (local.role == role &&
+          final exists = entryId != null
+              ? existingIds.contains(entryId)
+              : merged.any((local) =>
+                  local.role == role &&
                   local.text.trim() == content.trim() &&
                   (local.createdAt.difference(parsedCreatedAt).abs().inSeconds <
-                      3)));
+                      3));
 
           if (!exists) {
+            final resolvedEntryId = entryId ?? _newEntryId();
             merged.add(
               AiConversationEntry(
-                entryId:
-                    entryId != null && entryId.isNotEmpty ? entryId : _newEntryId(),
+                entryId: resolvedEntryId,
                 role: role,
                 text: content,
                 source: provider ?? 'restored',
                 createdAt: parsedCreatedAt,
               ),
             );
+            existingIds.add(resolvedEntryId);
+            restoredIds.add(resolvedEntryId);
+          } else if (entryId != null) {
+            restoredIds.add(entryId);
           }
         }
 
         // Sort all entries chronologically by createdAt to guarantee correct order in UI
         merged.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+        if (merged.length > _maxConversationEntries) {
+          final overflow = merged.length - _maxConversationEntries;
+          final removedIds = merged
+              .take(overflow)
+              .map((entry) => entry.entryId)
+              .toList(growable: false);
+          merged.removeRange(0, overflow);
+          _syncedEntryIds.removeAll(removedIds);
+          restoredIds.removeAll(removedIds);
+        }
 
         _conversationHistory
           ..clear()
           ..addAll(merged);
 
         await _persistConversationHistory();
+        _syncedEntryIds.addAll(restoredIds);
         notifyListeners();
         _logEvent('CLOUD_HISTORY_RESTORED', data: {'entries': _conversationHistory.length});
       }
@@ -1235,13 +1268,20 @@ class AiAssistantProvider with ChangeNotifier {
       return;
     }
 
-    final payload =
-        _conversationHistory.map((entry) => entry.toJson()).toList();
+    final pendingEntries = _conversationHistory
+        .where((entry) => !_syncedEntryIds.contains(entry.entryId))
+        .toList(growable: false);
+    if (pendingEntries.isEmpty) {
+      return;
+    }
+
+    final payload = pendingEntries.map((entry) => entry.toJson()).toList();
     try {
       await _aiService.backupConversationHistory(
         conversationId: _serverConversationId ?? aiConversationId,
         entries: payload,
       );
+      _syncedEntryIds.addAll(pendingEntries.map((entry) => entry.entryId));
       _logEvent('CLOUD_BACKUP_SYNCED', data: {'entries': payload.length});
     } catch (error) {
       _logEvent(
@@ -1428,7 +1468,7 @@ class AiAssistantProvider with ChangeNotifier {
     final normalized = (((rawLevel + 2) / 12).clamp(0.0, 1.0)).toDouble();
     final smoothed = (_soundLevel * 0.64) + (normalized * 0.36);
 
-    if ((_soundLevel - smoothed).abs() < 0.015) {
+    if ((_soundLevel - smoothed).abs() < 0.008) {
       return;
     }
 
@@ -1436,7 +1476,7 @@ class AiAssistantProvider with ChangeNotifier {
     final now = DateTime.now();
     if (_lastSoundLevelNotifyAt == null ||
         now.difference(_lastSoundLevelNotifyAt!) >=
-            const Duration(milliseconds: 90)) {
+            const Duration(milliseconds: 50)) {
       _lastSoundLevelNotifyAt = now;
       notifyListeners();
     }
@@ -1526,6 +1566,16 @@ class AiAssistantProvider with ChangeNotifier {
     dynamic params, {
     required String traceId,
   }) {
+    if (_isDisposed || _systemActionController.isClosed) {
+      _logEvent(
+        'AI_COMMAND_DROPPED',
+        traceId: traceId,
+        level: 'WARN',
+        data: {'reason': 'controller_closed', 'command': command},
+      );
+      return;
+    }
+
     final aiCommand = AiCommand(
       command: command,
       params: params,
