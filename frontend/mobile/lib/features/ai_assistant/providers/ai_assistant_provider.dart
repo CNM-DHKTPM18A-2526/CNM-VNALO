@@ -61,7 +61,6 @@ class AiAssistantProvider with ChangeNotifier {
   final List<Map<String, String>> _sessionHistory = [];
   final List<AiConversationEntry> _conversationHistory = [];
   final Set<String> _syncedEntryIds = <String>{};
-  final Set<String> _cloudDeleteFenceConversationIds = <String>{};
   String? _serverConversationId;
   final StreamController<AiCommand> _systemActionController =
       StreamController<AiCommand>.broadcast();
@@ -362,7 +361,6 @@ class AiAssistantProvider with ChangeNotifier {
 
     if (serverConversationIdToDelete != null &&
         serverConversationIdToDelete.isNotEmpty) {
-      _cloudDeleteFenceConversationIds.add(serverConversationIdToDelete);
       unawaited(_deleteCloudConversationHistory(serverConversationIdToDelete));
     }
   }
@@ -1385,7 +1383,12 @@ class AiAssistantProvider with ChangeNotifier {
       if (_isDisposed ||
           syncGeneration != _historyClearGeneration ||
           _conversationHistory.isEmpty) {
-        if (_cloudDeleteFenceConversationIds.contains(conversationId)) {
+        final canSafelyRetryDelete =
+            !_isPipelineLocked &&
+            !_isSessionActive &&
+            _conversationHistory.isEmpty &&
+            _serverConversationId != conversationId;
+        if (canSafelyRetryDelete) {
           unawaited(_deleteCloudConversationHistory(conversationId));
         }
         _logEvent(
