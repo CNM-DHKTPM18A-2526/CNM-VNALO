@@ -334,6 +334,12 @@ class AiAssistantProvider with ChangeNotifier {
     final serverConversationIdToDelete = _serverConversationId;
     _historyClearGeneration++;
     _cloudBackupDebounceTimer?.cancel();
+    _cancelActiveOperation(reason: 'history_clear:$reason');
+    await _stopAllInteractions(
+      reason: 'history_clear:$reason',
+      keepResponse: !clearCurrentResponse,
+    );
+
     _conversationHistory.clear();
     _syncedEntryIds.clear();
     _conversationCreated = false;
