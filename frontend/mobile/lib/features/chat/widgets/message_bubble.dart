@@ -100,7 +100,11 @@ class MessageBubble extends StatelessWidget {
                 ),
                 child: Text(
                   milestoneText!,
-                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ),
@@ -134,10 +138,14 @@ class MessageBubble extends StatelessWidget {
               Flexible(
                 child: Column(
                   crossAxisAlignment:
-                      isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                      isMine
+                          ? CrossAxisAlignment.end
+                          : CrossAxisAlignment.start,
                   children: [
                     _buildBubbleWrapper(context, isDarkMode),
-                    if (reactions != null && reactions!.isNotEmpty && currentUserId != null)
+                    if (reactions != null &&
+                        reactions!.isNotEmpty &&
+                        currentUserId != null)
                       MessageReactions(
                         reactions: reactions!,
                         currentUserId: currentUserId!,
@@ -169,14 +177,23 @@ class MessageBubble extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.transparent,
-          border: Border.all(color: isDarkMode ? DarkColors.divider : AppColors.itemDivider),
+          color:
+              isDarkMode
+                  ? Colors.white.withValues(alpha: 0.05)
+                  : Colors.transparent,
+          border: Border.all(
+            color: isDarkMode ? DarkColors.divider : AppColors.itemDivider,
+          ),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.history_rounded, size: 16, color: isDarkMode ? Colors.white38 : Colors.grey.shade500),
+            Icon(
+              Icons.history_rounded,
+              size: 16,
+              color: isDarkMode ? Colors.white38 : Colors.grey.shade500,
+            ),
             const SizedBox(width: 8),
             Text(
               common.msgRecalled,
@@ -199,21 +216,29 @@ class MessageBubble extends StatelessWidget {
       return _buildSticker(context);
     }
 
-    final isMediaOnly = message.messageType == MessageType.IMAGE || message.messageType == MessageType.VIDEO;
-    
-    final bubbleColor = isMediaOnly
-        ? Colors.transparent
-        : (isMine
-            ? (isDarkMode ? DarkColors.chatBubbleSent : LightColors.chatBubbleSent)
-            : (isDarkMode ? DarkColors.chatBubbleReceived : LightColors.chatBubbleReceived));
+    final isMediaOnly =
+        message.messageType == MessageType.IMAGE ||
+        message.messageType == MessageType.VIDEO;
+
+    final bubbleColor =
+        isMediaOnly
+            ? Colors.transparent
+            : (isMine
+                ? (isDarkMode
+                    ? DarkColors.chatBubbleSent
+                    : LightColors.chatBubbleSent)
+                : (isDarkMode
+                    ? DarkColors.chatBubbleReceived
+                    : LightColors.chatBubbleReceived));
 
     return Container(
       constraints: BoxConstraints(
         maxWidth: MediaQuery.of(context).size.width * 0.75,
       ),
-      padding: isMediaOnly
-          ? EdgeInsets.zero
-          : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding:
+          isMediaOnly
+              ? EdgeInsets.zero
+              : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: bubbleColor,
         borderRadius: BorderRadius.only(
@@ -222,9 +247,13 @@ class MessageBubble extends StatelessWidget {
           bottomLeft: Radius.circular(isMine ? 16 : 4),
           bottomRight: Radius.circular(isMine ? 4 : 16),
         ),
-        border: isDarkMode
-            ? Border.all(color: Colors.white.withValues(alpha: 0.1), width: 0.5)
-            : null,
+        border:
+            isDarkMode
+                ? Border.all(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  width: 0.5,
+                )
+                : null,
         boxShadow: [
           if (!isDarkMode && !isMediaOnly)
             BoxShadow(
@@ -239,7 +268,8 @@ class MessageBubble extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (message.replyToMessageId != null) _buildReplyQuote(context, isDarkMode),
+          if (message.replyToMessageId != null)
+            _buildReplyQuote(context, isDarkMode),
           _renderTypeSpecificContent(context, isDarkMode),
         ],
       ),
@@ -252,7 +282,10 @@ class MessageBubble extends StatelessWidget {
         context.watch<ChatProvider>().highlightedMessageId == message.id;
 
     return GestureDetector(
-      onTap: message.replyToMessageId != null ? () => onReplyTap?.call(message.replyToMessageId!) : null,
+      onTap:
+          message.replyToMessageId != null
+              ? () => onReplyTap?.call(message.replyToMessageId!)
+              : null,
       onLongPress: () => _showActionMenu(context, chatProvider),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 500),
@@ -286,15 +319,22 @@ class MessageBubble extends StatelessWidget {
     // Skip action menu for recalled messages.
     if (message.isRecalled) return;
 
-    final isCloud = message.conversationId == 'MY_DOCUMENTS' || message.conversationId == 'my_documents_conversation';
-    final isAiAssistant = message.conversationId == 'AI_ASSISTANT_LOCAL';
+    final isCloud =
+        message.conversationId == 'MY_DOCUMENTS' ||
+        message.conversationId == 'my_documents_conversation';
+    final isAiAssistant = AiAssistantProvider.isAiConversationId(
+      message.conversationId,
+    );
 
     FocusedMessageDialog.show(
       context,
       message: message,
       isMine: isMine,
       isCloud: isCloud,
-      isPinned: chatProvider.isMessagePinned(message.conversationId, message.id),
+      isPinned: chatProvider.isMessagePinned(
+        message.conversationId,
+        message.id,
+      ),
       isAiAssistant: isAiAssistant,
       canPin: canPin,
       canRecall: isMine && canRecall,
@@ -319,33 +359,36 @@ class MessageBubble extends StatelessWidget {
           }
         } else if (action == 'copy') {
           if (message.messageType == MessageType.TEXT) {
-             Clipboard.setData(ClipboardData(text: message.content ?? ''));
-             if (context.mounted) {
-               ScaffoldMessenger.of(context).showSnackBar(
-                 SnackBar(content: Text(common.msgCopiedToast)),
-               );
-             }
-           }
+            Clipboard.setData(ClipboardData(text: message.content ?? ''));
+            if (context.mounted) {
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(common.msgCopiedToast)));
+            }
+          }
         } else if (action == 'recall') {
           if (context.mounted) {
             final common = CommonTexts.of(context, listen: false);
             final confirmed = await showDialog<bool>(
               context: context,
-              builder: (ctx) => AlertDialog(
-                title: Text(common.recallAction),
-                content: Text(common.confirmRecallMessage),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    child: Text(common.cancel),
+              builder:
+                  (ctx) => AlertDialog(
+                    title: Text(common.recallAction),
+                    content: Text(common.confirmRecallMessage),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: Text(common.cancel),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.orange,
+                        ),
+                        child: Text(common.recallAction),
+                      ),
+                    ],
                   ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    style: TextButton.styleFrom(foregroundColor: Colors.orange),
-                    child: Text(common.recallAction),
-                  ),
-                ],
-              ),
             );
             if (confirmed == true) {
               chatProvider.recallMessage(message.id, message.conversationId);
@@ -353,59 +396,46 @@ class MessageBubble extends StatelessWidget {
           }
         } else if (action == 'delete') {
           if (onDeleteAction != null) {
-            final confirmed = await showDialog<bool>(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: Text(common.deleteMessageTitle),
-                content: Text(common.deleteMessagePrompt),
-                actions: [
-                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(common.cancel)),
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    style: TextButton.styleFrom(foregroundColor: Colors.red),
-                    child: Text(common.deleteMessageTitle),
-                  ),
-                ],
-              ),
-            );
-            if (confirmed == true) {
-              onDeleteAction!(message);
-            }
+            onDeleteAction!(message);
+            return;
+          }
+          if (isAiAssistant) {
             return;
           }
           if (context.mounted) {
             final common = CommonTexts.of(context, listen: false);
             final confirmed = await showDialog<bool>(
               context: context,
-              builder: (ctx) => AlertDialog(
-                title: Text(common.deleteForMeAction),
-                content: Text(common.deleteHistoryWarning),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    child: Text(common.cancel),
+              builder:
+                  (ctx) => AlertDialog(
+                    title: Text(common.deleteForMeAction),
+                    content: Text(common.deleteHistoryWarning),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: Text(common.cancel),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.red,
+                        ),
+                        child: Text(common.deleteForMeAction),
+                      ),
+                    ],
                   ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    style: TextButton.styleFrom(foregroundColor: Colors.red),
-                    child: Text(common.deleteForMeAction),
-                  ),
-                ],
-              ),
             );
             if (confirmed == true && context.mounted) {
-              if (message.conversationId == 'AI_ASSISTANT_LOCAL') {
-                await context.read<AiAssistantProvider>().deleteMessage(message.id);
-              } else {
-                await chatProvider.deleteForMe(
-                  message.id,
-                  message.conversationId,
-                );
-              }
+              await chatProvider.deleteForMe(
+                message.id,
+                message.conversationId,
+              );
             }
           }
         } else if (action == 'pin') {
-          final pins = chatProvider.getPinnedMessagesForConversation(message.conversationId);
+          final pins = chatProvider.getPinnedMessagesForConversation(
+            message.conversationId,
+          );
           if (pins.length >= 3) {
             // Already 3 pins — show dialog to unpin first
             if (context.mounted) {
@@ -414,9 +444,9 @@ class MessageBubble extends StatelessWidget {
           } else {
             chatProvider.pinMessage(message.id);
             if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(common.pinActionTag)),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(common.pinActionTag)));
             }
           }
         } else if (action == 'unpin') {
@@ -424,28 +454,33 @@ class MessageBubble extends StatelessWidget {
             final common = CommonTexts.of(context, listen: false);
             final confirmed = await showDialog<bool>(
               context: context,
-              builder: (ctx) => AlertDialog(
-                title: Text(common.confirmUnpinTitle),
-                content: Text('${common.confirmUnpinTitle} "${message.content ?? ''}"?'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    child: Text(common.cancel),
+              builder:
+                  (ctx) => AlertDialog(
+                    title: Text(common.confirmUnpinTitle),
+                    content: Text(
+                      '${common.confirmUnpinTitle} "${message.content ?? ''}"?',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: Text(common.cancel),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.red,
+                        ),
+                        child: Text(common.unpinAction),
+                      ),
+                    ],
                   ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    style: TextButton.styleFrom(foregroundColor: Colors.red),
-                    child: Text(common.unpinAction),
-                  ),
-                ],
-              ),
             );
             if (confirmed == true) {
               chatProvider.unpinMessage(message.id);
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(common.unpinSuccess)),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text(common.unpinSuccess)));
               }
             }
           }
@@ -565,9 +600,13 @@ class MessageBubble extends StatelessWidget {
           bottomLeft: Radius.circular(isMine ? 16 : 6),
           bottomRight: Radius.circular(isMine ? 6 : 16),
         ),
-        border: isDarkMode
-            ? Border.all(color: Colors.white.withValues(alpha: 0.1), width: 0.5)
-            : null,
+        border:
+            isDarkMode
+                ? Border.all(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  width: 0.5,
+                )
+                : null,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: isDarkMode ? 0.12 : 0.06),
@@ -602,7 +641,10 @@ class MessageBubble extends StatelessWidget {
                       Icon(
                         subtitleIcon,
                         size: 15,
-                        color: isMissed ? titleColor.withValues(alpha: 0.8) : labelColor,
+                        color:
+                            isMissed
+                                ? titleColor.withValues(alpha: 0.8)
+                                : labelColor,
                       ),
                       const SizedBox(width: 5),
                       Flexible(
@@ -635,7 +677,9 @@ class MessageBubble extends StatelessWidget {
                   common.callAgainAction,
                   style: TextStyle(
                     color:
-                        canCallAgain ? AppColors.primary : (isDarkMode ? Colors.white24 : Colors.black26),
+                        canCallAgain
+                            ? AppColors.primary
+                            : (isDarkMode ? Colors.white24 : Colors.black26),
                     fontWeight: FontWeight.w700,
                     fontSize: 13,
                   ),
@@ -647,7 +691,6 @@ class MessageBubble extends StatelessWidget {
       ),
     );
   }
-
 
   String _callLogTitle(CallLogMessage callLog, bool incoming, bool isVideo) {
     if (callLog.isGroup) {
@@ -809,8 +852,9 @@ class MessageBubble extends StatelessWidget {
               url.startsWith('/') ||
               url.contains('Users') ||
               url.contains('storage');
-          
-          final resolvedUrl = isLocal ? url : (AvatarResolver.resolveUrl(url) ?? url);
+
+          final resolvedUrl =
+              isLocal ? url : (AvatarResolver.resolveUrl(url) ?? url);
           final auth = context.read<AuthProvider>();
           final token = auth.accessToken;
 
@@ -833,23 +877,46 @@ class MessageBubble extends StatelessWidget {
                     : CachedNetworkImage(
                       imageUrl: resolvedUrl,
                       fit: BoxFit.cover,
-                      httpHeaders: (token != null && AvatarResolver.isInternalUrl(resolvedUrl))
-                          ? {'Authorization': 'Bearer $token'}
-                          : const {},
-                      placeholder: (context, url) => Container(
-                        color: isDarkMode ? Colors.white10 : Colors.grey.shade100,
-                        child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                      ),
+                      httpHeaders:
+                          (token != null &&
+                                  AvatarResolver.isInternalUrl(resolvedUrl))
+                              ? {'Authorization': 'Bearer $token'}
+                              : const {},
+                      placeholder:
+                          (context, url) => Container(
+                            color:
+                                isDarkMode
+                                    ? Colors.white10
+                                    : Colors.grey.shade100,
+                            child: const Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
                       errorWidget: (context, url, error) {
-                        debugPrint('[MEDIA] ❌ Load Failed: $url - Error: $error');
+                        debugPrint(
+                          '[MEDIA] ❌ Load Failed: $url - Error: $error',
+                        );
                         return Container(
-                          color: isDarkMode ? Colors.white10 : Colors.grey.shade100,
+                          color:
+                              isDarkMode
+                                  ? Colors.white10
+                                  : Colors.grey.shade100,
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.broken_image_outlined, color: Colors.grey, size: 32),
+                              const Icon(
+                                Icons.broken_image_outlined,
+                                color: Colors.grey,
+                                size: 32,
+                              ),
                               if (isDarkMode) const SizedBox(height: 4),
-                              const Text('Lỗi tải ảnh', style: TextStyle(color: Colors.grey, fontSize: 10)),
+                              const Text(
+                                'Lỗi tải ảnh',
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 10,
+                                ),
+                              ),
                             ],
                           ),
                         );
@@ -873,26 +940,36 @@ class MessageBubble extends StatelessWidget {
 
   Widget _buildImage(BuildContext context) {
     final rawUrl = message.mediaUrl ?? '';
-    debugPrint('[_buildImage] msgId=${message.id} type=${message.messageType} rawUrl="$rawUrl" content="${message.content}"');
+    debugPrint(
+      '[_buildImage] msgId=${message.id} type=${message.messageType} rawUrl="$rawUrl" content="${message.content}"',
+    );
     if (rawUrl.isEmpty) {
-      debugPrint('[_buildImage] ⚠️ rawUrl is EMPTY, checking content="${message.content}"');
+      debugPrint(
+        '[_buildImage] ⚠️ rawUrl is EMPTY, checking content="${message.content}"',
+      );
       return const SizedBox.shrink();
     }
 
     // Check if it's a real local file path (mobile storage paths)
-    final isLocalFile = rawUrl.startsWith('/data/') || 
-                        rawUrl.startsWith('/var/') ||
-                        rawUrl.startsWith('file://') ||
-                        (rawUrl.contains('/storage/emulated/') && !rawUrl.contains('/api/')) ||
-                        (rawUrl.contains('Users/') && Platform.isIOS) ||
-                        (rawUrl.contains('DCIM/') || rawUrl.contains('Pictures/') && Platform.isIOS);
-    
+    final isLocalFile =
+        rawUrl.startsWith('/data/') ||
+        rawUrl.startsWith('/var/') ||
+        rawUrl.startsWith('file://') ||
+        (rawUrl.contains('/storage/emulated/') && !rawUrl.contains('/api/')) ||
+        (rawUrl.contains('Users/') && Platform.isIOS) ||
+        (rawUrl.contains('DCIM/') ||
+            rawUrl.contains('Pictures/') && Platform.isIOS);
+
     // Determine if we should use file or network loading
-    final useLocalFile = isLocalFile && File(rawUrl.replaceFirst('file://', '')).existsSync();
-    
+    final useLocalFile =
+        isLocalFile && File(rawUrl.replaceFirst('file://', '')).existsSync();
+
     // If it's just an ID and not local, resolve it via MediaService pattern
     String resolvedRaw = rawUrl;
-    if (!useLocalFile && !rawUrl.contains('/') && !rawUrl.contains('.') && !rawUrl.startsWith('http')) {
+    if (!useLocalFile &&
+        !rawUrl.contains('/') &&
+        !rawUrl.contains('.') &&
+        !rawUrl.startsWith('http')) {
       // We don't have direct access to MediaService here easily without context.read,
       // but we know the pattern from MediaService.getPublicUrl.
       // However, AvatarResolver.resolveUrl already handles prepending the base.
@@ -900,14 +977,19 @@ class MessageBubble extends StatelessWidget {
       resolvedRaw = '/media/public/$rawUrl';
     }
 
-    final url = useLocalFile ? rawUrl.replaceFirst('file://', '') : (AvatarResolver.resolveUrl(resolvedRaw) ?? resolvedRaw);
+    final url =
+        useLocalFile
+            ? rawUrl.replaceFirst('file://', '')
+            : (AvatarResolver.resolveUrl(resolvedRaw) ?? resolvedRaw);
     final isGif = !useLocalFile && _isGifUrl(url);
 
     // GIF hiển thị nhỏ gọn (160×160), ảnh thường thì full width
     final double maxW = isGif ? 160 : MediaQuery.of(context).size.width * 0.75;
     final double maxH = isGif ? 160 : 300;
 
-    debugPrint('[_buildImage] rawUrl=$rawUrl isLocalFile=$isLocalFile useLocalFile=$useLocalFile resolvedUrl=$url');
+    debugPrint(
+      '[_buildImage] rawUrl=$rawUrl isLocalFile=$isLocalFile useLocalFile=$useLocalFile resolvedUrl=$url',
+    );
 
     return GestureDetector(
       onTap: () {
@@ -927,9 +1009,7 @@ class MessageBubble extends StatelessWidget {
         tag: 'message_${message.id}',
         child: Container(
           constraints: BoxConstraints(maxWidth: maxW, maxHeight: maxH),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
           clipBehavior: Clip.antiAlias,
           child:
               useLocalFile
@@ -937,18 +1017,27 @@ class MessageBubble extends StatelessWidget {
                   : CachedNetworkImage(
                     imageUrl: url,
                     fit: isGif ? BoxFit.contain : BoxFit.cover,
-                    httpHeaders: (AvatarResolver.isInternalUrl(url))
-                        ? {'Authorization': 'Bearer ${context.read<AuthProvider>().accessToken}'}
-                        : const {},
-                    placeholder: (context, url) => Container(
-                      color: Colors.grey.shade200,
-                      width: isGif ? 160 : 200,
-                      height: isGif ? 160 : 200,
-                    ),
-                    errorWidget: (context, url, error) => Container(
-                      color: Colors.grey.shade200,
-                      child: const Icon(Icons.broken_image, color: Colors.grey),
-                    ),
+                    httpHeaders:
+                        (AvatarResolver.isInternalUrl(url))
+                            ? {
+                              'Authorization':
+                                  'Bearer ${context.read<AuthProvider>().accessToken}',
+                            }
+                            : const {},
+                    placeholder:
+                        (context, url) => Container(
+                          color: Colors.grey.shade200,
+                          width: isGif ? 160 : 200,
+                          height: isGif ? 160 : 200,
+                        ),
+                    errorWidget:
+                        (context, url, error) => Container(
+                          color: Colors.grey.shade200,
+                          child: const Icon(
+                            Icons.broken_image,
+                            color: Colors.grey,
+                          ),
+                        ),
                   ),
         ),
       ),
@@ -958,15 +1047,19 @@ class MessageBubble extends StatelessWidget {
   Widget _buildFileCard(BuildContext context, bool isDarkMode) {
     final common = CommonTexts.of(context);
     final fileName = message.content ?? 'File';
-    final isDownloaded = message.mediaUrl != null && File(message.mediaUrl!).existsSync();
+    final isDownloaded =
+        message.mediaUrl != null && File(message.mediaUrl!).existsSync();
 
     return Container(
       width: 240,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDarkMode 
-            ? DarkColors.surfaceLight 
-            : (isMine ? Colors.white.withValues(alpha: 0.2) : Colors.black.withValues(alpha: 0.05)),
+        color:
+            isDarkMode
+                ? DarkColors.surfaceLight
+                : (isMine
+                    ? Colors.white.withValues(alpha: 0.2)
+                    : Colors.black.withValues(alpha: 0.05)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -976,7 +1069,10 @@ class MessageBubble extends StatelessWidget {
             children: [
               Icon(
                 Icons.insert_drive_file,
-                color: isDarkMode ? Colors.white : (isMine ? AppColors.primary : AppColors.primary),
+                color:
+                    isDarkMode
+                        ? Colors.white
+                        : (isMine ? AppColors.primary : AppColors.primary),
                 size: 32,
               ),
               const SizedBox(width: 12),
@@ -989,15 +1085,27 @@ class MessageBubble extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: isDarkMode ? Colors.white : (isMine ? LightColors.textPrimary : LightColors.textPrimary),
-                        fontWeight: FontWeight.bold
+                        color:
+                            isDarkMode
+                                ? Colors.white
+                                : (isMine
+                                    ? LightColors.textPrimary
+                                    : LightColors.textPrimary),
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                     Text(
-                      isDownloaded ? common.downloadedLabel : common.documentLabel,
+                      isDownloaded
+                          ? common.downloadedLabel
+                          : common.documentLabel,
                       style: TextStyle(
-                        color: isDarkMode ? Colors.white70 : (isMine ? LightColors.textSecondary : LightColors.textSecondary),
-                        fontSize: 12
+                        color:
+                            isDarkMode
+                                ? Colors.white70
+                                : (isMine
+                                    ? LightColors.textSecondary
+                                    : LightColors.textSecondary),
+                        fontSize: 12,
                       ),
                     ),
                   ],
@@ -1021,9 +1129,13 @@ class MessageBubble extends StatelessWidget {
                 backgroundColor: Colors.white,
                 foregroundColor: AppColors.primary,
                 elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
-              child: Text(isDownloaded ? common.openFileAction : common.downloadAction),
+              child: Text(
+                isDownloaded ? common.openFileAction : common.downloadAction,
+              ),
             ),
           ),
         ],
@@ -1033,7 +1145,7 @@ class MessageBubble extends StatelessWidget {
 
   Widget _buildAudioPlayer(BuildContext context) {
     final url = AvatarResolver.resolveUrl(message.mediaUrl ?? '') ?? '';
-    
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: AudioPlayerWidget(
@@ -1047,7 +1159,7 @@ class MessageBubble extends StatelessWidget {
   Widget _buildSticker(BuildContext context) {
     final rawUrl = message.mediaUrl ?? '';
     if (rawUrl.isEmpty) return const SizedBox.shrink();
-    
+
     final url = AvatarResolver.resolveUrl(rawUrl) ?? rawUrl;
     final token = context.read<AuthProvider>().accessToken;
 
@@ -1056,9 +1168,10 @@ class MessageBubble extends StatelessWidget {
       height: 120,
       child: CachedNetworkImage(
         imageUrl: url,
-        httpHeaders: (token != null && AvatarResolver.isInternalUrl(url))
-            ? {'Authorization': 'Bearer $token'}
-            : const {},
+        httpHeaders:
+            (token != null && AvatarResolver.isInternalUrl(url))
+                ? {'Authorization': 'Bearer $token'}
+                : const {},
         placeholder: (context, url) => const SizedBox.shrink(),
         errorWidget: (context, url, error) => const Icon(Icons.error),
       ),
@@ -1080,19 +1193,27 @@ class MessageBubble extends StatelessWidget {
           children: [
             const Icon(Icons.play_circle_fill, color: Colors.white, size: 48),
             const SizedBox(height: 8),
-            Text(common.videoAction, style: const TextStyle(color: Colors.white)),
+            Text(
+              common.videoAction,
+              style: const TextStyle(color: Colors.white),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStatusLabel(BuildContext context, bool isDarkMode, CommonTexts common) {
+  Widget _buildStatusLabel(
+    BuildContext context,
+    bool isDarkMode,
+    CommonTexts common,
+  ) {
     final timeStr = DateFormatter.time(message.createdAt);
 
     return Row(
       mainAxisSize: MainAxisSize.min,
-      mainAxisAlignment: isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
+      mainAxisAlignment:
+          isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
       children: [
         if (showTime)
           Text(
@@ -1133,13 +1254,17 @@ class MessageBubble extends StatelessWidget {
                 builder: (context) {
                   final token = context.watch<AuthProvider>().accessToken;
                   final url = AvatarResolver.resolveUrl(m.user?.avatarUrl);
-                  
+
                   if (url == null) {
                     return Container(
                       width: 14,
                       height: 14,
                       color: Colors.grey,
-                      child: const Icon(Icons.person, size: 10, color: Colors.white),
+                      child: const Icon(
+                        Icons.person,
+                        size: 10,
+                        color: Colors.white,
+                      ),
                     );
                   }
 
@@ -1148,18 +1273,29 @@ class MessageBubble extends StatelessWidget {
                     width: 14,
                     height: 14,
                     fit: BoxFit.cover,
-                    httpHeaders: (token != null && AvatarResolver.isInternalUrl(url))
-                        ? {'Authorization': 'Bearer $token'}
-                        : const {},
-                    placeholder: (_, __) => Container(width: 14, height: 14, color: Colors.grey.shade200),
-                    errorWidget: (_, __, ___) => Container(
-                      width: 14,
-                      height: 14,
-                      color: Colors.grey,
-                      child: const Icon(Icons.person, size: 10, color: Colors.white),
-                    ),
+                    httpHeaders:
+                        (token != null && AvatarResolver.isInternalUrl(url))
+                            ? {'Authorization': 'Bearer $token'}
+                            : const {},
+                    placeholder:
+                        (_, __) => Container(
+                          width: 14,
+                          height: 14,
+                          color: Colors.grey.shade200,
+                        ),
+                    errorWidget:
+                        (_, __, ___) => Container(
+                          width: 14,
+                          height: 14,
+                          color: Colors.grey,
+                          child: const Icon(
+                            Icons.person,
+                            size: 10,
+                            color: Colors.white,
+                          ),
+                        ),
                   );
-                }
+                },
               ),
             ),
           ),
@@ -1184,7 +1320,10 @@ class MessageBubble extends StatelessWidget {
     String replyName = message.replyToSenderName ?? 'User';
     if (message.replyToSenderName == null && message.replyToSenderId != null) {
       final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-      replyName = chatProvider.getSenderName(message.conversationId, message.replyToSenderId!);
+      replyName = chatProvider.getSenderName(
+        message.conversationId,
+        message.replyToSenderId!,
+      );
     }
 
     return Container(
@@ -1194,7 +1333,9 @@ class MessageBubble extends StatelessWidget {
         color:
             isDarkMode
                 ? Colors.white.withValues(alpha: 0.08)
-                : (isMine ? Colors.white.withValues(alpha: 0.4) : AppColors.itemPressBackground),
+                : (isMine
+                    ? Colors.white.withValues(alpha: 0.4)
+                    : AppColors.itemPressBackground),
         borderRadius: BorderRadius.circular(10),
         border: Border(
           left: BorderSide(
@@ -1245,7 +1386,10 @@ class _StatusIcon extends StatelessWidget {
         return const SizedBox(
           width: 12,
           height: 12,
-          child: CircularProgressIndicator(strokeWidth: 1.5, color: Colors.grey),
+          child: CircularProgressIndicator(
+            strokeWidth: 1.5,
+            color: Colors.grey,
+          ),
         );
       case MessageStatus.SENT:
         return const Icon(Icons.check, size: 14, color: Colors.grey);
@@ -1259,9 +1403,10 @@ class _StatusIcon extends StatelessWidget {
         return Icon(
           Icons.history_rounded,
           size: 14,
-          color: Theme.of(context).brightness == Brightness.dark
-              ? Colors.white38
-              : Colors.grey.shade400,
+          color:
+              Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white38
+                  : Colors.grey.shade400,
         );
     }
   }

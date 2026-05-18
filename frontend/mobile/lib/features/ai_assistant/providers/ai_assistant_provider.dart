@@ -30,6 +30,12 @@ class AiAssistantProvider with ChangeNotifier {
   static const Duration _idleAutoHideDelay = Duration(seconds: 12);
   static const int _maxConversationEntries = 200;
   static const String aiConversationId = '00000000-0000-0000-0000-000000000000';
+  static const String _legacyAiConversationId = 'AI_ASSISTANT_LOCAL';
+
+  static bool isAiConversationId(String? conversationId) {
+    return conversationId == aiConversationId ||
+        conversationId == _legacyAiConversationId;
+  }
 
   final AiService _aiService;
   final FlutterTts _tts = FlutterTts();
@@ -55,6 +61,7 @@ class AiAssistantProvider with ChangeNotifier {
   final List<Map<String, String>> _sessionHistory = [];
   final List<AiConversationEntry> _conversationHistory = [];
   final Set<String> _syncedEntryIds = <String>{};
+  final Set<String> _cloudDeleteFenceConversationIds = <String>{};
   String? _serverConversationId;
   final StreamController<AiCommand> _systemActionController =
       StreamController<AiCommand>.broadcast();
@@ -62,6 +69,7 @@ class AiAssistantProvider with ChangeNotifier {
   bool _isSttInitialized = false;
   bool _isPipelineLocked = false;
   int _operationToken = 0;
+  int _historyClearGeneration = 0;
   String _activeTraceId = '';
   String? _resolvedLocaleId;
 
@@ -120,7 +128,10 @@ class AiAssistantProvider with ChangeNotifier {
 
   Stream<AiCommand> get systemActionStream => _systemActionController.stream;
 
-  List<Message> getHistoryAsMessages(String currentUserId, {String? userAvatarUrl}) {
+  List<Message> getHistoryAsMessages(
+    String currentUserId, {
+    String? userAvatarUrl,
+  }) {
     return _conversationHistory.map((entry) {
       final isUser = entry.role == AiConversationRole.user;
       return Message(
@@ -322,6 +333,8 @@ class AiAssistantProvider with ChangeNotifier {
     String reason = 'manual',
   }) async {
     final serverConversationIdToDelete = _serverConversationId;
+    _historyClearGeneration++;
+    _cloudBackupDebounceTimer?.cancel();
     _conversationHistory.clear();
     _syncedEntryIds.clear();
     _conversationCreated = false;
@@ -349,6 +362,7 @@ class AiAssistantProvider with ChangeNotifier {
 
     if (serverConversationIdToDelete != null &&
         serverConversationIdToDelete.isNotEmpty) {
+      _cloudDeleteFenceConversationIds.add(serverConversationIdToDelete);
       unawaited(_deleteCloudConversationHistory(serverConversationIdToDelete));
     }
   }
@@ -367,17 +381,13 @@ class AiAssistantProvider with ChangeNotifier {
     }
   }
 
-  Future<void> deleteMessage(String messageId) async {
-    final entryId = messageId.replaceFirst('ai_msg_', '');
-    if (entryId.isEmpty) return;
-
-    _conversationHistory.removeWhere((entry) => entry.entryId == entryId);
-    _syncedEntryIds.remove(entryId);
-    
-    await _persistConversationHistory();
-    unawaited(_persistSyncedEntryIds());
-    _logEvent('AI_MESSAGE_DELETED', data: {'messageId': messageId});
-    notifyListeners();
+  Future<void> deleteMessage(String messageId) {
+    _logEvent(
+      'AI_MESSAGE_DELETE_IGNORED',
+      level: 'WARN',
+      data: {'messageId': messageId, 'reason': 'per_message_delete_disabled'},
+    );
+    return Future<void>.value();
   }
 
   Future<void> hideMascot({String reason = 'user_hide'}) async {
@@ -641,11 +651,13 @@ class AiAssistantProvider with ChangeNotifier {
     try {
       final List<Map<String, dynamic>> structuredHistory = [];
       // Use persisted conversation history instead of session history to support cross-restart context!
-      final historySubset = _conversationHistory.length > 10
-          ? _conversationHistory.sublist(_conversationHistory.length - 10)
-          : _conversationHistory;
+      final historySubset =
+          _conversationHistory.length > 10
+              ? _conversationHistory.sublist(_conversationHistory.length - 10)
+              : _conversationHistory;
       for (final entry in historySubset) {
-        final role = entry.role == AiConversationRole.user ? 'user' : 'assistant';
+        final role =
+            entry.role == AiConversationRole.user ? 'user' : 'assistant';
         structuredHistory.add({
           'role': role,
           'content': entry.text,
@@ -1157,10 +1169,7 @@ class AiAssistantProvider with ChangeNotifier {
           .take(overflow)
           .map((entry) => entry.entryId)
           .toList(growable: false);
-      _conversationHistory.removeRange(
-        0,
-        overflow,
-      );
+      _conversationHistory.removeRange(0, overflow);
       _syncedEntryIds.removeAll(removedIds);
       unawaited(_persistSyncedEntryIds());
     }
@@ -1175,7 +1184,10 @@ class AiAssistantProvider with ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_conversationCreatedPrefKey, _conversationCreated);
       if (_serverConversationId != null) {
-        await prefs.setString(_serverConversationIdPrefKey, _serverConversationId!);
+        await prefs.setString(
+          _serverConversationIdPrefKey,
+          _serverConversationId!,
+        );
       } else {
         await prefs.remove(_serverConversationIdPrefKey);
       }
@@ -1198,10 +1210,7 @@ class AiAssistantProvider with ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       final ids = _syncedEntryIds.toList(growable: false)..sort();
-      await prefs.setStringList(
-        _syncedEntryIdsPrefKey,
-        ids,
-      );
+      await prefs.setStringList(_syncedEntryIdsPrefKey, ids);
     } catch (error) {
       _logEvent(
         'SYNCED_ENTRY_IDS_PERSIST_ERROR',
@@ -1214,16 +1223,31 @@ class AiAssistantProvider with ChangeNotifier {
   Future<void> _restoreConversationHistoryFromServer() async {
     final targetId = _serverConversationId;
     if (targetId == null || targetId.isEmpty) return;
+    final restoreGeneration = _historyClearGeneration;
 
     try {
-      final entries = await _aiService.restoreConversationHistory(conversationId: targetId);
+      final entries = await _aiService.restoreConversationHistory(
+        conversationId: targetId,
+      );
+      if (_isDisposed ||
+          restoreGeneration != _historyClearGeneration ||
+          targetId != _serverConversationId) {
+        _logEvent(
+          'CLOUD_HISTORY_RESTORE_DROPPED',
+          data: {'reason': 'stale_restore', 'conversationId': targetId},
+        );
+        return;
+      }
       if (entries.isNotEmpty) {
-        final List<AiConversationEntry> merged = List.from(_conversationHistory);
+        final List<AiConversationEntry> merged = List.from(
+          _conversationHistory,
+        );
         final existingIds = merged.map((entry) => entry.entryId).toSet();
         final restoredIds = <String>{};
-        final limitedEntries = entries.length > _maxConversationEntries
-            ? entries.sublist(entries.length - _maxConversationEntries)
-            : entries;
+        final limitedEntries =
+            entries.length > _maxConversationEntries
+                ? entries.sublist(entries.length - _maxConversationEntries)
+                : entries;
 
         for (final map in limitedEntries) {
           final roleStr = map['role']?.toString() ?? 'user';
@@ -1237,21 +1261,31 @@ class AiAssistantProvider with ChangeNotifier {
           final entryId =
               rawEntryId != null && rawEntryId.isNotEmpty ? rawEntryId : null;
           final rawCreatedAt = map['createdAt']?.toString();
-          final parsedCreatedAt = rawCreatedAt != null
-              ? (DateTime.tryParse(rawCreatedAt)?.toUtc() ??
-                  DateTime.now().toUtc())
-              : DateTime.now().toUtc();
+          final parsedCreatedAt =
+              rawCreatedAt != null
+                  ? (DateTime.tryParse(rawCreatedAt)?.toUtc() ??
+                      DateTime.now().toUtc())
+                  : DateTime.now().toUtc();
 
-          final role = roleStr == 'user' ? AiConversationRole.user : AiConversationRole.assistant;
+          final role =
+              roleStr == 'user'
+                  ? AiConversationRole.user
+                  : AiConversationRole.assistant;
 
           // Prefer stable entry ids; keep timestamp fallback for legacy rows.
-          final exists = entryId != null
-              ? existingIds.contains(entryId)
-              : merged.any((local) =>
-                  local.role == role &&
-                  local.text.trim() == content.trim() &&
-                  (local.createdAt.difference(parsedCreatedAt).abs().inSeconds <
-                      3));
+          final exists =
+              entryId != null
+                  ? existingIds.contains(entryId)
+                  : merged.any(
+                    (local) =>
+                        local.role == role &&
+                        local.text.trim() == content.trim() &&
+                        (local.createdAt
+                                .difference(parsedCreatedAt)
+                                .abs()
+                                .inSeconds <
+                            3),
+                  );
 
           if (!exists) {
             final resolvedEntryId = entryId ?? _newEntryId();
@@ -1284,6 +1318,16 @@ class AiAssistantProvider with ChangeNotifier {
           restoredIds.removeAll(removedIds);
         }
 
+        if (_isDisposed ||
+            restoreGeneration != _historyClearGeneration ||
+            targetId != _serverConversationId) {
+          _logEvent(
+            'CLOUD_HISTORY_RESTORE_DROPPED',
+            data: {'reason': 'stale_merge', 'conversationId': targetId},
+          );
+          return;
+        }
+
         _conversationHistory
           ..clear()
           ..addAll(merged);
@@ -1292,7 +1336,10 @@ class AiAssistantProvider with ChangeNotifier {
         _syncedEntryIds.addAll(restoredIds);
         unawaited(_persistSyncedEntryIds());
         notifyListeners();
-        _logEvent('CLOUD_HISTORY_RESTORED', data: {'entries': _conversationHistory.length});
+        _logEvent(
+          'CLOUD_HISTORY_RESTORED',
+          data: {'entries': _conversationHistory.length},
+        );
       }
     } catch (e) {
       _logEvent(
@@ -1319,6 +1366,8 @@ class AiAssistantProvider with ChangeNotifier {
     if (!_cloudBackupEnabled || _conversationHistory.isEmpty) {
       return;
     }
+    final syncGeneration = _historyClearGeneration;
+    final conversationId = _serverConversationId ?? aiConversationId;
 
     final pendingEntries = _conversationHistory
         .where((entry) => !_syncedEntryIds.contains(entry.entryId))
@@ -1330,9 +1379,21 @@ class AiAssistantProvider with ChangeNotifier {
     final payload = pendingEntries.map((entry) => entry.toJson()).toList();
     try {
       await _aiService.backupConversationHistory(
-        conversationId: _serverConversationId ?? aiConversationId,
+        conversationId: conversationId,
         entries: payload,
       );
+      if (_isDisposed ||
+          syncGeneration != _historyClearGeneration ||
+          _conversationHistory.isEmpty) {
+        if (_cloudDeleteFenceConversationIds.contains(conversationId)) {
+          unawaited(_deleteCloudConversationHistory(conversationId));
+        }
+        _logEvent(
+          'CLOUD_BACKUP_SYNC_DROPPED',
+          data: {'reason': 'stale_sync', 'conversationId': conversationId},
+        );
+        return;
+      }
       _syncedEntryIds.addAll(pendingEntries.map((entry) => entry.entryId));
       unawaited(_persistSyncedEntryIds());
       _logEvent('CLOUD_BACKUP_SYNCED', data: {'entries': payload.length});
@@ -1344,8 +1405,6 @@ class AiAssistantProvider with ChangeNotifier {
       );
     }
   }
-
-
 
   String _contextPromptLabel(String source) {
     return switch (source) {
@@ -1691,9 +1750,10 @@ class AiConversationEntry {
     final rawEntryId = (json['entryId'] ?? json['clientEntryId'])?.toString();
 
     return AiConversationEntry(
-      entryId: rawEntryId != null && rawEntryId.isNotEmpty
-          ? rawEntryId
-          : _legacyEntryId(resolvedRole, content, parsedCreatedAt),
+      entryId:
+          rawEntryId != null && rawEntryId.isNotEmpty
+              ? rawEntryId
+              : _legacyEntryId(resolvedRole, content, parsedCreatedAt),
       role: resolvedRole,
       text: content,
       source: (json['source'] ?? 'assistant_chat').toString(),
@@ -1707,7 +1767,8 @@ class AiConversationEntry {
     DateTime createdAt,
   ) {
     var hash = 2166136261;
-    final seed = '${role.name}|${createdAt.toUtc().microsecondsSinceEpoch}|$content';
+    final seed =
+        '${role.name}|${createdAt.toUtc().microsecondsSinceEpoch}|$content';
     for (final codeUnit in seed.codeUnits) {
       hash ^= codeUnit;
       hash = (hash * 16777619) & 0xffffffff;

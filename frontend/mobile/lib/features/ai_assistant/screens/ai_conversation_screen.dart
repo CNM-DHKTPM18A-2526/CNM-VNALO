@@ -5,8 +5,6 @@ import 'package:vnalo_mobile/core/utils/date_formatter.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/chat/widgets/message_bubble.dart';
-import 'package:vnalo_mobile/models/conversation_enums.dart';
-import 'package:vnalo_mobile/models/message_model.dart';
 
 class AiConversationScreen extends StatefulWidget {
   const AiConversationScreen({super.key});
@@ -78,19 +76,27 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
     final currentUserId = authProvider.user?.id ?? '';
     final userAvatarUrl = authProvider.user?.avatarUrl;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     // Convert AI history to standard Message models
-    final messages = provider.getHistoryAsMessages(currentUserId, userAvatarUrl: userAvatarUrl).reversed.toList();
+    final messages =
+        provider
+            .getHistoryAsMessages(currentUserId, userAvatarUrl: userAvatarUrl)
+            .reversed
+            .toList();
 
     return Scaffold(
-      backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
+      backgroundColor:
+          isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
       appBar: AppBar(
         titleSpacing: 0,
         elevation: 0,
         backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
-        flexibleSpace: isDarkMode 
-          ? null 
-          : Container(decoration: BoxDecoration(gradient: AppColors.appBarGradient)),
+        flexibleSpace:
+            isDarkMode
+                ? null
+                : Container(
+                  decoration: BoxDecoration(gradient: AppColors.appBarGradient),
+                ),
         iconTheme: const IconThemeData(color: Colors.white),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -115,7 +121,10 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
         ),
         actions: [
           IconButton(
-            onPressed: () => provider.setCloudBackupEnabled(!provider.cloudBackupEnabled),
+            onPressed:
+                () => provider.setCloudBackupEnabled(
+                  !provider.cloudBackupEnabled,
+                ),
             icon: Icon(
               provider.cloudBackupEnabled ? Icons.cloud_done : Icons.cloud_off,
               color: Colors.white,
@@ -124,7 +133,12 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
             tooltip: 'Sao lưu Cloud',
           ),
           IconButton(
-            onPressed: messages.isEmpty ? null : () => provider.clearConversationHistory(clearCurrentResponse: true),
+            onPressed:
+                messages.isEmpty
+                    ? null
+                    : () => provider.clearConversationHistory(
+                      clearCurrentResponse: true,
+                    ),
             icon: const Icon(Icons.delete_sweep_outlined, color: Colors.white),
             tooltip: 'Xóa lịch sử',
           ),
@@ -134,53 +148,66 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
         children: [
           // Security/Backup Banner
           _buildInfoBanner(provider, isDarkMode),
-          
-          Expanded(
-            child: messages.isEmpty
-                ? _EmptyAiConversation(
-                    statusLabel: _statusLabel(provider.state),
-                    isDarkMode: isDarkMode,
-                  )
-                : ListView.builder(
-                    controller: _scrollController,
-                    reverse: true,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                    itemCount: messages.length,
-                    itemBuilder: (context, index) {
-                      final message = messages[index];
-                      final isMine = message.isMine(currentUserId);
-                      
-                      // Calculate milestones and time visibility
-                      bool showTime = true;
-                      String? milestoneText;
-                      
-                      if (index < messages.length - 1) {
-                        final olderMsg = messages[index + 1];
-                        final gap = message.createdAt.difference(olderMsg.createdAt).inMinutes.abs();
-                        if (gap < 5 && olderMsg.senderId == message.senderId) {
-                          showTime = false;
-                        }
-                        if (gap > 20) {
-                          milestoneText = DateFormatter.formatTimelineDate(message.createdAt);
-                        }
-                      } else {
-                        // Very first message
-                        milestoneText = DateFormatter.formatTimelineDate(message.createdAt);
-                      }
 
-                      return MessageBubble(
-                        message: message,
-                        isMine: isMine,
-                        showTime: showTime,
-                        showAvatar: !isMine,
-                        senderAvatarUrl: message.senderAvatarUrl,
-                        senderDisplayName: message.senderName,
-                        milestoneText: milestoneText,
-                      );
-                    },
-                  ),
+          Expanded(
+            child:
+                messages.isEmpty
+                    ? _EmptyAiConversation(
+                      statusLabel: _statusLabel(provider.state),
+                      isDarkMode: isDarkMode,
+                    )
+                    : ListView.builder(
+                      controller: _scrollController,
+                      reverse: true,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 12,
+                      ),
+                      itemCount: messages.length,
+                      itemBuilder: (context, index) {
+                        final message = messages[index];
+                        final isMine = message.isMine(currentUserId);
+
+                        // Calculate milestones and time visibility
+                        bool showTime = true;
+                        String? milestoneText;
+
+                        if (index < messages.length - 1) {
+                          final olderMsg = messages[index + 1];
+                          final gap =
+                              message.createdAt
+                                  .difference(olderMsg.createdAt)
+                                  .inMinutes
+                                  .abs();
+                          if (gap < 5 &&
+                              olderMsg.senderId == message.senderId) {
+                            showTime = false;
+                          }
+                          if (gap > 20) {
+                            milestoneText = DateFormatter.formatTimelineDate(
+                              message.createdAt,
+                            );
+                          }
+                        } else {
+                          // Very first message
+                          milestoneText = DateFormatter.formatTimelineDate(
+                            message.createdAt,
+                          );
+                        }
+
+                        return MessageBubble(
+                          message: message,
+                          isMine: isMine,
+                          showTime: showTime,
+                          showAvatar: !isMine,
+                          senderAvatarUrl: message.senderAvatarUrl,
+                          senderDisplayName: message.senderName,
+                          milestoneText: milestoneText,
+                        );
+                      },
+                    ),
           ),
-          
+
           // Zalo-style Input Bar
           _buildInputBar(provider, isDarkMode),
         ],
@@ -196,7 +223,9 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
       child: Row(
         children: [
           Icon(
-            provider.cloudBackupEnabled ? Icons.lock_outline : Icons.shield_outlined,
+            provider.cloudBackupEnabled
+                ? Icons.lock_outline
+                : Icons.shield_outlined,
             size: 14,
             color: AppColors.primary,
           ),
@@ -219,7 +248,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
 
   Widget _buildInputBar(AiAssistantProvider provider, bool isDarkMode) {
     final bgColor = isDarkMode ? DarkColors.surface : LightColors.surface;
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
       decoration: BoxDecoration(
@@ -237,10 +266,18 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
           children: [
             IconButton(
               icon: Icon(
-                provider.state == AiState.listening ? Icons.mic_off : Icons.mic_none_outlined,
-                color: provider.state == AiState.listening ? AppColors.error : (isDarkMode ? Colors.white70 : AppColors.iconSubtle),
+                provider.state == AiState.listening
+                    ? Icons.mic_off
+                    : Icons.mic_none_outlined,
+                color:
+                    provider.state == AiState.listening
+                        ? AppColors.error
+                        : (isDarkMode ? Colors.white70 : AppColors.iconSubtle),
               ),
-              onPressed: () => provider.onPrimaryAction(source: 'conversation_screen_mic'),
+              onPressed:
+                  () => provider.onPrimaryAction(
+                    source: 'conversation_screen_mic',
+                  ),
             ),
             Expanded(
               child: Container(
@@ -256,18 +293,21 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
                     fontSize: 16,
                     color: isDarkMode ? Colors.white : Colors.black87,
                   ),
-                    decoration: InputDecoration(
-                      hintText: 'Hỏi trợ lý VNALO AI...',
-                      hintStyle: TextStyle(
-                        color: isDarkMode ? DarkColors.textHint : const Color(0xFFA1A3A7),
-                        fontSize: 16,
-                      ),
-                      border: InputBorder.none,
-                      isDense: true,
-                      filled: false,
-                      fillColor: Colors.transparent,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: InputDecoration(
+                    hintText: 'Hỏi trợ lý VNALO AI...',
+                    hintStyle: TextStyle(
+                      color:
+                          isDarkMode
+                              ? DarkColors.textHint
+                              : const Color(0xFFA1A3A7),
+                      fontSize: 16,
                     ),
+                    border: InputBorder.none,
+                    isDense: true,
+                    filled: false,
+                    fillColor: Colors.transparent,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
                 ),
               ),
             ),
@@ -278,7 +318,10 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
               )
             else
               IconButton(
-                icon: Icon(Icons.image_outlined, color: isDarkMode ? Colors.white70 : AppColors.iconSubtle),
+                icon: Icon(
+                  Icons.image_outlined,
+                  color: isDarkMode ? Colors.white70 : AppColors.iconSubtle,
+                ),
                 onPressed: () {
                   // Placeholder for future AI vision features
                 },
@@ -335,7 +378,10 @@ class _EmptyAiConversation extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 15,
-                  color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary,
+                  color:
+                      isDarkMode
+                          ? DarkColors.textSecondary
+                          : LightColors.textSecondary,
                 ),
               ),
             ),
@@ -354,13 +400,20 @@ class _EmptyAiConversation extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: isDarkMode ? DarkColors.surface : Colors.white.withValues(alpha: 0.8),
+        color:
+            isDarkMode
+                ? DarkColors.surface
+                : Colors.white.withValues(alpha: 0.8),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
       ),
       child: Text(
         text,
-        style: const TextStyle(color: AppColors.primary, fontSize: 13, fontWeight: FontWeight.w500),
+        style: const TextStyle(
+          color: AppColors.primary,
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+        ),
       ),
     );
   }

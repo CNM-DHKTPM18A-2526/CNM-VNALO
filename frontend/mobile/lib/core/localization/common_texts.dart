@@ -31,9 +31,13 @@ class CommonTexts {
   String get back => _isVi ? 'Quay lại' : 'Back';
   String get update => _isVi ? 'Cập nhật' : 'Update';
   String get sort => _isVi ? 'Sắp xếp' : 'Sort';
+  String get undo => _isVi ? 'Hoàn tác' : 'Undo';
   String get recallAction => _isVi ? 'Thu hồi' : 'Recall';
   String get deleteForMeAction => _isVi ? 'Xóa ở phía tôi' : 'Delete for me';
-  String get confirmDeleteForMe => _isVi ? 'Tin nhắn này sẽ bị xóa khỏi lịch sử trò chuyện của bạn.' : 'This message will be deleted from your chat history.';
+  String get confirmDeleteForMe =>
+      _isVi
+          ? 'Tin nhắn này sẽ bị xóa khỏi lịch sử trò chuyện của bạn.'
+          : 'This message will be deleted from your chat history.';
   String get filterAll => _isVi ? 'Tất cả' : 'All';
   String get recentlyActive => _isVi ? 'Mới truy cập' : 'Recently active';
   String get today => _isVi ? 'Hôm nay' : 'Today';
@@ -162,16 +166,22 @@ class CommonTexts {
   String get featureUnderDevelopment =>
       _isVi ? 'Tính năng đang được phát triển' : 'Feature under development';
   String get unknownUser => _isVi ? 'Người dùng ẩn danh' : 'Unknown user';
-  String get upcomingBirthday => _isVi ? 'Sinh nhật sắp tới' : 'Upcoming birthday';
+  String get upcomingBirthday =>
+      _isVi ? 'Sinh nhật sắp tới' : 'Upcoming birthday';
   String get you => _isVi ? 'Bạn' : 'You';
 
   // Chat List / Actions
   String get pinAction => _isVi ? 'Ghim' : 'Pin';
   String get unpinAction => _isVi ? 'Bỏ ghim' : 'Unpin';
-  String get confirmUnpinTitle => _isVi ? 'Bỏ ghim tin nhắn?' : 'Unpin message?';
-  String get unpinSuccess => _isVi ? 'Bạn đã bỏ ghim thành công' : 'Unpinned successfully';
+  String get confirmUnpinTitle =>
+      _isVi ? 'Bỏ ghim tin nhắn?' : 'Unpin message?';
+  String get unpinSuccess =>
+      _isVi ? 'Bạn đã bỏ ghim thành công' : 'Unpinned successfully';
   String get pinnedListTitle => _isVi ? 'Danh sách ghim' : 'Pinned messages';
-  String get pinLimitTitle => _isVi ? 'Danh sách tối đa 3 ghim.\nBạn cần bỏ bớt ghim cũ.' : 'Maximum 3 pinned messages.\nPlease unpin one first.';
+  String get pinLimitTitle =>
+      _isVi
+          ? 'Danh sách tối đa 3 ghim.\nBạn cần bỏ bớt ghim cũ.'
+          : 'Maximum 3 pinned messages.\nPlease unpin one first.';
   String get addNewPin => _isVi ? 'THÊM GHIM MỚI' : 'ADD NEW PIN';
   String get closeAction => _isVi ? 'ĐÓNG' : 'CLOSE';
   String get collapseAction => _isVi ? 'Thu gọn' : 'Collapse';
@@ -213,10 +223,12 @@ class CommonTexts {
   String get niceToMeetAction => _isVi ? 'Rất vui!' : 'Nice to meet!';
   String get hiAction => _isVi ? 'Chào bạn!' : 'Hi there!';
   String get setGroupNameAction => _isVi ? 'Đặt tên nhóm' : 'Set group name';
-  String get groupCreatedNote => _isVi ? 'Bạn vừa tạo nhóm' : 'You just created the group';
+  String get groupCreatedNote =>
+      _isVi ? 'Bạn vừa tạo nhóm' : 'You just created the group';
   String get groupMemberLabel => _isVi ? 'Thành viên' : 'Member';
   String get waveHandAction => _isVi ? 'Vẫy tay chào' : 'Wave hand';
-  String get viewGroupQrAction => _isVi ? 'Xem mã QR tham gia nhóm' : 'View group QR code';
+  String get viewGroupQrAction =>
+      _isVi ? 'Xem mã QR tham gia nhóm' : 'View group QR code';
 
   // Wallpaper
   String get doneAction => _isVi ? 'XONG' : 'DONE';
@@ -357,8 +369,14 @@ class CommonTexts {
   String get memberLimitLabel => _isVi ? 'Giới hạn thành viên' : 'Member Limit';
 
   // My Documents
-  List<String> get docTabs => _isVi ? ['Tất cả', 'Văn bản', 'Ảnh', 'File', 'Link'] : ['All', 'Text', 'Image', 'File', 'Link'];
-  String formatDocDate(DateTime dt) => _isVi ? '${dt.day} tháng ${dt.month}, ${dt.year}' : '${dt.month} ${dt.day}, ${dt.year}';
+  List<String> get docTabs =>
+      _isVi
+          ? ['Tất cả', 'Văn bản', 'Ảnh', 'File', 'Link']
+          : ['All', 'Text', 'Image', 'File', 'Link'];
+  String formatDocDate(DateTime dt) =>
+      _isVi
+          ? '${dt.day} tháng ${dt.month}, ${dt.year}'
+          : '${dt.month} ${dt.day}, ${dt.year}';
   String get myDocumentsHeader => _isVi ? 'Cloud của tôi' : 'My Documents';
   String get noContentYet => _isVi ? 'Chưa có nội dung nào' : 'No content yet';
   String get saveContentNote =>
@@ -493,7 +511,10 @@ class CommonTexts {
   String get translateAction => _isVi ? 'Dịch' : 'Translate';
   String get speakAction => _isVi ? 'Đọc văn bản' : 'Speak';
   String get detailsAction => _isVi ? 'Chi tiết' : 'Info';
-  String get confirmRecallMessage => _isVi ? 'Tin nhắn này sẽ bị gỡ bỏ với tất cả mọi người. Bạn có chắc chắn muốn thu hồi?' : 'This message will be removed for everyone. Are you sure you want to recall?';
+  String get confirmRecallMessage =>
+      _isVi
+          ? 'Tin nhắn này sẽ bị gỡ bỏ với tất cả mọi người. Bạn có chắc chắn muốn thu hồi?'
+          : 'This message will be removed for everyone. Are you sure you want to recall?';
   String get newTagLabel => _isVi ? 'MỚI' : 'NEW';
 
   // Message Bubble Status / Dialog
@@ -516,6 +537,10 @@ class CommonTexts {
       _isVi
           ? 'Tin nhắn này chỉ bị xóa ở phía bạn.'
           : 'This removes the message only for you.';
+  String documentDeletedUndoCountdown(int seconds) =>
+      _isVi
+          ? 'Đã xóa. Hoàn tác trong ${seconds}s'
+          : 'Deleted. Undo in ${seconds}s';
 
   // My Documents
   // Header and tabs are already declared at lines 344 and 352
