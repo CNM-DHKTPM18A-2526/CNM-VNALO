@@ -470,7 +470,16 @@ class AiAssistantProvider with ChangeNotifier {
     _cancelListenGuard();
     _soundLevel = 0;
     _setProvisionallyVisible(true, reason: 'stt_start:$source');
-    await _tts.stop();
+    try {
+      await _tts.stop();
+    } catch (error) {
+      _logEvent(
+        'TTS_STOP_ERROR',
+        traceId: traceId,
+        level: 'WARN',
+        data: {'error': error.toString(), 'source': source},
+      );
+    }
 
     final available = await _ensureSttInitialized();
     if (!_isCurrentOperation(token)) {
@@ -570,7 +579,15 @@ class AiAssistantProvider with ChangeNotifier {
     bool keepBubbleVisible = true,
   }) async {
     _cancelListenGuard();
-    await _stt.stop();
+    try {
+      await _stt.stop();
+    } catch (error) {
+      _logEvent(
+        'STT_STOP_ERROR',
+        level: 'WARN',
+        data: {'error': error.toString(), 'reason': reason},
+      );
+    }
     _isSessionActive = false;
     _soundLevel = 0;
     _transitionTo(AiState.idle, reason: reason, notify: false);
@@ -647,7 +664,16 @@ class AiAssistantProvider with ChangeNotifier {
       reason: 'command_received',
       traceId: traceId,
     );
-    await _stt.stop();
+    try {
+      await _stt.stop();
+    } catch (error) {
+      _logEvent(
+        'STT_STOP_ERROR',
+        traceId: traceId,
+        level: 'WARN',
+        data: {'error': error.toString(), 'reason': 'command_received'},
+      );
+    }
 
     final userEntryId = _newEntryId();
     final assistantEntryId = _newEntryId();
@@ -1556,7 +1582,16 @@ class AiAssistantProvider with ChangeNotifier {
       data: {'lastWordsLength': _lastWords.length},
     );
 
-    await _stt.stop();
+    try {
+      await _stt.stop();
+    } catch (error) {
+      _logEvent(
+        'STT_STOP_ERROR',
+        traceId: traceId,
+        level: 'WARN',
+        data: {'error': error.toString(), 'reason': 'listen_guard_timeout'},
+      );
+    }
     if (!_isCurrentOperation(token)) {
       return;
     }
