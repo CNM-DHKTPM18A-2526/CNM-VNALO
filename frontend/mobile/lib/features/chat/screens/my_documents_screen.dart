@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
@@ -11,12 +12,10 @@ import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:vnalo_mobile/features/chat/providers/forward_provider.dart';
 import 'package:vnalo_mobile/features/chat/screens/forward_screen.dart';
 import 'package:vnalo_mobile/features/chat/widgets/message_bubble.dart';
 import 'package:vnalo_mobile/services/media_service.dart';
-import 'package:path/path.dart' as p;
 import 'dart:io';
 
 // A simple local message model for self-storage
@@ -53,15 +52,34 @@ extension LocalMessageExtension on LocalMessage {
   }
 }
 
+class _PendingDocumentDeletion {
+  _PendingDocumentDeletion({required this.message, required this.index})
+    : secondsLeft = ValueNotifier<int>(5);
+
+  final LocalMessage message;
+  final int index;
+  final ValueNotifier<int> secondsLeft;
+  Timer? countdownTimer;
+  bool _disposed = false;
+
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    countdownTimer?.cancel();
+    secondsLeft.dispose();
+  }
+}
+
 class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
   static const _storageKey = 'my_documents_messages';
   static const _convId = 'MY_DOCUMENTS';
+  static const _deleteUndoDuration = Duration(seconds: 5);
 
   int _selectedTabIndex = 0;
   final List<LocalMessage> _messages = [];
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  bool _hasText = false;
+  final Map<String, _PendingDocumentDeletion> _pendingDeletes = {};
   bool _isLoading = true;
 
   @override
@@ -72,6 +90,10 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
 
   @override
   void dispose() {
+    for (final pending in _pendingDeletes.values) {
+      pending.dispose();
+    }
+    _pendingDeletes.clear();
     _inputController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -95,15 +117,21 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
 
           final List<LocalMessage> toMigrate = [];
           for (final item in decoded) {
-            toMigrate.add(LocalMessage(
-              id: item['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
-              ownerId: myId,
-              conversationId: _convId,
-              senderId: myId,
-              messageType: 'TEXT',
-              content: item['content'] ?? '',
-              createdAt: DateTime.tryParse(item['createdAt'] ?? '') ?? DateTime.now(),
-            ));
+            toMigrate.add(
+              LocalMessage(
+                id:
+                    item['id'] ??
+                    DateTime.now().millisecondsSinceEpoch.toString(),
+                ownerId: myId,
+                conversationId: _convId,
+                senderId: myId,
+                messageType: 'TEXT',
+                content: item['content'] ?? '',
+                createdAt:
+                    DateTime.tryParse(item['createdAt'] ?? '') ??
+                    DateTime.now(),
+              ),
+            );
           }
           if (toMigrate.isNotEmpty) {
             await db.saveMessagesBatch(toMigrate);
@@ -138,7 +166,6 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
     final db = context.read<LocalDatabase>();
     final auth = context.read<AuthProvider>();
     final myId = auth.user?.id ?? 'ME';
-    final myName = auth.user?.displayName ?? 'Tôi';
 
     final chat = context.read<ChatProvider>();
     final reply = chat.replyingTo;
@@ -165,7 +192,6 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
     chat.setReplyTo(null);
     context.read<ChatProvider>().refreshCloudPreview();
     _inputController.clear();
-    setState(() => _hasText = false);
   }
 
   List<LocalMessage> get _filteredMessages {
@@ -177,21 +203,20 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
       case 2: // Ảnh
         return _messages.where((m) => m.messageType == 'IMAGE').toList();
       case 3: // File
-        return _messages.where((m) => m.messageType == 'FILE' || m.messageType == 'VIDEO').toList();
+        return _messages
+            .where((m) => m.messageType == 'FILE' || m.messageType == 'VIDEO')
+            .toList();
       case 4: // Link
-        return _messages.where((m) => 
-          m.messageType == 'LINK' || 
-          (m.messageType == 'TEXT' && m.content.contains('http'))
-        ).toList();
+        return _messages
+            .where(
+              (m) =>
+                  m.messageType == 'LINK' ||
+                  (m.messageType == 'TEXT' && m.content.contains('http')),
+            )
+            .toList();
       default:
         return _messages;
     }
-  }
-
-  String _formatTime(DateTime dt) {
-    final h = dt.hour.toString().padLeft(2, '0');
-    final m = dt.minute.toString().padLeft(2, '0');
-    return '$h:$m';
   }
 
   String _formatDateGroup(DateTime dt, CommonTexts texts) {
@@ -203,11 +228,13 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
     if (diff == 1) return texts.yesterday;
     return '${dt.day}/${dt.month}/${dt.year}';
   }
+
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final appBarBg = isDarkMode ? DarkColors.appBarBg : Colors.transparent;
-    final bgColor = isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground;
+    final bgColor =
+        isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground;
     final cardColor = isDarkMode ? DarkColors.surface : Colors.white;
 
     final texts = CommonTexts.of(context);
@@ -224,18 +251,23 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
           backgroundColor: appBarBg,
           foregroundColor: Colors.white,
           iconTheme: const IconThemeData(color: Colors.white),
-          flexibleSpace: isDarkMode
-              ? null
-              : Container(
-                  decoration: BoxDecoration(
-                    gradient: AppColors.appBarGradient,
+          flexibleSpace:
+              isDarkMode
+                  ? null
+                  : Container(
+                    decoration: BoxDecoration(
+                      gradient: AppColors.appBarGradient,
+                    ),
                   ),
-                ),
           title: Row(
             children: [
               Text(
                 texts.myDocumentsHeader,
-                style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                  fontSize: 18,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(width: 6),
               const Icon(Icons.verified, color: Colors.orange, size: 18),
@@ -250,12 +282,25 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
                   setState(() => _selectedTabIndex = index);
                 },
                 dividerColor: Colors.transparent,
-                labelColor: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
-                unselectedLabelColor: isDarkMode ? DarkColors.textSecondary : Colors.grey.shade400,
-                indicatorColor: isDarkMode ? DarkColors.primary : AppColors.primary,
+                labelColor:
+                    isDarkMode
+                        ? DarkColors.textPrimary
+                        : LightColors.textPrimary,
+                unselectedLabelColor:
+                    isDarkMode
+                        ? DarkColors.textSecondary
+                        : Colors.grey.shade400,
+                indicatorColor:
+                    isDarkMode ? DarkColors.primary : AppColors.primary,
                 indicatorWeight: 3,
-                labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w400, fontSize: 14),
+                labelStyle: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+                unselectedLabelStyle: const TextStyle(
+                  fontWeight: FontWeight.w400,
+                  fontSize: 14,
+                ),
                 tabs: tabs.map((t) => Tab(text: t)).toList(),
               ),
             ),
@@ -264,42 +309,42 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
         body: Column(
           children: [
             const SizedBox(height: 1), // Tiny gap below tab bar
-
-          // Message list
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _filteredMessages.isEmpty
-                    ? _buildEmpty(isDarkMode)
-                    : RefreshIndicator(
+            // Message list
+            Expanded(
+              child:
+                  _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _filteredMessages.isEmpty
+                      ? _buildEmpty(isDarkMode)
+                      : RefreshIndicator(
                         onRefresh: _loadMessages,
                         child: _buildMessageList(isDarkMode),
                       ),
-          ),
-          ChatInputBar(
-            conversationId: _convId,
-            onSend: (text) => _sendMessage(text),
-            onSendImages: (images) async {
-              for (var img in images) {
-                await _saveMedia(img.path, MessageType.IMAGE);
-              }
-            },
-            onSendVideos: (paths) async {
-              for (var p in paths) {
-                await _saveMedia(p, MessageType.VIDEO);
-              }
-            },
-            onSendFiles: (paths) async {
-              for (var p in paths) {
-                await _saveMedia(p, MessageType.FILE);
-              }
-            },
-          ),
-        ],
+            ),
+            ChatInputBar(
+              conversationId: _convId,
+              onSend: (text) => _sendMessage(text),
+              onSendImages: (images) async {
+                for (var img in images) {
+                  await _saveMedia(img.path, MessageType.IMAGE);
+                }
+              },
+              onSendVideos: (paths) async {
+                for (var p in paths) {
+                  await _saveMedia(p, MessageType.VIDEO);
+                }
+              },
+              onSendFiles: (paths) async {
+                for (var p in paths) {
+                  await _saveMedia(p, MessageType.FILE);
+                }
+              },
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildEmpty(bool isDarkMode) {
     final common = CommonTexts.of(context);
@@ -348,11 +393,11 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
     // So we iterate dates from newest to oldest
     for (final date in dateOrder) {
       final messages = grouped[date]!;
-      
+
       // Add messages in that date (already newest first)
       for (int i = 0; i < messages.length; i++) {
         final msg = messages[i];
-        
+
         // i == 0 is newest in this date group
         bool showTime = true;
         if (i < messages.length - 1) {
@@ -362,7 +407,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
             showTime = false;
           }
         }
-        
+
         bool showStatus = false;
         if (msg.id == msgs.first.id) {
           showStatus = true; // Sent status for overall newest
@@ -379,7 +424,10 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: isDarkMode ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.12),
+                color:
+                    isDarkMode
+                        ? Colors.white.withValues(alpha: 0.1)
+                        : Colors.black.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
@@ -404,13 +452,105 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
     context.read<ChatProvider>().setReplyTo(msg);
   }
 
-  void _deleteMessage(Message msg) async {
+  Future<void> _deleteMessage(Message msg) async {
+    final messageId = msg.id;
+    if (messageId.isEmpty) return;
+
+    final index = _messages.indexWhere((m) => m.id == messageId);
+    if (index == -1) return;
+
+    _expirePendingDeletes();
+
     final db = context.read<LocalDatabase>();
     final auth = context.read<AuthProvider>();
     final myId = auth.user?.id ?? 'ME';
-    await db.deleteMessage(msg.id!, myId);
+    final deleted = _messages[index];
+
+    await db.deleteMessage(messageId, myId);
+    if (!mounted) return;
+
     setState(() {
-      _messages.removeWhere((m) => m.id == msg.id);
+      _messages.removeWhere((m) => m.id == messageId);
+    });
+    context.read<ChatProvider>().refreshCloudPreview();
+
+    final pending = _PendingDocumentDeletion(message: deleted, index: index);
+    _pendingDeletes[messageId] = pending;
+    _showDeleteUndoSnackBar(messageId, pending);
+  }
+
+  void _expirePendingDeletes() {
+    if (mounted) {
+      ScaffoldMessenger.of(context).removeCurrentSnackBar();
+    }
+    for (final pending in _pendingDeletes.values) {
+      pending.dispose();
+    }
+    _pendingDeletes.clear();
+  }
+
+  void _showDeleteUndoSnackBar(
+    String messageId,
+    _PendingDocumentDeletion pending,
+  ) {
+    final texts = CommonTexts.of(context, listen: false);
+    final messenger = ScaffoldMessenger.of(context);
+
+    pending.countdownTimer = Timer.periodic(const Duration(seconds: 1), (
+      timer,
+    ) {
+      final next = pending.secondsLeft.value - 1;
+      if (next <= 0) {
+        timer.cancel();
+        _pendingDeletes.remove(messageId);
+        pending.secondsLeft.value = 0;
+        return;
+      }
+      pending.secondsLeft.value = next;
+    });
+
+    final controller = messenger.showSnackBar(
+      SnackBar(
+        duration: _deleteUndoDuration,
+        content: ValueListenableBuilder<int>(
+          valueListenable: pending.secondsLeft,
+          builder: (context, secondsLeft, _) {
+            return Text(texts.documentDeletedUndoCountdown(secondsLeft));
+          },
+        ),
+        action: SnackBarAction(
+          label: texts.undo,
+          onPressed: () {
+            unawaited(_undoDeleteMessage(messageId));
+          },
+        ),
+      ),
+    );
+
+    controller.closed.then((_) {
+      if (!_pendingDeletes.containsKey(messageId)) {
+        pending.dispose();
+      }
+    });
+  }
+
+  Future<void> _undoDeleteMessage(String messageId) async {
+    final pending = _pendingDeletes.remove(messageId);
+    if (pending == null) return;
+
+    pending.countdownTimer?.cancel();
+    final db = context.read<LocalDatabase>();
+    await db.saveMessage(pending.message);
+    if (!mounted) {
+      pending.dispose();
+      return;
+    }
+
+    setState(() {
+      final insertIndex = pending.index.clamp(0, _messages.length).toInt();
+      if (!_messages.any((m) => m.id == pending.message.id)) {
+        _messages.insert(insertIndex, pending.message);
+      }
     });
     context.read<ChatProvider>().refreshCloudPreview();
   }
@@ -418,9 +558,9 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
   void _forwardMessage(Message msg) {
     // Parity with regular chat: use ForwardProvider
     context.read<ForwardProvider>().startForwarding([msg]);
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const ForwardScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const ForwardScreen()));
   }
 
   Future<void> _saveMedia(String path, MessageType type) async {
@@ -429,7 +569,6 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
     final media = context.read<MediaService>();
     final chat = context.read<ChatProvider>();
     final myId = auth.user?.id ?? 'ME';
-    final myName = auth.user?.displayName ?? 'Tôi';
     final fileName = path.split(Platform.isWindows ? '\\' : '/').last;
 
     // 0. Get reply state
@@ -458,8 +597,12 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
 
     try {
       // 2. Upload to server
-      final category = type == MessageType.IMAGE ? MediaCategory.CHAT_IMAGE : 
-                       (type == MessageType.VIDEO ? MediaCategory.CHAT_VIDEO : MediaCategory.CHAT_FILE);
+      final category =
+          type == MessageType.IMAGE
+              ? MediaCategory.CHAT_IMAGE
+              : (type == MessageType.VIDEO
+                  ? MediaCategory.CHAT_VIDEO
+                  : MediaCategory.CHAT_FILE);
       final mediaId = await media.uploadFile(File(path), category);
       final publicUrl = media.getPublicUrl(mediaId);
 
@@ -472,7 +615,7 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
 
       // 4. Save to DB
       await db.saveMessage(finalized);
-      
+
       // 5. Update UI and clear reply
       setState(() {
         final idx = _messages.indexWhere((m) => m.id == optimisticId);
@@ -484,14 +627,18 @@ class _MyDocumentsScreenState extends State<MyDocumentsScreen> {
 
       // 6. Sync chat list preview
       chat.refreshCloudPreview();
-      
     } catch (e) {
       debugPrint('Media upload failed: $e');
       // On failure, we keep the local version but maybe mark it for retry in UI later
     }
   }
 
-  Widget _buildBubble(LocalMessage msg, bool isDarkMode, bool showTime, bool showStatus) {
+  Widget _buildBubble(
+    LocalMessage msg,
+    bool isDarkMode,
+    bool showTime,
+    bool showStatus,
+  ) {
     final currentUserId = context.read<AuthProvider>().user?.id ?? 'ME';
     final message = msg.toMessage(currentUserId);
 

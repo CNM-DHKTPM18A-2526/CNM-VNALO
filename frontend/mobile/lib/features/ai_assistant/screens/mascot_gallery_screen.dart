@@ -17,6 +17,12 @@ class _MascotGalleryScreenState extends State<MascotGalleryScreen> {
   int _currentPage = 0;
 
   @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final provider = context.watch<AiAssistantProvider>();
     final mascots = MascotMetadata.defaultMascots;

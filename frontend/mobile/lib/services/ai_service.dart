@@ -61,7 +61,8 @@ class AiService {
   }) async {
     final response = await _apiService.get(
       AppConfig.instance.aiServiceUrl,
-      '/ai/history?conversationId=${Uri.encodeQueryComponent(conversationId)}',
+      '/ai/history',
+      queryParams: {'conversationId': conversationId},
     );
 
     final data = response['data'];
@@ -69,5 +70,15 @@ class AiService {
       return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
     }
     return [];
+  }
+
+  Future<void> deleteConversationHistory({
+    required String conversationId,
+  }) async {
+    await _apiService.delete(
+      AppConfig.instance.aiServiceUrl,
+      '/ai/history',
+      queryParams: {'conversationId': conversationId},
+    );
   }
 }

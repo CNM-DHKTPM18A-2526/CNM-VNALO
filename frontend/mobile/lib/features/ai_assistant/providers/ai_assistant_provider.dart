@@ -22,6 +22,7 @@ class AiAssistantProvider with ChangeNotifier {
   static const String _cloudBackupPrefKey = 'vnalo_ai_cloud_backup_enabled';
   static const String _serverConversationIdPrefKey =
       'vnalo_ai_server_conversation_id';
+  static const String _syncedEntryIdsPrefKey = 'vnalo_ai_synced_entry_ids_v1';
   static const String _defaultLocaleId = 'vi_VN';
   static const Duration _aiTimeout = Duration(seconds: 25);
   static const Duration _sttListenFor = Duration(seconds: 8);
@@ -29,6 +30,12 @@ class AiAssistantProvider with ChangeNotifier {
   static const Duration _idleAutoHideDelay = Duration(seconds: 12);
   static const int _maxConversationEntries = 200;
   static const String aiConversationId = '00000000-0000-0000-0000-000000000000';
+  static const String _legacyAiConversationId = 'AI_ASSISTANT_LOCAL';
+
+  static bool isAiConversationId(String? conversationId) {
+    return conversationId == aiConversationId ||
+        conversationId == _legacyAiConversationId;
+  }
 
   final AiService _aiService;
   final FlutterTts _tts = FlutterTts();
@@ -53,6 +60,7 @@ class AiAssistantProvider with ChangeNotifier {
 
   final List<Map<String, String>> _sessionHistory = [];
   final List<AiConversationEntry> _conversationHistory = [];
+  final Set<String> _syncedEntryIds = <String>{};
   String? _serverConversationId;
   final StreamController<AiCommand> _systemActionController =
       StreamController<AiCommand>.broadcast();
@@ -60,6 +68,7 @@ class AiAssistantProvider with ChangeNotifier {
   bool _isSttInitialized = false;
   bool _isPipelineLocked = false;
   int _operationToken = 0;
+  int _historyClearGeneration = 0;
   String _activeTraceId = '';
   String? _resolvedLocaleId;
 
@@ -118,7 +127,10 @@ class AiAssistantProvider with ChangeNotifier {
 
   Stream<AiCommand> get systemActionStream => _systemActionController.stream;
 
-  List<Message> getHistoryAsMessages(String currentUserId, {String? userAvatarUrl}) {
+  List<Message> getHistoryAsMessages(
+    String currentUserId, {
+    String? userAvatarUrl,
+  }) {
     return _conversationHistory.map((entry) {
       final isUser = entry.role == AiConversationRole.user;
       return Message(
@@ -143,6 +155,7 @@ class AiAssistantProvider with ChangeNotifier {
     _conversationCreated = prefs.getBool(_conversationCreatedPrefKey) ?? false;
     _serverConversationId = prefs.getString(_serverConversationIdPrefKey);
     await _loadConversationHistory(prefs: prefs);
+    _loadSyncedEntryIds(prefs: prefs);
 
     if (_cloudBackupEnabled && _serverConversationId != null) {
       unawaited(_restoreConversationHistoryFromServer());
@@ -190,6 +203,13 @@ class AiAssistantProvider with ChangeNotifier {
         data: {'error': error.toString()},
       );
     }
+  }
+
+  void _loadSyncedEntryIds({required SharedPreferences prefs}) {
+    final ids = prefs.getStringList(_syncedEntryIdsPrefKey) ?? const <String>[];
+    _syncedEntryIds
+      ..clear()
+      ..addAll(ids.where((id) => id.trim().isNotEmpty));
   }
 
   Future<void> _loadMascot({SharedPreferences? prefs}) async {
@@ -311,10 +331,21 @@ class AiAssistantProvider with ChangeNotifier {
     bool clearCurrentResponse = false,
     String reason = 'manual',
   }) async {
+    final serverConversationIdToDelete = _serverConversationId;
+    _historyClearGeneration++;
+    _cloudBackupDebounceTimer?.cancel();
+    _cancelActiveOperation(reason: 'history_clear:$reason');
+    await _stopAllInteractions(
+      reason: 'history_clear:$reason',
+      keepResponse: !clearCurrentResponse,
+    );
+
     _conversationHistory.clear();
+    _syncedEntryIds.clear();
     _conversationCreated = false;
     _sessionHistory.clear();
     _lastUserPrompt = '';
+    _serverConversationId = null;
 
     if (clearCurrentResponse) {
       _aiResponse = '';
@@ -324,6 +355,8 @@ class AiAssistantProvider with ChangeNotifier {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_historyPrefKey);
+    await prefs.remove(_serverConversationIdPrefKey);
+    await prefs.remove(_syncedEntryIdsPrefKey);
     await prefs.setBool(_conversationCreatedPrefKey, false);
 
     _logEvent(
@@ -331,17 +364,34 @@ class AiAssistantProvider with ChangeNotifier {
       data: {'reason': reason, 'clearCurrentResponse': clearCurrentResponse},
     );
     notifyListeners();
+
+    if (serverConversationIdToDelete != null &&
+        serverConversationIdToDelete.isNotEmpty) {
+      unawaited(_deleteCloudConversationHistory(serverConversationIdToDelete));
+    }
   }
 
-  Future<void> deleteMessage(String messageId) async {
-    final entryId = messageId.replaceFirst('ai_msg_', '');
-    if (entryId.isEmpty) return;
+  Future<void> _deleteCloudConversationHistory(String conversationId) async {
+    try {
+      await _aiService.deleteConversationHistory(
+        conversationId: conversationId,
+      );
+    } catch (error) {
+      _logEvent(
+        'CLOUD_HISTORY_DELETE_ERROR',
+        level: 'WARN',
+        data: {'error': error.toString()},
+      );
+    }
+  }
 
-    _conversationHistory.removeWhere((entry) => entry.entryId == entryId);
-    
-    await _persistConversationHistory();
-    _logEvent('AI_MESSAGE_DELETED', data: {'messageId': messageId});
-    notifyListeners();
+  Future<void> deleteMessage(String messageId) {
+    _logEvent(
+      'AI_MESSAGE_DELETE_IGNORED',
+      level: 'WARN',
+      data: {'messageId': messageId, 'reason': 'per_message_delete_disabled'},
+    );
+    return Future<void>.value();
   }
 
   Future<void> hideMascot({String reason = 'user_hide'}) async {
@@ -420,7 +470,16 @@ class AiAssistantProvider with ChangeNotifier {
     _cancelListenGuard();
     _soundLevel = 0;
     _setProvisionallyVisible(true, reason: 'stt_start:$source');
-    await _tts.stop();
+    try {
+      await _tts.stop();
+    } catch (error) {
+      _logEvent(
+        'TTS_STOP_ERROR',
+        traceId: traceId,
+        level: 'WARN',
+        data: {'error': error.toString(), 'source': source},
+      );
+    }
 
     final available = await _ensureSttInitialized();
     if (!_isCurrentOperation(token)) {
@@ -520,7 +579,15 @@ class AiAssistantProvider with ChangeNotifier {
     bool keepBubbleVisible = true,
   }) async {
     _cancelListenGuard();
-    await _stt.stop();
+    try {
+      await _stt.stop();
+    } catch (error) {
+      _logEvent(
+        'STT_STOP_ERROR',
+        level: 'WARN',
+        data: {'error': error.toString(), 'reason': reason},
+      );
+    }
     _isSessionActive = false;
     _soundLevel = 0;
     _transitionTo(AiState.idle, reason: reason, notify: false);
@@ -597,7 +664,16 @@ class AiAssistantProvider with ChangeNotifier {
       reason: 'command_received',
       traceId: traceId,
     );
-    await _stt.stop();
+    try {
+      await _stt.stop();
+    } catch (error) {
+      _logEvent(
+        'STT_STOP_ERROR',
+        traceId: traceId,
+        level: 'WARN',
+        data: {'error': error.toString(), 'reason': 'command_received'},
+      );
+    }
 
     final userEntryId = _newEntryId();
     final assistantEntryId = _newEntryId();
@@ -605,11 +681,13 @@ class AiAssistantProvider with ChangeNotifier {
     try {
       final List<Map<String, dynamic>> structuredHistory = [];
       // Use persisted conversation history instead of session history to support cross-restart context!
-      final historySubset = _conversationHistory.length > 10
-          ? _conversationHistory.sublist(_conversationHistory.length - 10)
-          : _conversationHistory;
+      final historySubset =
+          _conversationHistory.length > 10
+              ? _conversationHistory.sublist(_conversationHistory.length - 10)
+              : _conversationHistory;
       for (final entry in historySubset) {
-        final role = entry.role == AiConversationRole.user ? 'user' : 'assistant';
+        final role =
+            entry.role == AiConversationRole.user ? 'user' : 'assistant';
         structuredHistory.add({
           'role': role,
           'content': entry.text,
@@ -1116,10 +1194,14 @@ class AiAssistantProvider with ChangeNotifier {
     );
 
     if (_conversationHistory.length > _maxConversationEntries) {
-      _conversationHistory.removeRange(
-        0,
-        _conversationHistory.length - _maxConversationEntries,
-      );
+      final overflow = _conversationHistory.length - _maxConversationEntries;
+      final removedIds = _conversationHistory
+          .take(overflow)
+          .map((entry) => entry.entryId)
+          .toList(growable: false);
+      _conversationHistory.removeRange(0, overflow);
+      _syncedEntryIds.removeAll(removedIds);
+      unawaited(_persistSyncedEntryIds());
     }
 
     unawaited(_persistConversationHistory());
@@ -1132,7 +1214,10 @@ class AiAssistantProvider with ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_conversationCreatedPrefKey, _conversationCreated);
       if (_serverConversationId != null) {
-        await prefs.setString(_serverConversationIdPrefKey, _serverConversationId!);
+        await prefs.setString(
+          _serverConversationIdPrefKey,
+          _serverConversationId!,
+        );
       } else {
         await prefs.remove(_serverConversationIdPrefKey);
       }
@@ -1151,63 +1236,140 @@ class AiAssistantProvider with ChangeNotifier {
     }
   }
 
+  Future<void> _persistSyncedEntryIds() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final ids = _syncedEntryIds.toList(growable: false)..sort();
+      await prefs.setStringList(_syncedEntryIdsPrefKey, ids);
+    } catch (error) {
+      _logEvent(
+        'SYNCED_ENTRY_IDS_PERSIST_ERROR',
+        level: 'WARN',
+        data: {'error': error.toString()},
+      );
+    }
+  }
+
   Future<void> _restoreConversationHistoryFromServer() async {
     final targetId = _serverConversationId;
     if (targetId == null || targetId.isEmpty) return;
+    final restoreGeneration = _historyClearGeneration;
 
     try {
-      final entries = await _aiService.restoreConversationHistory(conversationId: targetId);
+      final entries = await _aiService.restoreConversationHistory(
+        conversationId: targetId,
+      );
+      if (_isDisposed ||
+          restoreGeneration != _historyClearGeneration ||
+          targetId != _serverConversationId) {
+        _logEvent(
+          'CLOUD_HISTORY_RESTORE_DROPPED',
+          data: {'reason': 'stale_restore', 'conversationId': targetId},
+        );
+        return;
+      }
       if (entries.isNotEmpty) {
-        final List<AiConversationEntry> merged = List.from(_conversationHistory);
-        for (final map in entries) {
+        final List<AiConversationEntry> merged = List.from(
+          _conversationHistory,
+        );
+        final existingIds = merged.map((entry) => entry.entryId).toSet();
+        final restoredIds = <String>{};
+        final limitedEntries =
+            entries.length > _maxConversationEntries
+                ? entries.sublist(entries.length - _maxConversationEntries)
+                : entries;
+
+        for (final map in limitedEntries) {
           final roleStr = map['role']?.toString() ?? 'user';
           final content = map['content']?.toString() ?? '';
           if (content.trim().isEmpty) {
             continue;
           }
           final provider = map['provider']?.toString();
-          final entryId =
+          final rawEntryId =
               (map['clientEntryId'] ?? map['entryId'])?.toString().trim();
+          final entryId =
+              rawEntryId != null && rawEntryId.isNotEmpty ? rawEntryId : null;
           final rawCreatedAt = map['createdAt']?.toString();
-          final parsedCreatedAt = rawCreatedAt != null
-              ? (DateTime.tryParse(rawCreatedAt)?.toUtc() ??
-                  DateTime.now().toUtc())
-              : DateTime.now().toUtc();
+          final parsedCreatedAt =
+              rawCreatedAt != null
+                  ? (DateTime.tryParse(rawCreatedAt)?.toUtc() ??
+                      DateTime.now().toUtc())
+                  : DateTime.now().toUtc();
 
-          final role = roleStr == 'user' ? AiConversationRole.user : AiConversationRole.assistant;
+          final role =
+              roleStr == 'user'
+                  ? AiConversationRole.user
+                  : AiConversationRole.assistant;
 
           // Prefer stable entry ids; keep timestamp fallback for legacy rows.
-          final exists = merged.any((local) =>
-              (entryId != null && entryId.isNotEmpty && local.entryId == entryId) ||
-              (local.role == role &&
-                  local.text.trim() == content.trim() &&
-                  (local.createdAt.difference(parsedCreatedAt).abs().inSeconds <
-                      3)));
+          final exists =
+              entryId != null
+                  ? existingIds.contains(entryId)
+                  : merged.any(
+                    (local) =>
+                        local.role == role &&
+                        local.text.trim() == content.trim() &&
+                        (local.createdAt
+                                .difference(parsedCreatedAt)
+                                .abs()
+                                .inSeconds <
+                            3),
+                  );
 
           if (!exists) {
+            final resolvedEntryId = entryId ?? _newEntryId();
             merged.add(
               AiConversationEntry(
-                entryId:
-                    entryId != null && entryId.isNotEmpty ? entryId : _newEntryId(),
+                entryId: resolvedEntryId,
                 role: role,
                 text: content,
                 source: provider ?? 'restored',
                 createdAt: parsedCreatedAt,
               ),
             );
+            existingIds.add(resolvedEntryId);
+            restoredIds.add(resolvedEntryId);
+          } else if (entryId != null) {
+            restoredIds.add(entryId);
           }
         }
 
         // Sort all entries chronologically by createdAt to guarantee correct order in UI
         merged.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+        if (merged.length > _maxConversationEntries) {
+          final overflow = merged.length - _maxConversationEntries;
+          final removedIds = merged
+              .take(overflow)
+              .map((entry) => entry.entryId)
+              .toList(growable: false);
+          merged.removeRange(0, overflow);
+          _syncedEntryIds.removeAll(removedIds);
+          restoredIds.removeAll(removedIds);
+        }
+
+        if (_isDisposed ||
+            restoreGeneration != _historyClearGeneration ||
+            targetId != _serverConversationId) {
+          _logEvent(
+            'CLOUD_HISTORY_RESTORE_DROPPED',
+            data: {'reason': 'stale_merge', 'conversationId': targetId},
+          );
+          return;
+        }
 
         _conversationHistory
           ..clear()
           ..addAll(merged);
 
         await _persistConversationHistory();
+        _syncedEntryIds.addAll(restoredIds);
+        unawaited(_persistSyncedEntryIds());
         notifyListeners();
-        _logEvent('CLOUD_HISTORY_RESTORED', data: {'entries': _conversationHistory.length});
+        _logEvent(
+          'CLOUD_HISTORY_RESTORED',
+          data: {'entries': _conversationHistory.length},
+        );
       }
     } catch (e) {
       _logEvent(
@@ -1234,14 +1396,41 @@ class AiAssistantProvider with ChangeNotifier {
     if (!_cloudBackupEnabled || _conversationHistory.isEmpty) {
       return;
     }
+    final syncGeneration = _historyClearGeneration;
+    final conversationId = _serverConversationId ?? aiConversationId;
 
-    final payload =
-        _conversationHistory.map((entry) => entry.toJson()).toList();
+    final pendingEntries = _conversationHistory
+        .where((entry) => !_syncedEntryIds.contains(entry.entryId))
+        .toList(growable: false);
+    if (pendingEntries.isEmpty) {
+      return;
+    }
+
+    final payload = pendingEntries.map((entry) => entry.toJson()).toList();
     try {
       await _aiService.backupConversationHistory(
-        conversationId: _serverConversationId ?? aiConversationId,
+        conversationId: conversationId,
         entries: payload,
       );
+      if (_isDisposed ||
+          syncGeneration != _historyClearGeneration ||
+          _conversationHistory.isEmpty) {
+        final canSafelyRetryDelete =
+            !_isPipelineLocked &&
+            !_isSessionActive &&
+            _conversationHistory.isEmpty &&
+            _serverConversationId != conversationId;
+        if (canSafelyRetryDelete) {
+          unawaited(_deleteCloudConversationHistory(conversationId));
+        }
+        _logEvent(
+          'CLOUD_BACKUP_SYNC_DROPPED',
+          data: {'reason': 'stale_sync', 'conversationId': conversationId},
+        );
+        return;
+      }
+      _syncedEntryIds.addAll(pendingEntries.map((entry) => entry.entryId));
+      unawaited(_persistSyncedEntryIds());
       _logEvent('CLOUD_BACKUP_SYNCED', data: {'entries': payload.length});
     } catch (error) {
       _logEvent(
@@ -1251,8 +1440,6 @@ class AiAssistantProvider with ChangeNotifier {
       );
     }
   }
-
-
 
   String _contextPromptLabel(String source) {
     return switch (source) {
@@ -1395,7 +1582,16 @@ class AiAssistantProvider with ChangeNotifier {
       data: {'lastWordsLength': _lastWords.length},
     );
 
-    await _stt.stop();
+    try {
+      await _stt.stop();
+    } catch (error) {
+      _logEvent(
+        'STT_STOP_ERROR',
+        traceId: traceId,
+        level: 'WARN',
+        data: {'error': error.toString(), 'reason': 'listen_guard_timeout'},
+      );
+    }
     if (!_isCurrentOperation(token)) {
       return;
     }
@@ -1428,7 +1624,7 @@ class AiAssistantProvider with ChangeNotifier {
     final normalized = (((rawLevel + 2) / 12).clamp(0.0, 1.0)).toDouble();
     final smoothed = (_soundLevel * 0.64) + (normalized * 0.36);
 
-    if ((_soundLevel - smoothed).abs() < 0.015) {
+    if ((_soundLevel - smoothed).abs() < 0.008) {
       return;
     }
 
@@ -1436,7 +1632,7 @@ class AiAssistantProvider with ChangeNotifier {
     final now = DateTime.now();
     if (_lastSoundLevelNotifyAt == null ||
         now.difference(_lastSoundLevelNotifyAt!) >=
-            const Duration(milliseconds: 90)) {
+            const Duration(milliseconds: 50)) {
       _lastSoundLevelNotifyAt = now;
       notifyListeners();
     }
@@ -1526,6 +1722,16 @@ class AiAssistantProvider with ChangeNotifier {
     dynamic params, {
     required String traceId,
   }) {
+    if (_isDisposed || _systemActionController.isClosed) {
+      _logEvent(
+        'AI_COMMAND_DROPPED',
+        traceId: traceId,
+        level: 'WARN',
+        data: {'reason': 'controller_closed', 'command': command},
+      );
+      return;
+    }
+
     final aiCommand = AiCommand(
       command: command,
       params: params,
@@ -1588,9 +1794,10 @@ class AiConversationEntry {
     final rawEntryId = (json['entryId'] ?? json['clientEntryId'])?.toString();
 
     return AiConversationEntry(
-      entryId: rawEntryId != null && rawEntryId.isNotEmpty
-          ? rawEntryId
-          : _legacyEntryId(resolvedRole, content, parsedCreatedAt),
+      entryId:
+          rawEntryId != null && rawEntryId.isNotEmpty
+              ? rawEntryId
+              : _legacyEntryId(resolvedRole, content, parsedCreatedAt),
       role: resolvedRole,
       text: content,
       source: (json['source'] ?? 'assistant_chat').toString(),
@@ -1604,7 +1811,8 @@ class AiConversationEntry {
     DateTime createdAt,
   ) {
     var hash = 2166136261;
-    final seed = '${role.name}|${createdAt.toUtc().microsecondsSinceEpoch}|$content';
+    final seed =
+        '${role.name}|${createdAt.toUtc().microsecondsSinceEpoch}|$content';
     for (final codeUnit in seed.codeUnits) {
       hash ^= codeUnit;
       hash = (hash * 16777619) & 0xffffffff;

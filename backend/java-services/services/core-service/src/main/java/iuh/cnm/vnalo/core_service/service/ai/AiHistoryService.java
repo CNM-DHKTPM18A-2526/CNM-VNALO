@@ -79,4 +79,12 @@ public class AiHistoryService {
                 userId, conversationId, org.springframework.data.domain.PageRequest.of(0, 200)
         ).getContent();
     }
+
+    @Transactional
+    public long deleteHistory(UUID userId, UUID conversationId) {
+        if (userId == null || conversationId == null) {
+            return 0;
+        }
+        return historyRepository.deleteByUserIdAndConversationId(userId, conversationId);
+    }
 }

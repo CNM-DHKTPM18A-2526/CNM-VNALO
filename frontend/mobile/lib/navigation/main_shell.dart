@@ -51,6 +51,7 @@ class MainShellState extends State<MainShell> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final aiProvider = context.read<AiAssistantProvider>();
       _actionSub = aiProvider.systemActionStream.listen((aiCmd) {
         unawaited(_handleAiSystemAction(aiCmd));
@@ -86,6 +87,7 @@ class MainShellState extends State<MainShell> {
   }
 
   Future<void> _handleNavigateTo(Map<String, dynamic>? params) async {
+    if (!mounted) return;
     final page = (params?['page'] ?? '').toString().trim().toLowerCase();
 
     if (page.isEmpty) {
@@ -140,10 +142,33 @@ class MainShellState extends State<MainShell> {
     }
   }
 
+  Map<String, dynamic>? _normalizeAiParams(AiCommand aiCmd) {
+    final rawParams = aiCmd.params;
+    if (rawParams == null) {
+      return null;
+    }
+    if (rawParams is Map<String, dynamic>) {
+      return rawParams;
+    }
+    if (rawParams is Map) {
+      return rawParams.map<String, dynamic>(
+        (key, value) => MapEntry(key.toString(), value),
+      );
+    }
+
+    _logAiFlow(
+      'AI_PARAMS_MALFORMED',
+      aiCommand: aiCmd,
+      extra: {'rawType': rawParams.runtimeType.toString()},
+    );
+    return null;
+  }
+
   Future<void> _handleAiSystemAction(AiCommand aiCmd) async {
+    if (!mounted) return;
     final chatProvider = context.read<ChatProvider>();
     final command = _normalizeAiSystemAction(aiCmd.command);
-    final params = aiCmd.params as Map<String, dynamic>?;
+    final params = _normalizeAiParams(aiCmd);
 
     _logAiFlow(
       'AI_COMMAND_RECEIVED',
@@ -171,11 +196,17 @@ class MainShellState extends State<MainShell> {
         await _handleNavigateTo({'page': 'timeline'});
         break;
 
-       case 'OPEN_CHAT':
+      case 'OPEN_CHAT':
       case 'SEND_MESSAGE':
       case 'START_CALL':
         final targetName =
-            (params?['target'] ?? params?['recipient'] ?? '').toString();
+            (params?['target'] ??
+                    params?['recipient'] ??
+                    params?['contactName'] ??
+                    params?['name'] ??
+                    '')
+                .toString()
+                .trim();
         final conversation = chatProvider.findConversationByName(targetName);
 
         if (conversation == null) {
@@ -199,13 +230,31 @@ class MainShellState extends State<MainShell> {
         final peerUserId = peerMember?.userId ?? '';
         final peerName = conversation.getDisplayName(currentUserId);
 
-        final rawPrefilled = params?['content']?.toString().trim();
+        final rawPrefilled =
+            (params?['content'] ?? params?['messageText'] ?? params?['text'])
+                ?.toString()
+                .trim();
         final prefilledText =
-            (command == 'SEND_MESSAGE' && rawPrefilled != null && rawPrefilled.isNotEmpty)
+            (command == 'SEND_MESSAGE' &&
+                    rawPrefilled != null &&
+                    rawPrefilled.isNotEmpty)
                 ? rawPrefilled
                 : null;
 
         if (command == 'OPEN_CHAT' || command == 'SEND_MESSAGE') {
+          if (command == 'SEND_MESSAGE' &&
+              (prefilledText == null || prefilledText.isEmpty)) {
+            _logAiFlow(
+              'AI_SEND_MSG_BLOCKED',
+              aiCommand: aiCmd,
+              extra: {'reason': 'empty_content'},
+            );
+            _showErrorSnackBar(
+              'Tro ly AI khong the gui tin nhan vi noi dung trong.',
+            );
+            return;
+          }
+
           final isAlreadyInConversation =
               chatProvider.activeConversationId == conversation.id ||
               _activeAiConversationId == conversation.id;
@@ -224,22 +273,15 @@ class MainShellState extends State<MainShell> {
           }
 
           if (command == 'SEND_MESSAGE') {
-            if (prefilledText == null || prefilledText.isEmpty) {
-              _logAiFlow(
-                'AI_SEND_MSG_FALLBACK',
-                aiCommand: aiCmd,
-                extra: {'reason': 'empty_content'},
-              );
-            } else {
-              final confirmed = await _showConfirmationDialog(
-                'Xác nhận mở cuộc trò chuyện',
-                'Bạn có đồng ý để trợ lý ảo mở phòng chat và chuẩn bị sẵn tin nhắn "$prefilledText" tới "$peerName" không?',
-              );
-              if (!confirmed) {
-                _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
-                return;
-              }
+            final confirmed = await _showConfirmationDialog(
+              'Xác nhận mở cuộc trò chuyện',
+              'Bạn có đồng ý để trợ lý ảo mở phòng chat và chuẩn bị sẵn tin nhắn "$prefilledText" tới "$peerName" không?',
+            );
+            if (!confirmed) {
+              _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
+              return;
             }
+            if (!mounted) return;
           }
 
           _activeAiConversationId = conversation.id;
@@ -261,6 +303,7 @@ class MainShellState extends State<MainShell> {
                   ),
             ),
           );
+          if (!mounted) return;
           if (_activeAiConversationId == conversation.id) {
             _activeAiConversationId = null;
           }
@@ -281,7 +324,8 @@ class MainShellState extends State<MainShell> {
             return;
           }
 
-          final isVideo = params?['callType'] == 'video';
+          final callType = params?['callType']?.toString().toLowerCase();
+          final isVideo = callType == 'video';
           final callTypeName = isVideo ? 'video' : 'thoại';
 
           final confirmed = await _showConfirmationDialog(
@@ -292,6 +336,7 @@ class MainShellState extends State<MainShell> {
             _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
             return;
           }
+          if (!mounted) return;
 
           final callId = generateCallId(
             conversationId: conversation.id,
@@ -345,31 +390,41 @@ class MainShellState extends State<MainShell> {
       case 'RECALL_MESSAGE':
         if (chatProvider.activeConversationId != null &&
             chatProvider.messages.isNotEmpty) {
-          try {
-            final lastMsg = chatProvider.messages.firstWhere(
-              (m) => m.senderId == chatProvider.currentUserId,
-            );
+          final lastMsg = chatProvider.messages
+              .where((m) => m.senderId == chatProvider.currentUserId)
+              .firstOrNull;
 
-            final confirmed = await _showConfirmationDialog(
-              'Xác nhận thu hồi tin nhắn',
-              'Bạn có đồng ý để trợ lý ảo thu hồi tin nhắn cuối cùng của mình không?',
-            );
-            if (!confirmed) {
-              _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
-              return;
-            }
-
-            chatProvider.recallMessage(
-              lastMsg.id,
-              chatProvider.activeConversationId!,
-            );
-          } catch (_) {
+          if (lastMsg == null) {
             _logAiFlow(
               'AI_RECALL_FAILED',
               aiCommand: aiCmd,
               extra: {'reason': 'no_self_message'},
             );
+            _showErrorSnackBar('Khong tim thay tin nhan cua ban de thu hoi.');
+            return;
           }
+
+          final confirmed = await _showConfirmationDialog(
+            'Xác nhận thu hồi tin nhắn',
+            'Bạn có đồng ý để trợ lý ảo thu hồi tin nhắn cuối cùng của mình không?',
+          );
+          if (!confirmed) {
+            _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
+            return;
+          }
+          if (!mounted) return;
+
+          chatProvider.recallMessage(
+            lastMsg.id,
+            chatProvider.activeConversationId!,
+          );
+        } else {
+          _logAiFlow(
+            'AI_RECALL_FAILED',
+            aiCommand: aiCmd,
+            extra: {'reason': 'no_active_conversation_or_messages'},
+          );
+          _showErrorSnackBar('Khong co tin nhan de thu hoi.');
         }
         break;
 

@@ -88,6 +88,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
     final boardMaxHeight =
         widget.maxHeight ??
         (viewSize.height > 760 ? 420.0 : viewSize.height * 0.56);
+    final blurSigma = viewSize.shortestSide < 380 ? 8.0 : 14.0;
 
     final hasResponse = aiProvider.aiResponse.trim().isNotEmpty;
     final hasPrompt = aiProvider.lastUserPrompt.trim().isNotEmpty;
@@ -110,7 +111,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
           child: Container(
             constraints: BoxConstraints(
               maxHeight: boardMaxHeight,

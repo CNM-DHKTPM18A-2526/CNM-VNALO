@@ -85,4 +85,17 @@ public class CoreServiceClient {
             return new java.util.ArrayList<>();
         }
     }
+
+    public void deleteChatHistory(String userId, String conversationId) {
+        try {
+            String url = coreServiceUrl + "/api/v1/ai/internal/history?userId=" + userId + "&conversationId=" + conversationId;
+            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+            headers.set("X-Internal-Secret", internalSecret);
+            org.springframework.http.HttpEntity<Void> entity = new org.springframework.http.HttpEntity<>(headers);
+            restTemplate.exchange(url, org.springframework.http.HttpMethod.DELETE, entity, Void.class);
+        } catch (Exception e) {
+            log.warn("Failed to delete chat history from core-service: {}", e.getMessage());
+            throw new RuntimeException("CORE_HISTORY_DELETE_FAILED", e);
+        }
+    }
 }

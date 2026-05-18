@@ -170,7 +170,7 @@ class ApiService {
       switch (method) {
         case 'GET':
           response = await http.get(url, headers: headers).timeout(_timeout);
-          debugPrint('[ApiService] GET $url status=${response.statusCode} body="$response.body"');
+          debugPrint('[ApiService] GET $url status=${response.statusCode}');
           break;
         case 'POST':
           response = await http

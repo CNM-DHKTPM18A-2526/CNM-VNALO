@@ -35,63 +35,353 @@ class MessageActionMenu extends StatelessWidget {
     // Dynamic items based on isMine (Matching User Images)
     final List<Widget> actionItems = [];
 
+    if (isAiAssistant) {
+      if (message.messageType == MessageType.TEXT &&
+          (message.content?.trim().isNotEmpty ?? false)) {
+        actionItems.add(
+          _buildActionItem(
+            context,
+            'copy',
+            common.copyAction,
+            Icons.copy_rounded,
+            const Color(0xFF1E88E5),
+          ),
+        );
+      }
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+            decoration: BoxDecoration(
+              color: backgroundColor.withValues(alpha: 0.98),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.12),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
+              children: actionItems,
+            ),
+          ),
+        ],
+      );
+    }
+
     if (isMine) {
       // Image 2 Order (Mine)
-      if (!isAiAssistant) actionItems.add(_buildActionItem(context, 'ask_ai', 'Hỏi VNALO', Icons.psychology_outlined, const Color(0xFF4CAF50)));
-      actionItems.add(_buildActionItem(context, 'reply', common.replyAction, Icons.reply_rounded, const Color(0xFF9C27B0)));
-      actionItems.add(_buildActionItem(context, 'forward', common.forwardAction, Icons.forward_rounded, const Color(0xFF2196F3)));
-      if (!isCloud && !isAiAssistant) actionItems.add(_buildActionItem(context, 'save', common.saveToDocsAction, Icons.folder_open_outlined, const Color(0xFF03A9F4)));
-      if (!isCloud && !isAiAssistant && canRecall) actionItems.add(_buildActionItem(context, 'recall', common.recallAction, Icons.settings_backup_restore_rounded, Colors.orange));
-      
-      actionItems.add(_buildActionItem(context, 'copy', common.copyAction, Icons.copy_rounded, const Color(0xFF1E88E5)));
+      if (!isAiAssistant) {
+        actionItems.add(
+          _buildActionItem(
+            context,
+            'ask_ai',
+            'Hỏi VNALO',
+            Icons.psychology_outlined,
+            const Color(0xFF4CAF50),
+          ),
+        );
+      }
+      actionItems.add(
+        _buildActionItem(
+          context,
+          'reply',
+          common.replyAction,
+          Icons.reply_rounded,
+          const Color(0xFF9C27B0),
+        ),
+      );
+      actionItems.add(
+        _buildActionItem(
+          context,
+          'forward',
+          common.forwardAction,
+          Icons.forward_rounded,
+          const Color(0xFF2196F3),
+        ),
+      );
+      if (!isCloud && !isAiAssistant) {
+        actionItems.add(
+          _buildActionItem(
+            context,
+            'save',
+            common.saveToDocsAction,
+            Icons.folder_open_outlined,
+            const Color(0xFF03A9F4),
+          ),
+        );
+      }
+      if (!isCloud && !isAiAssistant && canRecall) {
+        actionItems.add(
+          _buildActionItem(
+            context,
+            'recall',
+            common.recallAction,
+            Icons.settings_backup_restore_rounded,
+            Colors.orange,
+          ),
+        );
+      }
+
+      actionItems.add(
+        _buildActionItem(
+          context,
+          'copy',
+          common.copyAction,
+          Icons.copy_rounded,
+          const Color(0xFF1E88E5),
+        ),
+      );
       if (!isAiAssistant && canPin) {
-        actionItems.add(_buildActionItem(
-          context, 
-          isPinned ? 'unpin' : 'pin', 
-          isPinned ? common.unpinAction : common.pinActionTag, 
-          Icons.push_pin_outlined, 
-          const Color(0xFFFF9800)
-        ));
-        actionItems.add(_buildActionItem(context, 'reminder', common.reminderAction, Icons.access_time_rounded, const Color(0xFFE65100)));
+        actionItems.add(
+          _buildActionItem(
+            context,
+            isPinned ? 'unpin' : 'pin',
+            isPinned ? common.unpinAction : common.pinActionTag,
+            Icons.push_pin_outlined,
+            const Color(0xFFFF9800),
+          ),
+        );
+        actionItems.add(
+          _buildActionItem(
+            context,
+            'reminder',
+            common.reminderAction,
+            Icons.access_time_rounded,
+            const Color(0xFFE65100),
+          ),
+        );
       }
-      actionItems.add(_buildActionItem(context, 'multi', common.selectMultiAction, Icons.check_circle_outline_rounded, const Color(0xFF1976D2)));
-      
-      if (!isAiAssistant) actionItems.add(_buildActionItem(context, 'quick', common.quickReplyAction, Icons.bolt_rounded, const Color(0xFF1976D2)));
-      if (!isAiAssistant) actionItems.add(_buildActionItem(context, 'ai_translate', 'Dịch bằng AI', Icons.translate_rounded, const Color(0xFF4CAF50), labelExtra: common.newTagLabel));
-      if (!isAiAssistant && (message.messageType == MessageType.VIDEO || (message.content?.contains('http') ?? false))) {
-        actionItems.add(_buildActionItem(context, 'summarize_video', 'Tóm tắt Video', Icons.smart_display_outlined, Colors.redAccent));
+      actionItems.add(
+        _buildActionItem(
+          context,
+          'multi',
+          common.selectMultiAction,
+          Icons.check_circle_outline_rounded,
+          const Color(0xFF1976D2),
+        ),
+      );
+
+      if (!isAiAssistant) {
+        actionItems.add(
+          _buildActionItem(
+            context,
+            'quick',
+            common.quickReplyAction,
+            Icons.bolt_rounded,
+            const Color(0xFF1976D2),
+          ),
+        );
       }
-      actionItems.add(_buildActionItem(context, 'tts', common.speakAction, Icons.volume_up_outlined, const Color(0xFF9C27B0), labelExtra: common.newTagLabel));
-      if (!isAiAssistant) actionItems.add(_buildActionItem(context, 'info', common.detailsAction, Icons.info_outline_rounded, Colors.blueGrey));
-      
-      actionItems.add(_buildActionItem(context, 'delete', common.deleteForMeAction, Icons.delete_outline_rounded, Colors.redAccent));
+      if (!isAiAssistant) {
+        actionItems.add(
+          _buildActionItem(
+            context,
+            'ai_translate',
+            'Dịch bằng AI',
+            Icons.translate_rounded,
+            const Color(0xFF4CAF50),
+            labelExtra: common.newTagLabel,
+          ),
+        );
+      }
+      if (!isAiAssistant &&
+          (message.messageType == MessageType.VIDEO ||
+              (message.content?.contains('http') ?? false))) {
+        actionItems.add(
+          _buildActionItem(
+            context,
+            'summarize_video',
+            'Tóm tắt Video',
+            Icons.smart_display_outlined,
+            Colors.redAccent,
+          ),
+        );
+      }
+      actionItems.add(
+        _buildActionItem(
+          context,
+          'tts',
+          common.speakAction,
+          Icons.volume_up_outlined,
+          const Color(0xFF9C27B0),
+          labelExtra: common.newTagLabel,
+        ),
+      );
+      if (!isAiAssistant) {
+        actionItems.add(
+          _buildActionItem(
+            context,
+            'info',
+            common.detailsAction,
+            Icons.info_outline_rounded,
+            Colors.blueGrey,
+          ),
+        );
+      }
+
+      actionItems.add(
+        _buildActionItem(
+          context,
+          'delete',
+          common.deleteForMeAction,
+          Icons.delete_outline_rounded,
+          Colors.redAccent,
+        ),
+      );
     } else {
       // Image 1 Order (Other)
-      if (!isAiAssistant) actionItems.add(_buildActionItem(context, 'ask_ai', 'Hỏi VNALO', Icons.psychology_outlined, const Color(0xFF4CAF50)));
-      actionItems.add(_buildActionItem(context, 'reply', common.replyAction, Icons.reply_rounded, const Color(0xFF9C27B0)));
-      actionItems.add(_buildActionItem(context, 'forward', common.forwardAction, Icons.forward_rounded, const Color(0xFF2196F3)));
-      if (!isCloud && !isAiAssistant) actionItems.add(_buildActionItem(context, 'save', common.saveToDocsAction, Icons.folder_open_outlined, const Color(0xFF03A9F4)));
-      actionItems.add(_buildActionItem(context, 'copy', common.copyAction, Icons.copy_rounded, const Color(0xFF1E88E5)));
-      
+      if (!isAiAssistant) {
+        actionItems.add(
+          _buildActionItem(
+            context,
+            'ask_ai',
+            'Hỏi VNALO',
+            Icons.psychology_outlined,
+            const Color(0xFF4CAF50),
+          ),
+        );
+      }
+      actionItems.add(
+        _buildActionItem(
+          context,
+          'reply',
+          common.replyAction,
+          Icons.reply_rounded,
+          const Color(0xFF9C27B0),
+        ),
+      );
+      actionItems.add(
+        _buildActionItem(
+          context,
+          'forward',
+          common.forwardAction,
+          Icons.forward_rounded,
+          const Color(0xFF2196F3),
+        ),
+      );
+      if (!isCloud && !isAiAssistant) {
+        actionItems.add(
+          _buildActionItem(
+            context,
+            'save',
+            common.saveToDocsAction,
+            Icons.folder_open_outlined,
+            const Color(0xFF03A9F4),
+          ),
+        );
+      }
+      actionItems.add(
+        _buildActionItem(
+          context,
+          'copy',
+          common.copyAction,
+          Icons.copy_rounded,
+          const Color(0xFF1E88E5),
+        ),
+      );
+
       if (!isAiAssistant && canPin) {
-        actionItems.add(_buildActionItem(
-          context, 
-          isPinned ? 'unpin' : 'pin', 
-          isPinned ? common.unpinAction : common.pinActionTag, 
-          Icons.push_pin_outlined, 
-          const Color(0xFFFF9800)
-        ));
-        actionItems.add(_buildActionItem(context, 'reminder', common.reminderAction, Icons.access_time_rounded, const Color(0xFFE65100)));
+        actionItems.add(
+          _buildActionItem(
+            context,
+            isPinned ? 'unpin' : 'pin',
+            isPinned ? common.unpinAction : common.pinActionTag,
+            Icons.push_pin_outlined,
+            const Color(0xFFFF9800),
+          ),
+        );
+        actionItems.add(
+          _buildActionItem(
+            context,
+            'reminder',
+            common.reminderAction,
+            Icons.access_time_rounded,
+            const Color(0xFFE65100),
+          ),
+        );
       }
-      actionItems.add(_buildActionItem(context, 'multi', common.selectMultiAction, Icons.check_circle_outline_rounded, const Color(0xFF1976D2)));
-      if (!isAiAssistant) actionItems.add(_buildActionItem(context, 'quick', common.quickReplyAction, Icons.bolt_rounded, const Color(0xFF1976D2)));
-      if (!isAiAssistant) actionItems.add(_buildActionItem(context, 'ai_translate', 'Dịch bằng AI', Icons.translate_rounded, const Color(0xFF4CAF50), labelExtra: common.newTagLabel));
-      if (!isAiAssistant && (message.messageType == MessageType.VIDEO || (message.content?.contains('http') ?? false))) {
-        actionItems.add(_buildActionItem(context, 'summarize_video', 'Tóm tắt Video', Icons.smart_display_outlined, Colors.redAccent));
+      actionItems.add(
+        _buildActionItem(
+          context,
+          'multi',
+          common.selectMultiAction,
+          Icons.check_circle_outline_rounded,
+          const Color(0xFF1976D2),
+        ),
+      );
+      if (!isAiAssistant) {
+        actionItems.add(
+          _buildActionItem(
+            context,
+            'quick',
+            common.quickReplyAction,
+            Icons.bolt_rounded,
+            const Color(0xFF1976D2),
+          ),
+        );
       }
-      actionItems.add(_buildActionItem(context, 'tts', common.speakAction, Icons.volume_up_outlined, const Color(0xFF9C27B0), labelExtra: common.newTagLabel));
-      if (!isAiAssistant) actionItems.add(_buildActionItem(context, 'info', common.detailsAction, Icons.info_outline_rounded, Colors.blueGrey));
-      actionItems.add(_buildActionItem(context, 'delete', common.deleteForMeAction, Icons.delete_outline_rounded, Colors.redAccent));
+      if (!isAiAssistant) {
+        actionItems.add(
+          _buildActionItem(
+            context,
+            'ai_translate',
+            'Dịch bằng AI',
+            Icons.translate_rounded,
+            const Color(0xFF4CAF50),
+            labelExtra: common.newTagLabel,
+          ),
+        );
+      }
+      if (!isAiAssistant &&
+          (message.messageType == MessageType.VIDEO ||
+              (message.content?.contains('http') ?? false))) {
+        actionItems.add(
+          _buildActionItem(
+            context,
+            'summarize_video',
+            'Tóm tắt Video',
+            Icons.smart_display_outlined,
+            Colors.redAccent,
+          ),
+        );
+      }
+      actionItems.add(
+        _buildActionItem(
+          context,
+          'tts',
+          common.speakAction,
+          Icons.volume_up_outlined,
+          const Color(0xFF9C27B0),
+          labelExtra: common.newTagLabel,
+        ),
+      );
+      if (!isAiAssistant) {
+        actionItems.add(
+          _buildActionItem(
+            context,
+            'info',
+            common.detailsAction,
+            Icons.info_outline_rounded,
+            Colors.blueGrey,
+          ),
+        );
+      }
+      actionItems.add(
+        _buildActionItem(
+          context,
+          'delete',
+          common.deleteForMeAction,
+          Icons.delete_outline_rounded,
+          Colors.redAccent,
+        ),
+      );
     }
 
     return Column(
@@ -169,15 +459,15 @@ class MessageActionMenu extends StatelessWidget {
   }
 
   Widget _buildActionItem(
-    BuildContext context, 
-    String actionId, 
-    String label, 
-    IconData icon, 
-    Color color,
-    {String? labelExtra}
-  ) {
+    BuildContext context,
+    String actionId,
+    String label,
+    IconData icon,
+    Color color, {
+    String? labelExtra,
+  }) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     return GestureDetector(
       onTap: () {
         Navigator.pop(context);
@@ -193,7 +483,9 @@ class MessageActionMenu extends StatelessWidget {
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: (isDarkMode ? Colors.white : Colors.black).withValues(alpha: 0.05),
+                  color: (isDarkMode ? Colors.white : Colors.black).withValues(
+                    alpha: 0.05,
+                  ),
                 ),
                 child: Icon(icon, color: color, size: 24),
               ),
@@ -202,14 +494,21 @@ class MessageActionMenu extends StatelessWidget {
                   top: -2,
                   right: -8,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 1,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF4CAF50),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
                       labelExtra,
-                      style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 8,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
@@ -224,7 +523,10 @@ class MessageActionMenu extends StatelessWidget {
               style: TextStyle(
                 fontSize: 10.5,
                 fontWeight: FontWeight.w400,
-                color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
+                color:
+                    isDarkMode
+                        ? DarkColors.textPrimary
+                        : LightColors.textPrimary,
                 height: 1.1,
               ),
               maxLines: 2,

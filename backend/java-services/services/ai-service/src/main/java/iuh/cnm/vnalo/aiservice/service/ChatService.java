@@ -207,6 +207,7 @@ public class ChatService {
     public void deleteHistory(String userId, String conversationId) {
         if (conversationId != null && !conversationId.isBlank()) {
             redisTemplate.delete(historyKey(userId, conversationId));
+            coreServiceClient.deleteChatHistory(userId, conversationId);
         } else {
             String pattern = "ai:history:" + userId + ":*";
             Set<String> keys = scanKeys(pattern);

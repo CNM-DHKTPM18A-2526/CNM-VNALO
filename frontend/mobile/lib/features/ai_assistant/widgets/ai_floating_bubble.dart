@@ -40,6 +40,9 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
   Animation<double>? _scaleAnimation;
 
   double _currentScale = 0.86;
+  Size? _lastViewportSize;
+  double? _lastViewInsetsBottom;
+  double? _lastPaddingTop;
 
   @override
   void initState() {
@@ -68,6 +71,34 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
         _snapToEdge();
       }
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final mediaQuery = MediaQuery.of(context);
+    final viewportChanged = _lastViewportSize != mediaQuery.size ||
+        _lastViewInsetsBottom != mediaQuery.viewInsets.bottom ||
+        _lastPaddingTop != mediaQuery.padding.top;
+
+    _lastViewportSize = mediaQuery.size;
+    _lastViewInsetsBottom = mediaQuery.viewInsets.bottom;
+    _lastPaddingTop = mediaQuery.padding.top;
+
+    if (viewportChanged) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _isDragging) {
+          return;
+        }
+        final clamped = _clampToViewport(_position);
+        if ((clamped - _position).distance > 0.5) {
+          setState(() {
+            _positionAnimation = null;
+            _position = clamped;
+          });
+        }
+      });
+    }
   }
 
   @override
@@ -100,7 +131,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
     setState(() {
       final screenSize = MediaQuery.of(context).size;
       final rawPosition = _position + details.delta;
-      final clamped = _clampToViewport(rawPosition, screenSize);
+      final clamped = _clampToViewport(rawPosition);
 
       final distance = _distanceToTrashZone(clamped, screenSize);
       final inTrashBand = _isInTrashBand(clamped, screenSize);
@@ -110,7 +141,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
       if (inTrashBand && distance < _trashAttractionDistance) {
         final target = Offset(
           screenSize.width / 2 - _bubbleRadius,
-          screenSize.height - 140,
+          _trashCenterY(screenSize) - _bubbleRadius,
         );
         final attraction = ((_trashAttractionDistance - distance) /
                 _trashAttractionDistance)
@@ -160,11 +191,11 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
 
   bool _isInTrashBand(Offset position, Size screenSize) {
     final mascotCenterY = position.dy + _bubbleRadius;
-    return mascotCenterY > (screenSize.height - _trashActivationBandFromBottom);
+    return mascotCenterY > (_trashCenterY(screenSize) - _trashActivationBandFromBottom);
   }
 
   double _distanceToTrashZone(Offset position, Size screenSize) {
-    final trashCenter = Offset(screenSize.width / 2, screenSize.height - 80);
+    final trashCenter = Offset(screenSize.width / 2, _trashCenterY(screenSize));
     final mascotCenter = Offset(
       position.dx + _bubbleRadius,
       position.dy + _bubbleRadius,
@@ -185,11 +216,26 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
         (_trashHoverDistance + hoverPadding);
   }
 
-  Offset _clampToViewport(Offset candidate, Size screenSize) {
+  double _trashCenterY(Size screenSize) {
+    final mediaQuery = MediaQuery.of(context);
+    return screenSize.height -
+        mediaQuery.viewInsets.bottom -
+        mediaQuery.padding.bottom -
+        80;
+  }
+
+  Offset _clampToViewport(Offset candidate) {
+    final mediaQuery = MediaQuery.of(context);
+    final screenSize = mediaQuery.size;
+    final padding = mediaQuery.padding;
+    final viewInsets = mediaQuery.viewInsets;
     final minX = -(_bubbleSize * 0.2);
     final maxX = screenSize.width - (_bubbleSize * 0.8);
-    final minY = 40.0;
-    final maxY = screenSize.height - 200;
+    final minY = padding.top + 8.0;
+    final maxY = max(
+      minY,
+      screenSize.height - viewInsets.bottom - padding.bottom - 200,
+    );
 
     return Offset(
       candidate.dx.clamp(minX, maxX),
@@ -205,18 +251,21 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
         isLeft
             ? -(_bubbleSize * 0.23)
             : screenSize.width - (_bubbleSize * 0.77);
-    var targetY = _position.dy;
-
-    if (targetY < 40) {
-      targetY = 40;
-    }
-    if (targetY > screenSize.height - 200) {
-      targetY = screenSize.height - 200;
-    }
+    final target = _clampToViewport(Offset(targetX, _position.dy));
+    final viewportDiagonal = sqrt(
+      (screenSize.width * screenSize.width) +
+          (screenSize.height * screenSize.height),
+    );
+    final distanceRatio = viewportDiagonal <= 0
+        ? 0.0
+        : ((_position - target).distance / viewportDiagonal).clamp(0.0, 1.0);
+    _snapController.duration = Duration(
+      milliseconds: (150 + (distanceRatio * 250)).clamp(150, 400).toInt(),
+    );
 
     _positionAnimation = Tween<Offset>(
       begin: _position,
-      end: Offset(targetX, targetY),
+      end: target,
     ).animate(
       CurvedAnimation(parent: _snapController, curve: Curves.easeOutCubic),
     );
@@ -229,8 +278,9 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
   }
 
   Widget _buildTrashZone() {
+    final mediaQuery = MediaQuery.of(context);
     return Positioned(
-      bottom: 40,
+      bottom: 40 + mediaQuery.viewInsets.bottom + mediaQuery.padding.bottom,
       left: 0,
       right: 0,
       child: Center(
@@ -529,8 +579,10 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
   @override
   Widget build(BuildContext context) {
     final aiProvider = context.watch<AiAssistantProvider>();
-    final screenSize = MediaQuery.of(context).size;
-    final viewInsets = MediaQuery.of(context).viewInsets;
+    final mediaQuery = MediaQuery.of(context);
+    final screenSize = mediaQuery.size;
+    final viewInsets = mediaQuery.viewInsets;
+    final padding = mediaQuery.padding;
     final availableHeight = max(240.0, screenSize.height - viewInsets.bottom);
 
     const boardPadding = 12.0;
@@ -548,9 +600,14 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
             .toDouble();
 
     final desiredTop = _position.dy - (boardHeight * 0.34);
+    final minBoardTop = padding.top + 8.0;
+    final maxBoardTop = max(
+      minBoardTop,
+      availableHeight - boardHeight - padding.bottom - 16.0,
+    );
     final boardTop =
         desiredTop
-            .clamp(56.0, max(56.0, availableHeight - boardHeight - 16.0))
+            .clamp(minBoardTop, maxBoardTop)
             .toDouble();
 
     final showBoard =
