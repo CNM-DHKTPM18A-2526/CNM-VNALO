@@ -77,4 +77,22 @@ public class AiInteractionController {
                     .body(ApiResponse.error(500, "Failed to restore history: " + e.getMessage()));
         }
     }
+
+    @DeleteMapping("/history")
+    public ResponseEntity<?> deleteHistory(@RequestParam String conversationId) {
+        String userId = getCurrentUserId();
+        if (conversationId == null || conversationId.isBlank()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ApiResponse.error(400, "conversationId is required"));
+        }
+        log.info("Received request to delete AI history for user: {}, conversation: {}", userId, conversationId);
+        try {
+            chatService.deleteHistory(userId, conversationId);
+            return ResponseEntity.ok(ApiResponse.ok("History deleted successfully", null));
+        } catch (Exception e) {
+            log.error("Failed to delete AI history: ", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error(500, "Failed to delete history: " + e.getMessage()));
+        }
+    }
 }

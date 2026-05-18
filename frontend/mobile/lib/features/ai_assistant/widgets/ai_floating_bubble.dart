@@ -141,7 +141,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
       if (inTrashBand && distance < _trashAttractionDistance) {
         final target = Offset(
           screenSize.width / 2 - _bubbleRadius,
-          screenSize.height - 140,
+          _trashCenterY(screenSize) - _bubbleRadius,
         );
         final attraction = ((_trashAttractionDistance - distance) /
                 _trashAttractionDistance)
@@ -191,11 +191,11 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
 
   bool _isInTrashBand(Offset position, Size screenSize) {
     final mascotCenterY = position.dy + _bubbleRadius;
-    return mascotCenterY > (screenSize.height - _trashActivationBandFromBottom);
+    return mascotCenterY > (_trashCenterY(screenSize) - _trashActivationBandFromBottom);
   }
 
   double _distanceToTrashZone(Offset position, Size screenSize) {
-    final trashCenter = Offset(screenSize.width / 2, screenSize.height - 80);
+    final trashCenter = Offset(screenSize.width / 2, _trashCenterY(screenSize));
     final mascotCenter = Offset(
       position.dx + _bubbleRadius,
       position.dy + _bubbleRadius,
@@ -214,6 +214,14 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
 
     return _distanceToTrashZone(position, screenSize) <=
         (_trashHoverDistance + hoverPadding);
+  }
+
+  double _trashCenterY(Size screenSize) {
+    final mediaQuery = MediaQuery.of(context);
+    return screenSize.height -
+        mediaQuery.viewInsets.bottom -
+        mediaQuery.padding.bottom -
+        80;
   }
 
   Offset _clampToViewport(Offset candidate) {
@@ -270,8 +278,9 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
   }
 
   Widget _buildTrashZone() {
+    final mediaQuery = MediaQuery.of(context);
     return Positioned(
-      bottom: 40,
+      bottom: 40 + mediaQuery.viewInsets.bottom + mediaQuery.padding.bottom,
       left: 0,
       right: 0,
       child: Center(

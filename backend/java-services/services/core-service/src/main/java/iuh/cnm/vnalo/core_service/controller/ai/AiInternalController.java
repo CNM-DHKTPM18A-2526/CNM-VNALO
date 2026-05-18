@@ -77,6 +77,12 @@ public class AiInternalController {
         return ResponseEntity.ok(response);
     }
 
+    @DeleteMapping("/history")
+    public ResponseEntity<Void> deleteHistory(@RequestParam UUID userId, @RequestParam UUID conversationId) {
+        aiHistoryService.deleteHistory(userId, conversationId);
+        return ResponseEntity.ok().build();
+    }
+
     @Data
     public static class SaveHistoryRequest {
         private UUID userId;

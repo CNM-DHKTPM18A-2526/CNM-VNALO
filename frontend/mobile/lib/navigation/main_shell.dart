@@ -51,6 +51,7 @@ class MainShellState extends State<MainShell> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final aiProvider = context.read<AiAssistantProvider>();
       _actionSub = aiProvider.systemActionStream.listen((aiCmd) {
         unawaited(_handleAiSystemAction(aiCmd));
@@ -86,6 +87,7 @@ class MainShellState extends State<MainShell> {
   }
 
   Future<void> _handleNavigateTo(Map<String, dynamic>? params) async {
+    if (!mounted) return;
     final page = (params?['page'] ?? '').toString().trim().toLowerCase();
 
     if (page.isEmpty) {
@@ -163,6 +165,7 @@ class MainShellState extends State<MainShell> {
   }
 
   Future<void> _handleAiSystemAction(AiCommand aiCmd) async {
+    if (!mounted) return;
     final chatProvider = context.read<ChatProvider>();
     final command = _normalizeAiSystemAction(aiCmd.command);
     final params = _normalizeAiParams(aiCmd);
@@ -232,7 +235,9 @@ class MainShellState extends State<MainShell> {
                 ?.toString()
                 .trim();
         final prefilledText =
-            (command == 'SEND_MESSAGE' && rawPrefilled != null && rawPrefilled.isNotEmpty)
+            (command == 'SEND_MESSAGE' &&
+                    rawPrefilled != null &&
+                    rawPrefilled.isNotEmpty)
                 ? rawPrefilled
                 : null;
 
@@ -276,6 +281,7 @@ class MainShellState extends State<MainShell> {
               _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
               return;
             }
+            if (!mounted) return;
           }
 
           _activeAiConversationId = conversation.id;
@@ -297,6 +303,7 @@ class MainShellState extends State<MainShell> {
                   ),
             ),
           );
+          if (!mounted) return;
           if (_activeAiConversationId == conversation.id) {
             _activeAiConversationId = null;
           }
@@ -329,6 +336,7 @@ class MainShellState extends State<MainShell> {
             _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
             return;
           }
+          if (!mounted) return;
 
           final callId = generateCallId(
             conversationId: conversation.id,
@@ -382,33 +390,34 @@ class MainShellState extends State<MainShell> {
       case 'RECALL_MESSAGE':
         if (chatProvider.activeConversationId != null &&
             chatProvider.messages.isNotEmpty) {
-            final lastMsg = chatProvider.messages
-                .where((m) => m.senderId == chatProvider.currentUserId)
-                .firstOrNull;
+          final lastMsg = chatProvider.messages
+              .where((m) => m.senderId == chatProvider.currentUserId)
+              .firstOrNull;
 
-            if (lastMsg == null) {
-              _logAiFlow(
-                'AI_RECALL_FAILED',
-                aiCommand: aiCmd,
-                extra: {'reason': 'no_self_message'},
-              );
-              _showErrorSnackBar('Khong tim thay tin nhan cua ban de thu hoi.');
-              return;
-            }
-
-            final confirmed = await _showConfirmationDialog(
-              'Xác nhận thu hồi tin nhắn',
-              'Bạn có đồng ý để trợ lý ảo thu hồi tin nhắn cuối cùng của mình không?',
+          if (lastMsg == null) {
+            _logAiFlow(
+              'AI_RECALL_FAILED',
+              aiCommand: aiCmd,
+              extra: {'reason': 'no_self_message'},
             );
-            if (!confirmed) {
-              _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
-              return;
-            }
+            _showErrorSnackBar('Khong tim thay tin nhan cua ban de thu hoi.');
+            return;
+          }
 
-            chatProvider.recallMessage(
-              lastMsg.id,
-              chatProvider.activeConversationId!,
-            );
+          final confirmed = await _showConfirmationDialog(
+            'Xác nhận thu hồi tin nhắn',
+            'Bạn có đồng ý để trợ lý ảo thu hồi tin nhắn cuối cùng của mình không?',
+          );
+          if (!confirmed) {
+            _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
+            return;
+          }
+          if (!mounted) return;
+
+          chatProvider.recallMessage(
+            lastMsg.id,
+            chatProvider.activeConversationId!,
+          );
         } else {
           _logAiFlow(
             'AI_RECALL_FAILED',

@@ -22,6 +22,7 @@ class AiAssistantProvider with ChangeNotifier {
   static const String _cloudBackupPrefKey = 'vnalo_ai_cloud_backup_enabled';
   static const String _serverConversationIdPrefKey =
       'vnalo_ai_server_conversation_id';
+  static const String _syncedEntryIdsPrefKey = 'vnalo_ai_synced_entry_ids_v1';
   static const String _defaultLocaleId = 'vi_VN';
   static const Duration _aiTimeout = Duration(seconds: 25);
   static const Duration _sttListenFor = Duration(seconds: 8);
@@ -144,6 +145,7 @@ class AiAssistantProvider with ChangeNotifier {
     _conversationCreated = prefs.getBool(_conversationCreatedPrefKey) ?? false;
     _serverConversationId = prefs.getString(_serverConversationIdPrefKey);
     await _loadConversationHistory(prefs: prefs);
+    _loadSyncedEntryIds(prefs: prefs);
 
     if (_cloudBackupEnabled && _serverConversationId != null) {
       unawaited(_restoreConversationHistoryFromServer());
@@ -191,6 +193,13 @@ class AiAssistantProvider with ChangeNotifier {
         data: {'error': error.toString()},
       );
     }
+  }
+
+  void _loadSyncedEntryIds({required SharedPreferences prefs}) {
+    final ids = prefs.getStringList(_syncedEntryIdsPrefKey) ?? const <String>[];
+    _syncedEntryIds
+      ..clear()
+      ..addAll(ids.where((id) => id.trim().isNotEmpty));
   }
 
   Future<void> _loadMascot({SharedPreferences? prefs}) async {
@@ -312,11 +321,13 @@ class AiAssistantProvider with ChangeNotifier {
     bool clearCurrentResponse = false,
     String reason = 'manual',
   }) async {
+    final serverConversationIdToDelete = _serverConversationId;
     _conversationHistory.clear();
     _syncedEntryIds.clear();
     _conversationCreated = false;
     _sessionHistory.clear();
     _lastUserPrompt = '';
+    _serverConversationId = null;
 
     if (clearCurrentResponse) {
       _aiResponse = '';
@@ -326,6 +337,8 @@ class AiAssistantProvider with ChangeNotifier {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_historyPrefKey);
+    await prefs.remove(_serverConversationIdPrefKey);
+    await prefs.remove(_syncedEntryIdsPrefKey);
     await prefs.setBool(_conversationCreatedPrefKey, false);
 
     _logEvent(
@@ -333,6 +346,25 @@ class AiAssistantProvider with ChangeNotifier {
       data: {'reason': reason, 'clearCurrentResponse': clearCurrentResponse},
     );
     notifyListeners();
+
+    if (serverConversationIdToDelete != null &&
+        serverConversationIdToDelete.isNotEmpty) {
+      unawaited(_deleteCloudConversationHistory(serverConversationIdToDelete));
+    }
+  }
+
+  Future<void> _deleteCloudConversationHistory(String conversationId) async {
+    try {
+      await _aiService.deleteConversationHistory(
+        conversationId: conversationId,
+      );
+    } catch (error) {
+      _logEvent(
+        'CLOUD_HISTORY_DELETE_ERROR',
+        level: 'WARN',
+        data: {'error': error.toString()},
+      );
+    }
   }
 
   Future<void> deleteMessage(String messageId) async {
@@ -343,6 +375,7 @@ class AiAssistantProvider with ChangeNotifier {
     _syncedEntryIds.remove(entryId);
     
     await _persistConversationHistory();
+    unawaited(_persistSyncedEntryIds());
     _logEvent('AI_MESSAGE_DELETED', data: {'messageId': messageId});
     notifyListeners();
   }
@@ -1129,6 +1162,7 @@ class AiAssistantProvider with ChangeNotifier {
         overflow,
       );
       _syncedEntryIds.removeAll(removedIds);
+      unawaited(_persistSyncedEntryIds());
     }
 
     unawaited(_persistConversationHistory());
@@ -1154,6 +1188,23 @@ class AiAssistantProvider with ChangeNotifier {
     } catch (error) {
       _logEvent(
         'CONVERSATION_HISTORY_PERSIST_ERROR',
+        level: 'WARN',
+        data: {'error': error.toString()},
+      );
+    }
+  }
+
+  Future<void> _persistSyncedEntryIds() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final ids = _syncedEntryIds.toList(growable: false)..sort();
+      await prefs.setStringList(
+        _syncedEntryIdsPrefKey,
+        ids,
+      );
+    } catch (error) {
+      _logEvent(
+        'SYNCED_ENTRY_IDS_PERSIST_ERROR',
         level: 'WARN',
         data: {'error': error.toString()},
       );
@@ -1239,6 +1290,7 @@ class AiAssistantProvider with ChangeNotifier {
 
         await _persistConversationHistory();
         _syncedEntryIds.addAll(restoredIds);
+        unawaited(_persistSyncedEntryIds());
         notifyListeners();
         _logEvent('CLOUD_HISTORY_RESTORED', data: {'entries': _conversationHistory.length});
       }
@@ -1282,6 +1334,7 @@ class AiAssistantProvider with ChangeNotifier {
         entries: payload,
       );
       _syncedEntryIds.addAll(pendingEntries.map((entry) => entry.entryId));
+      unawaited(_persistSyncedEntryIds());
       _logEvent('CLOUD_BACKUP_SYNCED', data: {'entries': payload.length});
     } catch (error) {
       _logEvent(
