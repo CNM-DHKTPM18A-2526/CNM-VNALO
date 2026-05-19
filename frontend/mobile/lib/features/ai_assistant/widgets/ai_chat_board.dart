@@ -6,6 +6,8 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
+import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_prompt_chips.dart';
+import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_status_pill.dart';
 
 class AiChatBoard extends StatefulWidget {
   final VoidCallback onClose;
@@ -93,13 +95,6 @@ class _AiChatBoardState extends State<AiChatBoard> {
     final hasResponse = aiProvider.aiResponse.trim().isNotEmpty;
     final hasPrompt = aiProvider.lastUserPrompt.trim().isNotEmpty;
 
-    final statusLabel = switch (aiProvider.state) {
-      AiState.listening => 'Dang nghe',
-      AiState.thinking => 'Dang xu ly',
-      AiState.speaking => 'Dang phan hoi',
-      AiState.idle => 'San sang',
-    };
-
     final borderColor =
         isDarkMode
             ? const Color(0xFF5DA6FF).withValues(alpha: 0.35)
@@ -173,30 +168,9 @@ class _AiChatBoardState extends State<AiChatBoard> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            Flexible(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.16),
-                                  borderRadius: BorderRadius.circular(999),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.28),
-                                  ),
-                                ),
-                                child: Text(
-                                  statusLabel,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
+                            AiStatusPill(
+                              state: aiProvider.state,
+                              compact: true,
                             ),
                           ],
                         ),
@@ -311,10 +285,10 @@ class _AiChatBoardState extends State<AiChatBoard> {
                                     )
                                     : Text(
                                       aiProvider.state == AiState.listening
-                                          ? 'Dang nghe giong noi. Ban cung co the nhap cau hoi ben duoi.'
+                                          ? 'Äang nghe giá»ng nÃ³i. Báº¡n cÅ©ng cÃ³ thá»ƒ nháº­p cÃ¢u há»i bÃªn dÆ°á»›i.'
                                           : aiProvider.state == AiState.thinking
-                                          ? 'Dang xu ly yeu cau cua ban...'
-                                          : 'Nhap cau hoi de bat dau chat voi tro ly.',
+                                          ? 'Äang xá»­ lÃ½ yÃªu cáº§u cá»§a báº¡n...'
+                                          : 'Nháº­p cÃ¢u há»i hoáº·c chá»n gá»£i Ã½ Ä‘á»ƒ báº¯t Ä‘áº§u.',
                                       style: TextStyle(
                                         color:
                                             isDarkMode
@@ -344,6 +318,16 @@ class _AiChatBoardState extends State<AiChatBoard> {
                     ),
                   ),
                 ),
+                AiPromptChips(
+                  compact: true,
+                  onSelected: (prompt) {
+                    _inputController.text = prompt;
+                    _inputController.selection = TextSelection.collapsed(
+                      offset: prompt.length,
+                    );
+                    _inputFocusNode.requestFocus();
+                  },
+                ),
                 Container(
                   padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
                   decoration: BoxDecoration(
@@ -371,7 +355,8 @@ class _AiChatBoardState extends State<AiChatBoard> {
                             isDense: true,
                             hintText: 'Nhập để chat với trợ lý...',
                             hintStyle: TextStyle(
-                              color: isDarkMode ? Colors.white38 : Colors.black38,
+                              color:
+                                  isDarkMode ? Colors.white38 : Colors.black38,
                               fontSize: 14,
                             ),
                             contentPadding: const EdgeInsets.symmetric(

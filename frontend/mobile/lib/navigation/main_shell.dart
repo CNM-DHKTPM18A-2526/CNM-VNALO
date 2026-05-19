@@ -13,11 +13,13 @@ import 'package:vnalo_mobile/features/discover/screens/discover_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/profile_screen.dart';
 import 'package:vnalo_mobile/features/timeline/screens/home_wall_screen.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
+import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_action_confirmation_sheet.dart';
 import 'package:vnalo_mobile/features/chat/screens/chat_detail_screen.dart';
 import 'package:vnalo_mobile/features/call/screens/voice_call_screen.dart';
 import 'package:vnalo_mobile/features/call/screens/video_call_screen.dart';
 import 'package:vnalo_mobile/features/call/utils/call_id_generator.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
+import 'package:vnalo_mobile/models/conversation_model.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 
@@ -224,6 +226,7 @@ class MainShellState extends State<MainShell> {
           return;
         }
 
+        Conversation? selectedConversation;
         if (conversationMatches.length > 1) {
           _logAiFlow(
             'AI_RESOLUTION_AMBIGUOUS',
@@ -233,13 +236,18 @@ class MainShellState extends State<MainShell> {
               'matchCount': conversationMatches.length,
             },
           );
-          _showErrorSnackBar(
-            'Có nhiều cuộc trò chuyện tên "$targetName". Vui lòng nói rõ hơn.',
+          selectedConversation = await _showConversationDisambiguationSheet(
+            matches: conversationMatches,
+            currentUserId: chatProvider.currentUserId ?? '',
+            targetName: targetName,
           );
-          return;
+          if (selectedConversation == null) {
+            _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
+            return;
+          }
         }
 
-        final conversation = conversationMatches.first;
+        final conversation = selectedConversation ?? conversationMatches.first;
         final currentUserId = chatProvider.currentUserId ?? '';
         final isDirect = conversation.type.name == 'DIRECT';
         final peerMember =
@@ -294,9 +302,15 @@ class MainShellState extends State<MainShell> {
           }
 
           if (command == 'COMPOSE_MESSAGE') {
-            final confirmed = await _showConfirmationDialog(
-              'Xác nhận soạn tin nhắn',
-              'Bạn có đồng ý để trợ lý ảo mở phòng chat và điền sẵn tin nhắn "$prefilledText" tới "$peerName" không? Tin nhắn sẽ chưa được gửi.',
+            final confirmed = await AiActionConfirmationSheet.show(
+              context,
+              icon: Icons.edit_note_rounded,
+              title: 'X?c nh?n so?n tin nh?n',
+              description:
+                  'Tr? l? s? m? ph?ng chat v? ?i?n s?n n?i dung. Tin nh?n s? ch?a ???c g?i.',
+              confirmLabel: 'M? v? ?i?n s?n',
+              primaryDetail: 'Ng??i nh?n: $peerName',
+              secondaryDetail: prefilledText,
             );
             if (!confirmed) {
               _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
@@ -349,9 +363,13 @@ class MainShellState extends State<MainShell> {
           final isVideo = callType == 'video';
           final callTypeName = isVideo ? 'video' : 'thoại';
 
-          final confirmed = await _showConfirmationDialog(
-            'Xác nhận gọi điện',
-            'Bạn có đồng ý để trợ lý ảo thực hiện cuộc gọi $callTypeName tới "$peerName" không?',
+          final confirmed = await AiActionConfirmationSheet.show(
+            context,
+            icon: isVideo ? Icons.videocam_rounded : Icons.call_rounded,
+            title: 'X?c nh?n g?i $callTypeName',
+            description: 'Tr? l? s? b?t ??u cu?c g?i t?i li?n h? ?? ch?n.',
+            confirmLabel: 'B?t ??u g?i',
+            primaryDetail: 'Ng??i nh?n: $peerName',
           );
           if (!confirmed) {
             _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
@@ -440,9 +458,15 @@ class MainShellState extends State<MainShell> {
             return;
           }
 
-          final confirmed = await _showConfirmationDialog(
-            'Xác nhận thu hồi tin nhắn',
-            'Bạn có đồng ý để trợ lý ảo thu hồi tin nhắn cuối cùng của mình không?',
+          final confirmed = await AiActionConfirmationSheet.show(
+            context,
+            icon: Icons.undo_rounded,
+            title: 'X?c nh?n thu h?i tin nh?n',
+            description:
+                'Tr? l? s? thu h?i tin nh?n m?i nh?t c?a b?n trong cu?c tr? chuy?n hi?n t?i.',
+            confirmLabel: 'Thu h?i',
+            secondaryDetail: lastMsg.content,
+            destructive: true,
           );
           if (!confirmed) {
             _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
@@ -473,29 +497,70 @@ class MainShellState extends State<MainShell> {
     }
   }
 
-  Future<bool> _showConfirmationDialog(String title, String content) async {
-    return await showDialog<bool>(
+  Future<Conversation?> _showConversationDisambiguationSheet({
+    required List<Conversation> matches,
+    required String currentUserId,
+    required String targetName,
+  }) async {
+    return showModalBottomSheet<Conversation>(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        content: Text(content),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).primaryColor,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Đồng ý'),
-          ),
-        ],
+      useSafeArea: true,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-    ) ?? false;
+      builder: (sheetContext) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Chọn cuộc trò chuyện "$targetName"',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Có nhiều kết quả khớp. Vui lòng chọn đúng người hoặc nhóm để trợ lý tiếp tục.',
+              ),
+              const SizedBox(height: 12),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: matches.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (_, index) {
+                    final conversation = matches[index];
+                    final displayName = conversation.getDisplayName(
+                      currentUserId,
+                    );
+                    final isDirect = conversation.type.name == 'DIRECT';
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: AppColors.primary.withValues(
+                          alpha: 0.12,
+                        ),
+                        child: Icon(
+                          isDirect ? Icons.person : Icons.groups_rounded,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      title: Text(displayName),
+                      subtitle: Text(isDirect ? 'Cá nhân' : 'Nhóm'),
+                      onTap: () => Navigator.of(sheetContext).pop(conversation),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void _logAiFlow(
@@ -554,7 +619,9 @@ class MainShellState extends State<MainShell> {
       body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: Consumer2<ChatProvider, ContactProvider>(
         builder: (context, chatProvider, contactProvider, child) {
-          debugPrint('🎨 [MainShell] Rebuilding BottomNavigationBar (pendingFriendCount: ${contactProvider.pendingRequestCount})');
+          debugPrint(
+            '🎨 [MainShell] Rebuilding BottomNavigationBar (pendingFriendCount: ${contactProvider.pendingRequestCount})',
+          );
           int unreadCount = 0;
           for (var c in chatProvider.conversations) {
             unreadCount += c.unreadCount;

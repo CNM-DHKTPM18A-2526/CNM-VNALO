@@ -1,16 +1,17 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vnalo_mobile/features/ai_assistant/models/mascot_metadata.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
 import 'package:vnalo_mobile/features/ai_assistant/screens/ai_conversation_screen.dart';
 import 'package:vnalo_mobile/features/ai_assistant/screens/mascot_gallery_screen.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_chat_board.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_robot_avatar.dart';
-
 
 class AiFloatingBubble extends StatefulWidget {
   const AiFloatingBubble({super.key});
@@ -21,8 +22,10 @@ class AiFloatingBubble extends StatefulWidget {
 
 class _AiFloatingBubbleState extends State<AiFloatingBubble>
     with TickerProviderStateMixin {
-  static const double _bubbleSize = 120;
+  static const double _bubbleSize = 78;
   static const double _bubbleRadius = _bubbleSize / 2;
+  static const String _positionXPrefKey = 'vnalo_ai_bubble_x';
+  static const String _positionYPrefKey = 'vnalo_ai_bubble_y';
   static const double _trashHoverDistance = 72;
   static const double _trashAttractionDistance = 126;
   static const double _trashActivationBandFromBottom = 260;
@@ -68,7 +71,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        _snapToEdge();
+        _restorePositionAndSnap();
       }
     });
   }
@@ -77,7 +80,8 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
   void didChangeDependencies() {
     super.didChangeDependencies();
     final mediaQuery = MediaQuery.of(context);
-    final viewportChanged = _lastViewportSize != mediaQuery.size ||
+    final viewportChanged =
+        _lastViewportSize != mediaQuery.size ||
         _lastViewInsetsBottom != mediaQuery.viewInsets.bottom ||
         _lastPaddingTop != mediaQuery.padding.top;
 
@@ -183,15 +187,36 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
         _isBoardExpanded = false;
         _position = const Offset(20, 100);
       });
+      await _persistPosition(_position);
       return;
     }
 
     _snapToEdge();
   }
 
+  Future<void> _restorePositionAndSnap() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    final savedX = prefs.getDouble(_positionXPrefKey);
+    final savedY = prefs.getDouble(_positionYPrefKey);
+    if (savedX != null && savedY != null) {
+      setState(() {
+        _position = _clampToViewport(Offset(savedX, savedY));
+      });
+    }
+    _snapToEdge();
+  }
+
+  Future<void> _persistPosition(Offset position) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_positionXPrefKey, position.dx);
+    await prefs.setDouble(_positionYPrefKey, position.dy);
+  }
+
   bool _isInTrashBand(Offset position, Size screenSize) {
     final mascotCenterY = position.dy + _bubbleRadius;
-    return mascotCenterY > (_trashCenterY(screenSize) - _trashActivationBandFromBottom);
+    return mascotCenterY >
+        (_trashCenterY(screenSize) - _trashActivationBandFromBottom);
   }
 
   double _distanceToTrashZone(Offset position, Size screenSize) {
@@ -256,17 +281,18 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
       (screenSize.width * screenSize.width) +
           (screenSize.height * screenSize.height),
     );
-    final distanceRatio = viewportDiagonal <= 0
-        ? 0.0
-        : ((_position - target).distance / viewportDiagonal).clamp(0.0, 1.0);
+    final distanceRatio =
+        viewportDiagonal <= 0
+            ? 0.0
+            : ((_position - target).distance / viewportDiagonal).clamp(
+              0.0,
+              1.0,
+            );
     _snapController.duration = Duration(
       milliseconds: (150 + (distanceRatio * 250)).clamp(150, 400).toInt(),
     );
 
-    _positionAnimation = Tween<Offset>(
-      begin: _position,
-      end: target,
-    ).animate(
+    _positionAnimation = Tween<Offset>(begin: _position, end: target).animate(
       CurvedAnimation(parent: _snapController, curve: Curves.easeOutCubic),
     );
 
@@ -274,6 +300,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
       CurvedAnimation(parent: _snapController, curve: Curves.easeOutCubic),
     );
 
+    unawaited(_persistPosition(target));
     _snapController.forward(from: 0);
   }
 
@@ -357,8 +384,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
     }
 
     final isListening = provider.state == AiState.listening;
-    final text =
-        isListening ? 'Đang nghe... chạm lại để dừng' : 'Đang xử lý...';
+    final text = isListening ? 'Đang nghe... giữ để dừng' : 'Đang xử lý...';
 
     return Padding(
       padding: const EdgeInsets.only(top: 8),
@@ -427,8 +453,9 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
       child: AiRobotAvatar(
         state: provider.state,
         emotion: provider.currentEmotion,
+        size: _bubbleSize,
         onTap: () {
-          provider.onPrimaryAction(source: 'robot_avatar');
+          _toggleBoard();
         },
       ),
     );
@@ -450,8 +477,10 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
               DateTime.now().isBefore(_ignoreTapUntil!)) {
             return;
           }
-          provider.onPrimaryAction(source: 'bubble_mask');
+          _toggleBoard();
         },
+        onLongPress:
+            () => provider.onPrimaryAction(source: 'bubble_long_press'),
       ),
     );
   }
@@ -605,10 +634,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
       minBoardTop,
       availableHeight - boardHeight - padding.bottom - 16.0,
     );
-    final boardTop =
-        desiredTop
-            .clamp(minBoardTop, maxBoardTop)
-            .toDouble();
+    final boardTop = desiredTop.clamp(minBoardTop, maxBoardTop).toDouble();
 
     final showBoard =
         !_isDragging && (_isBoardExpanded || aiProvider.aiResponse.isNotEmpty);
