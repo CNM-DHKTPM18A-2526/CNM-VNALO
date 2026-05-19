@@ -207,7 +207,7 @@ export const GroupCallModal: React.FC<GroupCallModalProps> = ({
       </div>
 
       {/* ── CONTROLS ── */}
-      <div className="flex items-center justify-center gap-5 py-5 bg-black/30 backdrop-blur-sm border-t border-white/10">
+      <div className="grid grid-cols-3 items-center justify-items-center w-[280px] mx-auto gap-4 py-5 bg-black/30 backdrop-blur-sm border-t border-white/10">
         <button
           onClick={onToggleMic}
           title={snapshot.isMicOn ? 'Tắt micro' : 'Bật micro'}
@@ -217,7 +217,15 @@ export const GroupCallModal: React.FC<GroupCallModalProps> = ({
           {snapshot.isMicOn ? <Mic size={22} /> : <MicOff size={22} />}
         </button>
 
-        {!snapshot.audioOnly && (
+        <button
+          onClick={onLeave}
+          title="Rời cuộc gọi"
+          className="w-16 h-16 rounded-full bg-[#FF3B30] text-white flex items-center justify-center hover:bg-[#E03328] transition-all active:scale-90 shadow-lg shadow-[#FF3B30]/40 border border-white/10"
+        >
+          <Phone size={28} className="fill-white rotate-[135deg] transform-gpu" />
+        </button>
+
+        {!snapshot.audioOnly ? (
           <button
             onClick={onToggleCamera}
             title={snapshot.isCameraOn ? 'Tắt camera' : 'Bật camera'}
@@ -226,15 +234,9 @@ export const GroupCallModal: React.FC<GroupCallModalProps> = ({
           >
             {snapshot.isCameraOn ? <Video size={22} /> : <VideoOff size={22} />}
           </button>
+        ) : (
+          <div className="w-14 h-14" />
         )}
-
-        <button
-          onClick={onLeave}
-          title="Rời cuộc gọi"
-          className="w-16 h-16 rounded-full bg-[#FF3B30] text-white flex items-center justify-center hover:bg-[#E03328] transition-all active:scale-90 shadow-lg shadow-[#FF3B30]/40 border border-white/10"
-        >
-          <Phone size={28} className="fill-white rotate-[135deg] transform-gpu" />
-        </button>
       </div>
     </div>
   )

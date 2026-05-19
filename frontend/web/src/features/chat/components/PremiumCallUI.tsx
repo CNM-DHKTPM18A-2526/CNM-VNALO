@@ -227,10 +227,10 @@ export const PremiumCallControls: React.FC<PremiumCallControlsProps> = ({
       <div className="hidden md:block" style={{ width: CONTROL_SIZE }} />
 
       {/* Main Controls Group */}
-      <div className="flex items-center justify-center gap-6">
+      <div className="grid grid-cols-3 items-center justify-items-center gap-6">
 
         {/* Camera Toggle */}
-        {!isAudioOnly && (
+        {!isAudioOnly ? (
           <button
             onClick={onToggleCamera}
             title={isCameraOn ? 'Tắt camera' : 'Bật camera'}
@@ -250,6 +250,8 @@ export const PremiumCallControls: React.FC<PremiumCallControlsProps> = ({
               <ChevronUp size={10} className="text-white/80" />
             </div>
           </button>
+        ) : (
+          <div style={{ width: CONTROL_SIZE, height: CONTROL_SIZE }} />
         )}
 
         {/* End Call — red, largest, center */}
