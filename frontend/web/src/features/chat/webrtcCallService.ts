@@ -123,6 +123,7 @@ export class WebRtcCallService {
         this.startRingTimeout()
       } else if (params.initialSdp) {
         await this.handleOffer(params.initialSdp)
+        await this.acceptCall()
       }
     } catch (error) {
       console.error('[WebRTC] Initialization failed', error)

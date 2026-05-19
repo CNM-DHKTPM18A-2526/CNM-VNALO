@@ -37,10 +37,10 @@ export const PremiumVideoTile: React.FC<PremiumVideoTileProps> = ({
   const resolvedAvatar = avatarUrl ? resolveMediaUrl(avatarUrl) : null
 
   React.useEffect(() => {
-    if (videoRef.current && stream && isCameraOn) {
+    if (videoRef.current && stream) {
       videoRef.current.srcObject = stream
     }
-  }, [stream, isCameraOn])
+  }, [stream])
 
   const hasVideo = !!(stream && stream.getVideoTracks().length > 0)
   const showVideo = isCameraOn && hasVideo
@@ -67,13 +67,17 @@ export const PremiumVideoTile: React.FC<PremiumVideoTileProps> = ({
       </div>
 
       {/* ── VIDEO CONTENT ── */}
-      {showVideo && (
+      {stream && (
         <video
           ref={videoRef}
           autoPlay
           playsInline
           muted={isLocal}
-          className={`absolute inset-0 w-full h-full object-cover z-10 animate-in fade-in duration-1000 ${isLocal ? 'scale-x-[-1]' : ''}`}
+          className={
+            showVideo
+              ? `absolute inset-0 w-full h-full object-cover z-10 animate-in fade-in duration-1000 ${isLocal ? 'scale-x-[-1]' : ''}`
+              : `absolute inset-0 w-full h-full object-cover opacity-0 -z-50 pointer-events-none ${isLocal ? 'scale-x-[-1]' : ''}`
+          }
         />
       )}
 
@@ -473,22 +477,30 @@ export const MiniCallWindow: React.FC<MiniCallWindowProps> = ({
   const resolvedAvatar = peerAvatar ? resolveMediaUrl(peerAvatar) : null
 
   React.useEffect(() => {
-    if (videoRef.current && stream && isCameraOn) {
+    if (videoRef.current && stream) {
       videoRef.current.srcObject = stream
     }
-  }, [stream, isCameraOn])
+  }, [stream])
+
+  const showVideo = isCameraOn && !!stream
 
   return (
     <div className="fixed bottom-6 right-6 z-[600] w-48 h-72 rounded-3xl overflow-hidden bg-[#000000] border border-[#007BFF]/20 shadow-[0_20px_50px_rgba(0,0,0,0.6)] group transition-transform hover:scale-105">
-      {isCameraOn && stream ? (
+      {stream && (
         <video
           ref={videoRef}
           autoPlay
           playsInline
-          className="w-full h-full object-cover"
+          className={
+            showVideo
+              ? "w-full h-full object-cover relative z-10"
+              : "w-full h-full object-cover absolute opacity-0 -z-50 pointer-events-none"
+          }
         />
-      ) : (
-        <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-gradient-to-b from-[#131313] to-[#000000]">
+      )}
+
+      {!showVideo && (
+        <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-gradient-to-b from-[#131313] to-[#000000] relative z-20">
            {resolvedAvatar ? (
              <img src={resolvedAvatar} alt="" className="w-16 h-16 rounded-full border-2 border-white/5 shadow-lg" />
            ) : (

@@ -57,6 +57,11 @@ const CallPage: React.FC = () => {
     newSocket.on('connect', () => {
       console.log('[CallPage] Socket connected to /chat namespace')
       setSocket(newSocket)
+      if (conversationId) {
+        console.log('[CallPage] Automatically joining conversation room:', conversationId)
+        newSocket.emit('conversation.join', { conversationId })
+        newSocket.emit('conversation:join', { conversationId })
+      }
     })
 
     return () => {

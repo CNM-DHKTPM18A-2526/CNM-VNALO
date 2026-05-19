@@ -122,7 +122,7 @@ function destroySpeakerAnalyser(analyser: SpeakerAnalyser | null) {
   if (!analyser) return
   clearInterval(analyser.interval)
   analyser.source.disconnect()
-  analyser.context.close().catch(() => {})
+  analyser.context.close().catch(() => { })
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -293,10 +293,10 @@ export class WebRtcGroupCallService {
 
     const constraints = {
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-      video: this.state.audioOnly ? false : { 
-        facingMode: 'user', 
-        width: { ideal: 1280 }, 
-        height: { ideal: 720 } 
+      video: this.state.audioOnly ? false : {
+        facingMode: 'user',
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
       },
     }
     const isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1'
@@ -345,41 +345,41 @@ export class WebRtcGroupCallService {
 
     this.socket.on('group-call:user-joined', this.onUserJoined)
     this.socket.on('group-call.user-joined', this.onUserJoined)
-    
+
     this.socket.on('group-call:offer', this.onRemoteOffer)
     this.socket.on('group-call.offer', this.onRemoteOffer)
-    
+
     this.socket.on('group-call:answer', this.onRemoteAnswer)
     this.socket.on('group-call.answer', this.onRemoteAnswer)
-    
+
     this.socket.on('group-call:ice-candidate', this.onRemoteIceCandidate)
     this.socket.on('group-call.ice-candidate', this.onRemoteIceCandidate)
-    
+
     this.socket.on('group-call:media-update', this.onMediaUpdate)
     this.socket.on('group-call.media-update', this.onMediaUpdate)
-    
+
     this.socket.on('group-call:user-left', this.onUserLeft)
     this.socket.on('group-call.user-left', this.onUserLeft)
   }
 
   private removeSocketListeners() {
     if (!this.socket) return
-    
+
     this.socket.off('group-call:user-joined', this.onUserJoined)
     this.socket.off('group-call.user-joined', this.onUserJoined)
-    
+
     this.socket.off('group-call:offer', this.onRemoteOffer)
     this.socket.off('group-call.offer', this.onRemoteOffer)
-    
+
     this.socket.off('group-call:answer', this.onRemoteAnswer)
     this.socket.off('group-call.answer', this.onRemoteAnswer)
-    
+
     this.socket.off('group-call:ice-candidate', this.onRemoteIceCandidate)
     this.socket.off('group-call.ice-candidate', this.onRemoteIceCandidate)
-    
+
     this.socket.off('group-call:media-update', this.onMediaUpdate)
     this.socket.off('group-call.media-update', this.onMediaUpdate)
-    
+
     this.socket.off('group-call:user-left', this.onUserLeft)
     this.socket.off('group-call.user-left', this.onUserLeft)
   }
@@ -597,9 +597,9 @@ export class WebRtcGroupCallService {
 
   // ─── PEER MANAGEMENT ────────────────────────────────────────────
 
-  private createPeerState(user: { 
-    userId: string; 
-    displayName: string; 
+  private createPeerState(user: {
+    userId: string;
+    displayName: string;
     avatarUrl?: string;
     isMicOn?: boolean;
     isCameraOn?: boolean;
@@ -641,7 +641,7 @@ export class WebRtcGroupCallService {
 
     pc.ontrack = (event) => {
       console.log(`[GroupCall] 🎥 Remote track (${event.track.kind}) from:`, user.userId)
-      
+
       // Standard way: use the first stream provided by the event
       if (event.streams && event.streams[0]) {
         peerState.remoteStream = event.streams[0]
@@ -683,9 +683,9 @@ export class WebRtcGroupCallService {
     return peerState
   }
 
-  private async createPeerAndOffer(user: { 
-    userId: string; 
-    displayName: string; 
+  private async createPeerAndOffer(user: {
+    userId: string;
+    displayName: string;
     avatarUrl?: string;
     isMicOn?: boolean;
     isCameraOn?: boolean;
@@ -766,7 +766,7 @@ export class WebRtcGroupCallService {
 
   private notifyMediaState() {
     if (!this.socket) return
-    
+
     // 1. Dedicated media-update event (Cleaner)
     this.socket.emit('group-call:media-update', {
       conversationId: this.state.conversationId,
@@ -784,7 +784,7 @@ export class WebRtcGroupCallService {
         callId: this.state.callId,
         senderUserId: this.currentUserId,
         targetUserId: targetUserId,
-        candidate: null, 
+        candidate: null,
         isMediaUpdate: true,
         isMicOn: this.state.isMicOn,
         isCameraOn: this.state.isCameraOn,
@@ -802,7 +802,7 @@ export class WebRtcGroupCallService {
     const senderUserId = payload.senderUserId || payload.userId || payload.uid
     if (!senderUserId) return
     if (senderUserId === this.currentUserId) return
-    
+
     const peer = this.state.peers.get(senderUserId)
     if (!peer) return
 
