@@ -496,16 +496,16 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
                 ),
                 Positioned.fill(child: _buildLayeredGestureMask(provider)),
                 Positioned(
-                  top: -10,
-                  left: -8,
+                  top: 2,
+                  left: 2,
                   child: GestureDetector(
                     key: const ValueKey('ai_bubble_toggle_board'),
                     behavior: HitTestBehavior.opaque,
                     onTap: _toggleBoard,
                     onLongPress: _openAiConversation,
                     child: Container(
-                      width: 28,
-                      height: 28,
+                      width: 26,
+                      height: 26,
                       decoration: BoxDecoration(
                         color:
                             _isBoardExpanded
@@ -513,37 +513,38 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
                                 : Colors.black.withValues(alpha: 0.62),
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.35),
+                          color: Colors.white.withValues(alpha: 0.42),
                         ),
                       ),
                       child: const Icon(
                         Icons.chat_bubble_outline_rounded,
                         color: Colors.white,
-                        size: 15,
+                        size: 14,
                       ),
                     ),
                   ),
                 ),
                 Positioned(
-                  top: -10,
-                  right: -8,
+                  top: 2,
+                  right: 2,
                   child: GestureDetector(
+                    key: const ValueKey('ai_bubble_open_gallery'),
                     behavior: HitTestBehavior.opaque,
                     onTap: _openMascotGallery,
                     child: Container(
-                      width: 28,
-                      height: 28,
+                      width: 26,
+                      height: 26,
                       decoration: BoxDecoration(
                         color: Colors.black.withValues(alpha: 0.62),
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.35),
+                          color: Colors.white.withValues(alpha: 0.42),
                         ),
                       ),
                       child: const Icon(
                         Icons.tune,
                         color: Colors.white,
-                        size: 15,
+                        size: 14,
                       ),
                     ),
                   ),
@@ -568,7 +569,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
     const boardPadding = 12.0;
     final boardWidth = min(340.0, screenSize.width - (boardPadding * 2));
     final compactHeightLimit = max(
-      240.0,
+      220.0,
       availableHeight - padding.top - padding.bottom - 24.0,
     );
     final boardHeight = min(420.0, compactHeightLimit);

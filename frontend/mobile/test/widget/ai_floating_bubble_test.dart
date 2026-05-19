@@ -7,6 +7,7 @@ import 'package:vnalo_mobile/config/app_config.dart';
 import 'package:vnalo_mobile/config/env.dart';
 import 'package:vnalo_mobile/core/localization/language_provider.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
+import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_prompt_chips.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_floating_bubble.dart';
 import 'package:vnalo_mobile/features/discover/screens/discover_screen.dart';
 import 'package:vnalo_mobile/services/ai_service.dart';
@@ -239,6 +240,93 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('ai_chat_board')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    provider.dispose();
+  });
+
+  testWidgets('bubble board remains stable above keyboard on small viewport', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.viewInsets = const FakeViewPadding(bottom: 260);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      tester.view.resetViewInsets();
+    });
+
+    final provider = _buildProvider();
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: provider,
+        child: const MaterialApp(
+          home: Scaffold(body: Stack(children: [AiFloatingBubble()])),
+        ),
+      ),
+    );
+
+    await provider.summonMascot(
+      startListening: false,
+      persist: false,
+      source: 'keyboard_view_test',
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('ai_bubble_toggle_board')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('ai_chat_board')), findsOneWidget);
+    expect(find.byType(AiPromptChips), findsNothing);
+    expect(tester.takeException(), isNull);
+
+    provider.dispose();
+  });
+
+  testWidgets('bubble controls stay inside mascot visual bounds', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final provider = _buildProvider();
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: provider,
+        child: const MaterialApp(
+          home: Scaffold(body: Stack(children: [AiFloatingBubble()])),
+        ),
+      ),
+    );
+
+    await provider.summonMascot(
+      startListening: false,
+      persist: false,
+      source: 'bubble_bounds_test',
+    );
+    await tester.pumpAndSettle();
+
+    final bubbleRect = tester.getRect(
+      find.byKey(const ValueKey('ai_bubble_root')),
+    );
+    final toggleRect = tester.getRect(
+      find.byKey(const ValueKey('ai_bubble_toggle_board')),
+    );
+    final galleryRect = tester.getRect(
+      find.byKey(const ValueKey('ai_bubble_open_gallery')),
+    );
+
+    expect(bubbleRect.contains(toggleRect.topLeft), isTrue);
+    expect(bubbleRect.contains(toggleRect.bottomRight), isTrue);
+    expect(bubbleRect.contains(galleryRect.topLeft), isTrue);
+    expect(bubbleRect.contains(galleryRect.bottomRight), isTrue);
     expect(tester.takeException(), isNull);
 
     provider.dispose();

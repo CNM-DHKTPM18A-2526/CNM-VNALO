@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
+import 'package:vnalo_mobile/core/theme/app_typography.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_prompt_chips.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_status_pill.dart';
@@ -107,6 +108,8 @@ class _AiChatBoardState extends State<AiChatBoard> {
     final boardMaxHeight =
         widget.maxHeight ??
         (viewSize.height > 760 ? 420.0 : viewSize.height * 0.56);
+    final isCompactLayout = boardMaxHeight < 360 || viewSize.shortestSide < 360;
+    final showPromptChips = !isCompactLayout && boardMaxHeight >= 340;
     final blurSigma = viewSize.shortestSide < 380 ? 8.0 : 14.0;
 
     final hasResponse = aiProvider.aiResponse.trim().isNotEmpty;
@@ -161,7 +164,12 @@ class _AiChatBoardState extends State<AiChatBoard> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Container(
-                  padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+                  padding: EdgeInsets.fromLTRB(
+                    14,
+                    isCompactLayout ? 8 : 10,
+                    10,
+                    isCompactLayout ? 8 : 10,
+                  ),
                   decoration: const BoxDecoration(
                     gradient: AppColors.appBarGradient,
                   ),
@@ -173,34 +181,35 @@ class _AiChatBoardState extends State<AiChatBoard> {
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Row(
+                            Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(
+                                const Icon(
                                   Icons.smart_toy_outlined,
                                   color: Colors.white,
                                   size: 16,
                                 ),
-                                SizedBox(width: 8),
+                                const SizedBox(width: 8),
                                 Flexible(
                                   child: Text(
                                     'VNALO AI',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
+                                    style: AppTypography.labelLarge.copyWith(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w700,
-                                      fontSize: 14,
                                     ),
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 6),
-                            AiStatusPill(
-                              state: aiProvider.state,
-                              compact: true,
-                            ),
+                            if (!isCompactLayout) ...[
+                              const SizedBox(height: 6),
+                              AiStatusPill(
+                                state: aiProvider.state,
+                                compact: true,
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -232,7 +241,12 @@ class _AiChatBoardState extends State<AiChatBoard> {
                 ),
                 Flexible(
                   child: Container(
-                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                    padding: EdgeInsets.fromLTRB(
+                      12,
+                      isCompactLayout ? 10 : 12,
+                      12,
+                      isCompactLayout ? 4 : 8,
+                    ),
                     child: SingleChildScrollView(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -360,18 +374,24 @@ class _AiChatBoardState extends State<AiChatBoard> {
                     ),
                   ),
                 ),
-                AiPromptChips(
-                  compact: true,
-                  onSelected: (prompt) {
-                    _inputController.text = prompt;
-                    _inputController.selection = TextSelection.collapsed(
-                      offset: prompt.length,
-                    );
-                    _inputFocusNode.requestFocus();
-                  },
-                ),
+                if (showPromptChips)
+                  AiPromptChips(
+                    compact: true,
+                    onSelected: (prompt) {
+                      _inputController.text = prompt;
+                      _inputController.selection = TextSelection.collapsed(
+                        offset: prompt.length,
+                      );
+                      _inputFocusNode.requestFocus();
+                    },
+                  ),
                 Container(
-                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                  padding: EdgeInsets.fromLTRB(
+                    10,
+                    isCompactLayout ? 6 : 8,
+                    10,
+                    isCompactLayout ? 8 : 10,
+                  ),
                   decoration: BoxDecoration(
                     border: Border(
                       top: BorderSide(
