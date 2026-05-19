@@ -463,6 +463,13 @@ class AiAssistantProvider with ChangeNotifier {
     return AiResponseSurface.bubble;
   }
 
+  AiResponseSurface _resolveSurface(
+    String source, {
+    AiResponseSurface? explicitSurface,
+  }) {
+    return explicitSurface ?? _surfaceForSource(source);
+  }
+
   void _setProvisionallyVisible(bool visible, {required String reason}) {
     if (_provisionallyVisible == visible) {
       return;
@@ -850,6 +857,7 @@ class AiAssistantProvider with ChangeNotifier {
     bool startListening = true,
     bool persist = false,
     String source = 'discover',
+    AiResponseSurface? startListeningSurface,
   }) async {
     if (persist) {
       await setPersistentEnabled(true, reason: '$source.persist');
@@ -868,13 +876,19 @@ class AiAssistantProvider with ChangeNotifier {
 
     if (startListening) {
       await Future.delayed(const Duration(milliseconds: 120));
-      await onPrimaryAction(source: '$source.auto_listen');
+      await onPrimaryAction(
+        source: '$source.auto_listen',
+        surface: startListeningSurface,
+      );
     }
   }
 
-  Future<void> onPrimaryAction({String source = 'bubble'}) async {
-    final surface = _surfaceForSource(source);
-    final keepBubbleVisible = surface != AiResponseSurface.conversation;
+  Future<void> onPrimaryAction({
+    String source = 'bubble',
+    AiResponseSurface? surface,
+  }) async {
+    final resolvedSurface = _resolveSurface(source, explicitSurface: surface);
+    final keepBubbleVisible = resolvedSurface != AiResponseSurface.conversation;
 
     if (_state == AiState.listening) {
       await stopListening(
@@ -889,7 +903,7 @@ class AiAssistantProvider with ChangeNotifier {
       return;
     }
 
-    await startListening(source: source);
+    await startListening(source: source, surface: resolvedSurface);
   }
 
   // ==================== STT / TTS ========================================
@@ -921,7 +935,10 @@ class AiAssistantProvider with ChangeNotifier {
     });
   }
 
-  Future<void> startListening({String source = 'bubble'}) async {
+  Future<void> startListening({
+    String source = 'bubble',
+    AiResponseSurface? surface,
+  }) async {
     if (_state == AiState.listening) {
       _logEvent(
         'STT_START_SKIPPED',
@@ -939,9 +956,9 @@ class AiAssistantProvider with ChangeNotifier {
       return;
     }
 
-    final surface = _surfaceForSource(source);
-    _activeSurface = surface;
-    _lastResponseSurface = surface;
+    final resolvedSurface = _resolveSurface(source, explicitSurface: surface);
+    _activeSurface = resolvedSurface;
+    _lastResponseSurface = resolvedSurface;
 
     final traceId = _newTraceId('stt');
     final token = _beginOperation(traceId: traceId);
@@ -950,7 +967,7 @@ class AiAssistantProvider with ChangeNotifier {
     _cancelIdleAutoHide();
     _cancelListenGuard();
     _soundLevel = 0;
-    if (surface != AiResponseSurface.conversation) {
+    if (resolvedSurface != AiResponseSurface.conversation) {
       _setProvisionallyVisible(true, reason: 'stt_start:$source');
     }
 
@@ -978,7 +995,7 @@ class AiAssistantProvider with ChangeNotifier {
       _isSessionActive = false;
       _aiResponse = 'Thiết bị chưa sẵn sàng micro để nghe lệnh.';
       _transitionTo(AiState.idle, reason: 'stt_unavailable', traceId: traceId);
-      if (surface != AiResponseSurface.conversation) {
+      if (resolvedSurface != AiResponseSurface.conversation) {
         _setProvisionallyVisible(true, reason: 'stt_unavailable_visible');
         _scheduleIdleAutoHide(reason: 'stt_unavailable');
       }
@@ -1010,7 +1027,7 @@ class AiAssistantProvider with ChangeNotifier {
           if (result.finalResult &&
               _lastWords.isNotEmpty &&
               !_isDuplicateFinalResult(_lastWords)) {
-            _lastResponseSurface = surface;
+            _lastResponseSurface = resolvedSurface;
             unawaited(_handleCommand(_lastWords, parentTraceId: traceId));
           }
         },
@@ -1058,7 +1075,7 @@ class AiAssistantProvider with ChangeNotifier {
         traceId: traceId,
         notify: false,
       );
-      if (surface != AiResponseSurface.conversation) {
+      if (resolvedSurface != AiResponseSurface.conversation) {
         _setProvisionallyVisible(true, reason: 'stt_listen_error_visible');
         _scheduleIdleAutoHide(reason: 'stt_listen_error');
       }
@@ -1210,13 +1227,14 @@ class AiAssistantProvider with ChangeNotifier {
   Future<void> submitTextPrompt(
     String text, {
     String source = 'chat_board',
+    AiResponseSurface? surface,
   }) async {
     final normalized = text.trim();
     if (normalized.isEmpty) {
       return;
     }
 
-    final responseSurface = _surfaceForSource(source);
+    final responseSurface = _resolveSurface(source, explicitSurface: surface);
     _activeSurface = responseSurface;
     _lastResponseSurface = responseSurface;
 

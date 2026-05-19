@@ -96,6 +96,7 @@ class DiscoverScreen extends StatelessWidget {
             startListening: true,
             persist: false,
             source: 'discover_entry',
+            startListeningSurface: AiResponseSurface.voice,
           );
         },
       ),

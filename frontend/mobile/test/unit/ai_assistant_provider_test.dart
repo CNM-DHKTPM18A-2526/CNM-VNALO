@@ -178,6 +178,53 @@ void main() {
     provider.dispose();
   });
 
+  test(
+    'submitTextPrompt surface override takes precedence over source',
+    () async {
+      final provider = _buildProvider(
+        responses: {
+          'surface override': {
+            'textReply': 'Đây là phản hồi test surface.',
+            'emotion': 'neutral',
+          },
+        },
+      );
+
+      await provider.submitTextPrompt(
+        'surface override',
+        source: 'bubble_chat_board',
+        surface: AiResponseSurface.conversation,
+      );
+
+      expect(provider.lastResponseSurface, AiResponseSurface.conversation);
+      expect(provider.shouldBubbleAutoShowResponse, isFalse);
+      expect(provider.isMascotVisible, isFalse);
+
+      provider.dispose();
+    },
+  );
+
+  test(
+    'startListening surface override prevents bubble auto-visibility',
+    () async {
+      final provider = _buildProvider();
+
+      await provider.startListening(
+        source: 'bubble_long_press',
+        surface: AiResponseSurface.conversation,
+      );
+
+      expect(provider.lastResponseSurface, AiResponseSurface.conversation);
+      expect(provider.isMascotVisible, isFalse);
+
+      await provider.stopListening(
+        reason: 'override_cleanup',
+        keepBubbleVisible: false,
+      );
+      provider.dispose();
+    },
+  );
+
   test('normalizeAiTextEncoding repairs single-pass mojibake', () {
     const raw = 'ÄÃ¢y lÃ  cÃ¢u tráº£ lá»i trong mÃ n hÃ¬nh há»™i thoáº¡i.';
     final normalized = normalizeAiTextEncoding(raw);

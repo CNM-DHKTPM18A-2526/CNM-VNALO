@@ -50,7 +50,11 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
     setState(() => _isSending = true);
 
     try {
-      await provider.submitTextPrompt(text, source: 'ai_conversation_screen');
+      await provider.submitTextPrompt(
+        text,
+        source: 'ai_conversation_screen',
+        surface: AiResponseSurface.conversation,
+      );
       _inputController.clear();
       if (mounted) {
         _inputFocusNode.requestFocus();
@@ -341,6 +345,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
               onPressed:
                   () => provider.onPrimaryAction(
                     source: 'conversation_screen_mic',
+                    surface: AiResponseSurface.conversation,
                   ),
             ),
             Expanded(

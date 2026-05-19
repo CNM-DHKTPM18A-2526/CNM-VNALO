@@ -630,6 +630,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
                   await aiProvider.submitTextPrompt(
                     text,
                     source: 'bubble_chat_board',
+                    surface: AiResponseSurface.bubble,
                   );
                 },
               ),
