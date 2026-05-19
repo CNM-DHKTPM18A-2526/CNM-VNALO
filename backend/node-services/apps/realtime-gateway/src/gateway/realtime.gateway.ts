@@ -274,6 +274,25 @@ export class RealtimeGateway
     this.server.to(`user:${userId}`).emit(event, data);
   }
 
+  private emitCallSignalToUser(
+    targetUserId: string | undefined,
+    event: string,
+    data: any,
+  ) {
+    const normalizedTargetUserId = targetUserId?.toString().trim();
+    if (!normalizedTargetUserId) {
+      this.logger.warn(
+        `[Realtime.${event}] Missing targetUserId callId=${data?.callId ?? 'unknown'} sender=${data?.senderUserId ?? 'unknown'}`,
+      );
+      return;
+    }
+
+    this.logger.log(
+      `[Realtime.${event}] relay callId=${data?.callId ?? 'unknown'} conversationId=${data?.conversationId ?? data?.roomId ?? 'unknown'} sender=${data?.senderUserId ?? 'unknown'} target=${normalizedTargetUserId}`,
+    );
+    this.emitToUser(normalizedTargetUserId, event, data);
+  }
+
   /**
    * Resolve trusted sender for signaling payload.
    * - If payload senderUserId is empty, fallback to authenticated socket user.
@@ -432,6 +451,22 @@ export class RealtimeGateway
    * Thành viên rời phòng gọi.
    * Relay tới tất cả người trong room dưới dạng user-left.
    */
+  @SubscribeMessage('group-call:media-update')
+  handleGroupCallMediaUpdate(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: {
+      conversationId: string;
+      callId: string;
+      senderUserId: string;
+      isMicOn?: boolean;
+      isCameraOn?: boolean;
+    },
+  ) {
+    const room = `conversation:${data.conversationId}`;
+    client.to(room).emit('group-call:media-update', data);
+  }
+
   @SubscribeMessage('group-call:leave')
   handleGroupCallLeave(
     @ConnectedSocket() client: Socket,
@@ -484,7 +519,7 @@ export class RealtimeGateway
     if (this.resolveTrustedSenderUserId(client, data, 'call.offer') == null) {
       return;
     }
-    this.emitToUser(data.targetUserId, 'call.offer', data);
+    this.emitCallSignalToUser(data.targetUserId, 'call.offer', data);
   }
 
   @SubscribeMessage('call.answer')
@@ -492,7 +527,7 @@ export class RealtimeGateway
     if (this.resolveTrustedSenderUserId(client, data, 'call.answer') == null) {
       return;
     }
-    this.emitToUser(data.targetUserId, 'call.answer', data);
+    this.emitCallSignalToUser(data.targetUserId, 'call.answer', data);
   }
 
   @SubscribeMessage('call.ice-candidate')
@@ -503,7 +538,7 @@ export class RealtimeGateway
     ) {
       return;
     }
-    this.emitToUser(data.targetUserId, 'call.ice-candidate', data);
+    this.emitCallSignalToUser(data.targetUserId, 'call.ice-candidate', data);
   }
 
   @SubscribeMessage('call.end')
@@ -511,8 +546,8 @@ export class RealtimeGateway
     if (this.resolveTrustedSenderUserId(client, data, 'call.end') == null) {
       return;
     }
-    this.emitToUser(data.targetUserId, 'call.end', data);
-    this.emitToUser(data.senderUserId, 'call.end', data);
+    this.emitCallSignalToUser(data.targetUserId, 'call.end', data);
+    this.emitCallSignalToUser(data.senderUserId, 'call.end', data);
   }
 
   // Colon notation (web client also emits these)
@@ -521,7 +556,7 @@ export class RealtimeGateway
     if (this.resolveTrustedSenderUserId(client, data, 'call:offer') == null) {
       return;
     }
-    this.emitToUser(data.targetUserId, 'call.offer', data);
+    this.emitCallSignalToUser(data.targetUserId, 'call.offer', data);
   }
 
   @SubscribeMessage('call:answer')
@@ -529,7 +564,7 @@ export class RealtimeGateway
     if (this.resolveTrustedSenderUserId(client, data, 'call:answer') == null) {
       return;
     }
-    this.emitToUser(data.targetUserId, 'call.answer', data);
+    this.emitCallSignalToUser(data.targetUserId, 'call.answer', data);
   }
 
   @SubscribeMessage('call:ice-candidate')
@@ -540,7 +575,7 @@ export class RealtimeGateway
     ) {
       return;
     }
-    this.emitToUser(data.targetUserId, 'call.ice-candidate', data);
+    this.emitCallSignalToUser(data.targetUserId, 'call.ice-candidate', data);
   }
 
   @SubscribeMessage('call:end')
@@ -548,7 +583,7 @@ export class RealtimeGateway
     if (this.resolveTrustedSenderUserId(client, data, 'call:end') == null) {
       return;
     }
-    this.emitToUser(data.targetUserId, 'call.end', data);
-    this.emitToUser(data.senderUserId, 'call.end', data);
+    this.emitCallSignalToUser(data.targetUserId, 'call.end', data);
+    this.emitCallSignalToUser(data.senderUserId, 'call.end', data);
   }
 }

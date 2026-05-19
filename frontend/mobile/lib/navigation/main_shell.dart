@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/features/contacts/providers/contact_provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
@@ -88,6 +89,13 @@ class MainShellState extends State<MainShell> {
           backgroundColor: Colors.redAccent,
         ),
       );
+  }
+
+  Future<void> _dismissSoftKeyboard() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    try {
+      await SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
+    } catch (_) {}
   }
 
   Future<void> _handleNavigateTo(Map<String, dynamic>? params) async {
@@ -393,6 +401,8 @@ class MainShellState extends State<MainShell> {
             _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
             return;
           }
+          if (!mounted) return;
+          await _dismissSoftKeyboard();
           if (!mounted) return;
 
           final callId = generateCallId(

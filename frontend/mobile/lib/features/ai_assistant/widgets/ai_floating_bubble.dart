@@ -24,6 +24,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
     with TickerProviderStateMixin {
   static const double _bubbleSize = 78;
   static const double _bubbleRadius = _bubbleSize / 2;
+  static const double _bubbleRootHeight = 96;
   static const String _positionXPrefKey = 'vnalo_ai_bubble_x';
   static const String _positionYPrefKey = 'vnalo_ai_bubble_y';
   static const double _trashHoverDistance = 72;
@@ -266,7 +267,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
       screenSize.height -
           viewInsets.bottom -
           padding.bottom -
-          (_bubbleSize + 32),
+          (_bubbleRootHeight + 18),
     );
 
     return Offset(
@@ -566,7 +567,11 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
 
     const boardPadding = 12.0;
     final boardWidth = min(340.0, screenSize.width - (boardPadding * 2));
-    final boardHeight = min(420.0, availableHeight * 0.56);
+    final compactHeightLimit = max(
+      240.0,
+      availableHeight - padding.top - padding.bottom - 24.0,
+    );
+    final boardHeight = min(420.0, compactHeightLimit);
 
     final prefersRightDock = _position.dx < screenSize.width / 2;
     final desiredLeft =

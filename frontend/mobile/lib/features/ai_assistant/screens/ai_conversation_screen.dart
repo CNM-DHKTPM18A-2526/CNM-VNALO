@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/utils/date_formatter.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
-import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_status_pill.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/chat/widgets/message_bubble.dart';
 
@@ -123,6 +122,8 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
       backgroundColor:
           isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
       appBar: AppBar(
+        toolbarHeight: 64,
+        centerTitle: false,
         titleSpacing: 0,
         elevation: 0,
         backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
@@ -133,27 +134,53 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
                   decoration: BoxDecoration(gradient: AppColors.appBarGradient),
                 ),
         iconTheme: const IconThemeData(color: Colors.white),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        title: Row(
           children: [
-            const Text(
-              'Trợ lý AI VNALO',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.14),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+              ),
+              child: const Icon(
+                Icons.smart_toy_outlined,
                 color: Colors.white,
+                size: 21,
               ),
             ),
-            Text(
-              _statusLabel(provider.state),
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.white.withValues(alpha: 0.8),
-                fontWeight: FontWeight.w400,
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Trợ lý AI VNALO',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    _statusLabel(provider.state),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.white.withValues(alpha: 0.82),
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 4),
-            AiStatusPill(state: provider.state, compact: true),
           ],
         ),
         actions: [

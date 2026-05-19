@@ -35,6 +35,7 @@ export class WebRtcCallService {
   }
 
   private resetInternalState() {
+    this.stopPendingOfferRetry()
     this.state.hasRemoteDescription = false
     this.state.pendingCandidates = []
     this.state.isConnected = false
@@ -52,8 +53,10 @@ export class WebRtcCallService {
   private onStateChange: (state: WebRTCCallState) => void
 
   private ringTimeoutTimer: ReturnType<typeof setTimeout> | null = null
+  private pendingOfferRetryTimer: ReturnType<typeof setTimeout> | null = null
   private processedIceCandidates: Set<string> = new Set()
   private readonly RING_TIMEOUT_MS = 38000
+  private lastOfferPayload: Record<string, unknown> | null = null
 
   constructor(onStateChange: (state: WebRTCCallState) => void) {
     this.onStateChange = onStateChange
@@ -62,6 +65,51 @@ export class WebRtcCallService {
   private updateState(patch: Partial<WebRTCCallState>) {
     this.state = { ...this.state, ...patch }
     this.onStateChange(this.state)
+  }
+
+  private emitSocketEventPair(eventName: string, payload: Record<string, unknown>) {
+    if (!this.socket) {
+      console.warn(`[WebRTC] Cannot emit ${eventName}: socket unavailable`, payload)
+      return
+    }
+
+    const colonEventName = eventName.replace(/\./g, ':')
+    console.log(`[WebRTC] Emitting ${eventName}`, {
+      callId: payload.callId,
+      conversationId: payload.conversationId,
+      senderUserId: payload.senderUserId,
+      targetUserId: payload.targetUserId,
+      socketConnected: this.socket.connected,
+    })
+    this.socket.emit(colonEventName, payload)
+    this.socket.emit(eventName, payload)
+  }
+
+  private stopPendingOfferRetry() {
+    if (this.pendingOfferRetryTimer) {
+      clearTimeout(this.pendingOfferRetryTimer)
+      this.pendingOfferRetryTimer = null
+    }
+  }
+
+  private scheduleOfferRetry() {
+    this.stopPendingOfferRetry()
+    if (!this.isCaller || this.state.isConnected || this.state.isEnded || !this.lastOfferPayload) {
+      return
+    }
+
+    this.pendingOfferRetryTimer = setTimeout(() => {
+      if (!this.lastOfferPayload || !this.socket || this.state.isConnected || this.state.isEnded) {
+        return
+      }
+
+      console.warn('[WebRTC] No answer yet, retrying call.offer', {
+        callId: this.callId,
+        targetUserId: this.peerUserId,
+      })
+      this.emitSocketEventPair('call.offer', this.lastOfferPayload)
+      this.scheduleOfferRetry()
+    }, 2500)
   }
 
   async initialize(params: {
@@ -154,8 +202,7 @@ export class WebRtcCallService {
           type: 'ice-candidate',
         }
 
-        this.socket.emit('call:ice-candidate', payload)
-        this.socket.emit('call.ice-candidate', payload)
+        this.emitSocketEventPair('call.ice-candidate', payload)
       }
     }
 
@@ -204,6 +251,7 @@ export class WebRtcCallService {
       this.updateState({ isConnected: pc.connectionState === 'connected' })
       
       if (pc.connectionState === 'connected') {
+        this.stopPendingOfferRetry()
         this.stopRingTimeout()
         this.updateState({ startedAt: Date.now(), error: null })
       } else if (pc.connectionState === 'failed') {
@@ -311,9 +359,9 @@ export class WebRtcCallService {
     }
 
     if (this.socket) {
-      this.socket.emit('call:offer', offerPayload)
-      this.socket.emit('call.offer', offerPayload)
-
+      this.lastOfferPayload = offerPayload
+      this.emitSocketEventPair('call.offer', offerPayload)
+      this.scheduleOfferRetry()
     }
   }
 
@@ -351,9 +399,7 @@ export class WebRtcCallService {
       }
 
       if (this.socket) {
-        this.socket.emit('call:answer', answerPayload)
-        this.socket.emit('call.answer', answerPayload)
-
+        this.emitSocketEventPair('call.answer', answerPayload)
       }
     } catch (error) {
       console.error('[WebRTC] Failed to accept call', error)
@@ -465,6 +511,7 @@ export class WebRtcCallService {
     const safeReason = typeof reason === 'string' ? reason : 'hangup';
     console.log('[WebRTC] Ending call, reason:', safeReason)
 
+    this.stopPendingOfferRetry()
     this.stopRingTimeout()
 
     this.updateState({ isEnded: true, isConnected: false })
@@ -487,8 +534,7 @@ export class WebRtcCallService {
         startedAt: this.state.startedAt ?? null,
         direction: this.isCaller ? 'outgoing' : 'incoming',
       }
-      this.socket.emit('call.end', endPayload)
-      this.socket.emit('call:end', endPayload)
+      this.emitSocketEventPair('call.end', endPayload)
 
       // Notify opener (ChatPage) to create call log
       if (window.opener) {
