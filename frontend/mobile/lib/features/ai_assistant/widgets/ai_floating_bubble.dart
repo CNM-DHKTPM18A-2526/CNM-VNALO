@@ -254,12 +254,18 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
     final screenSize = mediaQuery.size;
     final padding = mediaQuery.padding;
     final viewInsets = mediaQuery.viewInsets;
-    final minX = -(_bubbleSize * 0.2);
-    final maxX = screenSize.width - (_bubbleSize * 0.8);
-    final minY = padding.top + 8.0;
+    const horizontalInset = 8.0;
+    const verticalInset = 8.0;
+    final minX = padding.left + horizontalInset;
+    final maxX =
+        screenSize.width - padding.right - _bubbleSize - horizontalInset;
+    final minY = padding.top + verticalInset;
     final maxY = max(
       minY,
-      screenSize.height - viewInsets.bottom - padding.bottom - 200,
+      screenSize.height -
+          viewInsets.bottom -
+          padding.bottom -
+          (_bubbleSize + 32),
     );
 
     return Offset(
@@ -375,75 +381,6 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildStateHint(AiAssistantProvider provider) {
-    if (provider.state == AiState.idle || provider.state == AiState.speaking) {
-      return const SizedBox.shrink();
-    }
-
-    final isListening = provider.state == AiState.listening;
-    final text = isListening ? 'Đang nghe... giữ để dừng' : 'Đang xử lý...';
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Container(
-        key: const ValueKey('ai_bubble_state_hint'),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              text,
-              style: const TextStyle(color: Colors.white, fontSize: 12),
-            ),
-            if (isListening) ...[
-              const SizedBox(height: 6),
-              _buildListeningMeter(provider),
-              if (provider.lastWords.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(
-                    provider.lastWords,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white70, fontSize: 11),
-                  ),
-                ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildListeningMeter(AiAssistantProvider provider) {
-    final energy = provider.soundLevel.clamp(0.0, 1.0);
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(5, (index) {
-        final distanceFromCenter = (index - 2).abs();
-        final weight = (1 - (distanceFromCenter * 0.16)).clamp(0.45, 1.0);
-        final level = (0.18 + (energy * weight)).clamp(0.12, 1.0);
-        final height = 4 + (level * 14);
-
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          margin: const EdgeInsets.symmetric(horizontal: 1.5),
-          width: 3,
-          height: height,
-          decoration: BoxDecoration(
-            color: Colors.cyanAccent.withValues(alpha: 0.92),
-            borderRadius: BorderRadius.circular(999),
-          ),
-        );
-      }),
     );
   }
 
@@ -637,7 +574,10 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
     final boardTop = desiredTop.clamp(minBoardTop, maxBoardTop).toDouble();
 
     final showBoard =
-        !_isDragging && (_isBoardExpanded || aiProvider.aiResponse.isNotEmpty);
+        !_isDragging &&
+        (_isBoardExpanded ||
+            (aiProvider.aiResponse.isNotEmpty &&
+                aiProvider.shouldBubbleAutoShowResponse));
 
     if (!aiProvider.isMascotVisible) {
       return const SizedBox.shrink();
@@ -653,7 +593,6 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
               top: boardTop,
               child: AiChatBoard(
                 onClose: () {
-                  aiProvider.clearAiResponse();
                   setState(() {
                     _isBoardExpanded = false;
                   });
@@ -683,7 +622,6 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
                 _buildBubbleIndicator(aiProvider),
                 const SizedBox(height: 8),
                 _buildMascotContainer(aiProvider),
-                _buildStateHint(aiProvider),
               ],
             ),
           ),

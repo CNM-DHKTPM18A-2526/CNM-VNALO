@@ -54,7 +54,7 @@ void main() {
     expect(find.byKey(const ValueKey('ai_bubble_root')), findsNothing);
   });
 
-  testWidgets('Tap bubble enters listening and does not auto-open board', (
+  testWidgets('Tap bubble opens board and close keeps bubble visible', (
     tester,
   ) async {
     await launchAppWithVisibleBubble(tester);
@@ -65,11 +65,13 @@ void main() {
     await tester.tap(bubble);
     await tester.pump(const Duration(milliseconds: 600));
 
+    expect(find.byKey(const ValueKey('ai_chat_board')), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('ai_chat_close')));
+    await tester.pump(const Duration(milliseconds: 600));
+
     expect(find.byKey(const ValueKey('ai_chat_board')), findsNothing);
-
-    await tester.pump(const Duration(seconds: 20));
-
-    expect(find.text('Đang nghe... chạm lại để dừng'), findsNothing);
+    expect(find.byKey(const ValueKey('ai_bubble_root')), findsOneWidget);
   });
 
   testWidgets('Open AI conversation from bubble board', (tester) async {

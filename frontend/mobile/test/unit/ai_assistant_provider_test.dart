@@ -178,6 +178,29 @@ void main() {
     provider.dispose();
   });
 
+  test('conversation screen prompt does not force bubble auto board', () async {
+    final provider = _buildProvider(
+      responses: {
+        'Mo lai noi dung nay': {
+          'textReply': 'Đây là câu trả lời trong màn hình hội thoại.',
+          'emotion': 'neutral',
+        },
+      },
+    );
+
+    await provider.submitTextPrompt(
+      'Mo lai noi dung nay',
+      source: 'ai_conversation_screen',
+    );
+
+    expect(provider.aiResponse, 'Đây là câu trả lời trong màn hình hội thoại.');
+    expect(provider.lastResponseSurface, AiResponseSurface.conversation);
+    expect(provider.shouldBubbleAutoShowResponse, isFalse);
+    expect(provider.isMascotVisible, isFalse);
+
+    provider.dispose();
+  });
+
   test('startListening falls back gracefully when listen fails', () async {
     speechListenThrows = true;
     final provider = _buildProvider();
@@ -227,10 +250,7 @@ void main() {
           'textReply': 'Toi se mo khung soan tin cho ban.',
           'emotion': 'neutral',
           'actionCommand': 'COMPOSE_MESSAGE',
-          'actionParams': {
-            'recipient': 'An',
-            'content': 'toi den tre',
-          },
+          'actionParams': {'recipient': 'An', 'content': 'toi den tre'},
         },
       },
     );

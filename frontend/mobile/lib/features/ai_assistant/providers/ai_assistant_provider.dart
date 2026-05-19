@@ -13,6 +13,8 @@ import 'package:vnalo_mobile/services/ai_service.dart';
 
 enum AiState { idle, listening, thinking, speaking }
 
+enum AiResponseSurface { bubble, conversation, contextual, voice }
+
 class AiAssistantProvider with ChangeNotifier {
   static const String _visibilityPrefKey = 'vnalo_ai_is_visible';
   static const String _mascotPrefKey = 'vnalo_ai_mascot_id';
@@ -46,6 +48,7 @@ class AiAssistantProvider with ChangeNotifier {
   String _lastWords = '';
   String _lastUserPrompt = '';
   String _aiResponse = '';
+  AiResponseSurface _lastResponseSurface = AiResponseSurface.bubble;
   String _currentEmotion = 'neutral';
   double _soundLevel = 0;
 
@@ -92,6 +95,11 @@ class AiAssistantProvider with ChangeNotifier {
   String get lastWords => _lastWords;
   String get lastUserPrompt => _lastUserPrompt;
   String get aiResponse => _aiResponse;
+  AiResponseSurface get lastResponseSurface => _lastResponseSurface;
+  bool get shouldBubbleAutoShowResponse =>
+      _lastResponseSurface == AiResponseSurface.bubble ||
+      _lastResponseSurface == AiResponseSurface.voice ||
+      _lastResponseSurface == AiResponseSurface.contextual;
   String get currentEmotion => _currentEmotion;
   double get soundLevel => _soundLevel;
 
@@ -602,6 +610,20 @@ class AiAssistantProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  AiResponseSurface _surfaceForSource(String source) {
+    if (source == 'ai_conversation_screen' ||
+        source.startsWith('ai_conversation_')) {
+      return AiResponseSurface.conversation;
+    }
+    if (source.contains('voice') || source.contains('stt')) {
+      return AiResponseSurface.voice;
+    }
+    if (source.contains('contextual')) {
+      return AiResponseSurface.contextual;
+    }
+    return AiResponseSurface.bubble;
+  }
+
   Future<void> submitTextPrompt(
     String text, {
     String source = 'chat_board',
@@ -611,15 +633,20 @@ class AiAssistantProvider with ChangeNotifier {
       return;
     }
 
+    final responseSurface = _surfaceForSource(source);
+    _lastResponseSurface = responseSurface;
+
     await _ensureConversationCreated(source: '$source.text_interaction');
 
     _idleAutoHideTimer?.cancel();
-    _setProvisionallyVisible(true, reason: '$source.visible');
+    if (responseSurface != AiResponseSurface.conversation) {
+      _setProvisionallyVisible(true, reason: '$source.visible');
+    }
 
     if (_state == AiState.listening) {
       await stopListening(
         reason: '$source.stop_listening',
-        keepBubbleVisible: true,
+        keepBubbleVisible: responseSurface != AiResponseSurface.conversation,
       );
     }
 

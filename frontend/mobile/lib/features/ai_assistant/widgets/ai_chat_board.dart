@@ -190,6 +190,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
                             onPressed: widget.onClear,
                           ),
                           IconButton(
+                            key: const ValueKey('ai_chat_close'),
                             icon: const Icon(Icons.close, size: 18),
                             color: Colors.white,
                             onPressed: widget.onClose,
@@ -285,10 +286,10 @@ class _AiChatBoardState extends State<AiChatBoard> {
                                     )
                                     : Text(
                                       aiProvider.state == AiState.listening
-                                          ? 'Äang nghe giá»ng nÃ³i. Báº¡n cÅ©ng cÃ³ thá»ƒ nháº­p cÃ¢u há»i bÃªn dÆ°á»›i.'
+                                          ? 'Đang nghe giọng nói. Bạn cũng có thể nhập câu hỏi bên dưới.'
                                           : aiProvider.state == AiState.thinking
-                                          ? 'Äang xá»­ lÃ½ yÃªu cáº§u cá»§a báº¡n...'
-                                          : 'Nháº­p cÃ¢u há»i hoáº·c chá»n gá»£i Ã½ Ä‘á»ƒ báº¯t Ä‘áº§u.',
+                                          ? 'Đang xử lý yêu cầu của bạn...'
+                                          : 'Nhập câu hỏi hoặc chọn gợi ý để bắt đầu.',
                                       style: TextStyle(
                                         color:
                                             isDarkMode
