@@ -451,6 +451,22 @@ export class RealtimeGateway
    * Thành viên rời phòng gọi.
    * Relay tới tất cả người trong room dưới dạng user-left.
    */
+  @SubscribeMessage('group-call:media-update')
+  handleGroupCallMediaUpdate(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: {
+      conversationId: string;
+      callId: string;
+      senderUserId: string;
+      isMicOn?: boolean;
+      isCameraOn?: boolean;
+    },
+  ) {
+    const room = `conversation:${data.conversationId}`;
+    client.to(room).emit('group-call:media-update', data);
+  }
+
   @SubscribeMessage('group-call:leave')
   handleGroupCallLeave(
     @ConnectedSocket() client: Socket,

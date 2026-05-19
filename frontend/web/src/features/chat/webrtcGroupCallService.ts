@@ -163,6 +163,44 @@ export class WebRtcGroupCallService {
   private localAnalyser: SpeakerAnalyser | null = null
   private remoteAnalysers: Map<string, SpeakerAnalyser> = new Map()
 
+  private async ensureConversationRoom() {
+    if (!this.socket || !this.state.conversationId) return false
+
+    return new Promise<boolean>((resolve) => {
+      let settled = false
+      const timeoutId = window.setTimeout(() => {
+        if (settled) return
+        settled = true
+        console.warn('[GroupCall] conversation.join timeout:', this.state.conversationId)
+        resolve(false)
+      }, 3000)
+
+      this.socket?.emit('conversation.join', { conversationId: this.state.conversationId }, (ack: unknown) => {
+        if (settled) return
+        settled = true
+        window.clearTimeout(timeoutId)
+
+        const response = ack as {
+          event?: string
+          success?: boolean
+          joined?: boolean
+          data?: { conversationId?: string }
+        } | null
+
+        const joined =
+          response?.success === true ||
+          response?.joined === true ||
+          response?.event === 'conversation.joined' ||
+          response?.data?.conversationId === this.state.conversationId
+
+        if (!joined) {
+          console.warn('[GroupCall] conversation.join rejected:', { conversationId: this.state.conversationId, response })
+        }
+        resolve(joined)
+      })
+    })
+  }
+
   private resolveName?: (userId: string) => string | undefined
   private resolveAvatar?: (userId: string) => string | undefined
 
@@ -206,6 +244,7 @@ export class WebRtcGroupCallService {
     try {
       // 1. Mở camera/mic cho bản thân
       await this.openLocalMedia()
+      await this.ensureConversationRoom()
 
       // 2. Đăng ký lắng nghe socket (các user khác join)
       this.registerSocketListeners()
@@ -262,6 +301,7 @@ export class WebRtcGroupCallService {
 
     try {
       await this.openLocalMedia()
+      await this.ensureConversationRoom()
       this.registerSocketListeners()
 
       // Thông báo cho cả room biết mình vừa join
@@ -414,7 +454,7 @@ export class WebRtcGroupCallService {
     if (this.state.peers.has(senderUserId)) return
 
     // Resolve identity if missing or technical ID
-    const isId = (s: any) => typeof s === 'string' && s.length > 20 && /^[0-9a-fA-F-]/.test(s)
+    const isId = (s: string | undefined | null) => typeof s === 'string' && s.length > 20 && /^[0-9a-fA-F-]/.test(s)
     if (!displayName || displayName === 'Người dùng' || isId(displayName)) {
       const resolved = this.resolveName?.(senderUserId)
       displayName = resolved || (isId(displayName) ? 'Người dùng' : (displayName || 'Người dùng'))
@@ -470,7 +510,7 @@ export class WebRtcGroupCallService {
       if (!name || isId(name)) {
         name = 'Người dùng'
       }
-      let avatarUrl = resolvedAvatar || this.resolveAvatar?.(senderUserId) || ''
+      const avatarUrl = resolvedAvatar || this.resolveAvatar?.(senderUserId) || ''
 
       this.createPeerState({
         userId: senderUserId,
