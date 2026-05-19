@@ -21,6 +21,7 @@ interface PremiumVideoTileProps {
   size?: 'sm' | 'md' | 'lg' | 'full'
   statusText?: string
   hideCentralIdentity?: boolean
+  isMiniPiP?: boolean
 }
 
 export const PremiumVideoTile: React.FC<PremiumVideoTileProps> = ({
@@ -31,10 +32,13 @@ export const PremiumVideoTile: React.FC<PremiumVideoTileProps> = ({
   isCameraOn,
   isLocal = false,
   statusText,
-  hideCentralIdentity = false
+  hideCentralIdentity = false,
+  size,
+  isMiniPiP = false
 }) => {
   const videoRef = React.useRef<HTMLVideoElement>(null)
   const resolvedAvatar = avatarUrl ? resolveMediaUrl(avatarUrl) : null
+  const [isPortraitStream, setIsPortraitStream] = React.useState(false)
 
   React.useEffect(() => {
     if (videoRef.current && stream && isCameraOn) {
@@ -42,29 +46,39 @@ export const PremiumVideoTile: React.FC<PremiumVideoTileProps> = ({
     }
   }, [stream, isCameraOn])
 
+  const handleLoadedMetadata = () => {
+    if (videoRef.current) {
+      const { videoWidth, videoHeight } = videoRef.current
+      setIsPortraitStream(videoWidth > 0 && videoHeight > 0 && videoWidth < videoHeight)
+    }
+  }
+
   const hasVideo = !!(stream && stream.getVideoTracks().length > 0)
   const showVideo = isCameraOn && hasVideo
+  const isBackgroundFull = size === 'full' && !isMiniPiP
 
   const initials = displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
   const AVATAR_SIZE = 90
 
   return (
     <div className={`relative w-full h-full overflow-hidden bg-[#0a0a0b] flex items-center justify-center select-none`}>
-      {/* ── PERSISTENT BLURRED BACKGROUND (Always visible — NEVER black screen) ── */}
-      <div className="absolute inset-0 z-0 overflow-hidden">
-        {resolvedAvatar ? (
-          <div className="relative w-full h-full">
-            <img
-              src={resolvedAvatar}
-              alt=""
-              className="w-full h-full object-cover blur-[120px] opacity-50 scale-150 transform-gpu"
-            />
-            <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/60" />
-          </div>
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-[#1a1a2e] via-[#0f0f1a] to-[#0a0a0b]" />
-        )}
-      </div>
+      {/* ── PERSISTENT BLURRED BACKGROUND (Always visible — NEVER black screen unless showing portrait video) ── */}
+      {!(showVideo && isPortraitStream && isBackgroundFull) && (
+        <div className="absolute inset-0 z-0 overflow-hidden">
+          {resolvedAvatar ? (
+            <div className="relative w-full h-full">
+              <img
+                src={resolvedAvatar}
+                alt=""
+                className="w-full h-full object-cover blur-[120px] opacity-50 scale-150 transform-gpu"
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/60" />
+            </div>
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-[#1a1a2e] via-[#0f0f1a] to-[#0a0a0b]" />
+          )}
+        </div>
+      )}
 
       {/* ── VIDEO CONTENT ── */}
       {showVideo && (
@@ -73,7 +87,14 @@ export const PremiumVideoTile: React.FC<PremiumVideoTileProps> = ({
           autoPlay
           playsInline
           muted={isLocal}
-          className={`absolute inset-0 w-full h-full object-cover z-10 animate-in fade-in duration-1000 ${isLocal ? 'scale-x-[-1]' : ''}`}
+          onLoadedMetadata={handleLoadedMetadata}
+          className={`absolute inset-0 w-full h-full z-10 animate-in fade-in duration-1000 ${
+            isLocal ? 'scale-x-[-1]' : ''
+          } ${
+            isPortraitStream && isBackgroundFull
+              ? 'object-contain bg-black'
+              : 'object-cover'
+          }`}
         />
       )}
 

@@ -130,6 +130,7 @@ export const CallModal: React.FC<CallModalProps> = ({
               isMicOn={isMicOn}
               isLocal={true}
               size="full"
+              isMiniPiP={true}
             />
             {!isMicOn && (
               <div className="absolute bottom-2 left-2 w-6 h-6 rounded-full bg-[#FF3B30] flex items-center justify-center shadow-lg z-50">
