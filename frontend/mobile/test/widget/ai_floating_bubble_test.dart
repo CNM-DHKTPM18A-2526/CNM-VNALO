@@ -161,4 +161,41 @@ void main() {
       provider.dispose();
     },
   );
+
+  testWidgets(
+    'conversation screen response does not auto-open floating bubble board',
+    (tester) async {
+      final provider = _buildProvider(
+        responses: {
+          'Hoi trong man hinh tro ly': {
+            'textReply': 'Day la phan hoi trong man hinh tro ly.',
+            'emotion': 'neutral',
+          },
+        },
+      );
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider.value(
+          value: provider,
+          child: const MaterialApp(
+            home: Scaffold(body: Stack(children: [AiFloatingBubble()])),
+          ),
+        ),
+      );
+
+      await provider.submitTextPrompt(
+        'Hoi trong man hinh tro ly',
+        source: 'ai_conversation_screen',
+      );
+      await tester.pumpAndSettle();
+
+      expect(provider.aiResponse, isNotEmpty);
+      expect(provider.lastResponseSurface, AiResponseSurface.conversation);
+      expect(provider.shouldBubbleAutoShowResponse, isFalse);
+      expect(find.byKey(const ValueKey('ai_chat_board')), findsNothing);
+      expect(find.byKey(const ValueKey('ai_bubble_root')), findsNothing);
+
+      provider.dispose();
+    },
+  );
 }
