@@ -13,6 +13,7 @@ import 'package:vnalo_mobile/features/discover/screens/discover_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/profile_screen.dart';
 import 'package:vnalo_mobile/features/timeline/screens/home_wall_screen.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
+import 'package:vnalo_mobile/features/ai_assistant/utils/ai_command_routing.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_action_confirmation_sheet.dart';
 import 'package:vnalo_mobile/features/chat/screens/chat_detail_screen.dart';
 import 'package:vnalo_mobile/features/call/screens/voice_call_screen.dart';
@@ -132,42 +133,19 @@ class MainShellState extends State<MainShell> {
   }
 
   String _normalizeAiSystemAction(String command) {
-    switch (command.trim().toUpperCase()) {
-      case 'MỞ SETTINGS':
-      case 'CÀI ĐẶT':
-        return 'NAVIGATE_TO_SETTINGS';
-      case 'MỞ DANH BẠ':
-        return 'NAVIGATE_TO_CONTACTS';
-      case 'MỞ CHAT':
-        return 'NAVIGATE_TO_CHAT';
-      case 'SEND_MESSAGE':
-        return 'COMPOSE_MESSAGE';
-      case 'RECALL_LAST_MESSAGE':
-      case 'UNDO_LAST_MESSAGE':
-        return 'RECALL_MESSAGE';
-      default:
-        return command.trim().toUpperCase();
-    }
+    return AiCommandRouting.normalizeSystemAction(command);
   }
 
   Map<String, dynamic>? _normalizeAiParams(AiCommand aiCmd) {
-    final rawParams = aiCmd.params;
-    if (rawParams == null) {
-      return null;
-    }
-    if (rawParams is Map<String, dynamic>) {
-      return rawParams;
-    }
-    if (rawParams is Map) {
-      return rawParams.map<String, dynamic>(
-        (key, value) => MapEntry(key.toString(), value),
-      );
+    final normalized = AiCommandRouting.normalizeParams(aiCmd.params);
+    if (normalized != null || aiCmd.params == null) {
+      return normalized;
     }
 
     _logAiFlow(
       'AI_PARAMS_MALFORMED',
       aiCommand: aiCmd,
-      extra: {'rawType': rawParams.runtimeType.toString()},
+      extra: {'rawType': aiCmd.params.runtimeType.toString()},
     );
     return null;
   }
@@ -207,14 +185,7 @@ class MainShellState extends State<MainShell> {
       case 'OPEN_CHAT':
       case 'COMPOSE_MESSAGE':
       case 'START_CALL':
-        final targetName =
-            (params?['target'] ??
-                    params?['recipient'] ??
-                    params?['contactName'] ??
-                    params?['name'] ??
-                    '')
-                .toString()
-                .trim();
+        final targetName = AiCommandRouting.extractTargetName(params);
         if (targetName.isEmpty) {
           _logAiFlow(
             'AI_RESOLUTION_FAILED',
@@ -273,16 +244,11 @@ class MainShellState extends State<MainShell> {
         final peerUserId = peerMember?.userId ?? '';
         final peerName = conversation.getDisplayName(currentUserId);
 
-        final rawPrefilled =
-            (params?['content'] ?? params?['messageText'] ?? params?['text'])
-                ?.toString()
-                .trim();
-        final prefilledText =
-            (command == 'COMPOSE_MESSAGE' &&
-                    rawPrefilled != null &&
-                    rawPrefilled.isNotEmpty)
-                ? rawPrefilled
-                : null;
+        final rawPrefilled = AiCommandRouting.extractPrefilledText(
+          command,
+          params,
+        );
+        final prefilledText = rawPrefilled;
 
         if (command == 'OPEN_CHAT' || command == 'COMPOSE_MESSAGE') {
           if (command == 'COMPOSE_MESSAGE' &&
@@ -304,7 +270,10 @@ class MainShellState extends State<MainShell> {
               _activeAiConversationId == conversation.id;
 
           if (command == 'OPEN_CHAT' &&
-              (isAlreadyActiveConversation || hasPendingAiNavigation)) {
+              AiCommandRouting.shouldBlockOpenChat(
+                isAlreadyActiveConversation: isAlreadyActiveConversation,
+                hasPendingAiNavigation: hasPendingAiNavigation,
+              )) {
             _logAiFlow(
               'AI_NAV_GUARD_BLOCKED',
               aiCommand: aiCmd,
@@ -317,7 +286,10 @@ class MainShellState extends State<MainShell> {
             return;
           }
 
-          if (command == 'COMPOSE_MESSAGE' && hasPendingAiNavigation) {
+          if (command == 'COMPOSE_MESSAGE' &&
+              AiCommandRouting.shouldBlockCompose(
+                hasPendingAiNavigation: hasPendingAiNavigation,
+              )) {
             _logAiFlow(
               'AI_NAV_GUARD_BLOCKED',
               aiCommand: aiCmd,
