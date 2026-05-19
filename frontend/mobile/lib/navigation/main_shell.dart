@@ -14,6 +14,7 @@ import 'package:vnalo_mobile/features/profile/screens/profile_screen.dart';
 import 'package:vnalo_mobile/features/timeline/screens/home_wall_screen.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
 import 'package:vnalo_mobile/features/ai_assistant/utils/ai_command_routing.dart';
+import 'package:vnalo_mobile/features/ai_assistant/utils/ai_recall_message_selector.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_action_confirmation_sheet.dart';
 import 'package:vnalo_mobile/features/chat/screens/chat_detail_screen.dart';
 import 'package:vnalo_mobile/features/call/screens/voice_call_screen.dart';
@@ -21,7 +22,6 @@ import 'package:vnalo_mobile/features/call/screens/video_call_screen.dart';
 import 'package:vnalo_mobile/features/call/utils/call_id_generator.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
-import 'package:vnalo_mobile/models/message_model.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 
 class MainShell extends StatefulWidget {
@@ -433,24 +433,10 @@ class MainShellState extends State<MainShell> {
       case 'RECALL_MESSAGE':
         if (chatProvider.activeConversationId != null &&
             chatProvider.messages.isNotEmpty) {
-          final lastMsg = chatProvider.messages
-              .where(
-                (m) =>
-                    m.senderId == chatProvider.currentUserId &&
-                    !m.isRecalled &&
-                    !m.isSystemMessage,
-              )
-              .fold<Message?>(null, (latest, message) {
-                if (latest == null) return message;
-                final latestSeq = latest.serverSeq;
-                final messageSeq = message.serverSeq;
-                if (latestSeq != null && messageSeq != null) {
-                  return messageSeq > latestSeq ? message : latest;
-                }
-                return message.createdAt.isAfter(latest.createdAt)
-                    ? message
-                    : latest;
-              });
+          final lastMsg = AiRecallMessageSelector.selectLatestRecallableMessage(
+            messages: chatProvider.messages,
+            currentUserId: chatProvider.currentUserId,
+          );
 
           if (lastMsg == null) {
             _logAiFlow(
