@@ -339,8 +339,19 @@ class _AiChatBoardState extends State<AiChatBoard> {
                                         ? () =>
                                             _copyResponse(aiProvider.aiResponse)
                                         : null,
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 8,
+                                  ),
+                                  visualDensity: VisualDensity.compact,
+                                  foregroundColor:
+                                      isDarkMode
+                                          ? Colors.white70
+                                          : AppColors.primary,
+                                ),
                                 icon: const Icon(Icons.copy_outlined, size: 16),
-                                label: const Text('Copy'),
+                                label: const Text('Sao chép'),
                               ),
                             ],
                           ),

@@ -518,59 +518,180 @@ class MainShellState extends State<MainShell> {
   }) async {
     return showModalBottomSheet<Conversation>(
       context: context,
+      isScrollControlled: true,
       useSafeArea: true,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (sheetContext) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Chọn cuộc trò chuyện "$targetName"',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Có nhiều kết quả khớp. Vui lòng chọn đúng người hoặc nhóm để trợ lý tiếp tục.',
-              ),
-              const SizedBox(height: 12),
-              Flexible(
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: matches.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (_, index) {
-                    final conversation = matches[index];
-                    final displayName = conversation.getDisplayName(
-                      currentUserId,
-                    );
-                    final isDirect = conversation.type.name == 'DIRECT';
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: AppColors.primary.withValues(
-                          alpha: 0.12,
-                        ),
-                        child: Icon(
-                          isDirect ? Icons.person : Icons.groups_rounded,
-                          color: AppColors.primary,
+        final isDark = Theme.of(sheetContext).brightness == Brightness.dark;
+        final textPrimary =
+            isDark ? DarkColors.textPrimary : LightColors.textPrimary;
+        final textSecondary =
+            isDark ? DarkColors.textSecondary : const Color(0xFF475569);
+        final sheetBackground = isDark ? DarkColors.surface : Colors.white;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: sheetBackground,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color:
+                            isDark ? Colors.white24 : AppColors.sectionDivider,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Chọn cuộc trò chuyện "$targetName"',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Có nhiều kết quả khớp. Vui lòng chọn đúng người hoặc nhóm để trợ lý tiếp tục.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.45,
+                      color: textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(sheetContext).size.height * 0.48,
+                    ),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: matches.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemBuilder: (_, index) {
+                        final conversation = matches[index];
+                        final displayName = conversation.getDisplayName(
+                          currentUserId,
+                        );
+                        final isDirect = conversation.type.name == 'DIRECT';
+                        return Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap:
+                                () => Navigator.of(
+                                  sheetContext,
+                                ).pop(conversation),
+                            child: Ink(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color:
+                                    isDark
+                                        ? Colors.white.withValues(alpha: 0.05)
+                                        : const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color:
+                                      isDark
+                                          ? Colors.white.withValues(alpha: 0.08)
+                                          : const Color(0xFFE2E8F0),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    backgroundColor: AppColors.primary
+                                        .withValues(alpha: 0.12),
+                                    child: Icon(
+                                      isDirect
+                                          ? Icons.person
+                                          : Icons.groups_rounded,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          displayName,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                            color: textPrimary,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          isDirect ? 'Cá nhân' : 'Nhóm',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: textSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(
+                                    Icons.chevron_right_rounded,
+                                    color:
+                                        isDark
+                                            ? Colors.white54
+                                            : AppColors.iconSubtle,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(sheetContext).pop(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor:
+                            isDark
+                                ? DarkColors.surfaceLight
+                                : AppColors.itemPressBackground,
+                        foregroundColor: textPrimary,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      title: Text(displayName),
-                      subtitle: Text(isDirect ? 'Cá nhân' : 'Nhóm'),
-                      onTap: () => Navigator.of(sheetContext).pop(conversation),
-                    );
-                  },
-                ),
+                      child: const Text(
+                        'Hủy',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         );
       },
