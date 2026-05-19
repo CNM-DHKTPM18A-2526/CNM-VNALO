@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/utils/date_formatter.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
+import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_status_pill.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/chat/widgets/message_bubble.dart';
 
@@ -117,6 +118,8 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
                 fontWeight: FontWeight.w400,
               ),
             ),
+            const SizedBox(height: 4),
+            AiStatusPill(state: provider.state, compact: true),
           ],
         ),
         actions: [
@@ -146,7 +149,6 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
       ),
       body: Column(
         children: [
-          // Security/Backup Banner
           _buildInfoBanner(provider, isDarkMode),
 
           Expanded(

@@ -25,6 +25,7 @@ class _StubApiService extends ApiService {
     String baseUrl,
     String endpoint, {
     Map<String, dynamic>? body,
+    Map<String, String>? queryParams,
   }) async {
     if (endpoint == '/ai/chat') {
       final prompt = (body?['prompt'] ?? '').toString();
@@ -215,6 +216,36 @@ void main() {
 
     expect(provider.conversationHistory.length, greaterThanOrEqualTo(2));
     expect(provider.lastConversationPreview, contains('AI:'));
+
+    provider.dispose();
+  });
+
+  test('submitTextPrompt emits compose command', () async {
+    final provider = _buildProvider(
+      responses: {
+        'nhan tin cho An la toi den tre': {
+          'textReply': 'Toi se mo khung soan tin cho ban.',
+          'emotion': 'neutral',
+          'actionCommand': 'COMPOSE_MESSAGE',
+          'actionParams': {
+            'recipient': 'An',
+            'content': 'toi den tre',
+          },
+        },
+      },
+    );
+
+    final commandFuture = provider.systemActionStream.first;
+    await provider.submitTextPrompt(
+      'nhan tin cho An la toi den tre',
+      source: 'compose_command_test',
+    );
+    final command = await commandFuture;
+
+    expect(command.command, 'COMPOSE_MESSAGE');
+    expect(command.params, isA<Map>());
+    expect((command.params as Map)['recipient'], 'An');
+    expect((command.params as Map)['content'], 'toi den tre');
 
     provider.dispose();
   });

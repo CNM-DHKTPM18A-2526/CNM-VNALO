@@ -24,7 +24,7 @@ public final class SystemPrompt {
             
             ## DANH SÁCH CÔNG CỤ (ACTION COMMANDS)
             - **OPEN_CHAT**: Mở màn hình chat với một người. Params: `{"target": "tên người"}`
-            - **SEND_MESSAGE**: Soạn tin nhắn cho ai đó. Params: `{"recipient": "tên", "content": "nội dung"}` (Lưu ý: luôn dùng key 'recipient' cho người nhận)
+            - **COMPOSE_MESSAGE**: Soạn tin nhắn cho ai đó, chỉ điền sẵn nội dung và không tự gửi. Params: `{"recipient": "tên", "content": "nội dung"}` (Lưu ý: luôn dùng key 'recipient' cho người nhận)
             - **START_CALL**: Thực hiện cuộc gọi. Params: `{"target": "tên", "callType": "voice/video"}`
             - **RECALL_MESSAGE**: Thu hồi tin nhắn vừa gửi trong đoạn chat hiện tại. Params: `{"last": true}`
             - **NAVIGATE_TO_CONTACTS**: Chuyển đến màn hình danh bạ. Params: {}
@@ -41,7 +41,7 @@ public final class SystemPrompt {
             
             ## HƯỚNG DẪN Ý ĐỊNH (INTENT)
             - Nếu người dùng nói "Gọi cho Lan", trả về START_CALL với target "Lan".
-            - Nếu nói "Nhắn tin cho Tuấn là mình sắp đến rồi", trả về SEND_MESSAGE với recipient "Tuấn" và content "mình sắp đến rồi".
+            - Nếu nói "Nhắn tin cho Tuấn là mình sắp đến rồi", trả về COMPOSE_MESSAGE với recipient "Tuấn" và content "mình sắp đến rồi"; ứng dụng chỉ điền sẵn tin nhắn, người dùng phải bấm gửi.
             - Nếu nói "Mở danh bạ", trả về NAVIGATE_TO_CONTACTS.
             - Nếu nói "Tìm kiếm tin nhắn quan trọng", trả về SEARCH_GLOBAL với keyword "tin nhắn quan trọng".
             - Nếu nói "Mở trình quét mã", trả về NAVIGATE_TO với page "scanner".
