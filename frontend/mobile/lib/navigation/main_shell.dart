@@ -18,6 +18,7 @@ import 'package:vnalo_mobile/features/call/screens/voice_call_screen.dart';
 import 'package:vnalo_mobile/features/call/screens/video_call_screen.dart';
 import 'package:vnalo_mobile/features/call/utils/call_id_generator.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
+import 'package:vnalo_mobile/models/message_model.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 
 class MainShell extends StatefulWidget {
@@ -137,6 +138,8 @@ class MainShellState extends State<MainShell> {
         return 'NAVIGATE_TO_CONTACTS';
       case 'MỞ CHAT':
         return 'NAVIGATE_TO_CHAT';
+      case 'SEND_MESSAGE':
+        return 'COMPOSE_MESSAGE';
       default:
         return command.trim().toUpperCase();
     }
@@ -197,7 +200,7 @@ class MainShellState extends State<MainShell> {
         break;
 
       case 'OPEN_CHAT':
-      case 'SEND_MESSAGE':
+      case 'COMPOSE_MESSAGE':
       case 'START_CALL':
         final targetName =
             (params?['target'] ??
@@ -207,9 +210,11 @@ class MainShellState extends State<MainShell> {
                     '')
                 .toString()
                 .trim();
-        final conversation = chatProvider.findConversationByName(targetName);
+        final conversationMatches = chatProvider.findConversationMatchesByName(
+          targetName,
+        );
 
-        if (conversation == null) {
+        if (conversationMatches.isEmpty) {
           _logAiFlow(
             'AI_RESOLUTION_FAILED',
             aiCommand: aiCmd,
@@ -219,6 +224,22 @@ class MainShellState extends State<MainShell> {
           return;
         }
 
+        if (conversationMatches.length > 1) {
+          _logAiFlow(
+            'AI_RESOLUTION_AMBIGUOUS',
+            aiCommand: aiCmd,
+            extra: {
+              'targetName': targetName,
+              'matchCount': conversationMatches.length,
+            },
+          );
+          _showErrorSnackBar(
+            'Có nhiều cuộc trò chuyện tên "$targetName". Vui lòng nói rõ hơn.',
+          );
+          return;
+        }
+
+        final conversation = conversationMatches.first;
         final currentUserId = chatProvider.currentUserId ?? '';
         final isDirect = conversation.type.name == 'DIRECT';
         final peerMember =
@@ -235,14 +256,14 @@ class MainShellState extends State<MainShell> {
                 ?.toString()
                 .trim();
         final prefilledText =
-            (command == 'SEND_MESSAGE' &&
+            (command == 'COMPOSE_MESSAGE' &&
                     rawPrefilled != null &&
                     rawPrefilled.isNotEmpty)
                 ? rawPrefilled
                 : null;
 
-        if (command == 'OPEN_CHAT' || command == 'SEND_MESSAGE') {
-          if (command == 'SEND_MESSAGE' &&
+        if (command == 'OPEN_CHAT' || command == 'COMPOSE_MESSAGE') {
+          if (command == 'COMPOSE_MESSAGE' &&
               (prefilledText == null || prefilledText.isEmpty)) {
             _logAiFlow(
               'AI_SEND_MSG_BLOCKED',
@@ -272,10 +293,10 @@ class MainShellState extends State<MainShell> {
             return;
           }
 
-          if (command == 'SEND_MESSAGE') {
+          if (command == 'COMPOSE_MESSAGE') {
             final confirmed = await _showConfirmationDialog(
-              'Xác nhận mở cuộc trò chuyện',
-              'Bạn có đồng ý để trợ lý ảo mở phòng chat và chuẩn bị sẵn tin nhắn "$prefilledText" tới "$peerName" không?',
+              'Xác nhận soạn tin nhắn',
+              'Bạn có đồng ý để trợ lý ảo mở phòng chat và điền sẵn tin nhắn "$prefilledText" tới "$peerName" không? Tin nhắn sẽ chưa được gửi.',
             );
             if (!confirmed) {
               _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
@@ -391,8 +412,23 @@ class MainShellState extends State<MainShell> {
         if (chatProvider.activeConversationId != null &&
             chatProvider.messages.isNotEmpty) {
           final lastMsg = chatProvider.messages
-              .where((m) => m.senderId == chatProvider.currentUserId)
-              .firstOrNull;
+              .where(
+                (m) =>
+                    m.senderId == chatProvider.currentUserId &&
+                    !m.isRecalled &&
+                    !m.isSystemMessage,
+              )
+              .fold<Message?>(null, (latest, message) {
+                if (latest == null) return message;
+                final latestSeq = latest.serverSeq;
+                final messageSeq = message.serverSeq;
+                if (latestSeq != null && messageSeq != null) {
+                  return messageSeq > latestSeq ? message : latest;
+                }
+                return message.createdAt.isAfter(latest.createdAt)
+                    ? message
+                    : latest;
+              });
 
           if (lastMsg == null) {
             _logAiFlow(

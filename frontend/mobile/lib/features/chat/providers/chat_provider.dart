@@ -2923,46 +2923,56 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Find a conversation by name (Friend name or Group title) for AI resolution.
   Conversation? findConversationByName(String name) {
-    if (name.isEmpty) return null;
+    final matches = findConversationMatchesByName(name);
+    return matches.length == 1 ? matches.first : null;
+  }
+
+  /// Find all deterministic conversation matches for AI resolution.
+  List<Conversation> findConversationMatchesByName(String name) {
+    if (name.isEmpty) return const [];
     final search = name.toLowerCase().trim();
 
-    String getLabel(Conversation conversation) {
-      if (conversation.type == ConversationType.GROUP) {
-        return (conversation.title ?? '').toLowerCase();
-      }
-
-      if (_currentUserId == null) {
-        return (conversation.title ?? '').toLowerCase();
-      }
-
-      ConversationMember? peer;
-      for (final member in conversation.members) {
-        if (member.userId != _currentUserId) {
-          peer = member;
-          break;
+    List<String> getLabels(Conversation conversation) {
+      final labels = <String>{};
+      void addLabel(String? value) {
+        final normalized = value?.toLowerCase().trim();
+        if (normalized != null && normalized.isNotEmpty) {
+          labels.add(normalized);
         }
       }
 
-      return (peer?.nickname ??
-              peer?.user?.displayName ??
-              conversation.title ??
-              '')
-          .toLowerCase();
+      addLabel(conversation.title);
+      if (conversation.type == ConversationType.GROUP) {
+        return labels.toList(growable: false);
+      }
+
+      if (_currentUserId == null) {
+        return labels.toList(growable: false);
+      }
+
+      for (final member in conversation.members) {
+        if (member.userId != _currentUserId) {
+          addLabel(member.nickname);
+          addLabel(member.user?.displayName);
+          addLabel(member.user?.phone);
+        }
+      }
+
+      return labels.toList(growable: false);
     }
 
+    final exactMatches = <Conversation>[];
+    final partialMatches = <Conversation>[];
     for (final conversation in _conversations) {
-      if (getLabel(conversation) == search) {
-        return conversation;
+      final labels = getLabels(conversation);
+      if (labels.any((label) => label == search)) {
+        exactMatches.add(conversation);
+      } else if (labels.any((label) => label.contains(search))) {
+        partialMatches.add(conversation);
       }
     }
 
-    for (final conversation in _conversations) {
-      if (getLabel(conversation).contains(search)) {
-        return conversation;
-      }
-    }
-
-    return null;
+    return exactMatches.isNotEmpty ? exactMatches : partialMatches;
   }
 
   void pinMessage(String messageId) {

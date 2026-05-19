@@ -38,7 +38,7 @@ public class GeminiAiService {
 
     private static final java.util.Set<String> ALLOWED_COMMANDS = java.util.Set.of(
         "OPEN_CHAT",
-        "SEND_MESSAGE",
+        "COMPOSE_MESSAGE",
         "START_CALL",
         "RECALL_MESSAGE",
         "NAVIGATE_TO",
@@ -187,6 +187,9 @@ public class GeminiAiService {
         String actionCommand = cmdNode.path("actionCommand").asText(null);
         if (actionCommand != null) {
             actionCommand = actionCommand.toUpperCase().trim();
+            if ("SEND_MESSAGE".equals(actionCommand)) {
+                actionCommand = "COMPOSE_MESSAGE";
+            }
             if (ALLOWED_COMMANDS.contains(actionCommand)) {
                 response.setActionCommand(actionCommand);
             } else {
@@ -226,7 +229,7 @@ public class GeminiAiService {
                 cp = new HashMap<>();
                 response.setActionParams(cp);
             }
-            if ("SEND_MESSAGE".equals(cmd)) {
+            if ("COMPOSE_MESSAGE".equals(cmd)) {
                 String recipient = null;
                 if (cp.containsKey("recipient")) recipient = String.valueOf(cp.get("recipient"));
                 else if (cp.containsKey("target")) recipient = String.valueOf(cp.get("target"));
