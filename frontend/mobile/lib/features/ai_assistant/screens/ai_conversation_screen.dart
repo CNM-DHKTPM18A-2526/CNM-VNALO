@@ -20,6 +20,8 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _isSending = false;
   bool _hasText = false;
+  int _lastMessageCount = 0;
+  AiState? _lastProviderState;
 
   @override
   void initState() {
@@ -61,6 +63,31 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
     }
   }
 
+  void _queueScrollToLatest() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) {
+        return;
+      }
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
+  void _applyQuickPrompt(String text) {
+    final normalized = text.trim();
+    if (normalized.isEmpty) {
+      return;
+    }
+    _inputController.value = TextEditingValue(
+      text: normalized,
+      selection: TextSelection.collapsed(offset: normalized.length),
+    );
+    _inputFocusNode.requestFocus();
+  }
+
   String _statusLabel(AiState state) {
     return switch (state) {
       AiState.listening => 'Đang lắng nghe...',
@@ -84,6 +111,13 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
             .getHistoryAsMessages(currentUserId, userAvatarUrl: userAvatarUrl)
             .reversed
             .toList();
+
+    if (_lastMessageCount != messages.length ||
+        _lastProviderState != provider.state) {
+      _lastMessageCount = messages.length;
+      _lastProviderState = provider.state;
+      _queueScrollToLatest();
+    }
 
     return Scaffold(
       backgroundColor:
@@ -157,6 +191,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
                     ? _EmptyAiConversation(
                       statusLabel: _statusLabel(provider.state),
                       isDarkMode: isDarkMode,
+                      onQuickActionSelected: _applyQuickPrompt,
                     )
                     : ListView.builder(
                       controller: _scrollController,
@@ -338,10 +373,12 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
 class _EmptyAiConversation extends StatelessWidget {
   final String statusLabel;
   final bool isDarkMode;
+  final ValueChanged<String> onQuickActionSelected;
 
   const _EmptyAiConversation({
     required this.statusLabel,
     required this.isDarkMode,
+    required this.onQuickActionSelected,
   });
 
   @override
@@ -398,23 +435,45 @@ class _EmptyAiConversation extends StatelessWidget {
 
   Widget _buildQuickAction(BuildContext context, String text) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color:
-            isDarkMode
-                ? DarkColors.surface
-                : Colors.white.withValues(alpha: 0.8),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: AppColors.primary,
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () => onQuickActionSelected(text),
+          child: Ink(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color:
+                  isDarkMode
+                      ? DarkColors.surface
+                      : Colors.white.withValues(alpha: 0.8),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.2),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.auto_awesome_outlined,
+                  size: 16,
+                  color: AppColors.primary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  text,
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

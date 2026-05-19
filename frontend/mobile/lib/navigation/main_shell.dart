@@ -318,6 +318,20 @@ class MainShellState extends State<MainShell> {
               return;
             }
             if (!mounted) return;
+
+            if (isAlreadyActiveConversation) {
+              chatProvider.injectAiComposeDraft(
+                conversationId: conversation.id,
+                text: prefilledText!,
+              );
+              _logAiFlow(
+                'AI_COMPOSE_DRAFT_INJECTED',
+                aiCommand: aiCmd,
+                extra: {'conversationId': conversation.id},
+              );
+              setState(() => _currentIndex = 0);
+              return;
+            }
           }
 
           if (!mounted) return;

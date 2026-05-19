@@ -32,6 +32,7 @@ import 'package:vnalo_mobile/features/call/services/group_call_tracker.dart';
 import 'package:vnalo_mobile/services/notification_service.dart';
 import 'package:vnalo_mobile/services/ai_service.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
+import 'package:vnalo_mobile/features/ai_assistant/utils/ai_compose_draft_bus.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_floating_bubble.dart';
 import 'package:vnalo_mobile/features/contacts/providers/contact_provider.dart';
 import 'package:vnalo_mobile/features/notifications/providers/notification_provider.dart';
@@ -187,6 +188,10 @@ class VnaloApp extends StatelessWidget {
         Provider<AiService>(
           create: (context) => AiService(context.read<ApiService>()),
         ),
+        Provider<AiComposeDraftBus>(
+          create: (_) => AiComposeDraftBus(),
+          dispose: (_, bus) => bus.close(),
+        ),
         ChangeNotifierProvider<ThemeProvider>(
           create: (_) => ThemeProvider()..initialize(),
         ),
@@ -227,6 +232,7 @@ class VnaloApp extends StatelessWidget {
             mediaService: context.read<MediaService>(),
             db: context.read<LocalDatabase>(),
             notificationService: context.read<NotificationService>(),
+            aiComposeDraftBus: context.read<AiComposeDraftBus>(),
           ),
           update: (context, auth, socket, chat) {
             final currentChat = chat ??
@@ -236,6 +242,7 @@ class VnaloApp extends StatelessWidget {
                   mediaService: context.read<MediaService>(),
                   db: context.read<LocalDatabase>(),
                   notificationService: context.read<NotificationService>(),
+                  aiComposeDraftBus: context.read<AiComposeDraftBus>(),
                 );
             currentChat.update(auth.user?.id, socket);
             return currentChat;

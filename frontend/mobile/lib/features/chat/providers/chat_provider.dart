@@ -15,6 +15,7 @@ import 'package:vnalo_mobile/services/media_service.dart';
 import 'package:vnalo_mobile/services/notification_service.dart';
 import 'package:vnalo_mobile/core/database/local_database.dart';
 import 'package:vnalo_mobile/core/utils/avatar_resolver.dart';
+import 'package:vnalo_mobile/features/ai_assistant/utils/ai_compose_draft_bus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'dart:io';
@@ -26,6 +27,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
   final MediaService _mediaService;
   final NotificationService _notificationService;
   final LocalDatabase _db;
+  final AiComposeDraftBus _aiComposeDraftBus;
 
   final Map<String, List<Message>> _messages = {};
   final Map<String, Timer> _retryTimers = {};
@@ -78,6 +80,8 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
   Message? get replyingTo => _replyingTo;
   String? get highlightedMessageId => _highlightedMessageId;
   String? get currentUserId => _currentUserId;
+  Stream<AiComposeDraftEvent> get aiComposeDraftStream =>
+      _aiComposeDraftBus.stream;
   /// Get messages for the currently active conversation.
   /// Use [getMessagesForConversation] for explicit scoping.
   List<Message> get messages =>
@@ -108,11 +112,13 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     required MediaService mediaService,
     required NotificationService notificationService,
     required LocalDatabase db,
+    required AiComposeDraftBus aiComposeDraftBus,
   })      : _chatService = chatService,
         _socketService = socketService,
         _mediaService = mediaService,
         _notificationService = notificationService,
-        _db = db {
+        _db = db,
+        _aiComposeDraftBus = aiComposeDraftBus {
     _notificationService.ensureInitialized();
     _initSocketListeners();
     
@@ -194,6 +200,13 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       timer.cancel();
     }
     super.dispose();
+  }
+
+  void injectAiComposeDraft({
+    required String conversationId,
+    required String text,
+  }) {
+    _aiComposeDraftBus.emit(conversationId: conversationId, text: text);
   }
 
   List<Message> getMessages(String conversationId) =>

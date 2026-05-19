@@ -2699,7 +2699,20 @@ export default function ChatPage() {
     if (!selectedConversationId) return;
     const isGroup = !!selectedConversation?.isGroup;
     const callId = `call_${Date.now()}`;
-    const peerUserId = selectedConversation?.userId || selectedConversationId;
+    const peerUserId = isGroup
+      ? selectedConversationId
+      : (
+        selectedConversation?.userId ||
+        selectedConversation?.members?.find(member => member.userId && member.userId !== user?.id)?.userId ||
+        selectedConversation?.participantUserIds?.find(memberId => memberId !== user?.id)
+      );
+    if (!peerUserId) {
+      console.error('[CALL][INITIATE] Missing direct peer user id', {
+        conversationId: selectedConversationId,
+        selectedConversation,
+      });
+      return;
+    }
     const peerName = (peerUserId && userMap[peerUserId]?.displayName && userMap[peerUserId].displayName !== 'Người dùng')
       ? userMap[peerUserId].displayName
       : (selectedConversation?.name || "Người dùng");
@@ -2731,7 +2744,7 @@ export default function ChatPage() {
     const height = window.screen.availHeight;
     window.open(url, "VnaloCall", `width=${width},height=${height},menubar=no,toolbar=no,location=no,status=no`);
     setCallState(prev => ({ ...prev, isOpen: false }));
-  }, [selectedConversationId, selectedConversation, userMap, accessToken]);
+  }, [selectedConversationId, selectedConversation, userMap, accessToken, user?.id]);
 
 
   const handleEndCall = useCallback(async (data: any = 'hangup') => {

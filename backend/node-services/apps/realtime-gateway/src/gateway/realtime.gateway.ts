@@ -274,6 +274,35 @@ export class RealtimeGateway
     this.server.to(`user:${userId}`).emit(event, data);
   }
 
+  /**
+   * Resolve trusted sender for signaling payload.
+   * - If payload senderUserId is empty, fallback to authenticated socket user.
+   * - If payload senderUserId mismatches authenticated user, reject as spoofing.
+   */
+  private resolveTrustedSenderUserId(
+    client: Socket,
+    data: any,
+    eventName: string,
+  ): string | null {
+    const authUserId = client.data?.user?.userId?.toString().trim();
+    const rawSender = data?.senderUserId?.toString().trim();
+
+    if (!authUserId) {
+      this.logger.warn(`[Realtime.${eventName}] Missing auth user on socket`);
+      return null;
+    }
+
+    if (rawSender != null && rawSender.length > 0 && rawSender !== authUserId) {
+      this.logger.warn(
+        `[Realtime.${eventName}] Sender spoofing attempt: auth=${authUserId} sent=${rawSender}`,
+      );
+      return null;
+    }
+
+    data['senderUserId'] = authUserId;
+    return authUserId;
+  }
+
   isUserOnline(userId: string): boolean {
     return (
       this.userSockets.has(userId) && this.userSockets.get(userId)!.size > 0
@@ -452,9 +481,7 @@ export class RealtimeGateway
 
   @SubscribeMessage('call.offer')
   handleCallOffer(@ConnectedSocket() client: Socket, @MessageBody() data: any) {
-    const authUserId = client.data?.user?.userId;
-    if (authUserId && authUserId !== data.senderUserId) {
-      this.logger.warn(`[Realtime.call.offer] Sender spoofing attempt: auth=${authUserId} sent=${data.senderUserId}`);
+    if (this.resolveTrustedSenderUserId(client, data, 'call.offer') == null) {
       return;
     }
     this.emitToUser(data.targetUserId, 'call.offer', data);
@@ -462,9 +489,7 @@ export class RealtimeGateway
 
   @SubscribeMessage('call.answer')
   handleCallAnswer(@ConnectedSocket() client: Socket, @MessageBody() data: any) {
-    const authUserId = client.data?.user?.userId;
-    if (authUserId && authUserId !== data.senderUserId) {
-      this.logger.warn(`[Realtime.call.answer] Sender spoofing attempt`);
+    if (this.resolveTrustedSenderUserId(client, data, 'call.answer') == null) {
       return;
     }
     this.emitToUser(data.targetUserId, 'call.answer', data);
@@ -472,9 +497,10 @@ export class RealtimeGateway
 
   @SubscribeMessage('call.ice-candidate')
   handleIceCandidate(@ConnectedSocket() client: Socket, @MessageBody() data: any) {
-    const authUserId = client.data?.user?.userId;
-    if (authUserId && authUserId !== data.senderUserId) {
-      this.logger.warn(`[Realtime.call.ice-candidate] Sender spoofing attempt`);
+    if (
+      this.resolveTrustedSenderUserId(client, data, 'call.ice-candidate') ==
+      null
+    ) {
       return;
     }
     this.emitToUser(data.targetUserId, 'call.ice-candidate', data);
@@ -482,9 +508,7 @@ export class RealtimeGateway
 
   @SubscribeMessage('call.end')
   handleCallEnd(@ConnectedSocket() client: Socket, @MessageBody() data: any) {
-    const authUserId = client.data?.user?.userId;
-    if (authUserId && authUserId !== data.senderUserId) {
-      this.logger.warn(`[Realtime.call.end] Sender spoofing attempt`);
+    if (this.resolveTrustedSenderUserId(client, data, 'call.end') == null) {
       return;
     }
     this.emitToUser(data.targetUserId, 'call.end', data);
@@ -494,9 +518,7 @@ export class RealtimeGateway
   // Colon notation (web client also emits these)
   @SubscribeMessage('call:offer')
   handleCallOfferColon(@ConnectedSocket() client: Socket, @MessageBody() data: any) {
-    const authUserId = client.data?.user?.userId;
-    if (authUserId && authUserId !== data.senderUserId) {
-      this.logger.warn(`[Realtime.call:offer] Sender spoofing attempt`);
+    if (this.resolveTrustedSenderUserId(client, data, 'call:offer') == null) {
       return;
     }
     this.emitToUser(data.targetUserId, 'call.offer', data);
@@ -504,9 +526,7 @@ export class RealtimeGateway
 
   @SubscribeMessage('call:answer')
   handleCallAnswerColon(@ConnectedSocket() client: Socket, @MessageBody() data: any) {
-    const authUserId = client.data?.user?.userId;
-    if (authUserId && authUserId !== data.senderUserId) {
-      this.logger.warn(`[Realtime.call:answer] Sender spoofing attempt`);
+    if (this.resolveTrustedSenderUserId(client, data, 'call:answer') == null) {
       return;
     }
     this.emitToUser(data.targetUserId, 'call.answer', data);
@@ -514,9 +534,10 @@ export class RealtimeGateway
 
   @SubscribeMessage('call:ice-candidate')
   handleIceCandidateColon(@ConnectedSocket() client: Socket, @MessageBody() data: any) {
-    const authUserId = client.data?.user?.userId;
-    if (authUserId && authUserId !== data.senderUserId) {
-      this.logger.warn(`[Realtime.call:ice-candidate] Sender spoofing attempt`);
+    if (
+      this.resolveTrustedSenderUserId(client, data, 'call:ice-candidate') ==
+      null
+    ) {
       return;
     }
     this.emitToUser(data.targetUserId, 'call.ice-candidate', data);
@@ -524,9 +545,7 @@ export class RealtimeGateway
 
   @SubscribeMessage('call:end')
   handleCallEndColon(@ConnectedSocket() client: Socket, @MessageBody() data: any) {
-    const authUserId = client.data?.user?.userId;
-    if (authUserId && authUserId !== data.senderUserId) {
-      this.logger.warn(`[Realtime.call:end] Sender spoofing attempt`);
+    if (this.resolveTrustedSenderUserId(client, data, 'call:end') == null) {
       return;
     }
     this.emitToUser(data.targetUserId, 'call.end', data);

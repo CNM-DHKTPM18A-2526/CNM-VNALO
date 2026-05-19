@@ -233,6 +233,25 @@ void main() {
     provider.dispose();
   });
 
+  test(
+    'conversation mic listen failure keeps floating bubble hidden',
+    () async {
+      speechListenThrows = true;
+      final provider = _buildProvider();
+
+      await provider.startListening(source: 'conversation_screen_mic');
+
+      expect(provider.state, AiState.idle);
+      expect(provider.lastResponseSurface, AiResponseSurface.conversation);
+      expect(provider.aiResponse, contains('Không thể bắt đầu thu âm'));
+      expect(provider.shouldBubbleAutoShowResponse, isFalse);
+      expect(provider.isMascotVisible, isFalse);
+      expect(provider.provisionallyVisible, isFalse);
+
+      provider.dispose();
+    },
+  );
+
   test('clearAiResponse keeps bubble visible for quick follow-up', () async {
     final provider = _buildProvider(
       responses: {

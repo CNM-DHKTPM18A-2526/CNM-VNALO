@@ -111,7 +111,7 @@ export function ChatWindow({
 
   const { accessToken } = useAuth()
   const [suggestedReplies, setSuggestedReplies] = React.useState<string[]>([])
-  const [isLoadingSuggestions, setIsLoadingSuggestions] = React.useState(false)
+  const [, setIsLoadingSuggestions] = React.useState(false)
 
   const conversationMessages = React.useMemo(() => {
     if (!conversation) {
