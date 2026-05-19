@@ -4,16 +4,17 @@ import 'package:vnalo_mobile/config/env.dart';
 
 void main() {
   group('AppConfig dev URL derivation', () {
-    test('derives media/message/socket from CORE_SERVICE_URL host', () {
+    test('routes dev services through CORE_SERVICE_URL gateway by default', () {
       AppConfig.initialize(
         Environment.dev,
         coreServiceUrl: 'http://192.168.1.88:8081/api/v1',
       );
 
       expect(AppConfig.instance.coreServiceUrl, 'http://192.168.1.88:8081/api/v1');
-      expect(AppConfig.instance.mediaServiceUrl, 'http://192.168.1.88:8083/api/v1');
-      expect(AppConfig.instance.messageServiceUrl, 'http://192.168.1.88:3000/api/v1');
-      expect(AppConfig.instance.socketUrl, 'http://192.168.1.88:3000');
+      expect(AppConfig.instance.mediaServiceUrl, 'http://192.168.1.88:8081/api/v1');
+      expect(AppConfig.instance.messageServiceUrl, 'http://192.168.1.88:8081/api/v1');
+      expect(AppConfig.instance.socketUrl, 'http://192.168.1.88:8081');
+      expect(AppConfig.instance.aiServiceUrl, 'http://192.168.1.88:8081/api/v1');
     });
 
     test('respects explicit overrides when provided', () {

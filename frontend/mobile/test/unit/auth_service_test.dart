@@ -38,6 +38,7 @@ class _StubApi extends ApiService {
     String baseUrl,
     String endpoint, {
     Map<String, dynamic>? body,
+    Map<String, String>? queryParams,
   }) async {
     lastPostEndpoint = endpoint;
     lastPostBody = body;
