@@ -5,8 +5,10 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vnalo_mobile/config/app_config.dart';
 import 'package:vnalo_mobile/config/env.dart';
+import 'package:vnalo_mobile/core/localization/language_provider.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_floating_bubble.dart';
+import 'package:vnalo_mobile/features/discover/screens/discover_screen.dart';
 import 'package:vnalo_mobile/services/ai_service.dart';
 import 'package:vnalo_mobile/services/api_service.dart';
 import 'package:vnalo_mobile/services/storage_service.dart';
@@ -53,6 +55,12 @@ AiAssistantProvider _buildProvider({
 }) {
   final aiService = AiService(_StubApiService(responses: responses));
   return AiAssistantProvider(aiService);
+}
+
+Widget _bubbleOverlayBuilder(BuildContext context, Widget? child) {
+  return Stack(
+    children: [child ?? const SizedBox.shrink(), const AiFloatingBubble()],
+  );
 }
 
 void main() {
@@ -199,41 +207,72 @@ void main() {
     },
   );
 
-  testWidgets(
-    'bubble board remains stable on compact viewport',
-    (tester) async {
-      tester.view.physicalSize = const Size(320, 640);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() {
-        tester.view.resetPhysicalSize();
-        tester.view.resetDevicePixelRatio();
-      });
+  testWidgets('bubble board remains stable on compact viewport', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
 
-      final provider = _buildProvider();
+    final provider = _buildProvider();
 
-      await tester.pumpWidget(
-        ChangeNotifierProvider.value(
-          value: provider,
-          child: const MaterialApp(
-            home: Scaffold(body: Stack(children: [AiFloatingBubble()])),
-          ),
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: provider,
+        child: const MaterialApp(
+          home: Scaffold(body: Stack(children: [AiFloatingBubble()])),
         ),
-      );
+      ),
+    );
 
-      await provider.summonMascot(
-        startListening: false,
-        persist: false,
-        source: 'compact_view_test',
-      );
-      await tester.pumpAndSettle();
+    await provider.summonMascot(
+      startListening: false,
+      persist: false,
+      source: 'compact_view_test',
+    );
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const ValueKey('ai_bubble_toggle_board')));
-      await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('ai_bubble_toggle_board')));
+    await tester.pumpAndSettle();
 
-      expect(find.byKey(const ValueKey('ai_chat_board')), findsOneWidget);
-      expect(tester.takeException(), isNull);
+    expect(find.byKey(const ValueKey('ai_chat_board')), findsOneWidget);
+    expect(tester.takeException(), isNull);
 
-      provider.dispose();
-    },
-  );
+    provider.dispose();
+  });
+
+  testWidgets('discover assistant entry summons visible mascot bubble', (
+    tester,
+  ) async {
+    final provider = _buildProvider();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: provider),
+          ChangeNotifierProvider(create: (_) => LanguageProvider()),
+        ],
+        child: const MaterialApp(
+          home: DiscoverScreen(),
+          builder: _bubbleOverlayBuilder,
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('discover_item_vnaloAi')));
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.byKey(const ValueKey('ai_bubble_root')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await provider.stopListening(
+      reason: 'discover_assistant_test_cleanup',
+      keepBubbleVisible: false,
+    );
+    await tester.pump(const Duration(seconds: 3));
+    provider.dispose();
+  });
 }

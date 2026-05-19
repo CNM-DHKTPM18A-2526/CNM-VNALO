@@ -130,6 +130,7 @@ class AiAssistantProvider with ChangeNotifier {
   static const Duration _sttListenFor = Duration(seconds: 8);
   static const Duration _sttPauseFor = Duration(seconds: 2);
   static const Duration _idleAutoHideDelay = Duration(seconds: 12);
+  static const Duration _emptySummonAutoHideDelay = Duration(seconds: 6);
   static const int _maxConversationEntries = 200;
   static const String aiConversationId = '00000000-0000-0000-0000-000000000000';
   static const String _legacyAiConversationId = 'AI_ASSISTANT_LOCAL';
@@ -179,6 +180,7 @@ class AiAssistantProvider with ChangeNotifier {
   DateTime? _lastFinalResultAt;
   String _lastFinalResultText = '';
   DateTime? _lastSoundLevelNotifyAt;
+  DateTime? _keepVisibleUntil;
 
   Timer? _listenGuardTimer;
   Timer? _idleAutoHideTimer;
@@ -380,7 +382,7 @@ class AiAssistantProvider with ChangeNotifier {
     _listenGuardTimer?.cancel();
     _idleAutoHideTimer?.cancel();
     _cloudBackupDebounceTimer?.cancel();
-    unawaited(_stt.stop());
+    unawaited(_stt.cancel());
     unawaited(_tts.stop());
     _systemActionController.close();
     super.dispose();
@@ -530,6 +532,7 @@ class AiAssistantProvider with ChangeNotifier {
       await setPersistentEnabled(true, reason: '$source.persist');
     } else {
       _setProvisionallyVisible(true, reason: '$source.contextual_summon');
+      _keepVisibleUntil = DateTime.now().add(_emptySummonAutoHideDelay);
     }
 
     if (startListening) {
@@ -721,6 +724,7 @@ class AiAssistantProvider with ChangeNotifier {
       _setProvisionallyVisible(true, reason: '$reason.keep_visible');
       _scheduleIdleAutoHide(reason: reason);
     } else {
+      _keepVisibleUntil = null;
       _syncVisibilityAfterSession();
     }
 
@@ -864,8 +868,9 @@ class AiAssistantProvider with ChangeNotifier {
       }
 
       _aiResponse =
-          normalizeAiTextEncoding((response['textReply'] ?? '').toString())
-              .trim();
+          normalizeAiTextEncoding(
+            (response['textReply'] ?? '').toString(),
+          ).trim();
       _currentEmotion = (response['emotion'] ?? 'neutral').toString();
       final actionCommand = response['actionCommand']?.toString();
       final actionParams = response['actionParams'];
@@ -1036,8 +1041,9 @@ class AiAssistantProvider with ChangeNotifier {
       }
 
       _aiResponse =
-          normalizeAiTextEncoding((response['textReply'] ?? '').toString())
-              .trim();
+          normalizeAiTextEncoding(
+            (response['textReply'] ?? '').toString(),
+          ).trim();
       if (_aiResponse.isEmpty) {
         _aiResponse = fallbackMessage;
       }
@@ -1442,8 +1448,9 @@ class AiAssistantProvider with ChangeNotifier {
 
         for (final map in limitedEntries) {
           final roleStr = map['role']?.toString() ?? 'user';
-          final content =
-              normalizeAiTextEncoding(map['content']?.toString() ?? '');
+          final content = normalizeAiTextEncoding(
+            map['content']?.toString() ?? '',
+          );
           if (content.trim().isEmpty) {
             continue;
           }
@@ -1675,6 +1682,14 @@ class AiAssistantProvider with ChangeNotifier {
 
   void _syncVisibilityAfterSession() {
     if (_isSessionActive) {
+      return;
+    }
+    if (!_persistentEnabled &&
+        _aiResponse.isEmpty &&
+        _keepVisibleUntil != null &&
+        DateTime.now().isBefore(_keepVisibleUntil!) &&
+        _activeSurface != AiResponseSurface.conversation) {
+      _scheduleIdleAutoHide(reason: 'keep_visible_window');
       return;
     }
     if (!_persistentEnabled && _aiResponse.isEmpty) {

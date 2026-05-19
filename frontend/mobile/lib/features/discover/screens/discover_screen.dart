@@ -22,7 +22,8 @@ class DiscoverScreen extends StatelessWidget {
     final common = CommonTexts.of(context);
 
     return Scaffold(
-      backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
+      backgroundColor:
+          isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
       appBar: AppBar(
         backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
         elevation: 0,
@@ -31,9 +32,7 @@ class DiscoverScreen extends StatelessWidget {
             isDarkMode
                 ? null
                 : Container(
-                  decoration: BoxDecoration(
-                    gradient: AppColors.appBarGradient,
-                  ),
+                  decoration: BoxDecoration(gradient: AppColors.appBarGradient),
                 ),
         title: GestureDetector(
           behavior: HitTestBehavior.opaque,
@@ -59,7 +58,10 @@ class DiscoverScreen extends StatelessWidget {
                   Text(
                     common.search,
                     style: TextStyle(
-                      color: isDarkMode ? DarkColors.textHint : Colors.white.withValues(alpha: 0.7),
+                      color:
+                          isDarkMode
+                              ? DarkColors.textHint
+                              : Colors.white.withValues(alpha: 0.7),
                       fontSize: 15,
                       fontWeight: FontWeight.w400,
                     ),
@@ -180,6 +182,7 @@ class _DiscoverItem extends StatelessWidget {
     final isPremium = itemKey == 'vnaloAi';
 
     return ListTile(
+      key: ValueKey('discover_item_$itemKey'),
       leading: Container(
         width: 48,
         height: 48,
@@ -217,7 +220,12 @@ class _DiscoverItem extends StatelessWidget {
         style: TextStyle(
           fontWeight: FontWeight.w500,
           fontSize: 16,
-          color: isPremium && isDarkMode ? Colors.orange.shade300 : (isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary),
+          color:
+              isPremium && isDarkMode
+                  ? Colors.orange.shade300
+                  : (isDarkMode
+                      ? DarkColors.textPrimary
+                      : LightColors.textPrimary),
         ),
       ),
       subtitle: Text(
@@ -225,12 +233,21 @@ class _DiscoverItem extends StatelessWidget {
         style:
             isPremium && isDarkMode
                 ? TextStyle(color: Colors.orange.shade100.withOpacity(0.7))
-                : TextStyle(color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary, fontSize: 13),
+                : TextStyle(
+                  color:
+                      isDarkMode
+                          ? DarkColors.textSecondary
+                          : LightColors.textSecondary,
+                  fontSize: 13,
+                ),
       ),
       trailing: Icon(
         Icons.chevron_right,
         size: 20,
-        color: isDarkMode ? DarkColors.textHint : AppColors.iconSubtle.withValues(alpha: 0.5),
+        color:
+            isDarkMode
+                ? DarkColors.textHint
+                : AppColors.iconSubtle.withValues(alpha: 0.5),
       ),
       onTap: onTap,
     );
