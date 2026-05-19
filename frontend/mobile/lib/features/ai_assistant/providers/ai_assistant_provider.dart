@@ -1045,8 +1045,12 @@ class AiAssistantProvider with ChangeNotifier {
             _transitionTo(AiState.idle, reason: 'stt_error', notify: false);
             _aiResponse =
                 'Không thể tiếp tục thu âm. Bạn kiểm tra quyền micro và thử lại.';
-            _setProvisionallyVisible(true, reason: 'stt_error_visible');
-            _scheduleIdleAutoHide(reason: 'stt_error');
+            if (_activeSurface != AiResponseSurface.conversation) {
+              _setProvisionallyVisible(true, reason: 'stt_error_visible');
+              _scheduleIdleAutoHide(reason: 'stt_error');
+            } else {
+              _syncVisibilityAfterSession();
+            }
             notifyListeners();
           }
         },
