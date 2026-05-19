@@ -133,6 +133,14 @@ const CallPage: React.FC = () => {
         isCaller,
         initialSdp,
       })
+      .then(() => {
+        if (!isCaller && initialSdp) {
+          return service.acceptCall();
+        }
+      })
+      .catch((error) => {
+        console.error('[CallPage] Failed to initialize direct call', error);
+      });
 
       // Listener for 1-1 signaling (Handle both colon and dot notation)
       const onAnswer = (data: any) => {

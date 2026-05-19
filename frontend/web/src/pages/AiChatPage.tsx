@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Sparkles, Send, Trash2 } from 'lucide-react'
 import { useAuth } from '../features/auth/useAuth'
 import { sendAiChatMessage } from '../features/chat/chat.api'
