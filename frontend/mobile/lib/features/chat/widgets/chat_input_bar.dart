@@ -63,25 +63,65 @@ class _ChatInputBarState extends State<ChatInputBar> {
   // Typing indicator
   Timer? _typingTimer;
   static const _typingDebounceMs = 2000;
+  StreamSubscription? _aiComposeDraftSub;
 
   @override
   void initState() {
     super.initState();
     if (widget.initialText != null && widget.initialText!.isNotEmpty) {
-      _controller.text = widget.initialText!;
-      _hasText = true;
+      _applyDraftText(widget.initialText!);
     }
     _controller.addListener(_onTextChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final chat = context.read<ChatProvider>();
+      _aiComposeDraftSub = chat.aiComposeDraftStream.listen((event) {
+        if (!mounted || event.conversationId != widget.conversationId) {
+          return;
+        }
+        _applyDraftText(event.text);
+        _focusNode.requestFocus();
+      });
+    });
   }
 
   @override
   void dispose() {
+    _aiComposeDraftSub?.cancel();
     _controller.removeListener(_onTextChanged);
     _controller.dispose();
     _recorder.dispose();
     _focusNode.dispose();
     _typingTimer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant ChatInputBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final incoming = widget.initialText?.trim();
+    final previous = oldWidget.initialText?.trim();
+    if (incoming != null &&
+        incoming.isNotEmpty &&
+        incoming != previous &&
+        incoming != _controller.text.trim()) {
+      _applyDraftText(incoming);
+    }
+  }
+
+  void _applyDraftText(String text) {
+    final normalized = text.trim();
+    if (normalized.isEmpty) {
+      return;
+    }
+    _controller.value = TextEditingValue(
+      text: normalized,
+      selection: TextSelection.collapsed(offset: normalized.length),
+    );
+    _hideMention();
+    if (!_hasText) {
+      setState(() => _hasText = true);
+    }
   }
 
   // ─── @Mention Detection ───────────────────────────────────────────────────
