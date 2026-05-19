@@ -27,21 +27,40 @@ String normalizeAiTextEncoding(String value) {
   var best = value;
   var bestScore = _mojibakeScore(best);
 
-  for (var pass = 0; pass < 3; pass++) {
+  for (var pass = 0; pass < 4; pass++) {
+    final candidates = <String>{};
+
     final encodedBytes = _encodeWindows1252Bytes(best);
-    if (encodedBytes == null) {
+    if (encodedBytes != null) {
+      candidates.add(utf8.decode(encodedBytes, allowMalformed: true));
+    }
+
+    final latin1Bytes = _encodeLatin1Bytes(best);
+    if (latin1Bytes != null) {
+      candidates.add(utf8.decode(latin1Bytes, allowMalformed: true));
+    }
+
+    String? improvedCandidate;
+    var improvedScore = bestScore;
+
+    for (final candidate in candidates) {
+      if (candidate.trim().isEmpty || candidate == best) {
+        continue;
+      }
+
+      final candidateScore = _mojibakeScore(candidate);
+      if (candidateScore < improvedScore) {
+        improvedCandidate = candidate;
+        improvedScore = candidateScore;
+      }
+    }
+
+    if (improvedCandidate == null) {
       break;
     }
 
-    final candidate = utf8.decode(encodedBytes, allowMalformed: true);
-
-    final candidateScore = _mojibakeScore(candidate);
-    if (candidateScore >= bestScore || candidate.trim().isEmpty) {
-      break;
-    }
-
-    best = candidate;
-    bestScore = candidateScore;
+    best = improvedCandidate;
+    bestScore = improvedScore;
   }
 
   return best;
@@ -54,11 +73,18 @@ int _mojibakeScore(String value) {
     '\u00C4',
     '\u00C2',
     '\u00C6',
+    '\u00C5',
+    '\u00D0',
     '\u00E2\u20AC',
     '\u00E2\u20AC\u2122',
     '\u00E2\u20AC\u0153',
     '\u00E2\u20AC\u009d',
     '\u00F0\u0178',
+    '\u00E1\u00BA',
+    '\u00E1\u00BB',
+    '\u00C4\u2018',
+    '\u00C6\u00B0',
+    '\u00C6\u00A1',
   ];
 
   for (final marker in markers) {
@@ -73,7 +99,7 @@ int _mojibakeScore(String value) {
     }
   }
 
-  return score;
+  return score - _vietnameseCharacterBonus(value);
 }
 
 List<int>? _encodeWindows1252Bytes(String value) {
@@ -121,6 +147,35 @@ List<int>? _encodeWindows1252Bytes(String value) {
     bytes.add(mapped);
   }
   return bytes;
+}
+
+List<int>? _encodeLatin1Bytes(String value) {
+  final bytes = <int>[];
+  for (final rune in value.runes) {
+    if (rune > 0xff) {
+      return null;
+    }
+    bytes.add(rune);
+  }
+  return bytes;
+}
+
+int _vietnameseCharacterBonus(String value) {
+  var bonus = 0;
+  for (final rune in value.runes) {
+    if (_isVietnameseCodePoint(rune)) {
+      bonus += 1;
+    }
+  }
+  return bonus.clamp(0, 24);
+}
+
+bool _isVietnameseCodePoint(int rune) {
+  return rune == 0x0111 ||
+      rune == 0x0110 ||
+      (rune >= 0x0102 && rune <= 0x0103) ||
+      (rune >= 0x01A0 && rune <= 0x01B0) ||
+      (rune >= 0x1EA0 && rune <= 0x1EF9);
 }
 
 // ---------------------------------------------------------------------------

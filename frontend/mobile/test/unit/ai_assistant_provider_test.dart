@@ -178,6 +178,21 @@ void main() {
     provider.dispose();
   });
 
+  test('normalizeAiTextEncoding repairs single-pass mojibake', () {
+    const raw = 'ÄÃ¢y lÃ  cÃ¢u tráº£ lá»i trong mÃ n hÃ¬nh há»™i thoáº¡i.';
+    final normalized = normalizeAiTextEncoding(raw);
+
+    expect(normalized, 'Đây là câu trả lời trong màn hình hội thoại.');
+  });
+
+  test('normalizeAiTextEncoding repairs multi-pass mojibake', () {
+    const raw =
+        'KhÃƒÂ´ng thÃ¡Â»Æ’ bÃ¡ÂºÂ¯t Ã„â€˜Ã¡ÂºÂ§u thu ÃƒÂ¢m. BÃ¡ÂºÂ¡n thÃ¡Â»Â­ lÃ¡ÂºÂ¡i.';
+    final normalized = normalizeAiTextEncoding(raw);
+
+    expect(normalized, 'Không thể bắt đầu thu âm. Bạn thử lại.');
+  });
+
   test('conversation screen prompt does not force bubble auto board', () async {
     final provider = _buildProvider(
       responses: {
@@ -205,8 +220,7 @@ void main() {
     final provider = _buildProvider(
       responses: {
         'kiem tra utf': {
-          'textReply':
-              'KhÃ´ng thá»ƒ báº¯t Ä‘áº§u thu Ã¢m. Báº¡n thá»­ láº¡i.',
+          'textReply': 'KhÃ´ng thá»ƒ báº¯t Ä‘áº§u thu Ã¢m. Báº¡n thá»­ láº¡i.',
           'emotion': 'neutral',
         },
       },
