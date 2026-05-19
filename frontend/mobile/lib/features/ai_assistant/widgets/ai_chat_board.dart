@@ -79,6 +79,23 @@ class _AiChatBoardState extends State<AiChatBoard> {
     await Clipboard.setData(ClipboardData(text: response));
   }
 
+  Widget _buildHeaderAction({
+    required Key key,
+    required IconData icon,
+    required VoidCallback? onPressed,
+  }) {
+    return IconButton(
+      key: key,
+      icon: Icon(icon, size: 17),
+      color: Colors.white,
+      onPressed: onPressed,
+      padding: EdgeInsets.zero,
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+      splashRadius: 18,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final aiProvider = context.watch<AiAssistantProvider>();
@@ -168,9 +185,11 @@ class _AiChatBoardState extends State<AiChatBoard> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            AiStatusPill(
-                              state: aiProvider.state,
-                              compact: true,
+                            Flexible(
+                              child: AiStatusPill(
+                                state: aiProvider.state,
+                                compact: true,
+                              ),
                             ),
                           ],
                         ),
@@ -178,21 +197,19 @@ class _AiChatBoardState extends State<AiChatBoard> {
                       Row(
                         children: [
                           if (widget.onOpenConversation != null)
-                            IconButton(
+                            _buildHeaderAction(
                               key: const ValueKey('ai_chat_open_conversation'),
-                              icon: const Icon(Icons.open_in_full, size: 18),
-                              color: Colors.white,
+                              icon: Icons.open_in_full,
                               onPressed: widget.onOpenConversation,
                             ),
-                          IconButton(
-                            icon: const Icon(Icons.clear_all, size: 18),
-                            color: Colors.white,
+                          _buildHeaderAction(
+                            key: const ValueKey('ai_chat_clear'),
+                            icon: Icons.clear_all,
                             onPressed: widget.onClear,
                           ),
-                          IconButton(
+                          _buildHeaderAction(
                             key: const ValueKey('ai_chat_close'),
-                            icon: const Icon(Icons.close, size: 18),
-                            color: Colors.white,
+                            icon: Icons.close,
                             onPressed: widget.onClose,
                           ),
                         ],

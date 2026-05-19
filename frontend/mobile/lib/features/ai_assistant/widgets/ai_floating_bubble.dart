@@ -35,6 +35,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
   bool _isDragging = false;
   bool _isHoveringTrash = false;
   bool _isBoardExpanded = false;
+  String? _dismissedAssistantEntryId;
 
   DateTime? _ignoreTapUntil;
 
@@ -424,8 +425,20 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
 
   void _toggleBoard() {
     setState(() {
+      if (!_isBoardExpanded) {
+        _dismissedAssistantEntryId = null;
+      }
       _isBoardExpanded = !_isBoardExpanded;
     });
+  }
+
+  String? _latestAssistantEntryId(AiAssistantProvider provider) {
+    for (final entry in provider.conversationHistory.reversed) {
+      if (entry.role == AiConversationRole.assistant) {
+        return entry.entryId;
+      }
+    }
+    return null;
   }
 
   Future<void> _openMascotGallery() async {
@@ -573,11 +586,14 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
     );
     final boardTop = desiredTop.clamp(minBoardTop, maxBoardTop).toDouble();
 
+    final latestAssistantEntryId = _latestAssistantEntryId(aiProvider);
+    final hasNewBubbleResponse =
+        aiProvider.aiResponse.isNotEmpty &&
+        aiProvider.shouldBubbleAutoShowResponse &&
+        latestAssistantEntryId != null &&
+        latestAssistantEntryId != _dismissedAssistantEntryId;
     final showBoard =
-        !_isDragging &&
-        (_isBoardExpanded ||
-            (aiProvider.aiResponse.isNotEmpty &&
-                aiProvider.shouldBubbleAutoShowResponse));
+        !_isDragging && (_isBoardExpanded || hasNewBubbleResponse);
 
     if (!aiProvider.isMascotVisible) {
       return const SizedBox.shrink();
@@ -595,6 +611,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
                 onClose: () {
                   setState(() {
                     _isBoardExpanded = false;
+                    _dismissedAssistantEntryId = latestAssistantEntryId;
                   });
                 },
                 onClear: aiProvider.clearAiResponse,
