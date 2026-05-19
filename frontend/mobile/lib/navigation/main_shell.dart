@@ -13,6 +13,8 @@ import 'package:vnalo_mobile/features/discover/screens/discover_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/profile_screen.dart';
 import 'package:vnalo_mobile/features/timeline/screens/home_wall_screen.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
+import 'package:vnalo_mobile/features/ai_assistant/utils/ai_command_routing.dart';
+import 'package:vnalo_mobile/features/ai_assistant/utils/ai_recall_message_selector.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_action_confirmation_sheet.dart';
 import 'package:vnalo_mobile/features/chat/screens/chat_detail_screen.dart';
 import 'package:vnalo_mobile/features/call/screens/voice_call_screen.dart';
@@ -20,7 +22,6 @@ import 'package:vnalo_mobile/features/call/screens/video_call_screen.dart';
 import 'package:vnalo_mobile/features/call/utils/call_id_generator.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
-import 'package:vnalo_mobile/models/message_model.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 
 class MainShell extends StatefulWidget {
@@ -132,39 +133,19 @@ class MainShellState extends State<MainShell> {
   }
 
   String _normalizeAiSystemAction(String command) {
-    switch (command.trim().toUpperCase()) {
-      case 'MỞ SETTINGS':
-      case 'CÀI ĐẶT':
-        return 'NAVIGATE_TO_SETTINGS';
-      case 'MỞ DANH BẠ':
-        return 'NAVIGATE_TO_CONTACTS';
-      case 'MỞ CHAT':
-        return 'NAVIGATE_TO_CHAT';
-      case 'SEND_MESSAGE':
-        return 'COMPOSE_MESSAGE';
-      default:
-        return command.trim().toUpperCase();
-    }
+    return AiCommandRouting.normalizeSystemAction(command);
   }
 
   Map<String, dynamic>? _normalizeAiParams(AiCommand aiCmd) {
-    final rawParams = aiCmd.params;
-    if (rawParams == null) {
-      return null;
-    }
-    if (rawParams is Map<String, dynamic>) {
-      return rawParams;
-    }
-    if (rawParams is Map) {
-      return rawParams.map<String, dynamic>(
-        (key, value) => MapEntry(key.toString(), value),
-      );
+    final normalized = AiCommandRouting.normalizeParams(aiCmd.params);
+    if (normalized != null || aiCmd.params == null) {
+      return normalized;
     }
 
     _logAiFlow(
       'AI_PARAMS_MALFORMED',
       aiCommand: aiCmd,
-      extra: {'rawType': rawParams.runtimeType.toString()},
+      extra: {'rawType': aiCmd.params.runtimeType.toString()},
     );
     return null;
   }
@@ -204,14 +185,18 @@ class MainShellState extends State<MainShell> {
       case 'OPEN_CHAT':
       case 'COMPOSE_MESSAGE':
       case 'START_CALL':
-        final targetName =
-            (params?['target'] ??
-                    params?['recipient'] ??
-                    params?['contactName'] ??
-                    params?['name'] ??
-                    '')
-                .toString()
-                .trim();
+        final targetName = AiCommandRouting.extractTargetName(params);
+        if (targetName.isEmpty) {
+          _logAiFlow(
+            'AI_RESOLUTION_FAILED',
+            aiCommand: aiCmd,
+            extra: {'reason': 'missing_target_name'},
+          );
+          _showErrorSnackBar(
+            'Trợ lý AI chưa xác định được người nhận hoặc cuộc trò chuyện đích.',
+          );
+          return;
+        }
         final conversationMatches = chatProvider.findConversationMatchesByName(
           targetName,
         );
@@ -259,16 +244,11 @@ class MainShellState extends State<MainShell> {
         final peerUserId = peerMember?.userId ?? '';
         final peerName = conversation.getDisplayName(currentUserId);
 
-        final rawPrefilled =
-            (params?['content'] ?? params?['messageText'] ?? params?['text'])
-                ?.toString()
-                .trim();
-        final prefilledText =
-            (command == 'COMPOSE_MESSAGE' &&
-                    rawPrefilled != null &&
-                    rawPrefilled.isNotEmpty)
-                ? rawPrefilled
-                : null;
+        final rawPrefilled = AiCommandRouting.extractPrefilledText(
+          command,
+          params,
+        );
+        final prefilledText = rawPrefilled;
 
         if (command == 'OPEN_CHAT' || command == 'COMPOSE_MESSAGE') {
           if (command == 'COMPOSE_MESSAGE' &&
@@ -279,16 +259,21 @@ class MainShellState extends State<MainShell> {
               extra: {'reason': 'empty_content'},
             );
             _showErrorSnackBar(
-              'Tro ly AI khong the gui tin nhan vi noi dung trong.',
+              'Trợ lý AI không thể soạn tin nhắn vì nội dung trống.',
             );
             return;
           }
 
-          final isAlreadyInConversation =
-              chatProvider.activeConversationId == conversation.id ||
+          final isAlreadyActiveConversation =
+              chatProvider.activeConversationId == conversation.id;
+          final hasPendingAiNavigation =
               _activeAiConversationId == conversation.id;
 
-          if (isAlreadyInConversation) {
+          if (command == 'OPEN_CHAT' &&
+              AiCommandRouting.shouldBlockOpenChat(
+                isAlreadyActiveConversation: isAlreadyActiveConversation,
+                hasPendingAiNavigation: hasPendingAiNavigation,
+              )) {
             _logAiFlow(
               'AI_NAV_GUARD_BLOCKED',
               aiCommand: aiCmd,
@@ -301,15 +286,31 @@ class MainShellState extends State<MainShell> {
             return;
           }
 
+          if (command == 'COMPOSE_MESSAGE' &&
+              AiCommandRouting.shouldBlockCompose(
+                hasPendingAiNavigation: hasPendingAiNavigation,
+              )) {
+            _logAiFlow(
+              'AI_NAV_GUARD_BLOCKED',
+              aiCommand: aiCmd,
+              extra: {
+                'reason': 'compose_navigation_already_pending',
+                'conversationId': conversation.id,
+              },
+            );
+            return;
+          }
+
           if (command == 'COMPOSE_MESSAGE') {
+            if (!mounted) return;
             final confirmed = await AiActionConfirmationSheet.show(
               context,
               icon: Icons.edit_note_rounded,
-              title: 'X?c nh?n so?n tin nh?n',
+              title: 'Xác nhận soạn tin nhắn',
               description:
-                  'Tr? l? s? m? ph?ng chat v? ?i?n s?n n?i dung. Tin nh?n s? ch?a ???c g?i.',
-              confirmLabel: 'M? v? ?i?n s?n',
-              primaryDetail: 'Ng??i nh?n: $peerName',
+                  'Trợ lý sẽ mở phòng chat và điền sẵn nội dung. Tin nhắn sẽ chưa được gửi.',
+              confirmLabel: 'Mở và điền sẵn',
+              primaryDetail: 'Người nhận: $peerName',
               secondaryDetail: prefilledText,
             );
             if (!confirmed) {
@@ -319,6 +320,8 @@ class MainShellState extends State<MainShell> {
             if (!mounted) return;
           }
 
+          if (!mounted) return;
+          final navigator = Navigator.of(context);
           _activeAiConversationId = conversation.id;
           _logAiFlow(
             'AI_NAVIGATE_CHAT',
@@ -329,7 +332,7 @@ class MainShellState extends State<MainShell> {
             },
           );
 
-          await Navigator.of(context).push(
+          await navigator.push(
             MaterialPageRoute(
               builder:
                   (_) => ChatDetailScreen(
@@ -363,13 +366,14 @@ class MainShellState extends State<MainShell> {
           final isVideo = callType == 'video';
           final callTypeName = isVideo ? 'video' : 'thoại';
 
+          if (!mounted) return;
           final confirmed = await AiActionConfirmationSheet.show(
             context,
             icon: isVideo ? Icons.videocam_rounded : Icons.call_rounded,
-            title: 'X?c nh?n g?i $callTypeName',
-            description: 'Tr? l? s? b?t ??u cu?c g?i t?i li?n h? ?? ch?n.',
-            confirmLabel: 'B?t ??u g?i',
-            primaryDetail: 'Ng??i nh?n: $peerName',
+            title: 'Xác nhận gọi $callTypeName',
+            description: 'Trợ lý sẽ bắt đầu cuộc gọi tới liên hệ đã chọn.',
+            confirmLabel: 'Bắt đầu gọi',
+            primaryDetail: 'Người nhận: $peerName',
           );
           if (!confirmed) {
             _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
@@ -429,24 +433,10 @@ class MainShellState extends State<MainShell> {
       case 'RECALL_MESSAGE':
         if (chatProvider.activeConversationId != null &&
             chatProvider.messages.isNotEmpty) {
-          final lastMsg = chatProvider.messages
-              .where(
-                (m) =>
-                    m.senderId == chatProvider.currentUserId &&
-                    !m.isRecalled &&
-                    !m.isSystemMessage,
-              )
-              .fold<Message?>(null, (latest, message) {
-                if (latest == null) return message;
-                final latestSeq = latest.serverSeq;
-                final messageSeq = message.serverSeq;
-                if (latestSeq != null && messageSeq != null) {
-                  return messageSeq > latestSeq ? message : latest;
-                }
-                return message.createdAt.isAfter(latest.createdAt)
-                    ? message
-                    : latest;
-              });
+          final lastMsg = AiRecallMessageSelector.selectLatestRecallableMessage(
+            messages: chatProvider.messages,
+            currentUserId: chatProvider.currentUserId,
+          );
 
           if (lastMsg == null) {
             _logAiFlow(
@@ -454,17 +444,17 @@ class MainShellState extends State<MainShell> {
               aiCommand: aiCmd,
               extra: {'reason': 'no_self_message'},
             );
-            _showErrorSnackBar('Khong tim thay tin nhan cua ban de thu hoi.');
+            _showErrorSnackBar('Không tìm thấy tin nhắn của bạn để thu hồi.');
             return;
           }
 
           final confirmed = await AiActionConfirmationSheet.show(
             context,
             icon: Icons.undo_rounded,
-            title: 'X?c nh?n thu h?i tin nh?n',
+            title: 'Xác nhận thu hồi tin nhắn',
             description:
-                'Tr? l? s? thu h?i tin nh?n m?i nh?t c?a b?n trong cu?c tr? chuy?n hi?n t?i.',
-            confirmLabel: 'Thu h?i',
+                'Trợ lý sẽ thu hồi tin nhắn mới nhất của bạn trong cuộc trò chuyện hiện tại.',
+            confirmLabel: 'Thu hồi',
             secondaryDetail: lastMsg.content,
             destructive: true,
           );
@@ -484,7 +474,7 @@ class MainShellState extends State<MainShell> {
             aiCommand: aiCmd,
             extra: {'reason': 'no_active_conversation_or_messages'},
           );
-          _showErrorSnackBar('Khong co tin nhan de thu hoi.');
+          _showErrorSnackBar('Không có tin nhắn để thu hồi.');
         }
         break;
 

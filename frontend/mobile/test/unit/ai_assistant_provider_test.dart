@@ -178,6 +178,48 @@ void main() {
     provider.dispose();
   });
 
+  test('conversation screen prompt does not force bubble auto board', () async {
+    final provider = _buildProvider(
+      responses: {
+        'Mo lai noi dung nay': {
+          'textReply': 'Đây là câu trả lời trong màn hình hội thoại.',
+          'emotion': 'neutral',
+        },
+      },
+    );
+
+    await provider.submitTextPrompt(
+      'Mo lai noi dung nay',
+      source: 'ai_conversation_screen',
+    );
+
+    expect(provider.aiResponse, 'Đây là câu trả lời trong màn hình hội thoại.');
+    expect(provider.lastResponseSurface, AiResponseSurface.conversation);
+    expect(provider.shouldBubbleAutoShowResponse, isFalse);
+    expect(provider.isMascotVisible, isFalse);
+
+    provider.dispose();
+  });
+
+  test('conversation mic keeps bubble hidden while listening', () async {
+    final provider = _buildProvider();
+
+    await provider.startListening(source: 'conversation_screen_mic');
+
+    expect(provider.state, AiState.listening);
+    expect(provider.lastResponseSurface, AiResponseSurface.conversation);
+    expect(provider.isMascotVisible, isFalse);
+
+    await provider.stopListening(
+      reason: 'conversation_screen_mic.toggle_stop',
+      keepBubbleVisible: false,
+    );
+
+    expect(provider.isMascotVisible, isFalse);
+
+    provider.dispose();
+  });
+
   test('startListening falls back gracefully when listen fails', () async {
     speechListenThrows = true;
     final provider = _buildProvider();
@@ -187,6 +229,26 @@ void main() {
     expect(provider.state, AiState.idle);
     expect(provider.aiResponse, contains('Không thể bắt đầu thu âm'));
     expect(provider.isMascotVisible, isTrue);
+
+    provider.dispose();
+  });
+
+  test('clearAiResponse keeps bubble visible for quick follow-up', () async {
+    final provider = _buildProvider(
+      responses: {
+        'Xin chao': {
+          'textReply': 'Xin chao! Toi co the giup gi cho ban?',
+          'emotion': 'joyful',
+        },
+      },
+    );
+
+    await provider.submitTextPrompt('Xin chao', source: 'chat_board_test');
+    provider.clearAiResponse();
+
+    expect(provider.aiResponse, isEmpty);
+    expect(provider.isMascotVisible, isTrue);
+    expect(provider.provisionallyVisible, isTrue);
 
     provider.dispose();
   });
@@ -227,10 +289,7 @@ void main() {
           'textReply': 'Toi se mo khung soan tin cho ban.',
           'emotion': 'neutral',
           'actionCommand': 'COMPOSE_MESSAGE',
-          'actionParams': {
-            'recipient': 'An',
-            'content': 'toi den tre',
-          },
+          'actionParams': {'recipient': 'An', 'content': 'toi den tre'},
         },
       },
     );
