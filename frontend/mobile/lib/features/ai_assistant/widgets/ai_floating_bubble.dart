@@ -566,7 +566,11 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
 
     const boardPadding = 12.0;
     final boardWidth = min(340.0, screenSize.width - (boardPadding * 2));
-    final boardHeight = min(420.0, availableHeight * 0.56);
+    final compactHeightLimit = max(
+      240.0,
+      availableHeight - padding.top - padding.bottom - 24.0,
+    );
+    final boardHeight = min(420.0, compactHeightLimit);
 
     final prefersRightDock = _position.dx < screenSize.width / 2;
     final desiredLeft =

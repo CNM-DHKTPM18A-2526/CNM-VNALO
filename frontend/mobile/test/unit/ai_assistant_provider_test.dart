@@ -201,6 +201,25 @@ void main() {
     provider.dispose();
   });
 
+  test('repairs mojibake AI responses before rendering and history', () async {
+    final provider = _buildProvider(
+      responses: {
+        'kiem tra utf': {
+          'textReply':
+              'KhÃ´ng thá»ƒ báº¯t Ä‘áº§u thu Ã¢m. Báº¡n thá»­ láº¡i.',
+          'emotion': 'neutral',
+        },
+      },
+    );
+
+    await provider.submitTextPrompt('kiem tra utf', source: 'chat_board_test');
+
+    expect(provider.aiResponse, 'Không thể bắt đầu thu âm. Bạn thử lại.');
+    expect(provider.conversationHistory.last.text, provider.aiResponse);
+
+    provider.dispose();
+  });
+
   test('conversation mic keeps bubble hidden while listening', () async {
     final provider = _buildProvider();
 

@@ -198,4 +198,42 @@ void main() {
       provider.dispose();
     },
   );
+
+  testWidgets(
+    'bubble board remains stable on compact viewport',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final provider = _buildProvider();
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider.value(
+          value: provider,
+          child: const MaterialApp(
+            home: Scaffold(body: Stack(children: [AiFloatingBubble()])),
+          ),
+        ),
+      );
+
+      await provider.summonMascot(
+        startListening: false,
+        persist: false,
+        source: 'compact_view_test',
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('ai_bubble_toggle_board')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('ai_chat_board')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      provider.dispose();
+    },
+  );
 }

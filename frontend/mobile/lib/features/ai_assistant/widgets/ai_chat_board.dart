@@ -166,35 +166,48 @@ class _AiChatBoardState extends State<AiChatBoard> {
                     gradient: AppColors.appBarGradient,
                   ),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: Row(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(
-                              Icons.smart_toy_outlined,
-                              color: Colors.white,
-                              size: 16,
+                            const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.smart_toy_outlined,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                                SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    'VNALO AI',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'VNALO AI',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: AiStatusPill(
-                                state: aiProvider.state,
-                                compact: true,
-                              ),
+                            const SizedBox(height: 6),
+                            AiStatusPill(
+                              state: aiProvider.state,
+                              compact: true,
                             ),
                           ],
                         ),
                       ),
-                      Row(
+                      const SizedBox(width: 6),
+                      Wrap(
+                        spacing: 0,
+                        runSpacing: 0,
                         children: [
                           if (widget.onOpenConversation != null)
                             _buildHeaderAction(

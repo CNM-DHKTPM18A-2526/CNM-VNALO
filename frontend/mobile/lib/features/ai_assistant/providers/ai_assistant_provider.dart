@@ -15,6 +15,106 @@ enum AiState { idle, listening, thinking, speaking }
 
 enum AiResponseSurface { bubble, conversation, contextual, voice }
 
+String normalizeAiTextEncoding(String value) {
+  var best = value;
+  var bestScore = _mojibakeScore(best);
+
+  for (var pass = 0; pass < 3; pass++) {
+    final encodedBytes = _encodeWindows1252Bytes(best);
+    if (encodedBytes == null) {
+      break;
+    }
+
+    final candidate = utf8.decode(encodedBytes, allowMalformed: true);
+
+    final candidateScore = _mojibakeScore(candidate);
+    if (candidateScore >= bestScore || candidate.trim().isEmpty) {
+      break;
+    }
+
+    best = candidate;
+    bestScore = candidateScore;
+  }
+
+  return best;
+}
+
+int _mojibakeScore(String value) {
+  var score = 0;
+  const markers = [
+    '\u00C3',
+    '\u00C4',
+    '\u00C2',
+    '\u00C6',
+    '\u00E2\u20AC',
+    '\u00E2\u20AC\u2122',
+    '\u00E2\u20AC\u0153',
+    '\u00E2\u20AC\u009d',
+    '\u00F0\u0178',
+  ];
+
+  for (final marker in markers) {
+    score += marker.allMatches(value).length * 4;
+  }
+
+  for (final rune in value.runes) {
+    if (rune == 0xfffd) {
+      score += 10;
+    } else if (rune >= 0x80 && rune <= 0x9f) {
+      score += 6;
+    }
+  }
+
+  return score;
+}
+
+List<int>? _encodeWindows1252Bytes(String value) {
+  const cp1252Map = <int, int>{
+    0x20AC: 0x80,
+    0x201A: 0x82,
+    0x0192: 0x83,
+    0x201E: 0x84,
+    0x2026: 0x85,
+    0x2020: 0x86,
+    0x2021: 0x87,
+    0x02C6: 0x88,
+    0x2030: 0x89,
+    0x0160: 0x8A,
+    0x2039: 0x8B,
+    0x0152: 0x8C,
+    0x017D: 0x8E,
+    0x2018: 0x91,
+    0x2019: 0x92,
+    0x201C: 0x93,
+    0x201D: 0x94,
+    0x2022: 0x95,
+    0x2013: 0x96,
+    0x2014: 0x97,
+    0x02DC: 0x98,
+    0x2122: 0x99,
+    0x0161: 0x9A,
+    0x203A: 0x9B,
+    0x0153: 0x9C,
+    0x017E: 0x9E,
+    0x0178: 0x9F,
+  };
+
+  final bytes = <int>[];
+  for (final rune in value.runes) {
+    if (rune <= 0xff) {
+      bytes.add(rune);
+      continue;
+    }
+
+    final mapped = cp1252Map[rune];
+    if (mapped == null) {
+      return null;
+    }
+    bytes.add(mapped);
+  }
+  return bytes;
+}
+
 class AiAssistantProvider with ChangeNotifier {
   static const String _visibilityPrefKey = 'vnalo_ai_is_visible';
   static const String _mascotPrefKey = 'vnalo_ai_mascot_id';
@@ -763,7 +863,9 @@ class AiAssistantProvider with ChangeNotifier {
         return;
       }
 
-      _aiResponse = (response['textReply'] ?? '').toString().trim();
+      _aiResponse =
+          normalizeAiTextEncoding((response['textReply'] ?? '').toString())
+              .trim();
       _currentEmotion = (response['emotion'] ?? 'neutral').toString();
       final actionCommand = response['actionCommand']?.toString();
       final actionParams = response['actionParams'];
@@ -933,7 +1035,9 @@ class AiAssistantProvider with ChangeNotifier {
         return;
       }
 
-      _aiResponse = (response['textReply'] ?? '').toString().trim();
+      _aiResponse =
+          normalizeAiTextEncoding((response['textReply'] ?? '').toString())
+              .trim();
       if (_aiResponse.isEmpty) {
         _aiResponse = fallbackMessage;
       }
@@ -1187,8 +1291,8 @@ class AiAssistantProvider with ChangeNotifier {
     String? userEntryId,
     String? assistantEntryId,
   }) {
-    final normalizedUser = userText.trim();
-    final normalizedAi = aiText.trim();
+    final normalizedUser = normalizeAiTextEncoding(userText).trim();
+    final normalizedAi = normalizeAiTextEncoding(aiText).trim();
 
     if (normalizedUser.isNotEmpty) {
       _sessionHistory.add({'role': 'User', 'text': normalizedUser});
@@ -1234,7 +1338,7 @@ class AiAssistantProvider with ChangeNotifier {
     String? entryId,
     DateTime? createdAt,
   }) {
-    final normalized = text.trim();
+    final normalized = normalizeAiTextEncoding(text).trim();
     if (normalized.isEmpty) {
       return;
     }
@@ -1338,7 +1442,8 @@ class AiAssistantProvider with ChangeNotifier {
 
         for (final map in limitedEntries) {
           final roleStr = map['role']?.toString() ?? 'user';
-          final content = map['content']?.toString() ?? '';
+          final content =
+              normalizeAiTextEncoding(map['content']?.toString() ?? '');
           if (content.trim().isEmpty) {
             continue;
           }
@@ -1849,7 +1954,9 @@ class AiConversationEntry {
       orElse: () => AiConversationRole.assistant,
     );
 
-    final content = (json['content'] ?? json['text'] ?? '').toString();
+    final content = normalizeAiTextEncoding(
+      (json['content'] ?? json['text'] ?? '').toString(),
+    );
     final rawCreatedAt = (json['createdAt'] ?? '').toString();
     final parsedCreatedAt =
         DateTime.tryParse(rawCreatedAt)?.toUtc() ?? DateTime.now().toUtc();
