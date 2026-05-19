@@ -142,6 +142,9 @@ class MainShellState extends State<MainShell> {
         return 'NAVIGATE_TO_CHAT';
       case 'SEND_MESSAGE':
         return 'COMPOSE_MESSAGE';
+      case 'RECALL_LAST_MESSAGE':
+      case 'UNDO_LAST_MESSAGE':
+        return 'RECALL_MESSAGE';
       default:
         return command.trim().toUpperCase();
     }
@@ -212,6 +215,17 @@ class MainShellState extends State<MainShell> {
                     '')
                 .toString()
                 .trim();
+        if (targetName.isEmpty) {
+          _logAiFlow(
+            'AI_RESOLUTION_FAILED',
+            aiCommand: aiCmd,
+            extra: {'reason': 'missing_target_name'},
+          );
+          _showErrorSnackBar(
+            'Trợ lý AI chưa xác định được người nhận hoặc cuộc trò chuyện đích.',
+          );
+          return;
+        }
         final conversationMatches = chatProvider.findConversationMatchesByName(
           targetName,
         );
@@ -279,16 +293,18 @@ class MainShellState extends State<MainShell> {
               extra: {'reason': 'empty_content'},
             );
             _showErrorSnackBar(
-              'Tro ly AI khong the gui tin nhan vi noi dung trong.',
+              'Trợ lý AI không thể soạn tin nhắn vì nội dung trống.',
             );
             return;
           }
 
-          final isAlreadyInConversation =
-              chatProvider.activeConversationId == conversation.id ||
+          final isAlreadyActiveConversation =
+              chatProvider.activeConversationId == conversation.id;
+          final hasPendingAiNavigation =
               _activeAiConversationId == conversation.id;
 
-          if (isAlreadyInConversation) {
+          if (command == 'OPEN_CHAT' &&
+              (isAlreadyActiveConversation || hasPendingAiNavigation)) {
             _logAiFlow(
               'AI_NAV_GUARD_BLOCKED',
               aiCommand: aiCmd,
@@ -301,15 +317,28 @@ class MainShellState extends State<MainShell> {
             return;
           }
 
+          if (command == 'COMPOSE_MESSAGE' && hasPendingAiNavigation) {
+            _logAiFlow(
+              'AI_NAV_GUARD_BLOCKED',
+              aiCommand: aiCmd,
+              extra: {
+                'reason': 'compose_navigation_already_pending',
+                'conversationId': conversation.id,
+              },
+            );
+            return;
+          }
+
           if (command == 'COMPOSE_MESSAGE') {
+            if (!mounted) return;
             final confirmed = await AiActionConfirmationSheet.show(
               context,
               icon: Icons.edit_note_rounded,
-              title: 'X?c nh?n so?n tin nh?n',
+              title: 'Xác nhận soạn tin nhắn',
               description:
-                  'Tr? l? s? m? ph?ng chat v? ?i?n s?n n?i dung. Tin nh?n s? ch?a ???c g?i.',
-              confirmLabel: 'M? v? ?i?n s?n',
-              primaryDetail: 'Ng??i nh?n: $peerName',
+                  'Trợ lý sẽ mở phòng chat và điền sẵn nội dung. Tin nhắn sẽ chưa được gửi.',
+              confirmLabel: 'Mở và điền sẵn',
+              primaryDetail: 'Người nhận: $peerName',
               secondaryDetail: prefilledText,
             );
             if (!confirmed) {
@@ -319,6 +348,8 @@ class MainShellState extends State<MainShell> {
             if (!mounted) return;
           }
 
+          if (!mounted) return;
+          final navigator = Navigator.of(context);
           _activeAiConversationId = conversation.id;
           _logAiFlow(
             'AI_NAVIGATE_CHAT',
@@ -329,7 +360,7 @@ class MainShellState extends State<MainShell> {
             },
           );
 
-          await Navigator.of(context).push(
+          await navigator.push(
             MaterialPageRoute(
               builder:
                   (_) => ChatDetailScreen(
@@ -363,13 +394,14 @@ class MainShellState extends State<MainShell> {
           final isVideo = callType == 'video';
           final callTypeName = isVideo ? 'video' : 'thoại';
 
+          if (!mounted) return;
           final confirmed = await AiActionConfirmationSheet.show(
             context,
             icon: isVideo ? Icons.videocam_rounded : Icons.call_rounded,
-            title: 'X?c nh?n g?i $callTypeName',
-            description: 'Tr? l? s? b?t ??u cu?c g?i t?i li?n h? ?? ch?n.',
-            confirmLabel: 'B?t ??u g?i',
-            primaryDetail: 'Ng??i nh?n: $peerName',
+            title: 'Xác nhận gọi $callTypeName',
+            description: 'Trợ lý sẽ bắt đầu cuộc gọi tới liên hệ đã chọn.',
+            confirmLabel: 'Bắt đầu gọi',
+            primaryDetail: 'Người nhận: $peerName',
           );
           if (!confirmed) {
             _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
@@ -454,17 +486,17 @@ class MainShellState extends State<MainShell> {
               aiCommand: aiCmd,
               extra: {'reason': 'no_self_message'},
             );
-            _showErrorSnackBar('Khong tim thay tin nhan cua ban de thu hoi.');
+            _showErrorSnackBar('Không tìm thấy tin nhắn của bạn để thu hồi.');
             return;
           }
 
           final confirmed = await AiActionConfirmationSheet.show(
             context,
             icon: Icons.undo_rounded,
-            title: 'X?c nh?n thu h?i tin nh?n',
+            title: 'Xác nhận thu hồi tin nhắn',
             description:
-                'Tr? l? s? thu h?i tin nh?n m?i nh?t c?a b?n trong cu?c tr? chuy?n hi?n t?i.',
-            confirmLabel: 'Thu h?i',
+                'Trợ lý sẽ thu hồi tin nhắn mới nhất của bạn trong cuộc trò chuyện hiện tại.',
+            confirmLabel: 'Thu hồi',
             secondaryDetail: lastMsg.content,
             destructive: true,
           );
@@ -484,7 +516,7 @@ class MainShellState extends State<MainShell> {
             aiCommand: aiCmd,
             extra: {'reason': 'no_active_conversation_or_messages'},
           );
-          _showErrorSnackBar('Khong co tin nhan de thu hoi.');
+          _showErrorSnackBar('Không có tin nhắn để thu hồi.');
         }
         break;
 
