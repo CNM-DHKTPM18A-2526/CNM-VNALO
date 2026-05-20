@@ -15,6 +15,10 @@ import org.springframework.web.bind.annotation.*;
 
 import iuh.cnm.vnalo.aiservice.dto.ApiResponse;
 
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
+
 @Slf4j
 @RestController
 @RequestMapping("")
@@ -43,8 +47,7 @@ public class AiInteractionController {
                     .body(ApiResponse.error(429, e.getMessage()));
         } catch (RuntimeException e) {
             log.error("AI Interaction error: ", e);
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body(ApiResponse.error(503, "VNALO Brain is restarting."));
+            return ResponseEntity.ok(ApiResponse.ok(buildEmergencyFallbackResponse(request)));
         }
     }
 
@@ -94,5 +97,49 @@ public class AiInteractionController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error(500, "Failed to delete history: " + e.getMessage()));
         }
+    }
+
+    private AiChatResponse buildEmergencyFallbackResponse(AiChatRequest request) {
+        AiChatResponse fallback = AiChatResponse.builder()
+                .textReply("Xin lỗi, hệ thống AI đang bận. Bạn vui lòng thử lại sau ít phút.")
+                .emotion("neutral")
+                .estimatedTokens(0)
+                .build();
+
+        if (!request.isAnalyzeIntent()) {
+            return fallback;
+        }
+
+        String prompt = request.getPrompt() == null ? "" : request.getPrompt().toLowerCase(Locale.ROOT);
+        if (looksLikeCallIntent(prompt)) {
+            Map<String, Object> params = new HashMap<>();
+            params.put("callType", isVideoCallIntent(prompt) ? "video" : "voice");
+
+            fallback.setActionCommand("START_CALL");
+            fallback.setActionParams(params);
+            fallback.setTextReply("Mình đang gặp sự cố AI, nhưng vẫn có thể hỗ trợ bắt đầu cuộc gọi cho bạn.");
+        }
+
+        return fallback;
+    }
+
+    private boolean looksLikeCallIntent(String prompt) {
+        if (prompt.isBlank()) {
+            return false;
+        }
+
+        return prompt.contains("gọi")
+                || prompt.contains("goi")
+                || prompt.contains("call")
+                || prompt.contains("điện thoại")
+                || prompt.contains("dien thoai");
+    }
+
+    private boolean isVideoCallIntent(String prompt) {
+        return prompt.contains("video")
+                || prompt.contains("camera")
+                || prompt.contains("hình")
+                || prompt.contains("hinh")
+                || prompt.contains("cam");
     }
 }
