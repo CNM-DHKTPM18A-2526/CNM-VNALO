@@ -369,20 +369,24 @@ export function ChatWindow({
           </div>
         </div>
         <div className='chat-window-header-actions'>
-          <button
-            className='chat-header-action-btn'
-            type='button'
-            onClick={() => onInitiateCall?.('audio')}
-          >
-            <Icon name='phone' />
-          </button>
-          <button
-            className='chat-header-action-btn'
-            type='button'
-            onClick={() => onInitiateCall?.('video')}
-          >
-            <Icon name='video' />
-          </button>
+          {!conversation.isCloud && (
+            <>
+              <button
+                className='chat-header-action-btn'
+                type='button'
+                onClick={() => onInitiateCall?.('audio')}
+              >
+                <Icon name='phone' />
+              </button>
+              <button
+                className='chat-header-action-btn'
+                type='button'
+                onClick={() => onInitiateCall?.('video')}
+              >
+                <Icon name='video' />
+              </button>
+            </>
+          )}
           <button
             className={rightSidebarContent === 'search' || rightSidebarContent === 'global-search' ? 'chat-header-action-btn chat-header-action-btn-active' : 'chat-header-action-btn'}
             type='button'

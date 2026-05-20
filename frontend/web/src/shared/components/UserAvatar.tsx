@@ -66,7 +66,7 @@ export function UserAvatar({
     const count = avatars.length;
 
     return (
-      <span className={`${mergedClassName} relative overflow-hidden bg-gray-100`}>
+      <span className={`${mergedClassName} relative overflow-hidden group-avatar-collage`}>
         {/* 2 Members: Overlapping offset */}
         {count === 2 && (
           <>

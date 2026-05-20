@@ -151,7 +151,10 @@ export function formatMessagePreview(
   sender?: string,
   attachments?: any[],
 ): string {
-  const content = text || ''
+  let content = text || ''
+  if (content) {
+    content = content.replace(/\u200B@(.*?)\|(.*?)\u200B/g, '@$1').replace(/\u200B/g, '');
+  }
   let prefix = ''
   if (isMe) {
     prefix = 'Bạn: '
