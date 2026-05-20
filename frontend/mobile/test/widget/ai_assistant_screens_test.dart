@@ -1,0 +1,197 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vnalo_mobile/config/app_config.dart';
+import 'package:vnalo_mobile/config/env.dart';
+import 'package:vnalo_mobile/core/localization/language_provider.dart';
+import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
+import 'package:vnalo_mobile/features/ai_assistant/screens/ai_conversation_screen.dart';
+import 'package:vnalo_mobile/features/ai_assistant/screens/mascot_gallery_screen.dart';
+import 'package:vnalo_mobile/services/ai_service.dart';
+import 'package:vnalo_mobile/services/api_service.dart';
+import 'package:vnalo_mobile/services/storage_service.dart';
+
+const MethodChannel _speechChannel = MethodChannel(
+  'plugin.csdcorp.com/speech_to_text',
+);
+const MethodChannel _ttsChannel = MethodChannel('flutter_tts');
+
+class _StubApiService extends ApiService {
+  _StubApiService({Map<String, Map<String, dynamic>> responses = const {}})
+    : _responses = responses,
+      super(StorageService());
+
+  final Map<String, Map<String, dynamic>> _responses;
+
+  @override
+  Future<Map<String, dynamic>> post(
+    String baseUrl,
+    String endpoint, {
+    Map<String, dynamic>? body,
+    Map<String, String>? queryParams,
+  }) async {
+    if (endpoint == '/ai/chat') {
+      final prompt = (body?['prompt'] ?? '').toString();
+      final response =
+          _responses[prompt] ??
+          {'textReply': 'Echo: $prompt', 'emotion': 'neutral'};
+      return {'data': response};
+    }
+
+    if (endpoint == '/ai/history/backup') {
+      return {
+        'data': {'ok': true},
+      };
+    }
+
+    return {};
+  }
+}
+
+AiAssistantProvider _buildProvider({
+  Map<String, Map<String, dynamic>> responses = const {},
+}) {
+  final aiService = AiService(_StubApiService(responses: responses));
+  return AiAssistantProvider(aiService);
+}
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUpAll(() {
+    AppConfig.initialize(Environment.dev);
+  });
+
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+
+    messenger.setMockMethodCallHandler(_speechChannel, (call) async {
+      switch (call.method) {
+        case 'initialize':
+          return true;
+        case 'has_permission':
+          return true;
+        case 'locales':
+          return ['vi_VN:Vietnamese (Vietnam)', 'en_US:English (US)'];
+        case 'listen':
+          return true;
+        case 'stop':
+        case 'cancel':
+          return null;
+        default:
+          return null;
+      }
+    });
+
+    messenger.setMockMethodCallHandler(_ttsChannel, (call) async {
+      switch (call.method) {
+        case 'awaitSpeakCompletion':
+        case 'setLanguage':
+        case 'setPitch':
+        case 'setSpeechRate':
+        case 'stop':
+        case 'speak':
+          return 1;
+        default:
+          return 1;
+      }
+    });
+  });
+
+  tearDown(() async {
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(_speechChannel, null);
+    messenger.setMockMethodCallHandler(_ttsChannel, null);
+  });
+
+  testWidgets('ai conversation screen shows standard send action for input', (
+    tester,
+  ) async {
+    final provider = _buildProvider();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: provider),
+          ChangeNotifierProvider(create: (_) => LanguageProvider()),
+        ],
+        child: const MaterialApp(home: AiConversationScreen()),
+      ),
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('ai_conversation_input')),
+      'Xin chao',
+    );
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('ai_conversation_send')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    provider.dispose();
+  });
+
+  testWidgets('ai conversation screen remains stable on compact viewport', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final provider = _buildProvider();
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: provider),
+          ChangeNotifierProvider(create: (_) => LanguageProvider()),
+        ],
+        child: const MaterialApp(home: AiConversationScreen()),
+      ),
+    );
+
+    expect(
+      find.byKey(const ValueKey('ai_conversation_appbar')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('ai_conversation_input_bar')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+
+    provider.dispose();
+  });
+
+  testWidgets('mascot gallery uses localized title and standard actions', (
+    tester,
+  ) async {
+    final provider = _buildProvider();
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: provider,
+        child: const MaterialApp(home: MascotGalleryScreen()),
+      ),
+    );
+
+    expect(find.text('Chọn trợ lý AI'), findsOneWidget);
+    expect(find.byKey(const ValueKey('mascot_gallery_pager')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('mascot_gallery_primary_button')),
+      findsOneWidget,
+    );
+    expect(find.text('Mascot hiện tại'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    provider.dispose();
+  });
+}

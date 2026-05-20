@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
+import 'package:vnalo_mobile/core/theme/app_typography.dart';
 import 'package:vnalo_mobile/core/utils/date_formatter.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
@@ -56,9 +57,6 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
         surface: AiResponseSurface.conversation,
       );
       _inputController.clear();
-      if (mounted) {
-        _inputFocusNode.requestFocus();
-      }
     } finally {
       if (mounted) {
         setState(() => _isSending = false);
@@ -103,9 +101,9 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<AiAssistantProvider>();
-    final authProvider = context.watch<AuthProvider>();
-    final currentUserId = authProvider.user?.id ?? '';
-    final userAvatarUrl = authProvider.user?.avatarUrl;
+    final authProvider = context.watch<AuthProvider?>();
+    final currentUserId = authProvider?.user?.id ?? '';
+    final userAvatarUrl = authProvider?.user?.avatarUrl;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     // Convert AI history to standard Message models
@@ -126,9 +124,9 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
       backgroundColor:
           isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
       appBar: AppBar(
-        toolbarHeight: 64,
+        toolbarHeight: 60,
         centerTitle: false,
-        titleSpacing: 0,
+        titleSpacing: 10,
         elevation: 0,
         backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
         flexibleSpace:
@@ -139,10 +137,11 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
                 ),
         iconTheme: const IconThemeData(color: Colors.white),
         title: Row(
+          key: const ValueKey('ai_conversation_appbar'),
           children: [
             Container(
-              width: 38,
-              height: 38,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.14),
                 shape: BoxShape.circle,
@@ -151,35 +150,32 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
               child: const Icon(
                 Icons.smart_toy_outlined,
                 color: Colors.white,
-                size: 21,
+                size: 20,
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
+                  Text(
                     'Trợ lý AI VNALO',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 17,
+                    style: AppTypography.titleMedium.copyWith(
                       fontWeight: FontWeight.w700,
                       color: Colors.white,
                     ),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 2),
                   Text(
                     _statusLabel(provider.state),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
+                    style: AppTypography.bodySmall.copyWith(
                       color: Colors.white.withValues(alpha: 0.82),
-                      fontWeight: FontWeight.w400,
                     ),
                   ),
                 ],
@@ -316,8 +312,15 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
 
   Widget _buildInputBar(AiAssistantProvider provider, bool isDarkMode) {
     final bgColor = isDarkMode ? DarkColors.surface : LightColors.surface;
+    final inputBorderColor =
+        isDarkMode
+            ? Colors.white.withValues(alpha: 0.08)
+            : AppColors.itemDivider;
+    final inputSurfaceColor =
+        isDarkMode ? DarkColors.surfaceLight : Colors.white;
 
     return Container(
+      key: const ValueKey('ai_conversation_input_bar'),
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
       decoration: BoxDecoration(
         color: bgColor,
@@ -350,40 +353,83 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
             ),
             Expanded(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: TextField(
+                  key: const ValueKey('ai_conversation_input'),
                   controller: _inputController,
                   focusNode: _inputFocusNode,
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => _sendPrompt(provider),
                   minLines: 1,
                   maxLines: 4,
-                  style: TextStyle(
-                    fontSize: 16,
+                  style: AppTypography.bodyLarge.copyWith(
                     color: isDarkMode ? Colors.white : Colors.black87,
                   ),
                   decoration: InputDecoration(
                     hintText: 'Hỏi trợ lý VNALO AI...',
-                    hintStyle: TextStyle(
+                    hintStyle: AppTypography.bodyLarge.copyWith(
                       color:
                           isDarkMode
                               ? DarkColors.textHint
                               : const Color(0xFFA1A3A7),
-                      fontSize: 16,
                     ),
-                    border: InputBorder.none,
+                    filled: true,
+                    fillColor: inputSurfaceColor,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(18),
+                      borderSide: BorderSide(color: inputBorderColor),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(18),
+                      borderSide: BorderSide(color: inputBorderColor),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(18),
+                      borderSide: BorderSide(
+                        color:
+                            isDarkMode
+                                ? DarkColors.primaryLight
+                                : AppColors.primary,
+                      ),
+                    ),
                     isDense: true,
-                    filled: false,
-                    fillColor: Colors.transparent,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 11,
+                    ),
                   ),
                 ),
               ),
             ),
             if (_hasText)
-              IconButton(
-                icon: const Icon(Icons.send, color: AppColors.primary),
-                onPressed: () => _sendPrompt(provider),
+              Container(
+                width: 44,
+                height: 44,
+                margin: const EdgeInsets.only(left: 8),
+                child: ElevatedButton(
+                  key: const ValueKey('ai_conversation_send'),
+                  onPressed: _isSending ? null : () => _sendPrompt(provider),
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    backgroundColor: AppColors.primary,
+                    disabledBackgroundColor: Colors.grey,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child:
+                      _isSending
+                          ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                          : const Icon(Icons.send_rounded, color: Colors.white),
+                ),
               )
             else
               IconButton(
@@ -469,41 +515,48 @@ class _EmptyAiConversation extends StatelessWidget {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: () => onQuickActionSelected(text),
-          child: Ink(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color:
-                  isDarkMode
-                      ? DarkColors.surface
-                      : Colors.white.withValues(alpha: 0.8),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: AppColors.primary.withValues(alpha: 0.2),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 320),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () => onQuickActionSelected(text),
+            child: Ink(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color:
+                    isDarkMode
+                        ? DarkColors.surface
+                        : Colors.white.withValues(alpha: 0.8),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.2),
+                ),
               ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.auto_awesome_outlined,
-                  size: 16,
-                  color: AppColors.primary,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  text,
-                  style: const TextStyle(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.auto_awesome_outlined,
+                    size: 16,
                     color: AppColors.primary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
                   ),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      text,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
