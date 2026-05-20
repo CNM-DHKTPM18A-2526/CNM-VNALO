@@ -1,6 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_action_confirmation_sheet.dart';
+import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_conversation_disambiguation_sheet.dart';
+import 'package:vnalo_mobile/models/conversation_enums.dart';
+import 'package:vnalo_mobile/models/conversation_member_model.dart';
+import 'package:vnalo_mobile/models/conversation_model.dart';
+import 'package:vnalo_mobile/models/user_model.dart';
+
+Conversation _directConversation({
+  required String id,
+  required String peerName,
+}) {
+  return Conversation(
+    id: id,
+    type: ConversationType.DIRECT,
+    members: [
+      ConversationMember(
+        conversationId: id,
+        userId: 'current-user',
+        joinedAt: DateTime(2026),
+      ),
+      ConversationMember(
+        conversationId: id,
+        userId: 'peer-$id',
+        joinedAt: DateTime(2026),
+        user: User(id: 'peer-$id', displayName: peerName),
+      ),
+    ],
+  );
+}
 
 void main() {
   testWidgets('AI confirmation sheet renders consistent actions', (
@@ -85,5 +113,93 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(await result, isTrue);
+  });
+
+  testWidgets('AI conversation disambiguation sheet returns selected chat', (
+    tester,
+  ) async {
+    late Future<Conversation?> result;
+    final matches = [
+      _directConversation(id: 'c1', peerName: 'Minh Anh'),
+      _directConversation(id: 'c2', peerName: 'Minh Anh Work'),
+    ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder:
+              (context) => Scaffold(
+                body: Center(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      result = AiConversationDisambiguationSheet.show(
+                        context,
+                        matches: matches,
+                        currentUserId: 'current-user',
+                        targetName: 'Minh Anh',
+                      );
+                    },
+                    child: const Text('Open'),
+                  ),
+                ),
+              ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Chọn cuộc trò chuyện "Minh Anh"'), findsOneWidget);
+    expect(find.text('Minh Anh'), findsOneWidget);
+    expect(find.text('Minh Anh Work'), findsOneWidget);
+    expect(find.text('Trò chuyện 1-1'), findsNWidgets(2));
+
+    await tester.tap(
+      find.byKey(const ValueKey('ai_conversation_disambiguation_item_c2')),
+    );
+    await tester.pumpAndSettle();
+
+    expect((await result)?.id, 'c2');
+  });
+
+  testWidgets('AI conversation disambiguation sheet cancel returns null', (
+    tester,
+  ) async {
+    late Future<Conversation?> result;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder:
+              (context) => Scaffold(
+                body: Center(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      result = AiConversationDisambiguationSheet.show(
+                        context,
+                        matches: [
+                          _directConversation(id: 'c1', peerName: 'An'),
+                        ],
+                        currentUserId: 'current-user',
+                        targetName: 'An',
+                      );
+                    },
+                    child: const Text('Open'),
+                  ),
+                ),
+              ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('ai_conversation_disambiguation_cancel')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(await result, isNull);
   });
 }

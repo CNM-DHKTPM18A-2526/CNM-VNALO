@@ -208,6 +208,54 @@ void main() {
     },
   );
 
+  testWidgets('bubble board submit releases focus to avoid keyboard jitter', (
+    tester,
+  ) async {
+    final provider = _buildProvider(
+      responses: {
+        'Mo phong dieu huong': {
+          'textReply': 'Toi da xu ly yeu cau.',
+          'emotion': 'neutral',
+        },
+      },
+    );
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: provider,
+        child: const MaterialApp(
+          home: Scaffold(body: Stack(children: [AiFloatingBubble()])),
+        ),
+      ),
+    );
+
+    await provider.summonMascot(
+      startListening: false,
+      persist: false,
+      source: 'focus_release_test',
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('ai_bubble_toggle_board')));
+    await tester.pumpAndSettle();
+
+    final inputFinder = find.byKey(const ValueKey('ai_chat_input'));
+    await tester.tap(inputFinder);
+    await tester.enterText(inputFinder, 'Mo phong dieu huong');
+    await tester.pump();
+
+    expect(tester.widget<TextField>(inputFinder).focusNode?.hasFocus, isTrue);
+
+    await tester.tap(find.byKey(const ValueKey('ai_chat_send')));
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<TextField>(inputFinder).focusNode?.hasFocus, isFalse);
+    expect(provider.aiResponse, isNotEmpty);
+    expect(tester.takeException(), isNull);
+
+    provider.dispose();
+  });
+
   testWidgets('bubble board remains stable on compact viewport', (
     tester,
   ) async {

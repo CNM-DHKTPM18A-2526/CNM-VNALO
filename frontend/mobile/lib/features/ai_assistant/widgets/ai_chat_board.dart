@@ -62,7 +62,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
       await widget.onSubmitPrompt(text);
       _inputController.clear();
       if (mounted) {
-        _inputFocusNode.requestFocus();
+        _inputFocusNode.unfocus();
       }
     } finally {
       if (mounted) {
