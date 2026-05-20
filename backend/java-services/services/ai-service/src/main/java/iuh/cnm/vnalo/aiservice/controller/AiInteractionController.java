@@ -101,7 +101,7 @@ public class AiInteractionController {
 
     private AiChatResponse buildEmergencyFallbackResponse(AiChatRequest request) {
         AiChatResponse fallback = AiChatResponse.builder()
-                .textReply("Xin lỗi, hệ thống AI đang bận. Bạn vui lòng thử lại sau ít phút.")
+                .textReply("Xin loi, he thong AI dang ban. Ban vui long thu lai sau it phut.")
                 .emotion("neutral")
                 .estimatedTokens(0)
                 .build();
@@ -117,7 +117,7 @@ public class AiInteractionController {
 
             fallback.setActionCommand("START_CALL");
             fallback.setActionParams(params);
-            fallback.setTextReply("Mình đang gặp sự cố AI, nhưng vẫn có thể hỗ trợ bắt đầu cuộc gọi cho bạn.");
+            fallback.setTextReply("AI dang gap su co, nhung minh van co the bat dau cuoc goi cho ban.");
         }
 
         return fallback;
@@ -128,17 +128,15 @@ public class AiInteractionController {
             return false;
         }
 
-        return prompt.contains("gọi")
-                || prompt.contains("goi")
+        return prompt.contains("goi")
                 || prompt.contains("call")
-                || prompt.contains("điện thoại")
+                || prompt.contains("phone")
                 || prompt.contains("dien thoai");
     }
 
     private boolean isVideoCallIntent(String prompt) {
         return prompt.contains("video")
                 || prompt.contains("camera")
-                || prompt.contains("hình")
                 || prompt.contains("hinh")
                 || prompt.contains("cam");
     }
