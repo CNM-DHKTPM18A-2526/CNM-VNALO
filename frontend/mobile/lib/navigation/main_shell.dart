@@ -344,6 +344,8 @@ class MainShellState extends State<MainShell> {
           }
 
           if (!mounted) return;
+          await _dismissSoftKeyboard();
+          if (!mounted) return;
           final navigator = Navigator.of(context);
           _activeAiConversationId = conversation.id;
           _logAiFlow(
@@ -355,18 +357,20 @@ class MainShellState extends State<MainShell> {
             },
           );
 
-          await navigator.push(
-            MaterialPageRoute(
-              builder:
-                  (_) => ChatDetailScreen(
-                    conversation: conversation,
-                    prefilledText: prefilledText,
-                  ),
-            ),
-          );
-          if (!mounted) return;
-          if (_activeAiConversationId == conversation.id) {
-            _activeAiConversationId = null;
+          try {
+            await navigator.push(
+              MaterialPageRoute(
+                builder:
+                    (_) => ChatDetailScreen(
+                      conversation: conversation,
+                      prefilledText: prefilledText,
+                    ),
+              ),
+            );
+          } finally {
+            if (mounted && _activeAiConversationId == conversation.id) {
+              _activeAiConversationId = null;
+            }
           }
         } else if (command == 'START_CALL') {
           if (_isCallScreenActive) {

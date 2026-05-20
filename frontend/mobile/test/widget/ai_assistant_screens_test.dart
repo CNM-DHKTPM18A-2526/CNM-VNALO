@@ -194,4 +194,50 @@ void main() {
 
     provider.dispose();
   });
+
+  testWidgets(
+    'ai conversation screen remains stable with large text scale on compact viewport',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final provider = _buildProvider();
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: provider),
+            ChangeNotifierProvider(create: (_) => LanguageProvider()),
+          ],
+          child: MaterialApp(
+            builder: (context, child) {
+              final mediaQuery = MediaQuery.of(context);
+              return MediaQuery(
+                data: mediaQuery.copyWith(
+                  textScaler: const TextScaler.linear(1.4),
+                ),
+                child: child ?? const SizedBox.shrink(),
+              );
+            },
+            home: const AiConversationScreen(),
+          ),
+        ),
+      );
+
+      expect(
+        find.byKey(const ValueKey('ai_conversation_appbar')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('ai_conversation_input_bar')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+
+      provider.dispose();
+    },
+  );
 }
