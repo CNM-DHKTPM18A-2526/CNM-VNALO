@@ -361,12 +361,14 @@ class AiAssistantProvider with ChangeNotifier {
   // ------------------------- Other ------------------------------------------
   MascotMetadata _currentMascot = MascotMetadata.defaultMascots.first;
   final bool _enableDeepSummary = false;
+  final bool _enableFlowLogging;
   final StreamController<AiCommand> _systemActionController =
       StreamController<AiCommand>.broadcast();
   bool _isDisposed = false;
 
   // ------------------------- Construction -----------------------------------
-  AiAssistantProvider(this._aiService) {
+  AiAssistantProvider(this._aiService, {bool enableFlowLogging = true})
+    : _enableFlowLogging = enableFlowLogging {
     _activeTraceId = _uuid.v4();
     _initTts();
     unawaited(_initPersistence());
@@ -2106,6 +2108,9 @@ class AiAssistantProvider with ChangeNotifier {
     String? traceId,
     Map<String, dynamic>? data,
   }) {
+    if (!_enableFlowLogging) {
+      return;
+    }
     final payload = <String, dynamic>{
       'ts': DateTime.now().toIso8601String(),
       'scope': 'AI_ASSISTANT',

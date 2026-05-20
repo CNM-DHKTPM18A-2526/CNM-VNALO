@@ -55,7 +55,7 @@ AiAssistantProvider _buildProvider({
   Map<String, Map<String, dynamic>> responses = const {},
 }) {
   final aiService = AiService(_StubApiService(responses: responses));
-  return AiAssistantProvider(aiService);
+  return AiAssistantProvider(aiService, enableFlowLogging: false);
 }
 
 Widget _bubbleOverlayBuilder(BuildContext context, Widget? child) {

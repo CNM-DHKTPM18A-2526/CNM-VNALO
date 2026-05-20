@@ -32,6 +32,17 @@ void main() {
         'RECALL_MESSAGE',
       );
     });
+
+    test('keeps call and scanner commands canonical', () {
+      expect(
+        AiCommandRouting.normalizeSystemAction(' start_call '),
+        'START_CALL',
+      );
+      expect(
+        AiCommandRouting.normalizeSystemAction('navigate_to_scanner'),
+        'NAVIGATE_TO_SCANNER',
+      );
+    });
   });
 
   group('AiCommandRouting.normalizeParams', () {
@@ -89,6 +100,20 @@ void main() {
         AiCommandRouting.extractPrefilledText('COMPOSE_MESSAGE', {
           'content': '   ',
         }),
+        isNull,
+      );
+    });
+
+    test('preserves call params for downstream confirmation flow', () {
+      final params = AiCommandRouting.normalizeParams({
+        'target': 'Minh Anh',
+        'callType': 'video',
+      });
+
+      expect(AiCommandRouting.extractTargetName(params), 'Minh Anh');
+      expect(params?['callType'], 'video');
+      expect(
+        AiCommandRouting.extractPrefilledText('START_CALL', params),
         isNull,
       );
     });

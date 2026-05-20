@@ -49,7 +49,7 @@ AiAssistantProvider _buildProvider({
   Map<String, Map<String, dynamic>> responses = const {},
 }) {
   final aiService = AiService(_StubApiService(responses: responses));
-  return AiAssistantProvider(aiService);
+  return AiAssistantProvider(aiService, enableFlowLogging: false);
 }
 
 void main() {
@@ -404,6 +404,33 @@ void main() {
     expect(command.params, isA<Map>());
     expect((command.params as Map)['recipient'], 'An');
     expect((command.params as Map)['content'], 'toi den tre');
+
+    provider.dispose();
+  });
+
+  test('submitTextPrompt emits start call command', () async {
+    final provider = _buildProvider(
+      responses: {
+        'goi video cho Minh Anh': {
+          'textReply': 'Toi se bat dau cuoc goi video cho ban.',
+          'emotion': 'neutral',
+          'actionCommand': 'START_CALL',
+          'actionParams': {'target': 'Minh Anh', 'callType': 'video'},
+        },
+      },
+    );
+
+    final commandFuture = provider.systemActionStream.first;
+    await provider.submitTextPrompt(
+      'goi video cho Minh Anh',
+      source: 'call_command_test',
+    );
+    final command = await commandFuture;
+
+    expect(command.command, 'START_CALL');
+    expect(command.params, isA<Map>());
+    expect((command.params as Map)['target'], 'Minh Anh');
+    expect((command.params as Map)['callType'], 'video');
 
     provider.dispose();
   });
