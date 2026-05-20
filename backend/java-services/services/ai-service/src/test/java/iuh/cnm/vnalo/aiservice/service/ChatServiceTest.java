@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import iuh.cnm.vnalo.aiservice.dto.Message;
 import iuh.cnm.vnalo.aiservice.dto.ChatResponse;
+import iuh.cnm.vnalo.aiservice.exception.AiUnavailableException;
 import iuh.cnm.vnalo.aiservice.exception.RateLimitExceededException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,6 +60,7 @@ class ChatServiceTest {
     @Test
     void ask_shouldFallbackToOllamaWithoutGlobalCounterWhenGeminiUnavailable() {
         when(geminiProvider.isAvailable()).thenReturn(false);
+        when(ollamaProvider.isAvailable()).thenReturn(true);
         when(ollamaProvider.generate(anyString(), org.mockito.ArgumentMatchers.anyList())).thenReturn("fallback");
         when(valueOperations.increment(argThat(key -> key != null && key.startsWith("rl:ai:user:")))).thenReturn(1L);
         when(valueOperations.get(anyString())).thenReturn(null);
@@ -68,6 +70,17 @@ class ChatServiceTest {
 
         assertEquals("ollama", response.getProvider());
         verify(valueOperations, never()).increment(argThat(key -> key.startsWith("rl:ai:global:")));
+    }
+
+    @Test
+    void ask_shouldThrowAiUnavailableWhenBothProvidersUnavailable() {
+        when(geminiProvider.isAvailable()).thenReturn(false);
+        when(ollamaProvider.isAvailable()).thenReturn(false);
+        when(valueOperations.increment(argThat(key -> key != null && key.startsWith("rl:ai:user:")))).thenReturn(1L);
+        when(valueOperations.get(anyString())).thenReturn(null);
+        when(redisTemplate.expire(anyString(), anyLong(), eq(TimeUnit.SECONDS))).thenReturn(true);
+
+        assertThrows(AiUnavailableException.class, () -> chatService.ask("u1", "hello", "c1"));
     }
 
     @Test

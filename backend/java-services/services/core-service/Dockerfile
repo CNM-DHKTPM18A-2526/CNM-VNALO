@@ -9,14 +9,35 @@
 FROM eclipse-temurin:21-jdk-alpine AS builder
 WORKDIR /build
 
+ARG MAVEN_RETRIES=5
+
 # Copy Maven wrapper and config first (cache dependencies layer)
 COPY .mvn/ .mvn/
 COPY mvnw pom.xml ./
-RUN chmod +x mvnw && ./mvnw dependency:go-offline -B
+RUN set -eux; \
+    chmod +x mvnw; \
+    attempts=0; \
+    until [ "$attempts" -ge "$MAVEN_RETRIES" ]; do \
+      attempts=$((attempts + 1)); \
+      ./mvnw -B -U --no-transfer-progress -Dmaven.wagon.http.retryHandler.count=5 dependency:go-offline && break; \
+      echo "Maven go-offline failed (attempt ${attempts}/${MAVEN_RETRIES})."; \
+      find /root/.m2/repository -name "*.lastUpdated" -delete || true; \
+      if [ "$attempts" -ge "$MAVEN_RETRIES" ]; then exit 1; fi; \
+      sleep $((attempts * 5)); \
+    done
 
 # Copy source and build
 COPY src/ src/
-RUN ./mvnw clean package -DskipTests -B
+RUN set -eux; \
+    attempts=0; \
+    until [ "$attempts" -ge "$MAVEN_RETRIES" ]; do \
+      attempts=$((attempts + 1)); \
+      ./mvnw -B -U --no-transfer-progress -DskipTests clean package && break; \
+      echo "Maven package failed (attempt ${attempts}/${MAVEN_RETRIES})."; \
+      find /root/.m2/repository -name "*.lastUpdated" -delete || true; \
+      if [ "$attempts" -ge "$MAVEN_RETRIES" ]; then exit 1; fi; \
+      sleep $((attempts * 5)); \
+    done
 
 # --- Stage 2: Runtime ---
 FROM eclipse-temurin:21-jre-alpine

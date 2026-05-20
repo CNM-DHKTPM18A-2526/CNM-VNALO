@@ -110,6 +110,9 @@ public class ChatService {
             log.warn("Gemini failed ({}), falling back to Ollama...", geminiEx.getMessage());
             
             try {
+                if (!ollamaProvider.isAvailable()) {
+                    throw new RuntimeException("OLLAMA_UNAVAILABLE");
+                }
                 answer = ollamaProvider.generate(dynamicSystemPrompt, trimmedHistory);
                 provider = "ollama";
                 log.info("Response via Ollama (fallback) for user {}", userId);
