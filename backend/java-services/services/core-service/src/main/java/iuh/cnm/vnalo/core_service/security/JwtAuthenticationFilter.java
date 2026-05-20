@@ -15,11 +15,17 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private static final Set<String> INTERNAL_PATH_PREFIXES = Set.of(
+            "/api/v1/ai/internal/",
+            "/api/v1/ai/mascot/internal/"
+    );
 
     private final JwtTokenProvider jwtTokenProvider;
     private final UserDetailsServiceImpl userDetailsService;
@@ -31,11 +37,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         try {
-            String path = request.getServletPath();
+            String path = resolveRequestPath(request);
             // Handle service-to-service authentication for internal endpoints
-            if (path.startsWith("/api/v1/ai/internal/") || path.startsWith("/api/v1/ai/mascot/internal/")) {
+            if (isInternalPath(path)) {
                 String secret = request.getHeader("X-Internal-Secret");
-                if (internalSecret != null && internalSecret.equals(secret)) {
+                if (StringUtils.hasText(internalSecret) && internalSecret.equals(secret)) {
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken("internal-service", null,
                                     org.springframework.security.core.authority.AuthorityUtils.createAuthorityList("ROLE_INTERNAL"));
@@ -45,7 +51,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     filterChain.doFilter(request, response);
                     return;
                 } else {
-                    log.warn("Unauthorized attempt to access internal path {} without valid service secret", path);
+                    log.warn("Unauthorized internal request for path {}. configuredSecretPresent={}, providedSecretPresent={}",
+                            path, StringUtils.hasText(internalSecret), StringUtils.hasText(secret));
                     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                     response.setContentType("application/json");
                     response.getWriter().write("{\"status\":\"error\",\"message\":\"Access Denied: Invalid Microservice Secret\"}");
@@ -84,9 +91,28 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return null;
     }
 
+    private String resolveRequestPath(HttpServletRequest request) {
+        String requestUri = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        if (StringUtils.hasText(contextPath) && StringUtils.hasText(requestUri) && requestUri.startsWith(contextPath)) {
+            return requestUri.substring(contextPath.length());
+        }
+        return StringUtils.hasText(requestUri) ? requestUri : request.getServletPath();
+    }
+
+    private boolean isInternalPath(String path) {
+        if (!StringUtils.hasText(path)) {
+            return false;
+        }
+        return INTERNAL_PATH_PREFIXES.stream().anyMatch(path::startsWith);
+    }
+
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        String path = request.getServletPath();
+        String path = resolveRequestPath(request);
+        if (isInternalPath(path)) {
+            return false;
+        }
         // Some /auth endpoints still require authentication, so do NOT skip JWT filter for them.
         // Keep this list in sync with SecurityConfig requestMatchers(...).authenticated().
         if (path.equals("/auth/logout-all")

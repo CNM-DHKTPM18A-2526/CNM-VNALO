@@ -28,6 +28,7 @@ ai:
     api-key: ${GEMINI_API_KEY:}
     model: ${GEMINI_MODEL:gemini-2.5-flash}
   ollama:
+    enabled: ${OLLAMA_ENABLED:true}
     base-url: ${OLLAMA_URL:http://localhost:11434}
     model: ${OLLAMA_MODEL:llama3.1:8b}
   chat:

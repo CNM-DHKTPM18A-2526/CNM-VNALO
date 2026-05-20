@@ -87,6 +87,9 @@ public class GeminiAiService {
         } catch (Exception geminiEx) {
             log.warn("Gemini failed in GeminiAiService ({}), falling back to Ollama...", geminiEx.getMessage());
             try {
+                if (!ollamaProvider.isAvailable()) {
+                    throw new RuntimeException("OLLAMA_UNAVAILABLE");
+                }
                 // Prepare messages list for Ollama fallback
                 List<Message> historyMessages = new ArrayList<>();
                 if (request.getHistory() != null) {
@@ -100,7 +103,7 @@ public class GeminiAiService {
                 answer = responseObj.getTextReply();
                 provider = "ollama";
             } catch (Exception ollamaEx) {
-                log.error("Both providers failed in GeminiAiService. Gemini: {}, Ollama: {}", geminiEx.getMessage(), ollamaEx.getMessage());
+                log.error("Both AI providers failed in GeminiAiService. Gemini: {}, Ollama: {}", geminiEx.getMessage(), ollamaEx.getMessage());
                 throw new RuntimeException("AI_SERVICE_ERROR");
             }
         }

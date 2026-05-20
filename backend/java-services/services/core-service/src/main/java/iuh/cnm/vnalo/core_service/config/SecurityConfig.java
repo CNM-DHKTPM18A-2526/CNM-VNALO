@@ -39,8 +39,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                     // Selected auth endpoints still require authentication
                     .requestMatchers("/auth/logout-all", "/auth/change-password", "/auth/password/change", "/auth/login-devices", "/auth/qr/sessions/*/approve").authenticated()
+                        .requestMatchers("/api/v1/ai/internal/**", "/api/v1/ai/mascot/internal/**").hasRole("INTERNAL")
                         .requestMatchers("/auth/**", "/swagger-ui/**", "/swagger-ui.html",
-                                "/v3/api-docs/**", "/h2-console/**").permitAll()
+                                "/v3/api-docs/**", "/h2-console/**", "/error").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers("/actuator/**").authenticated()
                         .anyRequest().authenticated())
