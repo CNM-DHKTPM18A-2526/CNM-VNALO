@@ -148,7 +148,7 @@ class AiActionConfirmationSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Container(
                         width: 52,
@@ -161,29 +161,34 @@ class AiActionConfirmationSheet extends StatelessWidget {
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(
-                            title,
-                            style: AppTypography.titleMedium.copyWith(
-                              color: textPrimary,
-                              fontWeight: FontWeight.w700,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title,
+                              style: AppTypography.titleMedium.copyWith(
+                                color: textPrimary,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
-                          ),
+                            const SizedBox(height: 4),
+                            Text(
+                              description,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.bodySmall.copyWith(
+                                height: 1.35,
+                                color: textSecondary,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    description,
-                    style: AppTypography.bodyMedium.copyWith(
-                      height: 1.45,
-                      color: textSecondary,
-                    ),
-                  ),
                   if (primaryDetail != null || secondaryDetail != null) ...[
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 16),
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(

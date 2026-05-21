@@ -126,12 +126,17 @@ class _AiRobotAvatarState extends State<AiRobotAvatar>
           animation: _controller,
           builder: (context, child) {
             final wave = math.sin(_controller.value * math.pi * 2);
-            final lift = wave * 2.0;
-            final auraScale = 0.92 + ((_controller.value + 0.12) * 0.12);
+            final lift =
+                widget.state == AiState.listening ? wave * 1.0 : wave * 2.0;
+            final auraScale =
+                widget.state == AiState.listening
+                    ? 0.9 + ((_controller.value + 0.08) * 0.08)
+                    : 0.92 + ((_controller.value + 0.12) * 0.12);
 
             return Transform.translate(
               offset: Offset(0, lift),
               child: Stack(
+                clipBehavior: Clip.none,
                 alignment: Alignment.center,
                 children: [
                   Transform.scale(

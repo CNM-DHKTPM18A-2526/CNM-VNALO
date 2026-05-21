@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -304,7 +304,7 @@ class AiAssistantProvider with ChangeNotifier {
   static const String _syncedEntryIdsPrefKey = 'vnalo_ai_synced_entry_ids_v1';
   static const String _defaultLocaleId = 'vi_VN';
   static const Duration _aiTimeout = Duration(seconds: 25);
-  static const Duration _sttListenFor = Duration(seconds: 8);
+  static const Duration _sttListenFor = Duration(seconds: 10);
   static const Duration _sttPauseFor = Duration(seconds: 2);
   static const Duration _idleAutoHideDelay = Duration(seconds: 12);
   static const Duration _emptySummonAutoHideDelay = Duration(seconds: 6);
@@ -339,6 +339,7 @@ class AiAssistantProvider with ChangeNotifier {
   String _activeTraceId = '';
   String? _resolvedLocaleId;
   Timer? _listenGuardTimer;
+  DateTime? _listenStartedAt;
   DateTime? _lastFinalResultAt;
   String _lastFinalResultText = '';
   DateTime? _lastSoundLevelNotifyAt;
@@ -566,7 +567,7 @@ class AiAssistantProvider with ChangeNotifier {
   void _startListenGuard({required int token, required String traceId}) {
     _cancelListenGuard();
     _listenGuardTimer = Timer(
-      _sttListenFor + const Duration(seconds: 1),
+      _sttListenFor,
       () =>
           unawaited(_handleListenGuardTimeout(token: token, traceId: traceId)),
     );
@@ -575,6 +576,14 @@ class AiAssistantProvider with ChangeNotifier {
   void _cancelListenGuard() {
     _listenGuardTimer?.cancel();
     _listenGuardTimer = null;
+  }
+
+  Duration _elapsedListeningTime() {
+    final startedAt = _listenStartedAt;
+    if (startedAt == null) {
+      return Duration.zero;
+    }
+    return DateTime.now().difference(startedAt);
   }
 
   void _handleSoundLevelChange(double rawLevel) {
@@ -609,6 +618,7 @@ class AiAssistantProvider with ChangeNotifier {
     _operationToken += 1;
     _isPipelineLocked = false;
     _cancelListenGuard();
+    _listenStartedAt = null;
     _logEvent('PIPELINE_CANCELLED', level: 'WARN', data: {'reason': reason});
   }
 
@@ -1017,6 +1027,7 @@ class AiAssistantProvider with ChangeNotifier {
 
     _isSessionActive = true;
     _lastWords = '';
+    _listenStartedAt = DateTime.now();
     _transitionTo(
       AiState.listening,
       reason: 'start_listening',
@@ -1080,8 +1091,7 @@ class AiAssistantProvider with ChangeNotifier {
       _cancelActiveOperation(reason: 'stt_listen_error:$source');
       _isSessionActive = false;
       _soundLevel = 0;
-      _aiResponse =
-          'Không thể bắt đầu thu âm. Bạn thử lại hoặc nhập tin nhắn.';
+      _aiResponse = 'Không thể bắt đầu thu âm. Bạn thử lại hoặc nhập tin nhắn.';
       _transitionTo(
         AiState.idle,
         reason: 'stt_listen_error',
@@ -1101,6 +1111,7 @@ class AiAssistantProvider with ChangeNotifier {
     bool keepBubbleVisible = true,
   }) async {
     _cancelListenGuard();
+    _listenStartedAt = null;
     try {
       await _stt.stop();
     } catch (error) {
@@ -1140,7 +1151,18 @@ class AiAssistantProvider with ChangeNotifier {
           if ((normalized == 'done' || normalized == 'notlistening') &&
               _state == AiState.listening &&
               !_isPipelineLocked) {
+            if (_lastWords.isEmpty && _elapsedListeningTime() < _sttListenFor) {
+              _logEvent(
+                'STT_EARLY_DONE_IGNORED',
+                data: {
+                  'elapsedMs': _elapsedListeningTime().inMilliseconds,
+                  'minimumMs': _sttListenFor.inMilliseconds,
+                },
+              );
+              return;
+            }
             _cancelListenGuard();
+            _listenStartedAt = null;
             _isSessionActive = false;
             _soundLevel = 0;
             _transitionTo(
@@ -1166,6 +1188,7 @@ class AiAssistantProvider with ChangeNotifier {
           );
           if (_state == AiState.listening && !_isPipelineLocked) {
             _cancelListenGuard();
+            _listenStartedAt = null;
             _isSessionActive = false;
             _soundLevel = 0;
             _transitionTo(AiState.idle, reason: 'stt_error', notify: false);
@@ -1656,7 +1679,11 @@ class AiAssistantProvider with ChangeNotifier {
     _currentEmotion = 'neutral';
     if (userText != null && userText.trim().isNotEmpty) {
       if (recordUserInHistory) {
-        _recordUserHistory(text: userText, source: source, entryId: userEntryId);
+        _recordUserHistory(
+          text: userText,
+          source: source,
+          entryId: userEntryId,
+        );
       }
       _recordAssistantHistory(
         text: _aiResponse,
@@ -1676,9 +1703,10 @@ class AiAssistantProvider with ChangeNotifier {
     bool notify = false,
   }) {
     _isResponseDegraded = degraded;
-    _providerStatus = providerStatus.trim().isEmpty
-        ? 'LIVE_PROVIDER_ACTIVE'
-        : providerStatus.trim();
+    _providerStatus =
+        providerStatus.trim().isEmpty
+            ? 'LIVE_PROVIDER_ACTIVE'
+            : providerStatus.trim();
     if (notify) {
       notifyListeners();
     }
@@ -1711,6 +1739,7 @@ class AiAssistantProvider with ChangeNotifier {
     required bool keepResponse,
   }) async {
     _cancelListenGuard();
+    _listenStartedAt = null;
     try {
       await _stt.stop();
     } catch (error) {
@@ -2131,6 +2160,7 @@ class AiAssistantProvider with ChangeNotifier {
     }
 
     _cancelListenGuard();
+    _listenStartedAt = null;
     _isSessionActive = false;
     _soundLevel = 0;
     _transitionTo(

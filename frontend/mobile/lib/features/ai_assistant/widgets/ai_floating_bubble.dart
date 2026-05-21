@@ -24,7 +24,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
     with TickerProviderStateMixin {
   static const double _bubbleSize = 78;
   static const double _bubbleRadius = _bubbleSize / 2;
-  static const double _bubbleRootHeight = 96;
+  static const double _bubbleRootHeight = 108;
   static const String _positionXPrefKey = 'vnalo_ai_bubble_x';
   static const String _positionYPrefKey = 'vnalo_ai_bubble_y';
   static const double _trashHoverDistance = 72;
@@ -460,8 +460,8 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
     return Transform.scale(
       scale: _currentScale,
       child: SizedBox(
-        width: _bubbleSize,
-        height: _bubbleSize,
+        width: _bubbleSize + 8,
+        height: _bubbleSize + 8,
         child: Listener(
           onPointerDown: (event) {
             _onPointerDown(event, provider.currentMascot);
@@ -644,7 +644,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
               mainAxisSize: MainAxisSize.min,
               children: [
                 _buildBubbleIndicator(aiProvider),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 _buildMascotContainer(aiProvider),
               ],
             ),
