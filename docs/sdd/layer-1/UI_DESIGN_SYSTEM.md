@@ -99,6 +99,26 @@ Font family source: GoogleFonts.inter
 - Error notification uses redAccent in MainShell for call signaling errors.
 - Warning uses orange in registration partial success paths.
 
+### Bottom Sheets and Confirmation Modals
+
+- Bottom-sheet top radius uses 22-24 depending on screen family.
+- Drag handles use width 40-56, height 4-6, and very high radius.
+- Primary and secondary CTA buttons use min height 48-50 and radius 12.
+- Secondary cancel buttons may use outlined or muted filled style, but must preserve radius 12 unless the sheet intentionally follows quick-action pill grammar.
+- Destructive confirmation buttons use error red and never appear as the only choice.
+
+### Inputs and Composers
+
+- Form fields use radius 12 with visible focused border.
+- Chat/AI composers may use larger pill wrappers, but the actual editable surface must preserve the same focus clarity and contrast as auth fields.
+- Placeholder controls must not be shown unless implemented or explicitly marked as disabled/coming soon.
+
+### AI Assistant Specific
+
+- AI provider status must be visible when the assistant is degraded, using chip/banner treatment rather than only generic error text.
+- AI action confirmation sheets must show recipient/target metadata separately from message preview text.
+- AI chat surfaces should align with chat-detail spacing, button sizing, and input ergonomics unless a smaller floating-board variant is intentionally used.
+
 ### Call Screens
 
 - Voice call primary background uses #0068FF in light mode and #0F172A in dark mode.
