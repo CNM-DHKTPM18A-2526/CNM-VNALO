@@ -4,25 +4,20 @@ import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provid
 class AiStatusPill extends StatelessWidget {
   final AiState state;
   final bool compact;
+  final bool degraded;
+  final String providerStatus;
 
-  const AiStatusPill({super.key, required this.state, this.compact = false});
+  const AiStatusPill({
+    super.key,
+    required this.state,
+    this.compact = false,
+    this.degraded = false,
+    this.providerStatus = 'LIVE_PROVIDER_ACTIVE',
+  });
 
   @override
   Widget build(BuildContext context) {
-    final (label, color, icon) = switch (state) {
-      AiState.listening => ('Đang nghe', const Color(0xFFEF4444), Icons.mic),
-      AiState.thinking => (
-        'Đang xử lý',
-        const Color(0xFF2563EB),
-        Icons.auto_awesome,
-      ),
-      AiState.speaking => (
-        'Đang phản hồi',
-        const Color(0xFF16A34A),
-        Icons.volume_up,
-      ),
-      AiState.idle => ('Sẵn sàng', const Color(0xFF64748B), Icons.bolt),
-    };
+    final (label, color, icon) = _resolveVisualState();
 
     return Semantics(
       label: 'Trạng thái trợ lý AI: $label',
@@ -56,5 +51,38 @@ class AiStatusPill extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  (String, Color, IconData) _resolveVisualState() {
+    if (providerStatus == 'AI_PROVIDER_UNAVAILABLE') {
+      return (
+        'AI đang bảo trì',
+        const Color(0xFFF59E0B),
+        Icons.warning_amber_rounded,
+      );
+    }
+
+    if (providerStatus == 'FALLBACK_PROVIDER_ACTIVE' || degraded) {
+      return (
+        'Chế độ dự phòng',
+        const Color(0xFFF59E0B),
+        Icons.shield_outlined,
+      );
+    }
+
+    return switch (state) {
+      AiState.listening => ('Đang nghe', const Color(0xFFEF4444), Icons.mic),
+      AiState.thinking => (
+        'Đang xử lý',
+        const Color(0xFF2563EB),
+        Icons.auto_awesome,
+      ),
+      AiState.speaking => (
+        'Đang phản hồi',
+        const Color(0xFF16A34A),
+        Icons.volume_up,
+      ),
+      AiState.idle => ('Sẵn sàng', const Color(0xFF64748B), Icons.bolt),
+    };
   }
 }

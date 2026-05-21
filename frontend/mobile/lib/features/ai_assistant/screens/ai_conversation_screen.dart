@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/theme/app_typography.dart';
@@ -280,31 +280,89 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
   }
 
   Widget _buildInfoBanner(AiAssistantProvider provider, bool isDarkMode) {
+    final infoText =
+        provider.cloudBackupEnabled
+            ? 'Cuộc trò chuyện được mã hóa và sao lưu trên Cloud.'
+            : 'Chế độ Local-first: dữ liệu chỉ lưu trên thiết bị này.';
+    final showDegradedBanner = provider.isResponseDegraded;
+    final degradedText =
+        provider.isProviderUnavailable
+            ? 'AI đang bảo trì. Một số thao tác cục bộ vẫn có thể tiếp tục.'
+            : 'AI đang chạy ở chế độ dự phòng.';
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: isDarkMode ? DarkColors.surface : Colors.white,
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            provider.cloudBackupEnabled
-                ? Icons.lock_outline
-                : Icons.shield_outlined,
-            size: 14,
-            color: AppColors.primary,
+          Row(
+            children: [
+              Icon(
+                provider.cloudBackupEnabled
+                    ? Icons.lock_outline
+                    : Icons.shield_outlined,
+                size: 14,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  infoText,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDarkMode ? Colors.white54 : Colors.black54,
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              provider.cloudBackupEnabled
-                  ? 'Cuộc trò chuyện được mã hóa và sao lưu trên Cloud.'
-                  : 'Chế độ Local-first: Dữ liệu chỉ lưu trên thiết bị này.',
-              style: TextStyle(
-                fontSize: 11,
-                color: isDarkMode ? Colors.white54 : Colors.black54,
+          if (showDegradedBanner) ...[
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color:
+                    provider.isProviderUnavailable
+                        ? AppColors.warning.withValues(alpha: 0.14)
+                        : AppColors.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color:
+                      provider.isProviderUnavailable
+                          ? AppColors.warning.withValues(alpha: 0.45)
+                          : AppColors.primary.withValues(alpha: 0.18),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    provider.isProviderUnavailable
+                        ? Icons.warning_amber_rounded
+                        : Icons.sync_problem_rounded,
+                    size: 16,
+                    color:
+                        provider.isProviderUnavailable
+                            ? AppColors.warning
+                            : AppColors.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      degradedText,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: isDarkMode ? Colors.white70 : Colors.black87,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -376,15 +434,15 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
                     filled: true,
                     fillColor: inputSurfaceColor,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(18),
+                      borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(color: inputBorderColor),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(18),
+                      borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(color: inputBorderColor),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(18),
+                      borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(
                         color:
                             isDarkMode
@@ -432,15 +490,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
                 ),
               )
             else
-              IconButton(
-                icon: Icon(
-                  Icons.image_outlined,
-                  color: isDarkMode ? Colors.white70 : AppColors.iconSubtle,
-                ),
-                onPressed: () {
-                  // Placeholder for future AI vision features
-                },
-              ),
+              const SizedBox(width: 8),
           ],
         ),
       ),
@@ -564,3 +614,4 @@ class _EmptyAiConversation extends StatelessWidget {
     );
   }
 }
+

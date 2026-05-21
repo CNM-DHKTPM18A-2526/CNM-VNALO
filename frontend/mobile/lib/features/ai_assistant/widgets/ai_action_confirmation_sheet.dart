@@ -2,14 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/theme/app_typography.dart';
 
+enum AiActionConfirmationResult { cancelled, confirmed, alternate }
+
 class AiActionConfirmationSheet extends StatelessWidget {
   final IconData icon;
   final String title;
   final String description;
   final String confirmLabel;
   final String cancelLabel;
+  final String? alternateLabel;
   final String? primaryDetail;
   final String? secondaryDetail;
+  final String? primaryDetailLabel;
+  final String? secondaryDetailLabel;
   final bool destructive;
 
   const AiActionConfirmationSheet({
@@ -19,8 +24,11 @@ class AiActionConfirmationSheet extends StatelessWidget {
     required this.description,
     required this.confirmLabel,
     this.cancelLabel = 'Hủy',
+    this.alternateLabel,
     this.primaryDetail,
     this.secondaryDetail,
+    this.primaryDetailLabel,
+    this.secondaryDetailLabel,
     this.destructive = false,
   });
 
@@ -31,11 +39,45 @@ class AiActionConfirmationSheet extends StatelessWidget {
     required String description,
     required String confirmLabel,
     String cancelLabel = 'Hủy',
+    String? alternateLabel,
     String? primaryDetail,
     String? secondaryDetail,
+    String? primaryDetailLabel,
+    String? secondaryDetailLabel,
     bool destructive = false,
   }) async {
-    return await showModalBottomSheet<bool>(
+    final result = await showForResult(
+      context,
+      icon: icon,
+      title: title,
+      description: description,
+      confirmLabel: confirmLabel,
+      cancelLabel: cancelLabel,
+      alternateLabel: alternateLabel,
+      primaryDetail: primaryDetail,
+      secondaryDetail: secondaryDetail,
+      primaryDetailLabel: primaryDetailLabel,
+      secondaryDetailLabel: secondaryDetailLabel,
+      destructive: destructive,
+    );
+    return result == AiActionConfirmationResult.confirmed;
+  }
+
+  static Future<AiActionConfirmationResult> showForResult(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String description,
+    required String confirmLabel,
+    String cancelLabel = 'Hủy',
+    String? alternateLabel,
+    String? primaryDetail,
+    String? secondaryDetail,
+    String? primaryDetailLabel,
+    String? secondaryDetailLabel,
+    bool destructive = false,
+  }) async {
+    return await showModalBottomSheet<AiActionConfirmationResult>(
           context: context,
           isScrollControlled: true,
           useSafeArea: true,
@@ -47,12 +89,15 @@ class AiActionConfirmationSheet extends StatelessWidget {
                 description: description,
                 confirmLabel: confirmLabel,
                 cancelLabel: cancelLabel,
+                alternateLabel: alternateLabel,
                 primaryDetail: primaryDetail,
                 secondaryDetail: secondaryDetail,
+                primaryDetailLabel: primaryDetailLabel,
+                secondaryDetailLabel: secondaryDetailLabel,
                 destructive: destructive,
               ),
         ) ??
-        false;
+        AiActionConfirmationResult.cancelled;
   }
 
   @override
@@ -146,7 +191,7 @@ class AiActionConfirmationSheet extends StatelessWidget {
                             isDark
                                 ? Colors.white.withValues(alpha: 0.06)
                                 : const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius: BorderRadius.circular(14),
                         border: Border.all(
                           color:
                               isDark
@@ -158,23 +203,21 @@ class AiActionConfirmationSheet extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           if (primaryDetail != null)
-                            Text(
-                              primaryDetail!,
-                              style: AppTypography.labelLarge.copyWith(
-                                color: textPrimary,
-                                fontWeight: FontWeight.w700,
-                              ),
+                            _DetailBlock(
+                              label: primaryDetailLabel ?? 'Đích đến',
+                              value: primaryDetail!,
+                              color: textPrimary,
+                              labelColor: textSecondary,
+                              emphasized: true,
                             ),
                           if (secondaryDetail != null) ...[
-                            const SizedBox(height: 8),
-                            Text(
-                              secondaryDetail!,
-                              maxLines: 6,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppTypography.bodyMedium.copyWith(
-                                color: textSecondary,
-                                height: 1.4,
-                              ),
+                            if (primaryDetail != null)
+                              const SizedBox(height: 12),
+                            _DetailBlock(
+                              label: secondaryDetailLabel ?? 'Nội dung',
+                              value: secondaryDetail!,
+                              color: textSecondary,
+                              labelColor: textSecondary,
                             ),
                           ],
                         ],
@@ -194,7 +237,10 @@ class AiActionConfirmationSheet extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      onPressed: () => Navigator.of(context).pop(true),
+                      onPressed:
+                          () => Navigator.of(
+                            context,
+                          ).pop(AiActionConfirmationResult.confirmed),
                       child: Text(
                         confirmLabel,
                         style: AppTypography.labelLarge.copyWith(
@@ -204,12 +250,42 @@ class AiActionConfirmationSheet extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (alternateLabel != null) ...[
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: OutlinedButton(
+                        onPressed:
+                            () => Navigator.of(
+                              context,
+                            ).pop(AiActionConfirmationResult.alternate),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: accent,
+                          side: BorderSide(color: accent.withValues(alpha: 0.4)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(
+                          alternateLabel!,
+                          style: AppTypography.labelLarge.copyWith(
+                            color: accent,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
                     height: 48,
                     child: ElevatedButton(
-                      onPressed: () => Navigator.of(context).pop(false),
+                      onPressed:
+                          () => Navigator.of(
+                            context,
+                          ).pop(AiActionConfirmationResult.cancelled),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: secondaryButtonBg,
                         foregroundColor: textPrimary,
@@ -233,6 +309,50 @@ class AiActionConfirmationSheet extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _DetailBlock extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  final Color labelColor;
+  final bool emphasized;
+
+  const _DetailBlock({
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.labelColor,
+    this.emphasized = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: AppTypography.labelSmall.copyWith(
+            color: labelColor,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 5),
+        Text(
+          value,
+          maxLines: emphasized ? 2 : 6,
+          overflow: TextOverflow.ellipsis,
+          style: (emphasized ? AppTypography.labelLarge : AppTypography.bodyMedium)
+              .copyWith(
+                color: color,
+                height: 1.4,
+                fontWeight: emphasized ? FontWeight.w700 : FontWeight.w400,
+              ),
+        ),
+      ],
     );
   }
 }

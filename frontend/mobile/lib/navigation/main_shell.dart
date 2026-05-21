@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -104,7 +104,7 @@ class MainShellState extends State<MainShell> {
     final page = (params?['page'] ?? '').toString().trim().toLowerCase();
 
     if (page.isEmpty) {
-      _showErrorSnackBar('Lệnh NAVIGATE_TO thiếu tham số page.');
+      _showErrorSnackBar('Lệnh NAVIGATE_TO thiếu tham số `page`.');
       return;
     }
 
@@ -310,34 +310,52 @@ class MainShellState extends State<MainShell> {
             return;
           }
 
+          var shouldSendImmediately = false;
           if (command == 'COMPOSE_MESSAGE') {
             if (!mounted) return;
-            final confirmed = await AiActionConfirmationSheet.show(
+            final composeDecision = await AiActionConfirmationSheet.showForResult(
               context,
               icon: Icons.edit_note_rounded,
-              title: 'Xác nhận soạn tin nhắn',
+              title: 'Xác nhận hỗ trợ nhắn tin',
               description:
-                  'Trợ lý sẽ mở phòng chat và điền sẵn nội dung. Tin nhắn sẽ chưa được gửi.',
+                  'Bạn có thể mở cuộc trò chuyện để kiểm tra lại hoặc gửi ngay sau khi đã xác nhận đúng người nhận.',
               confirmLabel: 'Mở và điền sẵn',
-              primaryDetail: 'Người nhận: $peerName',
+              alternateLabel: 'Gửi ngay',
+              primaryDetail: peerName,
               secondaryDetail: prefilledText,
+              primaryDetailLabel: 'Người nhận',
+              secondaryDetailLabel: 'Tin nhắn',
             );
-            if (!confirmed) {
+            if (composeDecision == AiActionConfirmationResult.cancelled) {
               _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
               return;
             }
             if (!mounted) return;
+            shouldSendImmediately =
+                composeDecision == AiActionConfirmationResult.alternate;
 
             if (isAlreadyActiveConversation) {
-              chatProvider.injectAiComposeDraft(
-                conversationId: conversation.id,
-                text: prefilledText!,
-              );
-              _logAiFlow(
-                'AI_COMPOSE_DRAFT_INJECTED',
-                aiCommand: aiCmd,
-                extra: {'conversationId': conversation.id},
-              );
+              if (shouldSendImmediately) {
+                chatProvider.sendMessage(
+                  conversationId: conversation.id,
+                  content: prefilledText!,
+                );
+                _logAiFlow(
+                  'AI_MESSAGE_SENT_IMMEDIATELY',
+                  aiCommand: aiCmd,
+                  extra: {'conversationId': conversation.id},
+                );
+              } else {
+                chatProvider.injectAiComposeDraft(
+                  conversationId: conversation.id,
+                  text: prefilledText!,
+                );
+                _logAiFlow(
+                  'AI_COMPOSE_DRAFT_INJECTED',
+                  aiCommand: aiCmd,
+                  extra: {'conversationId': conversation.id},
+                );
+              }
               setState(() => _currentIndex = 0);
               return;
             }
@@ -358,12 +376,26 @@ class MainShellState extends State<MainShell> {
           );
 
           try {
+            if (command == 'COMPOSE_MESSAGE' &&
+                shouldSendImmediately &&
+                prefilledText != null) {
+              chatProvider.sendMessage(
+                conversationId: conversation.id,
+                content: prefilledText,
+              );
+              _logAiFlow(
+                'AI_MESSAGE_SENT_IMMEDIATELY',
+                aiCommand: aiCmd,
+                extra: {'conversationId': conversation.id},
+              );
+            }
             await navigator.push(
               MaterialPageRoute(
                 builder:
                     (_) => ChatDetailScreen(
                       conversation: conversation,
-                      prefilledText: prefilledText,
+                      prefilledText:
+                          shouldSendImmediately ? null : prefilledText,
                     ),
               ),
             );
@@ -586,7 +618,7 @@ class MainShellState extends State<MainShell> {
       bottomNavigationBar: Consumer2<ChatProvider, ContactProvider>(
         builder: (context, chatProvider, contactProvider, child) {
           debugPrint(
-            '🎨 [MainShell] Rebuilding BottomNavigationBar (pendingFriendCount: ${contactProvider.pendingRequestCount})',
+            'ðŸŽ¨ [MainShell] Rebuilding BottomNavigationBar (pendingFriendCount: ${contactProvider.pendingRequestCount})',
           );
           int unreadCount = 0;
           for (var c in chatProvider.conversations) {
