@@ -19,11 +19,15 @@ const MethodChannel _speechChannel = MethodChannel(
 const MethodChannel _ttsChannel = MethodChannel('flutter_tts');
 
 class _StubApiService extends ApiService {
-  _StubApiService({Map<String, Map<String, dynamic>> responses = const {}})
-    : _responses = responses,
-      super(StorageService());
+  _StubApiService({
+    Map<String, Map<String, dynamic>> responses = const {},
+    Duration responseDelay = Duration.zero,
+  }) : _responses = responses,
+       _responseDelay = responseDelay,
+       super(StorageService());
 
   final Map<String, Map<String, dynamic>> _responses;
+  final Duration _responseDelay;
 
   @override
   Future<Map<String, dynamic>> post(
@@ -33,6 +37,9 @@ class _StubApiService extends ApiService {
     Map<String, String>? queryParams,
   }) async {
     if (endpoint == '/ai/chat') {
+      if (_responseDelay > Duration.zero) {
+        await Future<void>.delayed(_responseDelay);
+      }
       final prompt = (body?['prompt'] ?? '').toString();
       final response =
           _responses[prompt] ??
@@ -52,8 +59,11 @@ class _StubApiService extends ApiService {
 
 AiAssistantProvider _buildProvider({
   Map<String, Map<String, dynamic>> responses = const {},
+  Duration responseDelay = Duration.zero,
 }) {
-  final aiService = AiService(_StubApiService(responses: responses));
+  final aiService = AiService(
+    _StubApiService(responses: responses, responseDelay: responseDelay),
+  );
   return AiAssistantProvider(aiService, enableFlowLogging: false);
 }
 
@@ -136,6 +146,50 @@ void main() {
 
     provider.dispose();
   });
+
+  testWidgets(
+    'ai conversation screen sends immediately and shows typing state',
+    (tester) async {
+      final provider = _buildProvider(
+        responses: {
+          'Gui nhanh': {
+            'textReply': 'Đã nhận yêu cầu của bạn.',
+            'emotion': 'neutral',
+          },
+        },
+        responseDelay: const Duration(milliseconds: 300),
+      );
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: provider),
+            ChangeNotifierProvider(create: (_) => LanguageProvider()),
+          ],
+          child: const MaterialApp(home: AiConversationScreen()),
+        ),
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('ai_conversation_input')),
+        'Gui nhanh',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('ai_conversation_send')));
+      await tester.pump();
+
+      expect(find.text('Gui nhanh'), findsOneWidget);
+      expect(find.text('AI đang soạn phản hồi...'), findsOneWidget);
+
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Đã nhận yêu cầu của bạn.'), findsOneWidget);
+      expect(find.text('AI đang soạn phản hồi...'), findsNothing);
+
+      provider.dispose();
+    },
+  );
 
   testWidgets('ai conversation screen remains stable on compact viewport', (
     tester,

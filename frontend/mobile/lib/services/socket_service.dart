@@ -544,9 +544,21 @@ class SocketService with ChangeNotifier {
   }
 
   void sendTyping(String conversationId, bool isTyping) {
+    final platform =
+        kIsWeb
+            ? 'WEB'
+            : switch (defaultTargetPlatform) {
+              TargetPlatform.iOS => 'IOS',
+              TargetPlatform.android => 'ANDROID',
+              TargetPlatform.macOS => 'MACOS',
+              TargetPlatform.windows => 'WINDOWS',
+              TargetPlatform.linux => 'LINUX',
+              TargetPlatform.fuchsia => 'FUCHSIA',
+            };
     _socket?.emit('message.typing', {
       'conversationId': conversationId,
       'isTyping': isTyping,
+      'clientPlatform': platform,
     });
   }
 

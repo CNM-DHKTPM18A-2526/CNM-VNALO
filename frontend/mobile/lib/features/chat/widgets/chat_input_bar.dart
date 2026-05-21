@@ -656,7 +656,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
   ) {
     final displayName = _typingDisplayName(conversation, typer.key);
     final suffix = _typingPlatformSuffix(typer.value.clientPlatform);
-    return '$displayName ?ang nh?p tin nh?n$suffix...';
+    return '$displayName đang nhập tin nhắn$suffix...';
   }
 
   String _multiTypingLabel(
@@ -672,9 +672,9 @@ class _ChatInputBarState extends State<ChatInputBar> {
     final namesText = visibleNames.join(', ');
 
     if (remaining > 0) {
-      return '$namesText v? $remaining ng??i kh?c ?ang nh?p tin nh?n...';
+      return '$namesText và $remaining người khác đang nhập tin nhắn...';
     }
-    return '$namesText ?ang nh?p tin nh?n...';
+    return '$namesText đang nhập tin nhắn...';
   }
 
   String _typingDisplayName(Conversation conversation, String userId) {
@@ -690,18 +690,18 @@ class _ChatInputBarState extends State<ChatInputBar> {
       return displayName;
     }
 
-    return 'Ai ??';
+    return 'Ai đó';
   }
 
   String _typingPlatformSuffix(String? platform) {
     switch (platform) {
       case 'DESKTOP':
       case 'WEB':
-        return ' t? m?y t?nh';
+        return ' từ máy tính';
       case 'ANDROID':
       case 'IOS':
       case 'MOBILE':
-        return ' t? ?i?n tho?i';
+        return ' từ điện thoại';
       default:
         return '';
     }

@@ -1,11 +1,12 @@
-﻿import 'package:flutter/material.dart';
+import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/theme/app_typography.dart';
 import 'package:vnalo_mobile/core/utils/date_formatter.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
-import 'package:vnalo_mobile/features/chat/widgets/message_bubble.dart';
 
 class AiConversationScreen extends StatefulWidget {
   const AiConversationScreen({super.key});
@@ -42,7 +43,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
     super.dispose();
   }
 
-  Future<void> _sendPrompt(AiAssistantProvider provider) async {
+  void _sendPrompt(AiAssistantProvider provider) {
     if (_isSending) return;
 
     final text = _inputController.text.trim();
@@ -55,16 +56,22 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
     });
 
     try {
-      await provider.submitTextPrompt(
-        text,
-        source: 'ai_conversation_screen',
-        surface: AiResponseSurface.conversation,
+      unawaited(
+        provider.submitTextPrompt(
+          text,
+          source: 'ai_conversation_screen',
+          surface: AiResponseSurface.conversation,
+        ),
       );
-    } finally {
+    } catch (_) {
+      // Provider handles async failures; this guards only synchronous dispatch.
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         setState(() => _isSending = false);
       }
-    }
+    });
   }
 
   void _queueScrollToLatest() {
@@ -268,14 +275,13 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
                           );
                         }
 
-                        return MessageBubble(
-                          message: message,
+                        return _AiConversationMessageBubble(
+                          text: message.content ?? '',
                           isMine: isMine,
                           showTime: showTime,
-                          showAvatar: !isMine,
-                          senderAvatarUrl: message.senderAvatarUrl,
-                          senderDisplayName: message.senderName,
                           milestoneText: milestoneText,
+                          createdAt: message.createdAt,
+                          isDarkMode: isDarkMode,
                         );
                       },
                     ),
@@ -405,7 +411,10 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
             IconButton(
               icon: Icon(
                 Icons.auto_awesome_rounded,
-                color: isDarkMode ? DarkColors.textSecondary : AppColors.iconSubtle,
+                color:
+                    isDarkMode
+                        ? DarkColors.textSecondary
+                        : AppColors.iconSubtle,
               ),
               onPressed: () => _inputFocusNode.requestFocus(),
             ),
@@ -452,26 +461,10 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
               IconButton(
                 key: const ValueKey('ai_conversation_send'),
                 onPressed: _isSending ? null : () => _sendPrompt(provider),
-                icon:
-                    _isSending
-                        ? SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color:
-                                isDarkMode
-                                    ? DarkColors.primaryLight
-                                    : AppColors.primary,
-                          ),
-                        )
-                        : Icon(
-                          Icons.send,
-                          color:
-                              isDarkMode
-                                  ? DarkColors.primary
-                                  : AppColors.primary,
-                        ),
+                icon: Icon(
+                  Icons.send,
+                  color: isDarkMode ? DarkColors.primary : AppColors.primary,
+                ),
               )
             else
               IconButton(
@@ -491,6 +484,106 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _AiConversationMessageBubble extends StatelessWidget {
+  final String text;
+  final bool isMine;
+  final bool showTime;
+  final String? milestoneText;
+  final DateTime createdAt;
+  final bool isDarkMode;
+
+  const _AiConversationMessageBubble({
+    required this.text,
+    required this.isMine,
+    required this.showTime,
+    required this.milestoneText,
+    required this.createdAt,
+    required this.isDarkMode,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final userBubbleColor =
+        isDarkMode ? const Color(0xFF1C355A) : const Color(0xFFDCEBFF);
+    final assistantBubbleColor =
+        isDarkMode
+            ? Colors.white.withValues(alpha: 0.06)
+            : const Color(0xFFF4F6F8);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (milestoneText != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12, top: 4),
+            child: Center(
+              child: Text(
+                milestoneText!,
+                style: TextStyle(
+                  fontSize: 11,
+                  color:
+                      isDarkMode
+                          ? DarkColors.textSecondary
+                          : LightColors.textSecondary,
+                ),
+              ),
+            ),
+          ),
+        Align(
+          alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 6),
+            constraints: const BoxConstraints(maxWidth: 300),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: isMine ? userBubbleColor : assistantBubbleColor,
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(16),
+                topRight: const Radius.circular(16),
+                bottomLeft: Radius.circular(isMine ? 16 : 4),
+                bottomRight: Radius.circular(isMine ? 4 : 16),
+              ),
+              border:
+                  isMine
+                      ? null
+                      : Border.all(
+                        color:
+                            isDarkMode
+                                ? DarkColors.divider
+                                : AppColors.itemDivider.withValues(alpha: 0.8),
+                      ),
+            ),
+            child: Text(
+              text,
+              style: AppTypography.bodyMedium.copyWith(
+                height: 1.4,
+                color: isDarkMode ? Colors.white : Colors.black87,
+              ),
+            ),
+          ),
+        ),
+        if (showTime)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Align(
+              alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+              child: Text(
+                DateFormatter.time(createdAt),
+                style: TextStyle(
+                  fontSize: 11,
+                  color:
+                      isDarkMode
+                          ? DarkColors.textSecondary
+                          : LightColors.textSecondary,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -631,7 +724,11 @@ class _AiTypingBubble extends StatelessWidget {
               child: CircleAvatar(
                 radius: 12,
                 backgroundColor: AppColors.primary,
-                child: Icon(Icons.smart_toy_outlined, size: 14, color: Colors.white),
+                child: Icon(
+                  Icons.smart_toy_outlined,
+                  size: 14,
+                  color: Colors.white,
+                ),
               ),
             ),
           ),
@@ -710,8 +807,7 @@ class _AiTypingDotsState extends State<_AiTypingDots>
 
   @override
   Widget build(BuildContext context) {
-    final baseColor =
-        widget.isDarkMode ? Colors.white70 : AppColors.iconSubtle;
+    final baseColor = widget.isDarkMode ? Colors.white70 : AppColors.iconSubtle;
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
@@ -719,8 +815,10 @@ class _AiTypingDotsState extends State<_AiTypingDots>
           mainAxisSize: MainAxisSize.min,
           children: List.generate(3, (index) {
             final start = index * 0.18;
-            final progress =
-                ((_controller.value - start) % 1.0).clamp(0.0, 1.0);
+            final progress = ((_controller.value - start) % 1.0).clamp(
+              0.0,
+              1.0,
+            );
             final scale =
                 0.7 + (progress < 0.5 ? progress : 1 - progress) * 0.8;
             return Transform.translate(
@@ -743,4 +841,3 @@ class _AiTypingDotsState extends State<_AiTypingDots>
     );
   }
 }
-

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -48,24 +49,26 @@ class _AiChatBoardState extends State<AiChatBoard> {
     super.dispose();
   }
 
-  Future<void> _submitTextPrompt() async {
+  void _submitTextPrompt() {
     if (_isSending) return;
 
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
 
+    _inputController.clear();
     setState(() => _isSending = true);
     try {
-      await widget.onSubmitPrompt(text);
-      _inputController.clear();
-      if (mounted) {
-        _inputFocusNode.unfocus();
-      }
-    } finally {
+      unawaited(widget.onSubmitPrompt(text));
+    } catch (_) {
+      // Provider handles async failures; this guards only synchronous dispatch.
+    }
+
+    _inputFocusNode.unfocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         setState(() => _isSending = false);
       }
-    }
+    });
   }
 
   Future<void> _copyResponse(BuildContext context, String response) async {
@@ -193,6 +196,55 @@ class _AiChatBoardState extends State<AiChatBoard> {
     );
   }
 
+  Widget _buildAssistantTypingBubble({required bool isDarkMode}) {
+    final bubbleColor =
+        isDarkMode
+            ? Colors.white.withValues(alpha: 0.06)
+            : Colors.white.withValues(alpha: 0.82);
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        constraints: const BoxConstraints(maxWidth: 260),
+        decoration: BoxDecoration(
+          color: bubbleColor,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(16),
+            topRight: Radius.circular(16),
+            bottomLeft: Radius.circular(4),
+            bottomRight: Radius.circular(16),
+          ),
+          border: Border.all(
+            color:
+                isDarkMode
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.black.withValues(alpha: 0.06),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _TypingDots(isDarkMode: isDarkMode),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                'AI đang soạn phản hồi...',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDarkMode ? Colors.white60 : Colors.black54,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final aiProvider = context.watch<AiAssistantProvider>();
@@ -207,6 +259,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
     final isCompactLayout = boardMaxHeight < 360 || viewSize.shortestSide < 360;
     final showPromptChips = !isCompactLayout && boardMaxHeight >= 340;
     final blurSigma = viewSize.shortestSide < 380 ? 8.0 : 14.0;
+    final showAiTyping = aiProvider.isAssistantGenerating;
     final transcriptEntries =
         aiProvider.conversationHistory.length > 4
             ? aiProvider.conversationHistory.sublist(
@@ -455,6 +508,10 @@ class _AiChatBoardState extends State<AiChatBoard> {
                                                 index ==
                                                 transcriptEntries.length - 1,
                                           ),
+                                        if (showAiTyping)
+                                          _buildAssistantTypingBubble(
+                                            isDarkMode: isDarkMode,
+                                          ),
                                       ],
                                     ),
                           ),
@@ -577,21 +634,11 @@ class _AiChatBoardState extends State<AiChatBoard> {
                               _isSending || aiProvider.isBusy
                                   ? null
                                   : _submitTextPrompt,
-                          child:
-                              _isSending
-                                  ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                  : const Icon(
-                                    Icons.send_rounded,
-                                    size: 18,
-                                    color: Colors.white,
-                                  ),
+                          child: const Icon(
+                            Icons.send_rounded,
+                            size: 18,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ],
@@ -602,6 +649,71 @@ class _AiChatBoardState extends State<AiChatBoard> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _TypingDots extends StatefulWidget {
+  final bool isDarkMode;
+
+  const _TypingDots({required this.isDarkMode});
+
+  @override
+  State<_TypingDots> createState() => _TypingDotsState();
+}
+
+class _TypingDotsState extends State<_TypingDots>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final baseColor = widget.isDarkMode ? Colors.white70 : AppColors.iconSubtle;
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(3, (index) {
+            final start = index * 0.18;
+            final progress = ((_controller.value - start) % 1.0).clamp(
+              0.0,
+              1.0,
+            );
+            final scale =
+                0.7 + (progress < 0.5 ? progress : 1 - progress) * 0.8;
+            return Transform.translate(
+              offset: Offset(0, -progress * 2),
+              child: Container(
+                width: 6,
+                height: 6,
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                decoration: BoxDecoration(
+                  color: baseColor.withValues(
+                    alpha: 0.45 + (scale - 0.7) * 0.9,
+                  ),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            );
+          }),
+        );
+      },
     );
   }
 }
