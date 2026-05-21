@@ -2,6 +2,7 @@ package iuh.cnm.vnalo.core_service.service;
 
 import iuh.cnm.vnalo.core_service.exception.ApiException;
 import iuh.cnm.vnalo.core_service.exception.ErrorCode;
+import iuh.cnm.vnalo.core_service.kafka.producer.KafkaProducerService;
 import iuh.cnm.vnalo.core_service.model.entity.social.FriendRequest;
 import iuh.cnm.vnalo.core_service.model.entity.social.Friendship;
 import iuh.cnm.vnalo.core_service.model.entity.user.UserPrivacySetting;
@@ -48,6 +49,9 @@ class FriendServiceTest {
     @Mock
     private UserPrivacySettingRepository userPrivacySettingRepository;
 
+    @Mock
+    private KafkaProducerService kafkaProducerService;
+
     @InjectMocks
     private FriendService friendService;
 
@@ -91,6 +95,11 @@ class FriendServiceTest {
             assertEquals(userId2, result.getUserIdTo());
             assertEquals(FriendRequestStatus.PENDING, result.getStatus());
             verify(friendRequestRepository).save(any(FriendRequest.class));
+            verify(kafkaProducerService).sendRealtimeEvent(
+                    eq(userId2.toString()),
+                    eq("friend.request.received"),
+                    any()
+            );
         }
 
         @Test
@@ -193,6 +202,7 @@ class FriendServiceTest {
             assertNotNull(result);
             verify(friendRequestRepository).save(any(FriendRequest.class));
             verify(friendshipRepository).save(any(Friendship.class));
+            verify(kafkaProducerService, times(2)).sendRealtimeEvent(anyString(), eq("friendship.updated"), any());
         }
 
         @Test
