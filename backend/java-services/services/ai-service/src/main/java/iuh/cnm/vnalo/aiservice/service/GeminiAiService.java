@@ -112,6 +112,8 @@ public class GeminiAiService {
             responseObj.setConversationId(stableConvId);
             responseObj.setUserEntryId(userEntryId);
             responseObj.setAssistantEntryId(assistantEntryId);
+            responseObj.setDegraded("ollama".equals(provider));
+            responseObj.setProviderStatus("ollama".equals(provider) ? "FALLBACK_PROVIDER_ACTIVE" : "LIVE_PROVIDER_ACTIVE");
         }
 
         // 5. Save Chat History asynchronously-like to Core Service
@@ -329,7 +331,11 @@ public class GeminiAiService {
         JsonNode candidates = rootNode.path("candidates");
 
         if (candidates.isMissingNode() || !candidates.isArray() || candidates.size() == 0) {
-            return AiChatResponse.builder().textReply("I'm sorry, I couldn't process that.").build();
+            return AiChatResponse.builder()
+                    .textReply("I'm sorry, I couldn't process that.")
+                    .degraded(false)
+                    .providerStatus("LIVE_PROVIDER_ACTIVE")
+                    .build();
         }
 
         String fallbackText = "I'm sorry, I couldn't process that.";
@@ -338,7 +344,11 @@ public class GeminiAiService {
         JsonNode partsNode = contentNode.path("parts");
 
         if (partsNode.isMissingNode() || !partsNode.isArray() || partsNode.size() == 0) {
-            return AiChatResponse.builder().textReply(fallbackText).build();
+            return AiChatResponse.builder()
+                    .textReply(fallbackText)
+                    .degraded(false)
+                    .providerStatus("LIVE_PROVIDER_ACTIVE")
+                    .build();
         }
 
         String rawText = partsNode.get(0).path("text").asText();
@@ -376,6 +386,8 @@ public class GeminiAiService {
         // Fallback for natural language responses
         response.setTextReply(rawText);
         response.setEmotion("thinking");
+        response.setDegraded(false);
+        response.setProviderStatus("LIVE_PROVIDER_ACTIVE");
         return response;
     }
 

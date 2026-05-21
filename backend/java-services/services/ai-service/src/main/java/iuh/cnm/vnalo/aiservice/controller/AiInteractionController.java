@@ -15,15 +15,19 @@ import org.springframework.web.bind.annotation.*;
 
 import iuh.cnm.vnalo.aiservice.dto.ApiResponse;
 
+import java.text.Normalizer;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 @Slf4j
 @RestController
 @RequestMapping("")
 @RequiredArgsConstructor
 public class AiInteractionController {
+
+    private static final Pattern DIACRITICS_PATTERN = Pattern.compile("\\p{M}+");
 
     private final GeminiAiService geminiAiService;
     private final ChatService chatService;
@@ -104,13 +108,15 @@ public class AiInteractionController {
                 .textReply("Xin loi, he thong AI dang ban. Ban vui long thu lai sau it phut.")
                 .emotion("neutral")
                 .estimatedTokens(0)
+                .degraded(true)
+                .providerStatus("AI_PROVIDER_UNAVAILABLE")
                 .build();
 
         if (!request.isAnalyzeIntent()) {
             return fallback;
         }
 
-        String prompt = request.getPrompt() == null ? "" : request.getPrompt().toLowerCase(Locale.ROOT);
+        String prompt = normalizeIntentText(request.getPrompt());
         if (looksLikeCallIntent(prompt)) {
             Map<String, Object> params = new HashMap<>();
             params.put("callType", isVideoCallIntent(prompt) ? "video" : "voice");
@@ -131,7 +137,8 @@ public class AiInteractionController {
         return prompt.contains("goi")
                 || prompt.contains("call")
                 || prompt.contains("phone")
-                || prompt.contains("dien thoai");
+                || prompt.contains("dien thoai")
+                || prompt.contains("cuoc goi");
     }
 
     private boolean isVideoCallIntent(String prompt) {
@@ -139,5 +146,17 @@ public class AiInteractionController {
                 || prompt.contains("camera")
                 || prompt.contains("hinh")
                 || prompt.contains("cam");
+    }
+
+    private String normalizeIntentText(String input) {
+        if (input == null || input.isBlank()) {
+            return "";
+        }
+
+        String normalized = Normalizer.normalize(input.toLowerCase(Locale.ROOT), Normalizer.Form.NFD);
+        return DIACRITICS_PATTERN.matcher(normalized)
+                .replaceAll("")
+                .replace('đ', 'd')
+                .replace('Đ', 'D');
     }
 }
