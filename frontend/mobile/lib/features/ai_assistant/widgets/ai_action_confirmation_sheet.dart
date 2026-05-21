@@ -155,7 +155,7 @@ class AiActionConfirmationSheet extends StatelessWidget {
                         height: 52,
                         decoration: BoxDecoration(
                           color: accent.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(18),
+                          borderRadius: BorderRadius.circular(14),
                         ),
                         child: Icon(icon, color: accent, size: 24),
                       ),
@@ -234,7 +234,7 @@ class AiActionConfirmationSheet extends StatelessWidget {
                         foregroundColor: Colors.white,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(999),
                         ),
                       ),
                       onPressed:
@@ -262,9 +262,11 @@ class AiActionConfirmationSheet extends StatelessWidget {
                             ).pop(AiActionConfirmationResult.alternate),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: accent,
-                          side: BorderSide(color: accent.withValues(alpha: 0.4)),
+                          side: BorderSide(
+                            color: accent.withValues(alpha: 0.4),
+                          ),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(999),
                           ),
                         ),
                         child: Text(
@@ -291,7 +293,7 @@ class AiActionConfirmationSheet extends StatelessWidget {
                         foregroundColor: textPrimary,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(999),
                         ),
                       ),
                       child: Text(
@@ -345,7 +347,9 @@ class _DetailBlock extends StatelessWidget {
           value,
           maxLines: emphasized ? 2 : 6,
           overflow: TextOverflow.ellipsis,
-          style: (emphasized ? AppTypography.labelLarge : AppTypography.bodyMedium)
+          style: (emphasized
+                  ? AppTypography.labelLarge
+                  : AppTypography.bodyMedium)
               .copyWith(
                 color: color,
                 height: 1.4,

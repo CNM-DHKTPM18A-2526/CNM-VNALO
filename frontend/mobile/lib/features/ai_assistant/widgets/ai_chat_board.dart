@@ -33,6 +33,10 @@ class AiChatBoard extends StatefulWidget {
 }
 
 class _AiChatBoardState extends State<AiChatBoard> {
+  static const double _surfaceRadius = 14;
+  static const double _fieldRadius = 10;
+  static const double _buttonRadius = 999;
+
   final TextEditingController _inputController = TextEditingController();
   final FocusNode _inputFocusNode = FocusNode();
   bool _isSending = false;
@@ -104,9 +108,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
     final isUser = entry.role == AiConversationRole.user;
     final bubbleColor =
         isUser
-            ? (isDarkMode
-                ? const Color(0xFF1C355A)
-                : const Color(0xFFDCEBFF))
+            ? (isDarkMode ? const Color(0xFF1C355A) : const Color(0xFFDCEBFF))
             : (isDarkMode
                 ? Colors.white.withValues(alpha: 0.06)
                 : Colors.white.withValues(alpha: 0.82));
@@ -221,7 +223,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
       key: const ValueKey('ai_chat_board'),
       color: Colors.transparent,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(_surfaceRadius),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
           child: Container(
@@ -245,7 +247,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(_surfaceRadius),
               border: Border.all(color: borderColor),
               boxShadow: [
                 BoxShadow(
@@ -256,7 +258,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
               ],
             ),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisSize: MainAxisSize.max,
               children: [
                 Container(
                   padding: const EdgeInsets.fromLTRB(14, 12, 10, 10),
@@ -273,10 +275,10 @@ class _AiChatBoardState extends State<AiChatBoard> {
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
+                          mainAxisSize: MainAxisSize.max,
                           children: [
                             Row(
-                              mainAxisSize: MainAxisSize.min,
+                              mainAxisSize: MainAxisSize.max,
                               children: [
                                 const Icon(
                                   Icons.smart_toy_outlined,
@@ -335,7 +337,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
                     ],
                   ),
                 ),
-                Flexible(
+                Expanded(
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(
                       12,
@@ -354,14 +356,14 @@ class _AiChatBoardState extends State<AiChatBoard> {
                               vertical: 9,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF59E0B).withValues(
-                                alpha: isDarkMode ? 0.16 : 0.12,
-                              ),
-                              borderRadius: BorderRadius.circular(12),
+                              color: const Color(
+                                0xFFF59E0B,
+                              ).withValues(alpha: isDarkMode ? 0.16 : 0.12),
+                              borderRadius: BorderRadius.circular(_fieldRadius),
                               border: Border.all(
-                                color: const Color(0xFFF59E0B).withValues(
-                                  alpha: 0.35,
-                                ),
+                                color: const Color(
+                                  0xFFF59E0B,
+                                ).withValues(alpha: 0.35),
                               ),
                             ),
                             child: Row(
@@ -392,63 +394,69 @@ class _AiChatBoardState extends State<AiChatBoard> {
                           ),
                         Expanded(
                           child: SingleChildScrollView(
-                            child: transcriptEntries.isEmpty
-                                ? Container(
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color:
-                                          isDarkMode
-                                              ? Colors.white.withValues(
-                                                alpha: 0.06,
-                                              )
-                                              : Colors.white.withValues(
-                                                alpha: 0.82,
-                                              ),
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(
+                            child:
+                                transcriptEntries.isEmpty
+                                    ? Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
                                         color:
                                             isDarkMode
                                                 ? Colors.white.withValues(
-                                                  alpha: 0.08,
-                                                )
-                                                : Colors.black.withValues(
                                                   alpha: 0.06,
+                                                )
+                                                : Colors.white.withValues(
+                                                  alpha: 0.82,
                                                 ),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      aiProvider.state == AiState.listening
-                                          ? 'Đang nghe giọng nói. Bạn cũng có thể nhập câu hỏi bên dưới.'
-                                          : aiProvider.state == AiState.thinking
-                                          ? 'Đang xử lý yêu cầu của bạn...'
-                                          : 'Nhập câu hỏi hoặc chọn gợi ý để bắt đầu.',
-                                      style: TextStyle(
-                                        color:
-                                            isDarkMode
-                                                ? Colors.white60
-                                                : Colors.black54,
-                                        fontSize: 13,
-                                        height: 1.45,
-                                      ),
-                                    ),
-                                  )
-                                : Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      for (var index = 0;
-                                          index < transcriptEntries.length;
-                                          index++)
-                                        _buildEntryBubble(
-                                          context: context,
-                                          entry: transcriptEntries[index],
-                                          isDarkMode: isDarkMode,
-                                          allowCopy:
-                                              index ==
-                                              transcriptEntries.length - 1,
+                                        borderRadius: BorderRadius.circular(
+                                          _surfaceRadius,
                                         ),
-                                    ],
-                                  ),
+                                        border: Border.all(
+                                          color:
+                                              isDarkMode
+                                                  ? Colors.white.withValues(
+                                                    alpha: 0.08,
+                                                  )
+                                                  : Colors.black.withValues(
+                                                    alpha: 0.06,
+                                                  ),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        aiProvider.state == AiState.listening
+                                            ? 'Đang nghe giọng nói. Bạn cũng có thể nhập câu hỏi bên dưới.'
+                                            : aiProvider.state ==
+                                                AiState.thinking
+                                            ? 'Đang xử lý yêu cầu của bạn...'
+                                            : 'Nhập câu hỏi hoặc chọn gợi ý để bắt đầu.',
+                                        style: TextStyle(
+                                          color:
+                                              isDarkMode
+                                                  ? Colors.white60
+                                                  : Colors.black54,
+                                          fontSize: 13,
+                                          height: 1.45,
+                                        ),
+                                      ),
+                                    )
+                                    : Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        for (
+                                          var index = 0;
+                                          index < transcriptEntries.length;
+                                          index++
+                                        )
+                                          _buildEntryBubble(
+                                            context: context,
+                                            entry: transcriptEntries[index],
+                                            isDarkMode: isDarkMode,
+                                            allowCopy:
+                                                index ==
+                                                transcriptEntries.length - 1,
+                                          ),
+                                      ],
+                                    ),
                           ),
                         ),
                       ],
@@ -486,7 +494,6 @@ class _AiChatBoardState extends State<AiChatBoard> {
                   child: Row(
                     children: [
                       IconButton(
-                        tooltip: 'Nói với trợ lý',
                         onPressed:
                             _isSending || aiProvider.isBusy
                                 ? null
@@ -509,11 +516,8 @@ class _AiChatBoardState extends State<AiChatBoard> {
                       Expanded(
                         child: Container(
                           decoration: BoxDecoration(
-                            color:
-                                isDarkMode
-                                    ? Colors.white.withValues(alpha: 0.08)
-                                    : Colors.white,
-                            borderRadius: BorderRadius.circular(12),
+                            color: Colors.transparent,
+                            borderRadius: BorderRadius.circular(_fieldRadius),
                             border: Border.all(
                               color:
                                   isDarkMode
@@ -560,7 +564,9 @@ class _AiChatBoardState extends State<AiChatBoard> {
                           style: ElevatedButton.styleFrom(
                             padding: EdgeInsets.zero,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(
+                                _buttonRadius,
+                              ),
                             ),
                             backgroundColor:
                                 _isSending || aiProvider.isBusy

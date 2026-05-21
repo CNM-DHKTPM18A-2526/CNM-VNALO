@@ -59,13 +59,15 @@ class _AiConversationDisambiguationSheetState
     final textSecondary =
         isDark ? DarkColors.textSecondary : const Color(0xFF475569);
     final sheetBackground = isDark ? DarkColors.surface : Colors.white;
-    final list = widget.matches.where((conversation) {
-      if (_keyword.trim().isEmpty) return true;
-      final displayName = conversation.getDisplayName(widget.currentUserId);
-      final normalizedName = displayName.toLowerCase();
-      final normalizedKeyword = _keyword.trim().toLowerCase();
-      return normalizedName.contains(normalizedKeyword);
-    }).toList(growable: false);
+    final list = widget.matches
+        .where((conversation) {
+          if (_keyword.trim().isEmpty) return true;
+          final displayName = conversation.getDisplayName(widget.currentUserId);
+          final normalizedName = displayName.toLowerCase();
+          final normalizedKeyword = _keyword.trim().toLowerCase();
+          return normalizedName.contains(normalizedKeyword);
+        })
+        .toList(growable: false);
 
     return ConstrainedBox(
       constraints: BoxConstraints(
@@ -117,7 +119,7 @@ class _AiConversationDisambiguationSheetState
                         isDark
                             ? DarkColors.surfaceLight
                             : const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                     border: Border.all(
                       color:
                           isDark
@@ -128,7 +130,9 @@ class _AiConversationDisambiguationSheetState
                   child: TextField(
                     controller: _searchController,
                     onChanged: (value) => setState(() => _keyword = value),
-                    style: AppTypography.bodyMedium.copyWith(color: textPrimary),
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: textPrimary,
+                    ),
                     decoration: InputDecoration(
                       isDense: true,
                       hintText: 'Tìm nhanh theo tên hiển thị',
@@ -163,8 +167,8 @@ class _AiConversationDisambiguationSheetState
                           : ListView.separated(
                             shrinkWrap: true,
                             itemCount: list.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: 10),
+                            separatorBuilder:
+                                (_, __) => const SizedBox(height: 10),
                             itemBuilder: (_, index) {
                               final conversation = list[index];
                               final displayName = conversation.getDisplayName(
@@ -178,7 +182,7 @@ class _AiConversationDisambiguationSheetState
                                   key: ValueKey(
                                     'ai_conversation_disambiguation_item_${conversation.id}',
                                   ),
-                                  borderRadius: BorderRadius.circular(16),
+                                  borderRadius: BorderRadius.circular(14),
                                   onTap:
                                       () => Navigator.of(
                                         context,
@@ -192,7 +196,7 @@ class _AiConversationDisambiguationSheetState
                                                 alpha: 0.05,
                                               )
                                               : const Color(0xFFF8FAFC),
-                                      borderRadius: BorderRadius.circular(16),
+                                      borderRadius: BorderRadius.circular(14),
                                       border: Border.all(
                                         color:
                                             isDark
@@ -205,10 +209,8 @@ class _AiConversationDisambiguationSheetState
                                     child: Row(
                                       children: [
                                         CircleAvatar(
-                                          backgroundColor:
-                                              AppColors.primary.withValues(
-                                                alpha: 0.12,
-                                              ),
+                                          backgroundColor: AppColors.primary
+                                              .withValues(alpha: 0.12),
                                           child: Icon(
                                             isDirect
                                                 ? Icons.person
@@ -240,11 +242,10 @@ class _AiConversationDisambiguationSheetState
                                                     : 'Nhóm • ${conversation.members.length} thành viên',
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
-                                                style:
-                                                    AppTypography.bodySmall
-                                                        .copyWith(
-                                                          color: textSecondary,
-                                                        ),
+                                                style: AppTypography.bodySmall
+                                                    .copyWith(
+                                                      color: textSecondary,
+                                                    ),
                                               ),
                                             ],
                                           ),
@@ -279,7 +280,7 @@ class _AiConversationDisambiguationSheetState
                       foregroundColor: textPrimary,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(999),
                       ),
                     ),
                     child: Text(
