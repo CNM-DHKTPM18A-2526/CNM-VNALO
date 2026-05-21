@@ -21,6 +21,13 @@ import 'package:flutter/widgets.dart';
 import 'dart:io';
 import 'dart:convert';
 
+class ChatTypingState {
+  final DateTime lastSeen;
+  final String? clientPlatform;
+
+  const ChatTypingState({required this.lastSeen, this.clientPlatform});
+}
+
 class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
   final ChatService _chatService;
   SocketService _socketService;
@@ -55,8 +62,8 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
   int _lastSocketReinitCount = -1;
   final Random _random = Random.secure();
 
-  // Typing indicator state: conversationId -> { userId -> lastSeen }
-  final Map<String, Map<String, DateTime>> _typingUsers = {};
+  // Typing indicator state: conversationId -> { userId -> typing state }
+  final Map<String, Map<String, ChatTypingState>> _typingUsers = {};
 
   List<Conversation> _conversations = [];
   String? _activeConversationId;
@@ -102,8 +109,8 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
   List<MessageReaction> getReactionsForMessage(String messageId) =>
       _reactions[messageId] ?? [];
 
-  /// Returns a map of userId -> DateTime for users currently typing in [conversationId].
-  Map<String, DateTime> getTypingUsers(String conversationId) =>
+  /// Returns a map of userId -> typing state for users currently typing in [conversationId].
+  Map<String, ChatTypingState> getTypingUsers(String conversationId) =>
       _typingUsers[conversationId] ?? {};
 
   ChatProvider({
@@ -1788,8 +1795,12 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
 
   void _handleTypingEvent(Map<String, dynamic> data) {
     final conversationId = data['conversationId']?.toString();
-    final senderId = data['senderId']?.toString();
+    final senderId =
+        data['senderId']?.toString() ?? data['userId']?.toString();
     final isTyping = data['isTyping'] == true;
+    final clientPlatform = _normalizeTypingPlatform(
+      data['clientPlatform']?.toString(),
+    );
 
     if (conversationId == null || senderId == null) return;
     // Don't show own typing
@@ -1798,12 +1809,15 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     _typingUsers[conversationId] ??= {};
 
     if (isTyping) {
-      _typingUsers[conversationId]![senderId] = DateTime.now();
+      _typingUsers[conversationId]![senderId] = ChatTypingState(
+        lastSeen: DateTime.now(),
+        clientPlatform: clientPlatform,
+      );
       // Auto-expire after 5 seconds if no stop event
       Future.delayed(const Duration(seconds: 5), () {
         if (_typingUsers[conversationId]?[senderId] != null) {
           final elapsed = DateTime.now().difference(
-            _typingUsers[conversationId]![senderId]!,
+            _typingUsers[conversationId]![senderId]!.lastSeen,
           );
           if (elapsed.inSeconds >= 5) {
             _typingUsers[conversationId]?.remove(senderId);
@@ -1821,6 +1835,20 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       }
     }
     notifyListeners();
+  }
+
+  String? _normalizeTypingPlatform(String? rawPlatform) {
+    final normalized = rawPlatform?.trim().toUpperCase();
+    if (normalized == null || normalized.isEmpty) {
+      return null;
+    }
+    return switch (normalized) {
+      'WEB' || 'PC' || 'DESKTOP' || 'WINDOWS' || 'MACOS' || 'LINUX' =>
+        'DESKTOP',
+      'ANDROID' => 'ANDROID',
+      'IOS' || 'IPHONE' || 'IPAD' => 'IOS',
+      _ => normalized,
+    };
   }
 
   /// Emit typing indicator to socket.

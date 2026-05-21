@@ -395,6 +395,7 @@ class AiAssistantProvider with ChangeNotifier {
       _providerStatus == 'AI_PROVIDER_UNAVAILABLE';
   bool get isFallbackProviderActive =>
       _providerStatus == 'FALLBACK_PROVIDER_ACTIVE';
+  bool get isAssistantGenerating => _state == AiState.thinking;
   double get soundLevel => _soundLevel;
 
   bool get persistentEnabled => _persistentEnabled;
@@ -1338,6 +1339,12 @@ class AiAssistantProvider with ChangeNotifier {
         });
       }
 
+      _recordUserHistory(
+        text: normalized,
+        source: 'assistant_chat',
+        entryId: userEntryId,
+      );
+
       final response = await _aiService
           .chat(
             normalized,
@@ -1371,13 +1378,12 @@ class AiAssistantProvider with ChangeNotifier {
         _serverConversationId = response['conversationId'].toString();
       }
 
-      _recordHistory(
-        userText: normalized,
-        aiText: _aiResponse,
-        userEntryId: response['userEntryId']?.toString() ?? userEntryId,
-        assistantEntryId:
-            response['assistantEntryId']?.toString() ?? assistantEntryId,
+      _recordAssistantHistory(
+        text: _aiResponse,
+        source: 'assistant_chat',
+        entryId: response['assistantEntryId']?.toString() ?? assistantEntryId,
       );
+      _trimSessionHistory();
 
       if (actionCommand != null && actionCommand.isNotEmpty) {
         _executeSystemAction(actionCommand, actionParams, traceId: traceId);
@@ -1401,6 +1407,7 @@ class AiAssistantProvider with ChangeNotifier {
           fallbackMessage: 'AI đang phản hồi chậm, vui lòng thử lại sau.',
           userText: normalized,
           source: 'assistant_chat',
+          recordUserInHistory: false,
           userEntryId: userEntryId,
           assistantEntryId: assistantEntryId,
         );
@@ -1418,6 +1425,7 @@ class AiAssistantProvider with ChangeNotifier {
           error: error,
           userText: normalized,
           source: 'assistant_chat',
+          recordUserInHistory: false,
           userEntryId: userEntryId,
           assistantEntryId: assistantEntryId,
         );
@@ -1626,6 +1634,7 @@ class AiAssistantProvider with ChangeNotifier {
     Object? error,
     String? userText,
     String source = 'assistant_chat',
+    bool recordUserInHistory = true,
     String? userEntryId,
     String? assistantEntryId,
   }) async {
@@ -1646,15 +1655,15 @@ class AiAssistantProvider with ChangeNotifier {
     _aiResponse = fallbackMessage;
     _currentEmotion = 'neutral';
     if (userText != null && userText.trim().isNotEmpty) {
-      final fallbackAssistantEntryId =
-          assistantEntryId != null ? _newEntryId() : null;
-      _recordHistory(
-        userText: userText,
-        aiText: _aiResponse,
+      if (recordUserInHistory) {
+        _recordUserHistory(text: userText, source: source, entryId: userEntryId);
+      }
+      _recordAssistantHistory(
+        text: _aiResponse,
         source: source,
-        userEntryId: userEntryId,
-        assistantEntryId: fallbackAssistantEntryId,
+        entryId: assistantEntryId,
       );
+      _trimSessionHistory();
     }
     _transitionTo(AiState.speaking, reason: 'fallback_speak', traceId: traceId);
     notifyListeners();
@@ -1745,29 +1754,54 @@ class AiAssistantProvider with ChangeNotifier {
     String? userEntryId,
     String? assistantEntryId,
   }) {
-    final normalizedUser = normalizeAiTextEncoding(userText).trim();
-    final normalizedAi = normalizeAiTextEncoding(aiText).trim();
+    _recordUserHistory(text: userText, source: source, entryId: userEntryId);
+    _recordAssistantHistory(
+      text: aiText,
+      source: source,
+      entryId: assistantEntryId,
+    );
+    _trimSessionHistory();
+  }
 
-    if (normalizedUser.isNotEmpty) {
-      _sessionHistory.add({'role': 'User', 'text': normalizedUser});
-      _addConversationEntry(
-        role: AiConversationRole.user,
-        text: normalizedUser,
-        source: source,
-        entryId: userEntryId,
-      );
+  void _recordUserHistory({
+    required String text,
+    required String source,
+    String? entryId,
+  }) {
+    final normalized = normalizeAiTextEncoding(text).trim();
+    if (normalized.isEmpty) {
+      return;
     }
 
-    if (normalizedAi.isNotEmpty) {
-      _sessionHistory.add({'role': 'AI', 'text': normalizedAi});
-      _addConversationEntry(
-        role: AiConversationRole.assistant,
-        text: normalizedAi,
-        source: source,
-        entryId: assistantEntryId,
-      );
+    _sessionHistory.add({'role': 'User', 'text': normalized});
+    _addConversationEntry(
+      role: AiConversationRole.user,
+      text: normalized,
+      source: source,
+      entryId: entryId,
+    );
+  }
+
+  void _recordAssistantHistory({
+    required String text,
+    required String source,
+    String? entryId,
+  }) {
+    final normalized = normalizeAiTextEncoding(text).trim();
+    if (normalized.isEmpty) {
+      return;
     }
 
+    _sessionHistory.add({'role': 'AI', 'text': normalized});
+    _addConversationEntry(
+      role: AiConversationRole.assistant,
+      text: normalized,
+      source: source,
+      entryId: entryId,
+    );
+  }
+
+  void _trimSessionHistory() {
     if (_sessionHistory.length > 10) {
       _sessionHistory.removeRange(0, _sessionHistory.length - 10);
     }

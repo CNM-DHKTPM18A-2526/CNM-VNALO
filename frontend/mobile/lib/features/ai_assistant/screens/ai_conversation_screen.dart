@@ -48,7 +48,11 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
 
-    setState(() => _isSending = true);
+    _inputController.clear();
+    setState(() {
+      _isSending = true;
+      _hasText = false;
+    });
 
     try {
       await provider.submitTextPrompt(
@@ -56,7 +60,6 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
         source: 'ai_conversation_screen',
         surface: AiResponseSurface.conversation,
       );
-      _inputController.clear();
     } finally {
       if (mounted) {
         setState(() => _isSending = false);
@@ -112,6 +115,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
             .getHistoryAsMessages(currentUserId, userAvatarUrl: userAvatarUrl)
             .reversed
             .toList();
+    final showAiTyping = provider.isAssistantGenerating;
 
     if (_lastMessageCount != messages.length ||
         _lastProviderState != provider.state) {
@@ -227,17 +231,22 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
                         horizontal: 8,
                         vertical: 12,
                       ),
-                      itemCount: messages.length,
+                      itemCount: messages.length + (showAiTyping ? 1 : 0),
                       itemBuilder: (context, index) {
-                        final message = messages[index];
+                        if (showAiTyping && index == 0) {
+                          return _AiTypingBubble(isDarkMode: isDarkMode);
+                        }
+
+                        final messageIndex = showAiTyping ? index - 1 : index;
+                        final message = messages[messageIndex];
                         final isMine = message.isMine(currentUserId);
 
                         // Calculate milestones and time visibility
                         bool showTime = true;
                         String? milestoneText;
 
-                        if (index < messages.length - 1) {
-                          final olderMsg = messages[index + 1];
+                        if (messageIndex < messages.length - 1) {
+                          final olderMsg = messages[messageIndex + 1];
                           final gap =
                               message.createdAt
                                   .difference(olderMsg.createdAt)
@@ -599,6 +608,138 @@ class _EmptyAiConversation extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _AiTypingBubble extends StatelessWidget {
+  final bool isDarkMode;
+
+  const _AiTypingBubble({required this.isDarkMode});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(
+            width: 30,
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: CircleAvatar(
+                radius: 12,
+                backgroundColor: AppColors.primary,
+                child: Icon(Icons.smart_toy_outlined, size: 14, color: Colors.white),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color:
+                  isDarkMode
+                      ? Colors.white.withValues(alpha: 0.06)
+                      : const Color(0xFFF4F6F8),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+                bottomLeft: Radius.circular(4),
+                bottomRight: Radius.circular(16),
+              ),
+              border: Border.all(
+                color:
+                    isDarkMode
+                        ? DarkColors.divider
+                        : AppColors.itemDivider.withValues(alpha: 0.8),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _AiTypingDots(isDarkMode: isDarkMode),
+                const SizedBox(width: 8),
+                Text(
+                  'AI đang soạn phản hồi...',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color:
+                        isDarkMode
+                            ? DarkColors.textSecondary
+                            : LightColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AiTypingDots extends StatefulWidget {
+  final bool isDarkMode;
+
+  const _AiTypingDots({required this.isDarkMode});
+
+  @override
+  State<_AiTypingDots> createState() => _AiTypingDotsState();
+}
+
+class _AiTypingDotsState extends State<_AiTypingDots>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final baseColor =
+        widget.isDarkMode ? Colors.white70 : AppColors.iconSubtle;
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(3, (index) {
+            final start = index * 0.18;
+            final progress =
+                ((_controller.value - start) % 1.0).clamp(0.0, 1.0);
+            final scale =
+                0.7 + (progress < 0.5 ? progress : 1 - progress) * 0.8;
+            return Transform.translate(
+              offset: Offset(0, -progress * 2),
+              child: Container(
+                width: 6,
+                height: 6,
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                decoration: BoxDecoration(
+                  color: baseColor.withValues(
+                    alpha: 0.45 + (scale - 0.7) * 0.9,
+                  ),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            );
+          }),
+        );
+      },
     );
   }
 }
