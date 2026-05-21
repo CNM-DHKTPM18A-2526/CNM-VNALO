@@ -148,6 +148,39 @@ void main() {
   });
 
   testWidgets(
+    'ai conversation screen hides mascot bubble while open and restores on close',
+    (tester) async {
+      final provider = _buildProvider();
+      await provider.summonMascot(
+        startListening: false,
+        persist: true,
+        source: 'conversation_surface_test',
+      );
+      expect(provider.isMascotVisible, isTrue);
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: provider),
+            ChangeNotifierProvider(create: (_) => LanguageProvider()),
+          ],
+          child: const MaterialApp(home: AiConversationScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(provider.isMascotVisible, isFalse);
+
+      await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+      await tester.pumpAndSettle();
+
+      expect(provider.isMascotVisible, isTrue);
+
+      provider.dispose();
+    },
+  );
+
+  testWidgets(
     'ai conversation screen sends immediately and shows typing state',
     (tester) async {
       final provider = _buildProvider(

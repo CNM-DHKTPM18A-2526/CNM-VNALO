@@ -160,6 +160,16 @@ void main() {
 
       expect(find.byKey(const ValueKey('ai_chat_board')), findsOneWidget);
 
+      await tester.tap(find.byKey(const ValueKey('ai_bubble_toggle_board')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('ai_chat_board')), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('ai_bubble_toggle_board')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('ai_chat_board')), findsOneWidget);
+
       await tester.enterText(
         find.byKey(const ValueKey('ai_chat_input')),
         'Xin chao',

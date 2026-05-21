@@ -394,7 +394,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
         emotion: provider.currentEmotion,
         size: _bubbleSize,
         onTap: () {
-          _toggleBoard();
+          _toggleBoard(provider);
         },
       ),
     );
@@ -416,7 +416,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
               DateTime.now().isBefore(_ignoreTapUntil!)) {
             return;
           }
-          _toggleBoard();
+          _toggleBoard(provider);
         },
         onLongPress:
             () => provider.onPrimaryAction(source: 'bubble_long_press'),
@@ -424,9 +424,12 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
     );
   }
 
-  void _toggleBoard() {
+  void _toggleBoard(AiAssistantProvider provider) {
+    final latestAssistantEntryId = _latestAssistantEntryId(provider);
     setState(() {
-      if (!_isBoardExpanded) {
+      if (_isBoardExpanded) {
+        _dismissedAssistantEntryId = latestAssistantEntryId;
+      } else {
         _dismissedAssistantEntryId = null;
       }
       _isBoardExpanded = !_isBoardExpanded;
@@ -450,10 +453,23 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
   }
 
   Future<void> _openAiConversation() async {
+    if (mounted) {
+      context.read<AiAssistantProvider>().enterConversationSurface(
+        reason: 'bubble_open_conversation',
+      );
+      setState(() {
+        _isBoardExpanded = false;
+      });
+    }
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const AiConversationScreen()),
     );
+    if (mounted) {
+      context.read<AiAssistantProvider>().leaveConversationSurface(
+        reason: 'bubble_close_conversation',
+      );
+    }
   }
 
   Widget _buildMascotContainer(AiAssistantProvider provider) {
@@ -501,7 +517,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
                   child: GestureDetector(
                     key: const ValueKey('ai_bubble_toggle_board'),
                     behavior: HitTestBehavior.opaque,
-                    onTap: _toggleBoard,
+                    onTap: () => _toggleBoard(provider),
                     onLongPress: _openAiConversation,
                     child: Container(
                       width: 26,
@@ -567,12 +583,12 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
     final availableHeight = max(240.0, screenSize.height - viewInsets.bottom);
 
     const boardPadding = 12.0;
-    final boardWidth = min(340.0, screenSize.width - (boardPadding * 2));
+    final boardWidth = min(320.0, screenSize.width - (boardPadding * 2));
     final compactHeightLimit = max(
       220.0,
       availableHeight - padding.top - padding.bottom - 24.0,
     );
-    final boardHeight = min(420.0, compactHeightLimit);
+    final boardHeight = min(392.0, compactHeightLimit);
 
     final prefersRightDock = _position.dx < screenSize.width / 2;
     final desiredLeft =

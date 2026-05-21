@@ -427,9 +427,8 @@ class AiAssistantProvider with ChangeNotifier {
 
   bool get isBusy => _state != AiState.idle || _isPipelineLocked;
   bool get isMascotVisible =>
-      _persistentEnabled ||
-      _provisionallyVisible ||
-      (_isSessionActive && _activeSurface != AiResponseSurface.conversation);
+      _activeSurface != AiResponseSurface.conversation &&
+      (_persistentEnabled || _provisionallyVisible || _isSessionActive);
 
   Stream<AiCommand> get systemActionStream => _systemActionController.stream;
 
@@ -481,6 +480,35 @@ class AiAssistantProvider with ChangeNotifier {
     AiResponseSurface? explicitSurface,
   }) {
     return explicitSurface ?? _surfaceForSource(source);
+  }
+
+  void enterConversationSurface({String reason = 'conversation_open'}) {
+    _cancelIdleAutoHide();
+    _keepVisibleUntil = null;
+    _activeSurface = AiResponseSurface.conversation;
+    if (_provisionallyVisible) {
+      _provisionallyVisible = false;
+    }
+    _logEvent('SURFACE_ENTER_CONVERSATION', data: {'reason': reason});
+    notifyListeners();
+  }
+
+  void leaveConversationSurface({String reason = 'conversation_close'}) {
+    if (_activeSurface != AiResponseSurface.conversation) {
+      return;
+    }
+    _activeSurface = AiResponseSurface.bubble;
+    if (_persistentEnabled || _isSessionActive || _aiResponse.isNotEmpty) {
+      _provisionallyVisible = true;
+      if (!_persistentEnabled &&
+          _state == AiState.idle &&
+          _aiResponse.isEmpty &&
+          !_isSessionActive) {
+        _scheduleIdleAutoHide(reason: reason);
+      }
+    }
+    _logEvent('SURFACE_LEAVE_CONVERSATION', data: {'reason': reason});
+    notifyListeners();
   }
 
   void _setProvisionallyVisible(bool visible, {required String reason}) {
@@ -584,6 +612,57 @@ class AiAssistantProvider with ChangeNotifier {
       return Duration.zero;
     }
     return DateTime.now().difference(startedAt);
+  }
+
+  bool _hasCapturedFinalTranscript() {
+    return _lastFinalResultAt != null && _lastFinalResultText.trim().isNotEmpty;
+  }
+
+  bool _shouldIgnorePrematureSttEnd({required bool isPermanentError}) {
+    return _state == AiState.listening &&
+        !_isPipelineLocked &&
+        !isPermanentError &&
+        !_hasCapturedFinalTranscript() &&
+        _elapsedListeningTime() < _sttListenFor;
+  }
+
+  void _handleSttTerminalStatus(String status) {
+    final normalized = status.trim().toLowerCase();
+    if ((normalized != 'done' && normalized != 'notlistening') ||
+        _state != AiState.listening ||
+        _isPipelineLocked) {
+      return;
+    }
+
+    if (_shouldIgnorePrematureSttEnd(isPermanentError: false)) {
+      _logEvent(
+        'STT_EARLY_DONE_IGNORED',
+        data: {
+          'status': normalized,
+          'elapsedMs': _elapsedListeningTime().inMilliseconds,
+          'minimumMs': _sttListenFor.inMilliseconds,
+          'hasFinalTranscript': _hasCapturedFinalTranscript(),
+          'lastWordsLength': _lastWords.length,
+        },
+      );
+      return;
+    }
+
+    _finishListeningFromStt(reason: 'stt_done_status');
+  }
+
+  void _finishListeningFromStt({required String reason}) {
+    _cancelListenGuard();
+    _listenStartedAt = null;
+    _isSessionActive = false;
+    _soundLevel = 0;
+    _transitionTo(AiState.idle, reason: reason, notify: false);
+    if (_lastWords.isEmpty) {
+      _aiResponse = '';
+      _scheduleIdleAutoHide(reason: '${reason}_no_words');
+    }
+    _syncVisibilityAfterSession();
+    notifyListeners();
   }
 
   void _handleSoundLevelChange(double rawLevel) {
@@ -989,6 +1068,8 @@ class AiAssistantProvider with ChangeNotifier {
     _cancelIdleAutoHide();
     _cancelListenGuard();
     _soundLevel = 0;
+    _lastFinalResultAt = null;
+    _lastFinalResultText = '';
     if (resolvedSurface != AiResponseSurface.conversation) {
       _setProvisionallyVisible(true, reason: 'stt_start:$source');
     }
@@ -1037,6 +1118,7 @@ class AiAssistantProvider with ChangeNotifier {
     notifyListeners();
 
     try {
+      _startListenGuard(token: token, traceId: traceId);
       await _stt.listen(
         onResult: (result) {
           // HARDEN(late-callback): STT result arriving after operation changed
@@ -1050,6 +1132,8 @@ class AiAssistantProvider with ChangeNotifier {
           if (result.finalResult &&
               _lastWords.isNotEmpty &&
               !_isDuplicateFinalResult(_lastWords)) {
+            _lastFinalResultAt = DateTime.now();
+            _lastFinalResultText = _lastWords;
             _lastResponseSurface = resolvedSurface;
             unawaited(_handleCommand(_lastWords, parentTraceId: traceId));
           }
@@ -1065,7 +1149,6 @@ class AiAssistantProvider with ChangeNotifier {
         ),
       );
 
-      _startListenGuard(token: token, traceId: traceId);
       _logEvent(
         'STT_LISTEN_STARTED',
         traceId: traceId,
@@ -1081,6 +1164,7 @@ class AiAssistantProvider with ChangeNotifier {
       if (!_isCurrentOperation(token)) {
         return;
       }
+      _cancelListenGuard();
 
       _logEvent(
         'STT_LISTEN_ERROR',
@@ -1147,45 +1231,36 @@ class AiAssistantProvider with ChangeNotifier {
           // HARDEN(late-callback): guard STT status callback after dispose
           if (_isDisposed) return;
           _logEvent('STT_STATUS', data: {'status': status});
-          final normalized = status.trim().toLowerCase();
-          if ((normalized == 'done' || normalized == 'notlistening') &&
-              _state == AiState.listening &&
-              !_isPipelineLocked) {
-            if (_lastWords.isEmpty && _elapsedListeningTime() < _sttListenFor) {
-              _logEvent(
-                'STT_EARLY_DONE_IGNORED',
-                data: {
-                  'elapsedMs': _elapsedListeningTime().inMilliseconds,
-                  'minimumMs': _sttListenFor.inMilliseconds,
-                },
-              );
-              return;
-            }
-            _cancelListenGuard();
-            _listenStartedAt = null;
-            _isSessionActive = false;
-            _soundLevel = 0;
-            _transitionTo(
-              AiState.idle,
-              reason: 'stt_done_status',
-              notify: false,
-            );
-            if (_lastWords.isEmpty) {
-              _aiResponse = '';
-              _scheduleIdleAutoHide(reason: 'stt_done_no_words');
-            }
-            _syncVisibilityAfterSession();
-            notifyListeners();
-          }
+          _handleSttTerminalStatus(status);
         },
         onError: (error) {
           // HARDEN(late-callback): guard STT error callback after dispose
           if (_isDisposed) return;
+          final normalizedError = error.errorMsg.trim().toLowerCase();
           _logEvent(
             'STT_ERROR',
             level: 'ERROR',
-            data: {'error': error.toString()},
+            data: {'error': error.toString(), 'errorMsg': error.errorMsg},
           );
+          final isPermanentError =
+              normalizedError.contains('permission') ||
+              normalizedError.contains('denied') ||
+              normalizedError.contains('initialize') ||
+              normalizedError.contains('network');
+          if (_shouldIgnorePrematureSttEnd(
+            isPermanentError: isPermanentError,
+          )) {
+            _logEvent(
+              'STT_TRANSIENT_ERROR_IGNORED',
+              level: 'WARN',
+              data: {
+                'errorMsg': error.errorMsg,
+                'elapsedMs': _elapsedListeningTime().inMilliseconds,
+                'minimumMs': _sttListenFor.inMilliseconds,
+              },
+            );
+            return;
+          }
           if (_state == AiState.listening && !_isPipelineLocked) {
             _cancelListenGuard();
             _listenStartedAt = null;

@@ -34,7 +34,7 @@ class AiChatBoard extends StatefulWidget {
 }
 
 class _AiChatBoardState extends State<AiChatBoard> {
-  static const double _surfaceRadius = 14;
+  static const double _surfaceRadius = 8;
   static const double _fieldRadius = 10;
   static const double _buttonRadius = 999;
 
@@ -126,7 +126,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        constraints: const BoxConstraints(maxWidth: 260),
+        constraints: const BoxConstraints(maxWidth: 252),
         decoration: BoxDecoration(
           color: bubbleColor,
           borderRadius: BorderRadius.only(
@@ -207,7 +207,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        constraints: const BoxConstraints(maxWidth: 260),
+        constraints: const BoxConstraints(maxWidth: 252),
         decoration: BoxDecoration(
           color: bubbleColor,
           borderRadius: const BorderRadius.only(
@@ -257,7 +257,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
         widget.maxHeight ??
         (viewSize.height > 760 ? 440.0 : viewSize.height * 0.58);
     final isCompactLayout = boardMaxHeight < 360 || viewSize.shortestSide < 360;
-    final showPromptChips = !isCompactLayout && boardMaxHeight >= 340;
+    final showPromptChips = !isCompactLayout && boardMaxHeight >= 380;
     final blurSigma = viewSize.shortestSide < 380 ? 8.0 : 14.0;
     final showAiTyping = aiProvider.isAssistantGenerating;
     final transcriptEntries =
@@ -314,51 +314,62 @@ class _AiChatBoardState extends State<AiChatBoard> {
               mainAxisSize: MainAxisSize.max,
               children: [
                 Container(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 10, 10),
+                  padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors:
-                          isDarkMode
-                              ? const [Color(0xFF1C2840), Color(0xFF17355C)]
-                              : const [Color(0xFF1D7BFF), Color(0xFF4CA6FF)],
+                    color:
+                        isDarkMode
+                            ? const Color(0xFF111827).withValues(alpha: 0.84)
+                            : Colors.white.withValues(alpha: 0.78),
+                    border: Border(
+                      bottom: BorderSide(
+                        color:
+                            isDarkMode
+                                ? Colors.white.withValues(alpha: 0.08)
+                                : Colors.black.withValues(alpha: 0.06),
+                      ),
                     ),
                   ),
                   child: Row(
                     children: [
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.smart_toy_outlined,
+                          color: AppColors.primary,
+                          size: 16,
+                        ),
+                      ),
+                      const SizedBox(width: 9),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.max,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Row(
-                              mainAxisSize: MainAxisSize.max,
-                              children: [
-                                const Icon(
-                                  Icons.smart_toy_outlined,
-                                  color: Colors.white,
-                                  size: 16,
-                                ),
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: Text(
-                                    'VNALO AI',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: AppTypography.labelLarge.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            Text(
+                              'Trợ lý AI',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.labelLarge.copyWith(
+                                color:
+                                    isDarkMode ? Colors.white : Colors.black87,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                             if (!isCompactLayout) ...[
-                              const SizedBox(height: 6),
-                              AiStatusPill(
-                                state: aiProvider.state,
-                                compact: true,
-                                degraded: aiProvider.isResponseDegraded,
-                                providerStatus: aiProvider.providerStatus,
+                              const SizedBox(height: 4),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: AiStatusPill(
+                                  state: aiProvider.state,
+                                  compact: true,
+                                  degraded: aiProvider.isResponseDegraded,
+                                  providerStatus: aiProvider.providerStatus,
+                                ),
                               ),
                             ],
                           ],
@@ -552,7 +563,9 @@ class _AiChatBoardState extends State<AiChatBoard> {
                     children: [
                       IconButton(
                         onPressed:
-                            _isSending || aiProvider.isBusy
+                            _isSending ||
+                                    (aiProvider.isBusy &&
+                                        aiProvider.state != AiState.listening)
                                 ? null
                                 : () => aiProvider.onPrimaryAction(
                                   source: 'ai_chat_board_mic',
@@ -560,7 +573,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
                                 ),
                         icon: Icon(
                           aiProvider.state == AiState.listening
-                              ? Icons.mic
+                              ? Icons.mic_off
                               : Icons.mic_none_rounded,
                           color:
                               aiProvider.state == AiState.listening
@@ -575,12 +588,6 @@ class _AiChatBoardState extends State<AiChatBoard> {
                           decoration: BoxDecoration(
                             color: Colors.transparent,
                             borderRadius: BorderRadius.circular(_fieldRadius),
-                            border: Border.all(
-                              color:
-                                  isDarkMode
-                                      ? Colors.white.withValues(alpha: 0.1)
-                                      : AppColors.itemDivider,
-                            ),
                           ),
                           child: TextField(
                             key: const ValueKey('ai_chat_input'),
@@ -595,7 +602,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
                             ),
                             decoration: InputDecoration(
                               isDense: true,
-                              hintText: 'Nhập để chat với trợ lý...',
+                              hintText: 'Nhắn trợ lý AI',
                               hintStyle: TextStyle(
                                 color:
                                     isDarkMode
@@ -604,8 +611,8 @@ class _AiChatBoardState extends State<AiChatBoard> {
                                 fontSize: 14,
                               ),
                               contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 11,
+                                horizontal: 4,
+                                vertical: 10,
                               ),
                               border: InputBorder.none,
                             ),

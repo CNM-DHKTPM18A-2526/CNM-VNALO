@@ -5,6 +5,10 @@ import 'package:vnalo_mobile/core/theme/app_typography.dart';
 enum AiActionConfirmationResult { cancelled, confirmed, alternate }
 
 class AiActionConfirmationSheet extends StatelessWidget {
+  static const double _sheetRadius = 20;
+  static const double _cardRadius = 12;
+  static const double _buttonRadius = 999;
+
   final IconData icon;
   final String title;
   final String description;
@@ -125,7 +129,9 @@ class AiActionConfirmationSheet extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             color: sheetBackground,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(_sheetRadius),
+            ),
           ),
           child: SafeArea(
             top: false,
@@ -146,49 +152,67 @@ class AiActionConfirmationSheet extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: accent.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Icon(icon, color: accent, size: 24),
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color:
+                          isDark
+                              ? Colors.white.withValues(alpha: 0.04)
+                              : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(_cardRadius),
+                      border: Border.all(
+                        color:
+                            isDark
+                                ? Colors.white.withValues(alpha: 0.08)
+                                : const Color(0xFFE2E8F0),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              title,
-                              style: AppTypography.titleMedium.copyWith(
-                                color: textPrimary,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              description,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppTypography.bodySmall.copyWith(
-                                height: 1.35,
-                                color: textSecondary,
-                              ),
-                            ),
-                          ],
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: accent.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(_cardRadius),
+                          ),
+                          child: Icon(icon, color: accent, size: 23),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTypography.titleMedium.copyWith(
+                                  color: textPrimary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                description,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTypography.bodySmall.copyWith(
+                                  height: 1.35,
+                                  color: textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   if (primaryDetail != null || secondaryDetail != null) ...[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
@@ -196,7 +220,7 @@ class AiActionConfirmationSheet extends StatelessWidget {
                             isDark
                                 ? Colors.white.withValues(alpha: 0.06)
                                 : const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(_cardRadius),
                         border: Border.all(
                           color:
                               isDark
@@ -229,7 +253,7 @@ class AiActionConfirmationSheet extends StatelessWidget {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 16),
                   SizedBox(
                     width: double.infinity,
                     height: 48,
@@ -239,7 +263,7 @@ class AiActionConfirmationSheet extends StatelessWidget {
                         foregroundColor: Colors.white,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(999),
+                          borderRadius: BorderRadius.circular(_buttonRadius),
                         ),
                       ),
                       onPressed:
@@ -271,7 +295,7 @@ class AiActionConfirmationSheet extends StatelessWidget {
                             color: accent.withValues(alpha: 0.4),
                           ),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(999),
+                            borderRadius: BorderRadius.circular(_buttonRadius),
                           ),
                         ),
                         child: Text(
@@ -298,7 +322,7 @@ class AiActionConfirmationSheet extends StatelessWidget {
                         foregroundColor: textPrimary,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(999),
+                          borderRadius: BorderRadius.circular(_buttonRadius),
                         ),
                       ),
                       child: Text(
