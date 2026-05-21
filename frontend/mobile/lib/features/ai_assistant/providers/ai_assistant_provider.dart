@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -10,6 +10,7 @@ import 'package:vnalo_mobile/features/ai_assistant/models/mascot_metadata.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/services/ai_service.dart';
+import 'package:vnalo_mobile/services/api_service.dart';
 
 // ---------------------------------------------------------------------------
 // Public enums
@@ -285,7 +286,7 @@ class AiCommand {
 // - AiSurfaceController responsibilities: visibility state, auto-hide timer,
 //   surface routing (bubble vs conversation vs contextual)
 // - AiHistoryStore responsibilities: conversation history, cloud backup/sync
-// - AiCommandRouter responsibilities: stateless — delegates to MainShell via
+// - AiCommandRouter responsibilities: stateless â€” delegates to MainShell via
 //   systemActionStream. Shared helpers live here; routing logic lives in
 //   MainShell._handleAiSystemAction()
 // ---------------------------------------------------------------------------
@@ -402,12 +403,12 @@ class AiAssistantProvider with ChangeNotifier {
   String get lastConversationPreview {
     final entry = lastConversationEntry;
     if (entry == null) {
-      return 'Bắt đầu hội thoại với trợ lý AI';
+      return 'Báº¯t Ä‘áº§u há»™i thoáº¡i vá»›i trá»£ lÃ½ AI';
     }
 
     final prefix =
         entry.role == AiConversationRole.user
-            ? 'Bạn: '
+            ? 'Báº¡n: '
             : entry.role == AiConversationRole.assistant
             ? 'AI: '
             : '';
@@ -432,7 +433,7 @@ class AiAssistantProvider with ChangeNotifier {
         id: 'ai_msg_${entry.entryId}',
         conversationId: aiConversationId,
         senderId: isUser ? currentUserId : 'ai_assistant',
-        senderName: isUser ? 'Bạn' : currentMascot.name,
+        senderName: isUser ? 'Báº¡n' : currentMascot.name,
         senderAvatarUrl: isUser ? userAvatarUrl : currentMascot.previewImageUrl,
         content: entry.text,
         messageType: MessageType.TEXT,
@@ -991,11 +992,11 @@ class AiAssistantProvider with ChangeNotifier {
 
     // HARDEN(mic-permission): when mic unavailable/permission denied, the
     // bubble stays visible (not stuck) and shows an error message. State is
-    // always reset to idle — no orphan listening states.
+    // always reset to idle â€” no orphan listening states.
     if (!available) {
       _cancelActiveOperation(reason: 'stt_unavailable:$source');
       _isSessionActive = false;
-      _aiResponse = 'Thiết bị chưa sẵn sàng micro để nghe lệnh.';
+      _aiResponse = 'Thiáº¿t bá»‹ chÆ°a sáºµn sÃ ng micro Ä‘á»ƒ nghe lá»‡nh.';
       _transitionTo(AiState.idle, reason: 'stt_unavailable', traceId: traceId);
       if (resolvedSurface != AiResponseSurface.conversation) {
         _setProvisionallyVisible(true, reason: 'stt_unavailable_visible');
@@ -1056,7 +1057,7 @@ class AiAssistantProvider with ChangeNotifier {
       );
     } catch (error) {
       // HARDEN(mic-permission): catch listen() throwing (not just returning
-      // false from initialize) — ensures state is always cleaned up.
+      // false from initialize) â€” ensures state is always cleaned up.
       if (!_isCurrentOperation(token)) {
         return;
       }
@@ -1070,7 +1071,7 @@ class AiAssistantProvider with ChangeNotifier {
       _cancelActiveOperation(reason: 'stt_listen_error:$source');
       _isSessionActive = false;
       _soundLevel = 0;
-      _aiResponse = 'Không thể bắt đầu thu âm. Bạn thử lại hoặc nhập tin nhắn.';
+      _aiResponse = 'KhÃ´ng thá»ƒ báº¯t Ä‘áº§u thu Ã¢m. Báº¡n thá»­ láº¡i hoáº·c nháº­p tin nháº¯n.';
       _transitionTo(
         AiState.idle,
         reason: 'stt_listen_error',
@@ -1159,7 +1160,7 @@ class AiAssistantProvider with ChangeNotifier {
             _soundLevel = 0;
             _transitionTo(AiState.idle, reason: 'stt_error', notify: false);
             _aiResponse =
-                'Không thể tiếp tục thu âm. Bạn kiểm tra quyền micro và thử lại.';
+                'KhÃ´ng thá»ƒ tiáº¿p tá»¥c thu Ã¢m. Báº¡n kiá»ƒm tra quyá»n micro vÃ  thá»­ láº¡i.';
             if (_activeSurface != AiResponseSurface.conversation) {
               _setProvisionallyVisible(true, reason: 'stt_error_visible');
               _scheduleIdleAutoHide(reason: 'stt_error');
@@ -1383,7 +1384,7 @@ class AiAssistantProvider with ChangeNotifier {
           token: token,
           traceId: traceId,
           event: 'AI_TIMEOUT',
-          fallbackMessage: 'AI đang phản hồi chậm, vui lòng thử lại sau.',
+          fallbackMessage: 'AI Ä‘ang pháº£n há»“i cháº­m, vui lÃ²ng thá»­ láº¡i sau.',
           userText: normalized,
           source: 'assistant_chat',
           userEntryId: userEntryId,
@@ -1396,7 +1397,10 @@ class AiAssistantProvider with ChangeNotifier {
           token: token,
           traceId: traceId,
           event: 'AI_ERROR',
-          fallbackMessage: 'Xin lỗi, tôi đang gặp chút trục trặc mạng.',
+          fallbackMessage: _resolveAssistantErrorMessage(
+            error,
+            fallbackMessage: 'Xin lỗi, tôi đang gặp chút trục trặc mạng.',
+          ),
           error: error,
           userText: normalized,
           source: 'assistant_chat',
@@ -1436,8 +1440,8 @@ class AiAssistantProvider with ChangeNotifier {
     await _runContextualPrompt(
       source: 'analyze_message',
       prompt:
-          'Hãy giải thích hoặc tóm tắt ngắn gọn tin nhắn này cho tôi: "$content"',
-      fallbackMessage: 'Tôi không thể phân tích tin nhắn này lúc này.',
+          'HÃ£y giáº£i thÃ­ch hoáº·c tÃ³m táº¯t ngáº¯n gá»n tin nháº¯n nÃ y cho tÃ´i: "$content"',
+      fallbackMessage: 'TÃ´i khÃ´ng thá»ƒ phÃ¢n tÃ­ch tin nháº¯n nÃ y lÃºc nÃ y.',
     );
   }
 
@@ -1450,8 +1454,8 @@ class AiAssistantProvider with ChangeNotifier {
     await _runContextualPrompt(
       source: 'translate_message',
       prompt:
-          'Hãy dịch tin nhắn sau đây sang tiếng Việt một cách tự nhiên và chính xác nhất: "$content"',
-      fallbackMessage: 'Tôi không thể dịch tin nhắn này lúc này.',
+          'HÃ£y dá»‹ch tin nháº¯n sau Ä‘Ã¢y sang tiáº¿ng Viá»‡t má»™t cÃ¡ch tá»± nhiÃªn vÃ  chÃ­nh xÃ¡c nháº¥t: "$content"',
+      fallbackMessage: 'TÃ´i khÃ´ng thá»ƒ dá»‹ch tin nháº¯n nÃ y lÃºc nÃ y.',
     );
   }
 
@@ -1464,14 +1468,14 @@ class AiAssistantProvider with ChangeNotifier {
     await _runContextualPrompt(
       source: 'summarize_video',
       prompt:
-          'Hãy đóng vai một trợ lý thông minh, xem xét nội dung (nếu là video nội bộ) hoặc URL video này: $videoUrl. Hãy tóm tắt nội dung chính hoặc cho tôi biết đây là loại video gì. Trả lời ngắn gọn.',
-      fallbackMessage: 'Tôi gặp khó khăn khi truy cập video này.',
+          'HÃ£y Ä‘Ã³ng vai má»™t trá»£ lÃ½ thÃ´ng minh, xem xÃ©t ná»™i dung (náº¿u lÃ  video ná»™i bá»™) hoáº·c URL video nÃ y: $videoUrl. HÃ£y tÃ³m táº¯t ná»™i dung chÃ­nh hoáº·c cho tÃ´i biáº¿t Ä‘Ã¢y lÃ  loáº¡i video gÃ¬. Tráº£ lá»i ngáº¯n gá»n.',
+      fallbackMessage: 'TÃ´i gáº·p khÃ³ khÄƒn khi truy cáº­p video nÃ y.',
     );
   }
 
   /// HARDEN(flow-contextual): contextual prompts (analyze/translate/summarize)
   /// set _activeSurface to contextual (not conversation) so responses can
-  /// appear in the bubble board. This is intentional — context analysis is
+  /// appear in the bubble board. This is intentional â€” context analysis is
   /// driven by the bubble mascot experience.
   Future<void> _runContextualPrompt({
     required String source,
@@ -1629,6 +1633,28 @@ class AiAssistantProvider with ChangeNotifier {
     _transitionTo(AiState.speaking, reason: 'fallback_speak', traceId: traceId);
     notifyListeners();
     await _safeSpeak(_aiResponse, token: token, traceId: traceId);
+  }
+
+  String _resolveAssistantErrorMessage(
+    Object error, {
+    required String fallbackMessage,
+  }) {
+    if (error is ApiException) {
+      final normalizedMessage = normalizeAiTextEncoding(error.message).trim();
+      if (normalizedMessage.isNotEmpty) {
+        return normalizedMessage;
+      }
+
+      if (error.statusCode == 401 || error.statusCode == 403) {
+        return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+      }
+
+      if (error.statusCode == 429) {
+        return 'Bạn đang gửi quá nhanh. Vui lòng thử lại sau ít giây.';
+      }
+    }
+
+    return fallbackMessage;
   }
 
   Future<void> _stopAllInteractions({
@@ -1992,10 +2018,10 @@ class AiAssistantProvider with ChangeNotifier {
 
   String _contextPromptLabel(String source) {
     return switch (source) {
-      'analyze_message' => '[Phân tích tin nhắn]',
-      'translate_message' => '[Dịch tin nhắn]',
-      'summarize_video' => '[Tóm tắt video]',
-      _ => '[Yêu cầu AI]',
+      'analyze_message' => '[PhÃ¢n tÃ­ch tin nháº¯n]',
+      'translate_message' => '[Dá»‹ch tin nháº¯n]',
+      'summarize_video' => '[TÃ³m táº¯t video]',
+      _ => '[YÃªu cáº§u AI]',
     };
   }
 
