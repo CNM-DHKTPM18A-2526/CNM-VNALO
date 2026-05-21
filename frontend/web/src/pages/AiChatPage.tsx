@@ -1,13 +1,21 @@
-import { useState, useEffect, useRef } from 'react'
-import { Sparkles, Send, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Send, Sparkles, Trash2 } from 'lucide-react'
+import { extractMessage } from '../api.client'
 import { useAuth } from '../features/auth/useAuth'
 import { sendAiChatMessage } from '../features/chat/chat.api'
-import { extractMessage } from '../api.client'
+
+type ProviderStatus =
+  | 'LIVE_PROVIDER_ACTIVE'
+  | 'FALLBACK_PROVIDER_ACTIVE'
+  | 'AI_PROVIDER_UNAVAILABLE'
+  | null
 
 type AiMessage = {
   role: 'user' | 'assistant'
   content: string
   timestamp: string
+  degraded?: boolean
+  providerStatus?: ProviderStatus
 }
 
 const PRESET_PROMPTS = [
@@ -15,6 +23,52 @@ const PRESET_PROMPTS = [
   'Giúp tôi soạn một tin nhắn từ chối lịch hẹn khéo léo',
   'Giải thích khái niệm WebRTC một cách ngắn gọn',
 ]
+
+const INITIAL_ASSISTANT_MESSAGE: AiMessage = {
+  role: 'assistant',
+  content: 'Xin chào! Mình là Trợ lý AI VNALO. Mình có thể giúp gì cho bạn hôm nay?',
+  timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+}
+
+function resolveProviderPresentation(messages: AiMessage[]) {
+  const latestAssistantMessage = [...messages].reverse().find((message) => message.role === 'assistant')
+  const providerStatus = latestAssistantMessage?.providerStatus ?? null
+  const degraded = Boolean(latestAssistantMessage?.degraded)
+
+  if (providerStatus === 'AI_PROVIDER_UNAVAILABLE') {
+    return {
+      providerStatus,
+      degraded: true,
+      badgeClassName: 'ai-header-status ai-header-status-warning',
+      label: 'AI đang bảo trì',
+      helper: 'Một số phản hồi AI có thể tạm thời bị hạn chế.',
+      banner: 'AI đang bảo trì. Hãy thử lại sau hoặc tiếp tục với các thao tác thủ công.',
+      bannerClassName: 'ai-runtime-banner ai-runtime-banner-warning',
+    }
+  }
+
+  if (providerStatus === 'FALLBACK_PROVIDER_ACTIVE' || degraded) {
+    return {
+      providerStatus,
+      degraded: true,
+      badgeClassName: 'ai-header-status ai-header-status-degraded',
+      label: 'Chế độ dự phòng',
+      helper: 'Hệ thống đang dùng tuyến phản hồi thay thế.',
+      banner: 'AI đang chạy ở chế độ dự phòng, chất lượng phản hồi có thể giảm.',
+      bannerClassName: 'ai-runtime-banner ai-runtime-banner-info',
+    }
+  }
+
+  return {
+    providerStatus,
+    degraded: false,
+    badgeClassName: 'ai-header-status',
+    label: 'Sẵn sàng hỗ trợ',
+    helper: 'Trợ lý AI có thể trả lời và gợi ý thao tác trong VNALO.',
+    banner: '',
+    bannerClassName: 'ai-runtime-banner',
+  }
+}
 
 export function AiChatPage() {
   const { accessToken } = useAuth()
@@ -25,35 +79,36 @@ export function AiChatPage() {
 
   useEffect(() => {
     const saved = localStorage.getItem('vnalo_ai_chat_history')
-    if (saved) {
-      try {
-        setMessages(JSON.parse(saved))
-      } catch (error) {
-        console.warn('Failed to parse AI chat history', error)
-      }
-    } else {
-      setMessages([
-        {
-          role: 'assistant',
-          content: 'Xin chào! Mình là Trợ lý AI VNALO. Mình có thể giúp gì cho bạn hôm nay?',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ])
+    if (!saved) {
+      setMessages([INITIAL_ASSISTANT_MESSAGE])
+      return
+    }
+
+    try {
+      const parsed = JSON.parse(saved) as AiMessage[]
+      setMessages(parsed.length > 0 ? parsed : [INITIAL_ASSISTANT_MESSAGE])
+    } catch (error) {
+      console.warn('Failed to parse AI chat history', error)
+      setMessages([INITIAL_ASSISTANT_MESSAGE])
     }
   }, [])
 
-  const saveMessages = (newMessages: AiMessage[]) => {
-    setMessages(newMessages)
-    localStorage.setItem('vnalo_ai_chat_history', JSON.stringify(newMessages))
+  const saveMessages = (nextMessages: AiMessage[]) => {
+    setMessages(nextMessages)
+    localStorage.setItem('vnalo_ai_chat_history', JSON.stringify(nextMessages))
   }
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isLoading])
 
+  const runtimeState = useMemo(() => resolveProviderPresentation(messages), [messages])
+
   const handleSend = async (textToSend?: string) => {
-    const query = (textToSend || inputValue).trim()
-    if (!query || isLoading || !accessToken) return
+    const query = (textToSend ?? inputValue).trim()
+    if (!query || isLoading || !accessToken) {
+      return
+    }
 
     if (!textToSend) {
       setInputValue('')
@@ -70,17 +125,18 @@ export function AiChatPage() {
     setIsLoading(true)
 
     try {
-      const apiHistory = messages.map((message) => ({
+      const apiHistory = updatedMessages.map((message) => ({
         role: message.role,
         content: message.content,
       }))
 
       const aiResponse = await sendAiChatMessage(accessToken, query, apiHistory)
-
       const assistantMessage: AiMessage = {
         role: 'assistant',
         content: aiResponse.textReply || 'Rất tiếc, mình không thể xử lý yêu cầu lúc này.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        degraded: Boolean(aiResponse.degraded),
+        providerStatus: (aiResponse.providerStatus as ProviderStatus | undefined) ?? null,
       }
 
       saveMessages([...updatedMessages, assistantMessage])
@@ -89,12 +145,14 @@ export function AiChatPage() {
       const fallbackText =
         extractMessage((error as any)?.response?.data) ||
         extractMessage(error as any) ||
-        'Có lỗi xảy ra khi kết nối tới Trợ lý AI. Vui lòng thử lại sau!'
+        'Có lỗi xảy ra khi kết nối tới Trợ lý AI. Vui lòng thử lại sau.'
 
       const errorMessage: AiMessage = {
         role: 'assistant',
         content: fallbackText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        degraded: true,
+        providerStatus: 'AI_PROVIDER_UNAVAILABLE',
       }
 
       saveMessages([...updatedMessages, errorMessage])
@@ -104,15 +162,13 @@ export function AiChatPage() {
   }
 
   const handleClearHistory = () => {
-    const initial: AiMessage[] = [
+    saveMessages([
       {
         role: 'assistant',
         content: 'Lịch sử đã được dọn dẹp. Mình có thể hỗ trợ gì tiếp theo cho bạn?',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
-    ]
-
-    saveMessages(initial)
+    ])
   }
 
   return (
@@ -123,14 +179,14 @@ export function AiChatPage() {
             <Sparkles size={28} />
           </div>
           <h3>Trợ lý AI VNALO</h3>
-          <p>Trợ lý thông minh hỗ trợ giải đáp mọi câu hỏi và gợi ý công việc nhanh chóng.</p>
+          <p>Hỗ trợ trả lời câu hỏi, giải thích nhanh và gợi ý thao tác an toàn trong hệ thống VNALO.</p>
         </div>
 
         <div className='ai-presets-container'>
           <span className='ai-presets-title'>Gợi ý câu hỏi</span>
-          {PRESET_PROMPTS.map((prompt, index) => (
+          {PRESET_PROMPTS.map((prompt) => (
             <button
-              key={index}
+              key={prompt}
               type='button'
               className='ai-preset-btn'
               onClick={() => handleSend(prompt)}
@@ -156,16 +212,21 @@ export function AiChatPage() {
 
       <main className='ai-chat-main'>
         <header className='ai-chat-header'>
-          <div className='ai-header-info'>
-            <div className='ai-header-status' />
-            <strong className='text-[15px] font-semibold'>Trợ lý AI đang hoạt động</strong>
+          <div className='ai-header-stack'>
+            <div className='ai-header-info'>
+              <div className={runtimeState.badgeClassName} />
+              <strong className='text-[15px] font-semibold'>{runtimeState.label}</strong>
+            </div>
+            <span className='ai-header-helper'>{runtimeState.helper}</span>
           </div>
         </header>
 
         <div className='ai-chat-messages'>
+          {runtimeState.degraded && <div className={runtimeState.bannerClassName}>{runtimeState.banner}</div>}
+
           {messages.map((message, index) => (
             <div
-              key={index}
+              key={`${message.role}-${message.timestamp}-${index}`}
               className={message.role === 'assistant' ? 'ai-msg-bubble-ai' : 'ai-msg-bubble-user'}
             >
               <p className='text-[14.5px] whitespace-pre-wrap' style={{ margin: 0 }}>
@@ -195,13 +256,19 @@ export function AiChatPage() {
               handleSend()
             }}
           >
-            <input
-              type='text'
+            <textarea
               className='ai-input-field'
               placeholder='Hỏi trợ lý AI điều gì đó...'
               value={inputValue}
               onChange={(event) => setInputValue(event.target.value)}
+              rows={1}
               disabled={isLoading}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault()
+                  handleSend()
+                }
+              }}
             />
             <button type='submit' className='ai-send-btn' disabled={isLoading || !inputValue.trim()}>
               <Send size={18} />
