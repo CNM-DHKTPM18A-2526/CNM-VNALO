@@ -370,12 +370,10 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
 
   Widget _buildInputBar(AiAssistantProvider provider, bool isDarkMode) {
     final bgColor = isDarkMode ? DarkColors.surface : LightColors.surface;
-    final inputBorderColor =
-        isDarkMode
-            ? Colors.white.withValues(alpha: 0.08)
-            : AppColors.itemDivider;
-    final inputSurfaceColor =
-        isDarkMode ? DarkColors.surfaceLight : Colors.white;
+    final iconColor =
+        isDarkMode ? DarkColors.textSecondary : AppColors.iconSubtle;
+    final activeColor =
+        provider.state == AiState.listening ? AppColors.error : iconColor;
 
     return Container(
       key: const ValueKey('ai_conversation_input_bar'),
@@ -391,106 +389,96 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
       ),
       child: SafeArea(
         top: false,
+        minimum: const EdgeInsets.symmetric(vertical: 2),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             IconButton(
               icon: Icon(
-                provider.state == AiState.listening
-                    ? Icons.mic_off
-                    : Icons.mic_none_outlined,
-                color:
-                    provider.state == AiState.listening
-                        ? AppColors.error
-                        : (isDarkMode ? Colors.white70 : AppColors.iconSubtle),
+                Icons.auto_awesome_rounded,
+                color: isDarkMode ? DarkColors.textSecondary : AppColors.iconSubtle,
               ),
-              onPressed:
-                  () => provider.onPrimaryAction(
-                    source: 'conversation_screen_mic',
-                    surface: AiResponseSurface.conversation,
-                  ),
+              onPressed: () => _inputFocusNode.requestFocus(),
             ),
             Expanded(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
+                decoration: BoxDecoration(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: TextField(
                   key: const ValueKey('ai_conversation_input'),
                   controller: _inputController,
                   focusNode: _inputFocusNode,
                   textInputAction: TextInputAction.send,
+                  onTapOutside: (_) => _inputFocusNode.unfocus(),
                   onSubmitted: (_) => _sendPrompt(provider),
                   minLines: 1,
-                  maxLines: 4,
+                  maxLines: 5,
                   style: AppTypography.bodyLarge.copyWith(
+                    fontSize: 16,
                     color: isDarkMode ? Colors.white : Colors.black87,
                   ),
                   decoration: InputDecoration(
-                    hintText: 'Hỏi trợ lý VNALO AI...',
+                    hintText: 'Nhắn trợ lý AI',
                     hintStyle: AppTypography.bodyLarge.copyWith(
+                      fontSize: 16,
                       color:
                           isDarkMode
                               ? DarkColors.textHint
                               : const Color(0xFFA1A3A7),
                     ),
-                    filled: true,
-                    fillColor: inputSurfaceColor,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: inputBorderColor),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: inputBorderColor),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color:
-                            isDarkMode
-                                ? DarkColors.primaryLight
-                                : AppColors.primary,
-                      ),
-                    ),
                     isDense: true,
+                    filled: false,
                     contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 11,
+                      vertical: 10,
+                      horizontal: 4,
                     ),
+                    border: InputBorder.none,
                   ),
                 ),
               ),
             ),
             if (_hasText)
-              Container(
-                width: 44,
-                height: 44,
-                margin: const EdgeInsets.only(left: 8),
-                child: ElevatedButton(
-                  key: const ValueKey('ai_conversation_send'),
-                  onPressed: _isSending ? null : () => _sendPrompt(provider),
-                  style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    backgroundColor: AppColors.primary,
-                    disabledBackgroundColor: Colors.grey,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child:
-                      _isSending
-                          ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                          : const Icon(Icons.send_rounded, color: Colors.white),
-                ),
+              IconButton(
+                key: const ValueKey('ai_conversation_send'),
+                onPressed: _isSending ? null : () => _sendPrompt(provider),
+                icon:
+                    _isSending
+                        ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color:
+                                isDarkMode
+                                    ? DarkColors.primaryLight
+                                    : AppColors.primary,
+                          ),
+                        )
+                        : Icon(
+                          Icons.send,
+                          color:
+                              isDarkMode
+                                  ? DarkColors.primary
+                                  : AppColors.primary,
+                        ),
               )
             else
-              const SizedBox(width: 8),
+              IconButton(
+                key: const ValueKey('ai_conversation_mic'),
+                icon: Icon(
+                  provider.state == AiState.listening
+                      ? Icons.mic_off
+                      : Icons.mic_none_outlined,
+                  color: activeColor,
+                ),
+                onPressed:
+                    () => provider.onPrimaryAction(
+                      source: 'conversation_screen_mic',
+                      surface: AiResponseSurface.conversation,
+                    ),
+              ),
           ],
         ),
       ),
