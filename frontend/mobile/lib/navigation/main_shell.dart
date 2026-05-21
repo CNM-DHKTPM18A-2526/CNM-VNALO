@@ -1,10 +1,11 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/features/contacts/providers/contact_provider.dart';
+import 'package:vnalo_mobile/features/contacts/screens/friend_options_screen.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
@@ -19,11 +20,15 @@ import 'package:vnalo_mobile/features/ai_assistant/utils/ai_recall_message_selec
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_action_confirmation_sheet.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_conversation_disambiguation_sheet.dart';
 import 'package:vnalo_mobile/features/chat/screens/chat_detail_screen.dart';
+import 'package:vnalo_mobile/features/chat/screens/group_settings_screen.dart';
 import 'package:vnalo_mobile/features/call/screens/voice_call_screen.dart';
 import 'package:vnalo_mobile/features/call/screens/video_call_screen.dart';
 import 'package:vnalo_mobile/features/call/utils/call_id_generator.dart';
 import 'package:vnalo_mobile/features/auth/screens/qr_scanner_screen.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
+import 'package:vnalo_mobile/models/message_model.dart';
+import 'package:vnalo_mobile/models/user_model.dart';
+import 'package:vnalo_mobile/services/friend_service.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 
 class MainShell extends StatefulWidget {
@@ -539,6 +544,41 @@ class MainShellState extends State<MainShell> {
         }
         break;
 
+      case 'CREATE_GROUP':
+        await _handleAiCreateGroup(aiCmd, params);
+        break;
+      case 'MUTE_CONVERSATION':
+      case 'UNMUTE_CONVERSATION':
+        await _handleAiMuteConversation(
+          aiCmd,
+          params,
+          muted: command == 'MUTE_CONVERSATION',
+        );
+        break;
+      case 'PIN_MESSAGE':
+      case 'UNPIN_MESSAGE':
+        await _handleAiPinMessage(aiCmd, params, pin: command == 'PIN_MESSAGE');
+        break;
+      case 'OPEN_PROFILE':
+        await _handleAiOpenProfile(aiCmd, params);
+        break;
+      case 'OPEN_GROUP_SETTINGS':
+        await _handleAiOpenGroupSettings(aiCmd, params);
+        break;
+      case 'SEND_FRIEND_REQUEST':
+      case 'BLOCK_USER':
+      case 'UNBLOCK_USER':
+        await _handleAiContactAction(aiCmd, params, command: command);
+        break;
+      case 'CHANGE_GROUP_NAME':
+      case 'ADD_GROUP_MEMBER':
+      case 'REMOVE_GROUP_MEMBER':
+      case 'TRANSFER_GROUP_OWNER':
+      case 'LEAVE_GROUP':
+      case 'DISBAND_GROUP':
+        await _handleAiGroupAdminAction(aiCmd, params, command: command);
+        break;
+
       default:
         _logAiFlow(
           'AI_UNKNOWN_COMMAND',
@@ -560,6 +600,555 @@ class MainShellState extends State<MainShell> {
       targetName: targetName,
     );
   }
+
+  Conversation? _conversationById(ChatProvider chatProvider, String? id) {
+    if (id == null || id.trim().isEmpty) return null;
+    return chatProvider.conversations
+        .where((conversation) => conversation.id == id.trim())
+        .firstOrNull;
+  }
+
+  Future<Conversation?> _resolveAiConversation(
+    AiCommand aiCmd,
+    Map<String, dynamic>? params, {
+    bool requireGroup = false,
+  }) async {
+    final chatProvider = context.read<ChatProvider>();
+    final currentUserId = chatProvider.currentUserId ?? '';
+    final explicitId = (params?['conversationId'] ?? params?['id'])?.toString();
+    final byId = _conversationById(chatProvider, explicitId);
+    if (byId != null) {
+      if (requireGroup && byId.type.name != 'GROUP') {
+        _showErrorSnackBar('Cuộc trò chuyện đã chọn không phải nhóm.');
+        return null;
+      }
+      return byId;
+    }
+
+    final targetName =
+        AiCommandRouting.extractConversationName(params) ??
+        AiCommandRouting.extractTargetName(params);
+    if (targetName.isNotEmpty) {
+      final matches = chatProvider.findConversationMatchesByName(targetName);
+      final filtered =
+          requireGroup
+              ? matches
+                  .where((conversation) => conversation.type.name == 'GROUP')
+                  .toList()
+              : matches;
+      if (filtered.isEmpty) {
+        _showErrorSnackBar('Không tìm thấy cuộc trò chuyện "$targetName".');
+        return null;
+      }
+      if (filtered.length > 1) {
+        return _showConversationDisambiguationSheet(
+          matches: filtered,
+          currentUserId: currentUserId,
+          targetName: targetName,
+        );
+      }
+      return filtered.first;
+    }
+
+    final active = _conversationById(
+      chatProvider,
+      chatProvider.activeConversationId,
+    );
+    if (active != null && (!requireGroup || active.type.name == 'GROUP')) {
+      return active;
+    }
+
+    _showErrorSnackBar(
+      requireGroup
+          ? 'Trợ lý chưa xác định được nhóm cần thao tác.'
+          : 'Trợ lý chưa xác định được cuộc trò chuyện cần thao tác.',
+    );
+    return null;
+  }
+
+  List<User> _findUsersByName(Iterable<User> users, String name) {
+    final normalized = name.trim().toLowerCase();
+    if (normalized.isEmpty) return const <User>[];
+    final exact =
+        users
+            .where(
+              (user) => user.displayName.trim().toLowerCase() == normalized,
+            )
+            .toList();
+    if (exact.isNotEmpty) return exact;
+    return users
+        .where(
+          (user) => user.displayName.trim().toLowerCase().contains(normalized),
+        )
+        .toList();
+  }
+
+  Future<User?> _resolveAiFriend(
+    AiCommand aiCmd,
+    Map<String, dynamic>? params, {
+    String? fallbackName,
+  }) async {
+    final contactProvider = context.read<ContactProvider>();
+    if (contactProvider.friends.isEmpty) {
+      await contactProvider.fetchFriends();
+    }
+
+    final explicitId = (params?['userId'] ?? params?['friendId'])?.toString();
+    if (explicitId != null && explicitId.trim().isNotEmpty) {
+      final match =
+          contactProvider.friends
+              .where((user) => user.id == explicitId.trim())
+              .firstOrNull;
+      if (match != null) return match;
+    }
+
+    final name = fallbackName ?? AiCommandRouting.extractTargetName(params);
+    final matches = _findUsersByName(contactProvider.friends, name);
+    if (matches.isEmpty) {
+      _showErrorSnackBar('Không tìm thấy "$name" trong danh bạ.');
+      return null;
+    }
+    if (matches.length > 1) {
+      _showErrorSnackBar(
+        'Có nhiều người tên "$name". Hãy nói rõ họ tên hoặc mở danh bạ để chọn.',
+      );
+      return null;
+    }
+    return matches.first;
+  }
+
+  List<User> _resolveGroupMembersByName(
+    Conversation conversation,
+    List<String> names,
+  ) {
+    final members =
+        conversation.members
+            .where((member) => member.user != null)
+            .map((member) => member.user!)
+            .toList();
+    final resolved = <User>[];
+    for (final name in names) {
+      final matches = _findUsersByName(members, name);
+      if (matches.length != 1) {
+        throw StateError(
+          matches.isEmpty
+              ? 'Không tìm thấy thành viên "$name" trong nhóm.'
+              : 'Có nhiều thành viên tên "$name". Hãy nói rõ hơn.',
+        );
+      }
+      resolved.add(matches.first);
+    }
+    return resolved;
+  }
+
+  Message? _latestActionableMessage(ChatProvider chatProvider) {
+    final currentUserId = chatProvider.currentUserId;
+    for (final message in chatProvider.messages.reversed) {
+      if (message.isSystemMessage || message.isRecalled) continue;
+      if (currentUserId != null && message.senderId == currentUserId) {
+        return message;
+      }
+    }
+    return null;
+  }
+
+  Future<bool> _confirmAiAction({
+    required IconData icon,
+    required String title,
+    required String description,
+    required String confirmLabel,
+    String? primaryDetail,
+    String? secondaryDetail,
+    String? primaryDetailLabel,
+    String? secondaryDetailLabel,
+    bool destructive = false,
+  }) {
+    return AiActionConfirmationSheet.show(
+      context,
+      icon: icon,
+      title: title,
+      description: description,
+      confirmLabel: confirmLabel,
+      primaryDetail: primaryDetail,
+      secondaryDetail: secondaryDetail,
+      primaryDetailLabel: primaryDetailLabel,
+      secondaryDetailLabel: secondaryDetailLabel,
+      destructive: destructive,
+    );
+  }
+
+  void _showSuccessSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+      );
+  }
+
+  Future<void> _handleAiCreateGroup(
+    AiCommand aiCmd,
+    Map<String, dynamic>? params,
+  ) async {
+    final groupName = AiCommandRouting.extractGroupName(params);
+    final memberNames = AiCommandRouting.extractMemberNames(params);
+    if (groupName.isEmpty || memberNames.isEmpty) {
+      _showErrorSnackBar('Trợ lý cần tên nhóm và ít nhất một thành viên.');
+      return;
+    }
+
+    final contactProvider = context.read<ContactProvider>();
+    if (contactProvider.friends.isEmpty) {
+      await contactProvider.fetchFriends();
+    }
+    final selectedUsers = <User>[];
+    for (final name in memberNames) {
+      final matches = _findUsersByName(contactProvider.friends, name);
+      if (matches.length != 1) {
+        _showErrorSnackBar(
+          matches.isEmpty
+              ? 'Không tìm thấy "$name" trong danh bạ.'
+              : 'Có nhiều người tên "$name". Hãy nói rõ họ tên.',
+        );
+        return;
+      }
+      selectedUsers.add(matches.first);
+    }
+
+    final confirmed = await _confirmAiAction(
+      icon: Icons.group_add_rounded,
+      title: 'Xác nhận tạo nhóm',
+      description: 'Trợ lý sẽ tạo nhóm mới với các thành viên đã chọn.',
+      confirmLabel: 'Tạo nhóm',
+      primaryDetail: groupName,
+      primaryDetailLabel: 'Tên nhóm',
+      secondaryDetail: selectedUsers.map((user) => user.displayName).join(', '),
+      secondaryDetailLabel: 'Thành viên',
+    );
+    if (!confirmed || !mounted) return;
+
+    final conversation = await context
+        .read<ChatProvider>()
+        .createGroupConversation(
+          title: groupName,
+          memberIds: selectedUsers.map((user) => user.id).toList(),
+        );
+    if (conversation != null && mounted) {
+      _showSuccessSnackBar('Đã tạo nhóm "$groupName".');
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ChatDetailScreen(conversation: conversation),
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleAiMuteConversation(
+    AiCommand aiCmd,
+    Map<String, dynamic>? params, {
+    required bool muted,
+  }) async {
+    final currentUserId = context.read<ChatProvider>().currentUserId ?? '';
+    final conversation = await _resolveAiConversation(aiCmd, params);
+    if (conversation == null) return;
+    final confirmed = await _confirmAiAction(
+      icon:
+          muted ? Icons.notifications_off_rounded : Icons.notifications_rounded,
+      title: muted ? 'Tắt thông báo' : 'Bật thông báo',
+      description:
+          muted
+              ? 'Trợ lý sẽ tắt thông báo cho cuộc trò chuyện này.'
+              : 'Trợ lý sẽ bật lại thông báo cho cuộc trò chuyện này.',
+      confirmLabel: muted ? 'Tắt thông báo' : 'Bật thông báo',
+      primaryDetail: conversation.getDisplayName(currentUserId),
+    );
+    if (!confirmed || !mounted) return;
+    await context.read<ChatProvider>().updateConversationSettings(
+      conversationId: conversation.id,
+      isMuted: muted,
+    );
+    _showSuccessSnackBar(muted ? 'Đã tắt thông báo.' : 'Đã bật thông báo.');
+  }
+
+  Future<void> _handleAiPinMessage(
+    AiCommand aiCmd,
+    Map<String, dynamic>? params, {
+    required bool pin,
+  }) async {
+    final chatProvider = context.read<ChatProvider>();
+    final messageId = (params?['messageId'] ?? params?['id'])?.toString();
+    Message? message;
+    if (messageId != null && messageId.trim().isNotEmpty) {
+      message =
+          chatProvider.messages
+              .where((item) => item.id == messageId.trim())
+              .firstOrNull;
+    }
+    message ??= _latestActionableMessage(chatProvider);
+    if (message == null) {
+      _showErrorSnackBar('Không tìm thấy tin nhắn phù hợp để ghim/bỏ ghim.');
+      return;
+    }
+    final confirmed = await _confirmAiAction(
+      icon: pin ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+      title: pin ? 'Xác nhận ghim tin nhắn' : 'Xác nhận bỏ ghim tin nhắn',
+      description:
+          pin
+              ? 'Trợ lý sẽ ghim tin nhắn trong cuộc trò chuyện hiện tại.'
+              : 'Trợ lý sẽ bỏ ghim tin nhắn trong cuộc trò chuyện hiện tại.',
+      confirmLabel: pin ? 'Ghim' : 'Bỏ ghim',
+      secondaryDetail: message.content,
+      secondaryDetailLabel: 'Tin nhắn',
+    );
+    if (!confirmed || !mounted) return;
+    if (pin) {
+      chatProvider.pinMessage(message.id);
+    } else {
+      chatProvider.unpinMessage(message.id);
+    }
+  }
+
+  Future<void> _handleAiOpenProfile(
+    AiCommand aiCmd,
+    Map<String, dynamic>? params,
+  ) async {
+    final user = await _resolveAiFriend(aiCmd, params);
+    if (user == null || !mounted) return;
+    Conversation? direct;
+    final chatProvider = context.read<ChatProvider>();
+    final matches = chatProvider.findConversationMatchesByName(
+      user.displayName,
+    );
+    direct =
+        matches
+            .where((conversation) => conversation.type.name == 'DIRECT')
+            .firstOrNull;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder:
+            (_) => FriendOptionsScreen(
+              friendName: user.displayName,
+              friendAvatarUrl: user.avatarUrl,
+              friendUserId: user.id,
+              conversation: direct,
+            ),
+      ),
+    );
+  }
+
+  Future<void> _handleAiOpenGroupSettings(
+    AiCommand aiCmd,
+    Map<String, dynamic>? params,
+  ) async {
+    final conversation = await _resolveAiConversation(
+      aiCmd,
+      params,
+      requireGroup: true,
+    );
+    if (conversation == null || !mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => GroupSettingsScreen(conversation: conversation),
+      ),
+    );
+  }
+
+  Future<void> _handleAiContactAction(
+    AiCommand aiCmd,
+    Map<String, dynamic>? params, {
+    required String command,
+  }) async {
+    final user = await _resolveAiFriend(aiCmd, params);
+    if (user == null) return;
+    final destructive = command == 'BLOCK_USER';
+    final title = switch (command) {
+      'SEND_FRIEND_REQUEST' => 'Xác nhận gửi kết bạn',
+      'BLOCK_USER' => 'Xác nhận chặn người dùng',
+      'UNBLOCK_USER' => 'Xác nhận bỏ chặn người dùng',
+      _ => 'Xác nhận thao tác',
+    };
+    final confirmLabel = switch (command) {
+      'SEND_FRIEND_REQUEST' => 'Gửi kết bạn',
+      'BLOCK_USER' => 'Chặn',
+      'UNBLOCK_USER' => 'Bỏ chặn',
+      _ => 'Xác nhận',
+    };
+    final description = switch (command) {
+      'SEND_FRIEND_REQUEST' => 'Trợ lý sẽ gửi lời mời kết bạn đến người này.',
+      'BLOCK_USER' => 'Bạn sẽ không nhận tin nhắn/cuộc gọi từ người này.',
+      'UNBLOCK_USER' => 'Bạn sẽ cho phép liên hệ lại với người này.',
+      _ => 'Trợ lý sẽ thực hiện thao tác đã chọn.',
+    };
+    final confirmed = await _confirmAiAction(
+      icon: destructive ? Icons.block_rounded : Icons.person_add_alt_1_rounded,
+      title: title,
+      description: description,
+      confirmLabel: confirmLabel,
+      primaryDetail: user.displayName,
+      primaryDetailLabel: 'Liên hệ',
+      destructive: destructive,
+    );
+    if (!confirmed || !mounted) return;
+    final friendService = context.read<FriendService>();
+    if (command == 'SEND_FRIEND_REQUEST') {
+      await friendService.sendFriendRequest(
+        user.id,
+        message: AiCommandRouting.extractFriendRequestMessage(params),
+      );
+      if (!mounted) return;
+      context.read<ContactProvider>().onFriendshipUpdated();
+      _showSuccessSnackBar('Đã gửi lời mời kết bạn.');
+    } else if (command == 'BLOCK_USER') {
+      await friendService.blockUser(user.id);
+      if (!mounted) return;
+      context.read<ContactProvider>().onFriendshipUpdated();
+      _showSuccessSnackBar('Đã chặn ${user.displayName}.');
+    } else if (command == 'UNBLOCK_USER') {
+      await friendService.unblockUser(user.id);
+      if (!mounted) return;
+      context.read<ContactProvider>().onFriendshipUpdated();
+      _showSuccessSnackBar('Đã bỏ chặn ${user.displayName}.');
+    }
+  }
+
+  Future<void> _handleAiGroupAdminAction(
+    AiCommand aiCmd,
+    Map<String, dynamic>? params, {
+    required String command,
+  }) async {
+    final chatProvider = context.read<ChatProvider>();
+    final conversation = await _resolveAiConversation(
+      aiCmd,
+      params,
+      requireGroup: true,
+    );
+    if (conversation == null) return;
+
+    Future<void> execute() async {
+      switch (command) {
+        case 'CHANGE_GROUP_NAME':
+          final title = AiCommandRouting.extractNewTitle(params);
+          if (title == null) {
+            throw StateError('Trợ lý chưa có tên nhóm mới.');
+          }
+          await chatProvider.updateGroupInfo(conversation.id, title: title);
+          break;
+        case 'ADD_GROUP_MEMBER':
+          final names = AiCommandRouting.extractMemberNames(params);
+          if (names.isEmpty) {
+            throw StateError('Trợ lý chưa xác định thành viên cần thêm.');
+          }
+          final contactProvider = context.read<ContactProvider>();
+          if (contactProvider.friends.isEmpty) {
+            await contactProvider.fetchFriends();
+          }
+          final users = <User>[];
+          for (final name in names) {
+            final matches = _findUsersByName(contactProvider.friends, name);
+            if (matches.length != 1) {
+              throw StateError(
+                matches.isEmpty
+                    ? 'Không tìm thấy "$name" trong danh bạ.'
+                    : 'Có nhiều người tên "$name". Hãy nói rõ hơn.',
+              );
+            }
+            users.add(matches.first);
+          }
+          await chatProvider.addMembersToGroup(conversation.id, users);
+          break;
+        case 'REMOVE_GROUP_MEMBER':
+          final users = _resolveGroupMembersByName(
+            conversation,
+            AiCommandRouting.extractMemberNames(params),
+          );
+          if (users.isEmpty) {
+            throw StateError('Trợ lý chưa xác định thành viên cần xóa.');
+          }
+          for (final user in users) {
+            await chatProvider.removeMember(conversation.id, user.id);
+          }
+          break;
+        case 'TRANSFER_GROUP_OWNER':
+          final users = _resolveGroupMembersByName(
+            conversation,
+            AiCommandRouting.extractMemberNames(params),
+          );
+          if (users.length != 1) {
+            throw StateError('Cần chọn đúng một thành viên để chuyển quyền.');
+          }
+          await chatProvider.transferOwnership(conversation.id, users.first.id);
+          break;
+        case 'LEAVE_GROUP':
+          await chatProvider.leaveGroup(conversation.id);
+          break;
+        case 'DISBAND_GROUP':
+          await chatProvider.disbandGroup(conversation.id);
+          break;
+      }
+    }
+
+    final memberNames = AiCommandRouting.extractMemberNames(params);
+    final title = AiCommandRouting.extractNewTitle(params);
+    final destructive =
+        command == 'REMOVE_GROUP_MEMBER' ||
+        command == 'LEAVE_GROUP' ||
+        command == 'DISBAND_GROUP';
+    final confirmed = await _confirmAiAction(
+      icon:
+          destructive
+              ? Icons.warning_amber_rounded
+              : Icons.admin_panel_settings_rounded,
+      title: _groupActionTitle(command),
+      description: _groupActionDescription(command),
+      confirmLabel: _groupActionConfirmLabel(command),
+      primaryDetail: conversation.getDisplayName(
+        chatProvider.currentUserId ?? '',
+      ),
+      primaryDetailLabel: 'Nhóm',
+      secondaryDetail:
+          title ?? (memberNames.isEmpty ? null : memberNames.join(', ')),
+      secondaryDetailLabel: title != null ? 'Tên mới' : 'Thành viên',
+      destructive: destructive,
+    );
+    if (!confirmed || !mounted) return;
+    try {
+      await execute();
+      if (mounted) _showSuccessSnackBar('Trợ lý đã thực hiện thao tác nhóm.');
+    } catch (error) {
+      _showErrorSnackBar(error.toString().replaceFirst('Bad state: ', ''));
+    }
+  }
+
+  String _groupActionTitle(String command) => switch (command) {
+    'CHANGE_GROUP_NAME' => 'Xác nhận đổi tên nhóm',
+    'ADD_GROUP_MEMBER' => 'Xác nhận thêm thành viên',
+    'REMOVE_GROUP_MEMBER' => 'Xác nhận xóa thành viên',
+    'TRANSFER_GROUP_OWNER' => 'Xác nhận chuyển quyền nhóm',
+    'LEAVE_GROUP' => 'Xác nhận rời nhóm',
+    'DISBAND_GROUP' => 'Xác nhận giải tán nhóm',
+    _ => 'Xác nhận thao tác nhóm',
+  };
+
+  String _groupActionDescription(String command) => switch (command) {
+    'CHANGE_GROUP_NAME' => 'Trợ lý sẽ cập nhật tên nhóm sau khi bạn xác nhận.',
+    'ADD_GROUP_MEMBER' => 'Trợ lý sẽ thêm thành viên vào nhóm này.',
+    'REMOVE_GROUP_MEMBER' => 'Thành viên được chọn sẽ bị mời khỏi nhóm.',
+    'TRANSFER_GROUP_OWNER' =>
+      'Quyền trưởng nhóm sẽ được chuyển cho thành viên này.',
+    'LEAVE_GROUP' => 'Bạn sẽ rời khỏi nhóm này.',
+    'DISBAND_GROUP' => 'Nhóm sẽ bị giải tán cho tất cả thành viên.',
+    _ => 'Trợ lý sẽ thực hiện thao tác nhóm đã chọn.',
+  };
+
+  String _groupActionConfirmLabel(String command) => switch (command) {
+    'CHANGE_GROUP_NAME' => 'Đổi tên',
+    'ADD_GROUP_MEMBER' => 'Thêm',
+    'REMOVE_GROUP_MEMBER' => 'Xóa khỏi nhóm',
+    'TRANSFER_GROUP_OWNER' => 'Chuyển quyền',
+    'LEAVE_GROUP' => 'Rời nhóm',
+    'DISBAND_GROUP' => 'Giải tán',
+    _ => 'Xác nhận',
+  };
 
   void _logAiFlow(
     String event, {

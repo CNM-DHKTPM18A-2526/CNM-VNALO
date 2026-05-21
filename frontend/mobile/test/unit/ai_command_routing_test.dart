@@ -31,6 +31,22 @@ void main() {
         AiCommandRouting.normalizeSystemAction('UNDO_LAST_MESSAGE'),
         'RECALL_MESSAGE',
       );
+      expect(
+        AiCommandRouting.normalizeSystemAction('create_group_draft'),
+        'CREATE_GROUP',
+      );
+      expect(
+        AiCommandRouting.normalizeSystemAction('add_group_member'),
+        'ADD_GROUP_MEMBER',
+      );
+      expect(
+        AiCommandRouting.normalizeSystemAction('transfer_owner'),
+        'TRANSFER_GROUP_OWNER',
+      );
+      expect(
+        AiCommandRouting.normalizeSystemAction('block_contact'),
+        'BLOCK_USER',
+      );
     });
 
     test('keeps call and scanner commands canonical', () {
@@ -115,6 +131,30 @@ void main() {
       expect(
         AiCommandRouting.extractPrefilledText('START_CALL', params),
         isNull,
+      );
+    });
+
+    test('extracts group metadata and member names', () {
+      final params = {
+        'groupTitle': 'Nhóm đi chơi',
+        'members': ['An', 'Bình'],
+      };
+      expect(AiCommandRouting.extractGroupName(params), 'Nhóm đi chơi');
+      expect(AiCommandRouting.extractMemberNames(params), ['An', 'Bình']);
+    });
+
+    test('extracts fallback member name and conversation name', () {
+      final params = {'memberName': 'Uyên', 'conversationName': 'Lớp 18DHTPM'};
+      expect(AiCommandRouting.extractMemberNames(params), ['Uyên']);
+      expect(AiCommandRouting.extractConversationName(params), 'Lớp 18DHTPM');
+    });
+
+    test('extracts new group title and friend request message', () {
+      final params = {'newName': 'Nhóm mới', 'note': 'Kết bạn nhé'};
+      expect(AiCommandRouting.extractNewTitle(params), 'Nhóm mới');
+      expect(
+        AiCommandRouting.extractFriendRequestMessage(params),
+        'Kết bạn nhé',
       );
     });
   });

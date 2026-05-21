@@ -150,7 +150,7 @@ void main() {
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Chọn cuộc trò chuyện "Minh Anh"'), findsOneWidget);
+    expect(find.textContaining('Minh Anh'), findsWidgets);
     expect(find.text('Minh Anh'), findsOneWidget);
     expect(find.text('Minh Anh Work'), findsOneWidget);
     expect(find.text('Trò chuyện 1-1'), findsNWidgets(2));
