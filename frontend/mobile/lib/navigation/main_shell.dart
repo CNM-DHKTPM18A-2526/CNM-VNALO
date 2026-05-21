@@ -717,6 +717,39 @@ class MainShellState extends State<MainShell> {
     return matches.first;
   }
 
+  Future<User?> _resolveAiUserCandidate(
+    AiCommand aiCmd,
+    Map<String, dynamic>? params, {
+    bool includeGlobalSearch = false,
+  }) async {
+    final friendService = context.read<FriendService>();
+    final local = await _resolveAiFriend(aiCmd, params);
+    if (local != null || !includeGlobalSearch) {
+      return local;
+    }
+
+    final targetName = AiCommandRouting.extractTargetName(params);
+    if (targetName.isEmpty) {
+      _showErrorSnackBar('Trợ lý chưa xác định được người dùng mục tiêu.');
+      return null;
+    }
+
+    final candidates = await friendService.searchUsers(targetName);
+    if (!mounted) return null;
+    final matches = _findUsersByName(candidates, targetName);
+    if (matches.isEmpty) {
+      _showErrorSnackBar('Không tìm thấy người dùng "$targetName".');
+      return null;
+    }
+    if (matches.length > 1) {
+      _showErrorSnackBar(
+        'Có nhiều kết quả cho "$targetName". Hãy nói rõ hơn (thêm họ tên/số điện thoại).',
+      );
+      return null;
+    }
+    return matches.first;
+  }
+
   List<User> _resolveGroupMembersByName(
     Conversation conversation,
     List<String> names,
@@ -958,7 +991,11 @@ class MainShellState extends State<MainShell> {
     Map<String, dynamic>? params, {
     required String command,
   }) async {
-    final user = await _resolveAiFriend(aiCmd, params);
+    final user = await _resolveAiUserCandidate(
+      aiCmd,
+      params,
+      includeGlobalSearch: true,
+    );
     if (user == null) return;
     final destructive = command == 'BLOCK_USER';
     final title = switch (command) {
