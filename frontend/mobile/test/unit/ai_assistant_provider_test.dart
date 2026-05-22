@@ -371,6 +371,21 @@ void main() {
     provider.dispose();
   });
 
+  test('addActionFeedback keeps source metadata for UI disambiguation', () {
+    final provider = _buildProvider();
+
+    provider.addActionFeedback(
+      'Mình tìm thấy nhiều kết quả cho "Uyên". Bạn muốn chọn ai?',
+      source: 'ai_action_ambiguity.contact',
+    );
+
+    final mapped = provider.getHistoryAsMessages('current-user');
+    expect(mapped, isNotEmpty);
+    expect(mapped.last.clientMessageId, 'ai_action_ambiguity.contact');
+
+    provider.dispose();
+  });
+
   test('first interaction lazily creates AI conversation thread', () async {
     final provider = _buildProvider();
 
