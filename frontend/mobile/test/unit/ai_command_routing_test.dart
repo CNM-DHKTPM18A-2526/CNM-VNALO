@@ -243,4 +243,33 @@ void main() {
       );
     });
   });
+
+  group('AiCommandRouting action feedback copy', () {
+    test('builds ambiguity feedback with candidate names', () {
+      final message = AiCommandRouting.buildAmbiguousTargetFeedback(
+        targetName: 'Uyên',
+        candidates: const [
+          'Uyên Lý',
+          'Uyên Nguyễn',
+          'Uyên Trần',
+          'Uyên Hoàng',
+          'Uyên Đặng',
+        ],
+      );
+
+      expect(message, contains('Uyên Lý'));
+      expect(message, contains('Uyên Nguyễn'));
+      expect(message, isNot(contains('Uyên Đặng')));
+    });
+
+    test('builds missing target feedback with specific type', () {
+      final message = AiCommandRouting.buildMissingTargetFeedback(
+        targetName: 'Lý Vân',
+        targetType: 'liên hệ trong danh bạ',
+      );
+
+      expect(message, contains('liên hệ trong danh bạ'));
+      expect(message, contains('Lý Vân'));
+    });
+  });
 }

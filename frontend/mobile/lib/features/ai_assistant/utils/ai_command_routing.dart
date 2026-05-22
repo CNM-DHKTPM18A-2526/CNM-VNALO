@@ -344,4 +344,35 @@ class AiCommandRouting {
   static bool shouldBlockCompose({required bool hasPendingAiNavigation}) {
     return hasPendingAiNavigation;
   }
+
+  static String buildAmbiguousTargetFeedback({
+    required String targetName,
+    required Iterable<String> candidates,
+    String actionLabel = 'tiếp tục',
+  }) {
+    final cleanTarget = targetName.trim();
+    final uniqueCandidates = candidates
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .toSet()
+        .take(4)
+        .toList(growable: false);
+
+    if (uniqueCandidates.isEmpty) {
+      return 'Có nhiều kết quả khớp "$cleanTarget". Hãy nói rõ hơn để trợ lý $actionLabel.';
+    }
+
+    return 'Mình tìm thấy nhiều kết quả cho "$cleanTarget": ${uniqueCandidates.join(', ')}. Bạn muốn chọn ai?';
+  }
+
+  static String buildMissingTargetFeedback({
+    required String targetName,
+    String targetType = 'người hoặc cuộc trò chuyện',
+  }) {
+    final cleanTarget = targetName.trim();
+    if (cleanTarget.isEmpty) {
+      return 'Mình chưa xác định được $targetType. Hãy nói rõ tên để trợ lý tiếp tục.';
+    }
+    return 'Mình chưa tìm thấy $targetType "$cleanTarget". Hãy kiểm tra lại tên hoặc thử nói rõ hơn.';
+  }
 }

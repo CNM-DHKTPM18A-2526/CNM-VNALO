@@ -116,6 +116,10 @@ class MainShellState extends State<MainShell> {
       );
   }
 
+  void _addAiActionInfo(String message) {
+    context.read<AiAssistantProvider>().addActionFeedback(message);
+  }
+
   void _rememberAiTargetContext({
     required String targetName,
     String? conversationId,
@@ -237,7 +241,11 @@ class MainShellState extends State<MainShell> {
     }
     if (matches.length > 1) {
       _showErrorSnackBar(
-        'Có nhiều người tên "$targetName". Hãy nói rõ hơn để trợ lý chọn đúng.',
+        AiCommandRouting.buildAmbiguousTargetFeedback(
+          targetName: targetName,
+          candidates: matches.map((user) => user.displayName),
+          actionLabel: 'chọn đúng người nhận',
+        ),
       );
       return null;
     }
@@ -388,7 +396,12 @@ class MainShellState extends State<MainShell> {
             aiCommand: aiCmd,
             extra: {'targetName': targetName},
           );
-          _showErrorSnackBar('Không tìm thấy "$targetName" trong danh bạ.');
+          _showErrorSnackBar(
+            AiCommandRouting.buildMissingTargetFeedback(
+              targetName: targetName,
+              targetType: 'liên hệ hoặc cuộc trò chuyện',
+            ),
+          );
           return;
         }
 
@@ -403,6 +416,17 @@ class MainShellState extends State<MainShell> {
           }
         }
         if (selectedConversation == null && conversationMatches.length > 1) {
+          _addAiActionInfo(
+            AiCommandRouting.buildAmbiguousTargetFeedback(
+              targetName: targetName,
+              candidates: conversationMatches.map(
+                (conversation) => conversation.getDisplayName(
+                  chatProvider.currentUserId ?? '',
+                ),
+              ),
+              actionLabel: 'mở đúng cuộc trò chuyện',
+            ),
+          );
           _logAiFlow(
             'AI_RESOLUTION_AMBIGUOUS',
             aiCommand: aiCmd,
@@ -823,7 +847,12 @@ class MainShellState extends State<MainShell> {
                   .toList()
               : matches;
       if (filtered.isEmpty) {
-        _showErrorSnackBar('Không tìm thấy cuộc trò chuyện "$targetName".');
+        _showErrorSnackBar(
+          AiCommandRouting.buildMissingTargetFeedback(
+            targetName: targetName,
+            targetType: 'cuộc trò chuyện',
+          ),
+        );
         return null;
       }
       if (filtered.length > 1) {
@@ -834,6 +863,15 @@ class MainShellState extends State<MainShell> {
         if (contextConversation != null) {
           return contextConversation;
         }
+        _addAiActionInfo(
+          AiCommandRouting.buildAmbiguousTargetFeedback(
+            targetName: targetName,
+            candidates: filtered.map(
+              (conversation) => conversation.getDisplayName(currentUserId),
+            ),
+            actionLabel: 'chọn đúng cuộc trò chuyện',
+          ),
+        );
         return _showConversationDisambiguationSheet(
           matches: filtered,
           currentUserId: currentUserId,
@@ -906,7 +944,12 @@ class MainShellState extends State<MainShell> {
     final name = fallbackName ?? AiCommandRouting.extractTargetName(params);
     final matches = _findUsersByName(contactProvider.friends, name);
     if (matches.isEmpty) {
-      _showErrorSnackBar('Không tìm thấy "$name" trong danh bạ.');
+      _showErrorSnackBar(
+        AiCommandRouting.buildMissingTargetFeedback(
+          targetName: name,
+          targetType: 'liên hệ trong danh bạ',
+        ),
+      );
       return null;
     }
     final contextUser = _preferUserFromAiContext(matches);
@@ -915,7 +958,11 @@ class MainShellState extends State<MainShell> {
     }
     if (matches.length > 1) {
       _showErrorSnackBar(
-        'Có nhiều người tên "$name". Hãy nói rõ họ tên hoặc mở danh bạ để chọn.',
+        AiCommandRouting.buildAmbiguousTargetFeedback(
+          targetName: name,
+          candidates: matches.map((user) => user.displayName),
+          actionLabel: 'chọn đúng liên hệ',
+        ),
       );
       return null;
     }
@@ -943,7 +990,12 @@ class MainShellState extends State<MainShell> {
     if (!mounted) return null;
     final matches = _findUsersByName(candidates, targetName);
     if (matches.isEmpty) {
-      _showErrorSnackBar('Không tìm thấy người dùng "$targetName".');
+      _showErrorSnackBar(
+        AiCommandRouting.buildMissingTargetFeedback(
+          targetName: targetName,
+          targetType: 'người dùng',
+        ),
+      );
       return null;
     }
     final contextUser = _preferUserFromAiContext(matches);
@@ -952,7 +1004,11 @@ class MainShellState extends State<MainShell> {
     }
     if (matches.length > 1) {
       _showErrorSnackBar(
-        'Có nhiều kết quả cho "$targetName". Hãy nói rõ hơn (thêm họ tên/số điện thoại).',
+        AiCommandRouting.buildAmbiguousTargetFeedback(
+          targetName: targetName,
+          candidates: matches.map((user) => user.displayName),
+          actionLabel: 'chọn đúng người dùng',
+        ),
       );
       return null;
     }
