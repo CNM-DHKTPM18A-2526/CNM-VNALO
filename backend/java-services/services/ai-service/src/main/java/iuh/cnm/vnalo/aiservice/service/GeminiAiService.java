@@ -17,6 +17,7 @@ import org.springframework.web.client.RestTemplate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +42,22 @@ public class GeminiAiService {
         "COMPOSE_MESSAGE",
         "START_CALL",
         "RECALL_MESSAGE",
+        "CREATE_GROUP",
+        "MUTE_CONVERSATION",
+        "UNMUTE_CONVERSATION",
+        "PIN_MESSAGE",
+        "UNPIN_MESSAGE",
+        "OPEN_GROUP_SETTINGS",
+        "OPEN_PROFILE",
+        "SEND_FRIEND_REQUEST",
+        "BLOCK_USER",
+        "UNBLOCK_USER",
+        "CHANGE_GROUP_NAME",
+        "ADD_GROUP_MEMBER",
+        "REMOVE_GROUP_MEMBER",
+        "TRANSFER_GROUP_OWNER",
+        "LEAVE_GROUP",
+        "DISBAND_GROUP",
         "NAVIGATE_TO",
         "NAVIGATE_TO_SETTINGS",
         "NAVIGATE_TO_CHAT",
@@ -87,9 +104,6 @@ public class GeminiAiService {
         } catch (Exception geminiEx) {
             log.warn("Gemini failed in GeminiAiService ({}), falling back to Ollama...", geminiEx.getMessage());
             try {
-                if (!ollamaProvider.isAvailable()) {
-                    throw new RuntimeException("OLLAMA_UNAVAILABLE");
-                }
                 // Prepare messages list for Ollama fallback
                 List<Message> historyMessages = new ArrayList<>();
                 if (request.getHistory() != null) {
@@ -103,7 +117,7 @@ public class GeminiAiService {
                 answer = responseObj.getTextReply();
                 provider = "ollama";
             } catch (Exception ollamaEx) {
-                log.error("Both AI providers failed in GeminiAiService. Gemini: {}, Ollama: {}", geminiEx.getMessage(), ollamaEx.getMessage());
+                log.error("Both providers failed in GeminiAiService. Gemini: {}, Ollama: {}", geminiEx.getMessage(), ollamaEx.getMessage());
                 throw new RuntimeException("AI_SERVICE_ERROR");
             }
         }
@@ -112,8 +126,8 @@ public class GeminiAiService {
             responseObj.setConversationId(stableConvId);
             responseObj.setUserEntryId(userEntryId);
             responseObj.setAssistantEntryId(assistantEntryId);
-            responseObj.setDegraded("ollama".equals(provider));
-            responseObj.setProviderStatus("ollama".equals(provider) ? "FALLBACK_PROVIDER_ACTIVE" : "LIVE_PROVIDER_ACTIVE");
+            responseObj.setProviderStatus(resolveProviderStatus(provider));
+            responseObj.setDegraded(!"gemini".equals(provider));
         }
 
         // 5. Save Chat History asynchronously-like to Core Service
@@ -168,8 +182,6 @@ public class GeminiAiService {
     private Map<String, Object> buildGeminiPayload(AiChatRequest request, String systemPrompt) {
         List<Map<String, Object>> contents = new ArrayList<>();
 
-        contents.add(createContent("user", "SYSTEM INSTRUCTION:\n" + systemPrompt));
-
         // 2. Structured History Alignment
         if (request.getHistory() != null && !request.getHistory().isEmpty()) {
             for (Message msg : request.getHistory()) {
@@ -184,17 +196,27 @@ public class GeminiAiService {
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("contents", contents);
+        payload.put("systemInstruction", createContent("user", systemPrompt));
 
         return payload;
     }
 
+    private String resolveProviderStatus(String provider) {
+        return "gemini".equalsIgnoreCase(provider)
+                ? "LIVE_PROVIDER_ACTIVE"
+                : "FALLBACK_PROVIDER_ACTIVE";
+    }
+
     private void sanitizeActionCommand(AiChatResponse response, JsonNode cmdNode) {
         String actionCommand = cmdNode.path("actionCommand").asText(null);
+        if (actionCommand == null || actionCommand.isBlank()) {
+            actionCommand = cmdNode.path("action").asText(null);
+        }
+        if (actionCommand == null || actionCommand.isBlank()) {
+            actionCommand = cmdNode.path("command").asText(null);
+        }
         if (actionCommand != null) {
-            actionCommand = actionCommand.toUpperCase().trim();
-            if ("SEND_MESSAGE".equals(actionCommand)) {
-                actionCommand = "COMPOSE_MESSAGE";
-            }
+            actionCommand = normalizeActionAlias(actionCommand.toUpperCase().trim());
             if (ALLOWED_COMMANDS.contains(actionCommand)) {
                 response.setActionCommand(actionCommand);
             } else {
@@ -203,9 +225,15 @@ public class GeminiAiService {
             }
         }
 
-        if (response.getActionCommand() != null && cmdNode.has("actionParams")) {
+        JsonNode rawParamsNode = cmdNode.has("actionParams")
+                ? cmdNode.get("actionParams")
+                : cmdNode.has("params")
+                ? cmdNode.get("params")
+                : cmdNode.get("parameters");
+
+        if (response.getActionCommand() != null && rawParamsNode != null && !rawParamsNode.isMissingNode()) {
             try {
-                Map<String, Object> params = objectMapper.convertValue(cmdNode.get("actionParams"), Map.class);
+                Map<String, Object> params = objectMapper.convertValue(rawParamsNode, Map.class);
                 Map<String, Object> cleanParams = new HashMap<>();
                 for (Map.Entry<String, Object> entry : params.entrySet()) {
                     if (entry.getValue() instanceof String val) {
@@ -216,6 +244,11 @@ public class GeminiAiService {
                         }
                     } else if (entry.getValue() instanceof Number || entry.getValue() instanceof Boolean) {
                         cleanParams.put(entry.getKey(), entry.getValue());
+                    } else if (entry.getValue() instanceof List<?>) {
+                        List<String> values = extractStringList(entry.getValue());
+                        if (!values.isEmpty()) {
+                            cleanParams.put(entry.getKey(), values);
+                        }
                     }
                 }
                 response.setActionParams(cleanParams);
@@ -252,6 +285,18 @@ public class GeminiAiService {
                     cp.put("recipient", recipient.trim());
                     cp.put("content", content.trim());
                 }
+            } else if ("CREATE_GROUP".equals(cmd)) {
+                String groupName = firstNonBlank(cp, "groupName", "title", "name");
+                List<String> memberNames = extractStringList(cp.get("memberNames"));
+                if (memberNames.isEmpty()) {
+                    memberNames = extractStringList(cp.get("members"));
+                }
+                if (groupName == null || groupName.isBlank() || memberNames.isEmpty()) {
+                    valid = false;
+                } else {
+                    cp.put("groupName", groupName.trim());
+                    cp.put("memberNames", memberNames);
+                }
             } else if ("OPEN_CHAT".equals(cmd) || "START_CALL".equals(cmd)) {
                 String target = null;
                 if (cp.containsKey("target")) target = String.valueOf(cp.get("target"));
@@ -260,6 +305,13 @@ public class GeminiAiService {
                 else if (cp.containsKey("displayName")) target = String.valueOf(cp.get("displayName"));
 
                 if (target == null || target.trim().isEmpty()) {
+                    valid = false;
+                } else {
+                    cp.put("target", target.trim());
+                }
+            } else if (Arrays.asList("OPEN_PROFILE", "SEND_FRIEND_REQUEST", "BLOCK_USER", "UNBLOCK_USER").contains(cmd)) {
+                String target = firstNonBlank(cp, "target", "recipient", "contactName", "displayName", "name");
+                if (target == null || target.isBlank()) {
                     valid = false;
                 } else {
                     cp.put("target", target.trim());
@@ -274,6 +326,23 @@ public class GeminiAiService {
                     valid = false;
                 } else {
                     cp.put("page", page.trim().toLowerCase());
+                }
+            } else if ("CHANGE_GROUP_NAME".equals(cmd)) {
+                String title = firstNonBlank(cp, "title", "groupName", "name");
+                if (title == null || title.isBlank()) {
+                    valid = false;
+                } else {
+                    cp.put("title", title.trim());
+                }
+            } else if (Arrays.asList("ADD_GROUP_MEMBER", "REMOVE_GROUP_MEMBER", "TRANSFER_GROUP_OWNER").contains(cmd)) {
+                List<String> memberNames = extractStringList(cp.get("memberNames"));
+                if (memberNames.isEmpty()) {
+                    memberNames = extractStringList(cp.get("members"));
+                }
+                if (memberNames.isEmpty()) {
+                    valid = false;
+                } else {
+                    cp.put("memberNames", memberNames);
                 }
             }
             if (!valid) {
@@ -316,6 +385,61 @@ public class GeminiAiService {
         return response;
     }
 
+    private String normalizeActionAlias(String rawAction) {
+        return switch (rawAction) {
+            case "SEND_MESSAGE" -> "COMPOSE_MESSAGE";
+            case "MUTE_CHAT", "MUTE_GROUP", "MUTE_CONVERSATION" -> "MUTE_CONVERSATION";
+            case "UNMUTE_CHAT", "UNMUTE_GROUP", "UNMUTE_CONVERSATION" -> "UNMUTE_CONVERSATION";
+            case "PIN_LAST_MESSAGE" -> "PIN_MESSAGE";
+            case "UNPIN_LAST_MESSAGE" -> "UNPIN_MESSAGE";
+            case "OPEN_GROUP_SETTING", "OPEN_GROUP_SETTINGS" -> "OPEN_GROUP_SETTINGS";
+            case "OPEN_USER_PROFILE", "OPEN_FRIEND_PROFILE" -> "OPEN_PROFILE";
+            case "ADD_FRIEND" -> "SEND_FRIEND_REQUEST";
+            case "BLOCK_CONTACT" -> "BLOCK_USER";
+            case "UNBLOCK_CONTACT" -> "UNBLOCK_USER";
+            case "RENAME_GROUP" -> "CHANGE_GROUP_NAME";
+            case "ADD_MEMBER" -> "ADD_GROUP_MEMBER";
+            case "REMOVE_MEMBER" -> "REMOVE_GROUP_MEMBER";
+            case "TRANSFER_OWNER" -> "TRANSFER_GROUP_OWNER";
+            case "DELETE_GROUP" -> "DISBAND_GROUP";
+            case "RECALL_LAST_MESSAGE", "UNDO_LAST_MESSAGE" -> "RECALL_MESSAGE";
+            default -> rawAction;
+        };
+    }
+
+    private String firstNonBlank(Map<String, Object> params, String... keys) {
+        for (String key : keys) {
+            Object value = params.get(key);
+            if (value == null) {
+                continue;
+            }
+            String normalized = String.valueOf(value).trim();
+            if (!normalized.isEmpty()) {
+                return normalized;
+            }
+        }
+        return null;
+    }
+
+    private List<String> extractStringList(Object rawValue) {
+        if (rawValue instanceof List<?> rawList) {
+            return rawList.stream()
+                    .map(String::valueOf)
+                    .map(String::trim)
+                    .filter(item -> !item.isEmpty())
+                    .distinct()
+                    .toList();
+        }
+        if (rawValue instanceof String rawString && !rawString.isBlank()) {
+            return Arrays.stream(rawString.split(","))
+                    .map(String::trim)
+                    .filter(item -> !item.isEmpty())
+                    .distinct()
+                    .toList();
+        }
+        return List.of();
+    }
+
     private Map<String, Object> createContent(String role, String text) {
         Map<String, Object> part = new HashMap<>();
         part.put("text", text);
@@ -331,11 +455,7 @@ public class GeminiAiService {
         JsonNode candidates = rootNode.path("candidates");
 
         if (candidates.isMissingNode() || !candidates.isArray() || candidates.size() == 0) {
-            return AiChatResponse.builder()
-                    .textReply("I'm sorry, I couldn't process that.")
-                    .degraded(false)
-                    .providerStatus("LIVE_PROVIDER_ACTIVE")
-                    .build();
+            return AiChatResponse.builder().textReply("I'm sorry, I couldn't process that.").build();
         }
 
         String fallbackText = "I'm sorry, I couldn't process that.";
@@ -344,11 +464,7 @@ public class GeminiAiService {
         JsonNode partsNode = contentNode.path("parts");
 
         if (partsNode.isMissingNode() || !partsNode.isArray() || partsNode.size() == 0) {
-            return AiChatResponse.builder()
-                    .textReply(fallbackText)
-                    .degraded(false)
-                    .providerStatus("LIVE_PROVIDER_ACTIVE")
-                    .build();
+            return AiChatResponse.builder().textReply(fallbackText).build();
         }
 
         String rawText = partsNode.get(0).path("text").asText();
@@ -386,32 +502,63 @@ public class GeminiAiService {
         // Fallback for natural language responses
         response.setTextReply(rawText);
         response.setEmotion("thinking");
-        response.setDegraded(false);
-        response.setProviderStatus("LIVE_PROVIDER_ACTIVE");
         return response;
     }
 
     private String extractJson(String text) {
         if (text == null) return null;
-        
-        // 1. Try to find the outermost { ... } block
+
         int start = text.indexOf("{");
-        int end = text.lastIndexOf("}");
-        
-        if (start != -1 && end != -1 && start < end) {
-            String candidate = text.substring(start, end + 1);
-            // Quick sanity check: simple check if it even looks like JSON
-            if (candidate.contains(":") && (candidate.contains("\"textReply\"") || candidate.contains("\"actionCommand\""))) {
-                return candidate;
+        while (start >= 0 && start < text.length()) {
+            int depth = 0;
+            boolean inString = false;
+            boolean escaped = false;
+            for (int index = start; index < text.length(); index++) {
+                char current = text.charAt(index);
+                if (escaped) {
+                    escaped = false;
+                    continue;
+                }
+                if (current == '\\') {
+                    escaped = true;
+                    continue;
+                }
+                if (current == '"') {
+                    inString = !inString;
+                    continue;
+                }
+                if (inString) {
+                    continue;
+                }
+                if (current == '{') {
+                    depth++;
+                } else if (current == '}') {
+                    depth--;
+                    if (depth == 0) {
+                        String candidate = text.substring(start, index + 1);
+                        if (looksLikeActionJson(candidate)) {
+                            return candidate;
+                        }
+                        break;
+                    }
+                }
             }
+            start = text.indexOf("{", start + 1);
         }
-        
-        // 2. Fallback to trimmed direct match
+
         String trimmed = text.trim();
-        if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+        if (trimmed.startsWith("{") && trimmed.endsWith("}") && looksLikeActionJson(trimmed)) {
             return trimmed;
         }
-        
+
         return null;
+    }
+
+    private boolean looksLikeActionJson(String candidate) {
+        return candidate.contains(":")
+                && (candidate.contains("\"textReply\"")
+                || candidate.contains("\"actionCommand\"")
+                || candidate.contains("\"action\"")
+                || candidate.contains("\"command\""));
     }
 }
