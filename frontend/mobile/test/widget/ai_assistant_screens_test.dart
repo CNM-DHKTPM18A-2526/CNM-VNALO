@@ -170,6 +170,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Cần làm rõ'), findsOneWidget);
+    expect(
+      find.text('Trợ lý đang chờ bạn chọn đúng đối tượng để tiếp tục.'),
+      findsOneWidget,
+    );
     expect(find.text('Uyên Lý'), findsOneWidget);
     expect(find.text('Uyên Nguyễn'), findsOneWidget);
     expect(find.text('Nói rõ họ tên'), findsOneWidget);

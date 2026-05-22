@@ -403,6 +403,24 @@ void main() {
     },
   );
 
+  test('ambiguity feedback populates clarification state until resolved', () {
+    final provider = _buildProvider();
+
+    provider.addActionFeedback(
+      'Mình tìm thấy nhiều kết quả cho "Uyên". Bạn muốn chọn ai?',
+      source: 'ai_action_ambiguity.contact::Uy%C3%AAn%20L%C3%BD',
+    );
+
+    expect(provider.clarificationState, isNotNull);
+    expect(provider.clarificationState!.isAmbiguous, isTrue);
+    expect(provider.clarificationState!.candidates, const ['Uyên Lý']);
+
+    provider.submitDisambiguationSelection('Uyên Lý');
+
+    expect(provider.clarificationState, isNull);
+    provider.dispose();
+  });
+
   test('first interaction lazily creates AI conversation thread', () async {
     final provider = _buildProvider();
 

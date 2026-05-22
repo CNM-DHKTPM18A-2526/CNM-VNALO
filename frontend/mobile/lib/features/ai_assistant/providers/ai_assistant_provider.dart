@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:uuid/uuid.dart';
 import 'package:vnalo_mobile/features/ai_assistant/models/mascot_metadata.dart';
+import 'package:vnalo_mobile/features/ai_assistant/utils/ai_command_routing.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/services/ai_service.dart';
@@ -289,6 +290,23 @@ class AiDisambiguationSelection {
   });
 }
 
+class AiClarificationState {
+  final String message;
+  final String source;
+  final List<String> candidates;
+  final DateTime createdAt;
+
+  const AiClarificationState({
+    required this.message,
+    required this.source,
+    required this.candidates,
+    required this.createdAt,
+  });
+
+  bool get isAmbiguous => source.startsWith('ai_action_ambiguity');
+  bool get isMissingTarget => source.startsWith('ai_action_missing');
+}
+
 // ---------------------------------------------------------------------------
 // AiAssistantProvider
 //
@@ -383,6 +401,7 @@ class AiAssistantProvider with ChangeNotifier {
   final StreamController<AiDisambiguationSelection>
   _disambiguationSelectionController =
       StreamController<AiDisambiguationSelection>.broadcast();
+  AiClarificationState? _clarificationState;
   bool _isDisposed = false;
 
   // ------------------------- Construction -----------------------------------
@@ -448,6 +467,7 @@ class AiAssistantProvider with ChangeNotifier {
   Stream<AiCommand> get systemActionStream => _systemActionController.stream;
   Stream<AiDisambiguationSelection> get disambiguationSelectionStream =>
       _disambiguationSelectionController.stream;
+  AiClarificationState? get clarificationState => _clarificationState;
 
   void addActionFeedback(
     String message, {
@@ -461,6 +481,15 @@ class AiAssistantProvider with ChangeNotifier {
 
     _aiResponse = normalized;
     _lastResponseSurface = AiResponseSurface.conversation;
+    if (source.startsWith('ai_action_ambiguity') ||
+        source.startsWith('ai_action_missing')) {
+      _clarificationState = AiClarificationState(
+        message: normalized,
+        source: source,
+        candidates: AiCommandRouting.parseAmbiguityCandidatesFromSource(source),
+        createdAt: DateTime.now().toUtc(),
+      );
+    }
     _addConversationEntry(
       role: AiConversationRole.assistant,
       text: normalized,
@@ -486,6 +515,7 @@ class AiAssistantProvider with ChangeNotifier {
       source: source,
       entryId: _newEntryId(),
     );
+    _clarificationState = null;
     if (!_disambiguationSelectionController.isClosed) {
       _disambiguationSelectionController.add(
         AiDisambiguationSelection(
@@ -1411,6 +1441,7 @@ class AiAssistantProvider with ChangeNotifier {
     if (normalized.isEmpty) {
       return;
     }
+    _clarificationState = null;
 
     final responseSurface = _resolveSurface(source, explicitSurface: surface);
     _activeSurface = responseSurface;

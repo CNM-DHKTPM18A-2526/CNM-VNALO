@@ -348,6 +348,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
     final showPromptChips = !isCompactLayout && boardMaxHeight >= 380;
     final blurSigma = viewSize.shortestSide < 380 ? 8.0 : 14.0;
     final showAiTyping = aiProvider.isAssistantGenerating;
+    final clarification = aiProvider.clarificationState;
     final transcriptEntries =
         aiProvider.conversationHistory.length > 4
             ? aiProvider.conversationHistory.sublist(
@@ -611,6 +612,41 @@ class _AiChatBoardState extends State<AiChatBoard> {
                                           _buildAssistantTypingBubble(
                                             isDarkMode: isDarkMode,
                                           ),
+                                        if (clarification != null) ...[
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                              bottom: 8,
+                                            ),
+                                            child: Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 10,
+                                                    vertical: 6,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: AppColors.primary
+                                                    .withValues(alpha: 0.08),
+                                                borderRadius:
+                                                    BorderRadius.circular(999),
+                                                border: Border.all(
+                                                  color: AppColors.primary
+                                                      .withValues(alpha: 0.16),
+                                                ),
+                                              ),
+                                              child: Text(
+                                                clarification.isAmbiguous
+                                                    ? 'Đang chờ bạn chọn đúng người'
+                                                    : 'Đang chờ bạn thử lại tên',
+                                                style: AppTypography.bodySmall
+                                                    .copyWith(
+                                                      color: AppColors.primary,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ],
                                     ),
                           ),

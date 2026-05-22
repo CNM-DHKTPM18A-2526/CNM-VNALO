@@ -324,6 +324,13 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
         provider.isProviderUnavailable
             ? 'AI đang bảo trì. Một số thao tác cục bộ vẫn có thể tiếp tục.'
             : 'AI đang chạy ở chế độ dự phòng.';
+    final clarification = provider.clarificationState;
+    final clarificationText =
+        clarification == null
+            ? null
+            : clarification.isAmbiguous
+            ? 'Trợ lý đang chờ bạn chọn đúng đối tượng để tiếp tục.'
+            : 'Trợ lý đang chờ bạn xác nhận lại tên đối tượng.';
 
     return Container(
       width: double.infinity,
@@ -363,6 +370,17 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
                   provider.isProviderUnavailable
                       ? AppColors.warning
                       : AppColors.primary,
+              isDarkMode: isDarkMode,
+              background: Colors.transparent,
+              borderColor: Colors.transparent,
+            ),
+          ],
+          if (clarificationText != null) ...[
+            const SizedBox(height: 5),
+            _buildInfoPill(
+              icon: Icons.info_outline_rounded,
+              text: clarificationText,
+              color: AppColors.primary,
               isDarkMode: isDarkMode,
               background: Colors.transparent,
               borderColor: Colors.transparent,
