@@ -335,7 +335,7 @@ class AiAssistantProvider with ChangeNotifier {
   static const String _defaultLocaleId = 'vi_VN';
   static const Duration _aiTimeout = Duration(seconds: 25);
   static const Duration _sttListenFor = Duration(seconds: 10);
-  static const Duration _sttPauseFor = Duration(seconds: 2);
+  static const Duration _sttPauseFor = Duration(seconds: 10);
   static const Duration _idleAutoHideDelay = Duration(seconds: 12);
   static const Duration _emptySummonAutoHideDelay = Duration(seconds: 6);
   static const int _maxConversationEntries = 200;
