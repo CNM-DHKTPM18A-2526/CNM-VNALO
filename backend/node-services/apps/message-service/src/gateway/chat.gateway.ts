@@ -866,6 +866,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
           userId,
           conversationId: data.conversationId,
           isTyping: data.isTyping,
+          clientPlatform: client.data.user.clientPlatform ?? 'WEB',
         });
       })
       .catch((err) => {

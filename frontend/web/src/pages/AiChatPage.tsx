@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+﻿import { useEffect, useMemo, useRef, useState } from 'react'
 import { Send, Sparkles, Trash2 } from 'lucide-react'
+
 import { extractMessage } from '../api.client'
 import { useAuth } from '../features/auth/useAuth'
 import { sendAiChatMessage } from '../features/chat/chat.api'
@@ -17,6 +18,9 @@ type AiMessage = {
   degraded?: boolean
   providerStatus?: ProviderStatus
 }
+
+const STORAGE_KEY = 'vnalo_ai_chat_history'
+const MAX_API_HISTORY = 20
 
 const PRESET_PROMPTS = [
   'Hãy đề xuất 3 thói quen lành mạnh mỗi ngày',
@@ -42,7 +46,7 @@ function resolveProviderPresentation(messages: AiMessage[]) {
       badgeClassName: 'ai-header-status ai-header-status-warning',
       label: 'AI đang bảo trì',
       helper: 'Một số phản hồi AI có thể tạm thời bị hạn chế.',
-      banner: 'AI đang bảo trì. Hãy thử lại sau hoặc tiếp tục với các thao tác thủ công.',
+      banner: 'AI đang bảo trì. Hãy thử lại sau hoặc tiếp tục với thao tác thủ công.',
       bannerClassName: 'ai-runtime-banner ai-runtime-banner-warning',
     }
   }
@@ -78,7 +82,7 @@ export function AiChatPage() {
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
-    const saved = localStorage.getItem('vnalo_ai_chat_history')
+    const saved = localStorage.getItem(STORAGE_KEY)
     if (!saved) {
       setMessages([INITIAL_ASSISTANT_MESSAGE])
       return
@@ -95,7 +99,7 @@ export function AiChatPage() {
 
   const saveMessages = (nextMessages: AiMessage[]) => {
     setMessages(nextMessages)
-    localStorage.setItem('vnalo_ai_chat_history', JSON.stringify(nextMessages))
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(nextMessages))
   }
 
   useEffect(() => {
@@ -106,7 +110,19 @@ export function AiChatPage() {
 
   const handleSend = async (textToSend?: string) => {
     const query = (textToSend ?? inputValue).trim()
-    if (!query || isLoading || !accessToken) {
+    if (!query || isLoading) {
+      return
+    }
+
+    if (!accessToken) {
+      const authError: AiMessage = {
+        role: 'assistant',
+        content: 'Bạn cần đăng nhập lại để sử dụng Trợ lý AI trên web.',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        degraded: true,
+        providerStatus: 'AI_PROVIDER_UNAVAILABLE',
+      }
+      saveMessages([...messages, authError])
       return
     }
 
@@ -125,7 +141,7 @@ export function AiChatPage() {
     setIsLoading(true)
 
     try {
-      const apiHistory = updatedMessages.map((message) => ({
+      const apiHistory = updatedMessages.slice(-MAX_API_HISTORY).map((message) => ({
         role: message.role,
         content: message.content,
       }))
@@ -143,8 +159,8 @@ export function AiChatPage() {
     } catch (error) {
       console.error('AI chat failed:', error)
       const fallbackText =
-        extractMessage((error as any)?.response?.data) ||
-        extractMessage(error as any) ||
+        extractMessage((error as { response?: { data?: unknown } })?.response?.data) ||
+        extractMessage(error) ||
         'Có lỗi xảy ra khi kết nối tới Trợ lý AI. Vui lòng thử lại sau.'
 
       const errorMessage: AiMessage = {
@@ -189,7 +205,7 @@ export function AiChatPage() {
               key={prompt}
               type='button'
               className='ai-preset-btn'
-              onClick={() => handleSend(prompt)}
+              onClick={() => void handleSend(prompt)}
               disabled={isLoading}
             >
               {prompt}
@@ -253,7 +269,7 @@ export function AiChatPage() {
             className='ai-input-wrapper'
             onSubmit={(event) => {
               event.preventDefault()
-              handleSend()
+              void handleSend()
             }}
           >
             <textarea
@@ -266,7 +282,7 @@ export function AiChatPage() {
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
                   event.preventDefault()
-                  handleSend()
+                  void handleSend()
                 }
               }}
             />
