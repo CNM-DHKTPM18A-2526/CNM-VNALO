@@ -34,6 +34,8 @@ const toast = {
   info: (msg: string) => console.log('INFO:', msg),
 }
 
+const AI_WEB_DRAFT_KEY_PREFIX = 'vnalo_ai_web_compose_draft:'
+
 type ChatWindowProps = {
   conversation: ConversationSummary | undefined
   messages: ChatMessage[]
@@ -107,6 +109,7 @@ export function ChatWindow({
   const [highlightedMessageId, setHighlightedMessageId] = React.useState<string | null>(null)
   const [replyMessage, setReplyMessage] = React.useState<ChatMessage | null>(null)
   const [isPinnedExpanded, setIsPinnedExpanded] = React.useState(false)
+  const [seedComposeText, setSeedComposeText] = React.useState('')
   const lastHandledJumpIdRef = React.useRef<string | null>(null)
 
   const { accessToken } = useAuth()
@@ -120,6 +123,24 @@ export function ChatWindow({
 
     return messages.filter((message) => message.conversationId === conversation.id && !deletedMessageIds[message.id])
   }, [conversation, deletedMessageIds, messages])
+
+  React.useEffect(() => {
+    const conversationId = conversation?.id
+    if (!conversationId || typeof window === 'undefined') {
+      setSeedComposeText('')
+      return
+    }
+
+    const draftKey = `${AI_WEB_DRAFT_KEY_PREFIX}${conversationId}`
+    const draft = window.localStorage.getItem(draftKey)?.trim() ?? ''
+    if (!draft) {
+      setSeedComposeText('')
+      return
+    }
+
+    setSeedComposeText(draft)
+    window.localStorage.removeItem(draftKey)
+  }, [conversation?.id])
 
   const lastMessage = conversationMessages[conversationMessages.length - 1]
   const lastMessageId = lastMessage?.id
@@ -749,6 +770,7 @@ export function ChatWindow({
             disabled={isRestrictedMode}
             suggestedReplies={suggestedReplies}
             onSelectSuggestedReply={() => setSuggestedReplies([])}
+            initialText={seedComposeText}
             members={conversation.members?.map(m => ({
               userId: m.userId,
               displayName: userMap[m.userId]?.displayName || m.displayName || 'Người dùng',
