@@ -1,4 +1,172 @@
 class AiCommandRouting {
+  static const Map<String, String> _vietnameseCharMap = {
+    'à': 'a',
+    'á': 'a',
+    'ạ': 'a',
+    'ả': 'a',
+    'ã': 'a',
+    'â': 'a',
+    'ầ': 'a',
+    'ấ': 'a',
+    'ậ': 'a',
+    'ẩ': 'a',
+    'ẫ': 'a',
+    'ă': 'a',
+    'ằ': 'a',
+    'ắ': 'a',
+    'ặ': 'a',
+    'ẳ': 'a',
+    'ẵ': 'a',
+    'è': 'e',
+    'é': 'e',
+    'ẹ': 'e',
+    'ẻ': 'e',
+    'ẽ': 'e',
+    'ê': 'e',
+    'ề': 'e',
+    'ế': 'e',
+    'ệ': 'e',
+    'ể': 'e',
+    'ễ': 'e',
+    'ì': 'i',
+    'í': 'i',
+    'ị': 'i',
+    'ỉ': 'i',
+    'ĩ': 'i',
+    'ò': 'o',
+    'ó': 'o',
+    'ọ': 'o',
+    'ỏ': 'o',
+    'õ': 'o',
+    'ô': 'o',
+    'ồ': 'o',
+    'ố': 'o',
+    'ộ': 'o',
+    'ổ': 'o',
+    'ỗ': 'o',
+    'ơ': 'o',
+    'ờ': 'o',
+    'ớ': 'o',
+    'ợ': 'o',
+    'ở': 'o',
+    'ỡ': 'o',
+    'ù': 'u',
+    'ú': 'u',
+    'ụ': 'u',
+    'ủ': 'u',
+    'ũ': 'u',
+    'ư': 'u',
+    'ừ': 'u',
+    'ứ': 'u',
+    'ự': 'u',
+    'ử': 'u',
+    'ữ': 'u',
+    'ỳ': 'y',
+    'ý': 'y',
+    'ỵ': 'y',
+    'ỷ': 'y',
+    'ỹ': 'y',
+    'đ': 'd',
+  };
+
+  static String normalizeSearchText(String value) {
+    final lower = value.trim().toLowerCase();
+    if (lower.isEmpty) return '';
+
+    final buffer = StringBuffer();
+    for (final rune in lower.runes) {
+      final char = String.fromCharCode(rune);
+      buffer.write(_vietnameseCharMap[char] ?? char);
+    }
+
+    return buffer
+        .toString()
+        .replaceAll(RegExp(r'[^a-z0-9+]+'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
+  static List<String> tokenizeSearchText(String value) {
+    final normalized = normalizeSearchText(value);
+    if (normalized.isEmpty) return const <String>[];
+    return normalized.split(' ');
+  }
+
+  static bool isFlexibleNameMatch(String label, String query) {
+    final normalizedLabel = normalizeSearchText(label);
+    final normalizedQuery = normalizeSearchText(query);
+    if (normalizedLabel.isEmpty || normalizedQuery.isEmpty) {
+      return false;
+    }
+    if (normalizedLabel == normalizedQuery ||
+        normalizedLabel.contains(normalizedQuery)) {
+      return true;
+    }
+
+    final labelTokens = normalizedLabel.split(' ');
+    final queryTokens = normalizedQuery.split(' ');
+    if (queryTokens.isEmpty || queryTokens.length > labelTokens.length) {
+      return false;
+    }
+
+    var cursor = 0;
+    for (final queryToken in queryTokens) {
+      var found = false;
+      while (cursor < labelTokens.length) {
+        final labelToken = labelTokens[cursor++];
+        if (labelToken == queryToken || labelToken.startsWith(queryToken)) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) return false;
+    }
+    return true;
+  }
+
+  static int computeNameMatchScore(String label, String query) {
+    final normalizedLabel = normalizeSearchText(label);
+    final normalizedQuery = normalizeSearchText(query);
+    if (normalizedLabel.isEmpty || normalizedQuery.isEmpty) {
+      return -1;
+    }
+    if (normalizedLabel == normalizedQuery) {
+      return 1000;
+    }
+    if (normalizedLabel.startsWith('$normalizedQuery ')) {
+      return 920;
+    }
+    if (normalizedLabel.endsWith(' $normalizedQuery')) {
+      return 910;
+    }
+    if (normalizedLabel.contains(normalizedQuery)) {
+      return 860;
+    }
+    if (!isFlexibleNameMatch(normalizedLabel, normalizedQuery)) {
+      return -1;
+    }
+
+    final labelTokens = tokenizeSearchText(normalizedLabel);
+    final queryTokens = tokenizeSearchText(normalizedQuery);
+    var score = 720;
+    score += queryTokens.length * 20;
+
+    if (labelTokens.isNotEmpty &&
+        queryTokens.isNotEmpty &&
+        labelTokens.first == queryTokens.first) {
+      score += 30;
+    }
+    if (labelTokens.isNotEmpty &&
+        queryTokens.isNotEmpty &&
+        labelTokens.last == queryTokens.last) {
+      score += 40;
+    }
+
+    final gapPenalty = labelTokens.length - queryTokens.length;
+    score -= gapPenalty * 8;
+    return score;
+  }
+
   static String normalizeSystemAction(String command) {
     switch (command.trim().toUpperCase()) {
       case 'MỞ SETTINGS':

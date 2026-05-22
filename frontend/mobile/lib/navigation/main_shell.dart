@@ -31,6 +31,20 @@ import 'package:vnalo_mobile/models/user_model.dart';
 import 'package:vnalo_mobile/services/friend_service.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 
+class _AiTargetContext {
+  final String targetName;
+  final String? conversationId;
+  final String? peerUserId;
+  final DateTime updatedAt;
+
+  const _AiTargetContext({
+    required this.targetName,
+    this.conversationId,
+    this.peerUserId,
+    required this.updatedAt,
+  });
+}
+
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -39,11 +53,14 @@ class MainShell extends StatefulWidget {
 }
 
 class MainShellState extends State<MainShell> {
+  static const Duration _aiTargetContextTtl = Duration(minutes: 12);
+
   int _currentIndex = 0;
   bool _isCallScreenActive = false;
   String? _activeAiConversationId;
   StreamSubscription<AiCommand>? _actionSub;
   StreamSubscription<Map<String, dynamic>>? _callErrorSub;
+  _AiTargetContext? _aiTargetContext;
 
   // Static key to access state from outside
   static final GlobalKey<MainShellState> globalKey =
@@ -95,6 +112,144 @@ class MainShellState extends State<MainShell> {
           backgroundColor: Colors.redAccent,
         ),
       );
+  }
+
+  void _rememberAiTargetContext({
+    required String targetName,
+    String? conversationId,
+    String? peerUserId,
+  }) {
+    final normalizedTarget = targetName.trim();
+    if (normalizedTarget.isEmpty) {
+      return;
+    }
+    _aiTargetContext = _AiTargetContext(
+      targetName: normalizedTarget,
+      conversationId: conversationId?.trim(),
+      peerUserId: peerUserId?.trim(),
+      updatedAt: DateTime.now(),
+    );
+  }
+
+  _AiTargetContext? _activeAiTargetContext() {
+    final current = _aiTargetContext;
+    if (current == null) return null;
+    if (DateTime.now().difference(current.updatedAt) > _aiTargetContextTtl) {
+      _aiTargetContext = null;
+      return null;
+    }
+    return current;
+  }
+
+  String? _directPeerUserId(Conversation conversation, String currentUserId) {
+    if (conversation.type.name != 'DIRECT') return null;
+    for (final member in conversation.members) {
+      if (member.userId != currentUserId) {
+        return member.userId;
+      }
+    }
+    return null;
+  }
+
+  Conversation? _preferConversationFromAiContext(
+    Iterable<Conversation> matches,
+    ChatProvider chatProvider,
+  ) {
+    final context = _activeAiTargetContext();
+    if (context == null) return null;
+
+    final currentUserId = chatProvider.currentUserId ?? '';
+    final byConversationId =
+        context.conversationId == null
+            ? null
+            : matches
+                .where(
+                  (conversation) =>
+                      conversation.id == context.conversationId!.trim(),
+                )
+                .firstOrNull;
+    if (byConversationId != null) return byConversationId;
+
+    if (context.peerUserId == null || context.peerUserId!.trim().isEmpty) {
+      return null;
+    }
+    final peerUserId = context.peerUserId!.trim();
+    return matches
+        .where(
+          (conversation) =>
+              _directPeerUserId(conversation, currentUserId) == peerUserId,
+        )
+        .firstOrNull;
+  }
+
+  User? _preferUserFromAiContext(Iterable<User> matches) {
+    final context = _activeAiTargetContext();
+    final peerUserId = context?.peerUserId?.trim();
+    if (peerUserId == null || peerUserId.isEmpty) return null;
+    return matches.where((user) => user.id == peerUserId).firstOrNull;
+  }
+
+  String _resolveTargetNameForCommand(
+    String command,
+    Map<String, dynamic>? params,
+  ) {
+    final explicit = AiCommandRouting.extractTargetName(params);
+    if (explicit.isNotEmpty) {
+      return explicit;
+    }
+    if (command != 'OPEN_CHAT' &&
+        command != 'COMPOSE_MESSAGE' &&
+        command != 'START_CALL') {
+      return '';
+    }
+    return _activeAiTargetContext()?.targetName ?? '';
+  }
+
+  Future<Conversation?> _resolveDirectConversationFallback(
+    String targetName,
+    ChatProvider chatProvider,
+  ) async {
+    final contactProvider = context.read<ContactProvider>();
+    if (contactProvider.friends.isEmpty) {
+      await contactProvider.fetchFriends();
+    }
+    if (!mounted) return null;
+
+    final matches = _findUsersByName(contactProvider.friends, targetName);
+    if (matches.isEmpty) {
+      return null;
+    }
+    final contextUser = _preferUserFromAiContext(matches);
+    if (contextUser != null) {
+      final direct = await chatProvider.getOrCreateDirectConversation(
+        contextUser.id,
+      );
+      if (direct != null) {
+        _rememberAiTargetContext(
+          targetName: direct.getDisplayName(chatProvider.currentUserId ?? ''),
+          conversationId: direct.id,
+          peerUserId: contextUser.id,
+        );
+      }
+      return direct;
+    }
+    if (matches.length > 1) {
+      _showErrorSnackBar(
+        'Có nhiều người tên "$targetName". Hãy nói rõ hơn để trợ lý chọn đúng.',
+      );
+      return null;
+    }
+
+    final user = matches.first;
+    final direct = await chatProvider.getOrCreateDirectConversation(user.id);
+    if (direct != null) {
+      _rememberAiTargetContext(
+        targetName: direct.getDisplayName(chatProvider.currentUserId ?? ''),
+        conversationId: direct.id,
+        peerUserId: user.id,
+      );
+    }
+    return direct;
   }
 
   Future<void> _dismissSoftKeyboard() async {
@@ -199,7 +354,7 @@ class MainShellState extends State<MainShell> {
       case 'OPEN_CHAT':
       case 'COMPOSE_MESSAGE':
       case 'START_CALL':
-        final targetName = AiCommandRouting.extractTargetName(params);
+        final targetName = _resolveTargetNameForCommand(command, params);
         if (targetName.isEmpty) {
           _logAiFlow(
             'AI_RESOLUTION_FAILED',
@@ -211,9 +366,19 @@ class MainShellState extends State<MainShell> {
           );
           return;
         }
-        final conversationMatches = chatProvider.findConversationMatchesByName(
+        var conversationMatches = chatProvider.findConversationMatchesByName(
           targetName,
         );
+
+        if (conversationMatches.isEmpty) {
+          final createdDirect = await _resolveDirectConversationFallback(
+            targetName,
+            chatProvider,
+          );
+          if (createdDirect != null) {
+            conversationMatches = [createdDirect];
+          }
+        }
 
         if (conversationMatches.isEmpty) {
           _logAiFlow(
@@ -227,6 +392,15 @@ class MainShellState extends State<MainShell> {
 
         Conversation? selectedConversation;
         if (conversationMatches.length > 1) {
+          final contextConversation = _preferConversationFromAiContext(
+            conversationMatches,
+            chatProvider,
+          );
+          if (contextConversation != null) {
+            selectedConversation = contextConversation;
+          }
+        }
+        if (selectedConversation == null && conversationMatches.length > 1) {
           _logAiFlow(
             'AI_RESOLUTION_AMBIGUOUS',
             aiCommand: aiCmd,
@@ -257,6 +431,11 @@ class MainShellState extends State<MainShell> {
                 : null;
         final peerUserId = peerMember?.userId ?? '';
         final peerName = conversation.getDisplayName(currentUserId);
+        _rememberAiTargetContext(
+          targetName: peerName,
+          conversationId: conversation.id,
+          peerUserId: peerUserId,
+        );
 
         final rawPrefilled = AiCommandRouting.extractPrefilledText(
           command,
@@ -425,6 +604,11 @@ class MainShellState extends State<MainShell> {
             );
             return;
           }
+          _rememberAiTargetContext(
+            targetName: peerName,
+            conversationId: conversation.id,
+            peerUserId: peerUserId,
+          );
 
           final callType = params?['callType']?.toString().toLowerCase();
           final isVideo = callType == 'video';
@@ -641,6 +825,13 @@ class MainShellState extends State<MainShell> {
         return null;
       }
       if (filtered.length > 1) {
+        final contextConversation = _preferConversationFromAiContext(
+          filtered,
+          chatProvider,
+        );
+        if (contextConversation != null) {
+          return contextConversation;
+        }
         return _showConversationDisambiguationSheet(
           matches: filtered,
           currentUserId: currentUserId,
@@ -667,20 +858,28 @@ class MainShellState extends State<MainShell> {
   }
 
   List<User> _findUsersByName(Iterable<User> users, String name) {
-    final normalized = name.trim().toLowerCase();
+    final normalized = AiCommandRouting.normalizeSearchText(name);
     if (normalized.isEmpty) return const <User>[];
-    final exact =
-        users
-            .where(
-              (user) => user.displayName.trim().toLowerCase() == normalized,
-            )
-            .toList();
+    final exact = <User>[];
+    final scored = <({User user, int score})>[];
+
+    for (final user in users) {
+      final score = AiCommandRouting.computeNameMatchScore(
+        user.displayName,
+        normalized,
+      );
+      if (score < 0) continue;
+      if (score >= 1000) {
+        exact.add(user);
+      } else {
+        scored.add((user: user, score: score));
+      }
+    }
+
     if (exact.isNotEmpty) return exact;
-    return users
-        .where(
-          (user) => user.displayName.trim().toLowerCase().contains(normalized),
-        )
-        .toList();
+
+    scored.sort((a, b) => b.score.compareTo(a.score));
+    return scored.map((entry) => entry.user).toList(growable: false);
   }
 
   Future<User?> _resolveAiFriend(
@@ -707,6 +906,10 @@ class MainShellState extends State<MainShell> {
     if (matches.isEmpty) {
       _showErrorSnackBar('Không tìm thấy "$name" trong danh bạ.');
       return null;
+    }
+    final contextUser = _preferUserFromAiContext(matches);
+    if (contextUser != null) {
+      return contextUser;
     }
     if (matches.length > 1) {
       _showErrorSnackBar(
@@ -740,6 +943,10 @@ class MainShellState extends State<MainShell> {
     if (matches.isEmpty) {
       _showErrorSnackBar('Không tìm thấy người dùng "$targetName".');
       return null;
+    }
+    final contextUser = _preferUserFromAiContext(matches);
+    if (contextUser != null) {
+      return contextUser;
     }
     if (matches.length > 1) {
       _showErrorSnackBar(

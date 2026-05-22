@@ -159,6 +159,54 @@ void main() {
     });
   });
 
+  group('AiCommandRouting flexible name matching', () {
+    test('normalizes Vietnamese accents and spacing', () {
+      expect(
+        AiCommandRouting.normalizeSearchText('  Lý   Tinh Vân  '),
+        'ly tinh van',
+      );
+      expect(
+        AiCommandRouting.normalizeSearchText('Đặng Thị Uyên'),
+        'dang thi uyen',
+      );
+    });
+
+    test('matches skipped middle names for contact resolution', () {
+      expect(
+        AiCommandRouting.isFlexibleNameMatch('Lý Tinh Vân', 'lý vân'),
+        isTrue,
+      );
+      expect(
+        AiCommandRouting.isFlexibleNameMatch('Lý Tinh Vân', 'ly van'),
+        isTrue,
+      );
+      expect(
+        AiCommandRouting.isFlexibleNameMatch('Nguyễn Thị Uyên', 'uyen'),
+        isTrue,
+      );
+      expect(
+        AiCommandRouting.isFlexibleNameMatch('Lý Tinh Vân', 'lý bình'),
+        isFalse,
+      );
+    });
+
+    test('ranks exact and suffix matches above loose flexible matches', () {
+      final exact = AiCommandRouting.computeNameMatchScore('Lý Vân', 'lý vân');
+      final suffix = AiCommandRouting.computeNameMatchScore(
+        'Lý Tinh Vân',
+        'lý vân',
+      );
+      final loose = AiCommandRouting.computeNameMatchScore(
+        'Nguyễn Lý Tinh Vân',
+        'lý vân',
+      );
+
+      expect(exact, greaterThan(suffix));
+      expect(suffix, greaterThan(loose));
+      expect(loose, greaterThanOrEqualTo(0));
+    });
+  });
+
   group('AiCommandRouting navigation guards', () {
     test('blocks open chat if already active or pending', () {
       expect(
