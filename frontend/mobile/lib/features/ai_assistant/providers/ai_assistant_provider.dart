@@ -277,6 +277,18 @@ class AiCommand {
   };
 }
 
+class AiDisambiguationSelection {
+  final String selectedName;
+  final String source;
+  final DateTime createdAt;
+
+  const AiDisambiguationSelection({
+    required this.selectedName,
+    required this.source,
+    required this.createdAt,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // AiAssistantProvider
 //
@@ -368,6 +380,9 @@ class AiAssistantProvider with ChangeNotifier {
   final bool _enableFlowLogging;
   final StreamController<AiCommand> _systemActionController =
       StreamController<AiCommand>.broadcast();
+  final StreamController<AiDisambiguationSelection>
+  _disambiguationSelectionController =
+      StreamController<AiDisambiguationSelection>.broadcast();
   bool _isDisposed = false;
 
   // ------------------------- Construction -----------------------------------
@@ -431,6 +446,8 @@ class AiAssistantProvider with ChangeNotifier {
       (_persistentEnabled || _provisionallyVisible || _isSessionActive);
 
   Stream<AiCommand> get systemActionStream => _systemActionController.stream;
+  Stream<AiDisambiguationSelection> get disambiguationSelectionStream =>
+      _disambiguationSelectionController.stream;
 
   void addActionFeedback(
     String message, {
@@ -453,6 +470,30 @@ class AiAssistantProvider with ChangeNotifier {
     if (keepBubbleVisible && _activeSurface != AiResponseSurface.conversation) {
       _setProvisionallyVisible(true, reason: '$source.visible');
       _scheduleIdleAutoHide(reason: source);
+    }
+  }
+
+  void submitDisambiguationSelection(
+    String selectedName, {
+    String source = 'ai_disambiguation_chip',
+  }) {
+    final normalized = normalizeAiTextEncoding(selectedName).trim();
+    if (normalized.isEmpty) {
+      return;
+    }
+    _recordUserHistory(
+      text: 'Mình muốn chọn $normalized',
+      source: source,
+      entryId: _newEntryId(),
+    );
+    if (!_disambiguationSelectionController.isClosed) {
+      _disambiguationSelectionController.add(
+        AiDisambiguationSelection(
+          selectedName: normalized,
+          source: source,
+          createdAt: DateTime.now().toUtc(),
+        ),
+      );
     }
   }
 
@@ -820,6 +861,7 @@ class AiAssistantProvider with ChangeNotifier {
     unawaited(_stt.cancel());
     unawaited(_tts.stop());
     _systemActionController.close();
+    _disambiguationSelectionController.close();
     super.dispose();
   }
 

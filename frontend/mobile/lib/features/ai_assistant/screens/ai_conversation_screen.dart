@@ -676,10 +676,14 @@ class _AiConversationMessageBubble extends StatelessWidget {
                           .map(
                             (candidate) => _ActionPromptChip(
                               label: candidate,
-                              onTap:
-                                  () => onQuickActionSelected(
-                                    'Mình muốn chọn $candidate',
-                                  ),
+                              onTap: () {
+                                context
+                                    .read<AiAssistantProvider>()
+                                    .submitDisambiguationSelection(
+                                      candidate,
+                                      source: 'ai_conversation_candidate_chip',
+                                    );
+                              },
                             ),
                           ),
                       _ActionPromptChip(

@@ -228,9 +228,12 @@ class _AiChatBoardState extends State<AiChatBoard> {
                               (candidate) => _BoardActionChip(
                                 label: candidate,
                                 onTap:
-                                    () => _applyQuickPrompt(
-                                      'Mình muốn chọn $candidate',
-                                    ),
+                                    () => context
+                                        .read<AiAssistantProvider>()
+                                        .submitDisambiguationSelection(
+                                          candidate,
+                                          source: 'ai_board_candidate_chip',
+                                        ),
                               ),
                             ),
                         _BoardActionChip(

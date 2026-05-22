@@ -277,6 +277,10 @@ void main() {
     expect(find.text('Nói rõ họ tên'), findsOneWidget);
     expect(find.text('Mở AI chat'), findsOneWidget);
 
+    await tester.tap(find.text('Uyên Lý'));
+    await tester.pumpAndSettle();
+    expect(find.text('Mình muốn chọn Uyên Lý'), findsOneWidget);
+
     provider.dispose();
   });
 

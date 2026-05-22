@@ -386,6 +386,23 @@ void main() {
     provider.dispose();
   });
 
+  test(
+    'submitDisambiguationSelection emits selection and stores user choice',
+    () async {
+      final provider = _buildProvider();
+
+      final selectionFuture = provider.disambiguationSelectionStream.first;
+      provider.submitDisambiguationSelection('Uyên Lý');
+      final selection = await selectionFuture;
+
+      expect(selection.selectedName, 'Uyên Lý');
+      expect(provider.conversationHistory.last.role, AiConversationRole.user);
+      expect(provider.conversationHistory.last.text, 'Mình muốn chọn Uyên Lý');
+
+      provider.dispose();
+    },
+  );
+
   test('first interaction lazily creates AI conversation thread', () async {
     final provider = _buildProvider();
 

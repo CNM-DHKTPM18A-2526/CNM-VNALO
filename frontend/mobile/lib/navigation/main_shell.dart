@@ -45,6 +45,20 @@ class _AiTargetContext {
   });
 }
 
+class _AiPendingAction {
+  final String command;
+  final Map<String, dynamic>? params;
+  final String scope;
+  final DateTime updatedAt;
+
+  const _AiPendingAction({
+    required this.command,
+    required this.params,
+    required this.scope,
+    required this.updatedAt,
+  });
+}
+
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -54,13 +68,16 @@ class MainShell extends StatefulWidget {
 
 class MainShellState extends State<MainShell> {
   static const Duration _aiTargetContextTtl = Duration(minutes: 12);
+  static const Duration _aiPendingActionTtl = Duration(minutes: 5);
 
   int _currentIndex = 0;
   bool _isCallScreenActive = false;
   String? _activeAiConversationId;
   StreamSubscription<AiCommand>? _actionSub;
+  StreamSubscription<AiDisambiguationSelection>? _disambiguationSub;
   StreamSubscription<Map<String, dynamic>>? _callErrorSub;
   _AiTargetContext? _aiTargetContext;
+  _AiPendingAction? _aiPendingAction;
 
   // Static key to access state from outside
   static final GlobalKey<MainShellState> globalKey =
@@ -84,6 +101,11 @@ class MainShellState extends State<MainShell> {
       _actionSub = aiProvider.systemActionStream.listen((aiCmd) {
         unawaited(_handleAiSystemAction(aiCmd));
       });
+      _disambiguationSub = aiProvider.disambiguationSelectionStream.listen((
+        selection,
+      ) {
+        unawaited(_handleAiDisambiguationSelection(selection));
+      });
 
       final socketService = context.read<SocketService>();
       _callErrorSub = socketService.onCallError.listen(_handleCallErrorSignal);
@@ -96,6 +118,7 @@ class MainShellState extends State<MainShell> {
   @override
   void dispose() {
     _actionSub?.cancel();
+    _disambiguationSub?.cancel();
     _callErrorSub?.cancel();
     super.dispose();
   }
@@ -154,6 +177,89 @@ class MainShellState extends State<MainShell> {
       return null;
     }
     return current;
+  }
+
+  void _rememberPendingAiAction({
+    required String command,
+    required String scope,
+    Map<String, dynamic>? params,
+  }) {
+    _aiPendingAction = _AiPendingAction(
+      command: _normalizeAiSystemAction(command),
+      params: params == null ? null : Map<String, dynamic>.from(params),
+      scope: scope,
+      updatedAt: DateTime.now(),
+    );
+  }
+
+  _AiPendingAction? _activePendingAiAction() {
+    final current = _aiPendingAction;
+    if (current == null) return null;
+    if (DateTime.now().difference(current.updatedAt) > _aiPendingActionTtl) {
+      _aiPendingAction = null;
+      return null;
+    }
+    return current;
+  }
+
+  Map<String, dynamic> _injectSelectedNameIntoPendingParams(
+    _AiPendingAction pending,
+    String selectedName,
+  ) {
+    final next =
+        pending.params == null
+            ? <String, dynamic>{}
+            : Map<String, dynamic>.from(pending.params!);
+    switch (pending.scope) {
+      case 'conversation':
+        next['conversation'] = selectedName;
+        next['conversationName'] = selectedName;
+        next['group'] ??= selectedName;
+        if (pending.command == 'OPEN_CHAT' ||
+            pending.command == 'COMPOSE_MESSAGE' ||
+            pending.command == 'START_CALL') {
+          next['target'] = selectedName;
+          next['recipient'] ??= selectedName;
+        }
+        break;
+      case 'user':
+      case 'contact':
+      default:
+        next['target'] = selectedName;
+        next['recipient'] = selectedName;
+        next['contactName'] = selectedName;
+        next['name'] = selectedName;
+        break;
+    }
+    return next;
+  }
+
+  Future<void> _handleAiDisambiguationSelection(
+    AiDisambiguationSelection selection,
+  ) async {
+    final pending = _activePendingAiAction();
+    if (pending == null) {
+      return;
+    }
+
+    _aiPendingAction = null;
+    final selectedName = selection.selectedName.trim();
+    if (selectedName.isEmpty) {
+      return;
+    }
+
+    _addAiActionInfo(
+      'Đã chọn "$selectedName". Trợ lý đang tiếp tục thao tác trước đó.',
+      feedbackSource: 'ai_action_resume.selection',
+    );
+
+    final nextParams = _injectSelectedNameIntoPendingParams(
+      pending,
+      selectedName,
+    );
+    await _handleAiSystemAction(
+      AiCommand(command: pending.command, params: nextParams),
+    );
   }
 
   String? _directPeerUserId(Conversation conversation, String currentUserId) {
@@ -222,8 +328,10 @@ class MainShellState extends State<MainShell> {
 
   Future<Conversation?> _resolveDirectConversationFallback(
     String targetName,
-    ChatProvider chatProvider,
-  ) async {
+    ChatProvider chatProvider, {
+    required String command,
+    Map<String, dynamic>? params,
+  }) async {
     final contactProvider = context.read<ContactProvider>();
     if (contactProvider.friends.isEmpty) {
       await contactProvider.fetchFriends();
@@ -249,6 +357,11 @@ class MainShellState extends State<MainShell> {
       return direct;
     }
     if (matches.length > 1) {
+      _rememberPendingAiAction(
+        command: command,
+        scope: 'contact',
+        params: params,
+      );
       _showErrorSnackBar(
         AiCommandRouting.buildAmbiguousTargetFeedback(
           targetName: targetName,
@@ -397,6 +510,8 @@ class MainShellState extends State<MainShell> {
           final createdDirect = await _resolveDirectConversationFallback(
             targetName,
             chatProvider,
+            command: command,
+            params: params,
           );
           if (createdDirect != null) {
             conversationMatches = [createdDirect];
@@ -430,6 +545,11 @@ class MainShellState extends State<MainShell> {
           }
         }
         if (selectedConversation == null && conversationMatches.length > 1) {
+          _rememberPendingAiAction(
+            command: command,
+            scope: 'conversation',
+            params: params,
+          );
           _addAiActionInfo(
             AiCommandRouting.buildAmbiguousTargetFeedback(
               targetName: targetName,
@@ -886,6 +1006,11 @@ class MainShellState extends State<MainShell> {
         if (contextConversation != null) {
           return contextConversation;
         }
+        _rememberPendingAiAction(
+          command: aiCmd.command,
+          scope: 'conversation',
+          params: params,
+        );
         _addAiActionInfo(
           AiCommandRouting.buildAmbiguousTargetFeedback(
             targetName: targetName,
@@ -987,6 +1112,11 @@ class MainShellState extends State<MainShell> {
       return contextUser;
     }
     if (matches.length > 1) {
+      _rememberPendingAiAction(
+        command: aiCmd.command,
+        scope: 'contact',
+        params: params,
+      );
       _showErrorSnackBar(
         AiCommandRouting.buildAmbiguousTargetFeedback(
           targetName: name,
@@ -1038,6 +1168,11 @@ class MainShellState extends State<MainShell> {
       return contextUser;
     }
     if (matches.length > 1) {
+      _rememberPendingAiAction(
+        command: aiCmd.command,
+        scope: 'user',
+        params: params,
+      );
       _showErrorSnackBar(
         AiCommandRouting.buildAmbiguousTargetFeedback(
           targetName: targetName,
