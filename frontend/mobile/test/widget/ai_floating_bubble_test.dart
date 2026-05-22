@@ -266,11 +266,14 @@ void main() {
 
     provider.addActionFeedback(
       'Mình tìm thấy nhiều kết quả cho "Uyên". Bạn muốn chọn ai?',
-      source: 'ai_action_ambiguity.contact',
+      source:
+          'ai_action_ambiguity.contact::Uy%C3%AAn%20L%C3%BD,Uy%C3%AAn%20Nguy%E1%BB%85n',
     );
     await tester.pumpAndSettle();
 
     expect(find.text('Cần làm rõ'), findsOneWidget);
+    expect(find.text('Uyên Lý'), findsOneWidget);
+    expect(find.text('Uyên Nguyễn'), findsOneWidget);
     expect(find.text('Nói rõ họ tên'), findsOneWidget);
     expect(find.text('Mở AI chat'), findsOneWidget);
 

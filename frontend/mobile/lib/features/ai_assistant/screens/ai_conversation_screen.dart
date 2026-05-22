@@ -6,6 +6,7 @@ import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/theme/app_typography.dart';
 import 'package:vnalo_mobile/core/utils/date_formatter.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
+import 'package:vnalo_mobile/features/ai_assistant/utils/ai_command_routing.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 
 class AiConversationScreen extends StatefulWidget {
@@ -552,6 +553,9 @@ class _AiConversationMessageBubble extends StatelessWidget {
   bool get _isMissingTargetBubble =>
       !isMine && (source?.startsWith('ai_action_missing') ?? false);
 
+  List<String> get _clarificationCandidates =>
+      AiCommandRouting.parseAmbiguityCandidatesFromSource(source);
+
   @override
   Widget build(BuildContext context) {
     final userBubbleColor =
@@ -667,6 +671,17 @@ class _AiConversationMessageBubble extends StatelessWidget {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
+                      ..._clarificationCandidates
+                          .take(3)
+                          .map(
+                            (candidate) => _ActionPromptChip(
+                              label: candidate,
+                              onTap:
+                                  () => onQuickActionSelected(
+                                    'Mình muốn chọn $candidate',
+                                  ),
+                            ),
+                          ),
                       _ActionPromptChip(
                         label:
                             _isClarificationBubble

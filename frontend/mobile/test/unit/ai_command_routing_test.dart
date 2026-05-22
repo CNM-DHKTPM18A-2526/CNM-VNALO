@@ -271,5 +271,18 @@ void main() {
       expect(message, contains('liên hệ trong danh bạ'));
       expect(message, contains('Lý Vân'));
     });
+
+    test('round-trips ambiguity candidate metadata in source', () {
+      final source = AiCommandRouting.buildAmbiguityFeedbackSource(
+        scope: 'contact',
+        candidates: const ['Uyên Lý', 'Uyên Nguyễn', 'Uyên Lý'],
+      );
+
+      expect(source, startsWith('ai_action_ambiguity.contact::'));
+      expect(
+        AiCommandRouting.parseAmbiguityCandidatesFromSource(source),
+        const ['Uyên Lý', 'Uyên Nguyễn'],
+      );
+    });
   });
 }

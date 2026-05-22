@@ -147,34 +147,36 @@ void main() {
     provider.dispose();
   });
 
-  testWidgets(
-    'ai conversation screen surfaces clarification badge and actions',
-    (tester) async {
-      final provider = _buildProvider();
+  testWidgets('ai conversation screen surfaces clarification badge and actions', (
+    tester,
+  ) async {
+    final provider = _buildProvider();
 
-      await tester.pumpWidget(
-        MultiProvider(
-          providers: [
-            ChangeNotifierProvider.value(value: provider),
-            ChangeNotifierProvider(create: (_) => LanguageProvider()),
-          ],
-          child: const MaterialApp(home: AiConversationScreen()),
-        ),
-      );
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: provider),
+          ChangeNotifierProvider(create: (_) => LanguageProvider()),
+        ],
+        child: const MaterialApp(home: AiConversationScreen()),
+      ),
+    );
 
-      provider.addActionFeedback(
-        'Mình tìm thấy nhiều kết quả cho "Uyên". Bạn muốn chọn ai?',
-        source: 'ai_action_ambiguity.contact',
-      );
-      await tester.pumpAndSettle();
+    provider.addActionFeedback(
+      'Mình tìm thấy nhiều kết quả cho "Uyên". Bạn muốn chọn ai?',
+      source:
+          'ai_action_ambiguity.contact::Uy%C3%AAn%20L%C3%BD,Uy%C3%AAn%20Nguy%E1%BB%85n',
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('Cần làm rõ'), findsOneWidget);
-      expect(find.text('Nói rõ họ tên'), findsOneWidget);
-      expect(find.text('Mở danh bạ'), findsOneWidget);
+    expect(find.text('Cần làm rõ'), findsOneWidget);
+    expect(find.text('Uyên Lý'), findsOneWidget);
+    expect(find.text('Uyên Nguyễn'), findsOneWidget);
+    expect(find.text('Nói rõ họ tên'), findsOneWidget);
+    expect(find.text('Mở danh bạ'), findsOneWidget);
 
-      provider.dispose();
-    },
-  );
+    provider.dispose();
+  });
 
   testWidgets(
     'ai conversation screen hides mascot bubble while open and restores on close',

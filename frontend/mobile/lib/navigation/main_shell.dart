@@ -255,7 +255,10 @@ class MainShellState extends State<MainShell> {
           candidates: matches.map((user) => user.displayName),
           actionLabel: 'chọn đúng người nhận',
         ),
-        feedbackSource: 'ai_action_ambiguity.contact',
+        feedbackSource: AiCommandRouting.buildAmbiguityFeedbackSource(
+          scope: 'contact',
+          candidates: matches.map((user) => user.displayName),
+        ),
       );
       return null;
     }
@@ -437,7 +440,14 @@ class MainShellState extends State<MainShell> {
               ),
               actionLabel: 'mở đúng cuộc trò chuyện',
             ),
-            feedbackSource: 'ai_action_ambiguity.conversation',
+            feedbackSource: AiCommandRouting.buildAmbiguityFeedbackSource(
+              scope: 'conversation',
+              candidates: conversationMatches.map(
+                (conversation) => conversation.getDisplayName(
+                  chatProvider.currentUserId ?? '',
+                ),
+              ),
+            ),
           );
           _logAiFlow(
             'AI_RESOLUTION_AMBIGUOUS',
@@ -884,7 +894,12 @@ class MainShellState extends State<MainShell> {
             ),
             actionLabel: 'chọn đúng cuộc trò chuyện',
           ),
-          feedbackSource: 'ai_action_ambiguity.conversation',
+          feedbackSource: AiCommandRouting.buildAmbiguityFeedbackSource(
+            scope: 'conversation',
+            candidates: filtered.map(
+              (conversation) => conversation.getDisplayName(currentUserId),
+            ),
+          ),
         );
         return _showConversationDisambiguationSheet(
           matches: filtered,
@@ -978,7 +993,10 @@ class MainShellState extends State<MainShell> {
           candidates: matches.map((user) => user.displayName),
           actionLabel: 'chọn đúng liên hệ',
         ),
-        feedbackSource: 'ai_action_ambiguity.contact',
+        feedbackSource: AiCommandRouting.buildAmbiguityFeedbackSource(
+          scope: 'contact',
+          candidates: matches.map((user) => user.displayName),
+        ),
       );
       return null;
     }
@@ -1026,7 +1044,10 @@ class MainShellState extends State<MainShell> {
           candidates: matches.map((user) => user.displayName),
           actionLabel: 'chọn đúng người dùng',
         ),
-        feedbackSource: 'ai_action_ambiguity.user',
+        feedbackSource: AiCommandRouting.buildAmbiguityFeedbackSource(
+          scope: 'user',
+          candidates: matches.map((user) => user.displayName),
+        ),
       );
       return null;
     }

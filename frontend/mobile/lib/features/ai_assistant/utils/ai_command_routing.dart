@@ -375,4 +375,37 @@ class AiCommandRouting {
     }
     return 'Mình chưa tìm thấy $targetType "$cleanTarget". Hãy kiểm tra lại tên hoặc thử nói rõ hơn.';
   }
+
+  static String buildAmbiguityFeedbackSource({
+    required String scope,
+    required Iterable<String> candidates,
+  }) {
+    final normalizedScope = scope.trim().isEmpty ? 'generic' : scope.trim();
+    final encodedCandidates = candidates
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .toSet()
+        .take(6)
+        .map(Uri.encodeComponent)
+        .join(',');
+    if (encodedCandidates.isEmpty) {
+      return 'ai_action_ambiguity.$normalizedScope';
+    }
+    return 'ai_action_ambiguity.$normalizedScope::$encodedCandidates';
+  }
+
+  static List<String> parseAmbiguityCandidatesFromSource(String? source) {
+    if (source == null || source.isEmpty) return const <String>[];
+    final separatorIndex = source.indexOf('::');
+    if (separatorIndex < 0 || separatorIndex == source.length - 1) {
+      return const <String>[];
+    }
+    final payload = source.substring(separatorIndex + 2);
+    return payload
+        .split(',')
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .map(Uri.decodeComponent)
+        .toList(growable: false);
+  }
 }

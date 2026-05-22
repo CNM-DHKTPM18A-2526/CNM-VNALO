@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/theme/app_typography.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
+import 'package:vnalo_mobile/features/ai_assistant/utils/ai_command_routing.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_prompt_chips.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_status_pill.dart';
 
@@ -123,6 +124,8 @@ class _AiChatBoardState extends State<AiChatBoard> {
         !isUser && entry.source.startsWith('ai_action_ambiguity');
     final isMissingTarget =
         !isUser && entry.source.startsWith('ai_action_missing');
+    final clarificationCandidates =
+        AiCommandRouting.parseAmbiguityCandidatesFromSource(entry.source);
     final bubbleColor =
         isUser
             ? (isDarkMode ? const Color(0xFF1C355A) : const Color(0xFFDCEBFF))
@@ -219,6 +222,17 @@ class _AiChatBoardState extends State<AiChatBoard> {
                       spacing: 8,
                       runSpacing: 8,
                       children: [
+                        ...clarificationCandidates
+                            .take(3)
+                            .map(
+                              (candidate) => _BoardActionChip(
+                                label: candidate,
+                                onTap:
+                                    () => _applyQuickPrompt(
+                                      'Mình muốn chọn $candidate',
+                                    ),
+                              ),
+                            ),
                         _BoardActionChip(
                           label:
                               isClarification
