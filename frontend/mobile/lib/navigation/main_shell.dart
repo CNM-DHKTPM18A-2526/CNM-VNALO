@@ -126,10 +126,16 @@ class MainShellState extends State<MainShell> {
   void _showErrorSnackBar(
     String message, {
     String feedbackSource = 'ai_action_feedback',
+    bool showSnackBar = false,
+    bool keepBubbleVisible = true,
   }) {
     final aiProvider = context.read<AiAssistantProvider>();
-    aiProvider.addActionFeedback(message, source: feedbackSource);
-    if (!mounted) return;
+    aiProvider.addActionFeedback(
+      message,
+      source: feedbackSource,
+      keepBubbleVisible: keepBubbleVisible,
+    );
+    if (!showSnackBar || !mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     messenger
       ..hideCurrentSnackBar()
@@ -145,11 +151,20 @@ class MainShellState extends State<MainShell> {
   void _addAiActionInfo(
     String message, {
     String feedbackSource = 'ai_action_feedback',
+    bool keepBubbleVisible = true,
   }) {
     context.read<AiAssistantProvider>().addActionFeedback(
       message,
       source: feedbackSource,
+      keepBubbleVisible: keepBubbleVisible,
     );
+  }
+
+  void _addAiActionCancelled(
+    String message, {
+    String feedbackSource = 'ai_action_cancelled',
+  }) {
+    _addAiActionInfo(message, feedbackSource: feedbackSource);
   }
 
   void _rememberAiTargetContext({
@@ -584,6 +599,9 @@ class MainShellState extends State<MainShell> {
           );
           if (selectedConversation == null) {
             _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
+            _addAiActionCancelled(
+              'Đã hủy thao tác vì bạn chưa chọn cuộc trò chuyện.',
+            );
             return;
           }
         }
@@ -680,6 +698,7 @@ class MainShellState extends State<MainShell> {
             );
             if (composeDecision == AiActionConfirmationResult.cancelled) {
               _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
+              _addAiActionCancelled('Đã hủy thao tác soạn tin nhắn.');
               return;
             }
             if (!mounted) return;
@@ -793,6 +812,7 @@ class MainShellState extends State<MainShell> {
           );
           if (!confirmed) {
             _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
+            _addAiActionCancelled('Đã hủy thao tác gọi.');
             return;
           }
           if (!mounted) return;
@@ -878,6 +898,7 @@ class MainShellState extends State<MainShell> {
           );
           if (!confirmed) {
             _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
+            _addAiActionCancelled('Đã hủy thao tác thu hồi tin nhắn.');
             return;
           }
           if (!mounted) return;
@@ -1249,8 +1270,9 @@ class MainShellState extends State<MainShell> {
     );
   }
 
-  void _showSuccessSnackBar(String message) {
-    if (!mounted) return;
+  void _showSuccessSnackBar(String message, {bool showSnackBar = false}) {
+    _addAiActionInfo(message, feedbackSource: 'ai_action_success');
+    if (!showSnackBar || !mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
@@ -1297,7 +1319,11 @@ class MainShellState extends State<MainShell> {
       secondaryDetail: selectedUsers.map((user) => user.displayName).join(', '),
       secondaryDetailLabel: 'Thành viên',
     );
-    if (!confirmed || !mounted) return;
+    if (!confirmed) {
+      _addAiActionCancelled('Đã hủy thao tác tạo nhóm.');
+      return;
+    }
+    if (!mounted) return;
 
     final conversation = await context
         .read<ChatProvider>()
@@ -1334,7 +1360,13 @@ class MainShellState extends State<MainShell> {
       confirmLabel: muted ? 'Tắt thông báo' : 'Bật thông báo',
       primaryDetail: conversation.getDisplayName(currentUserId),
     );
-    if (!confirmed || !mounted) return;
+    if (!confirmed) {
+      _addAiActionCancelled(
+        muted ? 'Đã hủy thao tác tắt thông báo.' : 'Đã hủy thao tác bật thông báo.',
+      );
+      return;
+    }
+    if (!mounted) return;
     await context.read<ChatProvider>().updateConversationSettings(
       conversationId: conversation.id,
       isMuted: muted,
@@ -1372,7 +1404,13 @@ class MainShellState extends State<MainShell> {
       secondaryDetail: message.content,
       secondaryDetailLabel: 'Tin nhắn',
     );
-    if (!confirmed || !mounted) return;
+    if (!confirmed) {
+      _addAiActionCancelled(
+        pin ? 'Đã hủy thao tác ghim tin nhắn.' : 'Đã hủy thao tác bỏ ghim tin nhắn.',
+      );
+      return;
+    }
+    if (!mounted) return;
     if (pin) {
       chatProvider.pinMessage(message.id);
     } else {
@@ -1464,7 +1502,11 @@ class MainShellState extends State<MainShell> {
       primaryDetailLabel: 'Liên hệ',
       destructive: destructive,
     );
-    if (!confirmed || !mounted) return;
+    if (!confirmed) {
+      _addAiActionCancelled('Đã hủy thao tác liên hệ.');
+      return;
+    }
+    if (!mounted) return;
     final friendService = context.read<FriendService>();
     if (command == 'SEND_FRIEND_REQUEST') {
       await friendService.sendFriendRequest(
@@ -1586,7 +1628,11 @@ class MainShellState extends State<MainShell> {
       secondaryDetailLabel: title != null ? 'Tên mới' : 'Thành viên',
       destructive: destructive,
     );
-    if (!confirmed || !mounted) return;
+    if (!confirmed) {
+      _addAiActionCancelled('Đã hủy thao tác nhóm.');
+      return;
+    }
+    if (!mounted) return;
     try {
       await execute();
       if (mounted) _showSuccessSnackBar('Trợ lý đã thực hiện thao tác nhóm.');
