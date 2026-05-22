@@ -36,6 +36,7 @@ type MessageInputProps = {
   members?: Array<{ userId: string; displayName: string; avatarUrl?: string | null }>
   suggestedReplies?: string[]
   onSelectSuggestedReply?: (reply: string) => void
+  initialText?: string
 }
 
 type FilePreviewItem = {
@@ -57,6 +58,7 @@ export function MessageInput({
   members = [],
   suggestedReplies = [],
   onSelectSuggestedReply,
+  initialText,
 }: MessageInputProps) {
   const { accessToken } = useAuth()
   const [messageText, setMessageText] = React.useState('')
@@ -101,6 +103,15 @@ export function MessageInput({
   const [error, setError] = React.useState('')
   const [isFocused, setIsFocused] = React.useState(false)
   const fileInputRef = React.useRef<HTMLInputElement | null>(null)
+
+  React.useEffect(() => {
+    const normalized = initialText?.trim()
+    if (!normalized) return
+    setMessageText(normalized)
+    setTimeout(() => {
+      messageInputRef.current?.focus()
+    }, 50)
+  }, [initialText])
   
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;

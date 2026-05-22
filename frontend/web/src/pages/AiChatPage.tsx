@@ -1,9 +1,10 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Send, Sparkles, Trash2 } from 'lucide-react'
 
 import { extractMessage } from '../api.client'
 import { useAuth } from '../features/auth/useAuth'
-import { sendAiChatMessage } from '../features/chat/chat.api'
+import { fetchInbox, sendAiChatMessage } from '../features/chat/chat.api'
 
 type ProviderStatus =
   | 'LIVE_PROVIDER_ACTIVE'
@@ -11,15 +12,46 @@ type ProviderStatus =
   | 'AI_PROVIDER_UNAVAILABLE'
   | null
 
+type AiActionCommand =
+  | 'OPEN_CHAT'
+  | 'COMPOSE_MESSAGE'
+  | 'START_CALL'
+  | 'RECALL_MESSAGE'
+  | 'CREATE_GROUP'
+  | 'MUTE_CONVERSATION'
+  | 'UNMUTE_CONVERSATION'
+  | 'PIN_MESSAGE'
+  | 'UNPIN_MESSAGE'
+  | 'OPEN_GROUP_SETTINGS'
+  | 'OPEN_PROFILE'
+  | 'SEND_FRIEND_REQUEST'
+  | 'BLOCK_USER'
+  | 'UNBLOCK_USER'
+  | 'CHANGE_GROUP_NAME'
+  | 'ADD_GROUP_MEMBER'
+  | 'REMOVE_GROUP_MEMBER'
+  | 'TRANSFER_GROUP_OWNER'
+  | 'LEAVE_GROUP'
+  | 'DISBAND_GROUP'
+  | 'NAVIGATE_TO'
+  | 'NAVIGATE_TO_SETTINGS'
+  | 'NAVIGATE_TO_CHAT'
+  | 'NAVIGATE_TO_CONTACTS'
+  | 'NAVIGATE_TO_SCANNER'
+  | 'NAVIGATE_TO_TIMELINE'
+
 type AiMessage = {
   role: 'user' | 'assistant'
   content: string
   timestamp: string
   degraded?: boolean
   providerStatus?: ProviderStatus
+  actionCommand?: AiActionCommand | null
+  actionParams?: Record<string, unknown> | null
 }
 
 const STORAGE_KEY = 'vnalo_ai_chat_history'
+const DRAFT_KEY_PREFIX = 'vnalo_ai_web_compose_draft:'
 const MAX_API_HISTORY = 20
 
 const PRESET_PROMPTS = [
@@ -74,11 +106,76 @@ function resolveProviderPresentation(messages: AiMessage[]) {
   }
 }
 
+function normalizeLookupText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function extractActionTarget(params?: Record<string, unknown> | null) {
+  if (!params) return ''
+  const raw =
+    params.target ??
+    params.recipient ??
+    params.contactName ??
+    params.displayName ??
+    params.name ??
+    ''
+  return String(raw).trim()
+}
+
+function extractComposeContent(params?: Record<string, unknown> | null) {
+  if (!params) return ''
+  const raw = params.content ?? params.messageText ?? params.prefilledText ?? ''
+  return String(raw).trim()
+}
+
+function resolveNavigatePath(command: AiActionCommand, params?: Record<string, unknown> | null) {
+  if (command === 'NAVIGATE_TO_CHAT') return '/chat'
+  if (command === 'NAVIGATE_TO_CONTACTS') return '/contacts'
+  if (command === 'OPEN_PROFILE') return '/profile'
+  if (command === 'NAVIGATE_TO_SETTINGS') return '/profile'
+  if (command !== 'NAVIGATE_TO') return null
+
+  const page = String(params?.page ?? params?.destination ?? params?.screen ?? '').trim().toLowerCase()
+  if (page === 'chat') return '/chat'
+  if (page === 'contacts') return '/contacts'
+  if (page === 'profile' || page === 'settings') return '/profile'
+  return null
+}
+
+function buildActionLabel(command: AiActionCommand) {
+  switch (command) {
+    case 'OPEN_CHAT':
+      return 'Mở cuộc trò chuyện'
+    case 'COMPOSE_MESSAGE':
+      return 'Mở chat + điền sẵn'
+    case 'NAVIGATE_TO_CHAT':
+      return 'Đi tới Chat'
+    case 'NAVIGATE_TO_CONTACTS':
+      return 'Đi tới Danh bạ'
+    case 'OPEN_PROFILE':
+      return 'Đi tới Hồ sơ'
+    case 'NAVIGATE_TO':
+      return 'Đi tới màn hình đích'
+    case 'START_CALL':
+      return 'Mở chat để gọi'
+    default:
+      return 'Thử thực hiện thao tác'
+  }
+}
+
 export function AiChatPage() {
   const { accessToken } = useAuth()
+  const navigate = useNavigate()
   const [messages, setMessages] = useState<AiMessage[]>([])
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [actionBusyIndex, setActionBusyIndex] = useState<number | null>(null)
+  const [actionFeedback, setActionFeedback] = useState<string>('')
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -104,7 +201,7 @@ export function AiChatPage() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, isLoading])
+  }, [messages, isLoading, actionFeedback])
 
   const runtimeState = useMemo(() => resolveProviderPresentation(messages), [messages])
 
@@ -153,6 +250,8 @@ export function AiChatPage() {
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         degraded: Boolean(aiResponse.degraded),
         providerStatus: (aiResponse.providerStatus as ProviderStatus | undefined) ?? null,
+        actionCommand: (aiResponse.actionCommand as AiActionCommand | undefined) ?? null,
+        actionParams: aiResponse.actionParams ?? null,
       }
 
       saveMessages([...updatedMessages, assistantMessage])
@@ -174,6 +273,72 @@ export function AiChatPage() {
       saveMessages([...updatedMessages, errorMessage])
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleAction = async (message: AiMessage, index: number) => {
+    if (!accessToken || !message.actionCommand) {
+      return
+    }
+
+    setActionBusyIndex(index)
+    setActionFeedback('')
+
+    try {
+      const command = message.actionCommand
+      const params = message.actionParams ?? {}
+      const directPath = resolveNavigatePath(command, params)
+
+      if (directPath) {
+        navigate(directPath)
+        setActionFeedback('Đã mở đúng màn hình theo yêu cầu AI.')
+        return
+      }
+
+      if (command === 'OPEN_CHAT' || command === 'COMPOSE_MESSAGE' || command === 'START_CALL') {
+        const target = extractActionTarget(params)
+        if (!target) {
+          setActionFeedback('AI chưa xác định được người nhận. Hãy nhập rõ hơn.')
+          return
+        }
+
+        const inbox = await fetchInbox(accessToken)
+        const normalizedTarget = normalizeLookupText(target)
+        const matched = inbox
+          .map((conversation) => ({
+            conversation,
+            score: normalizeLookupText(conversation.name).includes(normalizedTarget) ? normalizedTarget.length : -1,
+          }))
+          .filter((item) => item.score >= 0)
+          .sort((left, right) => right.score - left.score)[0]?.conversation
+
+        if (!matched) {
+          setActionFeedback(`Không tìm thấy cuộc trò chuyện phù hợp với "${target}".`)
+          return
+        }
+
+        if (command === 'COMPOSE_MESSAGE') {
+          const draft = extractComposeContent(params)
+          if (draft) {
+            localStorage.setItem(`${DRAFT_KEY_PREFIX}${matched.id}`, draft)
+          }
+        }
+
+        navigate(`/chat/${matched.id}`)
+        if (command === 'START_CALL') {
+          setActionFeedback('Đã mở cuộc trò chuyện. Hãy nhấn nút gọi để xác nhận cuộc gọi trên web.')
+        } else {
+          setActionFeedback('Đã mở cuộc trò chuyện đích.')
+        }
+        return
+      }
+
+      setActionFeedback('Lệnh này chưa hỗ trợ thao tác trực tiếp trên web. Bạn có thể tiếp tục trên mobile.')
+    } catch (error) {
+      console.error('AI action execution failed:', error)
+      setActionFeedback('Không thể thực thi thao tác AI trên web lúc này. Vui lòng thử lại.')
+    } finally {
+      setActionBusyIndex(null)
     }
   }
 
@@ -239,6 +404,7 @@ export function AiChatPage() {
 
         <div className='ai-chat-messages'>
           {runtimeState.degraded && <div className={runtimeState.bannerClassName}>{runtimeState.banner}</div>}
+          {actionFeedback ? <div className='ai-runtime-banner ai-runtime-banner-info'>{actionFeedback}</div> : null}
 
           {messages.map((message, index) => (
             <div
@@ -248,6 +414,19 @@ export function AiChatPage() {
               <p className='text-[14.5px] whitespace-pre-wrap' style={{ margin: 0 }}>
                 {message.content}
               </p>
+              {message.role === 'assistant' && message.actionCommand ? (
+                <div style={{ marginTop: '10px' }}>
+                  <button
+                    type='button'
+                    className='ai-send-btn'
+                    style={{ width: 'auto', padding: '8px 14px', borderRadius: '999px' }}
+                    onClick={() => void handleAction(message, index)}
+                    disabled={actionBusyIndex === index || isLoading}
+                  >
+                    {actionBusyIndex === index ? 'Đang xử lý...' : buildActionLabel(message.actionCommand)}
+                  </button>
+                </div>
+              ) : null}
               <div className='text-[10px] opacity-60 text-right mt-1.5' style={{ marginTop: '6px' }}>
                 {message.timestamp}
               </div>

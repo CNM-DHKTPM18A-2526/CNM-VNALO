@@ -1119,6 +1119,8 @@ export async function sendAiChatMessage(
   history: Array<{ role: 'user' | 'assistant'; content: string }>
 ): Promise<{
   textReply: string
+  actionCommand?: string | null
+  actionParams?: Record<string, unknown> | null
   degraded?: boolean
   providerStatus?: string
 }> {
@@ -1129,6 +1131,8 @@ export async function sendAiChatMessage(
     const data = response.data?.data;
     return {
       textReply: data?.textReply ?? '',
+      actionCommand: data?.actionCommand ?? null,
+      actionParams: data?.actionParams ?? null,
       degraded: Boolean(data?.degraded),
       providerStatus: data?.providerStatus,
     };
