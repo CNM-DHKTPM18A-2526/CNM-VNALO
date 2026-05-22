@@ -239,6 +239,44 @@ void main() {
     provider.dispose();
   });
 
+  testWidgets('bubble board surfaces clarification badge and action chips', (
+    tester,
+  ) async {
+    final provider = _buildProvider();
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: provider,
+        child: MaterialApp(
+          home: const Scaffold(),
+          builder: _bubbleOverlayBuilder,
+        ),
+      ),
+    );
+
+    await provider.summonMascot(
+      startListening: false,
+      persist: false,
+      source: 'clarification_board_test',
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('ai_bubble_toggle_board')));
+    await tester.pumpAndSettle();
+
+    provider.addActionFeedback(
+      'Mình tìm thấy nhiều kết quả cho "Uyên". Bạn muốn chọn ai?',
+      source: 'ai_action_ambiguity.contact',
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cần làm rõ'), findsOneWidget);
+    expect(find.text('Nói rõ họ tên'), findsOneWidget);
+    expect(find.text('Mở AI chat'), findsOneWidget);
+
+    provider.dispose();
+  });
+
   testWidgets(
     'conversation screen response does not auto-open floating bubble board',
     (tester) async {

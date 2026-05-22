@@ -468,6 +468,7 @@ class AiAssistantProvider with ChangeNotifier {
         senderId: isUser ? currentUserId : 'ai_assistant',
         senderName: isUser ? 'Bạn' : currentMascot.name,
         senderAvatarUrl: isUser ? userAvatarUrl : currentMascot.previewImageUrl,
+        clientMessageId: entry.source,
         content: entry.text,
         messageType: MessageType.TEXT,
         status: MessageStatus.SENT,

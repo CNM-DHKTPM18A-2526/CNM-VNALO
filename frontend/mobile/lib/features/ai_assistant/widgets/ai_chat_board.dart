@@ -71,6 +71,16 @@ class _AiChatBoardState extends State<AiChatBoard> {
     });
   }
 
+  void _applyQuickPrompt(String text) {
+    final normalized = text.trim();
+    if (normalized.isEmpty) return;
+    _inputController.value = TextEditingValue(
+      text: normalized,
+      selection: TextSelection.collapsed(offset: normalized.length),
+    );
+    _inputFocusNode.requestFocus();
+  }
+
   Future<void> _copyResponse(BuildContext context, String response) async {
     if (response.trim().isEmpty) return;
     await Clipboard.setData(ClipboardData(text: response));
@@ -109,6 +119,10 @@ class _AiChatBoardState extends State<AiChatBoard> {
     required bool allowCopy,
   }) {
     final isUser = entry.role == AiConversationRole.user;
+    final isClarification =
+        !isUser && entry.source.startsWith('ai_action_ambiguity');
+    final isMissingTarget =
+        !isUser && entry.source.startsWith('ai_action_missing');
     final bubbleColor =
         isUser
             ? (isDarkMode ? const Color(0xFF1C355A) : const Color(0xFFDCEBFF))
@@ -158,17 +172,74 @@ class _AiChatBoardState extends State<AiChatBoard> {
                 ),
               )
             else
-              MarkdownBody(
-                data: entry.text,
-                selectable: true,
-                softLineBreak: true,
-                styleSheet: MarkdownStyleSheet(
-                  p: TextStyle(
-                    color: bubbleTextColor,
-                    fontSize: 14,
-                    height: 1.5,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (isClarification || isMissingTarget) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color:
+                            isClarification
+                                ? AppColors.primary.withValues(alpha: 0.14)
+                                : AppColors.warning.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(_buttonRadius),
+                      ),
+                      child: Text(
+                        isClarification ? 'Cần làm rõ' : 'Chưa tìm thấy',
+                        style: AppTypography.bodySmall.copyWith(
+                          color:
+                              isClarification
+                                  ? AppColors.primary
+                                  : AppColors.warning,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                  MarkdownBody(
+                    data: entry.text,
+                    selectable: true,
+                    softLineBreak: true,
+                    styleSheet: MarkdownStyleSheet(
+                      p: TextStyle(
+                        color: bubbleTextColor,
+                        fontSize: 14,
+                        height: 1.5,
+                      ),
+                    ),
                   ),
-                ),
+                  if (isClarification || isMissingTarget) ...[
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _BoardActionChip(
+                          label:
+                              isClarification
+                                  ? 'Nói rõ họ tên'
+                                  : 'Thử tên khác',
+                          onTap:
+                              () => _applyQuickPrompt(
+                                isClarification
+                                    ? 'Mình muốn người có họ tên đầy đủ là '
+                                    : 'Kiểm tra lại liên hệ tên ',
+                              ),
+                        ),
+                        if (widget.onOpenConversation != null)
+                          _BoardActionChip(
+                            label: 'Mở AI chat',
+                            onTap: widget.onOpenConversation!,
+                          ),
+                      ],
+                    ),
+                  ],
+                ],
               ),
             if (allowCopy && !isUser) ...[
               const SizedBox(height: 8),
@@ -653,6 +724,36 @@ class _AiChatBoardState extends State<AiChatBoard> {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BoardActionChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _BoardActionChip({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Ink(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.16)),
+        ),
+        child: Text(
+          label,
+          style: AppTypography.bodySmall.copyWith(
+            color: AppColors.primary,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),

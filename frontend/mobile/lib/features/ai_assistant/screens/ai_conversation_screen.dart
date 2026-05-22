@@ -299,6 +299,8 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
                           milestoneText: milestoneText,
                           createdAt: message.createdAt,
                           isDarkMode: isDarkMode,
+                          source: message.clientMessageId,
+                          onQuickActionSelected: _applyQuickPrompt,
                         );
                       },
                     ),
@@ -530,6 +532,8 @@ class _AiConversationMessageBubble extends StatelessWidget {
   final String? milestoneText;
   final DateTime createdAt;
   final bool isDarkMode;
+  final String? source;
+  final ValueChanged<String> onQuickActionSelected;
 
   const _AiConversationMessageBubble({
     required this.text,
@@ -538,7 +542,15 @@ class _AiConversationMessageBubble extends StatelessWidget {
     required this.milestoneText,
     required this.createdAt,
     required this.isDarkMode,
+    required this.source,
+    required this.onQuickActionSelected,
   });
+
+  bool get _isClarificationBubble =>
+      !isMine && (source?.startsWith('ai_action_ambiguity') ?? false);
+
+  bool get _isMissingTargetBubble =>
+      !isMine && (source?.startsWith('ai_action_missing') ?? false);
 
   @override
   Widget build(BuildContext context) {
@@ -613,12 +625,68 @@ class _AiConversationMessageBubble extends StatelessWidget {
                   ),
               ],
             ),
-            child: Text(
-              text,
-              style: AppTypography.bodyMedium.copyWith(
-                height: 1.4,
-                color: isDarkMode ? Colors.white : Colors.black87,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_isClarificationBubble || _isMissingTargetBubble) ...[
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color:
+                          _isClarificationBubble
+                              ? AppColors.primary.withValues(alpha: 0.14)
+                              : AppColors.warning.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      _isClarificationBubble ? 'Cần làm rõ' : 'Chưa tìm thấy',
+                      style: AppTypography.bodySmall.copyWith(
+                        color:
+                            _isClarificationBubble
+                                ? AppColors.primary
+                                : AppColors.warning,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+                Text(
+                  text,
+                  style: AppTypography.bodyMedium.copyWith(
+                    height: 1.4,
+                    color: isDarkMode ? Colors.white : Colors.black87,
+                  ),
+                ),
+                if (_isClarificationBubble || _isMissingTargetBubble) ...[
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _ActionPromptChip(
+                        label:
+                            _isClarificationBubble
+                                ? 'Nói rõ họ tên'
+                                : 'Thử lại tên khác',
+                        onTap:
+                            () => onQuickActionSelected(
+                              _isClarificationBubble
+                                  ? 'Mình muốn người có họ tên đầy đủ là '
+                                  : 'Kiểm tra lại liên hệ tên ',
+                            ),
+                      ),
+                      _ActionPromptChip(
+                        label: 'Mở danh bạ',
+                        onTap: () => onQuickActionSelected('Mở danh bạ'),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
             ),
           ),
         ),
@@ -640,6 +708,36 @@ class _AiConversationMessageBubble extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _ActionPromptChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _ActionPromptChip({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Ink(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
+        ),
+        child: Text(
+          label,
+          style: AppTypography.bodySmall.copyWith(
+            color: AppColors.primary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
     );
   }
 }

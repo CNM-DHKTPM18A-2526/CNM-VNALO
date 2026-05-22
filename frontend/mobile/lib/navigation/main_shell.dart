@@ -100,9 +100,12 @@ class MainShellState extends State<MainShell> {
     super.dispose();
   }
 
-  void _showErrorSnackBar(String message) {
+  void _showErrorSnackBar(
+    String message, {
+    String feedbackSource = 'ai_action_feedback',
+  }) {
     final aiProvider = context.read<AiAssistantProvider>();
-    aiProvider.addActionFeedback(message);
+    aiProvider.addActionFeedback(message, source: feedbackSource);
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     messenger
@@ -116,8 +119,14 @@ class MainShellState extends State<MainShell> {
       );
   }
 
-  void _addAiActionInfo(String message) {
-    context.read<AiAssistantProvider>().addActionFeedback(message);
+  void _addAiActionInfo(
+    String message, {
+    String feedbackSource = 'ai_action_feedback',
+  }) {
+    context.read<AiAssistantProvider>().addActionFeedback(
+      message,
+      source: feedbackSource,
+    );
   }
 
   void _rememberAiTargetContext({
@@ -246,6 +255,7 @@ class MainShellState extends State<MainShell> {
           candidates: matches.map((user) => user.displayName),
           actionLabel: 'chọn đúng người nhận',
         ),
+        feedbackSource: 'ai_action_ambiguity.contact',
       );
       return null;
     }
@@ -401,6 +411,7 @@ class MainShellState extends State<MainShell> {
               targetName: targetName,
               targetType: 'liên hệ hoặc cuộc trò chuyện',
             ),
+            feedbackSource: 'ai_action_missing.conversation',
           );
           return;
         }
@@ -426,6 +437,7 @@ class MainShellState extends State<MainShell> {
               ),
               actionLabel: 'mở đúng cuộc trò chuyện',
             ),
+            feedbackSource: 'ai_action_ambiguity.conversation',
           );
           _logAiFlow(
             'AI_RESOLUTION_AMBIGUOUS',
@@ -852,6 +864,7 @@ class MainShellState extends State<MainShell> {
             targetName: targetName,
             targetType: 'cuộc trò chuyện',
           ),
+          feedbackSource: 'ai_action_missing.conversation',
         );
         return null;
       }
@@ -871,6 +884,7 @@ class MainShellState extends State<MainShell> {
             ),
             actionLabel: 'chọn đúng cuộc trò chuyện',
           ),
+          feedbackSource: 'ai_action_ambiguity.conversation',
         );
         return _showConversationDisambiguationSheet(
           matches: filtered,
@@ -949,6 +963,7 @@ class MainShellState extends State<MainShell> {
           targetName: name,
           targetType: 'liên hệ trong danh bạ',
         ),
+        feedbackSource: 'ai_action_missing.contact',
       );
       return null;
     }
@@ -963,6 +978,7 @@ class MainShellState extends State<MainShell> {
           candidates: matches.map((user) => user.displayName),
           actionLabel: 'chọn đúng liên hệ',
         ),
+        feedbackSource: 'ai_action_ambiguity.contact',
       );
       return null;
     }
@@ -995,6 +1011,7 @@ class MainShellState extends State<MainShell> {
           targetName: targetName,
           targetType: 'người dùng',
         ),
+        feedbackSource: 'ai_action_missing.user',
       );
       return null;
     }
@@ -1009,6 +1026,7 @@ class MainShellState extends State<MainShell> {
           candidates: matches.map((user) => user.displayName),
           actionLabel: 'chọn đúng người dùng',
         ),
+        feedbackSource: 'ai_action_ambiguity.user',
       );
       return null;
     }
