@@ -432,6 +432,30 @@ class AiAssistantProvider with ChangeNotifier {
 
   Stream<AiCommand> get systemActionStream => _systemActionController.stream;
 
+  void addActionFeedback(
+    String message, {
+    String source = 'ai_action_feedback',
+    bool keepBubbleVisible = false,
+  }) {
+    final normalized = normalizeAiTextEncoding(message).trim();
+    if (normalized.isEmpty) {
+      return;
+    }
+
+    _aiResponse = normalized;
+    _lastResponseSurface = AiResponseSurface.conversation;
+    _addConversationEntry(
+      role: AiConversationRole.assistant,
+      text: normalized,
+      source: source,
+    );
+
+    if (keepBubbleVisible && _activeSurface != AiResponseSurface.conversation) {
+      _setProvisionallyVisible(true, reason: '$source.visible');
+      _scheduleIdleAutoHide(reason: source);
+    }
+  }
+
   List<Message> getHistoryAsMessages(
     String currentUserId, {
     String? userAvatarUrl,

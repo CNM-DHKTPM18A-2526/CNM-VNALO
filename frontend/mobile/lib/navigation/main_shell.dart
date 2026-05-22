@@ -101,6 +101,8 @@ class MainShellState extends State<MainShell> {
   }
 
   void _showErrorSnackBar(String message) {
+    final aiProvider = context.read<AiAssistantProvider>();
+    aiProvider.addActionFeedback(message);
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     messenger

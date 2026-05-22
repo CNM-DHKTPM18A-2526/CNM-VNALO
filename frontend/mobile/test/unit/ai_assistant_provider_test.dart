@@ -352,6 +352,25 @@ void main() {
     provider.dispose();
   });
 
+  test('addActionFeedback appends assistant feedback into history', () {
+    final provider = _buildProvider();
+
+    provider.addActionFeedback('Không tìm thấy "An" trong danh bạ.');
+
+    expect(provider.aiResponse, 'Không tìm thấy "An" trong danh bạ.');
+    expect(provider.conversationHistory, isNotEmpty);
+    expect(
+      provider.conversationHistory.last.role,
+      AiConversationRole.assistant,
+    );
+    expect(
+      provider.conversationHistory.last.text,
+      'Không tìm thấy "An" trong danh bạ.',
+    );
+
+    provider.dispose();
+  });
+
   test('first interaction lazily creates AI conversation thread', () async {
     final provider = _buildProvider();
 
