@@ -219,14 +219,28 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             conv.type == ConversationType.DIRECT || widget.friendUser != null;
         final wallpaperUrl = conv.personalWallpaperUrl ?? conv.wallpaperUrl;
 
-        final isRestrictedSending = conv.type == ConversationType.GROUP && chat.isReadOnlyForMembers(conv.id);
-        final myMember = conv.members.isEmpty 
-            ? ConversationMember(conversationId: conv.id, userId: 'none', joinedAt: DateTime.now())
-            : conv.members.firstWhere((m) => m.userId == currentUserId, orElse: () => conv.members.first);
-        final canSend = !isRestrictedSending || myMember.role == MemberRole.ADMIN || myMember.role == MemberRole.DEPUTY;
+        final isRestrictedSending =
+            conv.type == ConversationType.GROUP &&
+            chat.isReadOnlyForMembers(conv.id);
+        final myMember =
+            conv.members.isEmpty
+                ? ConversationMember(
+                  conversationId: conv.id,
+                  userId: 'none',
+                  joinedAt: DateTime.now(),
+                )
+                : conv.members.firstWhere(
+                  (m) => m.userId == currentUserId,
+                  orElse: () => conv.members.first,
+                );
+        final canSend =
+            !isRestrictedSending ||
+            myMember.role == MemberRole.ADMIN ||
+            myMember.role == MemberRole.DEPUTY;
 
         return Scaffold(
-          backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
+          backgroundColor:
+              isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
           appBar: AppBar(
             titleSpacing: 0,
             backgroundColor:
@@ -266,7 +280,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => GroupCallPickerScreen(conversation: conv),
+                        builder:
+                            (_) => GroupCallPickerScreen(conversation: conv),
                       ),
                     );
                     return;
@@ -307,7 +322,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => GroupCallPickerScreen(conversation: conv),
+                        builder:
+                            (_) => GroupCallPickerScreen(conversation: conv),
                       ),
                     );
                     return;
@@ -347,9 +363,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => conv.type == ConversationType.GROUP 
-                        ? GroupChatOptionsScreen(conversation: conv)
-                        : ChatOptionsScreen(conversation: conv),
+                      builder:
+                          (context) =>
+                              conv.type == ConversationType.GROUP
+                                  ? GroupChatOptionsScreen(conversation: conv)
+                                  : ChatOptionsScreen(conversation: conv),
                     ),
                   );
                 },
@@ -393,7 +411,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       final List<dynamic> items = [];
                       for (int i = 0; i < rawItems.length; i++) {
                         final msg = rawItems[i];
-                        if (msg.messageType == MessageType.IMAGE && msg.status != MessageStatus.RECALLED) {
+                        if (msg.messageType == MessageType.IMAGE &&
+                            msg.status != MessageStatus.RECALLED) {
                           if (items.isNotEmpty && items.last is List<Message>) {
                             final group = items.last as List<Message>;
                             final newestInGroup = group.first;
@@ -423,14 +442,30 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       return ListView.builder(
                         controller: _scrollController,
                         reverse: true,
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 8,
+                        ),
                         itemCount: items.length + 1,
                         itemBuilder: (context, index) {
                           if (index == items.length) {
                             if (isDirect) {
-                              return _buildFriendProfileCard(displayName, avatarUrl, coverUrl, chat, conv, currentUserId, isDirect);
+                              return _buildFriendProfileCard(
+                                displayName,
+                                avatarUrl,
+                                coverUrl,
+                                chat,
+                                conv,
+                                currentUserId,
+                                isDirect,
+                              );
                             } else {
-                              return _buildGroupProfileCard(displayName, conv, chat, currentUserId);
+                              return _buildGroupProfileCard(
+                                displayName,
+                                conv,
+                                chat,
+                                currentUserId,
+                              );
                             }
                           }
 
@@ -523,23 +558,31 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
                           final isGroup = conv.type == ConversationType.GROUP;
                           final myRole = myMember.role;
-                          final isAdmin = myRole == MemberRole.ADMIN || myRole == MemberRole.DEPUTY || myRole == MemberRole.DEPUTY;
-                          
+                          final isAdmin =
+                              myRole == MemberRole.ADMIN ||
+                              myRole == MemberRole.DEPUTY ||
+                              myRole == MemberRole.DEPUTY;
+
                           // Members can pin only if allowed
-                          final canPin = !isGroup || conv.allowMemberPin || isAdmin;
-                          
-                          // Recall: normally members can recall their own messages. 
+                          final canPin =
+                              !isGroup || conv.allowMemberPin || isAdmin;
+
+                          // Recall: normally members can recall their own messages.
                           // If we wanted to restrict this, we'd use conv.allowMemberRecall (not yet in DTO).
                           // For now, let's just pass canPin logic as a proxy if needed, or keep it true for own messages.
                           const canRecall = true;
 
                           bool showAvatar = false;
                           if (!isMine) {
-                            if (index == items.length - 1 || milestoneText != null) {
+                            if (index == items.length - 1 ||
+                                milestoneText != null) {
                               showAvatar = true;
                             } else {
                               final olderItem = items[index + 1];
-                              final olderMsg = olderItem is List<Message> ? (olderItem as List<Message>).first : olderItem as Message;
+                              final olderMsg =
+                                  olderItem is List<Message>
+                                      ? olderItem.first
+                                      : olderItem as Message;
                               if (olderMsg.senderId != message.senderId) {
                                 showAvatar = true;
                               }
@@ -571,11 +614,15 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                             reactions: chat.getReactionsForMessage(message.id),
                             currentUserId: _chatProvider?.currentUserId,
                             onToggleReaction: (emoji) {
-                              debugPrint('onToggleReaction callback called in chat_detail_screen: emoji=$emoji');
+                              debugPrint(
+                                'onToggleReaction callback called in chat_detail_screen: emoji=$emoji',
+                              );
                               _chatProvider?.toggleReaction(message.id, emoji);
                             },
                             onShowReactors: (emoji) {
-                              debugPrint('onShowReactors callback called: emoji=$emoji');
+                              debugPrint(
+                                'onShowReactors callback called: emoji=$emoji',
+                              );
                               _showReactionDetail(message.id, emoji);
                             },
                           );
@@ -587,12 +634,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 if (canSend)
                   ChatInputBar(
                     conversationId: conv.id,
-                    onSend: (text) => chat.sendMessage(conversationId: conv.id, content: text),
-                    onSendWithType: (content, messageType) => chat.sendMessage(
-                      conversationId: conv.id,
-                      content: content,
-                      messageType: messageType,
-                    ),
+                    onSend:
+                        (text) => chat.sendMessage(
+                          conversationId: conv.id,
+                          content: text,
+                        ),
+                    onSendWithType:
+                        (content, messageType) => chat.sendMessage(
+                          conversationId: conv.id,
+                          content: content,
+                          messageType: messageType,
+                        ),
                     initialText: widget.prefilledText,
                     members: conv.members,
                     isGroup: conv.type == ConversationType.GROUP,
@@ -611,19 +663,28 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final common = CommonTexts.of(context);
     final chat = context.read<ChatProvider>();
     final currentUserId = context.read<AuthProvider>().user?.id ?? '';
-    
+
     if (isDirect) {
       final otherMember = widget.conversation.members.firstWhere(
         (m) => m.userId != currentUserId,
         orElse: () => widget.conversation.members.first,
       );
-      
+
       final otherUserId = otherMember.userId;
-      
+
       // Get the latest user object from provider to access lastSeen
-      final convInProvider = chat.conversations.firstWhere((c) => c.id == widget.conversation.id, orElse: () => widget.conversation);
-      final latestUser = convInProvider.members.firstWhere((m) => m.userId == otherMember.userId, orElse: () => otherMember).user;
-      
+      final convInProvider = chat.conversations.firstWhere(
+        (c) => c.id == widget.conversation.id,
+        orElse: () => widget.conversation,
+      );
+      final latestUser =
+          convInProvider.members
+              .firstWhere(
+                (m) => m.userId == otherMember.userId,
+                orElse: () => otherMember,
+              )
+              .user;
+
       final bool isOnline = chat.isUserOnline(otherUserId);
       final DateTime? lastSeen = latestUser?.lastSeen;
 
@@ -697,9 +758,18 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       ? DecorationImage(
                         image: CachedNetworkImageProvider(
                           AvatarResolver.resolveUrl(coverUrl) ?? coverUrl,
-                          headers: (context.read<AuthProvider>().accessToken != null && AvatarResolver.isInternalUrl(AvatarResolver.resolveUrl(coverUrl) ?? coverUrl))
-                              ? {'Authorization': 'Bearer ${context.read<AuthProvider>().accessToken}'}
-                              : {},
+                          headers:
+                              (context.read<AuthProvider>().accessToken !=
+                                          null &&
+                                      AvatarResolver.isInternalUrl(
+                                        AvatarResolver.resolveUrl(coverUrl) ??
+                                            coverUrl,
+                                      ))
+                                  ? {
+                                    'Authorization':
+                                        'Bearer ${context.read<AuthProvider>().accessToken}',
+                                  }
+                                  : {},
                         ),
                         fit: BoxFit.cover,
                       )
@@ -738,7 +808,16 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     name: displayName,
                     size: 60,
                     showOnline: isDirect,
-                    isOnline: isDirect && chat.isUserOnline(conv.members.firstWhere((m) => m.userId != currentUserId, orElse: () => conv.members.first).userId),
+                    isOnline:
+                        isDirect &&
+                        chat.isUserOnline(
+                          conv.members
+                              .firstWhere(
+                                (m) => m.userId != currentUserId,
+                                orElse: () => conv.members.first,
+                              )
+                              .userId,
+                        ),
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -753,7 +832,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 Text(
                   common.startConversationNote,
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary, fontSize: 14),
+                  style: TextStyle(
+                    color:
+                        isDarkMode
+                            ? DarkColors.textSecondary
+                            : LightColors.textSecondary,
+                    fontSize: 14,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Wrap(
@@ -774,10 +859,15 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     );
   }
 
-  Widget _buildGroupProfileCard(String displayName, Conversation conv, ChatProvider chat, String currentUserId) {
+  Widget _buildGroupProfileCard(
+    String displayName,
+    Conversation conv,
+    ChatProvider chat,
+    String currentUserId,
+  ) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final common = CommonTexts.of(context);
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 24, top: 16),
       child: Column(
@@ -787,11 +877,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             AvatarWidget(imageUrl: conv.avatarUrl, name: displayName, size: 80)
           else
             GroupAvatar(
-              members: conv.members
-                  .where((m) => m.userId != currentUserId)
-                  .take(3)
-                  .map((m) => (imageUrl: m.user?.avatarUrl, name: m.user?.displayName ?? 'User'))
-                  .toList(),
+              members:
+                  conv.members
+                      .where((m) => m.userId != currentUserId)
+                      .take(3)
+                      .map(
+                        (m) => (
+                          imageUrl: m.user?.avatarUrl,
+                          name: m.user?.displayName ?? 'User',
+                        ),
+                      )
+                      .toList(),
               totalMemberCount: conv.members.length,
               size: 80,
             ),
@@ -815,31 +911,71 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             decoration: BoxDecoration(
               color: isDarkMode ? DarkColors.surface : Colors.white,
               borderRadius: BorderRadius.circular(16),
-              boxShadow: isDarkMode ? null : [
-                BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4)),
-              ],
+              boxShadow:
+                  isDarkMode
+                      ? null
+                      : [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
             ),
             child: Column(
               children: [
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : AppColors.itemPressBackground,
+                    color:
+                        isDarkMode
+                            ? Colors.white.withValues(alpha: 0.05)
+                            : AppColors.itemPressBackground,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.camera_alt, color: isDarkMode ? DarkColors.textHint : AppColors.iconSubtle, size: 28),
+                  child: Icon(
+                    Icons.camera_alt,
+                    color:
+                        isDarkMode ? DarkColors.textHint : AppColors.iconSubtle,
+                    size: 28,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Wrap(
                   alignment: WrapAlignment.center,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Text(common.setGroupNameAction, style: TextStyle(color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary, fontWeight: FontWeight.w600)),
-                    Icon(Icons.chevron_right, size: 18, color: isDarkMode ? DarkColors.textHint : AppColors.iconSubtle),
+                    Text(
+                      common.setGroupNameAction,
+                      style: TextStyle(
+                        color:
+                            isDarkMode
+                                ? DarkColors.textPrimary
+                                : LightColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right,
+                      size: 18,
+                      color:
+                          isDarkMode
+                              ? DarkColors.textHint
+                              : AppColors.iconSubtle,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text(common.groupCreatedNote, style: TextStyle(color: isDarkMode ? DarkColors.textHint : LightColors.textSecondary, fontSize: 13)),
+                Text(
+                  common.groupCreatedNote,
+                  style: TextStyle(
+                    color:
+                        isDarkMode
+                            ? DarkColors.textHint
+                            : LightColors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
                 const SizedBox(height: 16),
                 // Tiny avatars row
                 SingleChildScrollView(
@@ -847,16 +983,27 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      ...conv.members.take(4).map((m) => Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: AvatarWidget(
-                          imageUrl: m.user?.avatarUrl, 
-                          name: m.user?.displayName ?? m.nickname ?? common.groupMemberLabel, 
-                          size: 32,
-                          showOnline: m.userId != currentUserId,
-                          isOnline: m.userId != currentUserId && (m.user?.isOnline ?? false),
-                        ),
-                      )),
+                      ...conv.members
+                          .take(4)
+                          .map(
+                            (m) => Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                              ),
+                              child: AvatarWidget(
+                                imageUrl: m.user?.avatarUrl,
+                                name:
+                                    m.user?.displayName ??
+                                    m.nickname ??
+                                    common.groupMemberLabel,
+                                size: 32,
+                                showOnline: m.userId != currentUserId,
+                                isOnline:
+                                    m.userId != currentUserId &&
+                                    (m.user?.isOnline ?? false),
+                              ),
+                            ),
+                          ),
                       Container(
                         margin: const EdgeInsets.only(left: 4),
                         width: 32,
@@ -866,7 +1013,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                           border: Border.all(color: Colors.blue.shade100),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(Icons.person_add, size: 16, color: isDarkMode ? DarkColors.primary : AppColors.primary),
+                        child: Icon(
+                          Icons.person_add,
+                          size: 16,
+                          color:
+                              isDarkMode
+                                  ? DarkColors.primary
+                                  : AppColors.primary,
+                        ),
                       ),
                     ],
                   ),
@@ -879,7 +1033,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           const SizedBox(height: 12),
           TextButton(
             onPressed: () {},
-            child: Text(common.viewGroupQrAction, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+            child: Text(
+              common.viewGroupQrAction,
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+            ),
           ),
         ],
       ),
@@ -933,12 +1090,28 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             Expanded(
               child: RichText(
                 text: TextSpan(
-                  style: TextStyle(fontSize: 14, color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade700, height: 1.4),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color:
+                        isDarkMode
+                            ? Colors.grey.shade400
+                            : Colors.grey.shade700,
+                    height: 1.4,
+                  ),
                   children: const [
-                    TextSpan(text: 'Chá»‰ '),
-                    TextSpan(text: 'trÆ°á»Ÿng vÃ  phÃ³ cá»™ng Ä‘á»“ng', style: TextStyle(fontWeight: FontWeight.bold)),
-                    TextSpan(text: ' Ä‘Æ°á»£c gá»­i tin nháº¯n vÃ o cá»™ng Ä‘á»“ng. '),
-                    TextSpan(text: 'TÃ¬m hiá»ƒu thÃªm', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.w500)),
+                    TextSpan(text: 'Chỉ '),
+                    TextSpan(
+                      text: 'trưởng và phó cộng đồng',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    TextSpan(text: ' được gửi tin nhắn vào cộng đồng. '),
+                    TextSpan(
+                      text: 'Tìm hiểu thêm',
+                      style: TextStyle(
+                        color: Colors.blue,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -952,7 +1125,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   void _showReactionDetail(String messageId, String emoji) {
     final reactions = _chatProvider?.getReactionsForMessage(messageId) ?? [];
     final filteredReactions = reactions.where((r) => r.emoji == emoji).toList();
-    
+
     if (filteredReactions.isEmpty) return;
 
     // Close any open dialogs (action menu)
@@ -961,16 +1134,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     // Fetch user profiles for reactors
     final userIds = filteredReactions.map((r) => r.userId).toSet();
     final users = <String, User>{};
-    
+
     for (final userId in userIds) {
       final member = widget.conversation.members.firstWhere(
         (m) => m.userId == userId,
-        orElse: () => ConversationMember(
-          conversationId: widget.conversation.id,
-          userId: userId,
-          role: MemberRole.MEMBER,
-          joinedAt: DateTime.now(),
-        ),
+        orElse:
+            () => ConversationMember(
+              conversationId: widget.conversation.id,
+              userId: userId,
+              role: MemberRole.MEMBER,
+              joinedAt: DateTime.now(),
+            ),
       );
       if (member.user != null) {
         users[userId] = member.user!;

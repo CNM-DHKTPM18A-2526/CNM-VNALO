@@ -227,9 +227,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text(
-                  'KhÃ´ng há»— trá»£ gá»­i file/áº£nh lá»›n hÆ¡n 5MB',
-                ),
+                content: Text('Không hỗ trợ gửi file/ảnh lớn hơn 5MB'),
               ),
             );
           }
@@ -262,7 +260,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('KhÃ´ng há»— trá»£ gá»­i video lá»›n hÆ¡n 5MB'),
+                content: Text('Không hỗ trợ gửi video lớn hơn 5MB'),
               ),
             );
           }
@@ -292,7 +290,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('KhÃ´ng há»— trá»£ gá»­i file lá»›n hÆ¡n 5MB'),
+                content: Text('Không hỗ trợ gửi file lớn hơn 5MB'),
               ),
             );
           }
@@ -401,7 +399,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                           color: isDarkMode ? Colors.white : Colors.black87,
                         ),
                         decoration: InputDecoration(
-                          hintText: 'Tin nháº¯n',
+                          hintText: 'Tin nhắn',
                           hintStyle: TextStyle(
                             color:
                                 isDarkMode
@@ -747,7 +745,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                         isDarkMode,
                         Icons.location_on,
                         const Color(0xFFE56353),
-                        'Vá»‹ trÃ­',
+                        'Vị trí',
                         () {
                           Navigator.pop(context);
                           showModalBottomSheet(
@@ -757,7 +755,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                             builder:
                                 (_) => LocationPickerSheet(
                                   onLocationSelected: (address, lat, lng) {
-                                    widget.onSend('ðŸ“ $address');
+                                    widget.onSend('📍 $address');
                                   },
                                 ),
                           );
@@ -768,7 +766,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                         isDarkMode,
                         Icons.attach_file,
                         const Color(0xFF4A89DF),
-                        'TÃ i liá»‡u',
+                        'Tài liệu',
                         () {
                           Navigator.pop(context);
                           _pickFile();
@@ -790,7 +788,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                         isDarkMode,
                         Icons.alarm,
                         AppColors.warning,
-                        'Nháº¯c háº¹n',
+                        'Nhắc hẹn',
                         () {
                           Navigator.pop(context);
                           showDialog(
@@ -799,7 +797,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                                 (_) => ReminderDialog(
                                   onReminderSet: (title, reminderTime) {
                                     widget.onSend(
-                                      'â° Nháº¯c háº¹n: $title - ${_formatReminderTime(reminderTime)}',
+                                      '⏰ Nhắc hẹn: $title - ${_formatReminderTime(reminderTime)}',
                                     );
                                   },
                                 ),
@@ -811,7 +809,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                         isDarkMode,
                         Icons.poll_rounded,
                         AppColors.primary,
-                        'BÃ¬nh chá»n',
+                        'Bình chọn',
                         () {
                           Navigator.pop(context);
                           showDialog(
@@ -837,7 +835,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                         isDarkMode,
                         Icons.chat,
                         const Color(0xFF4A89DF),
-                        'Tin nháº¯n nhanh',
+                        'Tin nhắn nhanh',
                         () {
                           Navigator.pop(context);
                           showModalBottomSheet(
@@ -866,9 +864,9 @@ class _ChatInputBarState extends State<ChatInputBar> {
     final now = DateTime.now();
     final diff = dt.difference(now);
     if (diff.inDays > 0) {
-      return 'ngÃ y ${dt.day}/${dt.month} lÃºc ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      return 'ngày ${dt.day}/${dt.month} lúc ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
     }
-    return 'lÃºc ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    return 'lúc ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 
   Widget _buildMenuButton(

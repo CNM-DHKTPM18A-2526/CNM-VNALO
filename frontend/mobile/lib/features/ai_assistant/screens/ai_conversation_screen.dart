@@ -252,7 +252,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
                       controller: _scrollController,
                       reverse: true,
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
+                        horizontal: 12,
                         vertical: 12,
                       ),
                       itemCount: messages.length + (showAiTyping ? 1 : 0),
@@ -324,55 +324,47 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
-      color: isDarkMode ? DarkColors.surface : Colors.white,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _buildInfoPill(
-                icon:
-                    provider.cloudBackupEnabled
-                        ? Icons.lock_outline
-                        : Icons.shield_outlined,
-                text: infoText,
-                color: AppColors.primary,
-                isDarkMode: isDarkMode,
-                background:
-                    isDarkMode
-                        ? Colors.white.withValues(alpha: 0.06)
-                        : AppColors.primary.withValues(alpha: 0.06),
-                borderColor:
-                    isDarkMode
-                        ? Colors.white.withValues(alpha: 0.08)
-                        : AppColors.primary.withValues(alpha: 0.12),
-              ),
-              if (showDegradedBanner)
-                _buildInfoPill(
-                  icon:
-                      provider.isProviderUnavailable
-                          ? Icons.warning_amber_rounded
-                          : Icons.sync_problem_rounded,
-                  text: degradedText,
-                  color:
-                      provider.isProviderUnavailable
-                          ? AppColors.warning
-                          : AppColors.primary,
-                  isDarkMode: isDarkMode,
-                  background:
-                      provider.isProviderUnavailable
-                          ? AppColors.warning.withValues(alpha: 0.14)
-                          : AppColors.primary.withValues(alpha: 0.08),
-                  borderColor:
-                      provider.isProviderUnavailable
-                          ? AppColors.warning.withValues(alpha: 0.45)
-                          : AppColors.primary.withValues(alpha: 0.18),
-                ),
-            ],
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 7),
+      decoration: BoxDecoration(
+        color: isDarkMode ? DarkColors.surface : Colors.white,
+        border: Border(
+          bottom: BorderSide(
+            color: isDarkMode ? DarkColors.divider : AppColors.itemDivider,
+            width: 0.5,
           ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildInfoPill(
+            icon:
+                provider.cloudBackupEnabled
+                    ? Icons.lock_outline
+                    : Icons.shield_outlined,
+            text: infoText,
+            color: AppColors.primary,
+            isDarkMode: isDarkMode,
+            background: Colors.transparent,
+            borderColor: Colors.transparent,
+          ),
+          if (showDegradedBanner) ...[
+            const SizedBox(height: 5),
+            _buildInfoPill(
+              icon:
+                  provider.isProviderUnavailable
+                      ? Icons.warning_amber_rounded
+                      : Icons.sync_problem_rounded,
+              text: degradedText,
+              color:
+                  provider.isProviderUnavailable
+                      ? AppColors.warning
+                      : AppColors.primary,
+              isDarkMode: isDarkMode,
+              background: Colors.transparent,
+              borderColor: Colors.transparent,
+            ),
+          ],
         ],
       ),
     );
@@ -386,34 +378,32 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
     required Color background,
     required Color borderColor,
   }) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 28, maxWidth: 420),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: background,
-          borderRadius: BorderRadius.circular(_surfaceRadius),
-          border: Border.all(color: borderColor),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.max,
-          children: [
-            Icon(icon, size: 14, color: color),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                text,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: isDarkMode ? Colors.white70 : Colors.black87,
-                ),
+    return Container(
+      constraints: const BoxConstraints(minHeight: 26),
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(_surfaceRadius),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: isDarkMode ? Colors.white70 : Colors.black87,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -443,12 +433,15 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const SizedBox(width: 8),
+            IconButton(
+              icon: Icon(Icons.auto_awesome_rounded, color: iconColor),
+              onPressed: () => _inputFocusNode.requestFocus(),
+            ),
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
                   color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(_surfaceRadius),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: TextField(
                   key: const ValueKey('ai_conversation_input'),
@@ -487,10 +480,26 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
               IconButton(
                 key: const ValueKey('ai_conversation_send'),
                 onPressed: _isSending ? null : () => _sendPrompt(provider),
-                icon: Icon(
-                  Icons.send,
-                  color: isDarkMode ? DarkColors.primary : AppColors.primary,
-                ),
+                icon:
+                    _isSending
+                        ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color:
+                                isDarkMode
+                                    ? DarkColors.primaryLight
+                                    : AppColors.primary,
+                          ),
+                        )
+                        : Icon(
+                          Icons.send,
+                          color:
+                              isDarkMode
+                                  ? DarkColors.primary
+                                  : AppColors.primary,
+                        ),
               )
             else
               IconButton(
@@ -534,11 +543,11 @@ class _AiConversationMessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final userBubbleColor =
-        isDarkMode ? const Color(0xFF1C355A) : const Color(0xFFDCEBFF);
+        isDarkMode ? DarkColors.chatBubbleSent : LightColors.chatBubbleSent;
     final assistantBubbleColor =
         isDarkMode
-            ? Colors.white.withValues(alpha: 0.06)
-            : const Color(0xFFF4F6F8);
+            ? DarkColors.chatBubbleReceived
+            : LightColors.chatBubbleReceived;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -553,10 +562,7 @@ class _AiConversationMessageBubble extends StatelessWidget {
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color:
-                      isDarkMode
-                          ? Colors.white.withValues(alpha: 0.12)
-                          : Colors.black.withValues(alpha: 0.12),
+                  color: Colors.black.withValues(alpha: 0.16),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -564,103 +570,75 @@ class _AiConversationMessageBubble extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
-                    color: isDarkMode ? Colors.white : Colors.white,
+                    color: Colors.white.withValues(alpha: 0.92),
                   ),
                 ),
               ),
             ),
           ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          child: Row(
-            mainAxisAlignment:
-                isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (!isMine)
-                Container(
-                  width: 30,
-                  alignment: Alignment.topLeft,
-                  child: Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.14),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.smart_toy_outlined,
-                      size: 14,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-              if (!isMine) const SizedBox(width: 6),
-              Flexible(
-                child: Column(
-                  crossAxisAlignment:
-                      isMine
-                          ? CrossAxisAlignment.end
-                          : CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 2),
-                      constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.75,
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isMine ? userBubbleColor : assistantBubbleColor,
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(16),
-                          topRight: Radius.circular(16),
-                          bottomLeft: Radius.circular(16),
-                          bottomRight: Radius.circular(16),
-                        ).copyWith(
-                          bottomLeft: Radius.circular(isMine ? 16 : 4),
-                          bottomRight: Radius.circular(isMine ? 4 : 16),
-                        ),
-                        border: Border.all(
-                          color:
-                              isDarkMode
-                                  ? Colors.white.withValues(alpha: 0.1)
-                                  : AppColors.itemDivider.withValues(
-                                    alpha: 0.8,
-                                  ),
-                          width: 0.5,
-                        ),
-                      ),
-                      child: Text(
-                        text,
-                        style: AppTypography.bodyMedium.copyWith(
-                          height: 1.4,
-                          color: isDarkMode ? Colors.white : Colors.black87,
-                        ),
-                      ),
-                    ),
-                    if (showTime)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Text(
-                          DateFormatter.time(createdAt),
-                          style: TextStyle(
-                            fontSize: 11,
-                            color:
-                                isDarkMode
-                                    ? DarkColors.textSecondary
-                                    : LightColors.textSecondary,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
+        Align(
+          alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 6),
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.75,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: isMine ? userBubbleColor : assistantBubbleColor,
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(16),
+                topRight: const Radius.circular(16),
+                bottomLeft: Radius.circular(isMine ? 16 : 4),
+                bottomRight: Radius.circular(isMine ? 4 : 16),
               ),
-            ],
+              border:
+                  isDarkMode
+                      ? Border.all(
+                        color: Colors.white.withValues(alpha: 0.1),
+                        width: 0.5,
+                      )
+                      : (!isMine
+                          ? Border.all(
+                            color: AppColors.itemDivider.withValues(alpha: 0.8),
+                            width: 0.6,
+                          )
+                          : null),
+              boxShadow: [
+                if (!isDarkMode)
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 3,
+                    offset: const Offset(0, 1.5),
+                  ),
+              ],
+            ),
+            child: Text(
+              text,
+              style: AppTypography.bodyMedium.copyWith(
+                height: 1.4,
+                color: isDarkMode ? Colors.white : Colors.black87,
+              ),
+            ),
           ),
         ),
+        if (showTime)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Align(
+              alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+              child: Text(
+                DateFormatter.time(createdAt),
+                style: TextStyle(
+                  fontSize: 11,
+                  color:
+                      isDarkMode
+                          ? DarkColors.textSecondary
+                          : LightColors.textSecondary,
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -791,71 +769,62 @@ class _AiTypingBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(
-            width: 30,
-            child: Align(
-              alignment: Alignment.topLeft,
-              child: CircleAvatar(
-                radius: 12,
-                backgroundColor: AppColors.primary,
-                child: Icon(
-                  Icons.smart_toy_outlined,
-                  size: 14,
-                  color: Colors.white,
-                ),
-              ),
-            ),
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.75,
           ),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color:
-                    isDarkMode
-                        ? Colors.white.withValues(alpha: 0.06)
-                        : const Color(0xFFF4F6F8),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  topRight: Radius.circular(16),
-                  bottomLeft: Radius.circular(4),
-                  bottomRight: Radius.circular(16),
-                ),
-                border: Border.all(
-                  color:
-                      isDarkMode
-                          ? DarkColors.divider
-                          : AppColors.itemDivider.withValues(alpha: 0.8),
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _AiTypingDots(isDarkMode: isDarkMode),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      'AI đang soạn phản hồi...',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color:
-                            isDarkMode
-                                ? DarkColors.textSecondary
-                                : LightColors.textSecondary,
-                      ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color:
+                isDarkMode
+                    ? DarkColors.chatBubbleReceived
+                    : LightColors.chatBubbleReceived,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(16),
+              topRight: Radius.circular(16),
+              bottomLeft: Radius.circular(4),
+              bottomRight: Radius.circular(16),
+            ),
+            border:
+                isDarkMode
+                    ? Border.all(color: Colors.white.withValues(alpha: 0.1))
+                    : Border.all(
+                      color: AppColors.itemDivider.withValues(alpha: 0.8),
                     ),
-                  ),
-                ],
-              ),
-            ),
+            boxShadow: [
+              if (!isDarkMode)
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 3,
+                  offset: const Offset(0, 1.5),
+                ),
+            ],
           ),
-        ],
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _AiTypingDots(isDarkMode: isDarkMode),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  'AI đang soạn phản hồi...',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color:
+                        isDarkMode
+                            ? DarkColors.textSecondary
+                            : LightColors.textSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
