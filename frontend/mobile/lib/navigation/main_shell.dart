@@ -816,53 +816,7 @@ class MainShellState extends State<MainShell> {
           break;
 
         case 'RECALL_MESSAGE':
-          if (chatProvider.activeConversationId != null &&
-              chatProvider.messages.isNotEmpty) {
-            final lastMsg =
-                AiRecallMessageSelector.selectLatestRecallableMessage(
-                  messages: chatProvider.messages,
-                  currentUserId: chatProvider.currentUserId,
-                );
-
-            if (lastMsg == null) {
-              _logAiFlow(
-                'AI_RECALL_FAILED',
-                aiCommand: aiCmd,
-                extra: {'reason': 'no_self_message'},
-              );
-              _showErrorSnackBar('Không tìm thấy tin nhắn của bạn để thu hồi.');
-              return;
-            }
-
-            final confirmed = await AiActionConfirmationSheet.show(
-              context,
-              icon: Icons.undo_rounded,
-              title: 'Xác nhận thu hồi tin nhắn',
-              description:
-                  'Trợ lý sẽ thu hồi tin nhắn mới nhất của bạn trong cuộc trò chuyện hiện tại.',
-              confirmLabel: 'Thu hồi',
-              secondaryDetail: lastMsg.content,
-              destructive: AiActionPolicy.isDestructive(command),
-            );
-            if (!confirmed) {
-              _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
-              _addAiActionCancelled('Đã hủy thao tác thu hồi tin nhắn.');
-              return;
-            }
-            if (!mounted) return;
-
-            chatProvider.recallMessage(
-              lastMsg.id,
-              chatProvider.activeConversationId!,
-            );
-          } else {
-            _logAiFlow(
-              'AI_RECALL_FAILED',
-              aiCommand: aiCmd,
-              extra: {'reason': 'no_active_conversation_or_messages'},
-            );
-            _showErrorSnackBar('Không có tin nhắn để thu hồi.');
-          }
+          await _handleAiRecallAction(aiCmd, chatProvider);
           break;
 
         case 'CREATE_GROUP':
@@ -922,6 +876,60 @@ class MainShellState extends State<MainShell> {
         feedbackSource: 'ai_action_failed.unhandled',
       );
     }
+  }
+
+
+  Future<void> _handleAiRecallAction(
+    AiCommand aiCmd,
+    ChatProvider chatProvider,
+  ) async {
+    if (chatProvider.activeConversationId == null ||
+        chatProvider.messages.isEmpty) {
+      _logAiFlow(
+        'AI_RECALL_FAILED',
+        aiCommand: aiCmd,
+        extra: {'reason': 'no_active_conversation_or_messages'},
+      );
+      _showErrorSnackBar('Không có tin nhắn để thu hồi.');
+      return;
+    }
+
+    final lastMsg = AiRecallMessageSelector.selectLatestRecallableMessage(
+      messages: chatProvider.messages,
+      currentUserId: chatProvider.currentUserId,
+    );
+
+    if (lastMsg == null) {
+      _logAiFlow(
+        'AI_RECALL_FAILED',
+        aiCommand: aiCmd,
+        extra: {'reason': 'no_self_message'},
+      );
+      _showErrorSnackBar('Không tìm thấy tin nhắn của bạn để thu hồi.');
+      return;
+    }
+
+    final confirmed = await AiActionConfirmationSheet.show(
+      context,
+      icon: Icons.undo_rounded,
+      title: 'Xác nhận thu hồi tin nhắn',
+      description:
+          'Trợ lý sẽ thu hồi tin nhắn mới nhất của bạn trong cuộc trò chuyện hiện tại.',
+      confirmLabel: 'Thu hồi',
+      secondaryDetail: lastMsg.content,
+      destructive: AiActionPolicy.isDestructive('RECALL_MESSAGE'),
+    );
+    if (!confirmed) {
+      _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
+      _addAiActionCancelled('Đã hủy thao tác thu hồi tin nhắn.');
+      return;
+    }
+    if (!mounted) return;
+
+    chatProvider.recallMessage(
+      lastMsg.id,
+      chatProvider.activeConversationId!,
+    );
   }
 
   Future<Conversation?> _showConversationDisambiguationSheet({
