@@ -203,6 +203,52 @@ void main() {
     expect(await result, isNull);
   });
 
+
+  testWidgets('AI confirmation sheet keeps description aligned with icon block', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder:
+              (context) => Scaffold(
+                body: Center(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      AiActionConfirmationSheet.show(
+                        context,
+                        icon: Icons.call_rounded,
+                        title: 'Xác nhận gọi thoại',
+                        description:
+                            'Trợ lý sẽ bắt đầu cuộc gọi tới liên hệ đã chọn sau khi bạn xác nhận.',
+                        confirmLabel: 'Bắt đầu gọi',
+                        primaryDetail: 'Người nhận: Minh Anh',
+                      );
+                    },
+                    child: const Text('Open'),
+                  ),
+                ),
+              ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    final titleTop = tester.getTopLeft(find.text('Xác nhận gọi thoại')).dy;
+    final descTop = tester
+        .getTopLeft(
+          find.text(
+            'Trợ lý sẽ bắt đầu cuộc gọi tới liên hệ đã chọn sau khi bạn xác nhận.',
+          ),
+        )
+        .dy;
+
+    expect(descTop, greaterThan(titleTop));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('AI confirmation sheet remains stable on compact viewport', (
     tester,
   ) async {

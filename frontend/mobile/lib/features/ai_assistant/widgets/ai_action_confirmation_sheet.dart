@@ -6,7 +6,7 @@ enum AiActionConfirmationResult { cancelled, confirmed, alternate }
 
 class AiActionConfirmationSheet extends StatelessWidget {
   static const double _sheetRadius = 18;
-  static const double _cardRadius = 10;
+  static const double _cardRadius = 12;
   static const double _buttonRadius = 999;
 
   final IconData icon;
@@ -168,43 +168,43 @@ class AiActionConfirmationSheet extends StatelessWidget {
                                 : const Color(0xFFE2E8F0),
                       ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Container(
-                              width: 50,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                color: accent.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(
-                                  _cardRadius,
-                                ),
-                              ),
-                              child: Icon(icon, color: accent, size: 23),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Text(
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: accent.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(_cardRadius),
+                          ),
+                          child: Icon(icon, color: accent, size: 23),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
                                 title,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: AppTypography.titleMedium.copyWith(
                                   color: textPrimary,
                                   fontWeight: FontWeight.w700,
+                                  height: 1.2,
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          description,
-                          style: AppTypography.bodySmall.copyWith(
-                            height: 1.45,
-                            color: textSecondary,
+                              const SizedBox(height: 5),
+                              Text(
+                                description,
+                                style: AppTypography.bodySmall.copyWith(
+                                  height: 1.4,
+                                  color: textSecondary,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],

@@ -35,8 +35,8 @@ class AiChatBoard extends StatefulWidget {
 }
 
 class _AiChatBoardState extends State<AiChatBoard> {
-  static const double _surfaceRadius = 8;
-  static const double _fieldRadius = 10;
+  static const double _surfaceRadius = 10;
+  static const double _fieldRadius = 12;
   static const double _buttonRadius = 999;
 
   final TextEditingController _inputController = TextEditingController();
@@ -691,18 +691,23 @@ class _AiChatBoardState extends State<AiChatBoard> {
                   ),
                 Container(
                   padding: EdgeInsets.fromLTRB(
-                    10,
+                    6,
+                    isCompactLayout ? 5 : 6,
+                    6,
                     isCompactLayout ? 6 : 8,
-                    10,
-                    isCompactLayout ? 8 : 10,
                   ),
                   decoration: BoxDecoration(
+                    color:
+                        isDarkMode
+                            ? const Color(0xFF101826).withValues(alpha: 0.88)
+                            : Colors.white.withValues(alpha: 0.82),
                     border: Border(
                       top: BorderSide(
                         color:
                             isDarkMode
                                 ? Colors.white.withValues(alpha: 0.08)
-                                : Colors.black.withValues(alpha: 0.08),
+                                : AppColors.itemDivider,
+                        width: 0.5,
                       ),
                     ),
                   ),
@@ -719,12 +724,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
                         ),
                       ),
                       Expanded(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.transparent,
-                            borderRadius: BorderRadius.circular(_fieldRadius),
-                          ),
-                          child: TextField(
+                        child: TextField(
                             key: const ValueKey('ai_chat_input'),
                             controller: _inputController,
                             focusNode: _inputFocusNode,
@@ -746,14 +746,16 @@ class _AiChatBoardState extends State<AiChatBoard> {
                                         : const Color(0xFFA1A3A7),
                                 fontSize: 16,
                               ),
+                              filled: false,
                               contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 4,
                                 vertical: 10,
                               ),
                               border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
                             ),
                           ),
-                        ),
                       ),
                       if (_hasText)
                         IconButton(
