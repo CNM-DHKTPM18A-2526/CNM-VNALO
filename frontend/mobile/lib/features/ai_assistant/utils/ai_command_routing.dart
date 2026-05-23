@@ -176,7 +176,15 @@ class AiCommandRouting {
         return 'NAVIGATE_TO_CONTACTS';
       case 'MỞ CHAT':
         return 'NAVIGATE_TO_CHAT';
+      case 'OPEN_CHAT':
+        return 'OPEN_CHAT';
+      case 'START_CALL':
+      case 'CALL_CONTACT':
+      case 'VOICE_CALL':
+        return 'START_CALL';
       case 'SEND_MESSAGE':
+      case 'COMPOSE_MESSAGE':
+      case 'MESSAGE_CONTACT':
         return 'COMPOSE_MESSAGE';
       case 'CREATE_GROUP':
       case 'CREATE_GROUP_DRAFT':

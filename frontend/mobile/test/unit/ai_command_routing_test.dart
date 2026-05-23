@@ -24,6 +24,18 @@ void main() {
         'COMPOSE_MESSAGE',
       );
       expect(
+        AiCommandRouting.normalizeSystemAction('message_contact'),
+        'COMPOSE_MESSAGE',
+      );
+      expect(
+        AiCommandRouting.normalizeSystemAction('open_chat'),
+        'OPEN_CHAT',
+      );
+      expect(
+        AiCommandRouting.normalizeSystemAction('call_contact'),
+        'START_CALL',
+      );
+      expect(
         AiCommandRouting.normalizeSystemAction('RECALL_LAST_MESSAGE'),
         'RECALL_MESSAGE',
       );
