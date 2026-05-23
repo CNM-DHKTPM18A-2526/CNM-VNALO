@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vnalo_mobile/features/ai_assistant/services/ai_action_policy.dart';
 
 class AiContactActionPresentation {
   final IconData icon;
@@ -36,7 +37,7 @@ class AiActionPresentationResolver {
   const AiActionPresentationResolver._();
 
   static AiContactActionPresentation contact(String command) {
-    final destructive = command == 'BLOCK_USER';
+    final destructive = AiActionPolicy.isDestructive(command);
     return AiContactActionPresentation(
       icon: destructive ? Icons.block_rounded : Icons.person_add_alt_1_rounded,
       title: switch (command) {
@@ -65,10 +66,7 @@ class AiActionPresentationResolver {
   }
 
   static AiGroupActionPresentation group(String command) {
-    final destructive =
-        command == 'REMOVE_GROUP_MEMBER' ||
-        command == 'LEAVE_GROUP' ||
-        command == 'DISBAND_GROUP';
+    final destructive = AiActionPolicy.isDestructive(command);
 
     return AiGroupActionPresentation(
       icon:

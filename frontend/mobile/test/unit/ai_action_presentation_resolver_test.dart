@@ -40,10 +40,12 @@ void main() {
       final remove = AiActionPresentationResolver.group('REMOVE_GROUP_MEMBER');
       final leave = AiActionPresentationResolver.group('LEAVE_GROUP');
       final disband = AiActionPresentationResolver.group('DISBAND_GROUP');
+      final transfer = AiActionPresentationResolver.group('TRANSFER_GROUP_OWNER');
 
       expect(remove.destructive, isTrue);
       expect(leave.destructive, isTrue);
       expect(disband.destructive, isTrue);
+      expect(transfer.destructive, isTrue);
       expect(disband.icon, Icons.warning_amber_rounded);
     });
   });
