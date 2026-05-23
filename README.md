@@ -6,10 +6,10 @@
 
 ### Enterprise-Grade Real-Time Messaging Platform
 
-*Building the next generation of instant messaging with modern microservices architecture*
+*Polyglot microservices · Flutter mobile · React web · AI assistant · WebRTC calls*
 
 <p align="center">
-  <a href="https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO">
+  <a href="https://github.com/CNM-DHKTPM18A-2526/CNM-VNALO">
     <img src="https://img.shields.io/badge/version-1.0.0--SNAPSHOT-blue.svg?style=for-the-badge" alt="Version">
   </a>
   <a href="LICENSE">
@@ -19,7 +19,7 @@
     <img src="https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white" alt="Java">
   </a>
   <a href="https://spring.io/projects/spring-boot">
-    <img src="https://img.shields.io/badge/Spring_Boot-3.4-6DB33F?style=for-the-badge&logo=spring-boot&logoColor=white" alt="Spring Boot">
+    <img src="https://img.shields.io/badge/Spring_Boot-3.4.2-6DB33F?style=for-the-badge&logo=spring-boot&logoColor=white" alt="Spring Boot">
   </a>
 </p>
 
@@ -42,13 +42,16 @@
   <a href="https://flutter.dev/">
     <img src="https://img.shields.io/badge/Flutter-3.x-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter">
   </a>
+  <a href="https://react.dev/">
+    <img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React">
+  </a>
   <a href="https://www.docker.com/">
     <img src="https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker">
   </a>
 </p>
 
 <p align="center">
-  <strong><a href="README.md">English</a></strong> • 
+  <strong><a href="README.md">English</a></strong> •
   <strong><a href="README.vi.md">Tiếng Việt</a></strong>
 </p>
 
@@ -66,19 +69,19 @@
 
 <table>
 <tr>
-<td align="center">🔐<br/><strong>Authentication</strong><br/>Phone-based Auth + JWT</td>
-<td align="center">💬<br/><strong>Real-time Chat</strong><br/>Socket.IO Messaging</td>
-<td align="center">👥<br/><strong>Social Network</strong><br/>Friends & Groups</td>
+<td align="center">🔐<br/><strong>Auth & Security</strong><br/>Phone + Email · JWT HS512 · OTP · QR Login</td>
+<td align="center">💬<br/><strong>Real-time Chat</strong><br/>Socket.IO · Inbox CQRS · Reactions · Pins</td>
+<td align="center">📞<br/><strong>WebRTC Calls</strong><br/>Voice · Video · Group Calls</td>
 </tr>
 <tr>
-<td align="center">📱<br/><strong>Cross-platform</strong><br/>Flutter (iOS & Android)</td>
-<td align="center">🎥<br/><strong>Media Sharing</strong><br/>Images & Videos</td>
-<td align="center">🔔<br/><strong>Push Notifications</strong><br/>FCM Real-time Alerts</td>
+<td align="center">📱<br/><strong>Flutter Mobile</strong><br/>iOS · Android · Dark/Light Theme</td>
+<td align="center">🌐<br/><strong>React Web</strong><br/>Vite · TailwindCSS · QR Login · AI Chat</td>
+<td align="center">🤖<br/><strong>AI Assistant</strong><br/>Gemini 2.5 Flash + Ollama Fallback</td>
 </tr>
 <tr>
-<td align="center">⚡<br/><strong>WebSocket</strong><br/>Sub-second Delivery</td>
-<td align="center">📇<br/><strong>Contact Sync</strong><br/>Phone Book Integration</td>
-<td align="center">🌐<br/><strong>Microservices</strong><br/>Polyglot Architecture</td>
+<td align="center">🎥<br/><strong>Media Service</strong><br/>S3 · Local Fallback · Sticker Packs · Thumbnails</td>
+<td align="center">🔔<br/><strong>Push Notifications</strong><br/>FCM · Background Messages</td>
+<td align="center">⚡<br/><strong>Realtime Gateway</strong><br/>Redis Adapter · Presence · RabbitMQ Bridge</td>
 </tr>
 </table>
 
@@ -94,7 +97,9 @@
 - [🚀 Quick Start](#-quick-start)
 - [📁 Project Structure](#-project-structure)
 - [🔧 Development](#-development)
+- [🗄️ Database Migrations](#️-database-migrations)
 - [📖 Documentation](#-documentation)
+- [✅ Current Status](#-current-status)
 - [🤝 Contributing](#-contributing)
 - [📄 License](#-license)
 
@@ -106,19 +111,22 @@
 
 | 🎨 Modern UI/UX | ⚡ High Performance | 🔒 Secure | 📈 Scalable |
 |:---:|:---:|:---:|:---:|
-| Flutter Cross-platform | Socket.IO WebSocket | Firebase Auth | Microservices Architecture |
-| Material Design | Cursor-based Pagination | JWT (HS512) | Shared PostgreSQL |
-| Smooth Animations | Redis Caching | OTP Verification | Docker Ready |
+| Flutter + React dual frontend | Socket.IO WebSocket | Firebase + JWT HS512 | Polyglot Microservices |
+| Material Design + Dark Mode | Cursor-based Pagination | OTP via Email | Docker Compose ready |
+| WebRTC Voice & Video | Redis INCR serverSeq | QR Login Sessions | Kafka + RabbitMQ |
+| AI Floating Bubble | Sub-second Delivery | Session Audit Trail | Nginx TLS reverse proxy |
 
 </div>
 
-### 🌟 What Makes Us Different
+### 🌟 What Makes VNALO Different
 
-- **🎯 Production-Ready**: Built with enterprise-grade microservices architecture
-- **⚡ Real-Time Everything**: Sub-second message delivery with Socket.IO WebSocket
-- **📱 Cross-Platform**: Single Flutter codebase for iOS & Android
-- **🔧 Polyglot Backend**: Spring Boot (Java) for core + NestJS (TypeScript) for messaging
-- **☁️ Cloud-Native**: Designed for containerized deployment with Docker
+- **🤖 Integrated AI Assistant** — Gemini 2.5 Flash with Ollama fallback, rate limiting, persistent history (Redis + PostgreSQL)
+- **📞 WebRTC Calls** — Voice, video, and group calls on both mobile (flutter_webrtc) and web (WebRTC API)
+- **🖥️ Dual Frontend** — Flutter mobile app (iOS/Android) + React 19 web app (Vite + TailwindCSS), both fully functional
+- **🔐 QR Login** — Scan QR code from mobile to authenticate on web (`auth_qr_login_session` table)
+- **🔧 Polyglot Backend** — Spring Boot (Java 21) for core/media/ai + NestJS (TypeScript) for messaging/realtime
+- **🏗️ Schema-controlled** — Flyway V1→V26 as single source of truth, TypeORM `synchronize: false`
+- **🛡️ Production-hardened** — Nginx TLS, CORS explicit allow-lists, JWT on every endpoint, session audit
 
 ---
 
@@ -126,34 +134,42 @@
 
 <div align="center">
 
-### Backend Architecture
+### Backend
 
 <p>
-<img src="https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white" alt="Java">
-<img src="https://img.shields.io/badge/Spring_Boot-3.4-6DB33F?style=for-the-badge&logo=spring-boot&logoColor=white" alt="Spring Boot">
-<img src="https://img.shields.io/badge/Node.js-20-339933?style=for-the-badge&logo=node.js&logoColor=white" alt="Node.js">
-<img src="https://img.shields.io/badge/NestJS-11-E0234E?style=for-the-badge&logo=nestjs&logoColor=white" alt="NestJS">
+<img src="https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white">
+<img src="https://img.shields.io/badge/Spring_Boot-3.4.2-6DB33F?style=for-the-badge&logo=spring-boot&logoColor=white">
+<img src="https://img.shields.io/badge/Node.js-20+-339933?style=for-the-badge&logo=node.js&logoColor=white">
+<img src="https://img.shields.io/badge/NestJS-11-E0234E?style=for-the-badge&logo=nestjs&logoColor=white">
 </p>
 
 ### Data Layer
 
 <p>
-<img src="https://img.shields.io/badge/PostgreSQL-16-316192?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL">
-<img src="https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Redis">
+<img src="https://img.shields.io/badge/PostgreSQL-16-316192?style=for-the-badge&logo=postgresql&logoColor=white">
+<img src="https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis&logoColor=white">
+<img src="https://img.shields.io/badge/RabbitMQ-4-FF6600?style=for-the-badge&logo=rabbitmq&logoColor=white">
+<img src="https://img.shields.io/badge/Kafka-7.5-231F20?style=for-the-badge&logo=apache-kafka&logoColor=white">
 </p>
 
-### Frontend & Mobile
+### Frontend
 
 <p>
-<img src="https://img.shields.io/badge/Flutter-3.x-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter">
-<img src="https://img.shields.io/badge/Dart-3.x-0175C2?style=for-the-badge&logo=dart&logoColor=white" alt="Dart">
+<img src="https://img.shields.io/badge/Flutter-3.x-02569B?style=for-the-badge&logo=flutter&logoColor=white">
+<img src="https://img.shields.io/badge/Dart-3.7+-0175C2?style=for-the-badge&logo=dart&logoColor=white">
+<img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black">
+<img src="https://img.shields.io/badge/TypeScript-5.9-3178C6?style=for-the-badge&logo=typescript&logoColor=white">
+<img src="https://img.shields.io/badge/Vite-8-646CFF?style=for-the-badge&logo=vite&logoColor=white">
+<img src="https://img.shields.io/badge/TailwindCSS-3.4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white">
 </p>
 
-### DevOps & Infrastructure
+### Infrastructure & DevOps
 
 <p>
-<img src="https://img.shields.io/badge/Docker-24.0-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker">
-<img src="https://img.shields.io/badge/Docker_Compose-Services-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker Compose">
+<img src="https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white">
+<img src="https://img.shields.io/badge/Nginx-TLS-009639?style=for-the-badge&logo=nginx&logoColor=white">
+<img src="https://img.shields.io/badge/Firebase-FCM-FFCA28?style=for-the-badge&logo=firebase&logoColor=black">
+<img src="https://img.shields.io/badge/AWS_S3-Media-FF9900?style=for-the-badge&logo=amazon-s3&logoColor=white">
 </p>
 
 </div>
@@ -161,29 +177,76 @@
 <details>
 <summary><b>📦 Complete Technology Stack</b></summary>
 
-#### Backend — core-service (Java)
-- **Framework**: Spring Boot 3.4.2 (Java 21)
-- **Security**: Spring Security 6 + Firebase Admin SDK 9.7.0
-- **Database**: Spring Data JPA + Flyway Migrations (V1–V13)
-- **Auth**: JWT (HS512) with refresh tokens + OTP verification
+#### Backend — core-service (Java/Spring Boot)
+- **Framework**: Spring Boot 3.4.2 (Java 21) with Virtual Threads support
+- **Security**: Spring Security 6 + Firebase Admin SDK 9.7.0 + jjwt 0.12.6 (HS512)
+- **Database**: Spring Data JPA + Flyway (V1–V26, owner of all schema migrations)
+- **Auth**: Phone + Email login, JWT access (15min) + refresh tokens (30 days), OTP via email, QR Login sessions
+- **APIs**: Auth, Users, Friends, Blocks, Contacts (phone book sync), QR, FCM push, Session Audit, AI Mascot settings
+- **Extras**: Kafka producer (friendship/block events), Redis cache, Springdoc OpenAPI/Swagger
 
-#### Backend — message-service (TypeScript)
+#### Backend — message-service (TypeScript/NestJS)
 - **Framework**: NestJS 11 (Node.js 20+)
-- **ORM**: TypeORM with PostgreSQL driver
-- **WebSocket**: Socket.IO via @nestjs/platform-socket.io
+- **ORM**: TypeORM — `synchronize: false`, schema managed by Flyway in core-service
+- **WebSocket**: Socket.IO via `@nestjs/platform-socket.io` with **Redis IO adapter** for horizontal scaling
 - **Auth**: Passport JWT strategy (shared HS512 secret with core-service)
+- **Modules**: Conversation, Message, Inbox (CQRS), Gateway (Socket.IO), Kafka producer (notification events)
+- **Entities**: `conversation`, `conversation_member`, `conversation_direct_map`, `conversation_inbox`, `conversation_join_request`, `message`, `message_reaction`, `message_receipt`, `pinned_message` (9 TypeORM entities)
 
-#### Databases
-- **Primary**: PostgreSQL 16 (all persistent data — users, messages, conversations)
-- **Cache**: Redis 7 (session store, rate limiting)
+#### Backend — realtime-gateway (TypeScript/NestJS)
+- **Framework**: NestJS (Node.js 20+), port 8085
+- **Transport**: Socket.IO, namespace `/realtime`, WebSocket-only (no polling)
+- **Scaling**: Redis IO adapter — supports N parallel gateway instances
+- **Features**: Presence tracking, typing indicators, heartbeat, RabbitMQ consumer for message broadcast
+- **Integration**: Receives events from message-service via RabbitMQ `vnalo.realtime` exchange
 
-#### Frontend
-- **Mobile**: Flutter 3.x + Dart 3.x
-- **Platforms**: iOS, Android, Web
+#### Backend — media-service (Java/Spring Boot)
+- **Framework**: Spring Boot 3.4.2 (Java 21), port 8083
+- **Storage**: AWS S3 (primary) + local fallback (`.media-local/`)
+- **Features**: Upload, presigned upload (large files), thumbnails (async via RabbitMQ), access control
+- **Stickers**: Full sticker pack CRUD — 29 APIs (15 media + 14 sticker)
+- **Categories**: AVATAR, COVER, CHAT_IMAGE, CHAT_VIDEO, CHAT_FILE, CHAT_VOICE, STORY, TIMELINE, STICKER, EMOJI, GIF
+- **Database**: Separate `vnalo_media` PostgreSQL database
+
+#### Backend — ai-service (Java/Spring Boot)
+- **Framework**: Spring Boot 3.4.2 (Java 21), port 8094
+- **AI Engine**: Google Gemini 2.5 Flash (primary) → Ollama llama3.1:8b (fallback)
+- **Storage**: Redis (session cache + rate limiting) + PostgreSQL (persistent history via V25–V26 migrations)
+- **Rate Limiting**: 5 req/min per user, 10 req/min global
+- **Features**: Chat ask/history/delete, AI mascot settings (CRUD), internal API for core-service integration
+- **Knowledge Scope**: VNALO platform-specific; rejects off-topic queries
+
+#### Backend — moderation-service (Java/Spring Boot)
+- **Framework**: Spring Boot 3.4.x (Java 21), port 8082
+- **Features**: Report intake, case assignment/resolution, moderation actions, appeal lifecycle, audit log
+- **Roles**: MODERATOR, ADMIN (runtime guard via `moderation_admin_user` table)
+- **Migrations**: V1 (init schema), V2 (appeal table) — separate Flyway history table
+
+#### Backend — notification-service (Java/Spring Boot)
+- **Framework**: Spring Boot (Java 21), port 8087
+- **Transport**: Kafka consumer (topic from message-service) + FCM push via Firebase Admin SDK
+- **Database**: Separate `vnalo_notification` PostgreSQL database
+
+#### Frontend — Flutter Mobile
+- **SDK**: Flutter 3.x / Dart 3.7+ (`sdk: ^3.7.2`)
+- **State**: Provider + flutter_riverpod 3.3.1
+- **Local DB**: Drift (SQLite) for offline-first storage
+- **Features**: Auth (phone+email+OTP), Chat (reactions, pins, recall, voice messages, stickers), WebRTC calls (voice/video/group), AI assistant (floating bubble), Contacts, Notifications (FCM), Timeline, Discover, Profile
+- **Config**: `--dart-define` for all service URLs (CORE, MESSAGE, MEDIA, SOCKET, AI)
+
+#### Frontend — React Web
+- **Stack**: React 19 + TypeScript 5.9 + Vite 8 + TailwindCSS 3.4
+- **State**: React Context + custom hooks
+- **WebSocket**: socket.io-client 4.8.x
+- **Features**: Auth (phone/email login, QR login, forgot password), Chat (real-time, file sharing, stickers), WebRTC calls (1-1 + group), Contacts, Profile, AI Chat page
+- **Deployment**: Docker + Nginx (served at port 80/443)
 
 #### Infrastructure
-- **Containerization**: Docker + Docker Compose
-- **Services**: PostgreSQL 16 + Redis 7 (+ RabbitMQ, Kafka, Ollama optional for extended flows)
+- **Databases**: PostgreSQL 16 (vnalo_core, vnalo_media, vnalo_notification, vnalo_analytics)
+- **Cache/Queue**: Redis 7 (sessions, presence, serverSeq INCR, block cache)
+- **Messaging**: RabbitMQ 4 (media thumbnails, realtime broadcast), Kafka/Zookeeper (event streaming)
+- **Gateway**: Nginx (TLS termination, path-based routing, WebSocket proxy), domain: `vnalo.fit`
+- **AI**: Ollama (optional, profile `ai-local`) for local LLM fallback
 
 </details>
 
@@ -193,92 +256,98 @@
 
 <div align="center">
 
-### 🎨 System Architecture Diagram
-
-![VNALO System Architecture](./assets/SA-VNALO_lightver.png)
-
-*Polyglot microservices architecture with Spring Boot, NestJS, and shared PostgreSQL*
-
-</div>
-
----
-
-<div align="center">
-
 ### High-Level System Design
 
 ```
-┌──────────────────┐
-│  Flutter Mobile   │
-│  (iOS + Android)  │
-└────────┬─────────┘
-         │
-    ┌────┴────────────────────────┐
-    │      REST / WebSocket        │
-    │                              │
-┌───┴──────────┐  ┌───────────────┴──┐
-│ core-service │  │ message-service  │
-│ (Spring Boot)│  │ (NestJS 11)      │
-│ Port 8081    │  │ Port 3000        │
-│              │  │                  │
-│ • Auth/JWT   │  │ • Conversations  │
-│ • Users      │  │ • Messages       │
-│ • Friends    │  │ • Socket.IO GW   │
-│ • Blocks     │  │ • Inbox (CQRS)   │
-│ • QR Code    │  │ • Reactions      │
-│ • Contacts   │  │ • Pins           │
-│ • FCM Push   │  │ • Read Receipts  │
-└──────┬───────┘  └───────┬──────────┘
-       │                  │
-       └────────┬─────────┘
-                │ Shared JWT Secret (HS512)
-       ┌────────┴────────┐
-       │   PostgreSQL 16  │
-       │   (vnalo_core)   │
-       │                  │
-       │   + Redis 7      │
-       │   (cache/session)│
-       └─────────────────┘
+┌─────────────────────────────────────────┐
+│            CLIENT LAYER                  │
+│  Flutter Mobile (iOS/Android)            │
+│  React Web (vnalo.fit)                   │
+└────────────────┬────────────────────────┘
+                 │ HTTPS / WSS
+┌────────────────▼────────────────────────┐
+│         NGINX (TLS termination)          │
+│  vnalo.fit  ·  Path-based routing        │
+│  /api/v1/*  ·  /socket.io/              │
+└──┬───────┬────────┬────────┬────────────┘
+   │       │        │        │
+┌──▼──┐ ┌──▼──┐ ┌──▼──┐ ┌──▼────────┐
+│core │ │ msg │ │media│ │realtime   │
+│8081 │ │3000 │ │8083 │ │gateway    │
+│Java │ │Nest │ │Java │ │8085 Nest  │
+└──┬──┘ └──┬──┘ └──┬──┘ └──┬────────┘
+   │       │        │        │
+   └───────┴────────┴───────┘
+           │ Shared JWT Secret (HS512)
+   ┌───────▼────────────────┐
+   │    PostgreSQL 16        │
+   │    vnalo_core (main)    │
+   │    vnalo_media          │
+   │    vnalo_notification   │
+   ├────────────────────────┤
+   │    Redis 7              │
+   │  sessions·presence·seq │
+   ├────────────────────────┤
+   │  RabbitMQ 4             │
+   │  media·realtime events │
+   ├────────────────────────┤
+   │  Kafka + Zookeeper      │
+   │  friendship·moderation │
+   └────────────────────────┘
 ```
 
 </div>
 
-### 🎯 Service Overview
+### 🎯 Service Registry
 
-| Service | Responsibility | Port | Technology | Status |
-|---------|---------------|------|------------|--------|
-| 🔐 **core-service** | Auth, Users, Social Features, QR, Contacts | 8081 | Spring Boot 3.4 (Java 21) | ✅ Complete |
-| 💬 **message-service** | Conversations, Messages, WebSocket, Inbox | 3000 | NestJS 11 (TypeScript) | ✅ Complete |
-| 📎 **media-service** | File Upload, S3/Local Storage, Stickers | 8083 | Spring Boot 3.4 (Java 21) | 🔄 In Progress |
-| ⚡ **realtime-gateway** | WebSocket Scaling, Presence, Redis adapter | 8085 | NestJS (Node.js 20+) | 🔄 In Progress |
-| 📝 **content-service** | Story, Timeline, Posts, Comments | 8086 | Spring Boot (scaffold) | 🧪 Scaffolded |
-| 🔔 **notification-service** | Push Notifications (FCM) | 8087 | Spring Boot (scaffold) | 🧪 Scaffolded |
-| 🛡️ **moderation-service** | Reports, Content Review, User Actions | 8082 | Spring Boot 3.4 (Java 21) | 🔄 In Progress |
-| 🤖 **ai-service** | Gemini + Ollama fallback chatbot API | 8094 | Spring Boot 3.4 (Java 21) | 🧪 Experimental |
-| 📊 **analytics-service** | Activity Logging, Stats, Monitoring | 8084 *(compose profile)* | Spring Boot *(planned)* | ⏳ Planned |
+| Service | Port | Technology | Responsibility | Status |
+|---------|:----:|-----------|----------------|--------|
+| 🔐 **core-service** | 8081 | Spring Boot 3.4.2 (Java 21) | Auth (phone+email+OTP+QR), Users, Friends, Blocks, Contacts, FCM, AI Mascot | ✅ Complete |
+| 💬 **message-service** | 3000 | NestJS 11 (TypeScript) | Conversations, Messages, WebSocket gateway, Inbox CQRS, Reactions, Pins | ✅ Complete |
+| 🖼️ **media-service** | 8083 | Spring Boot 3.4.2 (Java 21) | File upload (S3+local), Thumbnails, Sticker packs (29 APIs) | 🔄 In Progress |
+| ⚡ **realtime-gateway** | 8085 | NestJS (Node.js 20+) | Presence federation, Typing indicators, RabbitMQ→Socket.IO bridge | 🔄 In Progress |
+| 🤖 **ai-service** | 8094 | Spring Boot 3.4.2 (Java 21) | Gemini 2.5 Flash chatbot + Ollama fallback, rate limiting, persistent history | 🔄 Active |
+| 🔔 **notification-service** | 8087 | Spring Boot (Java 21) | Kafka consumer → FCM push notifications | 🔄 Active |
+| 🛡️ **moderation-service** | 8082 | Spring Boot 3.4.x (Java 21) | Reports, Cases, Appeals, Audit log | 🔄 In Progress |
+| 📝 **content-service** | 8086 | Spring Boot (scaffold) | Stories, Posts, Comments, Timeline | 🧪 Scaffolded |
+| 📊 **analytics-service** | 8084 | Spring Boot (planned) | Event ingestion, dashboards | ⏳ Planned |
+| 🌐 **frontend-web** | 80/443 | React 19 + Nginx | Web client (served by Docker/Nginx) | ✅ Active |
 
 ### 🔄 Message Flow
 
 ```
-┌────────┐   Socket.IO    ┌──────────────────┐
-│ Client │ ═══════════════▶│  message-service  │
-│        │◀════════════════│  (NestJS + S.IO)  │
-└────────┘  message.send   └────────┬─────────┘
-            message.received        │
-            message.typing          │ TypeORM
-            message.read            ▼
-                            ┌───────────────┐
-                            │  PostgreSQL    │
-                            │  (vnalo_core)  │
-                            └───────────────┘
+Client A ──POST /api/v1/messages──► message-service (3000)
+                                         │ save to PostgreSQL
+                                         │ publish → RabbitMQ (vnalo.realtime)
+                                         ▼
+                                   realtime-gateway (8085)
+                                         │ broadcast to room conversation:{id}
+                                         ▼
+Client B ◄──── event: message.received ──── Socket.IO /realtime namespace
 ```
 
 **Key Design Decisions:**
-- 📊 **serverSeq per conversation**: Monotonic ordering without timestamp collisions
-- 🔄 **Cursor-based pagination**: Efficient message history with `before` + `limit`
-- 👥 **CQRS Inbox**: Denormalized `conversation_inbox` table for fast inbox listing
-- 🔐 **Idempotency**: `clientMessageId` for deduplication at persistence layer
-- ⚡ **Real-time**: Socket.IO rooms per conversation with JWT authentication
+- 📊 **`serverSeq` per conversation** — Redis `INCR` for monotonic message ordering, no timestamp collisions
+- 🔄 **Cursor-based pagination** — efficient history with `before` + `limit`
+- 👥 **CQRS Inbox** — denormalized `conversation_inbox` table for O(1) unread counts
+- 🔐 **Idempotency** — `clientMessageId` for deduplication at persistence layer
+- 🏷️ **Group roles** — 3-tier: `ADMIN` (leader) / `DEPUTY` (sub-leader) / `MEMBER` (V23 migration)
+- 🔑 **QR Login** — stateless QR token with `auth_qr_login_session` table, mobile approves web login
+
+### 🌐 Nginx Routing (vnalo.fit)
+
+| Route Pattern | Upstream | Notes |
+|---|---|---|
+| `/socket.io/` | `realtime-gateway:8085` | WebSocket, buffering disabled |
+| `/api/v1/media` | `media-service:8083` | File upload/download |
+| `/api/v1/upload` | `media-service:8083/api/v1/media/upload` | Alias |
+| `/api/v1/ai/mascot` | `core-service:8081` | AI mascot settings |
+| `/api/v1/ai` | `ai-service:8094` | AI chatbot (120s timeout) |
+| `/api/v1/(conversations\|messages\|...)` | `message-service:3000` | Chat REST |
+| `/api/v1/notifications` | `notification-service:8087` | Push notifications |
+| `/api/v1/(posts\|stories\|feeds\|comments)` | `content-service:8086` | Social content |
+| `/api/v1/` (catch-all) | `core-service:8081` | Auth, Users, Social |
+| `/` | Static files | React web app |
 
 ---
 
@@ -289,142 +358,193 @@
 ```bash
 # Required
 ☑️  Java 21+ (JDK)
-☑️  Node.js 20+ (for message-service)
+☑️  Node.js 20+
 ☑️  Docker & Docker Compose
 ☑️  Git
 
-# Optional (for mobile development)
-📱  Flutter SDK 3.x
-📱  Android Studio (for Android)
-🍎  Xcode (for iOS - macOS only)
+# Optional — mobile development
+📱  Flutter SDK 3.x (Dart 3.7+)
+📱  Android Studio (Android)
+🍎  Xcode (iOS — macOS only)
+
+# Optional — web development
+🌐  Node.js 20+ (already required above)
 ```
 
-### ⚡ Backend Setup
+### ⚡ Option 1 — Full Stack with Docker
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO.git
-cd CNM-ZALO
+# 1. Clone
+git clone https://github.com/CNM-DHKTPM18A-2526/CNM-VNALO.git
+cd CNM-VNALO
 
-# 2. Get Firebase credentials from team lead
-# Place file: backend/java-services/services/core-service/src/main/resources/
-# Filename: iuh-cnm-vnalo-firebase-adminsdk-fbsvc-5008b7c5eb.json
+# 2. Configure secrets
+cp docker/.env.example docker/.env
+# Edit docker/.env — set JWT_SECRET (required), optionally AWS keys & GEMINI_API_KEY
 
-# 3. Start Docker containers (PostgreSQL + Redis)
+# 3. Add Firebase credentials (for core-service FCM)
+# Place: backend/java-services/services/core-service/src/main/resources/
+# File:  iuh-cnm-vnalo-firebase-adminsdk-fbsvc-5008b7c5eb.json
+
+# 4. Start infrastructure + core services
 cd docker
-docker compose up -d postgres redis
+docker compose up -d postgres redis rabbitmq kafka zookeeper
+docker compose up -d core-service message-service media-service realtime-gateway ai-service
 
-# 4. Build and run core-service (Terminal 1)
-cd ../backend/java-services/services/core-service
+# 5. (Optional) Start web frontend
+docker compose up -d frontend-web
 
-# Windows
-.\mvnw.cmd clean install -DskipTests
+# 6. Health checks
+curl http://localhost:8081/api/v1/actuator/health  # core-service
+curl http://localhost:3000/api/v1/health            # message-service
+curl http://localhost:8083/actuator/health          # media-service
+curl http://localhost:8085/health                   # realtime-gateway
+curl http://localhost:8094/actuator/health          # ai-service
+```
+
+### ⚡ Option 2 — Local Development (Manual)
+
+```bash
+# 1. Start infrastructure only
+cd docker
+docker compose -f docker-compose.infra.yml up -d
+# OR with message brokers:
+docker compose up -d postgres redis rabbitmq kafka zookeeper
+
+# 2. core-service (Terminal 1)
+cd backend/java-services/services/core-service
+# Windows:
 .\mvnw.cmd spring-boot:run
-
-# Linux/Mac
-./mvnw clean install -DskipTests
+# Linux/macOS:
 ./mvnw spring-boot:run
 
-# 5. Install and run message-service (Terminal 2)
-cd ../../../../backend/node-services
+# 3. message-service (Terminal 2)
+cd backend/node-services
 npm install
 npm run start:dev
 
-# 6. Verify services
-# core-service:    http://localhost:8081/api/v1/swagger-ui.html
-# message-service: http://localhost:3000/api/v1/health
+# 4. realtime-gateway (Terminal 3)
+cd backend/node-services
+npm run start:realtime:dev
+
+# 5. media-service (Terminal 4)
+cd backend/java-services/services/media-service
+./mvnw spring-boot:run
+
+# 6. ai-service (Terminal 5)
+cd backend/java-services/services/ai-service
+./mvnw spring-boot:run
 ```
 
-> **Note:** Dev profile has JWT default value and OTP disabled. Flyway is enabled and is the source of truth for schema. TypeORM `synchronize` is disabled.
-
-### 🐳 Docker Services
+### 🌐 Web Frontend (Development)
 
 ```bash
-# Start infrastructure (PostgreSQL + Redis)
-docker compose up -d
-
-# View logs
-docker compose logs -f
-
-# Stop all services
-docker compose down
-
-# Reset everything (wipe data)
-docker compose down -v && docker compose up -d
+cd frontend/web
+cp .env.example .env   # configure VITE_CORE_URL etc.
+npm install
+npm run dev            # http://localhost:5173
 ```
 
-**Available Services:**
-- PostgreSQL: `localhost:5432` (database: `vnalo_core`, user: `postgres`)
-- Redis: `localhost:6379`
+### 📱 Flutter Mobile
+
+```bash
+cd frontend/mobile
+flutter pub get
+
+# Android emulator (10.0.2.2 → host machine)
+flutter run \
+  --dart-define=ENV=dev \
+  --dart-define=CORE_SERVICE_URL=http://10.0.2.2:8081/api/v1 \
+  --dart-define=MESSAGE_SERVICE_URL=http://10.0.2.2:3000/api/v1 \
+  --dart-define=MEDIA_SERVICE_URL=http://10.0.2.2:8083/api/v1 \
+  --dart-define=SOCKET_URL=http://10.0.2.2:3000 \
+  --dart-define=AI_SERVICE_URL=http://10.0.2.2:8094/api/v1
+
+# Physical device — use LAN IP instead of 10.0.2.2
+# See frontend/mobile/README.md for full network mapping guide
+```
+
+> **Note:** Dev profile has JWT default value and OTP test-mode enabled. Flyway runs automatically on core-service startup and is the single source of truth for schema. TypeORM `synchronize` is **disabled** in message-service.
 
 ---
 
 ## 📁 Project Structure
 
 ```
-CNM-ZALO/
-├── 📄 README.md                     # Project overview (English)
-├── 📄 README.vi.md                  # Project overview (Vietnamese)
-├── 📄 CONTRIBUTING.md               # Contribution guidelines
-├── 📄 .gitignore
-│
-├── 📂 docs/                         # Project documentation
-│   ├── README.md                    #   Documentation index
-│   ├── contributing.md              #   Code conventions
-│   ├── system/                      #   System docs
-│   │   ├── architecture.md          #     Architecture overview
-│   │   ├── database-schema.md       #     Complete DB schema
-│   │   └── api-reference.md         #     REST + WebSocket API
-│   └── project/                     #   Project management
-│       ├── status.md                #     Implementation status
-│       ├── changelog.md             #     Version history
-│       └── team-assignment.md       #     Team task distribution
+CNM-VNALO/
+├── 📄 README.md                       # Project overview (English)
+├── 📄 README.vi.md                    # Project overview (Vietnamese)
+├── 📄 CONTRIBUTING.md                 # Contribution guidelines
+├── 📄 nginx.conf                      # Nginx production config (vnalo.fit)
 │
 ├── 📂 backend/
-│   ├── java-services/               # Java microservices
-│   │   ├── common/                  #   Shared modules
-│   │   │   ├── common-domain/       #     Common entities
-│   │   │   └── common-security/     #     Security utilities
+│   ├── java-services/
 │   │   └── services/
-│   │       └── core-service/        #   ✅ Auth, Users, Social (Spring Boot 3.4)
-│   │           ├── src/main/
-│   │           │   ├── java/        #     75 Java source files
-│   │           │   └── resources/
-│   │           │       ├── application.yml
-│   │           │       └── db/migration/  # V1–V13 Flyway migrations
-│   │           └── pom.xml
+│   │       ├── core-service/          # ✅ Auth, Users, Social, QR, AI Mascot
+│   │       │   └── src/main/resources/db/migration/   # V1–V26 Flyway
+│   │       ├── media-service/         # 🔄 Upload, S3/local, Stickers (29 APIs)
+│   │       ├── ai-service/            # 🔄 Gemini + Ollama chatbot
+│   │       ├── moderation-service/    # 🔄 Reports, Cases, Appeals
+│   │       ├── notification-service/  # 🔄 FCM push via Kafka
+│   │       ├── content-service/       # 🧪 Stories, Posts (scaffold)
+│   │       └── analytics-service/     # ⏳ Planned
 │   │
-│   └── node-services/               # NestJS services
-│       ├── apps/
-│       │   └── message-service/     #   ✅ Messaging (NestJS 11)
-│       │       └── src/
-│       │           ├── auth/        #     JWT + WS auth guards
-│       │           ├── config/      #     Database, Redis, JWT config
-│       │           ├── entities/    #     8 TypeORM entities
-│       │           ├── dto/         #     9 DTO classes
-│       │           ├── conversation/#     Conversation module
-│       │           ├── message/     #     Message module
-│       │           ├── inbox/       #     Inbox module (CQRS)
-│       │           └── gateway/     #     Socket.IO gateway
-│       ├── package.json
-│       └── nest-cli.json
-│
-├── 📂 docker/
-│   ├── docker-compose.yml           # Full stack (infra + services)
-│   ├── docker-compose.infra.yml     # Infra only (PostgreSQL + Redis)
-│   └── init-db.sql                  # Database initialization
+│   └── node-services/                 # NestJS monorepo workspace
+│       └── apps/
+│           ├── message-service/       # ✅ Chat, WebSocket, Inbox CQRS (port 3000)
+│           └── realtime-gateway/      # 🔄 Presence, RabbitMQ bridge (port 8085)
 │
 ├── 📂 frontend/
-│   └── mobile/                      # 📦 Flutter mobile app
-│       ├── lib/                     #   Dart source code
-│       ├── android/                 #   Android platform
-│       ├── ios/                     #   iOS platform
-│       └── pubspec.yaml             #   Dependencies
+│   ├── mobile/                        # ✅ Flutter (iOS + Android)
+│   │   ├── lib/
+│   │   │   ├── features/
+│   │   │   │   ├── auth/              # Phone+email login, OTP, splash
+│   │   │   │   ├── chat/              # Messaging, reactions, pins, stickers
+│   │   │   │   ├── call/              # Voice, video, group WebRTC calls
+│   │   │   │   ├── ai_assistant/      # AI floating bubble, Gemini chat
+│   │   │   │   ├── contacts/          # Phone book sync, friend management
+│   │   │   │   ├── notifications/     # FCM, push notification handler
+│   │   │   │   ├── profile/           # Avatar, settings, privacy
+│   │   │   │   ├── timeline/          # Posts, stories (scaffold)
+│   │   │   │   ├── discover/          # Explore screen
+│   │   │   │   └── search/            # Global search
+│   │   │   ├── services/              # ApiService, ChatService, SocketService…
+│   │   │   └── core/                  # Theme, localization, local DB (Drift)
+│   │   └── pubspec.yaml
+│   │
+│   └── web/                           # ✅ React 19 + Vite + TailwindCSS
+│       ├── src/
+│       │   ├── features/
+│       │   │   ├── auth/              # Login, QR login, register, forgot password
+│       │   │   ├── chat/              # Chat, Socket.IO, WebRTC (1-1 + group)
+│       │   │   ├── contacts/          # Contacts page
+│       │   │   ├── friends/           # Friend management
+│       │   │   ├── notifications/     # Notification context
+│       │   │   ├── profile/           # Profile management
+│       │   │   └── settings/          # App settings
+│       │   └── pages/                 # ChatPage, CallPage, AiChatPage…
+│       └── package.json
 │
-├── 📂 assets/                       # Project images
+├── 📂 docker/
+│   ├── docker-compose.yml             # Full stack (all services + infra)
+│   ├── docker-compose.infra.yml       # Infra only (PostgreSQL + Redis)
+│   └── init-db.sql                    # Database initialization
 │
-└── 📂 config/                       # Configuration files
-    └── environments/
+├── 📂 docs/
+│   ├── system/
+│   │   ├── architecture.md            # Target architecture (hardened spec)
+│   │   ├── database-schema.md         # Complete PostgreSQL schema
+│   │   ├── api-reference.md           # REST + WebSocket API contracts
+│   │   └── moderation/                # 10-doc moderation portal
+│   └── project/
+│       ├── status.md                  # Implementation status
+│       ├── changelog.md               # Version history
+│       └── team-assignment.md         # Team task distribution
+│
+├── 📂 config/
+│   └── environments/                  # Environment config files
+│
+└── 📂 scripts/                        # E2E smoke scripts, dev utilities
 ```
 
 ---
@@ -436,96 +556,158 @@ CNM-ZALO/
 ```bash
 cd backend/java-services/services/core-service
 
-# Build
+# Build (skip tests)
 ./mvnw clean install -DskipTests
 
-# Run (dev profile - default)
+# Run (dev profile — default, OTP test-mode, JWT default secret)
 ./mvnw spring-boot:run
 
-# Run tests (43 tests)
+# Run tests (uses Testcontainers — Docker required)
 ./mvnw test
+
+# Swagger UI
+open http://localhost:8081/api/v1/swagger-ui.html
 ```
 
-### message-service (TypeScript/NestJS)
+### message-service + realtime-gateway (NestJS monorepo)
 
 ```bash
 cd backend/node-services
 
-# Install dependencies
+# Install
 npm install
 
-# Run in dev mode (hot-reload)
+# Run message-service only (port 3000) with hot-reload
 npm run start:dev
 
+# Run realtime-gateway only (port 8085)
+npm run start:realtime:dev
+
+# Run both simultaneously (two terminals)
+npm run start:dev &
+npm run start:realtime:dev
+
 # Build for production
-npm run build
+npm run build                    # message-service
+npm run build:realtime           # realtime-gateway
 
-# Run production
-npm run start:prod
-
-# Run e2e from repository root (stable path)
-npm --prefix backend/node-services run test:e2e
+# Tests
+npm test                         # unit tests
+npm run test:e2e                 # e2e (from repo root: npm --prefix backend/node-services run test:e2e)
 ```
 
-### Flutter Mobile App
+### Flutter Mobile
 
 ```bash
 cd frontend/mobile
 
-# Get dependencies
 flutter pub get
+flutter analyze      # must be error-free before PR
+flutter test         # unit tests
+flutter run ...      # see Quick Start section for --dart-define flags
 
-# Run on device
-flutter run
-
-# Build APK
+# Release build
 flutter build apk --release
+flutter build ios --release
 ```
 
-### Database Migrations
-
-Migrations are managed by **Flyway** in core-service and applied automatically on startup:
-
-```
-V1  — auth_account, user_profile, user_setting, user_privacy_setting
-V2  — Foreign keys
-V3  — Auth account enhancements
-V4  — Refresh token device tracking
-V5  — friend_request, friendship, block_list, contact_sync
-V6  — User profile enhancements
-V7  — Indexes, constraints
-V8  — conversation, conversation_member, message, conversation_inbox
-V9  — message_reaction, pinned_message, message_receipt
-V10 — schema hardening and idempotent guards
-V11 — group member_limit default 1000→100 + backfill
-V12 — message.hidden_by_users for Delete For Me
-V13 — conversation_join_request + join_mode OPEN defaults
-```
-
-### Environment Variables
-
-<details>
-<summary>View Configuration</summary>
+### React Web
 
 ```bash
-# Database
+cd frontend/web
+
+npm install
+npm run dev          # development server on :5173
+npm run build        # production build
+npm run lint         # ESLint check
+```
+
+---
+
+## 🗄️ Database Migrations
+
+Managed by **Flyway** in `core-service`, applied automatically on startup. TypeORM `synchronize: false` in all Node services.
+
+| Migration | Description |
+|-----------|-------------|
+| `V1` | `auth_account`, `user_profile`, `user_setting`, `user_privacy_setting` |
+| `V2` | Foreign key constraints |
+| `V3` | Auth account enhancements |
+| `V4` | Refresh token device tracking |
+| `V5` | `friend_request`, `friendship`, `block_list`, `contact_sync` |
+| `V6` | User profile enhancements |
+| `V7` | Indexes and constraints |
+| `V8` | `conversation`, `conversation_member`, `message`, `conversation_inbox` |
+| `V9` | `message_reaction`, `pinned_message`, `message_receipt` |
+| `V10` | Schema hardening — idempotent guards, uniqueness constraints |
+| `V11` | Group `member_limit` default 1000→100 + backfill |
+| `V12` | `message.hidden_by_users` for Delete-For-Me feature |
+| `V13` | `conversation_join_request` + `join_mode` OPEN default |
+| `V14` | `auth_account.email` column + case-insensitive unique index |
+| `V15` | `auth_qr_login_session` table for QR web login flow |
+| `V17` | `sync_control_policy` table |
+| `V18` | `auth_session_audit` table — session transition audit trail |
+| `V19` | Messaging entities alignment |
+| `V20` | Chat settings expansion |
+| `V21` | Group settings columns |
+| `V22` | Legacy group settings alignment |
+| `V23` | Member role rename: `OWNER`→`ADMIN`, `ADMIN`→`DEPUTY` (3-tier model) |
+| `V24` | Optimistic locking (`version` column) on `conversation_member` |
+| `V25` | `user_mascot_settings`, `ai_chat_history` tables for AI persistence |
+| `V26` | `ai_chat_history.client_entry_id` for idempotency |
+
+> **Current migration count: V26** · `moderation-service` has its own separate Flyway history (`V1–V2`, table `flyway_schema_history_moderation`)
+
+---
+
+## ⚙️ Environment Variables
+
+<details>
+<summary><b>Core variables — docker/.env</b></summary>
+
+```bash
+# ── Database ──────────────────────────────────────
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=vnalo_core
 DB_USER=postgres
 DB_PASS=postgres
 
-# JWT
-JWT_SECRET=your-jwt-secret-key
-JWT_EXPIRATION_MS=900000        # 15 minutes
+# ── JWT (REQUIRED — shared across ALL services) ───
+JWT_SECRET=<base64-encoded-512-bit-key>
+# Generate: openssl rand -base64 64
+JWT_ISSUER=vnalo
 
-# Firebase (core-service)
-# Place credentials file in:
-# backend/java-services/services/core-service/src/main/resources/
-
-# Redis
+# ── Redis ─────────────────────────────────────────
 REDIS_HOST=localhost
 REDIS_PORT=6379
+
+# ── RabbitMQ ──────────────────────────────────────
+RABBITMQ_USER=guest
+RABBITMQ_PASS=guest
+RABBITMQ_PORT=5672
+RABBITMQ_MGMT_PORT=15672
+
+# ── Firebase (core-service + notification-service) ─
+FIREBASE_CREDENTIALS_PATH=iuh-cnm-vnalo-firebase-adminsdk-fbsvc-5008b7c5eb.json
+
+# ── AWS S3 (media-service) ────────────────────────
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_BUCKET_NAME=vnalo-media-service
+AWS_REGION=ap-southeast-1
+
+# ── AI Service ────────────────────────────────────
+GEMINI_API_KEY=             # https://aistudio.google.com/apikey
+GEMINI_MODEL=gemini-2.5-flash
+OLLAMA_URL=http://ollama:11434
+OLLAMA_MODEL=llama3.1:8b
+AI_RATE_LIMIT=5             # req/min per user
+AI_RATE_LIMIT_GLOBAL=10     # req/min global
+AI_INTERNAL_SECRET=         # for core-service → ai-service internal calls
+
+# ── CORS ──────────────────────────────────────────
+APP_CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,https://vnalo.fit
 ```
 
 </details>
@@ -536,36 +718,43 @@ REDIS_PORT=6379
 
 | Document | Description |
 |----------|-------------|
-| [📂 Documentation Index](docs/README.md) | All documentation with descriptions |
-| [🏗️ Architecture](docs/system/architecture.md) | System architecture, service map |
-| [🗄️ Database Schema](docs/system/database-schema.md) | Complete PostgreSQL schema and runtime reconcile notes (Flyway V1–V13) |
+| [📂 Documentation Index](docs/README.md) | All docs with descriptions |
+| [🏗️ Architecture](docs/system/architecture.md) | Target architecture spec (hardened, v2.0) |
+| [🗄️ Database Schema](docs/system/database-schema.md) | Complete PostgreSQL schema (Flyway V1–V26) |
 | [📡 API Reference](docs/system/api-reference.md) | REST endpoints + WebSocket events |
+| [🛡️ Moderation Portal](docs/system/moderation/) | 10-document moderation service spec |
 | [📊 Status](docs/project/status.md) | Implementation status per service |
 | [📝 Changelog](docs/project/changelog.md) | Version history |
 | [👥 Team Assignment](docs/project/team-assignment.md) | Task distribution |
-| [🤝 Contributing](docs/contributing.md) | Code standards and conventions |
+| [🤝 Contributing](CONTRIBUTING.md) | Code standards and workflow |
+| [📱 Mobile Setup Guide](frontend/mobile/README.md) | Flutter setup, run, troubleshoot |
+| [🌐 Web Setup Guide](frontend/web/README.md) | React web setup and development |
+| [🖼️ Media Service Guide](backend/java-services/services/media-service/Readme.md) | Media + Sticker API (29 endpoints) |
+| [🤖 AI Service Guide](backend/java-services/services/ai-service/README.md) | AI chatbot setup and API |
+| [🛡️ Moderation Service Guide](backend/java-services/services/moderation-service/README.md) | Moderation quick start |
+| [⚡ Realtime Gateway Guide](backend/node-services/apps/realtime-gateway/Readme.md) | WebSocket events reference |
 
 ---
 
 ## ✅ Current Status
 
-| Service | Status | Features | Tests |
+| Service | Status | Features | Notes |
 |---------|--------|----------|-------|
-| **core-service** | ✅ Complete | Auth, Users, Friends, Blocks, QR, Contacts, FCM | 44 pass |
-| **message-service** | ✅ Complete | Conversations, Messages, Reactions, Pins, Inbox, WebSocket | Build OK |
-| **media-service** | 🔄 In Progress | Upload APIs, S3/local storage fallback, stickers | Service tests + smoke script |
-| **realtime-gateway** | 🔄 In Progress | Redis-backed Socket.IO scaling skeleton | Build available |
-| **content-service** | 🧪 Scaffolded | Story/Timeline service skeleton | Build stage |
-| **notification-service** | 🧪 Scaffolded | FCM notification skeleton | Build stage |
-| **moderation-service** | 🔄 In Progress | Reports, moderation workflows, runbook docs | Build verified |
-| **ai-service** | 🧪 Experimental | Gemini + Ollama chatbot API | Build stage |
-| **analytics-service** | ⏳ Planned | Placeholder profile in compose; service code pending | — |
+| **core-service** | ✅ Complete | Auth (phone+email+OTP+QR), Users, Friends, Blocks, Contacts, FCM, Session Audit, AI Mascot | Flyway V1–V26, Swagger |
+| **message-service** | ✅ Complete | Conversations, Messages, Reactions, Pins, Inbox, WebSocket (Redis adapter), Kafka producer | 9 TypeORM entities |
+| **realtime-gateway** | 🔄 Active | Presence, typing, heartbeat, RabbitMQ→Socket.IO broadcast | Port 8085, `/realtime` namespace |
+| **media-service** | 🔄 Active | 29 APIs: upload/presigned/thumbnail/access + sticker packs, S3+local fallback | RabbitMQ async thumbnails |
+| **ai-service** | 🔄 Active | Gemini 2.5 Flash + Ollama fallback, rate limiting, persistent history | V25–V26 migrations |
+| **notification-service** | 🔄 Active | Kafka consumer → FCM push, device token management | Active in docker-compose |
+| **moderation-service** | 🔄 In Progress | Reports, cases, appeals, audit log, moderation actions | Separate Flyway history |
+| **content-service** | 🧪 Scaffolded | Stories, posts, comments (scaffold) | Commented out in compose |
+| **analytics-service** | ⏳ Planned | Event ingestion, dashboards | Commented out in compose |
+| **Flutter mobile** | ✅ Active | Full auth, chat, WebRTC calls, AI assistant, contacts, notifications | Drift local DB, Provider+Riverpod |
+| **React web** | ✅ Active | Auth (QR login), chat, WebRTC calls, AI chat, contacts, profile | React 19 + Vite 8 |
 
 ---
 
 ## 🤝 Contributing
-
-We welcome contributions! Please follow these guidelines:
 
 ### 📝 Commit Convention
 
@@ -581,23 +770,29 @@ test:     ✅ Tests
 chore:    🔧 Maintenance
 ```
 
+Scope examples: `feat(auth):`, `fix(message-service):`, `docs(mobile):`
+
 ### 🔀 Workflow
 
 ```bash
-# 1. Fork the repository
-# 2. Create your feature branch
-git checkout -b feature/amazing-feature
+# 1. Create feature branch from nguyenvu
+git checkout nguyenvu
+git pull origin nguyenvu
+git checkout -b feature/your-feature
 
-# 3. Commit your changes
-git commit -m 'feat: add amazing feature'
+# 2. Develop, commit using conventional commits
+git commit -m 'feat(scope): add amazing feature'
 
-# 4. Push to the branch
-git push origin feature/amazing-feature
+# 3. Before PR: pass tests + update docs
+flutter analyze && flutter test        # mobile
+npm test                               # node-services
+./mvnw test                            # java services
 
-# 5. Open a Pull Request
+# 4. Open Pull Request → nguyenvu
+git push origin feature/your-feature
 ```
 
-### 👥 Team Structure
+### 👥 Team
 
 <div align="center">
 
@@ -608,65 +803,53 @@ git push origin feature/amazing-feature
 <td align="center">
 <a href="https://github.com/iamnguyenvu">
 <img src="https://github.com/iamnguyenvu.png" width="100px;" alt="Nguyễn Hoàng Nguyên Vũ"/>
-<br />
-<sub><b>Nguyễn Hoàng Nguyên Vũ</b></sub>
+<br /><sub><b>Nguyễn Hoàng Nguyên Vũ</b></sub>
 </a>
-<br />
-<sub>👑 Team Leader</sub>
-<br />
-<sub>📋 22003185</sub>
+<br /><sub>👑 Team Leader</sub>
+<br /><sub>📋 22003185</sub>
 <br />
 <a href="https://github.com/iamnguyenvu">
-<img src="https://img.shields.io/badge/GitHub-iamnguyenvu-181717?style=flat-square&logo=github" alt="GitHub">
+<img src="https://img.shields.io/badge/GitHub-iamnguyenvu-181717?style=flat-square&logo=github">
 </a>
 <br />
 <a href="mailto:iamnguyenvu.gm@gmail.com">
-<img src="https://img.shields.io/badge/Email-Contact-EA4335?style=flat-square&logo=gmail&logoColor=white" alt="Email">
+<img src="https://img.shields.io/badge/Email-Contact-EA4335?style=flat-square&logo=gmail&logoColor=white">
 </a>
 </td>
 <td align="center">
 <a href="https://github.com/datle0910">
 <img src="https://github.com/datle0910.png" width="100px;" alt="Lê Văn Đạt"/>
-<br />
-<sub><b>Lê Văn Đạt</b></sub>
+<br /><sub><b>Lê Văn Đạt</b></sub>
 </a>
-<br />
-<sub>💻 Developer</sub>
-<br />
-<sub>📋 22001605</sub>
+<br /><sub>💻 Developer</sub>
+<br /><sub>📋 22001605</sub>
 <br />
 <a href="https://github.com/datle0910">
-<img src="https://img.shields.io/badge/GitHub-datle0910-181717?style=flat-square&logo=github" alt="GitHub">
+<img src="https://img.shields.io/badge/GitHub-datle0910-181717?style=flat-square&logo=github">
 </a>
 </td>
 <td align="center">
 <a href="https://github.com/pnwang1704">
 <img src="https://github.com/pnwang1704.png" width="100px;" alt="Phan Nhật Quang"/>
-<br />
-<sub><b>Phan Nhật Quang</b></sub>
+<br /><sub><b>Phan Nhật Quang</b></sub>
 </a>
-<br />
-<sub>💻 Developer</sub>
-<br />
-<sub>📋 22684961</sub>
+<br /><sub>💻 Developer</sub>
+<br /><sub>📋 22684961</sub>
 <br />
 <a href="https://github.com/pnwang1704">
-<img src="https://img.shields.io/badge/GitHub-pnwang1704-181717?style=flat-square&logo=github" alt="GitHub">
+<img src="https://img.shields.io/badge/GitHub-pnwang1704-181717?style=flat-square&logo=github">
 </a>
 </td>
 <td align="center">
 <a href="https://github.com/thaibaotb">
 <img src="https://github.com/thaibaotb.png" width="100px;" alt="Đặng Thái Bảo"/>
-<br />
-<sub><b>Đặng Thái Bảo</b></sub>
+<br /><sub><b>Đặng Thái Bảo</b></sub>
 </a>
-<br />
-<sub>💻 Developer</sub>
-<br />
-<sub>📋 22686331</sub>
+<br /><sub>💻 Developer</sub>
+<br /><sub>📋 22686331</sub>
 <br />
 <a href="https://github.com/thaibaotb">
-<img src="https://img.shields.io/badge/GitHub-thaibaotb-181717?style=flat-square&logo=github" alt="GitHub">
+<img src="https://img.shields.io/badge/GitHub-thaibaotb-181717?style=flat-square&logo=github">
 </a>
 </td>
 </tr>
@@ -676,89 +859,27 @@ git push origin feature/amazing-feature
 
 </div>
 
-**Project Responsibilities**:
-- **Nguyễn Hoàng Nguyên Vũ** (Team Leader): Architecture, core-service, message-service
+**Project Responsibilities:**
+- **Nguyễn Hoàng Nguyên Vũ** (Team Leader): Architecture, core-service, message-service, realtime-gateway, web frontend, AI service integration
 - **Lê Văn Đạt**: realtime-gateway, media-service
 - **Phan Nhật Quang**: content-service, notification-service
 - **Đặng Thái Bảo**: moderation-service, analytics-service
 
 ---
 
-## 📊 Project Stats
-
-<div align="center">
-
-<p>
-<a href="https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO/stargazers">
-<img src="https://img.shields.io/github/stars/CNM-DHKTPM18A-2526/CNM-ZALO?style=for-the-badge&logo=github&color=yellow" alt="Stars">
-</a>
-<a href="https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO/network/members">
-<img src="https://img.shields.io/github/forks/CNM-DHKTPM18A-2526/CNM-ZALO?style=for-the-badge&logo=github&color=blue" alt="Forks">
-</a>
-<a href="https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO/watchers">
-<img src="https://img.shields.io/github/watchers/CNM-DHKTPM18A-2526/CNM-ZALO?style=for-the-badge&logo=github&color=green" alt="Watchers">
-</a>
-</p>
-
-<p>
-<a href="https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO/issues">
-<img src="https://img.shields.io/github/issues/CNM-DHKTPM18A-2526/CNM-ZALO?style=for-the-badge&logo=github&color=red" alt="Issues">
-</a>
-<a href="https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO/pulls">
-<img src="https://img.shields.io/github/issues-pr/CNM-DHKTPM18A-2526/CNM-ZALO?style=for-the-badge&logo=github&color=purple" alt="Pull Requests">
-</a>
-<a href="https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO/commits">
-<img src="https://img.shields.io/github/last-commit/CNM-DHKTPM18A-2526/CNM-ZALO?style=for-the-badge&logo=github&color=orange" alt="Last Commit">
-</a>
-</p>
-
-<p>
-<a href="https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO/graphs/contributors">
-<img src="https://img.shields.io/github/contributors/CNM-DHKTPM18A-2526/CNM-ZALO?style=for-the-badge&logo=github&color=cyan" alt="Contributors">
-</a>
-<a href="https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO">
-<img src="https://img.shields.io/github/repo-size/CNM-DHKTPM18A-2526/CNM-ZALO?style=for-the-badge&logo=github&color=lightgrey" alt="Repo Size">
-</a>
-<a href="LICENSE">
-<img src="https://img.shields.io/github/license/CNM-DHKTPM18A-2526/CNM-ZALO?style=for-the-badge&logo=github&color=brightgreen" alt="License">
-</a>
-</p>
-
-</div>
-
----
-
 ## 📄 License
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
 
 ---
-
-## 🙏 Acknowledgments
 
 <div align="center">
 
-**Inspired by**
-- [Zalo](https://zalo.me) - Vietnam's leading messaging platform
-- [WhatsApp](https://whatsapp.com) - End-to-end encryption
-- [Telegram](https://telegram.org) - Speed and reliability
+**Inspired by** [Zalo](https://zalo.me) · [WhatsApp](https://whatsapp.com) · [Telegram](https://telegram.org)
 
-**Built with**
-- ☕ Lots of coffee
-- 💻 Modern technologies
-- ❤️ Passion for great software
+**Production domain**: [vnalo.fit](https://vnalo.fit) · **Repo**: [CNM-DHKTPM18A-2526/CNM-VNALO](https://github.com/CNM-DHKTPM18A-2526/CNM-VNALO)
 
----
-
-### 📬 Contact & Support
-
-**Project Repository**: [github.com/CNM-DHKTPM18A-2526/CNM-ZALO](https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO)
-
-**Report Issues**: [GitHub Issues](https://github.com/CNM-DHKTPM18A-2526/CNM-ZALO/issues)
-
----
-
-<sub>Made with ❤️ by the CNM-DHKTPM18A-2526 Team | February 2026</sub>
+<sub>Made with ❤️ by the CNM-DHKTPM18A-2526 Team · 2026</sub>
 
 **[⬆ Back to Top](#-vnalo)**
 
