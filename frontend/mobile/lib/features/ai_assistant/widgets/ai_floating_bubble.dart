@@ -393,9 +393,6 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
         state: provider.state,
         emotion: provider.currentEmotion,
         size: _bubbleSize,
-        onTap: () {
-          _toggleBoard(provider);
-        },
       ),
     );
   }

@@ -5,8 +5,8 @@ import 'package:vnalo_mobile/core/theme/app_typography.dart';
 enum AiActionConfirmationResult { cancelled, confirmed, alternate }
 
 class AiActionConfirmationSheet extends StatelessWidget {
-  static const double _sheetRadius = 20;
-  static const double _cardRadius = 12;
+  static const double _sheetRadius = 18;
+  static const double _cardRadius = 10;
   static const double _buttonRadius = 999;
 
   final IconData icon;
@@ -152,9 +152,9 @@ class AiActionConfirmationSheet extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color:
                           isDark
@@ -168,25 +168,26 @@ class AiActionConfirmationSheet extends StatelessWidget {
                                 : const Color(0xFFE2E8F0),
                       ),
                     ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: accent.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(_cardRadius),
-                          ),
-                          child: Icon(icon, color: accent, size: 23),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 50,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                color: accent.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(
+                                  _cardRadius,
+                                ),
+                              ),
+                              child: Icon(icon, color: accent, size: 23),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Text(
                                 title,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
@@ -195,17 +196,15 @@ class AiActionConfirmationSheet extends StatelessWidget {
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
-                              const SizedBox(height: 5),
-                              Text(
-                                description,
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
-                                style: AppTypography.bodySmall.copyWith(
-                                  height: 1.35,
-                                  color: textSecondary,
-                                ),
-                              ),
-                            ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          description,
+                          style: AppTypography.bodySmall.copyWith(
+                            height: 1.45,
+                            color: textSecondary,
                           ),
                         ),
                       ],

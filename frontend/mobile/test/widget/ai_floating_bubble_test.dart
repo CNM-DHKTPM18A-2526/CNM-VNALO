@@ -169,11 +169,18 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('ai_chat_board')), findsOneWidget);
+      expect(find.byKey(const ValueKey('ai_chat_send')), findsNothing);
+      expect(find.byKey(const ValueKey('ai_chat_mic_idle')), findsOneWidget);
 
       await tester.enterText(
         find.byKey(const ValueKey('ai_chat_input')),
         'Xin chao',
       );
+      await tester.pump();
+
+      expect(find.byKey(const ValueKey('ai_chat_send')), findsOneWidget);
+      expect(find.byKey(const ValueKey('ai_chat_mic_idle')), findsNothing);
+
       await tester.tap(find.byKey(const ValueKey('ai_chat_send')));
       await tester.pump();
       await tester.pumpAndSettle();

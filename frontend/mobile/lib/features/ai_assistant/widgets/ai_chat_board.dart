@@ -42,9 +42,24 @@ class _AiChatBoardState extends State<AiChatBoard> {
   final TextEditingController _inputController = TextEditingController();
   final FocusNode _inputFocusNode = FocusNode();
   bool _isSending = false;
+  bool _hasText = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _inputController.addListener(_handleInputChanged);
+  }
+
+  void _handleInputChanged() {
+    final hasText = _inputController.text.trim().isNotEmpty;
+    if (hasText != _hasText) {
+      setState(() => _hasText = hasText);
+    }
+  }
 
   @override
   void dispose() {
+    _inputController.removeListener(_handleInputChanged);
     _inputController.dispose();
     _inputFocusNode.dispose();
     super.dispose();
@@ -57,7 +72,10 @@ class _AiChatBoardState extends State<AiChatBoard> {
     if (text.isEmpty) return;
 
     _inputController.clear();
-    setState(() => _isSending = true);
+    setState(() {
+      _isSending = true;
+      _hasText = false;
+    });
     try {
       unawaited(widget.onSubmitPrompt(text));
     } catch (_) {
@@ -686,25 +704,13 @@ class _AiChatBoardState extends State<AiChatBoard> {
                   child: Row(
                     children: [
                       IconButton(
-                        onPressed:
-                            _isSending ||
-                                    (aiProvider.isBusy &&
-                                        aiProvider.state != AiState.listening)
-                                ? null
-                                : () => aiProvider.onPrimaryAction(
-                                  source: 'ai_chat_board_mic',
-                                  surface: AiResponseSurface.bubble,
-                                ),
+                        onPressed: () => _inputFocusNode.requestFocus(),
                         icon: Icon(
-                          aiProvider.state == AiState.listening
-                              ? Icons.mic_off
-                              : Icons.mic_none_rounded,
+                          Icons.auto_awesome_rounded,
                           color:
-                              aiProvider.state == AiState.listening
-                                  ? AppColors.error
-                                  : (isDarkMode
-                                      ? Colors.white70
-                                      : AppColors.iconSubtle),
+                              isDarkMode
+                                  ? Colors.white70
+                                  : AppColors.iconSubtle,
                         ),
                       ),
                       Expanded(
@@ -722,6 +728,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
                             minLines: 1,
                             maxLines: 3,
                             style: AppTypography.bodyMedium.copyWith(
+                              fontSize: 16,
                               color: isDarkMode ? Colors.white : Colors.black87,
                             ),
                             decoration: InputDecoration(
@@ -730,9 +737,9 @@ class _AiChatBoardState extends State<AiChatBoard> {
                               hintStyle: TextStyle(
                                 color:
                                     isDarkMode
-                                        ? Colors.white38
-                                        : Colors.black38,
-                                fontSize: 14,
+                                        ? DarkColors.textHint
+                                        : const Color(0xFFA1A3A7),
+                                fontSize: 16,
                               ),
                               contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 4,
@@ -743,35 +750,40 @@ class _AiChatBoardState extends State<AiChatBoard> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      SizedBox(
-                        width: 42,
-                        height: 42,
-                        child: ElevatedButton(
+                      if (_hasText)
+                        IconButton(
                           key: const ValueKey('ai_chat_send'),
-                          style: ElevatedButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(
-                                _buttonRadius,
-                              ),
-                            ),
-                            backgroundColor:
-                                _isSending || aiProvider.isBusy
-                                    ? Colors.grey
+                          icon: Icon(
+                            Icons.send,
+                            color:
+                                isDarkMode
+                                    ? DarkColors.primary
                                     : AppColors.primary,
                           ),
-                          onPressed:
-                              _isSending || aiProvider.isBusy
-                                  ? null
-                                  : _submitTextPrompt,
-                          child: const Icon(
-                            Icons.send_rounded,
-                            size: 18,
-                            color: Colors.white,
+                          onPressed: _isSending ? null : _submitTextPrompt,
+                        )
+                      else
+                        IconButton(
+                          key: const ValueKey('ai_chat_mic_idle'),
+                          icon: Icon(
+                            aiProvider.state == AiState.listening
+                                ? Icons.mic_off
+                                : Icons.mic_none_outlined,
+                            color:
+                                aiProvider.state == AiState.listening
+                                    ? AppColors.error
+                                    : (isDarkMode
+                                        ? Colors.white70
+                                        : AppColors.iconSubtle),
                           ),
+                          onPressed:
+                              _isSending
+                                  ? null
+                                  : () => aiProvider.onPrimaryAction(
+                                    source: 'ai_chat_board_mic_idle',
+                                    surface: AiResponseSurface.bubble,
+                                  ),
                         ),
-                      ),
                     ],
                   ),
                 ),

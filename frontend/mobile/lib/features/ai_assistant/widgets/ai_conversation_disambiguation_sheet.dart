@@ -42,6 +42,10 @@ class AiConversationDisambiguationSheet extends StatefulWidget {
 
 class _AiConversationDisambiguationSheetState
     extends State<AiConversationDisambiguationSheet> {
+  static const double _sheetRadius = 18;
+  static const double _cardRadius = 10;
+  static const double _buttonRadius = 999;
+
   final TextEditingController _searchController = TextEditingController();
   String _keyword = '';
 
@@ -76,7 +80,9 @@ class _AiConversationDisambiguationSheetState
       child: Container(
         decoration: BoxDecoration(
           color: sheetBackground,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(_sheetRadius),
+          ),
         ),
         child: SafeArea(
           top: false,
@@ -119,7 +125,7 @@ class _AiConversationDisambiguationSheetState
                         isDark
                             ? DarkColors.surfaceLight
                             : const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(_cardRadius),
                     border: Border.all(
                       color:
                           isDark
@@ -182,7 +188,9 @@ class _AiConversationDisambiguationSheetState
                                   key: ValueKey(
                                     'ai_conversation_disambiguation_item_${conversation.id}',
                                   ),
-                                  borderRadius: BorderRadius.circular(14),
+                                  borderRadius: BorderRadius.circular(
+                                    _cardRadius,
+                                  ),
                                   onTap:
                                       () => Navigator.of(
                                         context,
@@ -196,7 +204,9 @@ class _AiConversationDisambiguationSheetState
                                                 alpha: 0.05,
                                               )
                                               : const Color(0xFFF8FAFC),
-                                      borderRadius: BorderRadius.circular(14),
+                                      borderRadius: BorderRadius.circular(
+                                        _cardRadius,
+                                      ),
                                       border: Border.all(
                                         color:
                                             isDark
@@ -280,7 +290,7 @@ class _AiConversationDisambiguationSheetState
                       foregroundColor: textPrimary,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(999),
+                        borderRadius: BorderRadius.circular(_buttonRadius),
                       ),
                     ),
                     child: Text(
