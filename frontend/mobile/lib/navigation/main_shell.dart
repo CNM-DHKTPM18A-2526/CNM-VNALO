@@ -864,6 +864,10 @@ class MainShellState extends State<MainShell> {
             aiCommand: aiCmd,
             extra: {'command': command},
           );
+          _addAiActionInfo(
+            'Trợ lý chưa hỗ trợ thao tác "$command" trên mobile. Bạn có thể yêu cầu mở màn hình liên quan hoặc thao tác thủ công.',
+            feedbackSource: 'ai_action_unsupported.$command',
+          );
       }
     } catch (error) {
       _logAiFlow(
