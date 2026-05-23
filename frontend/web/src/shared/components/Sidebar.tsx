@@ -24,14 +24,15 @@ export function Sidebar({ onOpenSettingsModal, onOpenCaptureModal }: SidebarProp
   ]
 
   const secondaryNav = [
-    { 
-      to: user ? `/chat/vnalo_cloud_${user.id}` : '/chat', 
-      labelKey: 'sidebar.cloud', 
-      icon: 'cloud' as const 
+    {
+      to: user ? `/chat/vnalo_cloud_${user.id}` : '/chat',
+      labelKey: 'sidebar.cloud',
+      icon: 'cloud' as const
     },
     { to: '/chat/my-documents', labelKey: 'sidebar.documents', icon: 'folder' as const },
     { labelKey: 'sidebar.todo', icon: 'capture' as const, onClick: onOpenCaptureModal },
     { to: '/tools', labelKey: 'sidebar.tools', icon: 'briefcase' as const },
+    { to: '/face-auth', labelKey: 'sidebar.faceAuth', icon: 'spark' as const },
   ]
 
   const handleOpenSettings = () => {
