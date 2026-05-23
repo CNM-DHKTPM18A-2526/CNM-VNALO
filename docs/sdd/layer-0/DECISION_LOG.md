@@ -21,6 +21,7 @@
 | D-012 | Group Disband Performs Immediate Hard Delete of Messages and S3 Media | Accepted | 2026-04-22 |
 | D-013 | Block Applies to Group Messages Cross-Conversation | Accepted | 2026-04-22 |
 | D-014 | group.disbanded is a New First-Class WS Event | Accepted | 2026-04-22 |
+| D-015 | Face Auth: ONNX ArcFace + MiniFASNetV2 in core-service, no separate microservice | Accepted | 2026-05-23 |
 
 ---
 
@@ -179,3 +180,17 @@
 - Evidence:
   - docs/sdd/layer-2/MODULE_SPEC_CHAT.md §2.4
   - docs/sdd/layer-3/SOCKET_SIGNALING_SCHEMA.md (update required)
+
+## D-015 Face Auth: ONNX ArcFace + MiniFASNetV2 in core-service, no separate microservice
+
+- Context: Face authentication requires embedding extraction (ArcFace) and liveness detection (MiniFASNetV2). Initial analysis considered separate microservice, GPU inference, and pgvector storage.
+- Decision: Embed face auth as a feature module within core-service using ONNX Runtime (CPU-only) for inference and AES-256-GCM encrypted Postgres TEXT storage for embeddings. No GPU, no pgvector, no separate service.
+- Consequence:
+  - CPU inference limits throughput (~15-45ms per request, suitable for login-scale load).
+  - Embedding storage is encrypted at rest with application-level AES-256-GCM.
+  - ONNX models must be bundled in the container image or mounted as a volume.
+  - Feature is disabled by default; must be explicitly enabled via `FACE_AUTH_ENABLED=true` and `FACE_ENCRYPTION_KEY` must be set.
+- Evidence:
+  - docs/sdd/layer-2/MODULE_SPEC_FACE_AUTH.md
+  - backend/java-services/services/core-service/src/main/java/iuh/cnm/vnalo/core_service/controller/FaceAuthController.java
+  - backend/java-services/services/core-service/src/main/resources/db/migration/V27__add_face_auth.sql

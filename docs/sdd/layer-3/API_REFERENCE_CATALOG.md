@@ -124,6 +124,17 @@
 | POST | /api/v1/test/fcm/send | JWT | send test push payload |
 | POST | /api/v1/test/fcm/send-otp | JWT | send OTP-style test push payload |
 
+### Face Authentication
+
+| Method | Full Path | Auth | Notes |
+| --- | --- | --- | --- |
+| POST | /api/v1/face/enroll | JWT | Enroll face for biometric auth (multipart/form-data) |
+| POST | /api/v1/face/verify | Public | Verify face against enrolled face (multipart/form-data) |
+| POST | /api/v1/face/liveness-check | Public | Check liveness/anti-spoof (multipart/form-data) |
+| GET | /api/v1/face/status | JWT | Get enrollment status |
+| DELETE | /api/v1/face/enrollment | JWT | Delete face enrollment |
+| GET | /api/v1/face/health | Public | Service health check |
+
 ---
 
 ## message-service Endpoints
