@@ -615,7 +615,15 @@ class _ChatInputBarState extends State<ChatInputBar> {
 
     final orderedTypers =
         typingUsers.entries.toList()
-          ..sort((a, b) => a.value.lastSeen.compareTo(b.value.lastSeen));
+          ..sort((a, b) {
+            final startedCompare = a.value.startedAt.compareTo(
+              b.value.startedAt,
+            );
+            if (startedCompare != 0) {
+              return startedCompare;
+            }
+            return a.value.lastSeen.compareTo(b.value.lastSeen);
+          });
 
     final text =
         orderedTypers.length == 1

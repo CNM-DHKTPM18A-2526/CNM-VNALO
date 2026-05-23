@@ -22,10 +22,15 @@ import 'dart:io';
 import 'dart:convert';
 
 class ChatTypingState {
+  final DateTime startedAt;
   final DateTime lastSeen;
   final String? clientPlatform;
 
-  const ChatTypingState({required this.lastSeen, this.clientPlatform});
+  const ChatTypingState({
+    required this.startedAt,
+    required this.lastSeen,
+    this.clientPlatform,
+  });
 }
 
 class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
@@ -2121,8 +2126,11 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     _typingUsers[conversationId] ??= {};
 
     if (isTyping) {
+      final existing = _typingUsers[conversationId]![senderId];
+      final now = DateTime.now();
       _typingUsers[conversationId]![senderId] = ChatTypingState(
-        lastSeen: DateTime.now(),
+        startedAt: existing?.startedAt ?? now,
+        lastSeen: now,
         clientPlatform: clientPlatform,
       );
       // Auto-expire after 5 seconds if no stop event
