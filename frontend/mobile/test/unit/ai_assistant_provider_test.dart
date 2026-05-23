@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -67,6 +69,7 @@ void main() {
 
   bool speechInitAvailable = true;
   bool speechListenThrows = false;
+  Duration speechStopDelay = Duration.zero;
 
   setUpAll(() {
     AppConfig.initialize(Environment.dev);
@@ -76,6 +79,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     speechInitAvailable = true;
     speechListenThrows = false;
+    speechStopDelay = Duration.zero;
 
     final messenger =
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
@@ -97,6 +101,10 @@ void main() {
           }
           return true;
         case 'stop':
+          if (speechStopDelay > Duration.zero) {
+            await Future<void>.delayed(speechStopDelay);
+          }
+          return null;
         case 'cancel':
           return null;
         default:
@@ -340,6 +348,42 @@ void main() {
     expect(provider.aiResponse, 'Không thể bắt đầu thu âm. Bạn thử lại.');
     expect(provider.conversationHistory.last.text, provider.aiResponse);
 
+    provider.dispose();
+  });
+
+
+  test('submitTextPrompt records user message before slow STT stop completes', () async {
+    speechStopDelay = const Duration(milliseconds: 300);
+    final provider = _buildProvider(
+      responses: {
+        'Xin chao': {'textReply': 'Chao ban', 'emotion': 'neutral'},
+      },
+      responseDelay: const Duration(milliseconds: 300),
+    );
+
+    await provider.startListening(source: 'preempt_listening_test');
+    expect(provider.state, AiState.listening);
+
+    unawaited(
+      provider.submitTextPrompt(
+        'Xin chao',
+        source: 'ai_conversation_screen',
+        surface: AiResponseSurface.conversation,
+      ),
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+
+    expect(
+      provider.conversationHistory.any(
+        (entry) =>
+            entry.role == AiConversationRole.user && entry.text == 'Xin chao',
+      ),
+      isTrue,
+    );
+    expect(provider.state, AiState.thinking);
+
+    await Future<void>.delayed(const Duration(milliseconds: 650));
     provider.dispose();
   });
 

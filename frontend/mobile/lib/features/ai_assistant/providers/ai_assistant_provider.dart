@@ -1566,9 +1566,23 @@ class AiAssistantProvider with ChangeNotifier {
     }
 
     if (_state == AiState.listening) {
-      await stopListening(
-        reason: '$source.stop_listening',
-        keepBubbleVisible: responseSurface != AiResponseSurface.conversation,
+      final keepBubbleVisible = responseSurface != AiResponseSurface.conversation;
+      _cancelListenGuard();
+      _listenStartedAt = null;
+      _isSessionActive = false;
+      _soundLevel = 0;
+      _transitionTo(
+        AiState.idle,
+        reason: '$source.stop_listening_preempt',
+        notify: false,
+      );
+      notifyListeners();
+
+      unawaited(
+        stopListening(
+          reason: '$source.stop_listening',
+          keepBubbleVisible: keepBubbleVisible,
+        ),
       );
     }
 
