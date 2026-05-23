@@ -180,8 +180,15 @@ class _AiConversationDisambiguationSheetState
                               final displayName = conversation.getDisplayName(
                                 widget.currentUserId,
                               );
-                              final isDirect =
-                                  conversation.type.name == 'DIRECT';
+                              final avatarName = _avatarNameForConversation(
+                                conversation,
+                              );
+                              final avatarUrl = _avatarUrlForConversation(
+                                conversation,
+                              );
+                              final subtitle = _subtitleForConversation(
+                                conversation,
+                              );
                               return Material(
                                 color: Colors.transparent,
                                 child: InkWell(
@@ -218,15 +225,11 @@ class _AiConversationDisambiguationSheetState
                                     ),
                                     child: Row(
                                       children: [
-                                        CircleAvatar(
-                                          backgroundColor: AppColors.primary
-                                              .withValues(alpha: 0.12),
-                                          child: Icon(
-                                            isDirect
-                                                ? Icons.person
-                                                : Icons.groups_rounded,
-                                            color: AppColors.primary,
-                                          ),
+                                        _ConversationAvatar(
+                                          imageUrl: avatarUrl,
+                                          name: avatarName,
+                                          size: 44,
+                                          isDark: isDark,
                                         ),
                                         const SizedBox(width: 12),
                                         Expanded(
@@ -247,9 +250,7 @@ class _AiConversationDisambiguationSheetState
                                               ),
                                               const SizedBox(height: 4),
                                               Text(
-                                                isDirect
-                                                    ? 'Trò chuyện 1-1'
-                                                    : 'Nhóm • ${conversation.members.length} thành viên',
+                                                subtitle,
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                                 style: AppTypography.bodySmall
@@ -309,4 +310,160 @@ class _AiConversationDisambiguationSheetState
       ),
     );
   }
+
+  String _avatarNameForConversation(Conversation conversation) {
+    if (conversation.type.name == 'DIRECT' && conversation.members.isNotEmpty) {
+      final otherMember = conversation.members.firstWhere(
+        (member) => member.userId != widget.currentUserId,
+        orElse: () => conversation.members.first,
+      );
+      final directName = otherMember.user?.displayName.trim();
+      if (directName != null && directName.isNotEmpty) {
+        return directName;
+      }
+    }
+
+    final title = conversation.getDisplayName(widget.currentUserId).trim();
+    if (title.isNotEmpty) {
+      return title;
+    }
+    return conversation.type.name == 'DIRECT' ? 'Liên hệ' : 'Nhóm';
+  }
+
+  String? _avatarUrlForConversation(Conversation conversation) {
+    if (conversation.type.name == 'DIRECT' && conversation.members.isNotEmpty) {
+      final otherMember = conversation.members.firstWhere(
+        (member) => member.userId != widget.currentUserId,
+        orElse: () => conversation.members.first,
+      );
+      final directAvatar = otherMember.user?.avatarUrl?.trim();
+      if (directAvatar != null && directAvatar.isNotEmpty) {
+        return directAvatar;
+      }
+    }
+
+    final conversationAvatar = conversation.avatarUrl?.trim();
+    if (conversationAvatar != null && conversationAvatar.isNotEmpty) {
+      return conversationAvatar;
+    }
+    return null;
+  }
+
+  String _subtitleForConversation(Conversation conversation) {
+    if (conversation.type.name != 'DIRECT') {
+      return 'Nhóm • ${conversation.members.length} thành viên';
+    }
+
+    if (conversation.members.isEmpty) {
+      return 'Trò chuyện 1-1';
+    }
+
+    final otherMember = conversation.members.firstWhere(
+      (member) => member.userId != widget.currentUserId,
+      orElse: () => conversation.members.first,
+    );
+    final phone = otherMember.user?.phone?.trim();
+    final email = otherMember.user?.email?.trim();
+
+    if (phone != null && phone.isNotEmpty) {
+      return '1-1 • $phone';
+    }
+    if (email != null && email.isNotEmpty) {
+      return '1-1 • $email';
+    }
+    return 'Trò chuyện 1-1';
+  }
+}
+
+class _ConversationAvatar extends StatelessWidget {
+  final String? imageUrl;
+  final String name;
+  final double size;
+  final bool isDark;
+
+  const _ConversationAvatar({
+    required this.imageUrl,
+    required this.name,
+    required this.size,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = isDark ? Colors.white : const Color(0xFF0F172A);
+    final background = isDark
+        ? Colors.white.withValues(alpha: 0.14)
+        : const Color(0xFFE2E8F0);
+    final normalizedUrl = imageUrl?.trim();
+    final hasImage = normalizedUrl != null && normalizedUrl.isNotEmpty;
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: background,
+      ),
+      clipBehavior: Clip.antiAlias,
+      alignment: Alignment.center,
+      child: hasImage
+          ? Image.network(
+              normalizedUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => _ConversationAvatarFallback(
+                name: name,
+                foreground: foreground,
+              ),
+              loadingBuilder: (context, child, progress) {
+                if (progress == null) {
+                  return child;
+                }
+                return _ConversationAvatarFallback(
+                  name: name,
+                  foreground: foreground,
+                );
+              },
+            )
+          : _ConversationAvatarFallback(name: name, foreground: foreground),
+    );
+  }
+}
+
+class _ConversationAvatarFallback extends StatelessWidget {
+  final String name;
+  final Color foreground;
+
+  const _ConversationAvatarFallback({
+    required this.name,
+    required this.foreground,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      _avatarInitials(name),
+      maxLines: 1,
+      overflow: TextOverflow.clip,
+      style: AppTypography.labelLarge.copyWith(
+        color: foreground,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+  }
+}
+
+String _avatarInitials(String name) {
+  final parts = name
+      .trim()
+      .split(RegExp(r'\\s+'))
+      .where((part) => part.isNotEmpty)
+      .toList(growable: false);
+  if (parts.isEmpty) {
+    return '?';
+  }
+  if (parts.length == 1) {
+    return parts.first.substring(0, 1).toUpperCase();
+  }
+  return (parts.first.substring(0, 1) + parts.last.substring(0, 1))
+      .toUpperCase();
 }
