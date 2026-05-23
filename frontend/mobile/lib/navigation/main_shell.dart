@@ -15,6 +15,7 @@ import 'package:vnalo_mobile/features/discover/screens/discover_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/profile_screen.dart';
 import 'package:vnalo_mobile/features/timeline/screens/home_wall_screen.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
+import 'package:vnalo_mobile/features/ai_assistant/services/ai_action_context_store.dart';
 import 'package:vnalo_mobile/features/ai_assistant/services/ai_action_target_matcher.dart';
 import 'package:vnalo_mobile/features/ai_assistant/utils/ai_command_routing.dart';
 import 'package:vnalo_mobile/features/ai_assistant/utils/ai_recall_message_selector.dart';
@@ -32,34 +33,6 @@ import 'package:vnalo_mobile/models/user_model.dart';
 import 'package:vnalo_mobile/services/friend_service.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 
-class _AiTargetContext {
-  final String targetName;
-  final String? conversationId;
-  final String? peerUserId;
-  final DateTime updatedAt;
-
-  const _AiTargetContext({
-    required this.targetName,
-    this.conversationId,
-    this.peerUserId,
-    required this.updatedAt,
-  });
-}
-
-class _AiPendingAction {
-  final String command;
-  final Map<String, dynamic>? params;
-  final String scope;
-  final DateTime updatedAt;
-
-  const _AiPendingAction({
-    required this.command,
-    required this.params,
-    required this.scope,
-    required this.updatedAt,
-  });
-}
-
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -68,17 +41,13 @@ class MainShell extends StatefulWidget {
 }
 
 class MainShellState extends State<MainShell> {
-  static const Duration _aiTargetContextTtl = Duration(minutes: 12);
-  static const Duration _aiPendingActionTtl = Duration(minutes: 5);
-
   int _currentIndex = 0;
   bool _isCallScreenActive = false;
   String? _activeAiConversationId;
   StreamSubscription<AiCommand>? _actionSub;
   StreamSubscription<AiDisambiguationSelection>? _disambiguationSub;
   StreamSubscription<Map<String, dynamic>>? _callErrorSub;
-  _AiTargetContext? _aiTargetContext;
-  _AiPendingAction? _aiPendingAction;
+  final AiActionContextStore _aiActionContextStore = AiActionContextStore();
 
   // Static key to access state from outside
   static final GlobalKey<MainShellState> globalKey =
@@ -177,22 +146,15 @@ class MainShellState extends State<MainShell> {
     if (normalizedTarget.isEmpty) {
       return;
     }
-    _aiTargetContext = _AiTargetContext(
+    _aiActionContextStore.rememberTarget(
       targetName: normalizedTarget,
       conversationId: conversationId?.trim(),
       peerUserId: peerUserId?.trim(),
-      updatedAt: DateTime.now(),
     );
   }
 
-  _AiTargetContext? _activeAiTargetContext() {
-    final current = _aiTargetContext;
-    if (current == null) return null;
-    if (DateTime.now().difference(current.updatedAt) > _aiTargetContextTtl) {
-      _aiTargetContext = null;
-      return null;
-    }
-    return current;
+  AiTargetContext? _activeAiTargetContext() {
+    return _aiActionContextStore.activeTarget();
   }
 
   void _rememberPendingAiAction({
@@ -200,54 +162,25 @@ class MainShellState extends State<MainShell> {
     required String scope,
     Map<String, dynamic>? params,
   }) {
-    _aiPendingAction = _AiPendingAction(
+    _aiActionContextStore.rememberPendingAction(
       command: _normalizeAiSystemAction(command),
-      params: params == null ? null : Map<String, dynamic>.from(params),
       scope: scope,
-      updatedAt: DateTime.now(),
+      params: params,
     );
   }
 
-  _AiPendingAction? _activePendingAiAction() {
-    final current = _aiPendingAction;
-    if (current == null) return null;
-    if (DateTime.now().difference(current.updatedAt) > _aiPendingActionTtl) {
-      _aiPendingAction = null;
-      return null;
-    }
-    return current;
+  AiPendingAction? _activePendingAiAction() {
+    return _aiActionContextStore.activePendingAction();
   }
 
   Map<String, dynamic> _injectSelectedNameIntoPendingParams(
-    _AiPendingAction pending,
+    AiPendingAction pending,
     String selectedName,
   ) {
-    final next =
-        pending.params == null
-            ? <String, dynamic>{}
-            : Map<String, dynamic>.from(pending.params!);
-    switch (pending.scope) {
-      case 'conversation':
-        next['conversation'] = selectedName;
-        next['conversationName'] = selectedName;
-        next['group'] ??= selectedName;
-        if (pending.command == 'OPEN_CHAT' ||
-            pending.command == 'COMPOSE_MESSAGE' ||
-            pending.command == 'START_CALL') {
-          next['target'] = selectedName;
-          next['recipient'] ??= selectedName;
-        }
-        break;
-      case 'user':
-      case 'contact':
-      default:
-        next['target'] = selectedName;
-        next['recipient'] = selectedName;
-        next['contactName'] = selectedName;
-        next['name'] = selectedName;
-        break;
-    }
-    return next;
+    return _aiActionContextStore.injectSelectedNameIntoPendingParams(
+      pending,
+      selectedName,
+    );
   }
 
   Future<void> _handleAiDisambiguationSelection(
@@ -258,7 +191,7 @@ class MainShellState extends State<MainShell> {
       return;
     }
 
-    _aiPendingAction = null;
+    _aiActionContextStore.clearPendingAction();
     final selectedName = selection.selectedName.trim();
     if (selectedName.isEmpty) {
       return;
@@ -277,7 +210,6 @@ class MainShellState extends State<MainShell> {
       AiCommand(command: pending.command, params: nextParams),
     );
   }
-
   String? _directPeerUserId(Conversation conversation, String currentUserId) {
     if (conversation.type.name != 'DIRECT') return null;
     for (final member in conversation.members) {
