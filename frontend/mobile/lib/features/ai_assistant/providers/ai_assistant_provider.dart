@@ -2423,7 +2423,10 @@ class AiAssistantProvider with ChangeNotifier {
     required int token,
     required String traceId,
   }) async {
-    if (!_isCurrentOperation(token) || _state != AiState.listening) {
+    // HARDEN(late-callback): guard against timer firing after dispose
+    if (_isDisposed ||
+        !_isCurrentOperation(token) ||
+        _state != AiState.listening) {
       return;
     }
 
