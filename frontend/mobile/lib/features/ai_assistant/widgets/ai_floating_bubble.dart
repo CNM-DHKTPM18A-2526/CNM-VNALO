@@ -423,13 +423,21 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
 
   void _toggleBoard(AiAssistantProvider provider) {
     final latestAssistantEntryId = _latestAssistantEntryId(provider);
+    final isAutoBoardVisible =
+        !_isBoardExpanded &&
+        provider.aiResponse.isNotEmpty &&
+        provider.shouldBubbleAutoShowResponse &&
+        latestAssistantEntryId != null &&
+        latestAssistantEntryId != _dismissedAssistantEntryId;
+
     setState(() {
-      if (_isBoardExpanded) {
+      if (_isBoardExpanded || isAutoBoardVisible) {
+        _isBoardExpanded = false;
         _dismissedAssistantEntryId = latestAssistantEntryId;
       } else {
+        _isBoardExpanded = true;
         _dismissedAssistantEntryId = null;
       }
-      _isBoardExpanded = !_isBoardExpanded;
     });
   }
 
