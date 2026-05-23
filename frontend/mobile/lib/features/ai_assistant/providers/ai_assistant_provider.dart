@@ -369,6 +369,7 @@ class AiAssistantProvider with ChangeNotifier {
   String _activeTraceId = '';
   String? _resolvedLocaleId;
   Timer? _listenGuardTimer;
+  Timer? _sttRestartTimer;
   DateTime? _listenStartedAt;
   DateTime? _lastFinalResultAt;
   String _lastFinalResultText = '';
@@ -700,6 +701,8 @@ class AiAssistantProvider with ChangeNotifier {
   void _cancelListenGuard() {
     _listenGuardTimer?.cancel();
     _listenGuardTimer = null;
+    _sttRestartTimer?.cancel();
+    _sttRestartTimer = null;
   }
 
   Duration _elapsedListeningTime() {
@@ -722,6 +725,81 @@ class AiAssistantProvider with ChangeNotifier {
         _elapsedListeningTime() < _sttListenFor;
   }
 
+  void _restartListeningUntilGuardWindow({
+    required String reason,
+    required int token,
+    required String traceId,
+  }) {
+    if (!_shouldIgnorePrematureSttEnd(isPermanentError: false)) {
+      return;
+    }
+
+    _sttRestartTimer?.cancel();
+    _sttRestartTimer = Timer(const Duration(milliseconds: 180), () async {
+      if (!_isCurrentOperation(token) ||
+          _state != AiState.listening ||
+          _isPipelineLocked ||
+          !_shouldIgnorePrematureSttEnd(isPermanentError: false)) {
+        return;
+      }
+
+      try {
+        await _stt.listen(
+          onResult:
+              (result) =>
+                  _handleSpeechResult(result, token: token, traceId: traceId),
+          onSoundLevelChange: _handleSoundLevelChange,
+          listenFor: _sttListenFor,
+          pauseFor: _sttPauseFor,
+          localeId: _resolvedLocaleId ?? _defaultLocaleId,
+          listenOptions: SpeechListenOptions(
+            cancelOnError: true,
+            partialResults: true,
+            listenMode: ListenMode.dictation,
+          ),
+        );
+        _logEvent(
+          'STT_LISTEN_RESTARTED',
+          traceId: traceId,
+          data: {
+            'reason': reason,
+            'elapsedMs': _elapsedListeningTime().inMilliseconds,
+            'minimumMs': _sttListenFor.inMilliseconds,
+          },
+        );
+      } catch (error) {
+        _logEvent(
+          'STT_RESTART_ERROR',
+          traceId: traceId,
+          level: 'WARN',
+          data: {'error': error.toString(), 'reason': reason},
+        );
+      }
+    });
+  }
+
+  void _handleSpeechResult(
+    dynamic result, {
+    required int token,
+    required String traceId,
+  }) {
+    if (!_isCurrentOperation(token)) {
+      return;
+    }
+
+    _lastWords = result.recognizedWords.trim();
+    notifyListeners();
+
+    if (result.finalResult &&
+        _lastWords.isNotEmpty &&
+        !_isDuplicateFinalResult(_lastWords)) {
+      _lastFinalResultAt = DateTime.now();
+      _lastFinalResultText = _lastWords;
+      _lastResponseSurface = _activeSurface;
+      unawaited(_handleCommand(_lastWords, parentTraceId: traceId));
+    }
+  }
+
   void _handleSttTerminalStatus(String status) {
     final normalized = status.trim().toLowerCase();
     if ((normalized != 'done' && normalized != 'notlistening') ||
@@ -740,6 +818,11 @@ class AiAssistantProvider with ChangeNotifier {
           'hasFinalTranscript': _hasCapturedFinalTranscript(),
           'lastWordsLength': _lastWords.length,
         },
+      );
+      _restartListeningUntilGuardWindow(
+        reason: 'terminal_status:$normalized',
+        token: _operationToken,
+        traceId: _activeTraceId,
       );
       return;
     }
@@ -1217,24 +1300,9 @@ class AiAssistantProvider with ChangeNotifier {
     try {
       _startListenGuard(token: token, traceId: traceId);
       await _stt.listen(
-        onResult: (result) {
-          // HARDEN(late-callback): STT result arriving after operation changed
-          if (!_isCurrentOperation(token)) {
-            return;
-          }
-
-          _lastWords = result.recognizedWords.trim();
-          notifyListeners();
-
-          if (result.finalResult &&
-              _lastWords.isNotEmpty &&
-              !_isDuplicateFinalResult(_lastWords)) {
-            _lastFinalResultAt = DateTime.now();
-            _lastFinalResultText = _lastWords;
-            _lastResponseSurface = resolvedSurface;
-            unawaited(_handleCommand(_lastWords, parentTraceId: traceId));
-          }
-        },
+        onResult:
+            (result) =>
+                _handleSpeechResult(result, token: token, traceId: traceId),
         onSoundLevelChange: _handleSoundLevelChange,
         listenFor: _sttListenFor,
         pauseFor: _sttPauseFor,
@@ -1356,6 +1424,11 @@ class AiAssistantProvider with ChangeNotifier {
                 'minimumMs': _sttListenFor.inMilliseconds,
               },
             );
+            _restartListeningUntilGuardWindow(
+              reason: 'transient_error:${error.errorMsg}',
+              token: _operationToken,
+              traceId: _activeTraceId,
+            );
             return;
           }
           if (_state == AiState.listening && !_isPipelineLocked) {
@@ -1447,7 +1520,7 @@ class AiAssistantProvider with ChangeNotifier {
     _activeSurface = responseSurface;
     _lastResponseSurface = responseSurface;
 
-    await _ensureConversationCreated(source: '$source.text_interaction');
+    unawaited(_ensureConversationCreated(source: '$source.text_interaction'));
 
     _cancelIdleAutoHide();
     if (responseSurface != AiResponseSurface.conversation) {
@@ -1504,6 +1577,30 @@ class AiAssistantProvider with ChangeNotifier {
       reason: 'command_received',
       traceId: traceId,
     );
+
+    final userEntryId = _newEntryId();
+    final assistantEntryId = _newEntryId();
+    final List<Map<String, dynamic>> structuredHistory = [];
+    final historySubset =
+        _conversationHistory.length > 10
+            ? _conversationHistory.sublist(_conversationHistory.length - 10)
+            : _conversationHistory;
+    for (final entry in historySubset) {
+      final role = entry.role == AiConversationRole.user ? 'user' : 'assistant';
+      structuredHistory.add({
+        'role': role,
+        'content': entry.text,
+        'createdAt': entry.createdAt.toUtc().toIso8601String(),
+        'clientEntryId': entry.entryId,
+      });
+    }
+
+    _recordUserHistory(
+      text: normalized,
+      source: 'assistant_chat',
+      entryId: userEntryId,
+    );
+
     try {
       await _stt.stop();
     } catch (error) {
@@ -1515,32 +1612,7 @@ class AiAssistantProvider with ChangeNotifier {
       );
     }
 
-    final userEntryId = _newEntryId();
-    final assistantEntryId = _newEntryId();
-
     try {
-      final List<Map<String, dynamic>> structuredHistory = [];
-      final historySubset =
-          _conversationHistory.length > 10
-              ? _conversationHistory.sublist(_conversationHistory.length - 10)
-              : _conversationHistory;
-      for (final entry in historySubset) {
-        final role =
-            entry.role == AiConversationRole.user ? 'user' : 'assistant';
-        structuredHistory.add({
-          'role': role,
-          'content': entry.text,
-          'createdAt': entry.createdAt.toUtc().toIso8601String(),
-          'clientEntryId': entry.entryId,
-        });
-      }
-
-      _recordUserHistory(
-        text: normalized,
-        source: 'assistant_chat',
-        entryId: userEntryId,
-      );
-
       final response = await _aiService
           .chat(
             normalized,

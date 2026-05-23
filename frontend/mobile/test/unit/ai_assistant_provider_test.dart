@@ -14,11 +14,15 @@ const MethodChannel _speechChannel = MethodChannel(
 const MethodChannel _ttsChannel = MethodChannel('flutter_tts');
 
 class _StubApiService extends ApiService {
-  _StubApiService({Map<String, Map<String, dynamic>> responses = const {}})
-    : _responses = responses,
+  _StubApiService({
+    Map<String, Map<String, dynamic>> responses = const {},
+    Duration responseDelay = Duration.zero,
+  }) : _responses = responses,
+       _responseDelay = responseDelay,
       super(StorageService());
 
   final Map<String, Map<String, dynamic>> _responses;
+  final Duration _responseDelay;
 
   @override
   Future<Map<String, dynamic>> post(
@@ -28,6 +32,9 @@ class _StubApiService extends ApiService {
     Map<String, String>? queryParams,
   }) async {
     if (endpoint == '/ai/chat') {
+      if (_responseDelay > Duration.zero) {
+        await Future<void>.delayed(_responseDelay);
+      }
       final prompt = (body?['prompt'] ?? '').toString();
       final response =
           _responses[prompt] ??
@@ -47,8 +54,11 @@ class _StubApiService extends ApiService {
 
 AiAssistantProvider _buildProvider({
   Map<String, Map<String, dynamic>> responses = const {},
+  Duration responseDelay = Duration.zero,
 }) {
-  final aiService = AiService(_StubApiService(responses: responses));
+  final aiService = AiService(
+    _StubApiService(responses: responses, responseDelay: responseDelay),
+  );
   return AiAssistantProvider(aiService, enableFlowLogging: false);
 }
 
@@ -174,6 +184,36 @@ void main() {
     expect(provider.aiResponse, 'Xin chao! Toi co the giup gi cho ban?');
     expect(provider.state, AiState.idle);
     expect(provider.isMascotVisible, isTrue);
+
+    provider.dispose();
+  });
+
+  test('submitTextPrompt records user entry before delayed AI response', () async {
+    final provider = _buildProvider(
+      responses: {
+        'Ban oi': {
+          'textReply': 'Mình đang ở đây.',
+          'emotion': 'neutral',
+        },
+      },
+      responseDelay: const Duration(milliseconds: 250),
+    );
+
+    final submitFuture = provider.submitTextPrompt(
+      'Ban oi',
+      source: 'chat_board_test',
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+
+    expect(provider.conversationHistory, isNotEmpty);
+    expect(provider.conversationHistory.last.role, AiConversationRole.user);
+    expect(provider.conversationHistory.last.text, 'Ban oi');
+    expect(provider.isAssistantGenerating, isTrue);
+
+    await submitFuture;
+
+    expect(provider.aiResponse, 'Mình đang ở đây.');
 
     provider.dispose();
   });
