@@ -325,6 +325,58 @@ class MainShellState extends State<MainShell> {
     return matches.where((user) => user.id == peerUserId).firstOrNull;
   }
 
+  Conversation? _conversationForUser(ChatProvider chatProvider, String userId) {
+    final currentUserId = chatProvider.currentUserId ?? '';
+    if (userId.trim().isEmpty || currentUserId.isEmpty) return null;
+    return chatProvider.conversations
+        .where(
+          (conversation) =>
+              conversation.type.name == 'DIRECT' &&
+              _directPeerUserId(conversation, currentUserId) == userId.trim(),
+        )
+        .firstOrNull;
+  }
+
+  Future<Conversation?> _openOrCreateDirectConversation({
+    required User user,
+    required ChatProvider chatProvider,
+    required AiCommand aiCmd,
+    required String targetName,
+  }) async {
+    final existing = _conversationForUser(chatProvider, user.id);
+    if (existing != null) {
+      _rememberAiTargetContext(
+        targetName: existing.getDisplayName(chatProvider.currentUserId ?? ''),
+        conversationId: existing.id,
+        peerUserId: user.id,
+      );
+      return existing;
+    }
+
+    try {
+      final direct = await chatProvider.getOrCreateDirectConversation(user.id);
+      if (direct != null) {
+        _rememberAiTargetContext(
+          targetName: direct.getDisplayName(chatProvider.currentUserId ?? ''),
+          conversationId: direct.id,
+          peerUserId: user.id,
+        );
+      }
+      return direct;
+    } catch (error) {
+      _logAiFlow(
+        'AI_DIRECT_CONVERSATION_CREATE_FAILED',
+        aiCommand: aiCmd,
+        extra: {'targetName': targetName, 'error': error.toString()},
+      );
+      _addAiActionInfo(
+        'Mình đã tìm thấy ${user.displayName}, nhưng chưa mở được cuộc trò chuyện. Vui lòng thử mở chat thủ công hoặc kiểm tra kết nối.',
+        feedbackSource: 'ai_action_failed.direct_conversation',
+      );
+      return null;
+    }
+  }
+
   String _resolveTargetNameForCommand(
     String command,
     Map<String, dynamic>? params,
@@ -359,17 +411,12 @@ class MainShellState extends State<MainShell> {
     }
     final contextUser = _preferUserFromAiContext(matches);
     if (contextUser != null) {
-      final direct = await chatProvider.getOrCreateDirectConversation(
-        contextUser.id,
+      return _openOrCreateDirectConversation(
+        user: contextUser,
+        chatProvider: chatProvider,
+        aiCmd: AiCommand(command: command, params: params),
+        targetName: targetName,
       );
-      if (direct != null) {
-        _rememberAiTargetContext(
-          targetName: direct.getDisplayName(chatProvider.currentUserId ?? ''),
-          conversationId: direct.id,
-          peerUserId: contextUser.id,
-        );
-      }
-      return direct;
     }
     if (matches.length > 1) {
       _rememberPendingAiAction(
@@ -392,15 +439,12 @@ class MainShellState extends State<MainShell> {
     }
 
     final user = matches.first;
-    final direct = await chatProvider.getOrCreateDirectConversation(user.id);
-    if (direct != null) {
-      _rememberAiTargetContext(
-        targetName: direct.getDisplayName(chatProvider.currentUserId ?? ''),
-        conversationId: direct.id,
-        peerUserId: user.id,
-      );
-    }
-    return direct;
+    return _openOrCreateDirectConversation(
+      user: user,
+      chatProvider: chatProvider,
+      aiCmd: AiCommand(command: command, params: params),
+      targetName: targetName,
+    );
   }
 
   Future<void> _dismissSoftKeyboard() async {
@@ -482,482 +526,500 @@ class MainShellState extends State<MainShell> {
       extra: {'normalizedCommand': command, 'hasParams': params != null},
     );
 
-    switch (command) {
-      case 'NAVIGATE_TO':
-        await _handleNavigateTo(params);
-        break;
-      case 'NAVIGATE_TO_SETTINGS':
-        await _handleNavigateTo({'page': 'settings'});
-        break;
-      case 'NAVIGATE_TO_CHAT':
-        await _handleNavigateTo({'page': 'chat'});
-        break;
-      case 'NAVIGATE_TO_CONTACTS':
-        await _handleNavigateTo({'page': 'contacts'});
-        break;
-      case 'NAVIGATE_TO_SCANNER':
-        await _handleNavigateTo({'page': 'scanner'});
-        break;
-      case 'NAVIGATE_TO_TIMELINE':
-        await _handleNavigateTo({'page': 'timeline'});
-        break;
+    try {
+      switch (command) {
+        case 'NAVIGATE_TO':
+          await _handleNavigateTo(params);
+          break;
+        case 'NAVIGATE_TO_SETTINGS':
+          await _handleNavigateTo({'page': 'settings'});
+          break;
+        case 'NAVIGATE_TO_CHAT':
+          await _handleNavigateTo({'page': 'chat'});
+          break;
+        case 'NAVIGATE_TO_CONTACTS':
+          await _handleNavigateTo({'page': 'contacts'});
+          break;
+        case 'NAVIGATE_TO_SCANNER':
+          await _handleNavigateTo({'page': 'scanner'});
+          break;
+        case 'NAVIGATE_TO_TIMELINE':
+          await _handleNavigateTo({'page': 'timeline'});
+          break;
 
-      case 'OPEN_CHAT':
-      case 'COMPOSE_MESSAGE':
-      case 'START_CALL':
-        final targetName = _resolveTargetNameForCommand(command, params);
-        if (targetName.isEmpty) {
-          _logAiFlow(
-            'AI_RESOLUTION_FAILED',
-            aiCommand: aiCmd,
-            extra: {'reason': 'missing_target_name'},
-          );
-          _showErrorSnackBar(
-            'Trợ lý AI chưa xác định được người nhận hoặc cuộc trò chuyện đích.',
-          );
-          return;
-        }
-        var conversationMatches = chatProvider.findConversationMatchesByName(
-          targetName,
-        );
-
-        if (conversationMatches.isEmpty) {
-          final createdDirect = await _resolveDirectConversationFallback(
+        case 'OPEN_CHAT':
+        case 'COMPOSE_MESSAGE':
+        case 'START_CALL':
+          final targetName = _resolveTargetNameForCommand(command, params);
+          if (targetName.isEmpty) {
+            _logAiFlow(
+              'AI_RESOLUTION_FAILED',
+              aiCommand: aiCmd,
+              extra: {'reason': 'missing_target_name'},
+            );
+            _showErrorSnackBar(
+              'Trợ lý AI chưa xác định được người nhận hoặc cuộc trò chuyện đích.',
+            );
+            return;
+          }
+          var conversationMatches = chatProvider.findConversationMatchesByName(
             targetName,
-            chatProvider,
-            command: command,
-            params: params,
           );
-          if (createdDirect != null) {
-            conversationMatches = [createdDirect];
-          }
-        }
 
-        if (conversationMatches.isEmpty) {
-          _logAiFlow(
-            'AI_RESOLUTION_FAILED',
-            aiCommand: aiCmd,
-            extra: {'targetName': targetName},
-          );
-          _showErrorSnackBar(
-            AiCommandRouting.buildMissingTargetFeedback(
-              targetName: targetName,
-              targetType: 'liên hệ hoặc cuộc trò chuyện',
-            ),
-            feedbackSource: 'ai_action_missing.conversation',
-          );
-          return;
-        }
-
-        Conversation? selectedConversation;
-        if (conversationMatches.length > 1) {
-          final contextConversation = _preferConversationFromAiContext(
-            conversationMatches,
-            chatProvider,
-          );
-          if (contextConversation != null) {
-            selectedConversation = contextConversation;
+          if (conversationMatches.isEmpty) {
+            final createdDirect = await _resolveDirectConversationFallback(
+              targetName,
+              chatProvider,
+              command: command,
+              params: params,
+            );
+            if (createdDirect != null) {
+              conversationMatches = [createdDirect];
+            }
           }
-        }
-        if (selectedConversation == null && conversationMatches.length > 1) {
-          _rememberPendingAiAction(
-            command: command,
-            scope: 'conversation',
-            params: params,
-          );
-          _addAiActionInfo(
-            AiCommandRouting.buildAmbiguousTargetFeedback(
-              targetName: targetName,
-              candidates: conversationMatches.map(
-                (conversation) => conversation.getDisplayName(
-                  chatProvider.currentUserId ?? '',
-                ),
+
+          if (conversationMatches.isEmpty) {
+            _logAiFlow(
+              'AI_RESOLUTION_FAILED',
+              aiCommand: aiCmd,
+              extra: {'targetName': targetName},
+            );
+            _showErrorSnackBar(
+              AiCommandRouting.buildMissingTargetFeedback(
+                targetName: targetName,
+                targetType: 'liên hệ hoặc cuộc trò chuyện',
               ),
-              actionLabel: 'mở đúng cuộc trò chuyện',
-            ),
-            feedbackSource: AiCommandRouting.buildAmbiguityFeedbackSource(
+              feedbackSource: 'ai_action_missing.conversation',
+            );
+            return;
+          }
+
+          Conversation? selectedConversation;
+          if (conversationMatches.length > 1) {
+            final contextConversation = _preferConversationFromAiContext(
+              conversationMatches,
+              chatProvider,
+            );
+            if (contextConversation != null) {
+              selectedConversation = contextConversation;
+            }
+          }
+          if (selectedConversation == null && conversationMatches.length > 1) {
+            _rememberPendingAiAction(
+              command: command,
               scope: 'conversation',
-              candidates: conversationMatches.map(
-                (conversation) => conversation.getDisplayName(
-                  chatProvider.currentUserId ?? '',
+              params: params,
+            );
+            _addAiActionInfo(
+              AiCommandRouting.buildAmbiguousTargetFeedback(
+                targetName: targetName,
+                candidates: conversationMatches.map(
+                  (conversation) => conversation.getDisplayName(
+                    chatProvider.currentUserId ?? '',
+                  ),
+                ),
+                actionLabel: 'mở đúng cuộc trò chuyện',
+              ),
+              feedbackSource: AiCommandRouting.buildAmbiguityFeedbackSource(
+                scope: 'conversation',
+                candidates: conversationMatches.map(
+                  (conversation) => conversation.getDisplayName(
+                    chatProvider.currentUserId ?? '',
+                  ),
                 ),
               ),
-            ),
-          );
-          _logAiFlow(
-            'AI_RESOLUTION_AMBIGUOUS',
-            aiCommand: aiCmd,
-            extra: {
-              'targetName': targetName,
-              'matchCount': conversationMatches.length,
-            },
-          );
-          selectedConversation = await _showConversationDisambiguationSheet(
-            matches: conversationMatches,
-            currentUserId: chatProvider.currentUserId ?? '',
-            targetName: targetName,
-          );
-          if (selectedConversation == null) {
-            _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
-            _addAiActionCancelled(
-              'Đã hủy thao tác vì bạn chưa chọn cuộc trò chuyện.',
             );
-            return;
-          }
-        }
-
-        final conversation = selectedConversation ?? conversationMatches.first;
-        final currentUserId = chatProvider.currentUserId ?? '';
-        final isDirect = conversation.type.name == 'DIRECT';
-        final peerMember =
-            isDirect
-                ? conversation.members
-                    .where((m) => m.userId != currentUserId)
-                    .firstOrNull
-                : null;
-        final peerUserId = peerMember?.userId ?? '';
-        final peerName = conversation.getDisplayName(currentUserId);
-        _rememberAiTargetContext(
-          targetName: peerName,
-          conversationId: conversation.id,
-          peerUserId: peerUserId,
-        );
-
-        final rawPrefilled = AiCommandRouting.extractPrefilledText(
-          command,
-          params,
-        );
-        final prefilledText = rawPrefilled;
-
-        if (command == 'OPEN_CHAT' || command == 'COMPOSE_MESSAGE') {
-          if (command == 'COMPOSE_MESSAGE' &&
-              (prefilledText == null || prefilledText.isEmpty)) {
             _logAiFlow(
-              'AI_SEND_MSG_BLOCKED',
-              aiCommand: aiCmd,
-              extra: {'reason': 'empty_content'},
-            );
-            _showErrorSnackBar(
-              'Trợ lý AI không thể soạn tin nhắn vì nội dung trống.',
-            );
-            return;
-          }
-
-          final isAlreadyActiveConversation =
-              chatProvider.activeConversationId == conversation.id;
-          final hasPendingAiNavigation =
-              _activeAiConversationId == conversation.id;
-
-          if (command == 'OPEN_CHAT' &&
-              AiCommandRouting.shouldBlockOpenChat(
-                isAlreadyActiveConversation: isAlreadyActiveConversation,
-                hasPendingAiNavigation: hasPendingAiNavigation,
-              )) {
-            _logAiFlow(
-              'AI_NAV_GUARD_BLOCKED',
+              'AI_RESOLUTION_AMBIGUOUS',
               aiCommand: aiCmd,
               extra: {
-                'reason': 'already_in_target_chat',
-                'conversationId': conversation.id,
+                'targetName': targetName,
+                'matchCount': conversationMatches.length,
               },
             );
-            setState(() => _currentIndex = 0);
-            return;
-          }
-
-          if (command == 'COMPOSE_MESSAGE' &&
-              AiCommandRouting.shouldBlockCompose(
-                hasPendingAiNavigation: hasPendingAiNavigation,
-              )) {
-            _logAiFlow(
-              'AI_NAV_GUARD_BLOCKED',
-              aiCommand: aiCmd,
-              extra: {
-                'reason': 'compose_navigation_already_pending',
-                'conversationId': conversation.id,
-              },
+            selectedConversation = await _showConversationDisambiguationSheet(
+              matches: conversationMatches,
+              currentUserId: chatProvider.currentUserId ?? '',
+              targetName: targetName,
             );
-            return;
-          }
-
-          var shouldSendImmediately = false;
-          if (command == 'COMPOSE_MESSAGE') {
-            if (!mounted) return;
-            final composeDecision = await AiActionConfirmationSheet.showForResult(
-              context,
-              icon: Icons.edit_note_rounded,
-              title: 'Xác nhận hỗ trợ nhắn tin',
-              description:
-                  'Bạn có thể mở cuộc trò chuyện để kiểm tra lại hoặc gửi ngay sau khi đã xác nhận đúng người nhận.',
-              confirmLabel: 'Mở và điền sẵn',
-              alternateLabel: 'Gửi ngay',
-              primaryDetail: peerName,
-              secondaryDetail: prefilledText,
-              primaryDetailLabel: 'Người nhận',
-              secondaryDetailLabel: 'Tin nhắn',
-            );
-            if (composeDecision == AiActionConfirmationResult.cancelled) {
+            if (selectedConversation == null) {
               _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
-              _addAiActionCancelled('Đã hủy thao tác soạn tin nhắn.');
-              return;
-            }
-            if (!mounted) return;
-            shouldSendImmediately =
-                composeDecision == AiActionConfirmationResult.alternate;
-
-            if (isAlreadyActiveConversation) {
-              if (shouldSendImmediately) {
-                chatProvider.sendMessage(
-                  conversationId: conversation.id,
-                  content: prefilledText!,
-                );
-                _logAiFlow(
-                  'AI_MESSAGE_SENT_IMMEDIATELY',
-                  aiCommand: aiCmd,
-                  extra: {'conversationId': conversation.id},
-                );
-              } else {
-                chatProvider.injectAiComposeDraft(
-                  conversationId: conversation.id,
-                  text: prefilledText!,
-                );
-                _logAiFlow(
-                  'AI_COMPOSE_DRAFT_INJECTED',
-                  aiCommand: aiCmd,
-                  extra: {'conversationId': conversation.id},
-                );
-              }
-              setState(() => _currentIndex = 0);
+              _addAiActionCancelled(
+                'Đã hủy thao tác vì bạn chưa chọn cuộc trò chuyện.',
+              );
               return;
             }
           }
 
-          if (!mounted) return;
-          await _dismissSoftKeyboard();
-          if (!mounted) return;
-          final navigator = Navigator.of(context);
-          _activeAiConversationId = conversation.id;
-          _logAiFlow(
-            'AI_NAVIGATE_CHAT',
-            aiCommand: aiCmd,
-            extra: {
-              'conversationId': conversation.id,
-              'prefilled': prefilledText?.isNotEmpty == true,
-            },
-          );
-
-          try {
-            if (command == 'COMPOSE_MESSAGE' &&
-                shouldSendImmediately &&
-                prefilledText != null) {
-              chatProvider.sendMessage(
-                conversationId: conversation.id,
-                content: prefilledText,
-              );
-              _logAiFlow(
-                'AI_MESSAGE_SENT_IMMEDIATELY',
-                aiCommand: aiCmd,
-                extra: {'conversationId': conversation.id},
-              );
-            }
-            await navigator.push(
-              MaterialPageRoute(
-                builder:
-                    (_) => ChatDetailScreen(
-                      conversation: conversation,
-                      prefilledText:
-                          shouldSendImmediately ? null : prefilledText,
-                    ),
-              ),
-            );
-          } finally {
-            if (mounted && _activeAiConversationId == conversation.id) {
-              _activeAiConversationId = null;
-            }
-          }
-        } else if (command == 'START_CALL') {
-          if (_isCallScreenActive) {
-            _logAiFlow(
-              'AI_NAV_GUARD_BLOCKED',
-              aiCommand: aiCmd,
-              extra: {'reason': 'call_screen_already_active'},
-            );
-            return;
-          }
-
-          if (!isDirect || peerUserId.isEmpty) {
-            _showErrorSnackBar(
-              'Tính năng gọi điện hiện chỉ hỗ trợ hội thoại 1-1.',
-            );
-            return;
-          }
+          final conversation =
+              selectedConversation ?? conversationMatches.first;
+          final currentUserId = chatProvider.currentUserId ?? '';
+          final isDirect = conversation.type.name == 'DIRECT';
+          final peerMember =
+              isDirect
+                  ? conversation.members
+                      .where((m) => m.userId != currentUserId)
+                      .firstOrNull
+                  : null;
+          final peerUserId = peerMember?.userId ?? '';
+          final peerName = conversation.getDisplayName(currentUserId);
           _rememberAiTargetContext(
             targetName: peerName,
             conversationId: conversation.id,
             peerUserId: peerUserId,
           );
 
-          final callType = params?['callType']?.toString().toLowerCase();
-          final isVideo = callType == 'video';
-          final callTypeName = isVideo ? 'video' : 'thoại';
-
-          if (!mounted) return;
-          final confirmed = await AiActionConfirmationSheet.show(
-            context,
-            icon: isVideo ? Icons.videocam_rounded : Icons.call_rounded,
-            title: 'Xác nhận gọi $callTypeName',
-            description: 'Trợ lý sẽ bắt đầu cuộc gọi tới liên hệ đã chọn.',
-            confirmLabel: 'Bắt đầu gọi',
-            primaryDetail: 'Người nhận: $peerName',
+          final rawPrefilled = AiCommandRouting.extractPrefilledText(
+            command,
+            params,
           );
-          if (!confirmed) {
-            _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
-            _addAiActionCancelled('Đã hủy thao tác gọi.');
-            return;
-          }
-          if (!mounted) return;
-          await _dismissSoftKeyboard();
-          if (!mounted) return;
+          final prefilledText = rawPrefilled;
 
-          final callId = generateCallId(
-            conversationId: conversation.id,
-            callerUserId: currentUserId,
-            audioOnly: !isVideo,
-          );
+          if (command == 'OPEN_CHAT' || command == 'COMPOSE_MESSAGE') {
+            if (command == 'COMPOSE_MESSAGE' &&
+                (prefilledText == null || prefilledText.isEmpty)) {
+              _logAiFlow(
+                'AI_SEND_MSG_BLOCKED',
+                aiCommand: aiCmd,
+                extra: {'reason': 'empty_content'},
+              );
+              _showErrorSnackBar(
+                'Trợ lý AI không thể soạn tin nhắn vì nội dung trống.',
+              );
+              return;
+            }
 
-          _isCallScreenActive = true;
-          _logAiFlow(
-            'AI_NAVIGATE_CALL',
-            aiCommand: aiCmd,
-            extra: {
-              'conversationId': conversation.id,
-              'callId': callId,
-              'callType': isVideo ? 'video' : 'voice',
-            },
-          );
-          try {
-            await Navigator.of(context).push(
-              MaterialPageRoute(
-                builder:
-                    (_) =>
-                        isVideo
-                            ? VideoCallScreen(
-                              conversationId: conversation.id,
-                              callId: callId,
-                              targetUserId: peerUserId,
-                              targetDisplayName: peerName,
-                              isCaller: true,
-                            )
-                            : VoiceCallScreen(
-                              conversationId: conversation.id,
-                              callId: callId,
-                              targetUserId: peerUserId,
-                              targetDisplayName: peerName,
-                              isCaller: true,
-                            ),
-              ),
-            );
-          } finally {
-            _isCallScreenActive = false;
+            final isAlreadyActiveConversation =
+                chatProvider.activeConversationId == conversation.id;
+            final hasPendingAiNavigation =
+                _activeAiConversationId == conversation.id;
+
+            if (command == 'OPEN_CHAT' &&
+                AiCommandRouting.shouldBlockOpenChat(
+                  isAlreadyActiveConversation: isAlreadyActiveConversation,
+                  hasPendingAiNavigation: hasPendingAiNavigation,
+                )) {
+              _logAiFlow(
+                'AI_NAV_GUARD_BLOCKED',
+                aiCommand: aiCmd,
+                extra: {
+                  'reason': 'already_in_target_chat',
+                  'conversationId': conversation.id,
+                },
+              );
+              setState(() => _currentIndex = 0);
+              return;
+            }
+
+            if (command == 'COMPOSE_MESSAGE' &&
+                AiCommandRouting.shouldBlockCompose(
+                  hasPendingAiNavigation: hasPendingAiNavigation,
+                )) {
+              _logAiFlow(
+                'AI_NAV_GUARD_BLOCKED',
+                aiCommand: aiCmd,
+                extra: {
+                  'reason': 'compose_navigation_already_pending',
+                  'conversationId': conversation.id,
+                },
+              );
+              return;
+            }
+
+            var shouldSendImmediately = false;
+            if (command == 'COMPOSE_MESSAGE') {
+              if (!mounted) return;
+              final composeDecision = await AiActionConfirmationSheet.showForResult(
+                context,
+                icon: Icons.edit_note_rounded,
+                title: 'Xác nhận hỗ trợ nhắn tin',
+                description:
+                    'Bạn có thể mở cuộc trò chuyện để kiểm tra lại hoặc gửi ngay sau khi đã xác nhận đúng người nhận.',
+                confirmLabel: 'Mở và điền sẵn',
+                alternateLabel: 'Gửi ngay',
+                primaryDetail: peerName,
+                secondaryDetail: prefilledText,
+                primaryDetailLabel: 'Người nhận',
+                secondaryDetailLabel: 'Tin nhắn',
+              );
+              if (composeDecision == AiActionConfirmationResult.cancelled) {
+                _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
+                _addAiActionCancelled('Đã hủy thao tác soạn tin nhắn.');
+                return;
+              }
+              if (!mounted) return;
+              shouldSendImmediately =
+                  composeDecision == AiActionConfirmationResult.alternate;
+
+              if (isAlreadyActiveConversation) {
+                if (shouldSendImmediately) {
+                  chatProvider.sendMessage(
+                    conversationId: conversation.id,
+                    content: prefilledText!,
+                  );
+                  _logAiFlow(
+                    'AI_MESSAGE_SENT_IMMEDIATELY',
+                    aiCommand: aiCmd,
+                    extra: {'conversationId': conversation.id},
+                  );
+                } else {
+                  chatProvider.injectAiComposeDraft(
+                    conversationId: conversation.id,
+                    text: prefilledText!,
+                  );
+                  _logAiFlow(
+                    'AI_COMPOSE_DRAFT_INJECTED',
+                    aiCommand: aiCmd,
+                    extra: {'conversationId': conversation.id},
+                  );
+                }
+                setState(() => _currentIndex = 0);
+                return;
+              }
+            }
+
+            if (!mounted) return;
+            await _dismissSoftKeyboard();
+            if (!mounted) return;
+            final navigator = Navigator.of(context);
+            _activeAiConversationId = conversation.id;
             _logAiFlow(
-              'AI_CALL_SCREEN_RELEASED',
+              'AI_NAVIGATE_CHAT',
               aiCommand: aiCmd,
-              extra: {'conversationId': conversation.id},
+              extra: {
+                'conversationId': conversation.id,
+                'prefilled': prefilledText?.isNotEmpty == true,
+              },
             );
+
+            try {
+              if (command == 'COMPOSE_MESSAGE' &&
+                  shouldSendImmediately &&
+                  prefilledText != null) {
+                chatProvider.sendMessage(
+                  conversationId: conversation.id,
+                  content: prefilledText,
+                );
+                _logAiFlow(
+                  'AI_MESSAGE_SENT_IMMEDIATELY',
+                  aiCommand: aiCmd,
+                  extra: {'conversationId': conversation.id},
+                );
+              }
+              await navigator.push(
+                MaterialPageRoute(
+                  builder:
+                      (_) => ChatDetailScreen(
+                        conversation: conversation,
+                        prefilledText:
+                            shouldSendImmediately ? null : prefilledText,
+                      ),
+                ),
+              );
+            } finally {
+              if (mounted && _activeAiConversationId == conversation.id) {
+                _activeAiConversationId = null;
+              }
+            }
+          } else if (command == 'START_CALL') {
+            if (_isCallScreenActive) {
+              _logAiFlow(
+                'AI_NAV_GUARD_BLOCKED',
+                aiCommand: aiCmd,
+                extra: {'reason': 'call_screen_already_active'},
+              );
+              return;
+            }
+
+            if (!isDirect || peerUserId.isEmpty) {
+              _showErrorSnackBar(
+                'Tính năng gọi điện hiện chỉ hỗ trợ hội thoại 1-1.',
+              );
+              return;
+            }
+            _rememberAiTargetContext(
+              targetName: peerName,
+              conversationId: conversation.id,
+              peerUserId: peerUserId,
+            );
+
+            final callType = params?['callType']?.toString().toLowerCase();
+            final isVideo = callType == 'video';
+            final callTypeName = isVideo ? 'video' : 'thoại';
+
+            if (!mounted) return;
+            final confirmed = await AiActionConfirmationSheet.show(
+              context,
+              icon: isVideo ? Icons.videocam_rounded : Icons.call_rounded,
+              title: 'Xác nhận gọi $callTypeName',
+              description: 'Trợ lý sẽ bắt đầu cuộc gọi tới liên hệ đã chọn.',
+              confirmLabel: 'Bắt đầu gọi',
+              primaryDetail: 'Người nhận: $peerName',
+            );
+            if (!confirmed) {
+              _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
+              _addAiActionCancelled('Đã hủy thao tác gọi.');
+              return;
+            }
+            if (!mounted) return;
+            await _dismissSoftKeyboard();
+            if (!mounted) return;
+
+            final callId = generateCallId(
+              conversationId: conversation.id,
+              callerUserId: currentUserId,
+              audioOnly: !isVideo,
+            );
+
+            _isCallScreenActive = true;
+            _logAiFlow(
+              'AI_NAVIGATE_CALL',
+              aiCommand: aiCmd,
+              extra: {
+                'conversationId': conversation.id,
+                'callId': callId,
+                'callType': isVideo ? 'video' : 'voice',
+              },
+            );
+            try {
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder:
+                      (_) =>
+                          isVideo
+                              ? VideoCallScreen(
+                                conversationId: conversation.id,
+                                callId: callId,
+                                targetUserId: peerUserId,
+                                targetDisplayName: peerName,
+                                isCaller: true,
+                              )
+                              : VoiceCallScreen(
+                                conversationId: conversation.id,
+                                callId: callId,
+                                targetUserId: peerUserId,
+                                targetDisplayName: peerName,
+                                isCaller: true,
+                              ),
+                ),
+              );
+            } finally {
+              _isCallScreenActive = false;
+              _logAiFlow(
+                'AI_CALL_SCREEN_RELEASED',
+                aiCommand: aiCmd,
+                extra: {'conversationId': conversation.id},
+              );
+            }
           }
-        }
-        break;
+          break;
 
-      case 'RECALL_MESSAGE':
-        if (chatProvider.activeConversationId != null &&
-            chatProvider.messages.isNotEmpty) {
-          final lastMsg = AiRecallMessageSelector.selectLatestRecallableMessage(
-            messages: chatProvider.messages,
-            currentUserId: chatProvider.currentUserId,
-          );
+        case 'RECALL_MESSAGE':
+          if (chatProvider.activeConversationId != null &&
+              chatProvider.messages.isNotEmpty) {
+            final lastMsg =
+                AiRecallMessageSelector.selectLatestRecallableMessage(
+                  messages: chatProvider.messages,
+                  currentUserId: chatProvider.currentUserId,
+                );
 
-          if (lastMsg == null) {
+            if (lastMsg == null) {
+              _logAiFlow(
+                'AI_RECALL_FAILED',
+                aiCommand: aiCmd,
+                extra: {'reason': 'no_self_message'},
+              );
+              _showErrorSnackBar('Không tìm thấy tin nhắn của bạn để thu hồi.');
+              return;
+            }
+
+            final confirmed = await AiActionConfirmationSheet.show(
+              context,
+              icon: Icons.undo_rounded,
+              title: 'Xác nhận thu hồi tin nhắn',
+              description:
+                  'Trợ lý sẽ thu hồi tin nhắn mới nhất của bạn trong cuộc trò chuyện hiện tại.',
+              confirmLabel: 'Thu hồi',
+              secondaryDetail: lastMsg.content,
+              destructive: true,
+            );
+            if (!confirmed) {
+              _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
+              _addAiActionCancelled('Đã hủy thao tác thu hồi tin nhắn.');
+              return;
+            }
+            if (!mounted) return;
+
+            chatProvider.recallMessage(
+              lastMsg.id,
+              chatProvider.activeConversationId!,
+            );
+          } else {
             _logAiFlow(
               'AI_RECALL_FAILED',
               aiCommand: aiCmd,
-              extra: {'reason': 'no_self_message'},
+              extra: {'reason': 'no_active_conversation_or_messages'},
             );
-            _showErrorSnackBar('Không tìm thấy tin nhắn của bạn để thu hồi.');
-            return;
+            _showErrorSnackBar('Không có tin nhắn để thu hồi.');
           }
+          break;
 
-          final confirmed = await AiActionConfirmationSheet.show(
-            context,
-            icon: Icons.undo_rounded,
-            title: 'Xác nhận thu hồi tin nhắn',
-            description:
-                'Trợ lý sẽ thu hồi tin nhắn mới nhất của bạn trong cuộc trò chuyện hiện tại.',
-            confirmLabel: 'Thu hồi',
-            secondaryDetail: lastMsg.content,
-            destructive: true,
+        case 'CREATE_GROUP':
+          await _handleAiCreateGroup(aiCmd, params);
+          break;
+        case 'MUTE_CONVERSATION':
+        case 'UNMUTE_CONVERSATION':
+          await _handleAiMuteConversation(
+            aiCmd,
+            params,
+            muted: command == 'MUTE_CONVERSATION',
           );
-          if (!confirmed) {
-            _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
-            _addAiActionCancelled('Đã hủy thao tác thu hồi tin nhắn.');
-            return;
-          }
-          if (!mounted) return;
+          break;
+        case 'PIN_MESSAGE':
+        case 'UNPIN_MESSAGE':
+          await _handleAiPinMessage(
+            aiCmd,
+            params,
+            pin: command == 'PIN_MESSAGE',
+          );
+          break;
+        case 'OPEN_PROFILE':
+          await _handleAiOpenProfile(aiCmd, params);
+          break;
+        case 'OPEN_GROUP_SETTINGS':
+          await _handleAiOpenGroupSettings(aiCmd, params);
+          break;
+        case 'SEND_FRIEND_REQUEST':
+        case 'BLOCK_USER':
+        case 'UNBLOCK_USER':
+          await _handleAiContactAction(aiCmd, params, command: command);
+          break;
+        case 'CHANGE_GROUP_NAME':
+        case 'ADD_GROUP_MEMBER':
+        case 'REMOVE_GROUP_MEMBER':
+        case 'TRANSFER_GROUP_OWNER':
+        case 'LEAVE_GROUP':
+        case 'DISBAND_GROUP':
+          await _handleAiGroupAdminAction(aiCmd, params, command: command);
+          break;
 
-          chatProvider.recallMessage(
-            lastMsg.id,
-            chatProvider.activeConversationId!,
-          );
-        } else {
+        default:
           _logAiFlow(
-            'AI_RECALL_FAILED',
+            'AI_UNKNOWN_COMMAND',
             aiCommand: aiCmd,
-            extra: {'reason': 'no_active_conversation_or_messages'},
+            extra: {'command': command},
           );
-          _showErrorSnackBar('Không có tin nhắn để thu hồi.');
-        }
-        break;
-
-      case 'CREATE_GROUP':
-        await _handleAiCreateGroup(aiCmd, params);
-        break;
-      case 'MUTE_CONVERSATION':
-      case 'UNMUTE_CONVERSATION':
-        await _handleAiMuteConversation(
-          aiCmd,
-          params,
-          muted: command == 'MUTE_CONVERSATION',
-        );
-        break;
-      case 'PIN_MESSAGE':
-      case 'UNPIN_MESSAGE':
-        await _handleAiPinMessage(aiCmd, params, pin: command == 'PIN_MESSAGE');
-        break;
-      case 'OPEN_PROFILE':
-        await _handleAiOpenProfile(aiCmd, params);
-        break;
-      case 'OPEN_GROUP_SETTINGS':
-        await _handleAiOpenGroupSettings(aiCmd, params);
-        break;
-      case 'SEND_FRIEND_REQUEST':
-      case 'BLOCK_USER':
-      case 'UNBLOCK_USER':
-        await _handleAiContactAction(aiCmd, params, command: command);
-        break;
-      case 'CHANGE_GROUP_NAME':
-      case 'ADD_GROUP_MEMBER':
-      case 'REMOVE_GROUP_MEMBER':
-      case 'TRANSFER_GROUP_OWNER':
-      case 'LEAVE_GROUP':
-      case 'DISBAND_GROUP':
-        await _handleAiGroupAdminAction(aiCmd, params, command: command);
-        break;
-
-      default:
-        _logAiFlow(
-          'AI_UNKNOWN_COMMAND',
-          aiCommand: aiCmd,
-          extra: {'command': command},
-        );
+      }
+    } catch (error) {
+      _logAiFlow(
+        'AI_COMMAND_UNHANDLED_ERROR',
+        aiCommand: aiCmd,
+        extra: {'normalizedCommand': command, 'error': error.toString()},
+      );
+      _addAiActionInfo(
+        'Mình gặp trục trặc khi thực hiện thao tác này. Bạn thử lại hoặc mở thủ công giúp mình nhé.',
+        feedbackSource: 'ai_action_failed.unhandled',
+      );
     }
   }
 
@@ -1075,25 +1137,39 @@ class MainShellState extends State<MainShell> {
   List<User> _findUsersByName(Iterable<User> users, String name) {
     final normalized = AiCommandRouting.normalizeSearchText(name);
     if (normalized.isEmpty) return const <User>[];
-    final exact = <User>[];
-    final scored = <({User user, int score})>[];
+    final exactById = <String, User>{};
+    final scoredById = <String, ({User user, int score})>{};
+
+    Iterable<String> labelsFor(User user) sync* {
+      yield user.displayName;
+      if (user.phone?.trim().isNotEmpty == true) yield user.phone!.trim();
+      if (user.email?.trim().isNotEmpty == true) yield user.email!.trim();
+    }
 
     for (final user in users) {
-      final score = AiCommandRouting.computeNameMatchScore(
-        user.displayName,
-        normalized,
-      );
-      if (score < 0) continue;
-      if (score >= 1000) {
-        exact.add(user);
+      var bestScore = -1;
+      for (final label in labelsFor(user)) {
+        final score = AiCommandRouting.computeNameMatchScore(label, normalized);
+        if (score > bestScore) bestScore = score;
+      }
+      if (bestScore < 0) continue;
+      if (bestScore >= 1000) {
+        exactById[user.id] = user;
       } else {
-        scored.add((user: user, score: score));
+        final existing = scoredById[user.id];
+        if (existing == null || bestScore > existing.score) {
+          scoredById[user.id] = (user: user, score: bestScore);
+        }
       }
     }
 
-    if (exact.isNotEmpty) return exact;
+    if (exactById.isNotEmpty) return exactById.values.toList(growable: false);
 
-    scored.sort((a, b) => b.score.compareTo(a.score));
+    final scored = scoredById.values.toList(growable: false)..sort((a, b) {
+      final scoreCompare = b.score.compareTo(a.score);
+      if (scoreCompare != 0) return scoreCompare;
+      return a.user.displayName.compareTo(b.user.displayName);
+    });
     return scored.map((entry) => entry.user).toList(growable: false);
   }
 
@@ -1362,7 +1438,9 @@ class MainShellState extends State<MainShell> {
     );
     if (!confirmed) {
       _addAiActionCancelled(
-        muted ? 'Đã hủy thao tác tắt thông báo.' : 'Đã hủy thao tác bật thông báo.',
+        muted
+            ? 'Đã hủy thao tác tắt thông báo.'
+            : 'Đã hủy thao tác bật thông báo.',
       );
       return;
     }
@@ -1406,7 +1484,9 @@ class MainShellState extends State<MainShell> {
     );
     if (!confirmed) {
       _addAiActionCancelled(
-        pin ? 'Đã hủy thao tác ghim tin nhắn.' : 'Đã hủy thao tác bỏ ghim tin nhắn.',
+        pin
+            ? 'Đã hủy thao tác ghim tin nhắn.'
+            : 'Đã hủy thao tác bỏ ghim tin nhắn.',
       );
       return;
     }
