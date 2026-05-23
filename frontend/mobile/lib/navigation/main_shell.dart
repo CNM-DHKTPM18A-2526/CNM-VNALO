@@ -972,6 +972,18 @@ class MainShellState extends State<MainShell> {
                   .toList()
               : matches;
       if (filtered.isEmpty) {
+        if (!requireGroup) {
+          final createdDirect = await _resolveDirectConversationFallback(
+            targetName,
+            chatProvider,
+            command: aiCmd.command,
+            params: params,
+          );
+          if (createdDirect != null) {
+            return createdDirect;
+          }
+        }
+
         _showErrorSnackBar(
           AiCommandRouting.buildMissingTargetFeedback(
             targetName: targetName,
@@ -981,6 +993,7 @@ class MainShellState extends State<MainShell> {
         );
         return null;
       }
+
       if (filtered.length > 1) {
         final contextConversation =
             AiConversationTargetResolver.preferConversationFromContext(
