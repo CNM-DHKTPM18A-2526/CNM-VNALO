@@ -17,6 +17,7 @@ import 'package:vnalo_mobile/features/timeline/screens/home_wall_screen.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
 import 'package:vnalo_mobile/features/ai_assistant/services/ai_action_context_store.dart';
 import 'package:vnalo_mobile/features/ai_assistant/services/ai_action_presentation_resolver.dart';
+import 'package:vnalo_mobile/features/ai_assistant/services/ai_action_policy.dart';
 import 'package:vnalo_mobile/features/ai_assistant/services/ai_action_target_matcher.dart';
 import 'package:vnalo_mobile/features/ai_assistant/services/ai_conversation_target_resolver.dart';
 import 'package:vnalo_mobile/features/ai_assistant/utils/ai_command_routing.dart';
@@ -841,7 +842,7 @@ class MainShellState extends State<MainShell> {
                   'Trợ lý sẽ thu hồi tin nhắn mới nhất của bạn trong cuộc trò chuyện hiện tại.',
               confirmLabel: 'Thu hồi',
               secondaryDetail: lastMsg.content,
-              destructive: true,
+              destructive: AiActionPolicy.isDestructive(command),
             );
             if (!confirmed) {
               _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
@@ -1435,7 +1436,8 @@ class MainShellState extends State<MainShell> {
     );
     if (user == null) return;
     final presentation = AiActionPresentationResolver.contact(command);
-    final destructive = presentation.destructive;    final confirmed = await _confirmAiAction(
+    final destructive = AiActionPolicy.isDestructive(command);
+    final confirmed = await _confirmAiAction(
       icon: presentation.icon,
       title: presentation.title,
       description: presentation.description,
@@ -1550,7 +1552,8 @@ class MainShellState extends State<MainShell> {
     final memberNames = AiCommandRouting.extractMemberNames(params);
     final title = AiCommandRouting.extractNewTitle(params);
     final presentation = AiActionPresentationResolver.group(command);
-    final destructive = presentation.destructive;    final confirmed = await _confirmAiAction(
+    final destructive = AiActionPolicy.isDestructive(command);
+    final confirmed = await _confirmAiAction(
       icon: presentation.icon,
       title: presentation.title,
       description: presentation.description,
