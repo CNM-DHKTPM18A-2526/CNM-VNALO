@@ -52,7 +52,19 @@ public enum ErrorCode {
     SOCIAL_ALREADY_BLOCKED("SOCIAL_009", "User is already blocked"),
     SOCIAL_PRIVACY_RESTRICTION("SOCIAL_010", "Cannot perform action due to privacy settings"),
     SOCIAL_NOT_BLOCKED("SOCIAL_011", "User is not blocked"),
-    SOCIAL_NOT_REQUEST_SENDER("SOCIAL_012", "You are not the sender of this request");
+    SOCIAL_NOT_REQUEST_SENDER("SOCIAL_012", "You are not the sender of this request"),
+
+    // Face Authentication
+    FACE_NO_FACE_DETECTED("FACE_001", "No face detected in image"),
+    FACE_MULTIPLE_FACES("FACE_002", "Multiple faces detected in image"),
+    FACE_LOW_QUALITY("FACE_003", "Image quality is too low for face recognition"),
+    FACE_LIVENESS_FAILED("FACE_004", "Liveness check failed"),
+    FACE_MISMATCH("FACE_005", "Face does not match enrolled face"),
+    FACE_NOT_ENROLLED("FACE_006", "User has not enrolled a face"),
+    FACE_ALREADY_ENROLLED("FACE_007", "User already has a face enrolled"),
+    FACE_MODEL_ERROR("FACE_008", "Face model inference error"),
+    FACE_SERVICE_UNAVAILABLE("FACE_009", "Face authentication service is unavailable"),
+    FACE_RATE_LIMITED("FACE_010", "Too many face authentication requests");
 
     private final String code;
     private final String message;
