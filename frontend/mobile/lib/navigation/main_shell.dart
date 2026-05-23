@@ -16,6 +16,7 @@ import 'package:vnalo_mobile/features/profile/screens/profile_screen.dart';
 import 'package:vnalo_mobile/features/timeline/screens/home_wall_screen.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
 import 'package:vnalo_mobile/features/ai_assistant/services/ai_action_context_store.dart';
+import 'package:vnalo_mobile/features/ai_assistant/services/ai_action_presentation_resolver.dart';
 import 'package:vnalo_mobile/features/ai_assistant/services/ai_action_target_matcher.dart';
 import 'package:vnalo_mobile/features/ai_assistant/utils/ai_command_routing.dart';
 import 'package:vnalo_mobile/features/ai_assistant/utils/ai_recall_message_selector.dart';
@@ -1452,30 +1453,12 @@ class MainShellState extends State<MainShell> {
       includeGlobalSearch: true,
     );
     if (user == null) return;
-    final destructive = command == 'BLOCK_USER';
-    final title = switch (command) {
-      'SEND_FRIEND_REQUEST' => 'Xác nhận gửi kết bạn',
-      'BLOCK_USER' => 'Xác nhận chặn người dùng',
-      'UNBLOCK_USER' => 'Xác nhận bỏ chặn người dùng',
-      _ => 'Xác nhận thao tác',
-    };
-    final confirmLabel = switch (command) {
-      'SEND_FRIEND_REQUEST' => 'Gửi kết bạn',
-      'BLOCK_USER' => 'Chặn',
-      'UNBLOCK_USER' => 'Bỏ chặn',
-      _ => 'Xác nhận',
-    };
-    final description = switch (command) {
-      'SEND_FRIEND_REQUEST' => 'Trợ lý sẽ gửi lời mời kết bạn đến người này.',
-      'BLOCK_USER' => 'Bạn sẽ không nhận tin nhắn/cuộc gọi từ người này.',
-      'UNBLOCK_USER' => 'Bạn sẽ cho phép liên hệ lại với người này.',
-      _ => 'Trợ lý sẽ thực hiện thao tác đã chọn.',
-    };
-    final confirmed = await _confirmAiAction(
-      icon: destructive ? Icons.block_rounded : Icons.person_add_alt_1_rounded,
-      title: title,
-      description: description,
-      confirmLabel: confirmLabel,
+    final presentation = AiActionPresentationResolver.contact(command);
+    final destructive = presentation.destructive;    final confirmed = await _confirmAiAction(
+      icon: presentation.icon,
+      title: presentation.title,
+      description: presentation.description,
+      confirmLabel: presentation.confirmLabel,
       primaryDetail: user.displayName,
       primaryDetailLabel: 'Liên hệ',
       destructive: destructive,
@@ -1585,18 +1568,12 @@ class MainShellState extends State<MainShell> {
 
     final memberNames = AiCommandRouting.extractMemberNames(params);
     final title = AiCommandRouting.extractNewTitle(params);
-    final destructive =
-        command == 'REMOVE_GROUP_MEMBER' ||
-        command == 'LEAVE_GROUP' ||
-        command == 'DISBAND_GROUP';
-    final confirmed = await _confirmAiAction(
-      icon:
-          destructive
-              ? Icons.warning_amber_rounded
-              : Icons.admin_panel_settings_rounded,
-      title: _groupActionTitle(command),
-      description: _groupActionDescription(command),
-      confirmLabel: _groupActionConfirmLabel(command),
+    final presentation = AiActionPresentationResolver.group(command);
+    final destructive = presentation.destructive;    final confirmed = await _confirmAiAction(
+      icon: presentation.icon,
+      title: presentation.title,
+      description: presentation.description,
+      confirmLabel: presentation.confirmLabel,
       primaryDetail: conversation.getDisplayName(
         chatProvider.currentUserId ?? '',
       ),
@@ -1618,37 +1595,6 @@ class MainShellState extends State<MainShell> {
       _showErrorSnackBar(error.toString().replaceFirst('Bad state: ', ''));
     }
   }
-
-  String _groupActionTitle(String command) => switch (command) {
-    'CHANGE_GROUP_NAME' => 'Xác nhận đổi tên nhóm',
-    'ADD_GROUP_MEMBER' => 'Xác nhận thêm thành viên',
-    'REMOVE_GROUP_MEMBER' => 'Xác nhận xóa thành viên',
-    'TRANSFER_GROUP_OWNER' => 'Xác nhận chuyển quyền nhóm',
-    'LEAVE_GROUP' => 'Xác nhận rời nhóm',
-    'DISBAND_GROUP' => 'Xác nhận giải tán nhóm',
-    _ => 'Xác nhận thao tác nhóm',
-  };
-
-  String _groupActionDescription(String command) => switch (command) {
-    'CHANGE_GROUP_NAME' => 'Trợ lý sẽ cập nhật tên nhóm sau khi bạn xác nhận.',
-    'ADD_GROUP_MEMBER' => 'Trợ lý sẽ thêm thành viên vào nhóm này.',
-    'REMOVE_GROUP_MEMBER' => 'Thành viên được chọn sẽ bị mời khỏi nhóm.',
-    'TRANSFER_GROUP_OWNER' =>
-      'Quyền trưởng nhóm sẽ được chuyển cho thành viên này.',
-    'LEAVE_GROUP' => 'Bạn sẽ rời khỏi nhóm này.',
-    'DISBAND_GROUP' => 'Nhóm sẽ bị giải tán cho tất cả thành viên.',
-    _ => 'Trợ lý sẽ thực hiện thao tác nhóm đã chọn.',
-  };
-
-  String _groupActionConfirmLabel(String command) => switch (command) {
-    'CHANGE_GROUP_NAME' => 'Đổi tên',
-    'ADD_GROUP_MEMBER' => 'Thêm',
-    'REMOVE_GROUP_MEMBER' => 'Xóa khỏi nhóm',
-    'TRANSFER_GROUP_OWNER' => 'Chuyển quyền',
-    'LEAVE_GROUP' => 'Rời nhóm',
-    'DISBAND_GROUP' => 'Giải tán',
-    _ => 'Xác nhận',
-  };
 
   void _logAiFlow(
     String event, {
