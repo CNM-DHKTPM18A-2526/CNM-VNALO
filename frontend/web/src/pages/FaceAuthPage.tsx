@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { FaceSettings } from './components/FaceSettings'
+import { FaceSettings } from '../features/face-auth/components/FaceSettings'
 import { useAuth } from '../features/auth/useAuth'
 import { Card } from '../shared/components/ui/Card'
 
