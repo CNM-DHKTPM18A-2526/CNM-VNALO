@@ -18,6 +18,7 @@ import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provid
 import 'package:vnalo_mobile/features/ai_assistant/services/ai_action_context_store.dart';
 import 'package:vnalo_mobile/features/ai_assistant/services/ai_action_presentation_resolver.dart';
 import 'package:vnalo_mobile/features/ai_assistant/services/ai_action_target_matcher.dart';
+import 'package:vnalo_mobile/features/ai_assistant/services/ai_conversation_target_resolver.dart';
 import 'package:vnalo_mobile/features/ai_assistant/utils/ai_command_routing.dart';
 import 'package:vnalo_mobile/features/ai_assistant/utils/ai_recall_message_selector.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_action_confirmation_sheet.dart';
@@ -211,47 +212,6 @@ class MainShellState extends State<MainShell> {
       AiCommand(command: pending.command, params: nextParams),
     );
   }
-  String? _directPeerUserId(Conversation conversation, String currentUserId) {
-    if (conversation.type.name != 'DIRECT') return null;
-    for (final member in conversation.members) {
-      if (member.userId != currentUserId) {
-        return member.userId;
-      }
-    }
-    return null;
-  }
-
-  Conversation? _preferConversationFromAiContext(
-    Iterable<Conversation> matches,
-    ChatProvider chatProvider,
-  ) {
-    final context = _activeAiTargetContext();
-    if (context == null) return null;
-
-    final currentUserId = chatProvider.currentUserId ?? '';
-    final byConversationId =
-        context.conversationId == null
-            ? null
-            : matches
-                .where(
-                  (conversation) =>
-                      conversation.id == context.conversationId!.trim(),
-                )
-                .firstOrNull;
-    if (byConversationId != null) return byConversationId;
-
-    if (context.peerUserId == null || context.peerUserId!.trim().isEmpty) {
-      return null;
-    }
-    final peerUserId = context.peerUserId!.trim();
-    return matches
-        .where(
-          (conversation) =>
-              _directPeerUserId(conversation, currentUserId) == peerUserId,
-        )
-        .firstOrNull;
-  }
-
   User? _preferUserFromAiContext(Iterable<User> matches) {
     final context = _activeAiTargetContext();
     final peerUserId = context?.peerUserId?.trim();
@@ -266,7 +226,11 @@ class MainShellState extends State<MainShell> {
         .where(
           (conversation) =>
               conversation.type.name == 'DIRECT' &&
-              _directPeerUserId(conversation, currentUserId) == userId.trim(),
+              AiConversationTargetResolver.directPeerUserId(
+                    conversation,
+                    currentUserId,
+                  ) ==
+                  userId.trim(),
         )
         .firstOrNull;
   }
@@ -530,10 +494,12 @@ class MainShellState extends State<MainShell> {
 
           Conversation? selectedConversation;
           if (conversationMatches.length > 1) {
-            final contextConversation = _preferConversationFromAiContext(
-              conversationMatches,
-              chatProvider,
-            );
+            final contextConversation =
+                AiConversationTargetResolver.preferConversationFromContext(
+                  conversationMatches,
+                  context: _activeAiTargetContext(),
+                  currentUserId: chatProvider.currentUserId ?? '',
+                );
             if (contextConversation != null) {
               selectedConversation = contextConversation;
             }
@@ -1016,10 +982,12 @@ class MainShellState extends State<MainShell> {
         return null;
       }
       if (filtered.length > 1) {
-        final contextConversation = _preferConversationFromAiContext(
-          filtered,
-          chatProvider,
-        );
+        final contextConversation =
+            AiConversationTargetResolver.preferConversationFromContext(
+              filtered,
+              context: _activeAiTargetContext(),
+              currentUserId: chatProvider.currentUserId ?? '',
+            );
         if (contextConversation != null) {
           return contextConversation;
         }
