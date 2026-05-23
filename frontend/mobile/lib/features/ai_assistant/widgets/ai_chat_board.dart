@@ -302,7 +302,10 @@ class _AiChatBoardState extends State<AiChatBoard> {
     );
   }
 
-  Widget _buildAssistantTypingBubble({required bool isDarkMode}) {
+  Widget _buildAssistantTypingBubble({
+    required bool isDarkMode,
+    required String label,
+  }) {
     final bubbleColor =
         isDarkMode
             ? Colors.white.withValues(alpha: 0.06)
@@ -334,10 +337,10 @@ class _AiChatBoardState extends State<AiChatBoard> {
           children: [
             _TypingDots(isDarkMode: isDarkMode),
             const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                'AI đang soạn phản hồi...',
-                maxLines: 1,
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 12,
@@ -597,7 +600,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
                                             ? 'Đang nghe giọng nói. Bạn cũng có thể nhập câu hỏi bên dưới.'
                                             : aiProvider.state ==
                                                 AiState.thinking
-                                            ? 'Đang xử lý yêu cầu của bạn...'
+                                            ? aiProvider.assistantActivityLabel
                                             : 'Nhập câu hỏi hoặc chọn gợi ý để bắt đầu.',
                                         style: TextStyle(
                                           color:
@@ -629,6 +632,8 @@ class _AiChatBoardState extends State<AiChatBoard> {
                                         if (showAiTyping)
                                           _buildAssistantTypingBubble(
                                             isDarkMode: isDarkMode,
+                                            label:
+                                                aiProvider.assistantActivityLabel,
                                           ),
                                         if (clarification != null) ...[
                                           Padding(

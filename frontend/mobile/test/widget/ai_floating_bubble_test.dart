@@ -231,17 +231,18 @@ void main() {
       find.byKey(const ValueKey('ai_chat_input')),
       'Ban oi',
     );
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('ai_chat_send')));
     await tester.pump();
 
     expect(find.text('Ban oi'), findsOneWidget);
-    expect(find.text('AI đang soạn phản hồi...'), findsOneWidget);
+    expect(find.text('Đang hiểu yêu cầu...'), findsOneWidget);
 
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pumpAndSettle();
 
     expect(find.text('Mình đang ở đây.'), findsOneWidget);
-    expect(find.text('AI đang soạn phản hồi...'), findsNothing);
+    expect(find.text('Đang hiểu yêu cầu...'), findsNothing);
 
     provider.dispose();
   });

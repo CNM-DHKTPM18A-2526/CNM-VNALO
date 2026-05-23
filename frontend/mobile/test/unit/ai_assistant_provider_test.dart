@@ -426,6 +426,33 @@ void main() {
     provider.dispose();
   });
 
+  test('addActionFeedback preserves bubble surface for bubble action flow', () async {
+    final provider = _buildProvider();
+
+    await provider.summonMascot(
+      startListening: false,
+      persist: false,
+      source: 'bubble_feedback_test',
+    );
+    await provider.submitTextPrompt(
+      'mo chat voi uyen',
+      source: 'bubble_chat_board',
+      surface: AiResponseSurface.bubble,
+    );
+
+    provider.addActionFeedback(
+      'Mình tìm thấy nhiều kết quả cho "Uyên". Bạn muốn chọn ai?',
+      source: 'ai_action_ambiguity.contact',
+      keepBubbleVisible: true,
+    );
+
+    expect(provider.lastResponseSurface, AiResponseSurface.bubble);
+    expect(provider.shouldBubbleAutoShowResponse, isTrue);
+    expect(provider.isMascotVisible, isTrue);
+
+    provider.dispose();
+  });
+
   test(
     'submitDisambiguationSelection emits selection and stores user choice',
     () async {

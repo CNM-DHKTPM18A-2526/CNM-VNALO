@@ -114,13 +114,8 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
     _inputFocusNode.requestFocus();
   }
 
-  String _statusLabel(AiState state) {
-    return switch (state) {
-      AiState.listening => 'Đang lắng nghe...',
-      AiState.thinking => 'Đang xử lý...',
-      AiState.speaking => 'Đang phản hồi...',
-      AiState.idle => 'Đang hoạt động',
-    };
+  String _statusLabel(AiAssistantProvider provider) {
+    return provider.assistantActivityLabel;
   }
 
   @override
@@ -199,7 +194,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    _statusLabel(provider.state),
+                    _statusLabel(provider),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppTypography.bodySmall.copyWith(
@@ -245,7 +240,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
             child:
                 messages.isEmpty
                     ? _EmptyAiConversation(
-                      statusLabel: _statusLabel(provider.state),
+                      statusLabel: _statusLabel(provider),
                       isDarkMode: isDarkMode,
                       onQuickActionSelected: _applyQuickPrompt,
                     )
@@ -259,7 +254,10 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
                       itemCount: messages.length + (showAiTyping ? 1 : 0),
                       itemBuilder: (context, index) {
                         if (showAiTyping && index == 0) {
-                          return _AiTypingBubble(isDarkMode: isDarkMode);
+                          return _AiTypingBubble(
+                            isDarkMode: isDarkMode,
+                            label: provider.assistantActivityLabel,
+                          );
                         }
 
                         final messageIndex = showAiTyping ? index - 1 : index;
@@ -898,8 +896,9 @@ class _EmptyAiConversation extends StatelessWidget {
 
 class _AiTypingBubble extends StatelessWidget {
   final bool isDarkMode;
+  final String label;
 
-  const _AiTypingBubble({required this.isDarkMode});
+  const _AiTypingBubble({required this.isDarkMode, required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -945,7 +944,7 @@ class _AiTypingBubble extends StatelessWidget {
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
-                  'AI đang soạn phản hồi...',
+                  label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(

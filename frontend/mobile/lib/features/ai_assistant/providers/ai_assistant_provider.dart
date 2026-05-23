@@ -19,6 +19,8 @@ import 'package:vnalo_mobile/services/api_service.dart';
 
 enum AiState { idle, listening, thinking, speaking }
 
+enum AiThinkingPhase { idle, understanding, executingAction, composingResponse }
+
 enum AiResponseSurface { bubble, conversation, contextual, voice }
 
 // ---------------------------------------------------------------------------
@@ -359,6 +361,7 @@ class AiAssistantProvider with ChangeNotifier {
   String _lastUserPrompt = '';
   String _aiResponse = '';
   String _currentEmotion = 'neutral';
+  AiThinkingPhase _thinkingPhase = AiThinkingPhase.idle;
   bool _isResponseDegraded = false;
   String _providerStatus = 'LIVE_PROVIDER_ACTIVE';
   double _soundLevel = 0;
@@ -427,11 +430,30 @@ class AiAssistantProvider with ChangeNotifier {
       _lastResponseSurface == AiResponseSurface.voice ||
       _lastResponseSurface == AiResponseSurface.contextual;
   String get currentEmotion => _currentEmotion;
+  AiThinkingPhase get thinkingPhase => _thinkingPhase;
   bool get isProviderUnavailable =>
       _providerStatus == 'AI_PROVIDER_UNAVAILABLE';
   bool get isFallbackProviderActive =>
       _providerStatus == 'FALLBACK_PROVIDER_ACTIVE';
   bool get isAssistantGenerating => _state == AiState.thinking;
+  String get assistantActivityLabel {
+    if (_state == AiState.listening) {
+      return 'Đang lắng nghe...';
+    }
+    if (_state == AiState.speaking) {
+      return 'Đang phản hồi...';
+    }
+    if (_state != AiState.thinking) {
+      return 'Đang hoạt động';
+    }
+
+    return switch (_thinkingPhase) {
+      AiThinkingPhase.understanding => 'Đang hiểu yêu cầu...',
+      AiThinkingPhase.executingAction => 'Đang thực hiện thao tác...',
+      AiThinkingPhase.composingResponse => 'Đang soạn phản hồi...',
+      AiThinkingPhase.idle => 'Đang xử lý...',
+    };
+  }
   double get soundLevel => _soundLevel;
 
   bool get persistentEnabled => _persistentEnabled;
@@ -474,14 +496,21 @@ class AiAssistantProvider with ChangeNotifier {
     String message, {
     String source = 'ai_action_feedback',
     bool keepBubbleVisible = false,
+    AiResponseSurface? responseSurface,
   }) {
     final normalized = normalizeAiTextEncoding(message).trim();
     if (normalized.isEmpty) {
       return;
     }
 
+    final resolvedSurface =
+        responseSurface ??
+        (keepBubbleVisible && _activeSurface != AiResponseSurface.conversation
+            ? _activeSurface
+            : AiResponseSurface.conversation);
+
     _aiResponse = normalized;
-    _lastResponseSurface = AiResponseSurface.conversation;
+    _lastResponseSurface = resolvedSurface;
     if (source.startsWith('ai_action_ambiguity') ||
         source.startsWith('ai_action_missing')) {
       _clarificationState = AiClarificationState(
@@ -677,6 +706,10 @@ class AiAssistantProvider with ChangeNotifier {
   }) {
     final previous = _state;
     _state = next;
+
+    if (next != AiState.thinking) {
+      _thinkingPhase = AiThinkingPhase.idle;
+    }
 
     _logEvent(
       'STATE_CHANGE',
@@ -1572,6 +1605,7 @@ class AiAssistantProvider with ChangeNotifier {
     _cancelListenGuard();
     _cancelIdleAutoHide();
     _isSessionActive = true;
+    _thinkingPhase = AiThinkingPhase.understanding;
     _transitionTo(
       AiState.thinking,
       reason: 'command_received',
@@ -1654,10 +1688,13 @@ class AiAssistantProvider with ChangeNotifier {
       _trimSessionHistory();
 
       if (actionCommand != null && actionCommand.isNotEmpty) {
+        _thinkingPhase = AiThinkingPhase.executingAction;
+        notifyListeners();
         _executeSystemAction(actionCommand, actionParams, traceId: traceId);
       }
 
       if (_aiResponse.isNotEmpty) {
+        _thinkingPhase = AiThinkingPhase.composingResponse;
         _transitionTo(
           AiState.speaking,
           reason: 'speak_response',

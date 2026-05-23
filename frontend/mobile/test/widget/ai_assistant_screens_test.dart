@@ -251,13 +251,13 @@ void main() {
       await tester.pump();
 
       expect(find.text('Gui nhanh'), findsOneWidget);
-      expect(find.text('AI đang soạn phản hồi...'), findsOneWidget);
+      expect(find.text('Đang hiểu yêu cầu...'), findsAtLeastNWidgets(1));
 
       await tester.pump(const Duration(milliseconds: 350));
       await tester.pumpAndSettle();
 
       expect(find.text('Đã nhận yêu cầu của bạn.'), findsOneWidget);
-      expect(find.text('AI đang soạn phản hồi...'), findsNothing);
+      expect(find.text('Đang hiểu yêu cầu...'), findsNothing);
 
       provider.dispose();
     },
