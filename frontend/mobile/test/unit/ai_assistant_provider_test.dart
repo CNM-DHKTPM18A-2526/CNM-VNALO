@@ -265,6 +265,28 @@ void main() {
     },
   );
 
+
+  test('summon auto-listen does not toggle-off active listening', () async {
+    final provider = _buildProvider();
+
+    await provider.startListening(source: 'summon_guard_test');
+    expect(provider.state, AiState.listening);
+
+    await provider.summonMascot(
+      startListening: true,
+      persist: false,
+      source: 'summon_guard_test',
+    );
+
+    expect(provider.state, AiState.listening);
+
+    await provider.stopListening(
+      reason: 'summon_guard_cleanup',
+      keepBubbleVisible: false,
+    );
+    provider.dispose();
+  });
+
   test('normalizeAiTextEncoding repairs single-pass mojibake', () {
     const raw = 'ÄÃ¢y lÃ  cÃ¢u tráº£ lá»i trong mÃ n hÃ¬nh há»™i thoáº¡i.';
     final normalized = normalizeAiTextEncoding(raw);

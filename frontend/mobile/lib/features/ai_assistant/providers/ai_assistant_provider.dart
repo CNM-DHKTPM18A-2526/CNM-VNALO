@@ -656,7 +656,9 @@ class AiAssistantProvider with ChangeNotifier {
     }
 
     _idleAutoHideTimer = Timer(_idleAutoHideDelay, () {
-      if (_persistentEnabled ||
+      // HARDEN(late-callback): guard against timer firing after dispose
+      if (_isDisposed ||
+          _persistentEnabled ||
           _isSessionActive ||
           _state != AiState.idle ||
           _aiResponse.isNotEmpty ||
@@ -1190,6 +1192,9 @@ class AiAssistantProvider with ChangeNotifier {
 
     if (startListening) {
       await Future.delayed(const Duration(milliseconds: 120));
+      if (_isDisposed || _state == AiState.listening) {
+        return;
+      }
       await onPrimaryAction(
         source: '$source.auto_listen',
         surface: startListeningSurface,
@@ -2218,6 +2223,8 @@ class AiAssistantProvider with ChangeNotifier {
     }
 
     _cloudBackupDebounceTimer = Timer(const Duration(seconds: 2), () {
+      // HARDEN(late-callback): guard against timer firing after dispose
+      if (_isDisposed) return;
       unawaited(_syncConversationHistoryToCloud());
     });
   }
