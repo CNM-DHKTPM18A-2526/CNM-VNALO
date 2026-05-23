@@ -305,8 +305,61 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
                     ),
           ),
 
+          if (provider.state != AiState.idle)
+            _buildActivityStrip(provider, isDarkMode),
+
           // Zalo-style Input Bar
           _buildInputBar(provider, isDarkMode),
+        ],
+      ),
+    );
+  }
+
+
+  Widget _buildActivityStrip(AiAssistantProvider provider, bool isDarkMode) {
+    final iconColor =
+        provider.state == AiState.listening
+            ? AppColors.error
+            : (isDarkMode ? DarkColors.textSecondary : AppColors.iconSubtle);
+
+    return Container(
+      key: const ValueKey('ai_conversation_activity_strip'),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+      color: isDarkMode ? DarkColors.surface : LightColors.surface,
+      child: Row(
+        children: [
+          if (provider.state == AiState.listening)
+            Icon(
+              Icons.mic_rounded,
+              key: const ValueKey('ai_conversation_activity_mic'),
+              size: 16,
+              color: iconColor,
+            )
+          else if (provider.isAssistantGenerating)
+            _AiTypingDots(isDarkMode: isDarkMode)
+          else
+            Icon(
+              Icons.volume_up_rounded,
+              key: const ValueKey('ai_conversation_activity_speaking'),
+              size: 16,
+              color: iconColor,
+            ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              provider.assistantActivityLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.bodySmall.copyWith(
+                color:
+                    isDarkMode
+                        ? DarkColors.textSecondary
+                        : LightColors.textSecondary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
         ],
       ),
     );

@@ -263,6 +263,45 @@ void main() {
     },
   );
 
+
+  testWidgets('ai conversation screen shows activity strip near input while listening', (
+    tester,
+  ) async {
+    final provider = _buildProvider();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: provider),
+          ChangeNotifierProvider(create: (_) => LanguageProvider()),
+        ],
+        child: const MaterialApp(home: AiConversationScreen()),
+      ),
+    );
+
+    await provider.startListening(
+      source: 'conversation_screen_mic',
+      surface: AiResponseSurface.conversation,
+    );
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('ai_conversation_activity_strip')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('ai_conversation_activity_mic')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+
+    await provider.stopListening(
+      reason: 'activity_strip_cleanup',
+      keepBubbleVisible: false,
+    );
+    provider.dispose();
+  });
+
   testWidgets('ai conversation screen remains stable on compact viewport', (
     tester,
   ) async {
