@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 class AiContactActionPresentation {
   final IconData icon;
@@ -40,25 +40,25 @@ class AiActionPresentationResolver {
     return AiContactActionPresentation(
       icon: destructive ? Icons.block_rounded : Icons.person_add_alt_1_rounded,
       title: switch (command) {
-        'SEND_FRIEND_REQUEST' => 'Xác nh?n g?i k?t b?n',
-        'BLOCK_USER' => 'Xác nh?n ch?n ngu?i dùng',
-        'UNBLOCK_USER' => 'Xác nh?n b? ch?n ngu?i dùng',
-        _ => 'Xác nh?n thao tác',
+        'SEND_FRIEND_REQUEST' => 'Xác nhận gửi kết bạn',
+        'BLOCK_USER' => 'Xác nhận chặn người dùng',
+        'UNBLOCK_USER' => 'Xác nhận bỏ chặn người dùng',
+        _ => 'Xác nhận thao tác',
       },
       description: switch (command) {
         'SEND_FRIEND_REQUEST' =>
-          'Tr? lý s? g?i l?i m?i k?t b?n d?n ngu?i này.',
+          'Trợ lý sẽ gửi lời mời kết bạn đến người này.',
         'BLOCK_USER' =>
-          'B?n s? không nh?n tin nh?n/cu?c g?i t? ngu?i này.',
+          'Bạn sẽ không nhận tin nhắn/cuộc gọi từ người này.',
         'UNBLOCK_USER' =>
-          'B?n s? cho phép liên h? l?i v?i ngu?i này.',
-        _ => 'Tr? lý s? th?c hi?n thao tác dã ch?n.',
+          'Bạn sẽ cho phép liên hệ lại với người này.',
+        _ => 'Trợ lý sẽ thực hiện thao tác đã chọn.',
       },
       confirmLabel: switch (command) {
-        'SEND_FRIEND_REQUEST' => 'G?i k?t b?n',
-        'BLOCK_USER' => 'Ch?n',
-        'UNBLOCK_USER' => 'B? ch?n',
-        _ => 'Xác nh?n',
+        'SEND_FRIEND_REQUEST' => 'Gửi kết bạn',
+        'BLOCK_USER' => 'Chặn',
+        'UNBLOCK_USER' => 'Bỏ chặn',
+        _ => 'Xác nhận',
       },
       destructive: destructive,
     );
@@ -76,34 +76,34 @@ class AiActionPresentationResolver {
               ? Icons.warning_amber_rounded
               : Icons.admin_panel_settings_rounded,
       title: switch (command) {
-        'CHANGE_GROUP_NAME' => 'Xác nh?n d?i tên nhóm',
-        'ADD_GROUP_MEMBER' => 'Xác nh?n thêm thành viên',
-        'REMOVE_GROUP_MEMBER' => 'Xác nh?n xóa thành viên',
-        'TRANSFER_GROUP_OWNER' => 'Xác nh?n chuy?n quy?n nhóm',
-        'LEAVE_GROUP' => 'Xác nh?n r?i nhóm',
-        'DISBAND_GROUP' => 'Xác nh?n gi?i tán nhóm',
-        _ => 'Xác nh?n thao tác nhóm',
+        'CHANGE_GROUP_NAME' => 'Xác nhận đổi tên nhóm',
+        'ADD_GROUP_MEMBER' => 'Xác nhận thêm thành viên',
+        'REMOVE_GROUP_MEMBER' => 'Xác nhận xóa thành viên',
+        'TRANSFER_GROUP_OWNER' => 'Xác nhận chuyển quyền nhóm',
+        'LEAVE_GROUP' => 'Xác nhận rời nhóm',
+        'DISBAND_GROUP' => 'Xác nhận giải tán nhóm',
+        _ => 'Xác nhận thao tác nhóm',
       },
       description: switch (command) {
         'CHANGE_GROUP_NAME' =>
-          'Tr? lý s? c?p nh?t tên nhóm sau khi b?n xác nh?n.',
-        'ADD_GROUP_MEMBER' => 'Tr? lý s? thêm thành viên vào nhóm này.',
+          'Trợ lý sẽ cập nhật tên nhóm sau khi bạn xác nhận.',
+        'ADD_GROUP_MEMBER' => 'Trợ lý sẽ thêm thành viên vào nhóm này.',
         'REMOVE_GROUP_MEMBER' =>
-          'Thành viên du?c ch?n s? b? m?i kh?i nhóm.',
+          'Thành viên được chọn sẽ bị mời khỏi nhóm.',
         'TRANSFER_GROUP_OWNER' =>
-          'Quy?n tru?ng nhóm s? du?c chuy?n cho thành viên này.',
-        'LEAVE_GROUP' => 'B?n s? r?i kh?i nhóm này.',
-        'DISBAND_GROUP' => 'Nhóm s? b? gi?i tán cho t?t c? thành viên.',
-        _ => 'Tr? lý s? th?c hi?n thao tác nhóm dã ch?n.',
+          'Quyền trưởng nhóm sẽ được chuyển cho thành viên này.',
+        'LEAVE_GROUP' => 'Bạn sẽ rời khỏi nhóm này.',
+        'DISBAND_GROUP' => 'Nhóm sẽ bị giải tán cho tất cả thành viên.',
+        _ => 'Trợ lý sẽ thực hiện thao tác nhóm đã chọn.',
       },
       confirmLabel: switch (command) {
-        'CHANGE_GROUP_NAME' => 'Ð?i tên',
+        'CHANGE_GROUP_NAME' => 'Đổi tên',
         'ADD_GROUP_MEMBER' => 'Thêm',
-        'REMOVE_GROUP_MEMBER' => 'Xóa kh?i nhóm',
-        'TRANSFER_GROUP_OWNER' => 'Chuy?n quy?n',
-        'LEAVE_GROUP' => 'R?i nhóm',
-        'DISBAND_GROUP' => 'Gi?i tán',
-        _ => 'Xác nh?n',
+        'REMOVE_GROUP_MEMBER' => 'Xóa khỏi nhóm',
+        'TRANSFER_GROUP_OWNER' => 'Chuyển quyền',
+        'LEAVE_GROUP' => 'Rời nhóm',
+        'DISBAND_GROUP' => 'Giải tán',
+        _ => 'Xác nhận',
       },
       destructive: destructive,
     );

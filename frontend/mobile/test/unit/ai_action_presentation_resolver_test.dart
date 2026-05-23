@@ -10,8 +10,8 @@ void main() {
       );
 
       expect(presentation.icon, Icons.person_add_alt_1_rounded);
-      expect(presentation.title, 'Xác nh?n g?i k?t b?n');
-      expect(presentation.confirmLabel, 'G?i k?t b?n');
+      expect(presentation.title, 'Xác nhận gửi kết bạn');
+      expect(presentation.confirmLabel, 'Gửi kết bạn');
       expect(presentation.destructive, isFalse);
     });
 
@@ -19,7 +19,7 @@ void main() {
       final presentation = AiActionPresentationResolver.contact('BLOCK_USER');
 
       expect(presentation.icon, Icons.block_rounded);
-      expect(presentation.confirmLabel, 'Ch?n');
+      expect(presentation.confirmLabel, 'Chặn');
       expect(presentation.destructive, isTrue);
     });
   });
@@ -31,8 +31,8 @@ void main() {
       );
 
       expect(presentation.icon, Icons.admin_panel_settings_rounded);
-      expect(presentation.title, 'Xác nh?n d?i tên nhóm');
-      expect(presentation.confirmLabel, 'Ð?i tên');
+      expect(presentation.title, 'Xác nhận đổi tên nhóm');
+      expect(presentation.confirmLabel, 'Đổi tên');
       expect(presentation.destructive, isFalse);
     });
 
