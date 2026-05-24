@@ -162,8 +162,13 @@ export function FaceEnrollment({ token, onSuccess, onError, onCancel }: FaceEnro
       )}
 
       {step === 'success' && (
-        <div className='face-enrollment-success'>
-          <span className='face-enrollment-success-icon'>✓</span>
+        <div className='face-enrollment-success' role='status' aria-live='polite'>
+          <span className='face-enrollment-success-icon' aria-hidden='true'>
+            <svg width='36' height='36' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
+              <circle cx='12' cy='12' r='10' />
+              <polyline points='9,12 12,15 16,10' />
+            </svg>
+          </span>
           <h3>Đăng ký thành công!</h3>
           <p>Khuôn mặt của bạn đã được đăng ký thành công.</p>
         </div>

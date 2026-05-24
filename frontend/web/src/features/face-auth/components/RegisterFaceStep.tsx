@@ -143,8 +143,13 @@ export function RegisterFaceStep({ token, onComplete }: RegisterFaceStepProps) {
       )}
 
       {step === 'success' && (
-        <div className='register-face-success'>
-          <div className='register-face-success-icon'>✓</div>
+        <div className='register-face-success' role='status' aria-live='polite'>
+          <div className='register-face-success-icon'>
+            <svg width='40' height='40' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' aria-hidden='true'>
+              <circle cx='12' cy='12' r='10' />
+              <polyline points='9,12 12,15 16,10' />
+            </svg>
+          </div>
           <h3>Đăng ký khuôn mặt thành công!</h3>
           <p>Bạn có thể đăng nhập bằng khuôn mặt từ lần sau.</p>
         </div>

@@ -178,11 +178,12 @@ export function FaceLoginModal({ onClose, onNotEnrolled, onSuccess }: FaceLoginM
     <div
       className="face-login-modal-overlay"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      role="presentation"
     >
-      <div className="face-login-modal">
+      <div className="face-login-modal" role="dialog" aria-modal="true" aria-labelledby="face-login-modal-title">
         <div className="face-login-modal-header">
-          <span className="face-login-modal-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 8, verticalAlign: 'middle' }}>
+          <span className="face-login-modal-title" id="face-login-modal-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 8, verticalAlign: 'middle' }} aria-hidden="true">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
               <circle cx="12" cy="7" r="4"></circle>
             </svg>
@@ -270,17 +271,17 @@ export function FaceLoginModal({ onClose, onNotEnrolled, onSuccess }: FaceLoginM
           )}
 
           {step === 'verifying' && (
-            <div className="face-login-verifying">
-              <div className="face-login-spinner" />
+            <div className="face-login-verifying" role="status" aria-live="polite" aria-label="Đang xác thực khuôn mặt">
+              <div className="face-login-spinner" aria-hidden="true" />
               <p className="face-login-verifying-text">Đang xác thực khuôn mặt...</p>
               <p className="face-login-verifying-sub">Vui lòng giữ yên khuôn mặt</p>
             </div>
           )}
 
           {step === 'error' && (
-            <div className="face-login-error-state">
+            <div className="face-login-error-state" role="alert">
               <div className="face-login-icon-wrapper face-login-icon-error">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
                   <circle cx="12" cy="12" r="10"></circle>
                   <line x1="15" y1="9" x2="9" y2="15"></line>
                   <line x1="9" y1="9" x2="15" y2="15"></line>

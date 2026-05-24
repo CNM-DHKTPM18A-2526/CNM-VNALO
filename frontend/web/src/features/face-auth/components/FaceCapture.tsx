@@ -105,7 +105,7 @@ export function FaceCapture({
         className='face-capture-btn'
         onClick={handleCapture}
         disabled={disabled || cameraState !== 'active'}
-        aria-label='Chụp ảnh khuôn mặt'
+        aria-label={cameraState === 'requesting' ? 'Đang yêu cầu quyền camera...' : cameraState === 'capturing' ? 'Đang chụp ảnh...' : 'Chụp ảnh khuôn mặt'}
       >
         <span className='face-capture-btn-ring'>
           {cameraState === 'capturing' ? (

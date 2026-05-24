@@ -93,8 +93,8 @@ export function FaceSettings({ token, onStatusChange }: FaceSettingsProps) {
 
   if (state === 'loading') {
     return (
-      <div className='face-settings face-settings-loading'>
-        <div className='face-settings-spinner' />
+      <div className='face-settings face-settings-loading' role="status" aria-live="polite">
+        <div className='face-settings-spinner' aria-hidden="true" />
         <p>Đang tải trạng thái...</p>
       </div>
     )
@@ -142,7 +142,7 @@ export function FaceSettings({ token, onStatusChange }: FaceSettingsProps) {
             </div>
             <div className='face-settings-status-info'>
               <strong>Đã đăng ký</strong>
-              <span>Phiên bản: {status.version ?? 1}</span>
+              <span>Phiên bản: {status.version != null ? status.version : '—'}</span>
               <span>Ngày đăng ký: {formatDate(status.enrolledAt)}</span>
             </div>
           </div>

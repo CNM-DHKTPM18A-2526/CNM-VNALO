@@ -18,6 +18,12 @@ body.theme-dark {
   --auth-border: #444444;
   --auth-input-border: #555555;
   --auth-card-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  --auth-focus-glow: rgba(74, 144, 226, 0.25);
+}
+
+body.theme-dark .auth-form input:focus,
+body.theme-dark .auth-form select:focus {
+  box-shadow: 0 0 0 3px var(--auth-focus-glow);
 }
 
 .auth-page {
@@ -69,7 +75,8 @@ body.theme-dark {
   padding: 0;
   overflow: visible;
   position: relative;
-  width: 400px; /* Fixed width like Zalo */
+  max-width: 400px;
+  width: 100%;
   margin: 0 auto;
   transition: height 0.3s ease;
 }
@@ -212,6 +219,16 @@ body.theme-dark {
   box-shadow: 0 0 0 3px rgba(0, 104, 255, 0.12);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .face-login-spinner {
+    animation: none;
+    border-top-color: var(--auth-primary);
+    border-right-color: transparent;
+    border-bottom-color: transparent;
+    border-left-color: transparent;
+  }
+}
+
 .auth-form button[type="submit"] {
   background: var(--auth-primary);
   color: #fff;
@@ -275,12 +292,17 @@ body.theme-dark {
   font-size: 10px;
   font-weight: 600;
   color: #ffffff;
-  background: #f59e0b;
+  background: #d97706;
   padding: 2px 7px;
   border-radius: 999px;
   letter-spacing: 0.3px;
   text-transform: uppercase;
   line-height: 1.4;
+}
+
+body.theme-dark .auth-face-badge {
+  background: #b45309;
+  color: #fef3c7;
 }
 
 /* Face Login Modal */
@@ -292,7 +314,7 @@ body.theme-dark {
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  backdrop-filter: blur(3px);
+  backdrop-filter: blur(6px);
 }
 
 .face-login-modal {
@@ -448,6 +470,14 @@ body.theme-dark {
   height: 220px;
   border: 2.5px dashed rgba(255, 255, 255, 0.7);
   border-radius: 50%;
+  max-width: 70%;
+}
+
+@media (max-width: 400px) {
+  .face-login-camera-guide {
+    width: 150px;
+    height: 185px;
+  }
 }
 
 .face-login-capture-btn {
@@ -571,21 +601,21 @@ body.theme-dark {
 }
 
 .face-login-field-error {
-  color: #ff4d4f;
+  color: #dc2626;
   font-size: 12px;
   margin-top: 6px;
   display: block;
 }
 
 .auth-field-error {
-  color: #ff4d4f;
+  color: #dc2626;
   font-size: 12px;
   margin-top: 6px;
   display: block;
 }
 
 .auth-form-error {
-  color: #ff4d4f;
+  color: #dc2626;
   font-size: 14px;
   text-align: center;
   margin: 10px 0;

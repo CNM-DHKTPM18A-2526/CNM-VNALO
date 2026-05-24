@@ -79,8 +79,7 @@ function validateRegisterForm(values: RegisterFormState): RegisterErrors {
 
 export function RegisterPage() {
   const navigate = useNavigate()
-  const { setLanguage, language } = useLanguage()
-  const { t } = useLanguage()
+  const { setLanguage, language, t } = useLanguage()
   const [step, setStep] = React.useState<RegisterStep>('form')
   const [form, setForm] = React.useState<RegisterFormState>({
     displayName: '',
@@ -221,8 +220,9 @@ export function RegisterPage() {
 
                 <div style={{ display: 'flex', gap: 15 }}>
                   <div style={{ flex: 2 }}>
-                    <p style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>{t('profile.dateOfBirth')}</p>
+                    <label htmlFor='reg-dob' style={{ fontSize: 12, color: '#666', marginBottom: 4, display: 'block' }}>{t('profile.dateOfBirth')}</label>
                     <input
+                      id='reg-dob'
                       type='date'
                       value={form.dob}
                       max={getLocalTodayIsoDate()}
@@ -232,9 +232,10 @@ export function RegisterPage() {
                     {errors.dob && <span className='auth-field-error'>{errors.dob}</span>}
                   </div>
                   <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>{t('profile.gender')}</p>
-                    <select 
-                        value={form.gender} 
+                    <label htmlFor='reg-gender' style={{ fontSize: 12, color: '#666', marginBottom: 4, display: 'block' }}>{t('profile.gender')}</label>
+                    <select
+                        id='reg-gender'
+                        value={form.gender}
                         onChange={(e) => setField('gender', e.target.value as Gender)}
                     >
                       <option value=''>--</option>
@@ -283,10 +284,10 @@ export function RegisterPage() {
                 </div>
 
                 {errors.otpCode && <p className='auth-form-error'>{errors.otpCode}</p>}
-                {errorMessage && <p className='auth-form-error'>{errorMessage}</p>}
-                {successMessage && <p className='auth-form-success'>{successMessage}</p>}
+                {errorMessage && <p className='auth-form-error' role="alert">{errorMessage}</p>}
+                {successMessage && <p className='auth-form-success' role="status">{successMessage}</p>}
 
-                <button type='submit' disabled={isSubmitting}>
+                <button type='submit' disabled={isSubmitting || otpCode.length < 6}>
                   {isSubmitting ? t('auth.verifying') : t('auth.verifyButton')}
                 </button>
                 
