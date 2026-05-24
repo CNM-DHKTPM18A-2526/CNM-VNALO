@@ -6,6 +6,7 @@ import 'package:vnalo_mobile/services/auth_events.dart';
 import 'package:vnalo_mobile/services/auth_service.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 import 'package:vnalo_mobile/services/storage_service.dart';
+import 'package:vnalo_mobile/services/face_auth_service.dart';
 
 import 'package:vnalo_mobile/services/local_sync_service.dart';
 import 'package:vnalo_mobile/core/utils/device_info_util.dart';
@@ -582,6 +583,50 @@ class AuthProvider extends ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  Future<bool> loginWithFace({
+    required String userId,
+    required String deviceId,
+    required String deviceName,
+    required String platform,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      // Import lazily to avoid circular deps
+      final faceService = FaceAuthService();
+      final result = await faceService.faceLogin(
+        userId: userId,
+        deviceId: deviceId,
+        deviceName: deviceName,
+        platform: platform,
+      );
+
+      await _storageService.saveTokens(
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      );
+      _accessToken = result.accessToken;
+
+      _user = await _authService.getMe();
+      await _storageService.saveUserId(_user!.id);
+
+      _socketService.connect(result.accessToken);
+
+      _isLoading = false;
+      notifyListeners();
+      debugPrint('[Auth] Success: Face login.');
+      _localSyncService.syncRecently();
+      return true;
+    } catch (e) {
+      _isLoading = false;
+      _error = _friendlyAuthError(e);
+      notifyListeners();
+      return false;
+    }
   }
 }
 

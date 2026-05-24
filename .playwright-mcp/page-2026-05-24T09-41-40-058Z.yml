@@ -1,0 +1,25 @@
+- generic [ref=e4]:
+  - button "Tối" [ref=e6] [cursor=pointer]:
+    - img [ref=e7]
+    - generic [ref=e9]: Tối
+  - banner [ref=e10]:
+    - generic [ref=e11]: Vnalo
+    - paragraph [ref=e12]:
+      - text: Đăng nhập VNALO
+      - text: Web chat
+  - generic [ref=e13]:
+    - generic [ref=e14]:
+      - generic [ref=e15]: Đăng nhập bằng QR
+      - button [ref=e16] [cursor=pointer]:
+        - img [ref=e17]
+    - generic [ref=e19]:
+      - img [ref=e21]
+      - paragraph [ref=e22]: Chỉ dùng để đăng nhập
+      - paragraph [ref=e23]: Vnalo trên máy tính
+  - paragraph [ref=e25]:
+    - text: Chưa có tài khoản?
+    - link "Tạo tài khoản!" [ref=e26] [cursor=pointer]:
+      - /url: /register
+  - generic [ref=e27]:
+    - button "Tiếng Việt" [ref=e28] [cursor=pointer]
+    - button "English" [ref=e29] [cursor=pointer]
