@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:uuid/uuid.dart';
 import 'package:vnalo_mobile/features/ai_assistant/models/mascot_metadata.dart';
+import 'package:vnalo_mobile/features/ai_assistant/services/ai_stt_resilience_policy.dart';
 import 'package:vnalo_mobile/features/ai_assistant/utils/ai_command_routing.dart';
 import 'package:vnalo_mobile/models/message_model.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
@@ -753,11 +754,14 @@ class AiAssistantProvider with ChangeNotifier {
   }
 
   bool _shouldIgnorePrematureSttEnd({required bool isPermanentError}) {
-    return _state == AiState.listening &&
-        !_isPipelineLocked &&
-        !isPermanentError &&
-        !_hasCapturedFinalTranscript() &&
-        _elapsedListeningTime() < _sttListenFor;
+    return AiSttResiliencePolicy.shouldHoldListening(
+      isListening: _state == AiState.listening,
+      isPipelineLocked: _isPipelineLocked,
+      hasCapturedFinalTranscript: _hasCapturedFinalTranscript(),
+      elapsed: _elapsedListeningTime(),
+      minimumListenFor: _sttListenFor,
+      isPermanentError: isPermanentError,
+    );
   }
 
   void _restartListeningUntilGuardWindow({
@@ -1445,11 +1449,12 @@ class AiAssistantProvider with ChangeNotifier {
             level: 'ERROR',
             data: {'error': error.toString(), 'errorMsg': error.errorMsg},
           );
-          final isPermanentError =
-              normalizedError.contains('permission') ||
-              normalizedError.contains('denied') ||
-              normalizedError.contains('initialize') ||
-              normalizedError.contains('network');
+          final isPermanentError = AiSttResiliencePolicy.isPermanentError(
+            normalizedError,
+          );
+          final isTransientError = AiSttResiliencePolicy.isTransientError(
+            normalizedError,
+          );
           if (_shouldIgnorePrematureSttEnd(
             isPermanentError: isPermanentError,
           )) {
@@ -1460,6 +1465,8 @@ class AiAssistantProvider with ChangeNotifier {
                 'errorMsg': error.errorMsg,
                 'elapsedMs': _elapsedListeningTime().inMilliseconds,
                 'minimumMs': _sttListenFor.inMilliseconds,
+                'isTransientError': isTransientError,
+                'isPermanentError': isPermanentError,
               },
             );
             _restartListeningUntilGuardWindow(
