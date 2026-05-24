@@ -223,6 +223,317 @@ body.theme-dark {
   background: var(--auth-primary-hover);
 }
 
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--auth-text-sub);
+  font-size: 13px;
+  margin: 4px 0;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--auth-border);
+}
+
+.auth-face-login-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px;
+  border: 1.5px solid var(--auth-border);
+  background: var(--auth-card-bg);
+  color: var(--auth-text-main);
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  position: relative;
+}
+.auth-face-login-btn:hover:not(:disabled) {
+  border-color: var(--auth-primary);
+  background: rgba(0, 104, 255, 0.04);
+}
+.auth-face-login-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.auth-face-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: #ffffff;
+  background: #f59e0b;
+  padding: 2px 7px;
+  border-radius: 999px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  line-height: 1.4;
+}
+
+/* Face Login Modal */
+.face-login-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(3px);
+}
+
+.face-login-modal {
+  background: var(--auth-card-bg);
+  border-radius: 16px;
+  width: min(380px, 92vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+}
+
+.face-login-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--auth-border);
+}
+
+.face-login-modal-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--auth-text-main);
+}
+
+.face-login-modal-close {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  color: var(--auth-text-sub);
+  cursor: pointer;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+.face-login-modal-close:hover {
+  background: var(--auth-bg);
+}
+
+.face-login-modal-body {
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.face-login-intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+  width: 100%;
+}
+
+.face-login-icon-wrapper {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(0, 104, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--auth-primary);
+}
+
+.face-login-icon-error {
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+}
+
+.face-login-intro-text {
+  font-size: 15px;
+  color: var(--auth-text-main);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.face-login-intro-note {
+  font-size: 13px;
+  color: var(--auth-text-sub);
+  line-height: 1.5;
+  margin: -6px 0 0;
+}
+
+.face-login-primary-btn {
+  width: 100%;
+  padding: 13px;
+  background: var(--auth-primary);
+  color: #ffffff;
+  border: none;
+  border-radius: 999px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.face-login-primary-btn:hover {
+  background: var(--auth-primary-hover);
+}
+
+.face-login-secondary-link {
+  background: none;
+  border: none;
+  color: var(--auth-primary);
+  font-size: 14px;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 4px;
+}
+
+.face-login-camera {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.face-login-camera-wrapper {
+  width: 100%;
+  max-width: 300px;
+  aspect-ratio: 4 / 3;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  background: #111;
+}
+
+.face-login-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.face-login-camera-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.face-login-camera-guide {
+  width: 180px;
+  height: 220px;
+  border: 2.5px dashed rgba(255, 255, 255, 0.7);
+  border-radius: 50%;
+}
+
+.face-login-capture-btn {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: transparent;
+  border: 3px solid var(--auth-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  transition: transform 0.15s, opacity 0.15s;
+}
+.face-login-capture-btn:hover:not(:disabled) {
+  transform: scale(1.05);
+}
+.face-login-capture-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.face-login-capture-ring {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--auth-primary);
+}
+
+.face-login-camera-hint {
+  font-size: 13px;
+  color: var(--auth-text-sub);
+  margin: 0;
+  text-align: center;
+}
+
+.face-login-verifying {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 0;
+  color: var(--auth-text-main);
+  font-size: 15px;
+}
+
+.face-login-spinner {
+  width: 48px;
+  height: 48px;
+  border: 3px solid var(--auth-border);
+  border-top-color: var(--auth-primary);
+  border-radius: 50%;
+  animation: face-login-spin 0.8s linear infinite;
+}
+
+@keyframes face-login-spin {
+  to { transform: rotate(360deg); }
+}
+
+.face-login-error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  text-align: center;
+}
+
+.face-login-error-text {
+  font-size: 14px;
+  color: #ef4444;
+  line-height: 1.5;
+  margin: 0;
+}
+
+@media (max-width: 480px) {
+  .face-login-modal {
+    border-radius: 16px 16px 0 0;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-height: 92vh;
+  }
+  .face-login-modal-overlay {
+    align-items: flex-end;
+  }
+}
+
 .auth-field-error {
   color: #ff4d4f;
   font-size: 12px;

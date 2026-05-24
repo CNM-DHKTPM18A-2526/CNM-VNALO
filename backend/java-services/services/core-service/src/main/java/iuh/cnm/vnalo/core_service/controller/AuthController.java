@@ -27,6 +27,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * REST Controller for authentication endpoints.
@@ -223,6 +224,42 @@ public class AuthController {
     public ResponseEntity<Void> verifyOtp(@RequestBody Map<String, String> body) {
         authService.verifyRegistrationOtp(body.get("email"), body.get("otp"));
         return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Face login — caller must first call /face/verify to get verified=true with a userId.
+     * This endpoint creates a session for the verified userId.
+     */
+    @PostMapping("/face-login")
+    @Operation(summary = "Face login", description = "Create session after face verification succeeded")
+    public ResponseEntity<ApiResponse<AuthResponse>> faceLogin(
+            @Valid @RequestBody FaceLoginRequest request,
+            HttpServletRequest httpRequest) {
+
+        AuthResponse response = authService.faceLogin(
+                UUID.fromString(request.getUserId()),
+                httpRequest,
+                request.getDeviceId(),
+                request.getDeviceName(),
+                request.getPlatform()
+        );
+        return ResponseEntity.ok(ApiResponse.success("Face login successful", response));
+    }
+
+    /**
+     * Lookup a user account by phone number or email, returning the userId.
+     * Used by the face login flow to resolve an identifier to a UUID.
+     */
+    @GetMapping("/lookup")
+    @Operation(summary = "Lookup user by identifier", description = "Resolve phone or email to userId for face login")
+    public ResponseEntity<ApiResponse<Map<String, String>>> lookupByIdentifier(
+            @RequestParam("identifier") String identifier) {
+
+        UUID userId = authService.resolveAccountToUserId(identifier);
+        return ResponseEntity.ok(ApiResponse.success(
+                "User found",
+                Map.of("userId", userId.toString())
+        ));
     }
 
     /**

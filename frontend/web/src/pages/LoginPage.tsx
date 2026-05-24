@@ -4,6 +4,7 @@ import { QRCodeCanvas } from 'qrcode.react'
 
 import { useAuth } from '../features/auth/useAuth'
 import { createQrLoginSession, pollQrLoginSession } from '../features/auth/auth.api'
+import { FaceLoginModal } from '../features/face-auth/components/FaceLoginModal'
 
 import { useLanguage } from '../shared/i18n/LanguageContext'
 import { useTheme } from '../shared/contexts/ThemeContext'
@@ -19,6 +20,7 @@ export function LoginPage() {
 
   const [loginMode, setLoginMode] = React.useState<'qr' | 'password'>('qr')
   const [showMenu, setShowMenu] = React.useState(false)
+  const [showFaceModal, setShowFaceModal] = React.useState(false)
   
   // Password login states
   const [identifier, setIdentifier] = React.useState('')
@@ -202,6 +204,22 @@ export function LoginPage() {
                 <div style={{ textAlign: 'center' }}>
                   <Link to='/forgot-password' style={{ color: '#0068ff', fontSize: 14, textDecoration: 'none' }}>{t('auth.forgotPassword')}?</Link>
                 </div>
+                <div className='auth-divider'>
+                  <span>hoặc</span>
+                </div>
+                <button
+                  type='button'
+                  className='auth-face-login-btn'
+                  onClick={() => setShowFaceModal(true)}
+                  disabled={isSubmitting}
+                >
+                  <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'>
+                    <path d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2' />
+                    <circle cx='12' cy='7' r='4' />
+                  </svg>
+                  Đăng nhập bằng khuôn mặt
+                  <span className='auth-face-badge'>thử nghiệm</span>
+                </button>
               </form>
             )}
           </div>
@@ -213,19 +231,33 @@ export function LoginPage() {
       </div>
 
       <div className='auth-lang-selector'>
-          <button 
+          <button
             className={`auth-lang-btn ${language === 'vi' ? 'active' : ''}`}
             onClick={() => setLanguage('vi')}
           >
             Tiếng Việt
           </button>
-          <button 
+          <button
             className={`auth-lang-btn ${language === 'en' ? 'active' : ''}`}
             onClick={() => setLanguage('en')}
           >
             English
           </button>
       </div>
+
+      {showFaceModal && (
+        <FaceLoginModal
+          onClose={() => setShowFaceModal(false)}
+          onNotEnrolled={() => {
+            setShowFaceModal(false)
+            setLoginMode('qr')
+          }}
+          onSuccess={() => {
+            setShowFaceModal(false)
+            navigate(fromPath, { replace: true })
+          }}
+        />
+      )}
       </div>
     </div>
   )

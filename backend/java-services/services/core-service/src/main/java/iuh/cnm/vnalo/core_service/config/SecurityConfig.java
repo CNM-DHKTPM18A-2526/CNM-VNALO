@@ -41,7 +41,7 @@ public class SecurityConfig {
                     .requestMatchers("/auth/logout-all", "/auth/change-password", "/auth/password/change", "/auth/login-devices", "/auth/qr/sessions/*/approve").authenticated()
                         .requestMatchers("/api/v1/ai/internal/**", "/api/v1/ai/mascot/internal/**").hasRole("INTERNAL")
                         // Face authentication public endpoints (verification and liveness do not require auth)
-                        .requestMatchers("/api/v1/face/verify", "/api/v1/face/liveness-check", "/api/v1/face/health").permitAll()
+                        .requestMatchers("/api/v1/face/verify", "/api/v1/face/liveness-check", "/api/v1/face/health", "/api/v1/auth/face-login", "/api/v1/auth/lookup").permitAll()
                         // Face authentication authenticated endpoints (enrollment, status, delete require JWT)
                         .requestMatchers("/api/v1/face/enroll", "/api/v1/face/status", "/api/v1/face/enrollment").authenticated()
                         .requestMatchers("/auth/**", "/swagger-ui/**", "/swagger-ui.html",

@@ -179,6 +179,38 @@ export async function verifyFace(
   }
 }
 
+export async function faceLogin(
+  userId: string,
+  deviceId: string,
+  deviceName: string,
+  platform: string,
+): Promise<{ accessToken: string; refreshToken: string }> {
+  const response = await fetch(`${API_BASE_URL}/auth/face-login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, deviceId, deviceName, platform }),
+  })
+
+  const json = (await response.json().catch(() => null)) as unknown
+
+  if (!response.ok) {
+    const message = extractMessage(json)
+    throw new Error(message ?? 'Đăng nhập bằng khuôn mặt thất bại.')
+  }
+
+  const root = json as ApiResponse<Record<string, unknown>>
+  const data = root.data ?? {}
+
+  const accessToken = typeof data.accessToken === 'string' ? data.accessToken : ''
+  const refreshToken = typeof data.refreshToken === 'string' ? data.refreshToken : ''
+
+  if (!accessToken || !refreshToken) {
+    throw new Error('Không lấy được token từ phản hồi.')
+  }
+
+  return { accessToken, refreshToken }
+}
+
 export async function checkLiveness(imageBlob: Blob): Promise<FaceLivenessResult> {
   const formData = new FormData()
   formData.append('image', imageBlob, 'face.jpg')
@@ -204,6 +236,29 @@ export async function checkLiveness(imageBlob: Blob): Promise<FaceLivenessResult
     threshold: typeof data.threshold === 'number' ? data.threshold : 0,
     pass: typeof data.pass === 'boolean' ? data.pass : false,
   }
+}
+
+export async function lookupUserId(identifier: string): Promise<string> {
+  const response = await fetch(
+    `${API_BASE_URL}/auth/lookup?identifier=${encodeURIComponent(identifier)}`
+  )
+
+  const json = (await response.json().catch(() => null)) as unknown
+
+  if (!response.ok) {
+    const message = extractMessage(json)
+    throw new Error(message ?? 'Không tìm thấy tài khoản.')
+  }
+
+  const root = json as ApiResponse<Record<string, unknown>>
+  const data = root.data ?? {}
+
+  const userId = typeof data.userId === 'string' ? data.userId : ''
+  if (!userId) {
+    throw new Error('Không tìm thấy tài khoản.')
+  }
+
+  return userId
 }
 
 export async function getFaceHealth(): Promise<FaceHealthResponse> {
