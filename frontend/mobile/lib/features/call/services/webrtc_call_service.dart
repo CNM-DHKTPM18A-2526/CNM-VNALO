@@ -537,7 +537,9 @@ class WebRtcCallService extends ChangeNotifier {
 
     try {
       await _peerConnection?.close();
-    } catch (_) {}
+    } catch (_) {
+      // Peer connection may already be closed or in a failed state.
+    }
     _peerConnection = null;
     _pendingCandidates.clear();
     _hasRemoteDescription = false;

@@ -6,9 +6,10 @@ import 'package:vnalo_mobile/services/auth_events.dart';
 import 'package:vnalo_mobile/services/auth_service.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 import 'package:vnalo_mobile/services/storage_service.dart';
-
+import 'package:vnalo_mobile/services/notification_service.dart';
 import 'package:vnalo_mobile/services/local_sync_service.dart';
 import 'package:vnalo_mobile/core/utils/device_info_util.dart';
+import 'package:vnalo_mobile/config/app_config.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService;
@@ -70,12 +71,26 @@ class AuthProvider extends ChangeNotifier {
       } catch (e) {
         debugPrint('[Auth] Error: Fetching profile failed: $e');
         // If profile fetch fails, we might still be able to function if local cache exists,
-        // but if it's an auth error, we should clear. 
+        // but if it's an auth error, we should clear.
         // For now, keep the session but log the error.
       }
+
+      // Register FCM token so the backend can push notifications to this device.
+      final deviceInfo = await DeviceInfoUtil.getDeviceInfo();
+      await _registerFcmToken(token, deviceInfo);
     }
     _isInitialized = true;
     notifyListeners();
+  }
+
+  Future<void> _registerFcmToken(String accessToken, DeviceInfo info) async {
+    final coreBase = AppConfig.instance.coreServiceUrl;
+    await NotificationService().registerTokenToBackend(
+      accessToken: accessToken,
+      deviceId: info.deviceId,
+      platform: info.platform,
+      coreServiceUrl: coreBase,
+    );
   }
 
   // Login with phone and password
@@ -113,6 +128,9 @@ class AuthProvider extends ChangeNotifier {
       }
 
       _socketService.connect(tokens.accessToken);
+
+      // Register FCM token so the backend can push notifications to this device.
+      await _registerFcmToken(tokens.accessToken, info);
 
       _isLoading = false;
       notifyListeners();
@@ -231,6 +249,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      final info = await DeviceInfoUtil.getDeviceInfo();
       final response = await _authService.register(
         phone: phone,
         email: email,
@@ -256,6 +275,9 @@ class AuthProvider extends ChangeNotifier {
       );
       _accessToken = tokens.accessToken;
       _socketService.connect(tokens.accessToken);
+
+      // Register FCM token so the backend can push notifications to this device.
+      await _registerFcmToken(tokens.accessToken, info);
 
       final hydrated = await _hydrateUserAfterRegister(
         data,
