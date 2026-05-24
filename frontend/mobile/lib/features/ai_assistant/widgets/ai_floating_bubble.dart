@@ -260,8 +260,9 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
     const horizontalInset = 8.0;
     const verticalInset = 8.0;
     final minX = padding.left + horizontalInset;
-    final maxX =
+    final rawMaxX =
         screenSize.width - padding.right - _bubbleSize - horizontalInset;
+    final maxX = max(minX, rawMaxX);
     final minY = padding.top + verticalInset;
     final maxY = max(
       minY,
