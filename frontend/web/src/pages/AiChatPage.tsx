@@ -73,6 +73,11 @@ type AiActionPreview = {
   draft?: string
   risk: 'low' | 'medium' | 'high'
 }
+
+type ActionFeedbackState = {
+  tone: 'info' | 'success' | 'warning' | 'error'
+  message: string
+}
 const STORAGE_KEY = 'vnalo_ai_chat_history'
 const DRAFT_KEY_PREFIX = 'vnalo_ai_web_compose_draft:'
 const MAX_API_HISTORY = 20
@@ -246,7 +251,8 @@ export function AiChatPage() {
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [actionBusyIndex, setActionBusyIndex] = useState<number | null>(null)
-  const [actionFeedback, setActionFeedback] = useState<string>('')
+  const [activeActionLabel, setActiveActionLabel] = useState<string>('')
+  const [actionFeedback, setActionFeedback] = useState<ActionFeedbackState | null>(null)
   const [pendingResolution, setPendingResolution] = useState<PendingActionResolution | null>(null)
   const [pendingActionReview, setPendingActionReview] = useState<PendingActionReview | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
@@ -364,7 +370,8 @@ export function AiChatPage() {
     }
 
     setActionBusyIndex(index)
-    setActionFeedback('')
+    setActiveActionLabel(buildActionLabel(message.actionCommand))
+    setActionFeedback(null)
 
     try {
       const command = message.actionCommand
@@ -373,7 +380,7 @@ export function AiChatPage() {
 
       if (directPath) {
         navigate(directPath)
-        setActionFeedback('Opened the requested VNALO screen.')
+        setActionFeedback({ tone: 'success', message: 'Opened the requested VNALO screen.' })
         return
       }
 
@@ -417,7 +424,7 @@ export function AiChatPage() {
         const target = extractActionTarget(params)
         if (!target) {
           navigate('/chat')
-          setActionFeedback('AI did not identify a specific conversation. Opened Chat so you can choose manually.')
+          setActionFeedback({ tone: 'warning', message: 'AI did not identify a specific conversation. Opened Chat so you can choose manually.' })
           return
         }
 
@@ -447,14 +454,14 @@ export function AiChatPage() {
             command,
             targetLabel: target,
           })
-          setActionFeedback(`Found ${candidateConversations.length} matching conversations for "${target}". Please choose the exact target before continuing.`)
+          setActionFeedback({ tone: 'info', message: `Found ${candidateConversations.length} matching conversations for "${target}". Please choose the exact target before continuing.` })
           return
         }
 
         const matched = candidateConversations[0]
 
         if (!matched) {
-          setActionFeedback(`No matching conversation found for "${target}".`)
+          setActionFeedback({ tone: 'warning', message: `No matching conversation found for "${target}".` })
           return
         }
 
@@ -467,11 +474,11 @@ export function AiChatPage() {
 
         navigate(`/chat/${matched.id}`)
         if (command === 'START_CALL') {
-          setActionFeedback('Opened the conversation. Use the call button to confirm the call manually on web.')
+          setActionFeedback({ tone: 'success', message: 'Opened the conversation. Use the call button to confirm the call manually on web.' })
         } else if (HIGH_RISK_ACTION_COMMANDS.has(command)) {
-          setActionFeedback('Opened the target conversation. Please confirm and perform this sensitive action manually.')
+          setActionFeedback({ tone: 'warning', message: 'Opened the target conversation. Please confirm and perform this sensitive action manually.' })
         } else {
-          setActionFeedback('Opened the target conversation.')
+          setActionFeedback({ tone: 'success', message: 'Opened the target conversation.' })
         }
         return
       }
@@ -486,9 +493,10 @@ export function AiChatPage() {
       })
     } catch (error) {
       console.error('AI action execution failed:', error)
-      setActionFeedback('Could not execute the AI action on web right now. Please try again manually.')
+      setActionFeedback({ tone: 'error', message: 'Could not execute the AI action on web right now. Please try again manually.' })
     } finally {
       setActionBusyIndex(null)
+      setActiveActionLabel('')
     }
   }
 
@@ -523,7 +531,7 @@ export function AiChatPage() {
     if (pendingActionReview.path) {
       navigate(pendingActionReview.path)
     }
-    setActionFeedback(pendingActionReview.feedback)
+    setActionFeedback({ tone: 'info', message: pendingActionReview.feedback })
     setPendingActionReview(null)
   }
 
@@ -597,7 +605,7 @@ export function AiChatPage() {
 
         <div className='ai-chat-messages'>
           {runtimeState.degraded && <div className={runtimeState.bannerClassName}>{runtimeState.banner}</div>}
-          {actionFeedback ? <div className='ai-runtime-banner ai-runtime-banner-info'>{actionFeedback}</div> : null}
+          {actionFeedback ? <div className={`ai-runtime-banner ai-runtime-banner-${actionFeedback.tone}`}>{actionFeedback.message}</div> : null}
 
           {messages.map((message, index) => (
             <div
@@ -627,7 +635,7 @@ export function AiChatPage() {
 
           {isLoading && (
             <div className='ai-typing-indicator'>
-              <span className='ai-typing-label'>AI assistant is typing</span>
+              <span className='ai-typing-label'>{activeActionLabel ? `${activeActionLabel} in progress` : 'AI assistant is typing'}</span>
               <div className='ai-typing-dot' />
               <div className='ai-typing-dot' />
               <div className='ai-typing-dot' />

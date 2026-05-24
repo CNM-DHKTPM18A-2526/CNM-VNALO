@@ -2998,3 +2998,15 @@
     padding: 8px;
   }
 }
+
+.ai-runtime-banner-success {
+  background: color-mix(in srgb, #22c55e 14%, var(--surface));
+  border: 1px solid color-mix(in srgb, #22c55e 36%, transparent);
+  color: var(--text);
+}
+
+.ai-runtime-banner-error {
+  background: color-mix(in srgb, #ef4444 14%, var(--surface));
+  border: 1px solid color-mix(in srgb, #ef4444 36%, transparent);
+  color: var(--text);
+}
