@@ -7,8 +7,9 @@ import { OtpCodeInput } from '../features/auth/components/OtpCodeInput'
 import { isNormalizedVietnamPhone, normalizeVietnamPhone } from '../features/auth/phone.util'
 import { validatePassword } from '../features/auth/password.util'
 import { useLanguage } from '../shared/i18n/LanguageContext'
+import { RegisterFaceStep } from '../features/face-auth/components/RegisterFaceStep'
 
-type RegisterStep = 'form' | 'otp'
+type RegisterStep = 'form' | 'otp' | 'face'
 
 type RegisterFormState = {
   displayName: string
@@ -93,6 +94,7 @@ export function RegisterPage() {
   const [otpCode, setOtpCode] = React.useState('')
   const [normalizedPhone, setNormalizedPhone] = React.useState('')
   const [normalizedEmail, setNormalizedEmail] = React.useState('')
+  const [accessToken, setAccessToken] = React.useState<string | null>(null)
   const [errors, setErrors] = React.useState<RegisterErrors>({})
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
   const [successMessage, setSuccessMessage] = React.useState<string | null>(null)
@@ -140,7 +142,7 @@ export function RegisterPage() {
     setErrorMessage(null)
     setIsSubmitting(true)
     try {
-      await registerAccount({
+      const token = await registerAccount({
         displayName: form.displayName.trim(),
         phone: normalizedPhone,
         email: normalizedEmail,
@@ -150,8 +152,9 @@ export function RegisterPage() {
         gender: form.gender || undefined,
       })
 
-      setSuccessMessage('Đăng ký thành công! Đang chuyển hướng...')
-      setTimeout(() => navigate('/login', { replace: true }), 1500)
+      setAccessToken(token)
+      setSuccessMessage('Đăng ký thành công!')
+      setStep('face')
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Đăng ký thất bại')
     } finally {
@@ -284,7 +287,19 @@ export function RegisterPage() {
                    {t('auth.editInfoButton')}
                 </button>
               </form>
-            )}
+            ) : step === 'face' && accessToken ? (
+              <div className='register-face-step-container'>
+                <RegisterFaceStep
+                  token={accessToken}
+                  onComplete={(enrolled) => {
+                    if (enrolled) {
+                      setSuccessMessage('Đăng ký khuôn mặt thành công!')
+                    }
+                    setTimeout(() => navigate('/login', { replace: true }), 1200)
+                  }}
+                />
+              </div>
+            ) : null}
           </div>
         </div>
 
