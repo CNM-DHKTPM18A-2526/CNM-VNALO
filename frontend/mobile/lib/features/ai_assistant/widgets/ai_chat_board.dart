@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/theme/app_typography.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
+import 'package:vnalo_mobile/features/ai_assistant/theme/ai_assistant_tokens.dart';
 import 'package:vnalo_mobile/features/ai_assistant/utils/ai_command_routing.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_prompt_chips.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_status_pill.dart';
@@ -35,13 +36,8 @@ class AiChatBoard extends StatefulWidget {
 }
 
 class _AiChatBoardState extends State<AiChatBoard> {
-  static const double _surfaceRadius = 10;
-  static const double _fieldRadius = 12;
-  static const double _buttonRadius = 999;
-
   final TextEditingController _inputController = TextEditingController();
   final FocusNode _inputFocusNode = FocusNode();
-  bool _isSending = false;
   bool _hasText = false;
 
   @override
@@ -66,14 +62,11 @@ class _AiChatBoardState extends State<AiChatBoard> {
   }
 
   void _submitTextPrompt() {
-    if (_isSending) return;
-
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
 
     _inputController.clear();
     setState(() {
-      _isSending = true;
       _hasText = false;
     });
     try {
@@ -82,12 +75,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
       // Provider handles async failures; this guards only synchronous dispatch.
     }
 
-    _inputFocusNode.unfocus();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        setState(() => _isSending = false);
-      }
-    });
+    _inputFocusNode.requestFocus();
   }
 
   void _applyQuickPrompt(String text) {
@@ -208,7 +196,9 @@ class _AiChatBoardState extends State<AiChatBoard> {
                             isClarification
                                 ? AppColors.primary.withValues(alpha: 0.14)
                                 : AppColors.warning.withValues(alpha: 0.16),
-                        borderRadius: BorderRadius.circular(_buttonRadius),
+                        borderRadius: BorderRadius.circular(
+                          AiAssistantTokens.pillRadius,
+                        ),
                       ),
                       child: Text(
                         isClarification ? 'Cần làm rõ' : 'Chưa tìm thấy',
@@ -337,10 +327,10 @@ class _AiChatBoardState extends State<AiChatBoard> {
           children: [
             _TypingDots(isDarkMode: isDarkMode),
             const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 12,
@@ -386,7 +376,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
       key: const ValueKey('ai_chat_board'),
       color: Colors.transparent,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(_surfaceRadius),
+        borderRadius: BorderRadius.circular(AiAssistantTokens.surfaceRadius),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
           child: Container(
@@ -410,7 +400,9 @@ class _AiChatBoardState extends State<AiChatBoard> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(_surfaceRadius),
+              borderRadius: BorderRadius.circular(
+                AiAssistantTokens.surfaceRadius,
+              ),
               border: Border.all(color: borderColor),
               boxShadow: [
                 BoxShadow(
@@ -533,7 +525,9 @@ class _AiChatBoardState extends State<AiChatBoard> {
                               color: const Color(
                                 0xFFF59E0B,
                               ).withValues(alpha: isDarkMode ? 0.16 : 0.12),
-                              borderRadius: BorderRadius.circular(_fieldRadius),
+                              borderRadius: BorderRadius.circular(
+                                AiAssistantTokens.fieldRadius,
+                              ),
                               border: Border.all(
                                 color: const Color(
                                   0xFFF59E0B,
@@ -582,7 +576,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
                                                   alpha: 0.82,
                                                 ),
                                         borderRadius: BorderRadius.circular(
-                                          _surfaceRadius,
+                                          AiAssistantTokens.surfaceRadius,
                                         ),
                                         border: Border.all(
                                           color:
@@ -633,7 +627,8 @@ class _AiChatBoardState extends State<AiChatBoard> {
                                           _buildAssistantTypingBubble(
                                             isDarkMode: isDarkMode,
                                             label:
-                                                aiProvider.assistantActivityLabel,
+                                                aiProvider
+                                                    .assistantActivityLabel,
                                           ),
                                         if (clarification != null) ...[
                                           Padding(
@@ -697,10 +692,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
                     isCompactLayout ? 6 : 8,
                   ),
                   decoration: BoxDecoration(
-                    color:
-                        isDarkMode
-                            ? const Color(0xFF101826).withValues(alpha: 0.88)
-                            : Colors.white.withValues(alpha: 0.82),
+                    color: Colors.transparent,
                     border: Border(
                       top: BorderSide(
                         color:
@@ -725,37 +717,38 @@ class _AiChatBoardState extends State<AiChatBoard> {
                       ),
                       Expanded(
                         child: TextField(
-                            key: const ValueKey('ai_chat_input'),
-                            controller: _inputController,
-                            focusNode: _inputFocusNode,
-                            textInputAction: TextInputAction.send,
-                            onSubmitted: (_) => _submitTextPrompt(),
-                            minLines: 1,
-                            maxLines: 3,
-                            style: AppTypography.bodyMedium.copyWith(
-                              fontSize: 16,
-                              color: isDarkMode ? Colors.white : Colors.black87,
-                            ),
-                            decoration: InputDecoration(
-                              isDense: true,
-                              hintText: 'Nhắn trợ lý AI',
-                              hintStyle: TextStyle(
-                                color:
-                                    isDarkMode
-                                        ? DarkColors.textHint
-                                        : const Color(0xFFA1A3A7),
-                                fontSize: 16,
-                              ),
-                              filled: false,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 4,
-                                vertical: 10,
-                              ),
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                            ),
+                          key: const ValueKey('ai_chat_input'),
+                          controller: _inputController,
+                          focusNode: _inputFocusNode,
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => _submitTextPrompt(),
+                          minLines: 1,
+                          maxLines: 3,
+                          style: AppTypography.bodyMedium.copyWith(
+                            fontSize: 16,
+                            color: isDarkMode ? Colors.white : Colors.black87,
                           ),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            hintText: 'Nhắn trợ lý AI',
+                            hintStyle: TextStyle(
+                              color:
+                                  isDarkMode
+                                      ? DarkColors.textHint
+                                      : const Color(0xFFA1A3A7),
+                              fontSize: 16,
+                            ),
+                            filled: false,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal:
+                                  AiAssistantTokens.inputHorizontalPadding,
+                              vertical: AiAssistantTokens.inputVerticalPadding,
+                            ),
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                          ),
+                        ),
                       ),
                       if (_hasText)
                         IconButton(
@@ -767,7 +760,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
                                     ? DarkColors.primary
                                     : AppColors.primary,
                           ),
-                          onPressed: _isSending ? null : _submitTextPrompt,
+                          onPressed: _submitTextPrompt,
                         )
                       else
                         IconButton(
@@ -784,12 +777,10 @@ class _AiChatBoardState extends State<AiChatBoard> {
                                         : AppColors.iconSubtle),
                           ),
                           onPressed:
-                              _isSending
-                                  ? null
-                                  : () => aiProvider.onPrimaryAction(
-                                    source: 'ai_chat_board_mic_idle',
-                                    surface: AiResponseSurface.bubble,
-                                  ),
+                              () => aiProvider.onPrimaryAction(
+                                source: 'ai_chat_board_mic_idle',
+                                surface: AiResponseSurface.bubble,
+                              ),
                         ),
                     ],
                   ),
@@ -813,12 +804,12 @@ class _BoardActionChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(999),
+      borderRadius: BorderRadius.circular(AiAssistantTokens.pillRadius),
       child: Ink(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         decoration: BoxDecoration(
           color: AppColors.primary.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(AiAssistantTokens.pillRadius),
           border: Border.all(color: AppColors.primary.withValues(alpha: 0.16)),
         ),
         child: Text(

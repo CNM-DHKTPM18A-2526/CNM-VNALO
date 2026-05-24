@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/theme/app_typography.dart';
+import 'package:vnalo_mobile/features/ai_assistant/theme/ai_assistant_tokens.dart';
 
 enum AiActionConfirmationResult { cancelled, confirmed, alternate }
 
 class AiActionConfirmationSheet extends StatelessWidget {
-  static const double _sheetRadius = 18;
-  static const double _cardRadius = 12;
-  static const double _buttonRadius = 999;
-
   final IconData icon;
   final String title;
   final String description;
@@ -130,7 +127,7 @@ class AiActionConfirmationSheet extends StatelessWidget {
           decoration: BoxDecoration(
             color: sheetBackground,
             borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(_sheetRadius),
+              top: Radius.circular(AiAssistantTokens.sheetRadius),
             ),
           ),
           child: SafeArea(
@@ -160,7 +157,9 @@ class AiActionConfirmationSheet extends StatelessWidget {
                           isDark
                               ? Colors.white.withValues(alpha: 0.04)
                               : const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(_cardRadius),
+                      borderRadius: BorderRadius.circular(
+                        AiAssistantTokens.buttonRadius,
+                      ),
                       border: Border.all(
                         color:
                             isDark
@@ -176,7 +175,9 @@ class AiActionConfirmationSheet extends StatelessWidget {
                           height: 48,
                           decoration: BoxDecoration(
                             color: accent.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(_cardRadius),
+                            borderRadius: BorderRadius.circular(
+                              AiAssistantTokens.buttonRadius,
+                            ),
                           ),
                           child: Icon(icon, color: accent, size: 23),
                         ),
@@ -219,7 +220,9 @@ class AiActionConfirmationSheet extends StatelessWidget {
                             isDark
                                 ? Colors.white.withValues(alpha: 0.06)
                                 : const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(_cardRadius),
+                        borderRadius: BorderRadius.circular(
+                          AiAssistantTokens.buttonRadius,
+                        ),
                         border: Border.all(
                           color:
                               isDark
@@ -262,7 +265,9 @@ class AiActionConfirmationSheet extends StatelessWidget {
                         foregroundColor: Colors.white,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(_buttonRadius),
+                          borderRadius: BorderRadius.circular(
+                            AiAssistantTokens.buttonRadius,
+                          ),
                         ),
                       ),
                       onPressed:
@@ -294,7 +299,9 @@ class AiActionConfirmationSheet extends StatelessWidget {
                             color: accent.withValues(alpha: 0.4),
                           ),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(_buttonRadius),
+                            borderRadius: BorderRadius.circular(
+                              AiAssistantTokens.buttonRadius,
+                            ),
                           ),
                         ),
                         child: Text(
@@ -321,7 +328,9 @@ class AiActionConfirmationSheet extends StatelessWidget {
                         foregroundColor: textPrimary,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(_buttonRadius),
+                          borderRadius: BorderRadius.circular(
+                            AiAssistantTokens.buttonRadius,
+                          ),
                         ),
                       ),
                       child: Text(

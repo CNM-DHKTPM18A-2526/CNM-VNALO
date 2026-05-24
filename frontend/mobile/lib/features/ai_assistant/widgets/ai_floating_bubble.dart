@@ -36,6 +36,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
   bool _isDragging = false;
   bool _isHoveringTrash = false;
   bool _isBoardExpanded = false;
+  bool _suppressNextAutoBoard = false;
   String? _dismissedAssistantEntryId;
 
   DateTime? _ignoreTapUntil;
@@ -428,14 +429,17 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
         provider.aiResponse.isNotEmpty &&
         provider.shouldBubbleAutoShowResponse &&
         latestAssistantEntryId != null &&
+        !_suppressNextAutoBoard &&
         latestAssistantEntryId != _dismissedAssistantEntryId;
 
     setState(() {
       if (_isBoardExpanded || isAutoBoardVisible) {
         _isBoardExpanded = false;
+        _suppressNextAutoBoard = provider.isAssistantGenerating;
         _dismissedAssistantEntryId = latestAssistantEntryId;
       } else {
         _isBoardExpanded = true;
+        _suppressNextAutoBoard = false;
         _dismissedAssistantEntryId = null;
       }
     });
@@ -618,6 +622,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
         aiProvider.aiResponse.isNotEmpty &&
         aiProvider.shouldBubbleAutoShowResponse &&
         latestAssistantEntryId != null &&
+        !_suppressNextAutoBoard &&
         latestAssistantEntryId != _dismissedAssistantEntryId;
     final showBoard =
         !_isDragging && (_isBoardExpanded || hasNewBubbleResponse);
@@ -638,6 +643,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
                 onClose: () {
                   setState(() {
                     _isBoardExpanded = false;
+                    _suppressNextAutoBoard = aiProvider.isAssistantGenerating;
                     _dismissedAssistantEntryId = latestAssistantEntryId;
                   });
                 },
@@ -648,6 +654,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
                 onSubmitPrompt: (text) async {
                   setState(() {
                     _isBoardExpanded = true;
+                    _suppressNextAutoBoard = false;
                   });
                   await aiProvider.submitTextPrompt(
                     text,

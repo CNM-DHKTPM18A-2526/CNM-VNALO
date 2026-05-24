@@ -6,6 +6,7 @@ import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/theme/app_typography.dart';
 import 'package:vnalo_mobile/core/utils/date_formatter.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
+import 'package:vnalo_mobile/features/ai_assistant/theme/ai_assistant_tokens.dart';
 import 'package:vnalo_mobile/features/ai_assistant/utils/ai_command_routing.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 
@@ -17,12 +18,9 @@ class AiConversationScreen extends StatefulWidget {
 }
 
 class _AiConversationScreenState extends State<AiConversationScreen> {
-  static const double _surfaceRadius = 12;
-
   final TextEditingController _inputController = TextEditingController();
   final FocusNode _inputFocusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
-  bool _isSending = false;
   bool _hasText = false;
   int _lastMessageCount = 0;
   AiState? _lastProviderState;
@@ -59,14 +57,11 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
   }
 
   void _sendPrompt(AiAssistantProvider provider) {
-    if (_isSending) return;
-
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
 
     _inputController.clear();
     setState(() {
-      _isSending = true;
       _hasText = false;
     });
 
@@ -82,11 +77,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
       // Provider handles async failures; this guards only synchronous dispatch.
     }
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        setState(() => _isSending = false);
-      }
-    });
+    _inputFocusNode.requestFocus();
   }
 
   void _queueScrollToLatest() {
@@ -315,7 +306,6 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
     );
   }
 
-
   Widget _buildActivityStrip(AiAssistantProvider provider, bool isDarkMode) {
     final iconColor =
         provider.state == AiState.listening
@@ -455,7 +445,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
       decoration: BoxDecoration(
         color: background,
-        borderRadius: BorderRadius.circular(_surfaceRadius),
+        borderRadius: BorderRadius.circular(AiAssistantTokens.surfaceRadius),
         border: Border.all(color: borderColor),
       ),
       child: Row(
@@ -481,7 +471,6 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
   }
 
   Widget _buildInputBar(AiAssistantProvider provider, bool isDarkMode) {
-    final bgColor = isDarkMode ? DarkColors.surface : LightColors.surface;
     final iconColor =
         isDarkMode ? DarkColors.textSecondary : AppColors.iconSubtle;
     final activeColor =
@@ -491,7 +480,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
       key: const ValueKey('ai_conversation_input_bar'),
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
       decoration: BoxDecoration(
-        color: bgColor,
+        color: Colors.transparent,
         border: Border(
           top: BorderSide(
             color: isDarkMode ? DarkColors.divider : AppColors.itemDivider,
@@ -513,7 +502,9 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
               child: Container(
                 decoration: BoxDecoration(
                   color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(
+                    AiAssistantTokens.fieldRadius,
+                  ),
                 ),
                 child: TextField(
                   key: const ValueKey('ai_conversation_input'),
@@ -540,8 +531,8 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
                     isDense: true,
                     filled: false,
                     contentPadding: const EdgeInsets.symmetric(
-                      vertical: 10,
-                      horizontal: 4,
+                      vertical: AiAssistantTokens.inputVerticalPadding,
+                      horizontal: AiAssistantTokens.inputHorizontalPadding,
                     ),
                     border: InputBorder.none,
                   ),
@@ -551,27 +542,11 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
             if (_hasText)
               IconButton(
                 key: const ValueKey('ai_conversation_send'),
-                onPressed: _isSending ? null : () => _sendPrompt(provider),
-                icon:
-                    _isSending
-                        ? SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color:
-                                isDarkMode
-                                    ? DarkColors.primaryLight
-                                    : AppColors.primary,
-                          ),
-                        )
-                        : Icon(
-                          Icons.send,
-                          color:
-                              isDarkMode
-                                  ? DarkColors.primary
-                                  : AppColors.primary,
-                        ),
+                onPressed: () => _sendPrompt(provider),
+                icon: Icon(
+                  Icons.send,
+                  color: isDarkMode ? DarkColors.primary : AppColors.primary,
+                ),
               )
             else
               IconButton(
@@ -648,7 +623,9 @@ class _AiConversationMessageBubble extends StatelessWidget {
                 ),
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(
+                    AiAssistantTokens.fieldRadius,
+                  ),
                 ),
                 child: Text(
                   milestoneText!,
