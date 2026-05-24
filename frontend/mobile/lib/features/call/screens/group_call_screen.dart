@@ -103,8 +103,8 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
       ));
       if (mounted) setState(() => _isConnecting = false);
     } else {
-      // Callee: just listen for signals, don't init media yet
-      // Media init happens in acceptCall()
+      // Callee: play ringtone while waiting for user to accept/decline
+      _ringtoneService.startRinging();
     }
 
     try {
