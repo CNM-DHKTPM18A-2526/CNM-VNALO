@@ -350,6 +350,7 @@ export function AiChatPage() {
   }, [messages, isLoading, actionFeedback])
 
   const runtimeState = useMemo(() => resolveProviderPresentation(messages), [messages])
+  const isAssistantBusy = isLoading || actionBusyIndex !== null || pendingActionReview !== null || pendingResolution !== null
 
   useEffect(() => {
     const input = inputRef.current
@@ -361,7 +362,7 @@ export function AiChatPage() {
 
   const handleSend = async (textToSend?: string) => {
     const query = (textToSend ?? inputValue).trim()
-    if (!query || isLoading || actionBusyIndex !== null || pendingActionReview !== null || pendingResolution !== null) {
+    if (!query || isAssistantBusy) {
       return
     }
 
@@ -620,8 +621,26 @@ export function AiChatPage() {
     navigate(`/chat/${conversation.id}`)
   }
 
+  useEffect(() => {
+    if (!pendingActionReview && !pendingResolution) {
+      return
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') {
+        return
+      }
+
+      setPendingActionReview(null)
+      setPendingResolution(null)
+    }
+
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [pendingActionReview, pendingResolution])
+
   const handleRetry = () => {
-    if (!retryPrompt || isLoading) {
+    if (!retryPrompt || isAssistantBusy) {
       return
     }
 
@@ -661,7 +680,7 @@ export function AiChatPage() {
               type='button'
               className='ai-preset-btn'
               onClick={() => void handleSend(prompt)}
-              disabled={isLoading || actionBusyIndex !== null}
+              disabled={isAssistantBusy}
             >
               {prompt}
             </button>
@@ -674,7 +693,7 @@ export function AiChatPage() {
           type='button'
           className='ai-clear-btn flex items-center justify-center gap-2'
           onClick={handleClearHistory}
-          disabled={isLoading || actionBusyIndex !== null}
+          disabled={isAssistantBusy}
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
         >
           <Trash2 size={14} />
@@ -699,7 +718,7 @@ export function AiChatPage() {
             <div className={`ai-runtime-banner ai-runtime-banner-${actionFeedback.tone}`}>
               <span>{actionFeedback.message}</span>
               {actionFeedback.tone === 'error' && retryPrompt ? (
-                <button type='button' className='ai-banner-action' onClick={handleRetry} disabled={isLoading}>
+                <button type='button' className='ai-banner-action' onClick={handleRetry} disabled={isAssistantBusy}>
                   Retry
                 </button>
               ) : null}
@@ -720,7 +739,7 @@ export function AiChatPage() {
                     type='button'
                     className='ai-action-btn'
                     onClick={() => void handleAction(message, index)}
-                    disabled={actionBusyIndex === index || isLoading}
+                    disabled={isLoading || actionBusyIndex !== null || pendingActionReview !== null || pendingResolution !== null}
                   >
                     {actionBusyIndex === index ? 'Äang xá»­ lÃ½...' : buildActionLabel(message.actionCommand)}
                   </button>
@@ -757,6 +776,7 @@ export function AiChatPage() {
               placeholder='Há»i trá»£ lÃ½ AI Ä‘iá»u gÃ¬ Ä‘Ã³...'
               value={inputValue}
               onChange={(event) => setInputValue(event.target.value)}
+              disabled={pendingActionReview !== null || pendingResolution !== null}
               rows={1}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
@@ -765,7 +785,7 @@ export function AiChatPage() {
                 }
               }}
             />
-            <button type='submit' className='ai-send-btn' disabled={isLoading || actionBusyIndex !== null || !inputValue.trim()}>
+            <button type='submit' className='ai-send-btn' disabled={isAssistantBusy || !inputValue.trim()}>
 
               <Send size={18} />
             </button>
