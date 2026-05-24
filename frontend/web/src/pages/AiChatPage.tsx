@@ -83,14 +83,14 @@ const DRAFT_KEY_PREFIX = 'vnalo_ai_web_compose_draft:'
 const MAX_API_HISTORY = 20
 
 const PRESET_PROMPTS = [
-  'Suggest 3 healthy habits I can keep every day',
-  'Help me draft a polite message to decline an appointment',
-  'Explain WebRTC in a short and simple way',
+  'Tóm tắt nhanh các tính năng chính của VNALO',
+  'Giúp tôi soạn một tin nhắn từ chối lịch hẹn lịch sự',
+  'Mở cuộc trò chuyện với một người trong danh bạ',
 ]
 
 const INITIAL_ASSISTANT_MESSAGE: AiMessage = {
   role: 'assistant',
-  content: 'Hello! I am the VNALO AI assistant. What can I help you with today?',
+  content: 'Xin chào! Mình là Trợ lý AI VNALO. Mình có thể trả lời câu hỏi và gợi ý thao tác an toàn trong hệ thống.',
   timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
 }
 
@@ -161,9 +161,9 @@ function resolveProviderPresentation(messages: AiMessage[]) {
       providerStatus,
       degraded: true,
       badgeClassName: 'ai-header-status ai-header-status-warning',
-      label: 'AI maintenance mode',
-      helper: 'Some assistant replies may be temporarily limited.',
-      banner: 'AI is currently unavailable. Please try again later or continue manually.',
+      label: 'AI đang bảo trì',
+      helper: 'Một số phản hồi AI có thể tạm thời bị giới hạn.',
+      banner: 'AI đang bảo trì. Hãy thử lại sau hoặc tiếp tục thao tác thủ công.',
       bannerClassName: 'ai-runtime-banner ai-runtime-banner-warning',
     }
   }
@@ -173,9 +173,9 @@ function resolveProviderPresentation(messages: AiMessage[]) {
       providerStatus,
       degraded: true,
       badgeClassName: 'ai-header-status ai-header-status-degraded',
-      label: 'Fallback mode active',
-      helper: 'The assistant is currently using a backup response route.',
-      banner: 'AI is running in fallback mode, so response quality may be reduced.',
+      label: 'Chế độ dự phòng',
+      helper: 'Hệ thống đang dùng tuyến phản hồi thay thế.',
+      banner: 'AI đang chạy ở chế độ dự phòng, chất lượng phản hồi có thể giảm.',
       bannerClassName: 'ai-runtime-banner ai-runtime-banner-info',
     }
   }
@@ -184,8 +184,8 @@ function resolveProviderPresentation(messages: AiMessage[]) {
     providerStatus,
     degraded: false,
     badgeClassName: 'ai-header-status',
-    label: 'Ready to help',
-    helper: 'The AI assistant can answer questions and suggest safe actions inside VNALO.',
+    label: 'Sẵn sàng hỗ trợ',
+    helper: 'Trợ lý AI có thể trả lời và gợi ý thao tác an toàn trong VNALO.',
     banner: '',
     bannerClassName: 'ai-runtime-banner',
   }
@@ -198,6 +198,46 @@ function normalizeLookupText(value: string) {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+function tokenizeLookupText(value: string) {
+  const normalized = normalizeLookupText(value)
+  return normalized ? normalized.split(' ') : []
+}
+
+function computeConversationMatchScore(conversationName: string, target: string) {
+  const normalizedName = normalizeLookupText(conversationName)
+  const normalizedTarget = normalizeLookupText(target)
+  if (!normalizedName || !normalizedTarget) return -1
+  if (normalizedName === normalizedTarget) return 1000
+  if (normalizedName.startsWith(`${normalizedTarget} `)) return 930
+  if (normalizedName.endsWith(` ${normalizedTarget}`)) return 920
+  if (normalizedName.includes(normalizedTarget)) return 870 + normalizedTarget.length
+
+  const nameTokens = tokenizeLookupText(normalizedName)
+  const targetTokens = tokenizeLookupText(normalizedTarget)
+  if (!nameTokens.length || !targetTokens.length || targetTokens.length > nameTokens.length) return -1
+
+  let cursor = 0
+  let score = 700 + targetTokens.length * 25
+  for (const targetToken of targetTokens) {
+    let foundIndex = -1
+    for (let index = cursor; index < nameTokens.length; index += 1) {
+      const nameToken = nameTokens[index]
+      if (nameToken === targetToken || nameToken.startsWith(targetToken)) {
+        foundIndex = index
+        break
+      }
+    }
+    if (foundIndex < 0) return -1
+    score -= (foundIndex - cursor) * 8
+    cursor = foundIndex + 1
+  }
+
+  if (nameTokens[0] === targetTokens[0]) score += 30
+  if (nameTokens[nameTokens.length - 1] === targetTokens[targetTokens.length - 1]) score += 45
+  score -= Math.max(0, nameTokens.length - targetTokens.length) * 6
+  return score
 }
 
 function extractActionTarget(params?: Record<string, unknown> | null) {
@@ -225,10 +265,16 @@ function extractComposeContent(params?: Record<string, unknown> | null) {
 function buildConversationSubtitle(conversation: ConversationSummary) {
   if (conversation.isGroup) {
     const count = conversation.memberCount ?? conversation.members?.length ?? 0
-    return count > 0 ? `${count} members` : 'Group conversation'
+    return count > 0 ? `${count} thành viên` : 'Cuộc trò chuyện nhóm'
   }
 
-  return 'Direct conversation'
+  return 'Cuộc trò chuyện 1-1'
+}
+
+function buildRiskLabel(risk: AiActionPreview['risk']) {
+  if (risk === 'high') return 'Rủi ro cao'
+  if (risk === 'medium') return 'Cần xác nhận'
+  return 'An toàn'
 }
 
 function buildActionRisk(command: AiActionCommand): AiActionPreview['risk'] {
@@ -283,9 +329,9 @@ function isConversationAction(command: AiActionCommand) {
 function buildActionLabel(command: AiActionCommand) {
   switch (command) {
     case 'OPEN_CHAT':
-      return 'Open conversation'
+      return 'Mở cuộc trò chuyện'
     case 'COMPOSE_MESSAGE':
-      return 'Open chat with draft'
+      return 'Mở chat và điền nháp'
     case 'NAVIGATE_TO_CHAT':
       return 'Go to Chat'
     case 'NAVIGATE_TO_CONTACTS':
@@ -295,7 +341,7 @@ function buildActionLabel(command: AiActionCommand) {
     case 'NAVIGATE_TO':
       return 'Go to destination'
     case 'START_CALL':
-      return 'Open chat for call'
+      return 'Mở chat để gọi'
     default:
       return 'Try this action'
   }
@@ -370,7 +416,7 @@ export function AiChatPage() {
     if (!accessToken) {
       const authError: AiMessage = {
         role: 'assistant',
-        content: 'Please sign in again to use the AI assistant on web.',
+        content: 'Bạn cần đăng nhập lại để dùng Trợ lý AI trên web.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         degraded: true,
         providerStatus: 'AI_PROVIDER_UNAVAILABLE',
@@ -423,7 +469,7 @@ export function AiChatPage() {
       const fallbackText =
         extractMessage((error as { response?: { data?: unknown } })?.response?.data) ||
         extractMessage(error) ||
-        'There was a problem connecting to the AI assistant. Please try again later.'
+        'Đã xảy ra lỗi khi kết nối tới Trợ lý AI. Vui lòng thử lại sau.'
 
       const errorMessage: AiMessage = {
         role: 'assistant',
@@ -462,41 +508,41 @@ export function AiChatPage() {
 
       if (directPath) {
         navigate(directPath)
-        setActionFeedback({ tone: 'success', message: 'Opened the requested VNALO screen.' })
+        setActionFeedback({ tone: 'success', message: 'Đã mở đúng màn hình bạn yêu cầu trong VNALO.' })
         return
       }
 
       if (command === 'CREATE_GROUP') {
         setPendingActionReview({
-          title: 'Open create group flow',
-          description: 'AI can open the group creation screen, but you still choose members and confirm the group manually.',
-          confirmLabel: 'Open create group',
+          title: 'Mở luồng tạo nhóm',
+          description: 'AI sẽ mở màn hình tạo nhóm. Bạn vẫn cần kiểm tra thành viên và xác nhận tạo nhóm thủ công.',
+          confirmLabel: 'Mở tạo nhóm',
           path: '/chat?createGroup=true',
-          feedback: 'Opened create group flow. Review members and group name before creating.',
-          preview: { risk: 'medium', targetLabel: String(params.title ?? params.groupName ?? 'New group') },
+          feedback: 'Đã mở luồng tạo nhóm. Hãy kiểm tra tên nhóm và danh sách thành viên trước khi tạo.',
+          preview: { risk: 'medium', targetLabel: String(params.title ?? params.groupName ?? 'Nhóm mới') },
         })
         return
       }
 
       if (command === 'SEND_FRIEND_REQUEST') {
         setPendingActionReview({
-          title: 'Open contacts to add friend',
-          description: 'Web AI will not send a friend request automatically. Open Contacts, verify the person, then send the request yourself.',
-          confirmLabel: 'Open Contacts',
+          title: 'Mở danh bạ để gửi kết bạn',
+          description: 'Trợ lý web sẽ không tự gửi lời mời kết bạn. Mình sẽ mở Danh bạ để bạn kiểm tra đúng người rồi tự gửi.',
+          confirmLabel: 'Mở Danh bạ',
           path: '/contacts',
-          feedback: 'Opened Contacts. Please verify the target before sending a friend request.',
-          preview: { risk: 'medium', targetLabel: extractActionTarget(params) || 'Unknown contact' },
+          feedback: 'Đã mở Danh bạ. Hãy xác nhận đúng người trước khi gửi lời mời kết bạn.',
+          preview: { risk: 'medium', targetLabel: extractActionTarget(params) || 'Chưa rõ liên hệ' },
         })
         return
       }
 
       if (HIGH_RISK_ACTION_COMMANDS.has(command) && !isConversationAction(command)) {
         setPendingActionReview({
-          title: 'Manual confirmation required',
-          description: 'This AI action can affect accounts, messages, or group membership. Web AI will not execute it automatically in this audit wave.',
-          confirmLabel: 'Open Chat',
+          title: 'Cần xác nhận thủ công',
+          description: 'Thao tác này có thể ảnh hưởng đến tài khoản, tin nhắn hoặc thành viên nhóm. Trợ lý web sẽ chỉ mở đúng luồng để bạn tự xác nhận.',
+          confirmLabel: 'Mở Chat',
           path: '/chat',
-          feedback: 'Opened Chat. Please perform the sensitive action manually after checking the target.',
+          feedback: 'Đã mở Chat. Hãy kiểm tra đúng đối tượng rồi tự thực hiện thao tác nhạy cảm này.',
           preview: { risk: 'high', targetLabel: extractActionTarget(params) || command },
         })
         return
@@ -506,26 +552,23 @@ export function AiChatPage() {
         const target = extractActionTarget(params)
         if (!target) {
           navigate('/chat')
-          setActionFeedback({ tone: 'warning', message: 'AI did not identify a specific conversation. Opened Chat so you can choose manually.' })
+          setActionFeedback({ tone: 'warning', message: 'AI chưa xác định được cuộc trò chuyện cụ thể. Mình đã mở Chat để bạn tự chọn.' })
           return
         }
 
         const inbox = await fetchInbox(accessToken, user?.id)
-        const normalizedTarget = normalizeLookupText(target)
         const matches = inbox
           .map((conversation) => {
-            const normalizedName = normalizeLookupText(conversation.name)
-            const isExact = normalizedName === normalizedTarget
-
             return {
               conversation,
-              normalizedName,
-              score: isExact ? 1000 : normalizedName.includes(normalizedTarget) ? normalizedTarget.length : -1,
+              normalizedName: normalizeLookupText(conversation.name),
+              score: computeConversationMatchScore(conversation.name, target),
             }
           })
           .filter((item) => item.score >= 0)
           .sort((left, right) => right.score - left.score)
 
+        const normalizedTarget = normalizeLookupText(target)
         const exactMatches = matches.filter((item) => item.normalizedName === normalizedTarget)
         const candidateConversations = (exactMatches.length > 0 ? exactMatches : matches).map((item) => item.conversation)
 
@@ -536,14 +579,14 @@ export function AiChatPage() {
             command,
             targetLabel: target,
           })
-          setActionFeedback({ tone: 'info', message: `Found ${candidateConversations.length} matching conversations for "${target}". Please choose the exact target before continuing.` })
+          setActionFeedback({ tone: 'info', message: `Mình tìm thấy ${candidateConversations.length} cuộc trò chuyện khớp với "${target}". Hãy chọn đúng đối tượng trước khi tiếp tục.` })
           return
         }
 
         const matched = candidateConversations[0]
 
         if (!matched) {
-          setActionFeedback({ tone: 'warning', message: `No matching conversation found for "${target}".` })
+          setActionFeedback({ tone: 'warning', message: `Chưa tìm thấy cuộc trò chuyện phù hợp với "${target}".` })
           return
         }
 
@@ -556,26 +599,26 @@ export function AiChatPage() {
 
         navigate(`/chat/${matched.id}`)
         if (command === 'START_CALL') {
-          setActionFeedback({ tone: 'success', message: 'Opened the conversation. Use the call button to confirm the call manually on web.' })
+          setActionFeedback({ tone: 'success', message: 'Đã mở cuộc trò chuyện. Hãy bấm nút gọi để xác nhận cuộc gọi trên web.' })
         } else if (HIGH_RISK_ACTION_COMMANDS.has(command)) {
-          setActionFeedback({ tone: 'warning', message: 'Opened the target conversation. Please confirm and perform this sensitive action manually.' })
+          setActionFeedback({ tone: 'warning', message: 'Đã mở đúng cuộc trò chuyện. Hãy tự xác nhận trước khi thực hiện thao tác nhạy cảm.' })
         } else {
-          setActionFeedback({ tone: 'success', message: 'Opened the target conversation.' })
+          setActionFeedback({ tone: 'success', message: 'Đã mở đúng cuộc trò chuyện đích.' })
         }
         return
       }
 
       setPendingActionReview({
-        title: 'Action not available on web yet',
-        description: 'This AI command is recognized, but the web client does not have a safe executor for it yet.',
-        confirmLabel: 'Open Chat',
+        title: 'Web chưa hỗ trợ tự động thao tác này',
+        description: 'Trợ lý đã nhận ra ý định của bạn, nhưng web hiện chưa có executor an toàn cho thao tác này.',
+        confirmLabel: 'Mở Chat',
         path: '/chat',
-        feedback: 'Opened Chat. Continue manually or use mobile for this AI action.',
+        feedback: 'Đã mở Chat. Bạn có thể tiếp tục thủ công hoặc dùng mobile để thực hiện thao tác này.',
         preview: { risk: 'medium', targetLabel: command },
       })
     } catch (error) {
       console.error('AI action execution failed:', error)
-      setActionFeedback({ tone: 'error', message: 'Could not execute the AI action on web right now. Please try again manually.' })
+      setActionFeedback({ tone: 'error', message: 'Chưa thể thực thi thao tác AI trên web lúc này. Vui lòng thử lại hoặc thao tác thủ công.' })
     } finally {
       setActionBusyIndex(null)
       setActiveActionLabel('')
@@ -588,16 +631,16 @@ export function AiChatPage() {
     return (
       <div className={`ai-action-preview ai-action-preview-${preview.risk}`}>
 
-        <span className='ai-action-preview-risk'>{preview.risk.toUpperCase()} RISK</span>
+        <span className='ai-action-preview-risk'>{buildRiskLabel(preview.risk)}</span>
         {preview.targetLabel ? (
           <div className='ai-action-preview-row'>
-            <span>Target</span>
+            <span>Đối tượng</span>
             <strong>{preview.targetLabel}</strong>
           </div>
         ) : null}
         {preview.draft ? (
           <div className='ai-action-preview-row ai-action-preview-draft'>
-            <span>Draft</span>
+            <span>Nội dung nháp</span>
             <p>{preview.draft}</p>
           </div>
         ) : null}
@@ -660,7 +703,7 @@ export function AiChatPage() {
     saveMessages([
       {
         role: 'assistant',
-        content: 'History was cleared. What can I help you with next?',
+        content: 'Đã dọn lịch sử AI chat. Mình có thể hỗ trợ gì tiếp theo?',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
     ])
@@ -674,11 +717,11 @@ export function AiChatPage() {
             <Sparkles size={28} />
           </div>
           <h3>VNALO AI Assistant</h3>
-          <p>Helps answer questions, explain quickly, and suggest safe actions inside VNALO.</p>
+          <p>Hỗ trợ trả lời câu hỏi, giải thích nhanh và gợi ý thao tác an toàn trong VNALO.</p>
         </div>
 
         <div className='ai-presets-container'>
-          <span className='ai-presets-title'>Suggested prompts</span>
+          <span className='ai-presets-title'>Gợi ý câu hỏi</span>
           {PRESET_PROMPTS.map((prompt) => (
             <button
               key={prompt}
@@ -758,7 +801,7 @@ export function AiChatPage() {
 
           {isLoading && (
             <div className='ai-typing-indicator'>
-              <span className='ai-typing-label'>{activeActionLabel ? `${activeActionLabel} in progress` : 'AI assistant is typing'}</span>
+              <span className='ai-typing-label'>{activeActionLabel ? `${activeActionLabel} đang được chuẩn bị` : 'Trợ lý AI đang soạn phản hồi'}</span>
               <div className='ai-typing-dot' />
               <div className='ai-typing-dot' />
               <div className='ai-typing-dot' />
@@ -778,7 +821,7 @@ export function AiChatPage() {
             <textarea
               ref={inputRef}
               className='ai-input-field'
-              placeholder='Ask the AI assistant something...'
+              placeholder='Nhắn điều bạn cần cho Trợ lý AI...'
               value={inputValue}
               onChange={(event) => setInputValue(event.target.value)}
               disabled={pendingActionReview !== null || pendingResolution !== null}
@@ -794,7 +837,7 @@ export function AiChatPage() {
 
               <Send size={18} />
             </button>
-            <span className='ai-input-hint'>Enter to send, Shift + Enter for a new line</span>
+            <span className='ai-input-hint'>Enter để gửi, Shift + Enter để xuống dòng</span>
           </form>
         </footer>
       </main>
@@ -814,7 +857,7 @@ export function AiChatPage() {
             </div>
             <div className='modal-footer'>
               <button className='btn btn-subtle' type='button' onClick={() => setPendingActionReview(null)}>
-                Cancel
+                Hủy
               </button>
               <button className='btn btn-primary' type='button' onClick={confirmPendingActionReview}>
                 {pendingActionReview.confirmLabel}
@@ -829,8 +872,8 @@ export function AiChatPage() {
           <div className='modal-card ai-resolution-modal' onClick={(event) => event.stopPropagation()}>
             <div className='modal-header'>
               <div>
-                <h3 id='ai-resolution-title'>Choose the exact conversation</h3>
-                <p>Confirm the target to avoid opening or drafting for the wrong contact.</p>
+                <h3 id='ai-resolution-title'>Chọn đúng cuộc trò chuyện</h3>
+                <p>Hãy xác nhận đúng đối tượng để tránh mở nhầm cuộc trò chuyện hoặc điền nháp sai người.</p>
                 {renderActionPreview({ risk: buildActionRisk(pendingResolution.command), targetLabel: pendingResolution.targetLabel, draft: pendingResolution.draft })}
               </div>
               <button className='modal-close-btn' type='button' onClick={() => setPendingResolution(null)} aria-label='Close'>
@@ -855,7 +898,7 @@ export function AiChatPage() {
             </div>
             <div className='modal-footer'>
               <button className='btn btn-subtle' type='button' onClick={() => setPendingResolution(null)}>
-                Cancel
+                Hủy
               </button>
             </div>
           </div>
