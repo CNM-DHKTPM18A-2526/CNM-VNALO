@@ -20,6 +20,7 @@ import 'package:vnalo_mobile/features/ai_assistant/services/ai_action_context_st
 import 'package:vnalo_mobile/features/ai_assistant/services/ai_action_presentation_resolver.dart';
 import 'package:vnalo_mobile/features/ai_assistant/services/ai_action_policy.dart';
 import 'package:vnalo_mobile/features/ai_assistant/services/ai_action_target_matcher.dart';
+import 'package:vnalo_mobile/features/ai_assistant/services/ai_conversation_action_plan.dart';
 import 'package:vnalo_mobile/features/ai_assistant/services/ai_conversation_target_resolver.dart';
 import 'package:vnalo_mobile/features/ai_assistant/services/ai_mobile_capability_catalog.dart';
 import 'package:vnalo_mobile/features/ai_assistant/utils/ai_command_routing.dart';
@@ -464,7 +465,7 @@ class MainShellState extends State<MainShell> {
           break;
 
         case 'CREATE_GROUP':
-          await _handleAiCreateGroup(aiCmd, params);
+          await _handleAiCreateGroup(params);
           break;
         case 'MUTE_CONVERSATION':
         case 'UNMUTE_CONVERSATION':
@@ -477,7 +478,6 @@ class MainShellState extends State<MainShell> {
         case 'PIN_MESSAGE':
         case 'UNPIN_MESSAGE':
           await _handleAiPinMessage(
-            aiCmd,
             params,
             pin: command == 'PIN_MESSAGE',
           );
@@ -1267,13 +1267,11 @@ class MainShellState extends State<MainShell> {
   }
 
   Future<void> _handleAiCreateGroup(
-    AiCommand aiCmd,
     Map<String, dynamic>? params,
   ) async {
-    final groupName = AiCommandRouting.extractGroupName(params);
-    final memberNames = AiCommandRouting.extractMemberNames(params);
-    if (groupName.isEmpty || memberNames.isEmpty) {
-      _showErrorSnackBar('Trợ lý cần tên nhóm và ít nhất một thành viên.');
+    final plan = AiCreateGroupActionPlan.fromParams(params);
+    if (!plan.isValid) {
+      _showErrorSnackBar(plan.invalidMessage);
       return;
     }
 
@@ -1282,13 +1280,13 @@ class MainShellState extends State<MainShell> {
       await contactProvider.fetchFriends();
     }
     final selectedUsers = <User>[];
-    for (final name in memberNames) {
+    for (final name in plan.memberNames) {
       final matches = _findUsersByName(contactProvider.friends, name);
       if (matches.length != 1) {
         _showErrorSnackBar(
           matches.isEmpty
-              ? 'Không tìm thấy "$name" trong danh bạ.'
-              : 'Có nhiều người tên "$name". Hãy nói rõ họ tên.',
+              ? plan.missingMemberMessage(name)
+              : plan.duplicateMemberMessage(name),
         );
         return;
       }
@@ -1300,13 +1298,13 @@ class MainShellState extends State<MainShell> {
       title: 'Xác nhận tạo nhóm',
       description: 'Trợ lý sẽ tạo nhóm mới với các thành viên đã chọn.',
       confirmLabel: 'Tạo nhóm',
-      primaryDetail: groupName,
+      primaryDetail: plan.groupName,
       primaryDetailLabel: 'Tên nhóm',
-      secondaryDetail: selectedUsers.map((user) => user.displayName).join(', '),
+      secondaryDetail: plan.selectedMemberDetail(selectedUsers),
       secondaryDetailLabel: 'Thành viên',
     );
     if (!confirmed) {
-      _addAiActionCancelled('Đã hủy thao tác tạo nhóm.');
+      _addAiActionCancelled(plan.cancelMessage);
       return;
     }
     if (!mounted) return;
@@ -1314,11 +1312,11 @@ class MainShellState extends State<MainShell> {
     final conversation = await context
         .read<ChatProvider>()
         .createGroupConversation(
-          title: groupName,
+          title: plan.groupName,
           memberIds: selectedUsers.map((user) => user.id).toList(),
         );
     if (conversation != null && mounted) {
-      _showSuccessSnackBar('Đã tạo nhóm "$groupName".');
+      _showSuccessSnackBar(plan.successMessage);
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => ChatDetailScreen(conversation: conversation),
@@ -1335,23 +1333,16 @@ class MainShellState extends State<MainShell> {
     final currentUserId = context.read<ChatProvider>().currentUserId ?? '';
     final conversation = await _resolveAiConversation(aiCmd, params);
     if (conversation == null) return;
+    final plan = AiMuteConversationActionPlan(muted: muted);
     final confirmed = await _confirmAiAction(
-      icon:
-          muted ? Icons.notifications_off_rounded : Icons.notifications_rounded,
-      title: muted ? 'Tắt thông báo' : 'Bật thông báo',
-      description:
-          muted
-              ? 'Trợ lý sẽ tắt thông báo cho cuộc trò chuyện này.'
-              : 'Trợ lý sẽ bật lại thông báo cho cuộc trò chuyện này.',
-      confirmLabel: muted ? 'Tắt thông báo' : 'Bật thông báo',
+      icon: plan.icon,
+      title: plan.title,
+      description: plan.description,
+      confirmLabel: plan.confirmLabel,
       primaryDetail: conversation.getDisplayName(currentUserId),
     );
     if (!confirmed) {
-      _addAiActionCancelled(
-        muted
-            ? 'Đã hủy thao tác tắt thông báo.'
-            : 'Đã hủy thao tác bật thông báo.',
-      );
+      _addAiActionCancelled(plan.cancelMessage);
       return;
     }
     if (!mounted) return;
@@ -1359,45 +1350,37 @@ class MainShellState extends State<MainShell> {
       conversationId: conversation.id,
       isMuted: muted,
     );
-    _showSuccessSnackBar(muted ? 'Đã tắt thông báo.' : 'Đã bật thông báo.');
+    _showSuccessSnackBar(plan.successMessage);
   }
 
   Future<void> _handleAiPinMessage(
-    AiCommand aiCmd,
     Map<String, dynamic>? params, {
     required bool pin,
   }) async {
     final chatProvider = context.read<ChatProvider>();
     final messageId = (params?['messageId'] ?? params?['id'])?.toString();
+    final plan = AiPinMessageActionPlan(pin: pin);
     Message? message;
     if (messageId != null && messageId.trim().isNotEmpty) {
-      message =
-          chatProvider.messages
-              .where((item) => item.id == messageId.trim())
-              .firstOrNull;
+      message = chatProvider.messages
+          .where((item) => item.id == messageId.trim())
+          .firstOrNull;
     }
     message ??= _latestActionableMessage(chatProvider);
     if (message == null) {
-      _showErrorSnackBar('Không tìm thấy tin nhắn phù hợp để ghim/bỏ ghim.');
+      _showErrorSnackBar(plan.missingMessage);
       return;
     }
     final confirmed = await _confirmAiAction(
-      icon: pin ? Icons.push_pin_rounded : Icons.push_pin_outlined,
-      title: pin ? 'Xác nhận ghim tin nhắn' : 'Xác nhận bỏ ghim tin nhắn',
-      description:
-          pin
-              ? 'Trợ lý sẽ ghim tin nhắn trong cuộc trò chuyện hiện tại.'
-              : 'Trợ lý sẽ bỏ ghim tin nhắn trong cuộc trò chuyện hiện tại.',
-      confirmLabel: pin ? 'Ghim' : 'Bỏ ghim',
+      icon: plan.icon,
+      title: plan.title,
+      description: plan.description,
+      confirmLabel: plan.confirmLabel,
       secondaryDetail: message.content,
       secondaryDetailLabel: 'Tin nhắn',
     );
     if (!confirmed) {
-      _addAiActionCancelled(
-        pin
-            ? 'Đã hủy thao tác ghim tin nhắn.'
-            : 'Đã hủy thao tác bỏ ghim tin nhắn.',
-      );
+      _addAiActionCancelled(plan.cancelMessage);
       return;
     }
     if (!mounted) return;
