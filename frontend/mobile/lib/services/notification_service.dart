@@ -1,10 +1,12 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:developer' as developer;
 import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -251,5 +253,53 @@ class NotificationService {
       notificationDetails: details,
       payload: payload,
     );
+  }
+
+  /// Registers the FCM device token with the backend notification service.
+  /// Returns true on success, false on failure (non-fatal).
+  Future<bool> registerTokenToBackend({
+    required String accessToken,
+    required String deviceId,
+    required String platform,
+    required String coreServiceUrl,
+  }) async {
+    if (_disabled || _fcm == null) return false;
+
+    final String? fcmToken = await _fcm!.getToken();
+    if (fcmToken == null || fcmToken.isEmpty) {
+      developer.log('[NotificationService] No FCM token available to register');
+      return false;
+    }
+
+    try {
+      final uri = Uri.parse(
+        '$coreServiceUrl/notifications/devices'.replaceAll('/api/v1', '/api/v1'),
+      );
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+        body: jsonEncode({
+          'deviceId': deviceId,
+          'platform': platform,
+          'fcmToken': fcmToken,
+        }),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        developer.log('[NotificationService] FCM token registered successfully');
+        return true;
+      } else {
+        developer.log(
+          '[NotificationService] FCM token registration failed: ${response.statusCode}',
+        );
+        return false;
+      }
+    } catch (e) {
+      developer.log('[NotificationService] FCM token registration error: $e');
+      return false;
+    }
   }
 }
