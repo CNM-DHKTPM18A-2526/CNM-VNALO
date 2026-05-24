@@ -4,6 +4,7 @@ import iuh.cnm.vnalo.core_service.config.OtpConfig;
 import iuh.cnm.vnalo.core_service.exception.ApiException;
 import iuh.cnm.vnalo.core_service.exception.ErrorCode;
 import iuh.cnm.vnalo.core_service.model.dto.request.ChangePasswordRequest;
+import iuh.cnm.vnalo.core_service.model.dto.request.FaceLoginRequest;
 import iuh.cnm.vnalo.core_service.model.dto.request.ForgotPasswordRequest;
 import iuh.cnm.vnalo.core_service.model.dto.request.LoginRequest;
 import iuh.cnm.vnalo.core_service.model.dto.request.RefreshTokenRequest;
