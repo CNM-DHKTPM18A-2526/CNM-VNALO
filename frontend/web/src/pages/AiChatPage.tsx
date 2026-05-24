@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+﻿import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Send, Sparkles, Trash2 } from 'lucide-react'
+import { Send, Sparkles, Trash2, X } from 'lucide-react'
 
 import { extractMessage } from '../api.client'
 import { useAuth } from '../features/auth/useAuth'
 import { fetchInbox, sendAiChatMessage } from '../features/chat/chat.api'
+import type { ConversationSummary } from '../features/chat/chat.types'
 
 type ProviderStatus =
   | 'LIVE_PROVIDER_ACTIVE'
@@ -50,19 +51,33 @@ type AiMessage = {
   actionParams?: Record<string, unknown> | null
 }
 
+
+type PendingActionResolution = {
+  candidates: ConversationSummary[]
+  draft: string
+  command: AiActionCommand
+}
+
+type PendingActionReview = {
+  title: string
+  description: string
+  confirmLabel: string
+  path?: string
+  feedback: string
+}
 const STORAGE_KEY = 'vnalo_ai_chat_history'
 const DRAFT_KEY_PREFIX = 'vnalo_ai_web_compose_draft:'
 const MAX_API_HISTORY = 20
 
 const PRESET_PROMPTS = [
-  'Hãy đề xuất 3 thói quen lành mạnh mỗi ngày',
-  'Giúp tôi soạn một tin nhắn từ chối lịch hẹn khéo léo',
-  'Giải thích khái niệm WebRTC một cách ngắn gọn',
+  'HÃ£y Ä‘á» xuáº¥t 3 thÃ³i quen lÃ nh máº¡nh má»—i ngÃ y',
+  'GiÃºp tÃ´i soáº¡n má»™t tin nháº¯n tá»« chá»‘i lá»‹ch háº¹n khÃ©o lÃ©o',
+  'Giáº£i thÃ­ch khÃ¡i niá»‡m WebRTC má»™t cÃ¡ch ngáº¯n gá»n',
 ]
 
 const INITIAL_ASSISTANT_MESSAGE: AiMessage = {
   role: 'assistant',
-  content: 'Xin chào! Mình là Trợ lý AI VNALO. Mình có thể giúp gì cho bạn hôm nay?',
+  content: 'Xin chÃ o! MÃ¬nh lÃ  Trá»£ lÃ½ AI VNALO. MÃ¬nh cÃ³ thá»ƒ giÃºp gÃ¬ cho báº¡n hÃ´m nay?',
   timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
 }
 
@@ -76,9 +91,9 @@ function resolveProviderPresentation(messages: AiMessage[]) {
       providerStatus,
       degraded: true,
       badgeClassName: 'ai-header-status ai-header-status-warning',
-      label: 'AI đang bảo trì',
-      helper: 'Một số phản hồi AI có thể tạm thời bị hạn chế.',
-      banner: 'AI đang bảo trì. Hãy thử lại sau hoặc tiếp tục với thao tác thủ công.',
+      label: 'AI Ä‘ang báº£o trÃ¬',
+      helper: 'Má»™t sá»‘ pháº£n há»“i AI cÃ³ thá»ƒ táº¡m thá»i bá»‹ háº¡n cháº¿.',
+      banner: 'AI Ä‘ang báº£o trÃ¬. HÃ£y thá»­ láº¡i sau hoáº·c tiáº¿p tá»¥c vá»›i thao tÃ¡c thá»§ cÃ´ng.',
       bannerClassName: 'ai-runtime-banner ai-runtime-banner-warning',
     }
   }
@@ -88,9 +103,9 @@ function resolveProviderPresentation(messages: AiMessage[]) {
       providerStatus,
       degraded: true,
       badgeClassName: 'ai-header-status ai-header-status-degraded',
-      label: 'Chế độ dự phòng',
-      helper: 'Hệ thống đang dùng tuyến phản hồi thay thế.',
-      banner: 'AI đang chạy ở chế độ dự phòng, chất lượng phản hồi có thể giảm.',
+      label: 'Cháº¿ Ä‘á»™ dá»± phÃ²ng',
+      helper: 'Há»‡ thá»‘ng Ä‘ang dÃ¹ng tuyáº¿n pháº£n há»“i thay tháº¿.',
+      banner: 'AI Ä‘ang cháº¡y á»Ÿ cháº¿ Ä‘á»™ dá»± phÃ²ng, cháº¥t lÆ°á»£ng pháº£n há»“i cÃ³ thá»ƒ giáº£m.',
       bannerClassName: 'ai-runtime-banner ai-runtime-banner-info',
     }
   }
@@ -99,8 +114,8 @@ function resolveProviderPresentation(messages: AiMessage[]) {
     providerStatus,
     degraded: false,
     badgeClassName: 'ai-header-status',
-    label: 'Sẵn sàng hỗ trợ',
-    helper: 'Trợ lý AI có thể trả lời và gợi ý thao tác trong VNALO.',
+    label: 'Sáºµn sÃ ng há»— trá»£',
+    helper: 'Trá»£ lÃ½ AI cÃ³ thá»ƒ tráº£ lá»i vÃ  gá»£i Ã½ thao tÃ¡c trong VNALO.',
     banner: '',
     bannerClassName: 'ai-runtime-banner',
   }
@@ -122,6 +137,10 @@ function extractActionTarget(params?: Record<string, unknown> | null) {
     params.recipient ??
     params.contactName ??
     params.displayName ??
+    params.conversationName ??
+    params.groupName ??
+    params.groupTitle ??
+    params.chatName ??
     params.name ??
     ''
   return String(raw).trim()
@@ -147,35 +166,66 @@ function resolveNavigatePath(command: AiActionCommand, params?: Record<string, u
   return null
 }
 
+const CONVERSATION_ACTION_COMMANDS = new Set<AiActionCommand>([
+  'OPEN_CHAT',
+  'COMPOSE_MESSAGE',
+  'START_CALL',
+  'OPEN_GROUP_SETTINGS',
+  'MUTE_CONVERSATION',
+  'UNMUTE_CONVERSATION',
+  'CHANGE_GROUP_NAME',
+  'ADD_GROUP_MEMBER',
+  'REMOVE_GROUP_MEMBER',
+  'TRANSFER_GROUP_OWNER',
+  'LEAVE_GROUP',
+  'DISBAND_GROUP',
+])
+
+const HIGH_RISK_ACTION_COMMANDS = new Set<AiActionCommand>([
+  'BLOCK_USER',
+  'UNBLOCK_USER',
+  'REMOVE_GROUP_MEMBER',
+  'TRANSFER_GROUP_OWNER',
+  'LEAVE_GROUP',
+  'DISBAND_GROUP',
+  'RECALL_MESSAGE',
+])
+
+function isConversationAction(command: AiActionCommand) {
+  return CONVERSATION_ACTION_COMMANDS.has(command)
+}
+
 function buildActionLabel(command: AiActionCommand) {
   switch (command) {
     case 'OPEN_CHAT':
-      return 'Mở cuộc trò chuyện'
+      return 'Má»Ÿ cuá»™c trÃ² chuyá»‡n'
     case 'COMPOSE_MESSAGE':
-      return 'Mở chat + điền sẵn'
+      return 'Má»Ÿ chat + Ä‘iá»n sáºµn'
     case 'NAVIGATE_TO_CHAT':
-      return 'Đi tới Chat'
+      return 'Äi tá»›i Chat'
     case 'NAVIGATE_TO_CONTACTS':
-      return 'Đi tới Danh bạ'
+      return 'Äi tá»›i Danh báº¡'
     case 'OPEN_PROFILE':
-      return 'Đi tới Hồ sơ'
+      return 'Äi tá»›i Há»“ sÆ¡'
     case 'NAVIGATE_TO':
-      return 'Đi tới màn hình đích'
+      return 'Äi tá»›i mÃ n hÃ¬nh Ä‘Ã­ch'
     case 'START_CALL':
-      return 'Mở chat để gọi'
+      return 'Má»Ÿ chat Ä‘á»ƒ gá»i'
     default:
-      return 'Thử thực hiện thao tác'
+      return 'Thá»­ thá»±c hiá»‡n thao tÃ¡c'
   }
 }
 
 export function AiChatPage() {
-  const { accessToken } = useAuth()
+  const { accessToken, user } = useAuth()
   const navigate = useNavigate()
   const [messages, setMessages] = useState<AiMessage[]>([])
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [actionBusyIndex, setActionBusyIndex] = useState<number | null>(null)
   const [actionFeedback, setActionFeedback] = useState<string>('')
+  const [pendingResolution, setPendingResolution] = useState<PendingActionResolution | null>(null)
+  const [pendingActionReview, setPendingActionReview] = useState<PendingActionReview | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -214,7 +264,7 @@ export function AiChatPage() {
     if (!accessToken) {
       const authError: AiMessage = {
         role: 'assistant',
-        content: 'Bạn cần đăng nhập lại để sử dụng Trợ lý AI trên web.',
+        content: 'Báº¡n cáº§n Ä‘Äƒng nháº­p láº¡i Ä‘á»ƒ sá»­ dá»¥ng Trá»£ lÃ½ AI trÃªn web.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         degraded: true,
         providerStatus: 'AI_PROVIDER_UNAVAILABLE',
@@ -246,7 +296,7 @@ export function AiChatPage() {
       const aiResponse = await sendAiChatMessage(accessToken, query, apiHistory)
       const assistantMessage: AiMessage = {
         role: 'assistant',
-        content: aiResponse.textReply || 'Rất tiếc, mình không thể xử lý yêu cầu lúc này.',
+        content: aiResponse.textReply || 'Ráº¥t tiáº¿c, mÃ¬nh khÃ´ng thá»ƒ xá»­ lÃ½ yÃªu cáº§u lÃºc nÃ y.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         degraded: Boolean(aiResponse.degraded),
         providerStatus: (aiResponse.providerStatus as ProviderStatus | undefined) ?? null,
@@ -260,7 +310,7 @@ export function AiChatPage() {
       const fallbackText =
         extractMessage((error as { response?: { data?: unknown } })?.response?.data) ||
         extractMessage(error) ||
-        'Có lỗi xảy ra khi kết nối tới Trợ lý AI. Vui lòng thử lại sau.'
+        'CÃ³ lá»—i xáº£y ra khi káº¿t ná»‘i tá»›i Trá»£ lÃ½ AI. Vui lÃ²ng thá»­ láº¡i sau.'
 
       const errorMessage: AiMessage = {
         role: 'assistant',
@@ -291,29 +341,84 @@ export function AiChatPage() {
 
       if (directPath) {
         navigate(directPath)
-        setActionFeedback('Đã mở đúng màn hình theo yêu cầu AI.')
+        setActionFeedback('Opened the requested VNALO screen.')
         return
       }
 
-      if (command === 'OPEN_CHAT' || command === 'COMPOSE_MESSAGE' || command === 'START_CALL') {
+      if (command === 'CREATE_GROUP') {
+        setPendingActionReview({
+          title: 'Open create group flow',
+          description: 'AI can open the group creation screen, but you still choose members and confirm the group manually.',
+          confirmLabel: 'Open create group',
+          path: '/chat?createGroup=true',
+          feedback: 'Opened create group flow. Review members and group name before creating.',
+        })
+        return
+      }
+
+      if (command === 'SEND_FRIEND_REQUEST') {
+        setPendingActionReview({
+          title: 'Open contacts to add friend',
+          description: 'Web AI will not send a friend request automatically. Open Contacts, verify the person, then send the request yourself.',
+          confirmLabel: 'Open Contacts',
+          path: '/contacts',
+          feedback: 'Opened Contacts. Please verify the target before sending a friend request.',
+        })
+        return
+      }
+
+      if (HIGH_RISK_ACTION_COMMANDS.has(command) && !isConversationAction(command)) {
+        setPendingActionReview({
+          title: 'Manual confirmation required',
+          description: 'This AI action can affect accounts, messages, or group membership. Web AI will not execute it automatically in this audit wave.',
+          confirmLabel: 'Open Chat',
+          path: '/chat',
+          feedback: 'Opened Chat. Please perform the sensitive action manually after checking the target.',
+        })
+        return
+      }
+
+      if (isConversationAction(command)) {
         const target = extractActionTarget(params)
         if (!target) {
-          setActionFeedback('AI chưa xác định được người nhận. Hãy nhập rõ hơn.')
+          navigate('/chat')
+          setActionFeedback('AI did not identify a specific conversation. Opened Chat so you can choose manually.')
           return
         }
 
-        const inbox = await fetchInbox(accessToken)
+        const inbox = await fetchInbox(accessToken, user?.id)
         const normalizedTarget = normalizeLookupText(target)
-        const matched = inbox
-          .map((conversation) => ({
-            conversation,
-            score: normalizeLookupText(conversation.name).includes(normalizedTarget) ? normalizedTarget.length : -1,
-          }))
+        const matches = inbox
+          .map((conversation) => {
+            const normalizedName = normalizeLookupText(conversation.name)
+            const isExact = normalizedName === normalizedTarget
+
+            return {
+              conversation,
+              normalizedName,
+              score: isExact ? 1000 : normalizedName.includes(normalizedTarget) ? normalizedTarget.length : -1,
+            }
+          })
           .filter((item) => item.score >= 0)
-          .sort((left, right) => right.score - left.score)[0]?.conversation
+          .sort((left, right) => right.score - left.score)
+
+        const exactMatches = matches.filter((item) => item.normalizedName === normalizedTarget)
+        const candidateConversations = (exactMatches.length > 0 ? exactMatches : matches).map((item) => item.conversation)
+
+        if (candidateConversations.length > 1) {
+          setPendingResolution({
+            candidates: candidateConversations.slice(0, 8),
+            draft: command === 'COMPOSE_MESSAGE' ? extractComposeContent(params) : '',
+            command,
+          })
+          setActionFeedback(`Found ${candidateConversations.length} matching conversations for "${target}". Please choose the exact target before continuing.`)
+          return
+        }
+
+        const matched = candidateConversations[0]
 
         if (!matched) {
-          setActionFeedback(`Không tìm thấy cuộc trò chuyện phù hợp với "${target}".`)
+          setActionFeedback(`No matching conversation found for "${target}".`)
           return
         }
 
@@ -326,27 +431,56 @@ export function AiChatPage() {
 
         navigate(`/chat/${matched.id}`)
         if (command === 'START_CALL') {
-          setActionFeedback('Đã mở cuộc trò chuyện. Hãy nhấn nút gọi để xác nhận cuộc gọi trên web.')
+          setActionFeedback('Opened the conversation. Use the call button to confirm the call manually on web.')
+        } else if (HIGH_RISK_ACTION_COMMANDS.has(command)) {
+          setActionFeedback('Opened the target conversation. Please confirm and perform this sensitive action manually.')
         } else {
-          setActionFeedback('Đã mở cuộc trò chuyện đích.')
+          setActionFeedback('Opened the target conversation.')
         }
         return
       }
 
-      setActionFeedback('Lệnh này chưa hỗ trợ thao tác trực tiếp trên web. Bạn có thể tiếp tục trên mobile.')
+      setPendingActionReview({
+        title: 'Action not available on web yet',
+        description: 'This AI command is recognized, but the web client does not have a safe executor for it yet.',
+        confirmLabel: 'Open Chat',
+        path: '/chat',
+        feedback: 'Opened Chat. Continue manually or use mobile for this AI action.',
+      })
     } catch (error) {
       console.error('AI action execution failed:', error)
-      setActionFeedback('Không thể thực thi thao tác AI trên web lúc này. Vui lòng thử lại.')
+      setActionFeedback('Could not execute the AI action on web right now. Please try again manually.')
     } finally {
       setActionBusyIndex(null)
     }
+  }
+
+  const confirmPendingActionReview = () => {
+    if (!pendingActionReview) {
+      return
+    }
+
+    if (pendingActionReview.path) {
+      navigate(pendingActionReview.path)
+    }
+    setActionFeedback(pendingActionReview.feedback)
+    setPendingActionReview(null)
+  }
+
+  const executeResolvedConversationAction = (conversation: ConversationSummary, resolution: PendingActionResolution) => {
+    if (resolution.command === 'COMPOSE_MESSAGE' && resolution.draft) {
+      localStorage.setItem(`${DRAFT_KEY_PREFIX}${conversation.id}`, resolution.draft)
+    }
+
+    setPendingResolution(null)
+    navigate(`/chat/${conversation.id}`)
   }
 
   const handleClearHistory = () => {
     saveMessages([
       {
         role: 'assistant',
-        content: 'Lịch sử đã được dọn dẹp. Mình có thể hỗ trợ gì tiếp theo cho bạn?',
+        content: 'Lá»‹ch sá»­ Ä‘Ã£ Ä‘Æ°á»£c dá»n dáº¹p. MÃ¬nh cÃ³ thá»ƒ há»— trá»£ gÃ¬ tiáº¿p theo cho báº¡n?',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
     ])
@@ -359,19 +493,18 @@ export function AiChatPage() {
           <div className='ai-avatar-glow'>
             <Sparkles size={28} />
           </div>
-          <h3>Trợ lý AI VNALO</h3>
-          <p>Hỗ trợ trả lời câu hỏi, giải thích nhanh và gợi ý thao tác an toàn trong hệ thống VNALO.</p>
+          <h3>Trá»£ lÃ½ AI VNALO</h3>
+          <p>Helps answer questions, explain quickly, and suggest safe actions inside VNALO.</p>
         </div>
 
         <div className='ai-presets-container'>
-          <span className='ai-presets-title'>Gợi ý câu hỏi</span>
+          <span className='ai-presets-title'>Gá»£i Ã½ cÃ¢u há»i</span>
           {PRESET_PROMPTS.map((prompt) => (
             <button
               key={prompt}
               type='button'
               className='ai-preset-btn'
               onClick={() => void handleSend(prompt)}
-              disabled={isLoading}
             >
               {prompt}
             </button>
@@ -387,7 +520,7 @@ export function AiChatPage() {
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
         >
           <Trash2 size={14} />
-          Dọn dẹp lịch sử
+          Dá»n dáº¹p lá»‹ch sá»­
         </button>
       </aside>
 
@@ -415,15 +548,14 @@ export function AiChatPage() {
                 {message.content}
               </p>
               {message.role === 'assistant' && message.actionCommand ? (
-                <div style={{ marginTop: '10px' }}>
+                <div className='ai-action-row'>
                   <button
                     type='button'
-                    className='ai-send-btn'
-                    style={{ width: 'auto', padding: '8px 14px', borderRadius: '999px' }}
+                    className='ai-action-btn'
                     onClick={() => void handleAction(message, index)}
                     disabled={actionBusyIndex === index || isLoading}
                   >
-                    {actionBusyIndex === index ? 'Đang xử lý...' : buildActionLabel(message.actionCommand)}
+                    {actionBusyIndex === index ? 'Äang xá»­ lÃ½...' : buildActionLabel(message.actionCommand)}
                   </button>
                 </div>
               ) : null}
@@ -435,6 +567,7 @@ export function AiChatPage() {
 
           {isLoading && (
             <div className='ai-typing-indicator'>
+              <span className='ai-typing-label'>AI assistant is typing</span>
               <div className='ai-typing-dot' />
               <div className='ai-typing-dot' />
               <div className='ai-typing-dot' />
@@ -453,11 +586,10 @@ export function AiChatPage() {
           >
             <textarea
               className='ai-input-field'
-              placeholder='Hỏi trợ lý AI điều gì đó...'
+              placeholder='Há»i trá»£ lÃ½ AI Ä‘iá»u gÃ¬ Ä‘Ã³...'
               value={inputValue}
               onChange={(event) => setInputValue(event.target.value)}
               rows={1}
-              disabled={isLoading}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
                   event.preventDefault()
@@ -471,6 +603,67 @@ export function AiChatPage() {
           </form>
         </footer>
       </main>
+
+      {pendingActionReview ? (
+        <div className='modal-overlay' role='dialog' aria-modal='true' aria-labelledby='ai-action-review-title' onClick={() => setPendingActionReview(null)}>
+          <div className='modal-card ai-resolution-modal' onClick={(event) => event.stopPropagation()}>
+            <div className='modal-header'>
+              <div>
+                <h3 id='ai-action-review-title'>{pendingActionReview.title}</h3>
+                <p>{pendingActionReview.description}</p>
+              </div>
+              <button className='modal-close-btn' type='button' onClick={() => setPendingActionReview(null)} aria-label='Close'>
+                <X size={18} />
+              </button>
+            </div>
+            <div className='modal-footer'>
+              <button className='btn btn-subtle' type='button' onClick={() => setPendingActionReview(null)}>
+                Cancel
+              </button>
+              <button className='btn btn-primary' type='button' onClick={confirmPendingActionReview}>
+                {pendingActionReview.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {pendingResolution ? (
+        <div className='modal-overlay' role='dialog' aria-modal='true' aria-labelledby='ai-resolution-title' onClick={() => setPendingResolution(null)}>
+          <div className='modal-card ai-resolution-modal' onClick={(event) => event.stopPropagation()}>
+            <div className='modal-header'>
+              <div>
+                <h3 id='ai-resolution-title'>Choose the exact conversation</h3>
+                <p>Confirm the target to avoid opening or drafting for the wrong contact.</p>
+              </div>
+              <button className='modal-close-btn' type='button' onClick={() => setPendingResolution(null)} aria-label='Close'>
+                <X size={18} />
+              </button>
+            </div>
+            <div className='modal-body ai-resolution-list'>
+              {pendingResolution.candidates.map((conversation) => (
+                <button
+                  key={conversation.id}
+                  type='button'
+                  className='ai-resolution-option'
+                  onClick={() => executeResolvedConversationAction(conversation, pendingResolution)}
+                >
+                  <span className='ai-resolution-avatar'>{conversation.name.charAt(0).toUpperCase()}</span>
+                  <span className='ai-resolution-meta'>
+                    <strong>{conversation.name}</strong>
+                    <small>{conversation.isGroup ? `${conversation.memberCount ?? conversation.members?.length ?? 0} members` : 'Direct conversation'}</small>
+                  </span>
+                </button>
+              ))}
+            </div>
+            <div className='modal-footer'>
+              <button className='btn btn-subtle' type='button' onClick={() => setPendingResolution(null)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
