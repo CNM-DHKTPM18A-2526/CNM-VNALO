@@ -180,6 +180,21 @@ export function LoginPage() {
                 </div>
                 <p style={{ color: '#0068ff', fontSize: 15, marginTop: 15, fontWeight: 500 }}>Chỉ dùng để đăng nhập</p>
                 <p style={{ fontSize: 14, color: 'var(--auth-text-main)' }}>Vnalo {t('auth.loginHeroCopy').includes('Optimized') ? 'on Desktop' : 'trên máy tính'}</p>
+                <div className='auth-divider'>
+                  <span>hoặc</span>
+                </div>
+                <button
+                  type='button'
+                  className='auth-face-login-btn'
+                  onClick={() => setShowFaceModal(true)}
+                >
+                  <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'>
+                    <path d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2' />
+                    <circle cx='12' cy='7' r='4' />
+                  </svg>
+                  Đăng nhập bằng khuôn mặt
+                  <span className='auth-face-badge'>thử nghiệm</span>
+                </button>
               </div>
             ) : (
               <form className='auth-form' onSubmit={handlePasswordLogin}>
