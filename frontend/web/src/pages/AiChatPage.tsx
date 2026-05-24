@@ -56,6 +56,7 @@ type PendingActionResolution = {
   candidates: ConversationSummary[]
   draft: string
   command: AiActionCommand
+  targetLabel?: string
 }
 
 type PendingActionReview = {
@@ -64,6 +65,13 @@ type PendingActionReview = {
   confirmLabel: string
   path?: string
   feedback: string
+  preview?: AiActionPreview
+}
+
+type AiActionPreview = {
+  targetLabel?: string
+  draft?: string
+  risk: 'low' | 'medium' | 'high'
 }
 const STORAGE_KEY = 'vnalo_ai_chat_history'
 const DRAFT_KEY_PREFIX = 'vnalo_ai_web_compose_draft:'
@@ -152,6 +160,21 @@ function extractComposeContent(params?: Record<string, unknown> | null) {
   return String(raw).trim()
 }
 
+function buildConversationSubtitle(conversation: ConversationSummary) {
+  if (conversation.isGroup) {
+    const count = conversation.memberCount ?? conversation.members?.length ?? 0
+    return count > 0 ? `${count} members` : 'Group conversation'
+  }
+
+  return 'Direct conversation'
+}
+
+function buildActionRisk(command: AiActionCommand): AiActionPreview['risk'] {
+  if (HIGH_RISK_ACTION_COMMANDS.has(command)) return 'high'
+  if (command === 'CREATE_GROUP' || command === 'SEND_FRIEND_REQUEST' || command === 'START_CALL') return 'medium'
+  return 'low'
+}
+
 function resolveNavigatePath(command: AiActionCommand, params?: Record<string, unknown> | null) {
   if (command === 'NAVIGATE_TO_CHAT') return '/chat'
   if (command === 'NAVIGATE_TO_CONTACTS') return '/contacts'
@@ -227,6 +250,7 @@ export function AiChatPage() {
   const [pendingResolution, setPendingResolution] = useState<PendingActionResolution | null>(null)
   const [pendingActionReview, setPendingActionReview] = useState<PendingActionReview | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
+  const inputRef = useRef<HTMLTextAreaElement | null>(null)
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY)
@@ -254,6 +278,14 @@ export function AiChatPage() {
   }, [messages, isLoading, actionFeedback])
 
   const runtimeState = useMemo(() => resolveProviderPresentation(messages), [messages])
+
+  useEffect(() => {
+    const input = inputRef.current
+    if (!input) return
+
+    input.style.height = '0px'
+    input.style.height = `${Math.min(input.scrollHeight, 132)}px`
+  }, [inputValue])
 
   const handleSend = async (textToSend?: string) => {
     const query = (textToSend ?? inputValue).trim()
@@ -352,6 +384,7 @@ export function AiChatPage() {
           confirmLabel: 'Open create group',
           path: '/chat?createGroup=true',
           feedback: 'Opened create group flow. Review members and group name before creating.',
+          preview: { risk: 'medium', targetLabel: String(params.title ?? params.groupName ?? 'New group') },
         })
         return
       }
@@ -363,6 +396,7 @@ export function AiChatPage() {
           confirmLabel: 'Open Contacts',
           path: '/contacts',
           feedback: 'Opened Contacts. Please verify the target before sending a friend request.',
+          preview: { risk: 'medium', targetLabel: extractActionTarget(params) || 'Unknown contact' },
         })
         return
       }
@@ -374,6 +408,7 @@ export function AiChatPage() {
           confirmLabel: 'Open Chat',
           path: '/chat',
           feedback: 'Opened Chat. Please perform the sensitive action manually after checking the target.',
+          preview: { risk: 'high', targetLabel: extractActionTarget(params) || command },
         })
         return
       }
@@ -410,6 +445,7 @@ export function AiChatPage() {
             candidates: candidateConversations.slice(0, 8),
             draft: command === 'COMPOSE_MESSAGE' ? extractComposeContent(params) : '',
             command,
+            targetLabel: target,
           })
           setActionFeedback(`Found ${candidateConversations.length} matching conversations for "${target}". Please choose the exact target before continuing.`)
           return
@@ -446,6 +482,7 @@ export function AiChatPage() {
         confirmLabel: 'Open Chat',
         path: '/chat',
         feedback: 'Opened Chat. Continue manually or use mobile for this AI action.',
+        preview: { risk: 'medium', targetLabel: command },
       })
     } catch (error) {
       console.error('AI action execution failed:', error)
@@ -453,6 +490,29 @@ export function AiChatPage() {
     } finally {
       setActionBusyIndex(null)
     }
+  }
+
+  const renderActionPreview = (preview?: AiActionPreview) => {
+    if (!preview) return null
+
+    return (
+      <div className={`ai-action-preview ai-action-preview-${preview.risk}`}>
+
+        <span className='ai-action-preview-risk'>{preview.risk.toUpperCase()} RISK</span>
+        {preview.targetLabel ? (
+          <div className='ai-action-preview-row'>
+            <span>Target</span>
+            <strong>{preview.targetLabel}</strong>
+          </div>
+        ) : null}
+        {preview.draft ? (
+          <div className='ai-action-preview-row ai-action-preview-draft'>
+            <span>Draft</span>
+            <p>{preview.draft}</p>
+          </div>
+        ) : null}
+      </div>
+    )
   }
 
   const confirmPendingActionReview = () => {
@@ -585,6 +645,7 @@ export function AiChatPage() {
             }}
           >
             <textarea
+              ref={inputRef}
               className='ai-input-field'
               placeholder='Há»i trá»£ lÃ½ AI Ä‘iá»u gÃ¬ Ä‘Ã³...'
               value={inputValue}
@@ -600,6 +661,7 @@ export function AiChatPage() {
             <button type='submit' className='ai-send-btn' disabled={isLoading || !inputValue.trim()}>
               <Send size={18} />
             </button>
+            <span className='ai-input-hint'>Enter to send, Shift + Enter for a new line</span>
           </form>
         </footer>
       </main>
@@ -611,6 +673,7 @@ export function AiChatPage() {
               <div>
                 <h3 id='ai-action-review-title'>{pendingActionReview.title}</h3>
                 <p>{pendingActionReview.description}</p>
+                {renderActionPreview(pendingActionReview.preview)}
               </div>
               <button className='modal-close-btn' type='button' onClick={() => setPendingActionReview(null)} aria-label='Close'>
                 <X size={18} />
@@ -635,6 +698,7 @@ export function AiChatPage() {
               <div>
                 <h3 id='ai-resolution-title'>Choose the exact conversation</h3>
                 <p>Confirm the target to avoid opening or drafting for the wrong contact.</p>
+                {renderActionPreview({ risk: buildActionRisk(pendingResolution.command), targetLabel: pendingResolution.targetLabel, draft: pendingResolution.draft })}
               </div>
               <button className='modal-close-btn' type='button' onClick={() => setPendingResolution(null)} aria-label='Close'>
                 <X size={18} />
@@ -651,7 +715,7 @@ export function AiChatPage() {
                   <span className='ai-resolution-avatar'>{conversation.name.charAt(0).toUpperCase()}</span>
                   <span className='ai-resolution-meta'>
                     <strong>{conversation.name}</strong>
-                    <small>{conversation.isGroup ? `${conversation.memberCount ?? conversation.members?.length ?? 0} members` : 'Direct conversation'}</small>
+                    <small>{buildConversationSubtitle(conversation)}</small>
                   </span>
                 </button>
               ))}
