@@ -32,6 +32,26 @@ void main() {
         'OPEN_CHAT',
       );
       expect(
+        AiCommandRouting.normalizeSystemAction('open_conversation'),
+        'OPEN_CHAT',
+      );
+      expect(
+        AiCommandRouting.normalizeSystemAction('go_to_chat'),
+        'OPEN_CHAT',
+      );
+      expect(
+        AiCommandRouting.normalizeSystemAction('start_video_call'),
+        'START_CALL',
+      );
+      expect(
+        AiCommandRouting.normalizeSystemAction('make_call'),
+        'START_CALL',
+      );
+      expect(
+        AiCommandRouting.normalizeSystemAction('send_text'),
+        'COMPOSE_MESSAGE',
+      );
+      expect(
         AiCommandRouting.normalizeSystemAction('call_contact'),
         'START_CALL',
       );
