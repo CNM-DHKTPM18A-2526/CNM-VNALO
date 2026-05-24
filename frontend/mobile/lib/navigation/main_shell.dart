@@ -15,6 +15,7 @@ import 'package:vnalo_mobile/features/discover/screens/discover_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/profile_screen.dart';
 import 'package:vnalo_mobile/features/timeline/screens/home_wall_screen.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
+import 'package:vnalo_mobile/features/ai_assistant/services/ai_admin_action_plan.dart';
 import 'package:vnalo_mobile/features/ai_assistant/services/ai_action_context_store.dart';
 import 'package:vnalo_mobile/features/ai_assistant/services/ai_action_presentation_resolver.dart';
 import 'package:vnalo_mobile/features/ai_assistant/services/ai_action_policy.dart';
@@ -1462,6 +1463,7 @@ class MainShellState extends State<MainShell> {
       includeGlobalSearch: true,
     );
     if (user == null) return;
+    final plan = AiContactActionPlan.forCommand(command, user);
     final presentation = AiActionPresentationResolver.contact(command);
     final destructive = AiActionPolicy.isDestructive(command);
     final confirmed = await _confirmAiAction(
@@ -1474,7 +1476,7 @@ class MainShellState extends State<MainShell> {
       destructive: destructive,
     );
     if (!confirmed) {
-      _addAiActionCancelled('Đã hủy thao tác liên hệ.');
+      _addAiActionCancelled(plan.cancelMessage);
       return;
     }
     if (!mounted) return;
@@ -1486,20 +1488,19 @@ class MainShellState extends State<MainShell> {
       );
       if (!mounted) return;
       context.read<ContactProvider>().onFriendshipUpdated();
-      _showSuccessSnackBar('Đã gửi lời mời kết bạn.');
+      _showSuccessSnackBar(plan.successMessage);
     } else if (command == 'BLOCK_USER') {
       await friendService.blockUser(user.id);
       if (!mounted) return;
       context.read<ContactProvider>().onFriendshipUpdated();
-      _showSuccessSnackBar('Đã chặn ${user.displayName}.');
+      _showSuccessSnackBar(plan.successMessage);
     } else if (command == 'UNBLOCK_USER') {
       await friendService.unblockUser(user.id);
       if (!mounted) return;
       context.read<ContactProvider>().onFriendshipUpdated();
-      _showSuccessSnackBar('Đã bỏ chặn ${user.displayName}.');
+      _showSuccessSnackBar(plan.successMessage);
     }
   }
-
   Future<void> _handleAiGroupAdminAction(
     AiCommand aiCmd,
     Map<String, dynamic>? params, {
@@ -1512,27 +1513,24 @@ class MainShellState extends State<MainShell> {
       requireGroup: true,
     );
     if (conversation == null) return;
+    final plan = AiGroupAdminActionPlan.fromParams(params);
 
     Future<void> execute() async {
+      plan.validateBeforeExecute(command);
       switch (command) {
         case 'CHANGE_GROUP_NAME':
-          final title = AiCommandRouting.extractNewTitle(params);
-          if (title == null) {
-            throw StateError('Trợ lý chưa có tên nhóm mới.');
-          }
-          await chatProvider.updateGroupInfo(conversation.id, title: title);
+          await chatProvider.updateGroupInfo(
+            conversation.id,
+            title: plan.newTitle!,
+          );
           break;
         case 'ADD_GROUP_MEMBER':
-          final names = AiCommandRouting.extractMemberNames(params);
-          if (names.isEmpty) {
-            throw StateError('Trợ lý chưa xác định thành viên cần thêm.');
-          }
           final contactProvider = context.read<ContactProvider>();
           if (contactProvider.friends.isEmpty) {
             await contactProvider.fetchFriends();
           }
           final users = <User>[];
-          for (final name in names) {
+          for (final name in plan.memberNames) {
             final matches = _findUsersByName(contactProvider.friends, name);
             if (matches.length != 1) {
               throw StateError(
@@ -1548,7 +1546,7 @@ class MainShellState extends State<MainShell> {
         case 'REMOVE_GROUP_MEMBER':
           final users = _resolveGroupMembersByName(
             conversation,
-            AiCommandRouting.extractMemberNames(params),
+            plan.memberNames,
           );
           if (users.isEmpty) {
             throw StateError('Trợ lý chưa xác định thành viên cần xóa.');
@@ -1560,10 +1558,12 @@ class MainShellState extends State<MainShell> {
         case 'TRANSFER_GROUP_OWNER':
           final users = _resolveGroupMembersByName(
             conversation,
-            AiCommandRouting.extractMemberNames(params),
+            plan.memberNames,
           );
           if (users.length != 1) {
-            throw StateError('Cần chọn đúng một thành viên để chuyển quyền.');
+            throw StateError(
+              'Cần chọn đúng một thành viên để chuyển quyền.',
+            );
           }
           await chatProvider.transferOwnership(conversation.id, users.first.id);
           break;
@@ -1576,8 +1576,6 @@ class MainShellState extends State<MainShell> {
       }
     }
 
-    final memberNames = AiCommandRouting.extractMemberNames(params);
-    final title = AiCommandRouting.extractNewTitle(params);
     final presentation = AiActionPresentationResolver.group(command);
     final destructive = AiActionPolicy.isDestructive(command);
     final confirmed = await _confirmAiAction(
@@ -1589,24 +1587,22 @@ class MainShellState extends State<MainShell> {
         chatProvider.currentUserId ?? '',
       ),
       primaryDetailLabel: 'Nhóm',
-      secondaryDetail:
-          title ?? (memberNames.isEmpty ? null : memberNames.join(', ')),
-      secondaryDetailLabel: title != null ? 'Tên mới' : 'Thành viên',
+      secondaryDetail: plan.secondaryDetail,
+      secondaryDetailLabel: plan.secondaryDetailLabel,
       destructive: destructive,
     );
     if (!confirmed) {
-      _addAiActionCancelled('Đã hủy thao tác nhóm.');
+      _addAiActionCancelled(plan.cancelMessage);
       return;
     }
     if (!mounted) return;
     try {
       await execute();
-      if (mounted) _showSuccessSnackBar('Trợ lý đã thực hiện thao tác nhóm.');
+      if (mounted) _showSuccessSnackBar(plan.successMessage);
     } catch (error) {
       _showErrorSnackBar(error.toString().replaceFirst('Bad state: ', ''));
     }
   }
-
   void _logAiFlow(
     String event, {
     AiCommand? aiCommand,
