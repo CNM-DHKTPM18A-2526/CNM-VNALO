@@ -83,14 +83,14 @@ const DRAFT_KEY_PREFIX = 'vnalo_ai_web_compose_draft:'
 const MAX_API_HISTORY = 20
 
 const PRESET_PROMPTS = [
-  'HÃ£y Ä‘á» xuáº¥t 3 thÃ³i quen lÃ nh máº¡nh má»—i ngÃ y',
-  'GiÃºp tÃ´i soáº¡n má»™t tin nháº¯n tá»« chá»‘i lá»‹ch háº¹n khÃ©o lÃ©o',
-  'Giáº£i thÃ­ch khÃ¡i niá»‡m WebRTC má»™t cÃ¡ch ngáº¯n gá»n',
+  'Suggest 3 healthy habits I can keep every day',
+  'Help me draft a polite message to decline an appointment',
+  'Explain WebRTC in a short and simple way',
 ]
 
 const INITIAL_ASSISTANT_MESSAGE: AiMessage = {
   role: 'assistant',
-  content: 'Xin chÃ o! MÃ¬nh lÃ  Trá»£ lÃ½ AI VNALO. MÃ¬nh cÃ³ thá»ƒ giÃºp gÃ¬ cho báº¡n hÃ´m nay?',
+  content: 'Hello! I am the VNALO AI assistant. What can I help you with today?',
   timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
 }
 
@@ -161,9 +161,9 @@ function resolveProviderPresentation(messages: AiMessage[]) {
       providerStatus,
       degraded: true,
       badgeClassName: 'ai-header-status ai-header-status-warning',
-      label: 'AI Ä‘ang báº£o trÃ¬',
-      helper: 'Má»™t sá»‘ pháº£n há»“i AI cÃ³ thá»ƒ táº¡m thá»i bá»‹ háº¡n cháº¿.',
-      banner: 'AI Ä‘ang báº£o trÃ¬. HÃ£y thá»­ láº¡i sau hoáº·c tiáº¿p tá»¥c vá»›i thao tÃ¡c thá»§ cÃ´ng.',
+      label: 'AI maintenance mode',
+      helper: 'Some assistant replies may be temporarily limited.',
+      banner: 'AI is currently unavailable. Please try again later or continue manually.',
       bannerClassName: 'ai-runtime-banner ai-runtime-banner-warning',
     }
   }
@@ -173,9 +173,9 @@ function resolveProviderPresentation(messages: AiMessage[]) {
       providerStatus,
       degraded: true,
       badgeClassName: 'ai-header-status ai-header-status-degraded',
-      label: 'Cháº¿ Ä‘á»™ dá»± phÃ²ng',
-      helper: 'Há»‡ thá»‘ng Ä‘ang dÃ¹ng tuyáº¿n pháº£n há»“i thay tháº¿.',
-      banner: 'AI Ä‘ang cháº¡y á»Ÿ cháº¿ Ä‘á»™ dá»± phÃ²ng, cháº¥t lÆ°á»£ng pháº£n há»“i cÃ³ thá»ƒ giáº£m.',
+      label: 'Fallback mode active',
+      helper: 'The assistant is currently using a backup response route.',
+      banner: 'AI is running in fallback mode, so response quality may be reduced.',
       bannerClassName: 'ai-runtime-banner ai-runtime-banner-info',
     }
   }
@@ -184,8 +184,8 @@ function resolveProviderPresentation(messages: AiMessage[]) {
     providerStatus,
     degraded: false,
     badgeClassName: 'ai-header-status',
-    label: 'Sáºµn sÃ ng há»— trá»£',
-    helper: 'Trá»£ lÃ½ AI cÃ³ thá»ƒ tráº£ lá»i vÃ  gá»£i Ã½ thao tÃ¡c trong VNALO.',
+    label: 'Ready to help',
+    helper: 'The AI assistant can answer questions and suggest safe actions inside VNALO.',
     banner: '',
     bannerClassName: 'ai-runtime-banner',
   }
@@ -283,21 +283,21 @@ function isConversationAction(command: AiActionCommand) {
 function buildActionLabel(command: AiActionCommand) {
   switch (command) {
     case 'OPEN_CHAT':
-      return 'Má»Ÿ cuá»™c trÃ² chuyá»‡n'
+      return 'Open conversation'
     case 'COMPOSE_MESSAGE':
-      return 'Má»Ÿ chat + Ä‘iá»n sáºµn'
+      return 'Open chat with draft'
     case 'NAVIGATE_TO_CHAT':
-      return 'Äi tá»›i Chat'
+      return 'Go to Chat'
     case 'NAVIGATE_TO_CONTACTS':
-      return 'Äi tá»›i Danh báº¡'
+      return 'Go to Contacts'
     case 'OPEN_PROFILE':
-      return 'Äi tá»›i Há»“ sÆ¡'
+      return 'Go to Profile'
     case 'NAVIGATE_TO':
-      return 'Äi tá»›i mÃ n hÃ¬nh Ä‘Ã­ch'
+      return 'Go to destination'
     case 'START_CALL':
-      return 'Má»Ÿ chat Ä‘á»ƒ gá»i'
+      return 'Open chat for call'
     default:
-      return 'Thá»­ thá»±c hiá»‡n thao tÃ¡c'
+      return 'Try this action'
   }
 }
 
@@ -370,7 +370,7 @@ export function AiChatPage() {
     if (!accessToken) {
       const authError: AiMessage = {
         role: 'assistant',
-        content: 'Báº¡n cáº§n Ä‘Äƒng nháº­p láº¡i Ä‘á»ƒ sá»­ dá»¥ng Trá»£ lÃ½ AI trÃªn web.',
+        content: 'Please sign in again to use the AI assistant on web.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         degraded: true,
         providerStatus: 'AI_PROVIDER_UNAVAILABLE',
@@ -407,7 +407,7 @@ export function AiChatPage() {
       const safeActionCommand = responseActionCommand && KNOWN_ACTION_COMMANDS.has(responseActionCommand) ? responseActionCommand : null
       const assistantMessage: AiMessage = {
         role: 'assistant',
-        content: aiResponse.textReply || 'Ráº¥t tiáº¿c, mÃ¬nh khÃ´ng thá»ƒ xá»­ lÃ½ yÃªu cáº§u lÃºc nÃ y.',
+        content: aiResponse.textReply || 'Sorry, I cannot process that request right now.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         degraded: Boolean(aiResponse.degraded),
         providerStatus: (aiResponse.providerStatus as ProviderStatus | undefined) ?? null,
@@ -423,7 +423,7 @@ export function AiChatPage() {
       const fallbackText =
         extractMessage((error as { response?: { data?: unknown } })?.response?.data) ||
         extractMessage(error) ||
-        'CÃ³ lá»—i xáº£y ra khi káº¿t ná»‘i tá»›i Trá»£ lÃ½ AI. Vui lÃ²ng thá»­ láº¡i sau.'
+        'There was a problem connecting to the AI assistant. Please try again later.'
 
       const errorMessage: AiMessage = {
         role: 'assistant',
@@ -673,12 +673,12 @@ export function AiChatPage() {
           <div className='ai-avatar-glow'>
             <Sparkles size={28} />
           </div>
-          <h3>Trá»£ lÃ½ AI VNALO</h3>
+          <h3>VNALO AI Assistant</h3>
           <p>Helps answer questions, explain quickly, and suggest safe actions inside VNALO.</p>
         </div>
 
         <div className='ai-presets-container'>
-          <span className='ai-presets-title'>Gá»£i Ã½ cÃ¢u há»i</span>
+          <span className='ai-presets-title'>Suggested prompts</span>
           {PRESET_PROMPTS.map((prompt) => (
             <button
               key={prompt}
@@ -702,7 +702,7 @@ export function AiChatPage() {
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
         >
           <Trash2 size={14} />
-          Dá»n dáº¹p lá»‹ch sá»­
+          Clear history
         </button>
       </aside>
 
@@ -746,7 +746,7 @@ export function AiChatPage() {
                     onClick={() => void handleAction(message, index)}
                     disabled={isLoading || actionBusyIndex !== null || pendingActionReview !== null || pendingResolution !== null}
                   >
-                    {actionBusyIndex === index ? 'Äang xá»­ lÃ½...' : buildActionLabel(message.actionCommand)}
+                    {actionBusyIndex === index ? 'Processing...' : buildActionLabel(message.actionCommand)}
                   </button>
                 </div>
               ) : null}
@@ -778,7 +778,7 @@ export function AiChatPage() {
             <textarea
               ref={inputRef}
               className='ai-input-field'
-              placeholder='Há»i trá»£ lÃ½ AI Ä‘iá»u gÃ¬ Ä‘Ã³...'
+              placeholder='Ask the AI assistant something...'
               value={inputValue}
               onChange={(event) => setInputValue(event.target.value)}
               disabled={pendingActionReview !== null || pendingResolution !== null}
