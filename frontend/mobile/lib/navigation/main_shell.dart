@@ -217,6 +217,7 @@ class MainShellState extends State<MainShell> {
       AiCommand(command: pending.command, params: nextParams),
     );
   }
+
   User? _preferUserFromAiContext(Iterable<User> matches) {
     final context = _activeAiTargetContext();
     final peerUserId = context?.peerUserId?.trim();
@@ -478,10 +479,7 @@ class MainShellState extends State<MainShell> {
           break;
         case 'PIN_MESSAGE':
         case 'UNPIN_MESSAGE':
-          await _handleAiPinMessage(
-            params,
-            pin: command == 'PIN_MESSAGE',
-          );
+          await _handleAiPinMessage(params, pin: command == 'PIN_MESSAGE');
           break;
         case 'OPEN_PROFILE':
           await _handleAiOpenProfile(aiCmd, params);
@@ -526,8 +524,6 @@ class MainShellState extends State<MainShell> {
       );
     }
   }
-
-
 
   Future<void> _handleAiConversationCommand(
     AiCommand aiCmd,
@@ -601,18 +597,16 @@ class MainShellState extends State<MainShell> {
         AiCommandRouting.buildAmbiguousTargetFeedback(
           targetName: targetName,
           candidates: conversationMatches.map(
-            (conversation) => conversation.getDisplayName(
-              chatProvider.currentUserId ?? '',
-            ),
+            (conversation) =>
+                conversation.getDisplayName(chatProvider.currentUserId ?? ''),
           ),
           actionLabel: 'mở đúng cuộc trò chuyện',
         ),
         feedbackSource: AiCommandRouting.buildAmbiguityFeedbackSource(
           scope: 'conversation',
           candidates: conversationMatches.map(
-            (conversation) => conversation.getDisplayName(
-              chatProvider.currentUserId ?? '',
-            ),
+            (conversation) =>
+                conversation.getDisplayName(chatProvider.currentUserId ?? ''),
           ),
         ),
       );
@@ -638,8 +632,7 @@ class MainShellState extends State<MainShell> {
       }
     }
 
-    final conversation =
-        selectedConversation ?? conversationMatches.first;
+    final conversation = selectedConversation ?? conversationMatches.first;
     final currentUserId = chatProvider.currentUserId ?? '';
     final isDirect = conversation.type.name == 'DIRECT';
     final peerMember =
@@ -656,10 +649,7 @@ class MainShellState extends State<MainShell> {
       peerUserId: peerUserId,
     );
 
-    final rawPrefilled = AiCommandRouting.extractPrefilledText(
-      command,
-      params,
-    );
+    final rawPrefilled = AiCommandRouting.extractPrefilledText(command, params);
     final prefilledText = rawPrefilled;
 
     if (command == 'OPEN_CHAT' || command == 'COMPOSE_MESSAGE') {
@@ -678,8 +668,7 @@ class MainShellState extends State<MainShell> {
 
       final isAlreadyActiveConversation =
           chatProvider.activeConversationId == conversation.id;
-      final hasPendingAiNavigation =
-          _activeAiConversationId == conversation.id;
+      final hasPendingAiNavigation = _activeAiConversationId == conversation.id;
 
       if (command == 'OPEN_CHAT' &&
           AiCommandRouting.shouldBlockOpenChat(
@@ -798,8 +787,7 @@ class MainShellState extends State<MainShell> {
             builder:
                 (_) => ChatDetailScreen(
                   conversation: conversation,
-                  prefilledText:
-                      shouldSendImmediately ? null : prefilledText,
+                  prefilledText: shouldSendImmediately ? null : prefilledText,
                 ),
           ),
         );
@@ -809,92 +797,143 @@ class MainShellState extends State<MainShell> {
         }
       }
     } else if (command == 'START_CALL') {
-      if (_isCallScreenActive) {
-        _logAiFlow(
-          'AI_NAV_GUARD_BLOCKED',
-          aiCommand: aiCmd,
-          extra: {'reason': 'call_screen_already_active'},
-        );
-        return;
-      }
-
-      final callPlan = AiCallActionPlan.fromParams(params);
       if (!isDirect || peerUserId.isEmpty) {
+        final callPlan = AiCallActionPlan.fromParams(params);
         _showErrorSnackBar(callPlan.unsupportedGroupMessage);
         return;
       }
-      _rememberAiTargetContext(
-        targetName: peerName,
-        conversationId: conversation.id,
+
+      await _handleAiStartCall(
+        aiCmd,
+        conversation: conversation,
+        currentUserId: currentUserId,
         peerUserId: peerUserId,
+        peerName: peerName,
+        params: params,
       );
-
-      if (!mounted) return;
-      final confirmed = await AiActionConfirmationSheet.show(
-        context,
-        icon: callPlan.icon,
-        title: callPlan.title,
-        description: callPlan.description,
-        confirmLabel: callPlan.confirmLabel,
-        primaryDetail: peerName,
-        primaryDetailLabel: 'Người nhận',
-      );
-      if (!confirmed) {
-        _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
-        _addAiActionCancelled(callPlan.cancelMessage);
-        return;
-      }
-      if (!mounted) return;
-      await _dismissSoftKeyboard();
-      if (!mounted) return;
-
-      final callId = generateCallId(
-        conversationId: conversation.id,
-        callerUserId: currentUserId,
-        audioOnly: !callPlan.isVideo,
-      );
-
-      _isCallScreenActive = true;
-      _logAiFlow(
-        'AI_NAVIGATE_CALL',
-        aiCommand: aiCmd,
-        extra: {
-          'conversationId': conversation.id,
-          'callId': callId,
-          'callType': callPlan.analyticsCallType,
-        },
-      );
-      try {
-        await Navigator.of(context).push(
-          MaterialPageRoute(
-            builder:
-                (_) =>
-                    callPlan.isVideo
-                        ? VideoCallScreen(
-                          conversationId: conversation.id,
-                          callId: callId,
-                          targetUserId: peerUserId,
-                          targetDisplayName: peerName,
-                          isCaller: true,
-                        )
-                        : VoiceCallScreen(
-                          conversationId: conversation.id,
-                          callId: callId,
-                          targetUserId: peerUserId,
-                          targetDisplayName: peerName,
-                          isCaller: true,
-                        ),
-          ),
-        );
-      } finally {
-        _isCallScreenActive = false;
-        _logAiFlow(
-          'AI_CALL_SCREEN_RELEASED',
-          aiCommand: aiCmd,
-          extra: {'conversationId': conversation.id},
-        );
-      }
     }
+  }
+
+  Future<void> _handleAiStartCall(
+    AiCommand aiCmd, {
+    required Conversation conversation,
+    required String currentUserId,
+    required String peerUserId,
+    required String peerName,
+    required Map<String, dynamic>? params,
+  }) async {
+    if (_isCallScreenActive) {
+      _logAiFlow(
+        'AI_NAV_GUARD_BLOCKED',
+        aiCommand: aiCmd,
+        extra: {'reason': 'call_screen_already_active'},
+      );
+      return;
+    }
+
+    final callPlan = AiCallActionPlan.fromParams(params);
+    _rememberAiTargetContext(
+      targetName: peerName,
+      conversationId: conversation.id,
+      peerUserId: peerUserId,
+    );
+
+    if (!mounted) return;
+    final confirmed = await AiActionConfirmationSheet.show(
+      context,
+      icon: callPlan.icon,
+      title: callPlan.title,
+      description: callPlan.description,
+      confirmLabel: callPlan.confirmLabel,
+      primaryDetail: peerName,
+      primaryDetailLabel: 'Người nhận',
+    );
+    if (!confirmed) {
+      _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
+      _addAiActionCancelled(callPlan.cancelMessage);
+      return;
+    }
+    if (!mounted) return;
+    await _dismissSoftKeyboard();
+    if (!mounted) return;
+
+    final callId = generateCallId(
+      conversationId: conversation.id,
+      callerUserId: currentUserId,
+      audioOnly: !callPlan.isVideo,
+    );
+
+    _isCallScreenActive = true;
+    _logAiFlow(
+      'AI_NAVIGATE_CALL',
+      aiCommand: aiCmd,
+      extra: {
+        'conversationId': conversation.id,
+        'callId': callId,
+        'callType': callPlan.analyticsCallType,
+      },
+    );
+    try {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder:
+              (_) =>
+                  callPlan.isVideo
+                      ? VideoCallScreen(
+                        conversationId: conversation.id,
+                        callId: callId,
+                        targetUserId: peerUserId,
+                        targetDisplayName: peerName,
+                        isCaller: true,
+                      )
+                      : VoiceCallScreen(
+                        conversationId: conversation.id,
+                        callId: callId,
+                        targetUserId: peerUserId,
+                        targetDisplayName: peerName,
+                        isCaller: true,
+                      ),
+        ),
+      );
+    } finally {
+      _isCallScreenActive = false;
+      _logAiFlow(
+        'AI_CALL_SCREEN_RELEASED',
+        aiCommand: aiCmd,
+        extra: {'conversationId': conversation.id},
+      );
+    }
+  }
+
+  Future<void> _openAiFriendProfile(User user) async {
+    final chatProvider = context.read<ChatProvider>();
+    final matches = chatProvider.findConversationMatchesByName(
+      user.displayName,
+    );
+    final direct =
+        matches
+            .where((conversation) => conversation.type.name == 'DIRECT')
+            .firstOrNull;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder:
+            (_) => FriendOptionsScreen(
+              friendName: user.displayName,
+              friendAvatarUrl: user.avatarUrl,
+              friendUserId: user.id,
+              conversation: direct,
+            ),
+      ),
+    );
+  }
+
+  Future<void> _openAiGroupSettings(Conversation conversation) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => GroupSettingsScreen(conversation: conversation),
+      ),
+    );
   }
 
   Future<void> _handleAiRecallAction(
@@ -944,10 +983,7 @@ class MainShellState extends State<MainShell> {
     }
     if (!mounted) return;
 
-    chatProvider.recallMessage(
-      lastMsg.id,
-      chatProvider.activeConversationId!,
-    );
+    chatProvider.recallMessage(lastMsg.id, chatProvider.activeConversationId!);
   }
 
   Future<Conversation?> _showConversationDisambiguationSheet({
@@ -1263,9 +1299,7 @@ class MainShellState extends State<MainShell> {
       );
   }
 
-  Future<void> _handleAiCreateGroup(
-    Map<String, dynamic>? params,
-  ) async {
+  Future<void> _handleAiCreateGroup(Map<String, dynamic>? params) async {
     final plan = AiCreateGroupActionPlan.fromParams(params);
     if (!plan.isValid) {
       _showErrorSnackBar(plan.invalidMessage);
@@ -1359,9 +1393,10 @@ class MainShellState extends State<MainShell> {
     final plan = AiPinMessageActionPlan(pin: pin);
     Message? message;
     if (messageId != null && messageId.trim().isNotEmpty) {
-      message = chatProvider.messages
-          .where((item) => item.id == messageId.trim())
-          .firstOrNull;
+      message =
+          chatProvider.messages
+              .where((item) => item.id == messageId.trim())
+              .firstOrNull;
     }
     message ??= _latestActionableMessage(chatProvider);
     if (message == null) {
@@ -1394,26 +1429,7 @@ class MainShellState extends State<MainShell> {
   ) async {
     final user = await _resolveAiFriend(aiCmd, params);
     if (user == null || !mounted) return;
-    Conversation? direct;
-    final chatProvider = context.read<ChatProvider>();
-    final matches = chatProvider.findConversationMatchesByName(
-      user.displayName,
-    );
-    direct =
-        matches
-            .where((conversation) => conversation.type.name == 'DIRECT')
-            .firstOrNull;
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder:
-            (_) => FriendOptionsScreen(
-              friendName: user.displayName,
-              friendAvatarUrl: user.avatarUrl,
-              friendUserId: user.id,
-              conversation: direct,
-            ),
-      ),
-    );
+    await _openAiFriendProfile(user);
   }
 
   Future<void> _handleAiOpenGroupSettings(
@@ -1426,11 +1442,7 @@ class MainShellState extends State<MainShell> {
       requireGroup: true,
     );
     if (conversation == null || !mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => GroupSettingsScreen(conversation: conversation),
-      ),
-    );
+    await _openAiGroupSettings(conversation);
   }
 
   Future<void> _handleAiContactAction(
@@ -1482,6 +1494,7 @@ class MainShellState extends State<MainShell> {
       _showSuccessSnackBar(plan.successMessage);
     }
   }
+
   Future<void> _handleAiGroupAdminAction(
     AiCommand aiCmd,
     Map<String, dynamic>? params, {
@@ -1542,9 +1555,7 @@ class MainShellState extends State<MainShell> {
             plan.memberNames,
           );
           if (users.length != 1) {
-            throw StateError(
-              'Cần chọn đúng một thành viên để chuyển quyền.',
-            );
+            throw StateError('Cần chọn đúng một thành viên để chuyển quyền.');
           }
           await chatProvider.transferOwnership(conversation.id, users.first.id);
           break;
@@ -1584,6 +1595,7 @@ class MainShellState extends State<MainShell> {
       _showErrorSnackBar(error.toString().replaceFirst('Bad state: ', ''));
     }
   }
+
   void _logAiFlow(
     String event, {
     AiCommand? aiCommand,
