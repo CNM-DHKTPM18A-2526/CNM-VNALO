@@ -20,6 +20,8 @@ class NotificationService {
 
   static const String _mainChannelId = 'vnalo_main_channel';
   static const String _mainChannelName = 'Main Notifications';
+  static const String _otpChannelId = 'otp_channel';
+  static const String _otpChannelName = 'OTP Notifications';
 
   Future<void> initialize() async {
     if (_initialized || _disabled) return;
@@ -71,6 +73,20 @@ class NotificationService {
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(mainChannel);
+
+    const AndroidNotificationChannel otpChannel = AndroidNotificationChannel(
+      _otpChannelId,
+      _otpChannelName,
+      description: 'High-priority OTP authentication notifications',
+      importance: Importance.max,
+      playSound: true,
+      enableVibration: true,
+    );
+
+    await _localNotifications
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(otpChannel);
 
     // 3. Handle Foreground Messages
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {

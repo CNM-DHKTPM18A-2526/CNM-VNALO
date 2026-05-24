@@ -131,7 +131,9 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       APP_SYNC_POLICY_ENFORCE_WEB_RESTRICTION: ${APP_SYNC_POLICY_ENFORCE_WEB_RESTRICTION:-false}
-      FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:-iuh-cnm-vnalo-firebase-adminsdk-fbsvc-5008b7c5eb.json}
+      FIREBASE_ENABLED: ${FIREBASE_ENABLED:-false}
+      FIREBASE_FAIL_FAST: ${FIREBASE_FAIL_FAST:-false}
+      FIREBASE_CREDENTIALS_PATH: /app/firebase-credentials/firebase-adminsdk.json
       KAFKA_SERVERS: kafka:9092
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xss256k"
     depends_on:
@@ -139,6 +141,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    volumes:
+      - firebase_credentials:/app/firebase-credentials:ro
     networks:
       - vnalo-network
     healthcheck:
@@ -450,7 +454,9 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       JWT_ISSUER: ${JWT_ISSUER:-vnalo}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
-      FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:-iuh-cnm-vnalo-firebase-adminsdk-fbsvc-5008b7c5eb.json}
+      FIREBASE_ENABLED: ${FIREBASE_ENABLED:-false}
+      FIREBASE_FAIL_FAST: ${FIREBASE_FAIL_FAST:-false}
+      FIREBASE_CREDENTIALS_PATH: /app/firebase-credentials/firebase-adminsdk.json
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xss256k"
     depends_on:
       postgres:
@@ -459,6 +465,8 @@ services:
         condition: service_healthy
       kafka:
         condition: service_started
+    volumes:
+      - firebase_credentials:/app/firebase-credentials:ro
     networks:
       - vnalo-network
     healthcheck:
@@ -503,6 +511,12 @@ volumes:
     driver: local
   media_local_data:
     driver: local
+  firebase_credentials:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${FIREBASE_CREDENTIALS_DIR:-./firebase-credentials}
 
 networks:
   vnalo-network:

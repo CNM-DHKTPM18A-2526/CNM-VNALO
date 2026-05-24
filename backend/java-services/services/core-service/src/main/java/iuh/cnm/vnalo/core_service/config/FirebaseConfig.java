@@ -32,6 +32,10 @@ public class FirebaseConfig {
         this.resourceLoader = resourceLoader;
     }
 
+    public boolean isEnabled() {
+        return firebaseEnabled;
+    }
+
     // Initialize Firebase Admin SDK before the application starts
     @PostConstruct
     public void init() {
