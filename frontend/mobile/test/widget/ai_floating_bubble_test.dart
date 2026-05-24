@@ -247,60 +247,60 @@ void main() {
     provider.dispose();
   });
 
+  testWidgets(
+    'closing toggle while response is in flight keeps board collapsed',
+    (tester) async {
+      final provider = _buildProvider(
+        responses: {
+          'Ban oi': {'textReply': 'Mình đang ở đây.', 'emotion': 'neutral'},
+        },
+        responseDelay: const Duration(milliseconds: 300),
+      );
 
-  testWidgets('closing toggle while response is in flight keeps board collapsed', (
-    tester,
-  ) async {
-    final provider = _buildProvider(
-      responses: {
-        'Ban oi': {'textReply': 'Mình đang ở đây.', 'emotion': 'neutral'},
-      },
-      responseDelay: const Duration(milliseconds: 300),
-    );
-
-    await tester.pumpWidget(
-      ChangeNotifierProvider.value(
-        value: provider,
-        child: const MaterialApp(
-          home: Scaffold(body: Stack(children: [AiFloatingBubble()])),
+      await tester.pumpWidget(
+        ChangeNotifierProvider.value(
+          value: provider,
+          child: const MaterialApp(
+            home: Scaffold(body: Stack(children: [AiFloatingBubble()])),
+          ),
         ),
-      ),
-    );
+      );
 
-    await provider.summonMascot(
-      startListening: false,
-      persist: false,
-      source: 'typing_board_close_test',
-    );
-    await tester.pumpAndSettle();
+      await provider.summonMascot(
+        startListening: false,
+        persist: false,
+        source: 'typing_board_close_test',
+      );
+      await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('ai_bubble_toggle_board')));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('ai_bubble_toggle_board')));
+      await tester.pumpAndSettle();
 
-    await tester.enterText(
-      find.byKey(const ValueKey('ai_chat_input')),
-      'Ban oi',
-    );
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('ai_chat_send')));
-    await tester.pump();
+      await tester.enterText(
+        find.byKey(const ValueKey('ai_chat_input')),
+        'Ban oi',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('ai_chat_send')));
+      await tester.pump();
 
-    expect(find.byKey(const ValueKey('ai_chat_board')), findsOneWidget);
-    expect(find.text('Đang hiểu yêu cầu...'), findsOneWidget);
+      expect(find.byKey(const ValueKey('ai_chat_board')), findsOneWidget);
+      expect(find.text('Đang hiểu yêu cầu...'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('ai_bubble_toggle_board')));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('ai_bubble_toggle_board')));
+      await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('ai_chat_board')), findsNothing);
+      expect(find.byKey(const ValueKey('ai_chat_board')), findsNothing);
 
-    await tester.pump(const Duration(milliseconds: 350));
-    await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('ai_chat_board')), findsNothing);
-    expect(find.byKey(const ValueKey('ai_bubble_root')), findsOneWidget);
+      expect(find.byKey(const ValueKey('ai_chat_board')), findsNothing);
+      expect(find.byKey(const ValueKey('ai_bubble_root')), findsOneWidget);
 
-    provider.dispose();
-  });
+      provider.dispose();
+    },
+  );
 
   testWidgets('bubble board surfaces clarification badge and action chips', (
     tester,
@@ -385,7 +385,7 @@ void main() {
     },
   );
 
-  testWidgets('bubble board submit releases focus to avoid keyboard jitter', (
+  testWidgets('bubble board submit keeps focus for continuous messaging', (
     tester,
   ) async {
     final provider = _buildProvider(
@@ -409,7 +409,7 @@ void main() {
     await provider.summonMascot(
       startListening: false,
       persist: false,
-      source: 'focus_release_test',
+      source: 'focus_keep_test',
     );
     await tester.pumpAndSettle();
 
@@ -426,7 +426,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('ai_chat_send')));
     await tester.pumpAndSettle();
 
-    expect(tester.widget<TextField>(inputFinder).focusNode?.hasFocus, isFalse);
+    expect(tester.widget<TextField>(inputFinder).focusNode?.hasFocus, isTrue);
     expect(provider.aiResponse, isNotEmpty);
     expect(tester.takeException(), isNull);
 
