@@ -181,7 +181,19 @@ export function RegisterPage() {
                </h2>
             </div>
 
-            {step === 'form' ? (
+            {step === 'face' && accessToken ? (
+              <div className='register-face-step-container'>
+                <RegisterFaceStep
+                  token={accessToken}
+                  onComplete={(enrolled) => {
+                    if (enrolled) {
+                      setSuccessMessage('Đăng ký khuôn mặt thành công!')
+                    }
+                    setTimeout(() => navigate('/login', { replace: true }), 1200)
+                  }}
+                />
+              </div>
+            ) : step === 'form' ? (
               <form className='auth-form' onSubmit={handleSendOtp}>
                 <input
                   type='text'
@@ -287,19 +299,7 @@ export function RegisterPage() {
                    {t('auth.editInfoButton')}
                 </button>
               </form>
-            ) : step === 'face' && accessToken ? (
-              <div className='register-face-step-container'>
-                <RegisterFaceStep
-                  token={accessToken}
-                  onComplete={(enrolled) => {
-                    if (enrolled) {
-                      setSuccessMessage('Đăng ký khuôn mặt thành công!')
-                    }
-                    setTimeout(() => navigate('/login', { replace: true }), 1200)
-                  }}
-                />
-              </div>
-            ) : null}
+            )}
           </div>
         </div>
 
