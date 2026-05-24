@@ -340,7 +340,7 @@ class AiAssistantProvider with ChangeNotifier {
   static const Duration _sttListenFor = Duration(seconds: 10);
   static const Duration _sttPauseFor = Duration(seconds: 10);
   static const Duration _idleAutoHideDelay = Duration(seconds: 12);
-  static const Duration _emptySummonAutoHideDelay = Duration(seconds: 6);
+  static const Duration _emptySummonAutoHideDelay = Duration(seconds: 10);
   static const int _maxConversationEntries = 200;
   static const String aiConversationId = '00000000-0000-0000-0000-000000000000';
   static const String _legacyAiConversationId = 'AI_ASSISTANT_LOCAL';
@@ -455,6 +455,7 @@ class AiAssistantProvider with ChangeNotifier {
       AiThinkingPhase.idle => 'Đang xử lý...',
     };
   }
+
   double get soundLevel => _soundLevel;
 
   bool get persistentEnabled => _persistentEnabled;
@@ -1183,12 +1184,15 @@ class AiAssistantProvider with ChangeNotifier {
       await setPersistentEnabled(true, reason: '$source.persist');
     } else {
       _provisionallyVisible = true;
-      _keepVisibleUntil = DateTime.now().add(_emptySummonAutoHideDelay);
+      final summonHoldWindow =
+          startListening ? _sttListenFor : _emptySummonAutoHideDelay;
+      _keepVisibleUntil = DateTime.now().add(summonHoldWindow);
       _logEvent(
         'VISIBILITY_SUMMON_CONTEXTUAL',
         data: {
           'source': source,
-          'autoHideMs': _emptySummonAutoHideDelay.inMilliseconds,
+          'autoHideMs': summonHoldWindow.inMilliseconds,
+          'startListening': startListening,
         },
       );
       notifyListeners();
@@ -1573,7 +1577,8 @@ class AiAssistantProvider with ChangeNotifier {
     }
 
     if (_state == AiState.listening) {
-      final keepBubbleVisible = responseSurface != AiResponseSurface.conversation;
+      final keepBubbleVisible =
+          responseSurface != AiResponseSurface.conversation;
       _cancelListenGuard();
       _listenStartedAt = null;
       _isSessionActive = false;

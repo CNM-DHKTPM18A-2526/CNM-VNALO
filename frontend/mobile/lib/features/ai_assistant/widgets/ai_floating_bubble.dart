@@ -24,7 +24,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
     with TickerProviderStateMixin {
   static const double _bubbleSize = 78;
   static const double _bubbleRadius = _bubbleSize / 2;
-  static const double _bubbleRootHeight = 118;
+  static const double _bubbleRootHeight = 106;
   static const String _positionXPrefKey = 'vnalo_ai_bubble_x';
   static const String _positionYPrefKey = 'vnalo_ai_bubble_y';
   static const double _trashHoverDistance = 72;
@@ -485,8 +485,8 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
     return Transform.scale(
       scale: _currentScale,
       child: SizedBox(
-        width: _bubbleSize + 14,
-        height: _bubbleSize + 14,
+        width: _bubbleSize,
+        height: _bubbleSize,
         child: Listener(
           onPointerDown: (event) {
             _onPointerDown(event, provider.currentMascot);
@@ -497,27 +497,29 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
             cursor: SystemMouseCursors.click,
             onExit: (_) => _onPointerExit(),
             child: Stack(
-              clipBehavior: Clip.hardEdge,
+              clipBehavior: Clip.none,
               children: [
-                Container(
-                  width: _bubbleSize,
-                  height: _bubbleSize,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        provider.state == AiState.speaking
-                            ? Colors.greenAccent.withValues(alpha: 0.24)
-                            : Colors.blueAccent.withValues(alpha: 0.14),
-                        Colors.transparent,
-                      ],
-                      stops: const [0.52, 1.0],
+                Positioned.fill(
+                  child: Container(
+                    width: _bubbleSize,
+                    height: _bubbleSize,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          provider.state == AiState.speaking
+                              ? Colors.greenAccent.withValues(alpha: 0.24)
+                              : Colors.blueAccent.withValues(alpha: 0.14),
+                          Colors.transparent,
+                        ],
+                        stops: const [0.52, 1.0],
+                      ),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.45),
+                      ),
                     ),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.45),
-                    ),
+                    child: _buildMascotSurface(provider),
                   ),
-                  child: _buildMascotSurface(provider),
                 ),
                 Positioned.fill(child: _buildLayeredGestureMask(provider)),
                 Positioned(
@@ -672,7 +674,7 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
               mainAxisSize: MainAxisSize.min,
               children: [
                 _buildBubbleIndicator(aiProvider),
-                const SizedBox(height: 10),
+                const SizedBox(height: 6),
                 _buildMascotContainer(aiProvider),
               ],
             ),
