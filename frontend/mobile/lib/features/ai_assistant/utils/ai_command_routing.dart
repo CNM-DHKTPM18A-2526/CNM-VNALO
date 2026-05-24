@@ -177,14 +177,24 @@ class AiCommandRouting {
       case 'MỞ CHAT':
         return 'NAVIGATE_TO_CHAT';
       case 'OPEN_CHAT':
+      case 'OPEN_CONVERSATION':
+      case 'GO_TO_CHAT':
         return 'OPEN_CHAT';
       case 'START_CALL':
       case 'CALL_CONTACT':
       case 'VOICE_CALL':
+      case 'MAKE_CALL':
+      case 'AUDIO_CALL':
+      case 'START_VOICE_CALL':
+      case 'VIDEO_CALL':
+      case 'START_VIDEO_CALL':
         return 'START_CALL';
       case 'SEND_MESSAGE':
       case 'COMPOSE_MESSAGE':
       case 'MESSAGE_CONTACT':
+      case 'SEND_TEXT':
+      case 'SEND_CHAT':
+      case 'TEXT_CONTACT':
         return 'COMPOSE_MESSAGE';
       case 'CREATE_GROUP':
       case 'CREATE_GROUP_DRAFT':

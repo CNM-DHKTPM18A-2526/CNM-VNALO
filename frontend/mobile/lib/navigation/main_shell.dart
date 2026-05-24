@@ -20,6 +20,7 @@ import 'package:vnalo_mobile/features/ai_assistant/services/ai_action_context_st
 import 'package:vnalo_mobile/features/ai_assistant/services/ai_action_presentation_resolver.dart';
 import 'package:vnalo_mobile/features/ai_assistant/services/ai_action_policy.dart';
 import 'package:vnalo_mobile/features/ai_assistant/services/ai_action_target_matcher.dart';
+import 'package:vnalo_mobile/features/ai_assistant/services/ai_call_action_plan.dart';
 import 'package:vnalo_mobile/features/ai_assistant/services/ai_conversation_action_plan.dart';
 import 'package:vnalo_mobile/features/ai_assistant/services/ai_conversation_target_resolver.dart';
 import 'package:vnalo_mobile/features/ai_assistant/services/ai_mobile_capability_catalog.dart';
@@ -817,10 +818,9 @@ class MainShellState extends State<MainShell> {
         return;
       }
 
+      final callPlan = AiCallActionPlan.fromParams(params);
       if (!isDirect || peerUserId.isEmpty) {
-        _showErrorSnackBar(
-          'Tính năng gọi điện hiện chỉ hỗ trợ hội thoại 1-1.',
-        );
+        _showErrorSnackBar(callPlan.unsupportedGroupMessage);
         return;
       }
       _rememberAiTargetContext(
@@ -829,22 +829,19 @@ class MainShellState extends State<MainShell> {
         peerUserId: peerUserId,
       );
 
-      final callType = params?['callType']?.toString().toLowerCase();
-      final isVideo = callType == 'video';
-      final callTypeName = isVideo ? 'video' : 'thoại';
-
       if (!mounted) return;
       final confirmed = await AiActionConfirmationSheet.show(
         context,
-        icon: isVideo ? Icons.videocam_rounded : Icons.call_rounded,
-        title: 'Xác nhận gọi $callTypeName',
-        description: 'Trợ lý sẽ bắt đầu cuộc gọi tới liên hệ đã chọn.',
-        confirmLabel: 'Bắt đầu gọi',
-        primaryDetail: 'Người nhận: $peerName',
+        icon: callPlan.icon,
+        title: callPlan.title,
+        description: callPlan.description,
+        confirmLabel: callPlan.confirmLabel,
+        primaryDetail: peerName,
+        primaryDetailLabel: 'Người nhận',
       );
       if (!confirmed) {
         _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
-        _addAiActionCancelled('Đã hủy thao tác gọi.');
+        _addAiActionCancelled(callPlan.cancelMessage);
         return;
       }
       if (!mounted) return;
@@ -854,7 +851,7 @@ class MainShellState extends State<MainShell> {
       final callId = generateCallId(
         conversationId: conversation.id,
         callerUserId: currentUserId,
-        audioOnly: !isVideo,
+        audioOnly: !callPlan.isVideo,
       );
 
       _isCallScreenActive = true;
@@ -864,7 +861,7 @@ class MainShellState extends State<MainShell> {
         extra: {
           'conversationId': conversation.id,
           'callId': callId,
-          'callType': isVideo ? 'video' : 'voice',
+          'callType': callPlan.analyticsCallType,
         },
       );
       try {
@@ -872,7 +869,7 @@ class MainShellState extends State<MainShell> {
           MaterialPageRoute(
             builder:
                 (_) =>
-                    isVideo
+                    callPlan.isVideo
                         ? VideoCallScreen(
                           conversationId: conversation.id,
                           callId: callId,
