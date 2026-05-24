@@ -21,6 +21,7 @@ import 'package:vnalo_mobile/features/ai_assistant/services/ai_action_presentati
 import 'package:vnalo_mobile/features/ai_assistant/services/ai_action_policy.dart';
 import 'package:vnalo_mobile/features/ai_assistant/services/ai_action_target_matcher.dart';
 import 'package:vnalo_mobile/features/ai_assistant/services/ai_conversation_target_resolver.dart';
+import 'package:vnalo_mobile/features/ai_assistant/services/ai_mobile_capability_catalog.dart';
 import 'package:vnalo_mobile/features/ai_assistant/utils/ai_command_routing.dart';
 import 'package:vnalo_mobile/features/ai_assistant/utils/ai_recall_message_selector.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_action_confirmation_sheet.dart';
@@ -508,7 +509,7 @@ class MainShellState extends State<MainShell> {
             extra: {'command': command},
           );
           _addAiActionInfo(
-            'Trợ lý chưa hỗ trợ thao tác "$command" trên mobile. Bạn có thể yêu cầu mở màn hình liên quan hoặc thao tác thủ công.',
+            AiMobileCapabilityCatalog.buildUnsupportedFeedback(command),
             feedbackSource: 'ai_action_unsupported.$command',
           );
       }
