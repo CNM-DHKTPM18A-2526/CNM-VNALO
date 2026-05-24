@@ -344,11 +344,9 @@ export const IncomingCallBanner: React.FC<IncomingCallBannerProps> = ({
   // ── Also shows a browser Notification when the tab is hidden.
   React.useEffect(() => {
     let audioCtx: AudioContext | null = null
-    let sourceNode: AudioBufferSourceNode | null = null
     let gainNode: GainNode | null = null
     let loopTimeout: ReturnType<typeof setTimeout> | null = null
     let audioBuffer: AudioBuffer | null = null
-    let notificationPermission: NotificationPermission = 'default'
 
     // ── Helper: play one ringtone burst from the pre-generated buffer ──
     const playRingtone = () => {
@@ -378,14 +376,11 @@ export const IncomingCallBanner: React.FC<IncomingCallBannerProps> = ({
             body: displayName,
             icon: resolvedAvatar ?? undefined,
             tag: 'incoming-call',
-            renotify: true,
             silent: true, // We play sound ourselves via AudioContext
           },
         )
       } else if (Notification.permission === 'default') {
-        Notification.requestPermission().then((perm) => {
-          notificationPermission = perm
-        })
+        Notification.requestPermission()
       }
     }
 
