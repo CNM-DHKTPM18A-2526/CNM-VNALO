@@ -109,7 +109,9 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
 
     try {
       await WakelockPlus.enable();
-    } catch (_) {}
+    } catch (_) {
+      // Wakelock may not be available on this platform.
+    }
 
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   }
@@ -276,7 +278,9 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
     }
     try {
       WakelockPlus.disable();
-    } catch (_) {}
+    } catch (_) {
+      // Wakelock may not have been enabled or already released.
+    }
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
