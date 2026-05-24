@@ -94,6 +94,32 @@ const INITIAL_ASSISTANT_MESSAGE: AiMessage = {
   timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
 }
 
+function normalizeStoredMessages(payload: unknown): AiMessage[] {
+  if (!Array.isArray(payload)) return [INITIAL_ASSISTANT_MESSAGE]
+
+  const normalized = payload
+    .map<AiMessage | null>((item): AiMessage | null => {
+      if (!item || typeof item !== 'object') return null
+      const value = item as Record<string, unknown>
+      const role = value.role === 'assistant' ? 'assistant' : value.role === 'user' ? 'user' : null
+      const content = typeof value.content === 'string' ? value.content.trim() : ''
+      const timestamp = typeof value.timestamp === 'string' && value.timestamp.trim() ? value.timestamp : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      if (!role || !content) return null
+
+      return {
+        role,
+        content,
+        timestamp,
+        degraded: Boolean(value.degraded),
+        providerStatus: value.providerStatus === 'LIVE_PROVIDER_ACTIVE' || value.providerStatus === 'FALLBACK_PROVIDER_ACTIVE' || value.providerStatus === 'AI_PROVIDER_UNAVAILABLE' ? value.providerStatus : null,
+        actionCommand: typeof value.actionCommand === 'string' ? (value.actionCommand as AiActionCommand) : null,
+        actionParams: value.actionParams && typeof value.actionParams === 'object' ? (value.actionParams as Record<string, unknown>) : null,
+      }
+    })
+    .filter((item): item is AiMessage => item !== null)
+
+  return normalized.length > 0 ? normalized : [INITIAL_ASSISTANT_MESSAGE]
+}
 function resolveProviderPresentation(messages: AiMessage[]) {
   const latestAssistantMessage = [...messages].reverse().find((message) => message.role === 'assistant')
   const providerStatus = latestAssistantMessage?.providerStatus ?? null
@@ -255,8 +281,16 @@ export function AiChatPage() {
   const [actionFeedback, setActionFeedback] = useState<ActionFeedbackState | null>(null)
   const [pendingResolution, setPendingResolution] = useState<PendingActionResolution | null>(null)
   const [pendingActionReview, setPendingActionReview] = useState<PendingActionReview | null>(null)
+  const [retryPrompt, setRetryPrompt] = useState<string>('')
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
+  const isUnmountedRef = useRef(false)
+
+  useEffect(() => {
+    return () => {
+      isUnmountedRef.current = true
+    }
+  }, [])
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY)
@@ -266,8 +300,8 @@ export function AiChatPage() {
     }
 
     try {
-      const parsed = JSON.parse(saved) as AiMessage[]
-      setMessages(parsed.length > 0 ? parsed : [INITIAL_ASSISTANT_MESSAGE])
+      const parsed = JSON.parse(saved)
+      setMessages(normalizeStoredMessages(parsed))
     } catch (error) {
       console.warn('Failed to parse AI chat history', error)
       setMessages([INITIAL_ASSISTANT_MESSAGE])
@@ -275,8 +309,9 @@ export function AiChatPage() {
   }, [])
 
   const saveMessages = (nextMessages: AiMessage[]) => {
-    setMessages(nextMessages)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(nextMessages))
+    const normalized = normalizeStoredMessages(nextMessages)
+    setMessages(normalized)
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized))
   }
 
   useEffect(() => {
@@ -295,7 +330,7 @@ export function AiChatPage() {
 
   const handleSend = async (textToSend?: string) => {
     const query = (textToSend ?? inputValue).trim()
-    if (!query || isLoading) {
+    if (!query || isLoading || actionBusyIndex !== null) {
       return
     }
 
@@ -323,6 +358,8 @@ export function AiChatPage() {
 
     const updatedMessages = [...messages, userMessage]
     saveMessages(updatedMessages)
+    setRetryPrompt(query)
+    setActionFeedback(null)
     setIsLoading(true)
 
     try {
@@ -342,7 +379,9 @@ export function AiChatPage() {
         actionParams: aiResponse.actionParams ?? null,
       }
 
-      saveMessages([...updatedMessages, assistantMessage])
+      if (!isUnmountedRef.current) {
+        saveMessages([...updatedMessages, assistantMessage])
+      }
     } catch (error) {
       console.error('AI chat failed:', error)
       const fallbackText =
@@ -358,14 +397,18 @@ export function AiChatPage() {
         providerStatus: 'AI_PROVIDER_UNAVAILABLE',
       }
 
-      saveMessages([...updatedMessages, errorMessage])
+      if (!isUnmountedRef.current) {
+        saveMessages([...updatedMessages, errorMessage])
+      }
     } finally {
-      setIsLoading(false)
+      if (!isUnmountedRef.current) {
+        setIsLoading(false)
+      }
     }
   }
 
   const handleAction = async (message: AiMessage, index: number) => {
-    if (!accessToken || !message.actionCommand) {
+    if (!accessToken || !message.actionCommand || actionBusyIndex !== null) {
       return
     }
 
@@ -544,6 +587,14 @@ export function AiChatPage() {
     navigate(`/chat/${conversation.id}`)
   }
 
+  const handleRetry = () => {
+    if (!retryPrompt || isLoading) {
+      return
+    }
+
+    void handleSend(retryPrompt)
+  }
+
   const handleClearHistory = () => {
     saveMessages([
       {
@@ -573,6 +624,7 @@ export function AiChatPage() {
               type='button'
               className='ai-preset-btn'
               onClick={() => void handleSend(prompt)}
+              disabled={isLoading || actionBusyIndex !== null}
             >
               {prompt}
             </button>
@@ -605,7 +657,16 @@ export function AiChatPage() {
 
         <div className='ai-chat-messages'>
           {runtimeState.degraded && <div className={runtimeState.bannerClassName}>{runtimeState.banner}</div>}
-          {actionFeedback ? <div className={`ai-runtime-banner ai-runtime-banner-${actionFeedback.tone}`}>{actionFeedback.message}</div> : null}
+          {actionFeedback ? (
+            <div className={`ai-runtime-banner ai-runtime-banner-${actionFeedback.tone}`}>
+              <span>{actionFeedback.message}</span>
+              {actionFeedback.tone === 'error' && retryPrompt ? (
+                <button type='button' className='ai-banner-action' onClick={handleRetry} disabled={isLoading}>
+                  Retry
+                </button>
+              ) : null}
+            </div>
+          ) : null}
 
           {messages.map((message, index) => (
             <div
@@ -666,7 +727,8 @@ export function AiChatPage() {
                 }
               }}
             />
-            <button type='submit' className='ai-send-btn' disabled={isLoading || !inputValue.trim()}>
+            <button type='submit' className='ai-send-btn' disabled={isLoading || actionBusyIndex !== null || !inputValue.trim()}>
+
               <Send size={18} />
             </button>
             <span className='ai-input-hint'>Enter to send, Shift + Enter for a new line</span>

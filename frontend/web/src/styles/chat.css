@@ -3010,3 +3010,18 @@
   border: 1px solid color-mix(in srgb, #ef4444 36%, transparent);
   color: var(--text);
 }
+
+.ai-banner-action {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ai-banner-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
