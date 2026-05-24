@@ -133,7 +133,7 @@ services:
       APP_SYNC_POLICY_ENFORCE_WEB_RESTRICTION: ${APP_SYNC_POLICY_ENFORCE_WEB_RESTRICTION:-false}
       FIREBASE_ENABLED: ${FIREBASE_ENABLED:-false}
       FIREBASE_FAIL_FAST: ${FIREBASE_FAIL_FAST:-false}
-      FIREBASE_CREDENTIALS_PATH: /app/firebase-credentials/firebase-adminsdk.json
+      FIREBASE_CREDENTIALS_PATH: file:///app/firebase-credentials/firebase-adminsdk.json
       KAFKA_SERVERS: kafka:9092
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xss256k"
     depends_on:
@@ -456,7 +456,7 @@ services:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       FIREBASE_ENABLED: ${FIREBASE_ENABLED:-false}
       FIREBASE_FAIL_FAST: ${FIREBASE_FAIL_FAST:-false}
-      FIREBASE_CREDENTIALS_PATH: /app/firebase-credentials/firebase-adminsdk.json
+      FIREBASE_CREDENTIALS_PATH: file:///app/firebase-credentials/firebase-adminsdk.json
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xss256k"
     depends_on:
       postgres:
