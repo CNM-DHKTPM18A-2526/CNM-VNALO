@@ -3044,12 +3044,25 @@
   max-width: min(72%, 560px);
 }
 
+.ai-msg-bubble-ai,
+.ai-msg-bubble-user {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
 .ai-msg-bubble-ai {
   border-radius: 18px 18px 18px 6px;
+  color: var(--text);
 }
 
 .ai-msg-bubble-user {
   border-radius: 18px 18px 6px 18px;
+  color: #fff;
+}
+
+.ai-msg-bubble-ai .text-\[10px\],
+.ai-msg-bubble-user .text-\[10px\] {
+  font-size: 11px;
 }
 
 .ai-chat-footer {

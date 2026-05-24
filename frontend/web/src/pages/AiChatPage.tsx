@@ -316,6 +316,7 @@ export function AiChatPage() {
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const isUnmountedRef = useRef(false)
+  const inFlightRequestRef = useRef(false)
 
   useEffect(() => {
     return () => {
@@ -362,7 +363,7 @@ export function AiChatPage() {
 
   const handleSend = async (textToSend?: string) => {
     const query = (textToSend ?? inputValue).trim()
-    if (!query || isAssistantBusy) {
+    if (!query || isAssistantBusy || inFlightRequestRef.current) {
       return
     }
 
@@ -392,6 +393,7 @@ export function AiChatPage() {
     saveMessages(updatedMessages)
     setRetryPrompt(query)
     setActionFeedback(null)
+    inFlightRequestRef.current = true
     setIsLoading(true)
 
     try {
@@ -436,7 +438,10 @@ export function AiChatPage() {
       }
     } finally {
       if (!isUnmountedRef.current) {
+        inFlightRequestRef.current = false
         setIsLoading(false)
+      } else {
+        inFlightRequestRef.current = false
       }
     }
   }
