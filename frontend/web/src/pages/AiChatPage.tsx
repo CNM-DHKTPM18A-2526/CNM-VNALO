@@ -94,6 +94,35 @@ const INITIAL_ASSISTANT_MESSAGE: AiMessage = {
   timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
 }
 
+const KNOWN_ACTION_COMMANDS = new Set<AiActionCommand>([
+  'OPEN_CHAT',
+  'COMPOSE_MESSAGE',
+  'START_CALL',
+  'RECALL_MESSAGE',
+  'CREATE_GROUP',
+  'MUTE_CONVERSATION',
+  'UNMUTE_CONVERSATION',
+  'PIN_MESSAGE',
+  'UNPIN_MESSAGE',
+  'OPEN_GROUP_SETTINGS',
+  'OPEN_PROFILE',
+  'SEND_FRIEND_REQUEST',
+  'BLOCK_USER',
+  'UNBLOCK_USER',
+  'CHANGE_GROUP_NAME',
+  'ADD_GROUP_MEMBER',
+  'REMOVE_GROUP_MEMBER',
+  'TRANSFER_GROUP_OWNER',
+  'LEAVE_GROUP',
+  'DISBAND_GROUP',
+  'NAVIGATE_TO',
+  'NAVIGATE_TO_SETTINGS',
+  'NAVIGATE_TO_CHAT',
+  'NAVIGATE_TO_CONTACTS',
+  'NAVIGATE_TO_SCANNER',
+  'NAVIGATE_TO_TIMELINE',
+])
+
 function normalizeStoredMessages(payload: unknown): AiMessage[] {
   if (!Array.isArray(payload)) return [INITIAL_ASSISTANT_MESSAGE]
 
@@ -112,7 +141,9 @@ function normalizeStoredMessages(payload: unknown): AiMessage[] {
         timestamp,
         degraded: Boolean(value.degraded),
         providerStatus: value.providerStatus === 'LIVE_PROVIDER_ACTIVE' || value.providerStatus === 'FALLBACK_PROVIDER_ACTIVE' || value.providerStatus === 'AI_PROVIDER_UNAVAILABLE' ? value.providerStatus : null,
-        actionCommand: typeof value.actionCommand === 'string' ? (value.actionCommand as AiActionCommand) : null,
+        actionCommand: typeof value.actionCommand === 'string' && KNOWN_ACTION_COMMANDS.has(value.actionCommand as AiActionCommand)
+          ? (value.actionCommand as AiActionCommand)
+          : null,
         actionParams: value.actionParams && typeof value.actionParams === 'object' ? (value.actionParams as Record<string, unknown>) : null,
       }
     })
@@ -330,7 +361,7 @@ export function AiChatPage() {
 
   const handleSend = async (textToSend?: string) => {
     const query = (textToSend ?? inputValue).trim()
-    if (!query || isLoading || actionBusyIndex !== null) {
+    if (!query || isLoading || actionBusyIndex !== null || pendingActionReview !== null || pendingResolution !== null) {
       return
     }
 
@@ -369,13 +400,15 @@ export function AiChatPage() {
       }))
 
       const aiResponse = await sendAiChatMessage(accessToken, query, apiHistory)
+      const responseActionCommand = (aiResponse.actionCommand as AiActionCommand | undefined) ?? null
+      const safeActionCommand = responseActionCommand && KNOWN_ACTION_COMMANDS.has(responseActionCommand) ? responseActionCommand : null
       const assistantMessage: AiMessage = {
         role: 'assistant',
         content: aiResponse.textReply || 'Ráº¥t tiáº¿c, mÃ¬nh khÃ´ng thá»ƒ xá»­ lÃ½ yÃªu cáº§u lÃºc nÃ y.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         degraded: Boolean(aiResponse.degraded),
         providerStatus: (aiResponse.providerStatus as ProviderStatus | undefined) ?? null,
-        actionCommand: (aiResponse.actionCommand as AiActionCommand | undefined) ?? null,
+        actionCommand: safeActionCommand,
         actionParams: aiResponse.actionParams ?? null,
       }
 
@@ -408,7 +441,7 @@ export function AiChatPage() {
   }
 
   const handleAction = async (message: AiMessage, index: number) => {
-    if (!accessToken || !message.actionCommand || actionBusyIndex !== null) {
+    if (!accessToken || !message.actionCommand || actionBusyIndex !== null || isLoading) {
       return
     }
 
@@ -596,10 +629,14 @@ export function AiChatPage() {
   }
 
   const handleClearHistory = () => {
+    setActionFeedback(null)
+    setRetryPrompt('')
+    setPendingActionReview(null)
+    setPendingResolution(null)
     saveMessages([
       {
         role: 'assistant',
-        content: 'Lá»‹ch sá»­ Ä‘Ã£ Ä‘Æ°á»£c dá»n dáº¹p. MÃ¬nh cÃ³ thá»ƒ há»— trá»£ gÃ¬ tiáº¿p theo cho báº¡n?',
+        content: 'History was cleared. What can I help you with next?',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
     ])
@@ -637,6 +674,7 @@ export function AiChatPage() {
           type='button'
           className='ai-clear-btn flex items-center justify-center gap-2'
           onClick={handleClearHistory}
+          disabled={isLoading || actionBusyIndex !== null}
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
         >
           <Trash2 size={14} />
