@@ -21,12 +21,14 @@ class AuthProvider extends ChangeNotifier {
   bool _isLoading = false;
   bool _isInitialized = false;
   String? _error;
+
   /// Non-fatal result message — set when registration succeeds but a
   /// secondary action (e.g. avatar upload) fails. Does not affect [isLoggedIn].
   String? _warning;
+
   /// Cached access token for synchronous access (e.g. image loading headers).
   String? _accessToken;
-  
+
   /// Set when the user is kicked out by another device.
   String? _kickoutReason;
 
@@ -35,11 +37,13 @@ class AuthProvider extends ChangeNotifier {
   bool get isInitialized => _isInitialized;
   bool get isLoggedIn => _user != null;
   String? get error => _error;
+
   /// Non-fatal warning surfaced after a successful registration.
   String? get warning => _warning;
+
   /// Current access token (cached in memory for synchronous access).
   String? get accessToken => _accessToken;
-  
+
   String? get kickoutReason => _kickoutReason;
 
   AuthProvider(
@@ -62,7 +66,7 @@ class AuthProvider extends ChangeNotifier {
       _accessToken = token;
       // Start socket connection immediately in parallel with profile fetching
       _socketService.connect(token);
-      
+
       try {
         _user = await _authService.getMe();
         debugPrint('[Auth] Success: Profile hydrated.');
@@ -85,12 +89,21 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> _registerFcmToken(String accessToken, DeviceInfo info) async {
     final coreBase = AppConfig.instance.coreServiceUrl;
-    await NotificationService().registerTokenToBackend(
-      accessToken: accessToken,
-      deviceId: info.deviceId,
-      platform: info.platform,
-      coreServiceUrl: coreBase,
-    );
+    try {
+      final registered = await NotificationService().registerTokenToBackend(
+        accessToken: accessToken,
+        deviceId: info.deviceId,
+        platform: info.platform,
+        coreServiceUrl: coreBase,
+      );
+      if (!registered) {
+        debugPrint('[Auth] Warning: FCM token not registered (non-fatal).');
+      }
+    } catch (e) {
+      debugPrint(
+        '[Auth] Warning: FCM registration failed but login/session continues: $e',
+      );
+    }
   }
 
   // Login with phone and password
@@ -296,7 +309,9 @@ class AuthProvider extends ChangeNotifier {
           await _authService.updateProfileAvatar(avatarUrl);
           // Refresh profile to pick up the persisted avatar URL.
           _user = await _authService.getMe();
-          debugPrint('[AVATAR-REG] user.avatarUrl after getMe: ${_user?.avatarUrl}');
+          debugPrint(
+            '[AVATAR-REG] user.avatarUrl after getMe: ${_user?.avatarUrl}',
+          );
           try {
             _user = await _authService.getMe();
           } catch (_) {
@@ -310,9 +325,8 @@ class AuthProvider extends ChangeNotifier {
           debugPrint('[AVATAR-REG] Error: $e');
           // Avatar upload is non-fatal: registration already succeeded.
           final av = _avatarUploadWarning(e);
-          _warning = _warning != null && _warning!.isNotEmpty
-              ? '$_warning — $av'
-              : av;
+          _warning =
+              _warning != null && _warning!.isNotEmpty ? '$_warning — $av' : av;
         }
       } else {
         // No avatar file — do a final consistency refresh.
@@ -325,10 +339,10 @@ class AuthProvider extends ChangeNotifier {
 
       _isLoading = false;
       notifyListeners();
-      
+
       debugPrint('[Auth] Success: Registered.');
       _localSyncService.syncRecently();
-      
+
       return true;
     } catch (e) {
       _error = _friendlyAuthError(e);
@@ -399,12 +413,12 @@ class AuthProvider extends ChangeNotifier {
       final me = await _getMeWithRetry();
       return (user: me, warning: null);
     } catch (e) {
-      final fallback = _userFromRegisterPayload(rawMap, displayName: displayName);
+      final fallback = _userFromRegisterPayload(
+        rawMap,
+        displayName: displayName,
+      );
       if (fallback != null) {
-        return (
-          user: fallback,
-          warning: _profileHydrationFallbackWarning(e),
-        );
+        return (user: fallback, warning: _profileHydrationFallbackWarning(e));
       }
       rethrow;
     }
@@ -457,7 +471,10 @@ class AuthProvider extends ChangeNotifier {
     return 'Đăng ký thành công; hồ sơ sẽ đồng bộ đầy đủ khi mạng ổn định. Bạn có thể mở Hồ sơ.';
   }
 
-  Future<String> _uploadAvatarWithRetry(File avatarFile, {int attempts = 3}) async {
+  Future<String> _uploadAvatarWithRetry(
+    File avatarFile, {
+    int attempts = 3,
+  }) async {
     Object? lastError;
     for (var i = 0; i < attempts; i++) {
       try {
@@ -482,6 +499,7 @@ class AuthProvider extends ChangeNotifier {
     }
     return false;
   }
+
   String _avatarUploadWarning(Object error) {
     if (error is ApiException) {
       if (error.statusCode == 0) {

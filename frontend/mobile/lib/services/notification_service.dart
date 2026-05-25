@@ -1,5 +1,4 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
@@ -14,7 +13,8 @@ class NotificationService {
   NotificationService._internal();
 
   FirebaseMessaging? _fcm;
-  final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _localNotifications =
+      FlutterLocalNotificationsPlugin();
   bool _initialized = false;
   bool _disabled = false;
 
@@ -23,31 +23,68 @@ class NotificationService {
   static const String _otpChannelId = 'otp_channel';
   static const String _otpChannelName = 'OTP Notifications';
 
+  bool _shouldDisableFirebaseMessaging(Object error) {
+    final normalized = error.toString().toLowerCase();
+    return normalized.contains('fis_auth_error') ||
+        normalized.contains('firebase installations can not communicate') ||
+        normalized.contains('invalid configuration') ||
+        normalized.contains('permission_denied') ||
+        normalized.contains('the caller does not have permission');
+  }
+
+  void _handleFirebaseMessagingFailure(
+    String stage,
+    Object error, {
+    StackTrace? stackTrace,
+  }) {
+    developer.log(
+      '[NotificationService] $stage failed: $error',
+      error: error,
+      stackTrace: stackTrace,
+    );
+
+    if (_shouldDisableFirebaseMessaging(error)) {
+      _disabled = true;
+      developer.log(
+        '[NotificationService] Firebase Messaging disabled for this session due to invalid/unavailable Firebase Installations configuration.',
+      );
+    }
+  }
+
   Future<void> initialize() async {
     if (_initialized || _disabled) return;
 
     try {
       _fcm ??= FirebaseMessaging.instance;
     } catch (e) {
-      developer.log('NotificationService disabled: Firebase is not initialized. Error: $e');
+      developer.log(
+        'NotificationService disabled: Firebase is not initialized. Error: $e',
+      );
       _disabled = true;
       return;
     }
 
     // 1. Request permissions
-    NotificationSettings settings = await _fcm!.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+    try {
+      final settings = await _fcm!.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
 
-    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-      developer.log('User granted notification permission');
+      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+        developer.log('User granted notification permission');
+      }
+    } catch (e, st) {
+      _handleFirebaseMessagingFailure('requestPermission', e, stackTrace: st);
+      if (_disabled) return;
     }
 
     // 2. Local Notifications Setup
-    const AndroidInitializationSettings androidSettings = AndroidInitializationSettings('@mipmap/app_icon');
-    const DarwinInitializationSettings iosSettings = DarwinInitializationSettings();
+    const AndroidInitializationSettings androidSettings =
+        AndroidInitializationSettings('@mipmap/app_icon');
+    const DarwinInitializationSettings iosSettings =
+        DarwinInitializationSettings();
     const InitializationSettings initSettings = InitializationSettings(
       android: androidSettings,
       iOS: iosSettings,
@@ -71,7 +108,8 @@ class NotificationService {
 
     await _localNotifications
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.createNotificationChannel(mainChannel);
 
     const AndroidNotificationChannel otpChannel = AndroidNotificationChannel(
@@ -85,12 +123,15 @@ class NotificationService {
 
     await _localNotifications
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.createNotificationChannel(otpChannel);
 
     // 3. Handle Foreground Messages
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      developer.log('Received foreground message: ${message.notification?.title}');
+      developer.log(
+        'Received foreground message: ${message.notification?.title}',
+      );
       _showLocalNotification(message);
     });
 
@@ -108,7 +149,7 @@ class NotificationService {
   static void _onCallKitEvent(CallEvent? event) {
     if (event == null) return;
     developer.log('[NotificationService] CallKit Event: ${event.event}');
-    
+
     switch (event.event) {
       case Event.actionCallAccept:
         // Handle acceptance - redirection is typically handled by IncomingCallCoordinator
@@ -126,12 +167,14 @@ class NotificationService {
   static Future<void> handleBackgroundCallSignal(RemoteMessage message) async {
     final data = message.data;
     final type = data['type']?.toString();
-    
+
     if (type == 'call_offer' || type == 'group_call_started') {
       final isGroup = type == 'group_call_started';
       final callId = data['callId']?.toString() ?? const Uuid().v4();
       final conversationId = data['conversationId']?.toString() ?? '';
-      final senderName = data['senderName']?.toString() ?? (isGroup ? 'Cuộc gọi nhóm' : 'VNALO Call');
+      final senderName =
+          data['senderName']?.toString() ??
+          (isGroup ? 'Cuộc gọi nhóm' : 'VNALO Call');
       final senderAvatar = data['senderAvatar']?.toString();
       final audioOnly = data['audioOnly']?.toString() == 'true';
 
@@ -187,24 +230,30 @@ class NotificationService {
     }
   }
 
-
   Future<void> ensureInitialized() => initialize();
 
   Future<String?> getToken() async {
     await ensureInitialized();
     if (_disabled || _fcm == null) return null;
-    return await _fcm!.getToken();
+
+    try {
+      return await _fcm!.getToken();
+    } catch (e, st) {
+      _handleFirebaseMessagingFailure('getToken', e, stackTrace: st);
+      return null;
+    }
   }
 
   Future<void> _showLocalNotification(RemoteMessage message) async {
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      _mainChannelId,
-      _mainChannelName,
-      importance: Importance.max,
-      priority: Priority.high,
-      playSound: true,
-      enableVibration: true,
-    );
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          _mainChannelId,
+          _mainChannelName,
+          importance: Importance.max,
+          priority: Priority.high,
+          playSound: true,
+          enableVibration: true,
+        );
 
     const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
       presentAlert: true,
@@ -235,15 +284,16 @@ class NotificationService {
     await ensureInitialized();
     if (_disabled) return;
 
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      _mainChannelId,
-      _mainChannelName,
-      importance: Importance.max,
-      priority: Priority.high,
-      category: AndroidNotificationCategory.message,
-      playSound: true,
-      enableVibration: true,
-    );
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          _mainChannelId,
+          _mainChannelName,
+          importance: Importance.max,
+          priority: Priority.high,
+          category: AndroidNotificationCategory.message,
+          playSound: true,
+          enableVibration: true,
+        );
 
     const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
       presentAlert: true,
@@ -281,7 +331,7 @@ class NotificationService {
   }) async {
     if (_disabled || _fcm == null) return false;
 
-    final String? fcmToken = await _fcm!.getToken();
+    final String? fcmToken = await getToken();
     if (fcmToken == null || fcmToken.isEmpty) {
       developer.log('[NotificationService] No FCM token available to register');
       return false;
@@ -289,23 +339,30 @@ class NotificationService {
 
     try {
       final uri = Uri.parse(
-        '$coreServiceUrl/notifications/devices'.replaceAll('/api/v1', '/api/v1'),
+        '$coreServiceUrl/notifications/devices'.replaceAll(
+          '/api/v1',
+          '/api/v1',
+        ),
       );
-      final response = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $accessToken',
-        },
-        body: jsonEncode({
-          'deviceId': deviceId,
-          'platform': platform,
-          'fcmToken': fcmToken,
-        }),
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $accessToken',
+            },
+            body: jsonEncode({
+              'deviceId': deviceId,
+              'platform': platform,
+              'fcmToken': fcmToken,
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        developer.log('[NotificationService] FCM token registered successfully');
+        developer.log(
+          '[NotificationService] FCM token registered successfully',
+        );
         return true;
       } else {
         developer.log(
