@@ -38,6 +38,9 @@ type IconName =
   | 'micOff'
   | 'phoneOff'
   | 'cameraOff'
+  | 'clock'
+  | 'heart'
+  | 'heartFill'
 
 type IconProps = {
   name: IconName
@@ -422,6 +425,31 @@ export function Icon({ name, className, size = 24 }: IconProps) {
         <line x1='1' y1='1' x2='23' y2='23' />
         <path d='M16 16v1.25c0 .41-.34.75-.75.75H3.75c-.41 0-.75-.34-.75-.75V7c0-.41.34-.75.75-.75H5m3.75 0h6.5c.41 0 .75.34.75.75V11' />
         <path d='m16 10 5-3v10l-2.43-1.46' />
+      </svg>
+    )
+  }
+
+  if (name === 'clock') {
+    return (
+      <svg {...commonProps}>
+        <circle cx="12" cy="12" r="10" />
+        <polyline points="12 6 12 12 16 14" />
+      </svg>
+    )
+  }
+
+  if (name === 'heart') {
+    return (
+      <svg {...commonProps}>
+        <path d='M20.8 4.6c-1.8-1.7-4.6-1.8-6.5-.2L12 6.5l-2.3-2.1C7.9 2.8 5.1 2.9 3.3 4.6A5.6 5.6 0 0 0 3 9c0 3.3 2.7 6 6 9l3 2 3-2c3.3-3 6-5.7 6-9 0-1.6-.6-3.1-1.2-3.4z' strokeWidth='1.6' fill='none' />
+      </svg>
+    )
+  }
+
+  if (name === 'heartFill') {
+    return (
+      <svg {...commonProps}>
+        <path d='M20.8 4.6c-1.8-1.7-4.6-1.8-6.5-.2L12 6.5l-2.3-2.1C7.9 2.8 5.1 2.9 3.3 4.6A5.6 5.6 0 0 0 3 9c0 3.3 2.7 6 6 9l3 2 3-2c3.3-3 6-5.7 6-9 0-1.6-.6-3.1-1.2-3.4z' fill='currentColor' stroke='none' />
       </svg>
     )
   }

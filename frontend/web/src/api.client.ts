@@ -31,6 +31,7 @@ export function extractMessage(payload: unknown): string | null {
 // Override with environment variables:
 //   VITE_API_BASE_URL     → Core API (auth, users, friends)
 //   VITE_MESSAGE_API_URL  → Message API (chat, conversations)
+//   VITE_CONTENT_API_URL  → Content API (posts, stories)
 //   VITE_MEDIA_API_URL    → Media API (uploads, stickers)
 //   VITE_WS_BASE_URL      → WebSocket base (defaults to same origin)
 // ──────────────────────────────────────────────────────────────────────────────
@@ -57,6 +58,8 @@ if (typeof window !== 'undefined') {
 }
 
 export const MESSAGE_API_URL = forceHttps(import.meta.env.VITE_MESSAGE_API_URL ?? API_BASE_URL);
+
+export const CONTENT_API_URL = forceHttps(import.meta.env.VITE_CONTENT_API_URL ?? API_BASE_URL);
 
 const rawMediaUrl = forceHttps(import.meta.env.VITE_MEDIA_API_URL ?? (
   typeof window !== 'undefined'
@@ -89,6 +92,10 @@ export const messageApi = axios.create({
   baseURL: MESSAGE_API_URL,
 });
 
+export const contentApi = axios.create({
+  baseURL: CONTENT_API_URL,
+});
+
 export const mediaApi = axios.create({
   baseURL: MEDIA_API_URL,
 });
@@ -104,6 +111,11 @@ api.interceptors.request.use(req => {
 
 messageApi.interceptors.request.use(req => {
   console.log('[API-MSG]', req.url);
+  return req;
+});
+
+contentApi.interceptors.request.use(req => {
+  console.log('[API-CONTENT]', req.url);
   return req;
 });
 
