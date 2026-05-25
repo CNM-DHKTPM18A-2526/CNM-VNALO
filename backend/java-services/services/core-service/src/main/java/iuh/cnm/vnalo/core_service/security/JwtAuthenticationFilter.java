@@ -122,8 +122,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 || path.matches("^/auth/qr/sessions/[^/]+/approve$")) {
             return false;
         }
+        // Actuator health endpoints are handled by SecurityConfig permitAll(),
+        // not by skipping the filter — removing overly broad /health matches
+        // to avoid blocking custom health endpoints like /face/health.
         return path.startsWith("/auth/") || path.startsWith("/swagger-ui")
                || path.startsWith("/v3/api-docs") || path.startsWith("/actuator/health")
-               || path.equals("/health") || path.endsWith("/health");
+               || path.equals("/health");
     }
 }
