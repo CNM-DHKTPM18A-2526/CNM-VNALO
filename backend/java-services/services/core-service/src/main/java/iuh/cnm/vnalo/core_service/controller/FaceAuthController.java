@@ -49,6 +49,7 @@ public class FaceAuthController {
 
     @PostMapping(value = "/enroll", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Enroll face", description = "Enrolls the user's face for authentication")
+    @org.springframework.security.access.prepost.PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<FaceEnrollmentResponse>> enrollFace(
             @AuthenticationPrincipal UserPrincipal currentUser,
             @RequestParam("image") MultipartFile image,
@@ -142,6 +143,7 @@ public class FaceAuthController {
 
     @GetMapping("/status")
     @Operation(summary = "Get enrollment status", description = "Returns whether the user has enrolled a face")
+    @org.springframework.security.access.prepost.PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<FaceStatusResponse>> getStatus(
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
@@ -167,6 +169,7 @@ public class FaceAuthController {
 
     @DeleteMapping("/enrollment")
     @Operation(summary = "Delete enrollment", description = "Deletes the user's face enrollment")
+    @org.springframework.security.access.prepost.PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> deleteEnrollment(
             @AuthenticationPrincipal UserPrincipal currentUser
     ) {
