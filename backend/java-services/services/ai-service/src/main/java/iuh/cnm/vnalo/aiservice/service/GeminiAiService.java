@@ -351,6 +351,38 @@ public class GeminiAiService {
                 response.setActionParams(null);
             }
         }
+        applyActionExecutionHints(response);
+    }
+
+    private void applyActionExecutionHints(AiChatResponse response) {
+        String command = response.getActionCommand();
+        if (command == null || command.isBlank()) {
+            response.setRequiresConfirmation(false);
+            response.setRiskLevel("low");
+            return;
+        }
+
+        String normalized = command.trim().toUpperCase();
+        boolean requiresConfirmation = switch (normalized) {
+            case "COMPOSE_MESSAGE", "START_CALL", "RECALL_MESSAGE", "CREATE_GROUP",
+                    "MUTE_CONVERSATION", "UNMUTE_CONVERSATION", "PIN_MESSAGE", "UNPIN_MESSAGE",
+                    "SEND_FRIEND_REQUEST", "BLOCK_USER", "UNBLOCK_USER", "CHANGE_GROUP_NAME",
+                    "ADD_GROUP_MEMBER", "REMOVE_GROUP_MEMBER", "TRANSFER_GROUP_OWNER",
+                    "LEAVE_GROUP", "DISBAND_GROUP" -> true;
+            default -> false;
+        };
+
+        String riskLevel = switch (normalized) {
+            case "BLOCK_USER", "REMOVE_GROUP_MEMBER", "TRANSFER_GROUP_OWNER", "LEAVE_GROUP", "DISBAND_GROUP",
+                    "RECALL_MESSAGE" -> "high";
+            case "COMPOSE_MESSAGE", "START_CALL", "CREATE_GROUP", "MUTE_CONVERSATION", "UNMUTE_CONVERSATION",
+                    "PIN_MESSAGE", "UNPIN_MESSAGE", "SEND_FRIEND_REQUEST", "UNBLOCK_USER", "CHANGE_GROUP_NAME",
+                    "ADD_GROUP_MEMBER" -> "medium";
+            default -> "low";
+        };
+
+        response.setRequiresConfirmation(requiresConfirmation);
+        response.setRiskLevel(riskLevel);
     }
 
     private AiChatResponse parseFallbackResponse(String rawText, boolean isAnalyzingIntent) throws Exception {

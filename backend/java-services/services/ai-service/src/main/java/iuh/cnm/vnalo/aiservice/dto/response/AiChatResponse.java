@@ -38,4 +38,9 @@ public class AiChatResponse {
 
     private String userEntryId;
     private String assistantEntryId;
+
+    // Optional client hints for safer UI execution of AI-suggested actions.
+    private Boolean requiresConfirmation;
+    private String riskLevel;
 }
+

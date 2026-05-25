@@ -97,6 +97,8 @@ class GeminiAiServiceTest {
         assertEquals("LIVE_PROVIDER_ACTIVE", response.getProviderStatus());
         assertFalse(response.isDegraded());
         assertNotNull(response.getConversationId());
+        assertTrue(response.getRequiresConfirmation());
+        assertEquals("medium", response.getRiskLevel());
     }
 
     @Test
@@ -131,6 +133,8 @@ class GeminiAiServiceTest {
         assertEquals("CREATE_GROUP", response.getActionCommand());
         assertEquals("Nhom do an", response.getActionParams().get("groupName"));
         assertEquals(List.of("An", "Binh"), response.getActionParams().get("memberNames"));
+        assertTrue(response.getRequiresConfirmation());
+        assertEquals("medium", response.getRiskLevel());
     }
 
     @Test
@@ -165,6 +169,8 @@ class GeminiAiServiceTest {
         assertNull(response.getActionCommand());
         assertNull(response.getActionParams());
         assertEquals("I will open profile.", response.getTextReply());
+        assertFalse(response.getRequiresConfirmation());
+        assertEquals("low", response.getRiskLevel());
     }
 
     @Test
@@ -186,5 +192,7 @@ class GeminiAiServiceTest {
         assertEquals("NAVIGATE_TO_CONTACTS", response.getActionCommand());
         assertEquals("FALLBACK_PROVIDER_ACTIVE", response.getProviderStatus());
         assertTrue(response.isDegraded());
+        assertFalse(response.getRequiresConfirmation());
+        assertEquals("low", response.getRiskLevel());
     }
 }
