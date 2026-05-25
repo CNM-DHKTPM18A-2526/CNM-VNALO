@@ -1,5 +1,5 @@
 import { Info, UserPlus, MoreHorizontal } from 'lucide-react'
-import React from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { EmptyState } from '../../../shared/components/EmptyState'
 import { Icon } from '../../../shared/components/Icon'
@@ -25,16 +25,12 @@ import type { MessageContextMenuAction } from './MessageContextMenu'
 import { renderSystemMessage, formatMessagePreview } from '../utils/messageUtils'
 import { FriendWelcomeState } from './FriendWelcomeState'
 import { WelcomeScreen } from './WelcomeScreen'
-import { useAuth } from '../../auth/useAuth'
-import { fetchSuggestedReplies } from '../chat.api'
 
 const toast = {
   success: (msg: string) => console.log('SUCCESS:', msg),
   error: (msg: string) => console.error('ERROR:', msg),
   info: (msg: string) => console.log('INFO:', msg),
 }
-
-const AI_WEB_DRAFT_KEY_PREFIX = 'vnalo_ai_web_compose_draft:'
 
 type ChatWindowProps = {
   conversation: ConversationSummary | undefined
@@ -68,6 +64,7 @@ type ChatWindowProps = {
   onTogglePin?: (message: ChatMessage) => void
   onInitiateCall?: (type: 'audio' | 'video') => void
   onVotePoll?: (messageId: string, optionId: string) => void
+  members?: Array<{ userId: string; displayName: string; avatarUrl?: string | null }>
 }
 
 export function ChatWindow({
@@ -101,22 +98,18 @@ export function ChatWindow({
   onUnpinMessage,
   onInitiateCall,
   onVotePoll,
+  members = [],
 }: ChatWindowProps) {
   const { userMap } = useUserStore()
   const { t } = useLanguage()
-  const messagesContainerRef = React.useRef<HTMLDivElement | null>(null)
-  const [hoveredMessageId, setHoveredMessageId] = React.useState<string | null>(null)
-  const [highlightedMessageId, setHighlightedMessageId] = React.useState<string | null>(null)
-  const [replyMessage, setReplyMessage] = React.useState<ChatMessage | null>(null)
-  const [isPinnedExpanded, setIsPinnedExpanded] = React.useState(false)
-  const [seedComposeText, setSeedComposeText] = React.useState('')
-  const lastHandledJumpIdRef = React.useRef<string | null>(null)
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null)
+  const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null)
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null)
+  const [replyMessage, setReplyMessage] = useState<ChatMessage | null>(null)
+  const [isPinnedExpanded, setIsPinnedExpanded] = useState(false)
+  const lastHandledJumpIdRef = useRef<string | null>(null)
 
-  const { accessToken } = useAuth()
-  const [suggestedReplies, setSuggestedReplies] = React.useState<string[]>([])
-  const [, setIsLoadingSuggestions] = React.useState(false)
-
-  const conversationMessages = React.useMemo(() => {
+  const conversationMessages = useMemo(() => {
     if (!conversation) {
       return []
     }
@@ -124,78 +117,7 @@ export function ChatWindow({
     return messages.filter((message) => message.conversationId === conversation.id && !deletedMessageIds[message.id])
   }, [conversation, deletedMessageIds, messages])
 
-  React.useEffect(() => {
-    const conversationId = conversation?.id
-    if (!conversationId || typeof window === 'undefined') {
-      setSeedComposeText('')
-      return
-    }
-
-    const draftKey = `${AI_WEB_DRAFT_KEY_PREFIX}${conversationId}`
-    const draft = window.localStorage.getItem(draftKey)?.trim() ?? ''
-    if (!draft) {
-      setSeedComposeText('')
-      return
-    }
-
-    setSeedComposeText(draft)
-    window.localStorage.removeItem(draftKey)
-  }, [conversation?.id])
-
-  const lastMessage = conversationMessages[conversationMessages.length - 1]
-  const lastMessageId = lastMessage?.id
-
-  React.useEffect(() => {
-    if (!conversation || !lastMessageId || !currentUserId || !accessToken) {
-      setSuggestedReplies([])
-      return
-    }
-
-    // Only suggest replies if the last message was sent by someone else
-    if (lastMessage.senderId === currentUserId) {
-      setSuggestedReplies([])
-      return
-    }
-
-    // Ignore system/call messages or placeholders
-    if (lastMessage.text?.startsWith('{"action":') || lastMessage.text?.startsWith('CALL_LOG::') || lastMessage.isPlaceholder) {
-      setSuggestedReplies([])
-      return
-    }
-
-    const fetchSuggestions = async () => {
-      setIsLoadingSuggestions(true)
-      try {
-        const formattedHistory = conversationMessages
-          .filter(m => m.text && !m.text.startsWith('{"action":') && !m.text.startsWith('CALL_LOG::'))
-          .slice(-10)
-          .map(m => ({
-            role: (m.senderId === currentUserId ? 'assistant' : 'user') as 'user' | 'assistant',
-            content: m.text
-          }))
-
-        if (formattedHistory.length > 0) {
-          const replies = await fetchSuggestedReplies(accessToken, formattedHistory)
-          setSuggestedReplies(replies)
-        } else {
-          setSuggestedReplies([])
-        }
-      } catch (error) {
-        console.error('Failed to load suggestions:', error)
-        setSuggestedReplies([])
-      } finally {
-        setIsLoadingSuggestions(false)
-      }
-    }
-
-    const timer = setTimeout(() => {
-      fetchSuggestions()
-    }, 500)
-
-    return () => clearTimeout(timer)
-  }, [lastMessageId, conversation?.id, currentUserId, accessToken])
-
-  const viewerImages = React.useMemo<ViewerImageItem[]>(() => {
+  const viewerImages = useMemo<ViewerImageItem[]>(() => {
     if (!conversation) {
       return []
     }
@@ -218,7 +140,7 @@ export function ChatWindow({
       .filter((item): item is ViewerImageItem => Boolean(item))
   }, [conversation, conversationMessages])
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!conversation?.id) {
       return
     }
@@ -226,36 +148,20 @@ export function ChatWindow({
     onLoadConversationMessages?.(conversation.id)
   }, [conversation?.id, onLoadConversationMessages])
 
-  // 1. Initial scroll to bottom when switching conversation or finishing initial load
-  React.useEffect(() => {
+  useEffect(() => {
     if (!conversation || isLoadingMessages) {
       return
     }
 
     const container = messagesContainerRef.current
-    if (!container) return
+    if (!container) {
+      return
+    }
 
     container.scrollTop = container.scrollHeight
-  }, [conversation?.id, isLoadingMessages])
+  }, [conversation, conversationMessages.length, isLoadingMessages])
 
-  // 2. Smart scroll for new messages in the CURRENT conversation
-  React.useEffect(() => {
-    if (!conversation || isLoadingMessages) {
-      return
-    }
-
-    const container = messagesContainerRef.current
-    if (!container) return
-
-    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200
-    const lastMessageIsMine = conversationMessages.length > 0 && conversationMessages[conversationMessages.length - 1].sender === 'me'
-
-    if (isNearBottom || lastMessageIsMine) {
-      container.scrollTop = container.scrollHeight
-    }
-  }, [conversationMessages.length])
-
-  React.useEffect(() => {
+  useEffect(() => {
     if (!jumpToMessageId || lastHandledJumpIdRef.current === jumpToMessageId) {
       return
     }
@@ -283,7 +189,7 @@ export function ChatWindow({
     onJumpToMessageHandled?.()
   }, [conversationMessages, jumpToMessageId, onJumpToMessageHandled])
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!highlightedMessageId) {
       return
     }
@@ -390,24 +296,20 @@ export function ChatWindow({
           </div>
         </div>
         <div className='chat-window-header-actions'>
-          {!conversation.isCloud && (
-            <>
-              <button
-                className='chat-header-action-btn'
-                type='button'
-                onClick={() => onInitiateCall?.('audio')}
-              >
-                <Icon name='phone' />
-              </button>
-              <button
-                className='chat-header-action-btn'
-                type='button'
-                onClick={() => onInitiateCall?.('video')}
-              >
-                <Icon name='video' />
-              </button>
-            </>
-          )}
+          <button
+            className='chat-header-action-btn'
+            type='button'
+            onClick={() => onInitiateCall?.('audio')}
+          >
+            <Icon name='phone' />
+          </button>
+          <button
+            className='chat-header-action-btn'
+            type='button'
+            onClick={() => onInitiateCall?.('video')}
+          >
+            <Icon name='video' />
+          </button>
           <button
             className={rightSidebarContent === 'search' || rightSidebarContent === 'global-search' ? 'chat-header-action-btn chat-header-action-btn-active' : 'chat-header-action-btn'}
             type='button'
@@ -743,8 +645,8 @@ export function ChatWindow({
         </div>
       )}
       {(() => {
-        const currentUserRole = String(conversation.members?.find(m => String(m.userId) === String(currentUserId))?.role || '').toUpperCase();
-        const isBlocked = !!conversation.onlyAdminCanPost && currentUserRole === 'MEMBER';
+        const currentUserRole = conversation.members?.find(m => m.userId === currentUserId)?.role;
+        const isBlocked = conversation.onlyAdminCanPost && currentUserRole === 'MEMBER';
 
         if (isBlocked) {
           return (
@@ -765,16 +667,12 @@ export function ChatWindow({
             onSend={(payload) => {
               onSend(payload);
               setReplyMessage(null);
-              setSuggestedReplies([]);
             }}
             replyMessage={replyMessage}
             onCancelReply={() => setReplyMessage(null)}
             recipientName={displayName}
             placeholder={isRestrictedMode ? 'Tin nhắn bị khóa khi ở chế độ giới hạn' : undefined}
             disabled={isRestrictedMode}
-            suggestedReplies={suggestedReplies}
-            onSelectSuggestedReply={() => setSuggestedReplies([])}
-            initialText={seedComposeText}
             members={conversation.members?.map(m => ({
               userId: m.userId,
               displayName: userMap[m.userId]?.displayName || m.displayName || 'Người dùng',
