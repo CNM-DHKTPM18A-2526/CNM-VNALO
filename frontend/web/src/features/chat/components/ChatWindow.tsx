@@ -98,7 +98,6 @@ export function ChatWindow({
   onUnpinMessage,
   onInitiateCall,
   onVotePoll,
-  members = [],
 }: ChatWindowProps) {
   const { userMap } = useUserStore()
   const { t } = useLanguage()
