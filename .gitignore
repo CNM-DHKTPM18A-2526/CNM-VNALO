@@ -154,11 +154,11 @@ secrets/
 credentials/
 
 # Firebase
-google-services.json
+# google-services.json: keep (public config, Android build needs it)
 GoogleService-Info.plist
 firebase-adminsdk*.json
 *-firebase-adminsdk*.json
-*firebase*.json
+firebase-credentials/
 
 # ===========================
 # Docker
