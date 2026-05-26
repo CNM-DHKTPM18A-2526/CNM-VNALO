@@ -1,4 +1,9 @@
 import axios from 'axios';
+import type {
+  AxiosError,
+  AxiosResponse,
+  InternalAxiosRequestConfig,
+} from 'axios';
 
 export function extractMessage(payload: unknown): string | null {
   if (!payload || typeof payload !== 'object') {
@@ -53,7 +58,11 @@ export const API_BASE_URL = forceHttps(import.meta.env.VITE_API_BASE_URL ?? (
 
 if (typeof window !== 'undefined') {
   // Store the root origin (without /api/v1) for media resolution
-  (window as any).__VNALO_API_ROOT__ = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
+  ;(
+    window as Window & {
+      __VNALO_API_ROOT__?: string
+    }
+  ).__VNALO_API_ROOT__ = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
 }
 
 export const MESSAGE_API_URL = forceHttps(import.meta.env.VITE_MESSAGE_API_URL ?? API_BASE_URL);
@@ -89,6 +98,10 @@ export const messageApi = axios.create({
   baseURL: MESSAGE_API_URL,
 });
 
+export const contentApi = axios.create({
+  baseURL: API_BASE_URL,
+});
+
 export const mediaApi = axios.create({
   baseURL: MEDIA_API_URL,
 });
@@ -97,22 +110,27 @@ export const aiApi = axios.create({
   baseURL: `${API_BASE_URL}/ai`,
 });
 
-api.interceptors.request.use(req => {
+api.interceptors.request.use((req: InternalAxiosRequestConfig) => {
   console.log('[API-CORE]', req.url);
   return req;
 });
 
-messageApi.interceptors.request.use(req => {
+messageApi.interceptors.request.use((req: InternalAxiosRequestConfig) => {
   console.log('[API-MSG]', req.url);
   return req;
 });
 
-mediaApi.interceptors.request.use(req => {
+contentApi.interceptors.request.use((req: InternalAxiosRequestConfig) => {
+  console.log('[API-CONTENT]', req.url);
+  return req;
+});
+
+mediaApi.interceptors.request.use((req: InternalAxiosRequestConfig) => {
   console.log('[API-MEDIA]', req.url);
   return req;
 });
 
-aiApi.interceptors.request.use(req => {
+aiApi.interceptors.request.use((req: InternalAxiosRequestConfig) => {
   console.log('[API-AI]', req.url);
   return req;
 });
@@ -126,8 +144,8 @@ const globalLogoutHandler = () => {
 };
 
 const commonResponseInterceptor = [
-  (res: any) => res,
-  (err: any) => {
+  (res: AxiosResponse) => res,
+  (err: AxiosError) => {
     const status = err.response?.status;
     const isSilenced = status === 404 || status === 403; // Ignore noise for deleted/forbidden content
     
@@ -146,5 +164,6 @@ const commonResponseInterceptor = [
 
 api.interceptors.response.use(...commonResponseInterceptor);
 messageApi.interceptors.response.use(...commonResponseInterceptor);
+contentApi.interceptors.response.use(...commonResponseInterceptor);
 mediaApi.interceptors.response.use(...commonResponseInterceptor);
 aiApi.interceptors.response.use(...commonResponseInterceptor);

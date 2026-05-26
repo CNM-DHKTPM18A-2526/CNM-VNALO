@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { FaceCapture } from './FaceCapture'
 import { enrollFace, checkLiveness } from '../face-auth.api'
 
@@ -17,9 +17,10 @@ export function RegisterFaceStep({ token, onComplete }: RegisterFaceStepProps) {
   const streamRef = useRef<MediaStream | null>(null)
 
   useEffect(() => {
+    const stream = streamRef.current
     return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop())
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop())
       }
       if (preview) {
         URL.revokeObjectURL(preview)

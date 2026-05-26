@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React from 'react'
 import type { FaceStatusResponse, FaceEnrollmentState } from './face-auth.types'
 
@@ -16,8 +17,8 @@ export function FaceAuthProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = React.useState<FaceStatusResponse | null>(null)
   const [statusLoading, setStatusLoading] = React.useState(false)
   const [statusError, setStatusError] = React.useState<string | null>(null)
-  const [enrollmentState, setEnrollmentState] = React.useState<FaceEnrollmentState>('idle')
-  const [enrollmentError, setEnrollmentError] = React.useState<string | null>(null)
+  const [enrollmentState] = React.useState<FaceEnrollmentState>('idle')
+  const [enrollmentError] = React.useState<string | null>(null)
 
   const refreshStatus = React.useCallback(async () => {
     setStatusLoading(true)

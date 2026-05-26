@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createCameraStream, stopCameraStream, captureFrame, getCameraErrorMessage } from '../camera.util'
 import type { CameraState } from '../camera.util'
 
@@ -33,7 +33,7 @@ export function FaceCapture({
       setCameraError(null)
 
       try {
-        const stream = createCameraStream()
+        const stream = await createCameraStream()
         if (!stream) {
           throw new Error('Trình duyệt không hỗ trợ camera.')
         }

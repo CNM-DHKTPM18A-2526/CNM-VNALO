@@ -49,7 +49,11 @@ export function FaceSettings({ token, onStatusChange }: FaceSettingsProps) {
   }, [token, onStatusChange])
 
   useEffect(() => {
-    void loadStatus()
+    const timer = window.setTimeout(() => {
+      void loadStatus()
+    }, 0)
+
+    return () => window.clearTimeout(timer)
   }, [loadStatus])
 
   const handleDelete = async () => {
@@ -87,10 +91,6 @@ export function FaceSettings({ token, onStatusChange }: FaceSettingsProps) {
     onStatusChange?.(true)
   }
 
-  const handleEnrollError = (message: string) => {
-    setErrorMessage(message)
-  }
-
   if (state === 'loading') {
     return (
       <div className='face-settings face-settings-loading' role="status" aria-live="polite">
@@ -105,7 +105,6 @@ export function FaceSettings({ token, onStatusChange }: FaceSettingsProps) {
       <FaceEnrollmentPanel
         token={token}
         onSuccess={handleEnrollSuccess}
-        onError={handleEnrollError}
         onCancel={() => setShowEnrollment(false)}
       />
     )
@@ -134,7 +133,7 @@ export function FaceSettings({ token, onStatusChange }: FaceSettingsProps) {
         </div>
       ) : null}
 
-      {state === 'enrolled' && status ? (
+      {(state === 'enrolled' || state === 'deleting') && status ? (
         <div className='face-settings-enrolled'>
           <div className='face-settings-status-card face-settings-status-enrolled'>
             <div className='face-settings-status-icon face-settings-status-icon-enrolled'>
@@ -206,12 +205,10 @@ export function FaceSettings({ token, onStatusChange }: FaceSettingsProps) {
 function FaceEnrollmentPanel({
   token,
   onSuccess,
-  onError,
   onCancel,
 }: {
   token: string
   onSuccess: (enrolledAt: string, version: number) => void
-  onError: (message: string) => void
   onCancel: () => void
 }) {
   const [blob, setBlob] = React.useState<Blob | null>(null)

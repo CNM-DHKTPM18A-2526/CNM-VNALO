@@ -3,7 +3,13 @@ export type CameraDevice = {
   label: string
 }
 
-export type CameraState = 'idle' | 'requesting' | 'active' | 'error' | 'stopped'
+export type CameraState =
+  | 'idle'
+  | 'requesting'
+  | 'active'
+  | 'capturing'
+  | 'error'
+  | 'stopped'
 
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024 // 10MB
 
@@ -17,7 +23,9 @@ export async function getCameras(): Promise<CameraDevice[]> {
     }))
 }
 
-export function createCameraStream(constraints?: MediaTrackConstraints): MediaStream | null {
+export async function createCameraStream(
+  constraints?: MediaTrackConstraints,
+): Promise<MediaStream | null> {
   if (!navigator.mediaDevices?.getUserMedia) {
     return null
   }
@@ -33,7 +41,7 @@ export function createCameraStream(constraints?: MediaTrackConstraints): MediaSt
   }
 
   try {
-    const stream = navigator.mediaDevices.getUserMedia(defaultConstraints)
+    const stream = await navigator.mediaDevices.getUserMedia(defaultConstraints)
     return stream
   } catch {
     return null

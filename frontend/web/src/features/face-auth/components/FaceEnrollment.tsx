@@ -1,7 +1,6 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { FaceCapture } from './FaceCapture'
 import { enrollFace, checkLiveness } from '../face-auth.api'
-import type { FaceEnrollmentState } from '../face-auth.types'
 
 export type FaceEnrollmentProps = {
   token: string
@@ -127,6 +126,11 @@ export function FaceEnrollment({ token, onSuccess, onError, onCancel }: FaceEnro
               className='face-enrollment-preview-image'
             />
           </div>
+          {capturedLiveness ? (
+            <p className='face-enrollment-liveness'>
+              Liveness score: {capturedLiveness.score.toFixed(2)}
+            </p>
+          ) : null}
           <div className='face-enrollment-actions'>
             <button
               type='button'

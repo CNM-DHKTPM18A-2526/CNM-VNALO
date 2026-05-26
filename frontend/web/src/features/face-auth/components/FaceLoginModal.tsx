@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { verifyFace, checkLiveness, getFaceHealth, faceLogin, lookupUserId } from '../face-auth.api';
 import { useAuth } from '../../auth/useAuth';
 
@@ -78,10 +78,6 @@ export function FaceLoginModal({ onClose, onNotEnrolled, onSuccess }: FaceLoginM
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [serviceAvailable, setServiceAvailable] = useState<boolean | null>(null);
 
-  useEffect(() => {
-    void checkServiceHealth();
-  }, []);
-
   async function checkServiceHealth() {
     try {
       const health = await getFaceHealth();
@@ -90,6 +86,14 @@ export function FaceLoginModal({ onClose, onNotEnrolled, onSuccess }: FaceLoginM
       setServiceAvailable(false);
     }
   }
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void checkServiceHealth();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     return () => {
