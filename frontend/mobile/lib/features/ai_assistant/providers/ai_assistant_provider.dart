@@ -1019,7 +1019,6 @@ class AiAssistantProvider with ChangeNotifier {
   Future<void> _loadConversationHistory({SharedPreferences? prefs}) async {
     final store = prefs ?? await SharedPreferences.getInstance();
     final raw = store.getString(_scopedHistoryPrefKey);
-    _conversationHistory.clear();
     if (raw == null || raw.trim().isEmpty) {
       return;
     }
@@ -1791,20 +1790,25 @@ class AiAssistantProvider with ChangeNotifier {
         _serverConversationId = response['conversationId'].toString();
       }
 
-      _recordAssistantHistory(
-        text: _aiResponse,
-        source: 'assistant_chat',
-        entryId: response['assistantEntryId']?.toString() ?? assistantEntryId,
-      );
-      _trimSessionHistory();
+      final hasActionCommand =
+          actionCommand != null && actionCommand.isNotEmpty;
+      if (!hasActionCommand) {
+        _recordAssistantHistory(
+          text: _aiResponse,
+          source: 'assistant_chat',
+          entryId: response['assistantEntryId']?.toString() ?? assistantEntryId,
+        );
+        _trimSessionHistory();
+      }
 
-      if (actionCommand != null && actionCommand.isNotEmpty) {
+      if (hasActionCommand) {
+        _aiResponse = '';
         _thinkingPhase = AiThinkingPhase.executingAction;
         notifyListeners();
         _executeSystemAction(actionCommand, actionParams, traceId: traceId);
       }
 
-      if (_aiResponse.isNotEmpty) {
+      if (!hasActionCommand && _aiResponse.isNotEmpty) {
         _thinkingPhase = AiThinkingPhase.composingResponse;
         _transitionTo(
           AiState.speaking,

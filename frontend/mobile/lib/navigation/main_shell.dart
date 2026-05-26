@@ -683,6 +683,9 @@ class MainShellState extends State<MainShell> {
             'conversationId': conversation.id,
           },
         );
+        _showSuccessSnackBar(
+          'Mình đang ở đúng cuộc trò chuyện với $peerName rồi.',
+        );
         setState(() => _currentIndex = 0);
         return;
       }
@@ -738,6 +741,7 @@ class MainShellState extends State<MainShell> {
               aiCommand: aiCmd,
               extra: {'conversationId': conversation.id},
             );
+            _showSuccessSnackBar('Đã gửi tin nhắn cho $peerName.');
           } else {
             chatProvider.injectAiComposeDraft(
               conversationId: conversation.id,
@@ -747,6 +751,9 @@ class MainShellState extends State<MainShell> {
               'AI_COMPOSE_DRAFT_INJECTED',
               aiCommand: aiCmd,
               extra: {'conversationId': conversation.id},
+            );
+            _showSuccessSnackBar(
+              'Đã điền sẵn tin nhắn cho $peerName. Bạn kiểm tra rồi gửi nhé.',
             );
           }
           setState(() => _currentIndex = 0);
@@ -768,6 +775,14 @@ class MainShellState extends State<MainShell> {
         },
       );
 
+      if (command == 'OPEN_CHAT') {
+        _showSuccessSnackBar('Đang mở cuộc trò chuyện với $peerName.');
+      } else if (!shouldSendImmediately && prefilledText != null) {
+        _showSuccessSnackBar(
+          'Đang mở cuộc trò chuyện với $peerName và điền sẵn tin nhắn.',
+        );
+      }
+
       try {
         if (command == 'COMPOSE_MESSAGE' &&
             shouldSendImmediately &&
@@ -781,6 +796,7 @@ class MainShellState extends State<MainShell> {
             aiCommand: aiCmd,
             extra: {'conversationId': conversation.id},
           );
+          _showSuccessSnackBar('Đã gửi tin nhắn cho $peerName.');
         }
         await navigator.push(
           MaterialPageRoute(
@@ -863,6 +879,11 @@ class MainShellState extends State<MainShell> {
       audioOnly: !callPlan.isVideo,
     );
 
+    _showSuccessSnackBar(
+      callPlan.isVideo
+          ? 'Đang bắt đầu cuộc gọi video với $peerName.'
+          : 'Đang bắt đầu cuộc gọi thoại với $peerName.',
+    );
     _isCallScreenActive = true;
     _logAiFlow(
       'AI_NAVIGATE_CALL',

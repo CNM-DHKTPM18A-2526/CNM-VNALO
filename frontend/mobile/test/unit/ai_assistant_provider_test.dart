@@ -21,7 +21,7 @@ class _StubApiService extends ApiService {
     Duration responseDelay = Duration.zero,
   }) : _responses = responses,
        _responseDelay = responseDelay,
-      super(StorageService());
+       super(StorageService());
 
   final Map<String, Map<String, dynamic>> _responses;
   final Duration _responseDelay;
@@ -196,35 +196,35 @@ void main() {
     provider.dispose();
   });
 
-  test('submitTextPrompt records user entry before delayed AI response', () async {
-    final provider = _buildProvider(
-      responses: {
-        'Ban oi': {
-          'textReply': 'Mình đang ở đây.',
-          'emotion': 'neutral',
+  test(
+    'submitTextPrompt records user entry before delayed AI response',
+    () async {
+      final provider = _buildProvider(
+        responses: {
+          'Ban oi': {'textReply': 'Mình đang ở đây.', 'emotion': 'neutral'},
         },
-      },
-      responseDelay: const Duration(milliseconds: 250),
-    );
+        responseDelay: const Duration(milliseconds: 250),
+      );
 
-    final submitFuture = provider.submitTextPrompt(
-      'Ban oi',
-      source: 'chat_board_test',
-    );
+      final submitFuture = provider.submitTextPrompt(
+        'Ban oi',
+        source: 'chat_board_test',
+      );
 
-    await Future<void>.delayed(const Duration(milliseconds: 30));
+      await Future<void>.delayed(const Duration(milliseconds: 30));
 
-    expect(provider.conversationHistory, isNotEmpty);
-    expect(provider.conversationHistory.last.role, AiConversationRole.user);
-    expect(provider.conversationHistory.last.text, 'Ban oi');
-    expect(provider.isAssistantGenerating, isTrue);
+      expect(provider.conversationHistory, isNotEmpty);
+      expect(provider.conversationHistory.last.role, AiConversationRole.user);
+      expect(provider.conversationHistory.last.text, 'Ban oi');
+      expect(provider.isAssistantGenerating, isTrue);
 
-    await submitFuture;
+      await submitFuture;
 
-    expect(provider.aiResponse, 'Mình đang ở đây.');
+      expect(provider.aiResponse, 'Mình đang ở đây.');
 
-    provider.dispose();
-  });
+      provider.dispose();
+    },
+  );
 
   test(
     'submitTextPrompt surface override takes precedence over source',
@@ -272,7 +272,6 @@ void main() {
       provider.dispose();
     },
   );
-
 
   test('summon auto-listen does not toggle-off active listening', () async {
     final provider = _buildProvider();
@@ -351,41 +350,43 @@ void main() {
     provider.dispose();
   });
 
+  test(
+    'submitTextPrompt records user message before slow STT stop completes',
+    () async {
+      speechStopDelay = const Duration(milliseconds: 300);
+      final provider = _buildProvider(
+        responses: {
+          'Xin chao': {'textReply': 'Chao ban', 'emotion': 'neutral'},
+        },
+        responseDelay: const Duration(milliseconds: 300),
+      );
 
-  test('submitTextPrompt records user message before slow STT stop completes', () async {
-    speechStopDelay = const Duration(milliseconds: 300);
-    final provider = _buildProvider(
-      responses: {
-        'Xin chao': {'textReply': 'Chao ban', 'emotion': 'neutral'},
-      },
-      responseDelay: const Duration(milliseconds: 300),
-    );
+      await provider.startListening(source: 'preempt_listening_test');
+      expect(provider.state, AiState.listening);
 
-    await provider.startListening(source: 'preempt_listening_test');
-    expect(provider.state, AiState.listening);
+      unawaited(
+        provider.submitTextPrompt(
+          'Xin chao',
+          source: 'ai_conversation_screen',
+          surface: AiResponseSurface.conversation,
+        ),
+      );
 
-    unawaited(
-      provider.submitTextPrompt(
-        'Xin chao',
-        source: 'ai_conversation_screen',
-        surface: AiResponseSurface.conversation,
-      ),
-    );
+      await Future<void>.delayed(const Duration(milliseconds: 20));
 
-    await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(
+        provider.conversationHistory.any(
+          (entry) =>
+              entry.role == AiConversationRole.user && entry.text == 'Xin chao',
+        ),
+        isTrue,
+      );
+      expect(provider.state, AiState.thinking);
 
-    expect(
-      provider.conversationHistory.any(
-        (entry) =>
-            entry.role == AiConversationRole.user && entry.text == 'Xin chao',
-      ),
-      isTrue,
-    );
-    expect(provider.state, AiState.thinking);
-
-    await Future<void>.delayed(const Duration(milliseconds: 650));
-    provider.dispose();
-  });
+      await Future<void>.delayed(const Duration(milliseconds: 650));
+      provider.dispose();
+    },
+  );
 
   test('conversation mic keeps bubble hidden while listening', () async {
     final provider = _buildProvider();
@@ -492,32 +493,35 @@ void main() {
     provider.dispose();
   });
 
-  test('addActionFeedback preserves bubble surface for bubble action flow', () async {
-    final provider = _buildProvider();
+  test(
+    'addActionFeedback preserves bubble surface for bubble action flow',
+    () async {
+      final provider = _buildProvider();
 
-    await provider.summonMascot(
-      startListening: false,
-      persist: false,
-      source: 'bubble_feedback_test',
-    );
-    await provider.submitTextPrompt(
-      'mo chat voi uyen',
-      source: 'bubble_chat_board',
-      surface: AiResponseSurface.bubble,
-    );
+      await provider.summonMascot(
+        startListening: false,
+        persist: false,
+        source: 'bubble_feedback_test',
+      );
+      await provider.submitTextPrompt(
+        'mo chat voi uyen',
+        source: 'bubble_chat_board',
+        surface: AiResponseSurface.bubble,
+      );
 
-    provider.addActionFeedback(
-      'Mình tìm thấy nhiều kết quả cho "Uyên". Bạn muốn chọn ai?',
-      source: 'ai_action_ambiguity.contact',
-      keepBubbleVisible: true,
-    );
+      provider.addActionFeedback(
+        'Mình tìm thấy nhiều kết quả cho "Uyên". Bạn muốn chọn ai?',
+        source: 'ai_action_ambiguity.contact',
+        keepBubbleVisible: true,
+      );
 
-    expect(provider.lastResponseSurface, AiResponseSurface.bubble);
-    expect(provider.shouldBubbleAutoShowResponse, isTrue);
-    expect(provider.isMascotVisible, isTrue);
+      expect(provider.lastResponseSurface, AiResponseSurface.bubble);
+      expect(provider.shouldBubbleAutoShowResponse, isTrue);
+      expect(provider.isMascotVisible, isTrue);
 
-    provider.dispose();
-  });
+      provider.dispose();
+    },
+  );
 
   test(
     'submitDisambiguationSelection emits selection and stores user choice',
@@ -606,6 +610,84 @@ void main() {
     expect(command.params, isA<Map>());
     expect((command.params as Map)['recipient'], 'An');
     expect((command.params as Map)['content'], 'toi den tre');
+
+    provider.dispose();
+  });
+
+  test(
+    'submitTextPrompt with action command defers assistant text reply',
+    () async {
+      final provider = _buildProvider(
+        responses: {
+          'nhan tin cho An la toi den tre': {
+            'textReply': 'Toi se mo khung soan tin cho ban.',
+            'emotion': 'neutral',
+            'actionCommand': 'COMPOSE_MESSAGE',
+            'actionParams': {'recipient': 'An', 'content': 'toi den tre'},
+          },
+        },
+      );
+
+      final commandFuture = provider.systemActionStream.first;
+      await provider.submitTextPrompt(
+        'nhan tin cho An la toi den tre',
+        source: 'compose_command_defer_reply_test',
+      );
+      final command = await commandFuture;
+
+      expect(command.command, 'COMPOSE_MESSAGE');
+      expect(provider.aiResponse, isEmpty);
+
+      final assistantReplies = provider.conversationHistory
+          .where(
+            (entry) =>
+                entry.role == AiConversationRole.assistant &&
+                entry.source == 'assistant_chat',
+          )
+          .toList(growable: false);
+      expect(assistantReplies, isEmpty);
+      expect(provider.conversationHistory.last.role, AiConversationRole.user);
+
+      provider.dispose();
+    },
+  );
+
+  test('action failure feedback replaces deferred command reply', () async {
+    final provider = _buildProvider(
+      responses: {
+        'goi cho nguoi khong ton tai': {
+          'textReply': 'Toi se chuan bi cuoc goi cho ban.',
+          'emotion': 'neutral',
+          'actionCommand': 'START_CALL',
+          'actionParams': {'target': 'Nguoi Khong Ton Tai'},
+        },
+      },
+    );
+
+    final commandFuture = provider.systemActionStream.first;
+    await provider.submitTextPrompt(
+      'goi cho nguoi khong ton tai',
+      source: 'missing_contact_action_test',
+    );
+    final command = await commandFuture;
+
+    expect(command.command, 'START_CALL');
+    expect(provider.aiResponse, isEmpty);
+    expect(
+      provider.lastConversationPreview,
+      isNot(contains('Toi se chuan bi')),
+    );
+
+    provider.addActionFeedback(
+      'Không tìm thấy người có tên "Nguoi Khong Ton Tai" trong danh bạ.',
+      source: 'ai_action_missing.contact',
+      keepBubbleVisible: true,
+      responseSurface: AiResponseSurface.conversation,
+    );
+
+    expect(provider.aiResponse, contains('Không tìm thấy'));
+    expect(provider.lastConversationPreview, contains('Không tìm thấy'));
+    expect(provider.clarificationState?.message, contains('Không tìm thấy'));
 
     provider.dispose();
   });

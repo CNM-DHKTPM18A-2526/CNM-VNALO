@@ -220,6 +220,53 @@ void main() {
   );
 
   testWidgets(
+    'ai conversation screen waits for action feedback instead of showing speculative reply',
+    (tester) async {
+      final provider = _buildProvider(
+        responses: {
+          'goi cho nguoi khong ton tai': {
+            'textReply': 'Toi se chuan bi cuoc goi cho ban.',
+            'emotion': 'neutral',
+            'actionCommand': 'START_CALL',
+            'actionParams': {'target': 'Nguoi Khong Ton Tai'},
+          },
+        },
+      );
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: provider),
+            ChangeNotifierProvider(create: (_) => LanguageProvider()),
+          ],
+          child: const MaterialApp(home: AiConversationScreen()),
+        ),
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('ai_conversation_input')),
+        'goi cho nguoi khong ton tai',
+      );
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('ai_conversation_send')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('goi cho nguoi khong ton tai'), findsOneWidget);
+      expect(find.text('Toi se chuan bi cuoc goi cho ban.'), findsNothing);
+
+      provider.addActionFeedback(
+        'Không tìm thấy người có tên "Nguoi Khong Ton Tai" trong danh bạ.',
+        source: 'ai_action_missing.contact',
+        responseSurface: AiResponseSurface.conversation,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Không tìm thấy'), findsOneWidget);
+      provider.dispose();
+    },
+  );
+
+  testWidgets(
     'ai conversation screen sends immediately and shows typing state',
     (tester) async {
       final provider = _buildProvider(
@@ -263,44 +310,44 @@ void main() {
     },
   );
 
+  testWidgets(
+    'ai conversation screen shows activity strip near input while listening',
+    (tester) async {
+      final provider = _buildProvider();
 
-  testWidgets('ai conversation screen shows activity strip near input while listening', (
-    tester,
-  ) async {
-    final provider = _buildProvider();
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: provider),
+            ChangeNotifierProvider(create: (_) => LanguageProvider()),
+          ],
+          child: const MaterialApp(home: AiConversationScreen()),
+        ),
+      );
 
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider.value(value: provider),
-          ChangeNotifierProvider(create: (_) => LanguageProvider()),
-        ],
-        child: const MaterialApp(home: AiConversationScreen()),
-      ),
-    );
+      await provider.startListening(
+        source: 'conversation_screen_mic',
+        surface: AiResponseSurface.conversation,
+      );
+      await tester.pump();
 
-    await provider.startListening(
-      source: 'conversation_screen_mic',
-      surface: AiResponseSurface.conversation,
-    );
-    await tester.pump();
+      expect(
+        find.byKey(const ValueKey('ai_conversation_activity_strip')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('ai_conversation_activity_mic')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
 
-    expect(
-      find.byKey(const ValueKey('ai_conversation_activity_strip')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('ai_conversation_activity_mic')),
-      findsOneWidget,
-    );
-    expect(tester.takeException(), isNull);
-
-    await provider.stopListening(
-      reason: 'activity_strip_cleanup',
-      keepBubbleVisible: false,
-    );
-    provider.dispose();
-  });
+      await provider.stopListening(
+        reason: 'activity_strip_cleanup',
+        keepBubbleVisible: false,
+      );
+      provider.dispose();
+    },
+  );
 
   testWidgets('ai conversation screen remains stable on compact viewport', (
     tester,

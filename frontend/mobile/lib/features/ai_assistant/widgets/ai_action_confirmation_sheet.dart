@@ -266,7 +266,7 @@ class AiActionConfirmationSheet extends StatelessWidget {
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(
-                            AiAssistantTokens.buttonRadius,
+                            AiAssistantTokens.pillRadius,
                           ),
                         ),
                       ),
@@ -288,19 +288,19 @@ class AiActionConfirmationSheet extends StatelessWidget {
                     SizedBox(
                       width: double.infinity,
                       height: 48,
-                      child: OutlinedButton(
+                      child: ElevatedButton(
                         onPressed:
                             () => Navigator.of(
                               context,
                             ).pop(AiActionConfirmationResult.alternate),
-                        style: OutlinedButton.styleFrom(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: accent.withValues(alpha: 0.12),
                           foregroundColor: accent,
-                          side: BorderSide(
-                            color: accent.withValues(alpha: 0.4),
-                          ),
+                          elevation: 0,
+                          shadowColor: Colors.transparent,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(
-                              AiAssistantTokens.buttonRadius,
+                              AiAssistantTokens.pillRadius,
                             ),
                           ),
                         ),
@@ -329,7 +329,7 @@ class AiActionConfirmationSheet extends StatelessWidget {
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(
-                            AiAssistantTokens.buttonRadius,
+                            AiAssistantTokens.pillRadius,
                           ),
                         ),
                       ),

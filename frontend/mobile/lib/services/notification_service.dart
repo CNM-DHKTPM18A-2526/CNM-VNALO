@@ -12,7 +12,8 @@ class NotificationService {
   NotificationService._internal();
 
   FirebaseMessaging? _fcm;
-  final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _localNotifications =
+      FlutterLocalNotificationsPlugin();
   bool _initialized = false;
   bool _disabled = false;
 
@@ -25,72 +26,87 @@ class NotificationService {
     try {
       _fcm ??= FirebaseMessaging.instance;
     } catch (e) {
-      developer.log('NotificationService disabled: Firebase is not initialized. Error: $e');
+      developer.log(
+        'NotificationService disabled: Firebase is not initialized. Error: $e',
+      );
       _disabled = true;
       return;
     }
 
-    // 1. Request permissions
-    NotificationSettings settings = await _fcm!.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+    try {
+      // 1. Request permissions
+      NotificationSettings settings = await _fcm!.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
 
-    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-      developer.log('User granted notification permission');
+      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+        developer.log('User granted notification permission');
+      }
+
+      // 2. Local Notifications Setup
+      const AndroidInitializationSettings androidSettings =
+          AndroidInitializationSettings('@mipmap/app_icon');
+      const DarwinInitializationSettings iosSettings =
+          DarwinInitializationSettings();
+      const InitializationSettings initSettings = InitializationSettings(
+        android: androidSettings,
+        iOS: iosSettings,
+      );
+
+      await _localNotifications.initialize(
+        settings: initSettings,
+        onDidReceiveNotificationResponse: (details) {
+          // Handle notification click here
+        },
+      );
+
+      const AndroidNotificationChannel mainChannel = AndroidNotificationChannel(
+        _mainChannelId,
+        _mainChannelName,
+        description: 'General VNALO notifications',
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+      );
+
+      await _localNotifications
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >()
+          ?.createNotificationChannel(mainChannel);
+
+      // 3. Handle Foreground Messages
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        developer.log(
+          'Received foreground message: ${message.notification?.title}',
+        );
+        _showLocalNotification(message);
+      });
+
+      // 4. Handle Background/Terminated Messages
+      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+        developer.log('App opened from notification: ${message.data}');
+      });
+
+      // 5. Setup CallKit Listeners
+      FlutterCallkitIncoming.onEvent.listen(_onCallKitEvent);
+
+      _initialized = true;
+    } catch (e, stackTrace) {
+      developer.log(
+        'NotificationService initialization failed: $e',
+        stackTrace: stackTrace,
+      );
+      _disabled = true;
     }
-
-    // 2. Local Notifications Setup
-    const AndroidInitializationSettings androidSettings = AndroidInitializationSettings('@mipmap/app_icon');
-    const DarwinInitializationSettings iosSettings = DarwinInitializationSettings();
-    const InitializationSettings initSettings = InitializationSettings(
-      android: androidSettings,
-      iOS: iosSettings,
-    );
-
-    await _localNotifications.initialize(
-      settings: initSettings,
-      onDidReceiveNotificationResponse: (details) {
-        // Handle notification click here
-      },
-    );
-
-    const AndroidNotificationChannel mainChannel = AndroidNotificationChannel(
-      _mainChannelId,
-      _mainChannelName,
-      description: 'General VNALO notifications',
-      importance: Importance.max,
-      playSound: true,
-      enableVibration: true,
-    );
-
-    await _localNotifications
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(mainChannel);
-
-    // 3. Handle Foreground Messages
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      developer.log('Received foreground message: ${message.notification?.title}');
-      _showLocalNotification(message);
-    });
-
-    // 4. Handle Background/Terminated Messages
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      developer.log('App opened from notification: ${message.data}');
-    });
-
-    // 5. Setup CallKit Listeners
-    FlutterCallkitIncoming.onEvent.listen(_onCallKitEvent);
-
-    _initialized = true;
   }
 
   static void _onCallKitEvent(CallEvent? event) {
     if (event == null) return;
     developer.log('[NotificationService] CallKit Event: ${event.event}');
-    
+
     switch (event.event) {
       case Event.actionCallAccept:
         // Handle acceptance - redirection is typically handled by IncomingCallCoordinator
@@ -108,12 +124,14 @@ class NotificationService {
   static Future<void> handleBackgroundCallSignal(RemoteMessage message) async {
     final data = message.data;
     final type = data['type']?.toString();
-    
+
     if (type == 'call_offer' || type == 'group_call_started') {
       final isGroup = type == 'group_call_started';
       final callId = data['callId']?.toString() ?? const Uuid().v4();
       final conversationId = data['conversationId']?.toString() ?? '';
-      final senderName = data['senderName']?.toString() ?? (isGroup ? 'Cuộc gọi nhóm' : 'VNALO Call');
+      final senderName =
+          data['senderName']?.toString() ??
+          (isGroup ? 'Cuộc gọi nhóm' : 'VNALO Call');
       final senderAvatar = data['senderAvatar']?.toString();
       final audioOnly = data['audioOnly']?.toString() == 'true';
 
@@ -169,24 +187,32 @@ class NotificationService {
     }
   }
 
-
   Future<void> ensureInitialized() => initialize();
 
   Future<String?> getToken() async {
     await ensureInitialized();
     if (_disabled || _fcm == null) return null;
-    return await _fcm!.getToken();
+    try {
+      return await _fcm!.getToken();
+    } catch (e, stackTrace) {
+      developer.log(
+        'NotificationService getToken failed: $e',
+        stackTrace: stackTrace,
+      );
+      return null;
+    }
   }
 
   Future<void> _showLocalNotification(RemoteMessage message) async {
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      _mainChannelId,
-      _mainChannelName,
-      importance: Importance.max,
-      priority: Priority.high,
-      playSound: true,
-      enableVibration: true,
-    );
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          _mainChannelId,
+          _mainChannelName,
+          importance: Importance.max,
+          priority: Priority.high,
+          playSound: true,
+          enableVibration: true,
+        );
 
     const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
       presentAlert: true,
@@ -217,15 +243,16 @@ class NotificationService {
     await ensureInitialized();
     if (_disabled) return;
 
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      _mainChannelId,
-      _mainChannelName,
-      importance: Importance.max,
-      priority: Priority.high,
-      category: AndroidNotificationCategory.message,
-      playSound: true,
-      enableVibration: true,
-    );
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          _mainChannelId,
+          _mainChannelName,
+          importance: Importance.max,
+          priority: Priority.high,
+          category: AndroidNotificationCategory.message,
+          playSound: true,
+          enableVibration: true,
+        );
 
     const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
       presentAlert: true,
