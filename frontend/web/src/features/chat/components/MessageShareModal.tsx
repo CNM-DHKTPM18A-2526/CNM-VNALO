@@ -110,7 +110,7 @@ export function MessageShareModal({
             filteredFriends.map((friend) => {
               const checked = selectedUserIds.includes(friend.friendId)
               const label = resolveFriendLabel(friend)
-              const subtitle = friend.statusMessage?.trim() || friend.friendId
+              const subtitle = friend.statusMessage?.trim() || ''
 
               return (
                 <label key={friend.friendshipId} className='message-share-friend-item'>
@@ -122,7 +122,7 @@ export function MessageShareModal({
                   <UserAvatar name={label} imageUrl={friend.avatarUrl} size='sm' />
                   <span className='message-share-friend-copy'>
                     <strong>{label}</strong>
-                    <small>{subtitle}</small>
+                    {subtitle && <small>{subtitle}</small>}
                   </span>
                 </label>
               )

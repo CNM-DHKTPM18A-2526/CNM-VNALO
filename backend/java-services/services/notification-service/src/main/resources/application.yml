@@ -63,8 +63,10 @@ logging:
 
 # Firebase Configuration
 firebase:
+  enabled: ${FIREBASE_ENABLED:false}
+  fail-fast: ${FIREBASE_FAIL_FAST:false}
   credentials:
-    path: ${FIREBASE_CREDENTIALS_PATH:iuh-cnm-vnalo-firebase-adminsdk-fbsvc-5008b7c5eb.json}
+    path: ${FIREBASE_CREDENTIALS_PATH:}
 
 management:
   endpoints:
@@ -119,6 +121,11 @@ spring:
 otp:
   enabled: false
 
+# Dev: Firebase defaults (override via env vars)
+firebase:
+  enabled: ${FIREBASE_ENABLED:false}
+  fail-fast: ${FIREBASE_FAIL_FAST:false}
+
 # jwt:
 #   secret: ZGV2ZWxvcG1lbnQtb25seS1zZWNyZXQta2V5LWRvLW5vdC11c2UtaW4tcHJvZHVjdGlvbi10aGlzLWlzLWF0LWxlYXN0LTUxMi1iaXRzLWxvbmc=
 
@@ -165,3 +172,7 @@ logging:
   level:
     iuh.cnm.vnalo: INFO
     org.springframework.security: WARN
+
+firebase:
+  enabled: true
+  fail-fast: true

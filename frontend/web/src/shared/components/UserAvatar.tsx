@@ -64,37 +64,21 @@ export function UserAvatar({
   if (isGroup && memberAvatars && memberAvatars.length >= 2) {
     const avatars = memberAvatars.filter(Boolean).map(a => resolveMediaUrl(a)).slice(0, 3);
     const count = avatars.length;
+    const layoutCount = extraCount > 0 ? 4 : Math.max(2, Math.min(count, 3));
 
     return (
-      <span className={`${mergedClassName} relative overflow-hidden bg-gray-100`}>
-        {/* 2 Members: Overlapping offset */}
-        {count === 2 && (
-          <>
-            <img src={avatars[0]!} className="absolute top-0 left-0 w-[65%] h-[65%] rounded-full border-2 border-white object-cover z-10" />
-            <img src={avatars[1]!} className="absolute bottom-0 right-0 w-[65%] h-[65%] rounded-full border-2 border-white object-cover" />
-          </>
-        )}
+      <span className={`${mergedClassName} relative overflow-hidden group-avatar-collage`}>
+        <div className={`group-collage group-collage-${layoutCount}`}>
+          {avatars.map((src, i) => (
+            <img key={i} src={src!} className={`group-collage-img slot-${i + 1}`} />
+          ))}
 
-        {/* 3 Members: 1 top center, 2 bottom side-by-side */}
-        {count === 3 && extraCount === 0 && (
-          <>
-            <img src={avatars[0]!} className="absolute top-0 left-1/2 -translate-x-1/2 w-[55%] h-[55%] rounded-full border-2 border-white object-cover z-20" />
-            <img src={avatars[1]!} className="absolute bottom-0 left-0 w-[55%] h-[55%] rounded-full border-2 border-white object-cover z-10" />
-            <img src={avatars[2]!} className="absolute bottom-0 right-0 w-[55%] h-[55%] rounded-full border-2 border-white object-cover" />
-          </>
-        )}
-
-        {/* 4+ Members: 3 Avatars + Badge */}
-        {extraCount > 0 && (
-          <div className="grid grid-cols-2 grid-rows-2 w-full h-full gap-0.5 p-0.5">
-            <img src={avatars[0]!} className="w-full h-full rounded-full border border-white object-cover" />
-            <img src={avatars[1]!} className="w-full h-full rounded-full border border-white object-cover" />
-            <img src={avatars[2]!} className="w-full h-full rounded-full border border-white object-cover" />
-            <div className="w-full h-full rounded-full bg-gray-500/80 flex items-center justify-center text-white border border-white">
-               <span className="text-[10px] font-bold">+{extraCount + (avatars.length === 3 ? 0 : 4 - avatars.length)}</span>
+          {extraCount > 0 && (
+            <div className="group-collage-badge slot-4">
+              <span className="badge-text">+{extraCount + (avatars.length === 3 ? 0 : 4 - avatars.length)}</span>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </span>
     )
   }

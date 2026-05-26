@@ -3168,13 +3168,18 @@ export default function ChatPage() {
   }, [handleEndCall]);
 
   // Sync effect: Fetch profile for all group members when a conversation is opened
+  // Sync effect: Fetch profile for all visible conversation members when a conversation is opened
   useEffect(() => {
-    if (!accessToken || !selectedConversationId) return;
-    const selected = conversations.find(c => c.id === selectedConversationId);
-    if (selected?.participantUserIds) {
-      selected.participantUserIds.forEach(id => void ensureUser(accessToken, id));
-    }
-  }, [accessToken, selectedConversationId, conversations, ensureUser]);
+    const activeConversationId = routedConversationId || selectedConversationId
+    if (!accessToken || !activeConversationId) return;
+
+    const selected = conversations.find(c => c.id === activeConversationId);
+    const memberIds = selected?.members?.map(member => member.userId).filter(Boolean)
+      ?? selected?.participantUserIds
+      ?? [];
+
+    memberIds.forEach(id => void ensureUser(accessToken, id));
+  }, [accessToken, routedConversationId, selectedConversationId, conversations, ensureUser]);
 
   const loadInbox = useCallback(
     async (token: string, preferredConversationId?: string) => {

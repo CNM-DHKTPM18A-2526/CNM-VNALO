@@ -73,7 +73,9 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> with Single
           if (context.mounted) {
             context.read<ChatProvider>().loadInbox();
           }
-        } catch (_) {}
+        } catch (_) {
+          // Conversation creation is non-critical; user can open chat later.
+        }
       }
       if (!context.mounted) return;
 

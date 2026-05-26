@@ -21,6 +21,13 @@
   overflow: auto;
 }
 
+.workspace-main.workspace-main-social {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
 .workspace-main.workspace-main-contacts,
 .workspace-main.workspace-main-documents {
   padding: 0;
@@ -578,3 +585,113 @@
 
 [data-theme='dark'] .screen { background: #1a1a1a; border-color: #333; }
 [data-theme='dark'] .keyboard { background: #333; }
+
+/* Group avatar collage styling */
+.group-avatar-collage {
+  background: var(--surface) !important;
+}
+.group-avatar-collage img,
+.group-avatar-collage div {
+  border-color: var(--surface) !important;
+}
+
+/* Zalo-like group collage with safe positions inside circular mask */
+.group-avatar-collage .group-collage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.group-avatar-collage .group-collage-img,
+.group-avatar-collage .group-collage-badge {
+  position: absolute;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 0;
+}
+
+/* 2 members */
+.group-avatar-collage .group-collage-2 .slot-1,
+.group-avatar-collage .group-collage-2 .slot-2 {
+  width: 48%;
+  height: 48%;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.group-avatar-collage .group-collage-2 .slot-1 { left: 4%; }
+.group-avatar-collage .group-collage-2 .slot-2 { right: 4%; }
+
+/* 3 members */
+.group-avatar-collage .group-collage-3 .slot-1 {
+  width: 46%;
+  height: 46%;
+  left: 50%;
+  top: 4%;
+  transform: translateX(-50%);
+}
+
+.group-avatar-collage .group-collage-3 .slot-2,
+.group-avatar-collage .group-collage-3 .slot-3 {
+  width: 44%;
+  height: 44%;
+  bottom: 4%;
+}
+
+.group-avatar-collage .group-collage-3 .slot-2 { left: 6%; }
+.group-avatar-collage .group-collage-3 .slot-3 { right: 6%; }
+
+/* 4 members (3 avatars + badge) */
+.group-avatar-collage .group-collage-4 .slot-1,
+.group-avatar-collage .group-collage-4 .slot-2,
+.group-avatar-collage .group-collage-4 .slot-3,
+.group-avatar-collage .group-collage-4 .slot-4 {
+  width: 42%;
+  height: 42%;
+}
+
+.group-avatar-collage .group-collage-4 .slot-1 { top: 6%; left: 6%; }
+.group-avatar-collage .group-collage-4 .slot-2 { top: 6%; right: 6%; }
+.group-avatar-collage .group-collage-4 .slot-3 { bottom: 6%; left: 6%; }
+.group-avatar-collage .group-collage-4 .slot-4 { bottom: 6%; right: 6%; }
+
+.group-avatar-collage .group-collage-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--text) 65%, transparent);
+  color: #fff;
+}
+
+.group-avatar-collage .badge-text {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Chat list items (normal state) */
+.chat-item .group-avatar-collage {
+  background: var(--surface) !important;
+}
+.chat-item .group-avatar-collage img,
+.chat-item .group-avatar-collage div {
+  border-color: var(--surface) !important;
+}
+
+/* Hover state */
+.chat-item:hover .group-avatar-collage {
+  background: var(--surface-hover) !important;
+}
+.chat-item:hover .group-avatar-collage img,
+.chat-item:hover .group-avatar-collage div {
+  border-color: var(--surface-hover) !important;
+}
+
+/* Selected/Active state */
+.chat-item-active .group-avatar-collage {
+  background: var(--panel-highlight) !important;
+}
+.chat-item-active .group-avatar-collage img,
+.chat-item-active .group-avatar-collage div {
+  border-color: var(--panel-highlight) !important;
+}

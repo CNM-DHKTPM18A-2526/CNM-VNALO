@@ -1281,7 +1281,9 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
           );
           displayName = otherMember.nickname ?? otherMember.user?.displayName ?? displayName;
           avatarUrl ??= otherMember.user?.avatarUrl;
-        } catch (_) {}
+        } catch (_) {
+          // Fallback to default name already handled below.
+        }
       }
       
       if (displayName.isEmpty || displayName == 'Cuộc hội thoại') {

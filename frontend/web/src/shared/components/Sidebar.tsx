@@ -19,20 +19,20 @@ export function Sidebar({ onOpenSettingsModal, onOpenCaptureModal }: SidebarProp
 
   const primaryNav: Array<{ to: string; labelKey: string; icon: any; badge: number }> = [
     { to: '/chat', labelKey: 'sidebar.chat', icon: 'chat' as const, badge: unreadMessageCount },
+    { to: '/social', labelKey: 'sidebar.social', icon: 'clock' as const, badge: 0 },
     { to: '/contacts', labelKey: 'sidebar.contacts', icon: 'addressBook' as const, badge: pendingFriendRequestCount },
     { to: '/chat-ai', labelKey: 'sidebar.ai', icon: 'spark' as const, badge: 0 },
   ]
 
   const secondaryNav = [
-    {
-      to: user ? `/chat/vnalo_cloud_${user.id}` : '/chat',
-      labelKey: 'sidebar.cloud',
-      icon: 'cloud' as const
+    { 
+      to: user ? `/chat/vnalo_cloud_${user.id}` : '/chat', 
+      labelKey: 'sidebar.cloud', 
+      icon: 'cloud' as const 
     },
     { to: '/chat/my-documents', labelKey: 'sidebar.documents', icon: 'folder' as const },
     { labelKey: 'sidebar.todo', icon: 'capture' as const, onClick: onOpenCaptureModal },
     { to: '/tools', labelKey: 'sidebar.tools', icon: 'briefcase' as const },
-    { to: '/face-auth', labelKey: 'sidebar.faceAuth', icon: 'spark' as const },
   ]
 
   const handleOpenSettings = () => {

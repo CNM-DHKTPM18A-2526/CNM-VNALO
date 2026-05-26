@@ -95,7 +95,9 @@ class MainShellState extends State<MainShell> {
     FocusManager.instance.primaryFocus?.unfocus();
     try {
       await SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
-    } catch (_) {}
+    } catch (_) {
+      // Platform channel may be unavailable in some environments.
+    }
   }
 
   Future<void> _handleNavigateTo(Map<String, dynamic>? params) async {

@@ -253,7 +253,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               },
             ),
             onTap: () {
-              // TODO: Navigate to NotificationListScreen
+              // TODO(nguyenvu): Create NotificationListScreen and wire navigation.
+              // NotificationListScreen does not exist yet.
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Màn hình thông báo đang được phát triển')),
+              );
             },
           ),
         ],
