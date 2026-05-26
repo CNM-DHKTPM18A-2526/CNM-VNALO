@@ -392,6 +392,10 @@ function buildActionLabel(command: AiActionCommand) {
   }
 }
 
+function buildDeferredActionReply(command: AiActionCommand) {
+  return `Mình đã nhận diện yêu cầu: ${buildActionLabel(command)}. Hãy bấm nút bên dưới để mình kiểm tra đúng đối tượng và mở luồng an toàn.`
+}
+
 export function AiChatPage() {
   const { accessToken, user } = useAuth()
   const navigate = useNavigate()
@@ -507,7 +511,9 @@ export function AiChatPage() {
       const safeActionCommand = responseActionCommand && KNOWN_ACTION_COMMANDS.has(responseActionCommand) ? responseActionCommand : null
       const assistantMessage: AiMessage = {
         role: 'assistant',
-        content: aiResponse.textReply || 'Sorry, I cannot process that request right now.',
+        content: safeActionCommand
+          ? buildDeferredActionReply(safeActionCommand)
+          : aiResponse.textReply || 'Mình chưa thể xử lý yêu cầu này ngay lúc này.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         degraded: Boolean(aiResponse.degraded),
         providerStatus: (aiResponse.providerStatus as ProviderStatus | undefined) ?? null,
