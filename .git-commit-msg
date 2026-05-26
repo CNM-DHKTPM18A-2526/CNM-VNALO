@@ -1,4 +1,0 @@
-fix(face-auth-web): fix ternary chain syntax in RegisterPage.tsx JSX
-
-The JSX ternary chain was invalid — nested ternary after the : operator
-must be wrapped in parentheses. Reorder to check 'face' step first.
