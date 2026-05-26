@@ -84,7 +84,7 @@ const MAX_API_HISTORY = 20
 
 function buildAiStorageKey(userId?: string | number | null) {
   if (userId === undefined || userId === null || `${userId}`.trim().length === 0) {
-    return STORAGE_KEY
+    return null
   }
   return `${STORAGE_KEY}:${userId}`
 }
@@ -339,28 +339,63 @@ function buildActionLabel(command: AiActionCommand) {
       return 'Mở cuộc trò chuyện'
     case 'COMPOSE_MESSAGE':
       return 'Mở chat và điền nháp'
-    case 'NAVIGATE_TO_CHAT':
-      return 'Go to Chat'
-    case 'NAVIGATE_TO_CONTACTS':
-      return 'Go to Contacts'
-    case 'OPEN_PROFILE':
-      return 'Go to Profile'
-    case 'NAVIGATE_TO':
-      return 'Go to destination'
+    case 'OPEN_GROUP_SETTINGS':
+      return 'Mở cài đặt nhóm'
     case 'START_CALL':
       return 'Mở chat để gọi'
+    case 'RECALL_MESSAGE':
+      return 'Thu hồi tin nhắn'
+    case 'CREATE_GROUP':
+      return 'Tạo nhóm mới'
+    case 'MUTE_CONVERSATION':
+      return 'Tắt thông báo cuộc trò chuyện'
+    case 'UNMUTE_CONVERSATION':
+      return 'Bật lại thông báo cuộc trò chuyện'
+    case 'PIN_MESSAGE':
+      return 'Ghim tin nhắn'
+    case 'UNPIN_MESSAGE':
+      return 'Bỏ ghim tin nhắn'
+    case 'SEND_FRIEND_REQUEST':
+      return 'Gửi lời mời kết bạn'
+    case 'BLOCK_USER':
+      return 'Chặn người dùng'
+    case 'UNBLOCK_USER':
+      return 'Bỏ chặn người dùng'
+    case 'CHANGE_GROUP_NAME':
+      return 'Đổi tên nhóm'
+    case 'ADD_GROUP_MEMBER':
+      return 'Thêm thành viên'
+    case 'REMOVE_GROUP_MEMBER':
+      return 'Xóa thành viên'
+    case 'TRANSFER_GROUP_OWNER':
+      return 'Chuyển quyền trưởng nhóm'
+    case 'LEAVE_GROUP':
+      return 'Rời nhóm'
+    case 'DISBAND_GROUP':
+      return 'Giải tán nhóm'
+    case 'NAVIGATE_TO':
+      return 'Đi đến trang yêu cầu'
+    case 'NAVIGATE_TO_SETTINGS':
+      return 'Mở cài đặt'
+    case 'NAVIGATE_TO_CHAT':
+      return 'Đi đến Chat'
+    case 'NAVIGATE_TO_CONTACTS':
+      return 'Đi đến Danh bạ'
+    case 'NAVIGATE_TO_SCANNER':
+      return 'Mở trình quét'
+    case 'NAVIGATE_TO_TIMELINE':
+      return 'Mở nhật ký'
+    case 'OPEN_PROFILE':
+      return 'Mở hồ sơ'
     default:
-      return 'Try this action'
+      return 'Thực hiện thao tác'
   }
 }
 
 export function AiChatPage() {
   const { accessToken, user } = useAuth()
   const navigate = useNavigate()
-  const historyStorageKey = useMemo(
-    () => buildAiStorageKey(user?.id as string | number | undefined),
-    [user?.id],
-  )
+  const historyStorageKey = useMemo(() => buildAiStorageKey(user?.id as string | number | undefined), [user?.id])
   const [messages, setMessages] = useState<AiMessage[]>([])
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -382,6 +417,11 @@ export function AiChatPage() {
   }, [])
 
   useEffect(() => {
+    if (!historyStorageKey) {
+      setMessages([INITIAL_ASSISTANT_MESSAGE])
+      return
+    }
+
     const saved = localStorage.getItem(historyStorageKey)
     if (!saved) {
       setMessages([INITIAL_ASSISTANT_MESSAGE])
@@ -400,6 +440,9 @@ export function AiChatPage() {
   const saveMessages = (nextMessages: AiMessage[]) => {
     const normalized = normalizeStoredMessages(nextMessages)
     setMessages(normalized)
+    if (!historyStorageKey) {
+      return
+    }
     localStorage.setItem(historyStorageKey, JSON.stringify(normalized))
   }
 
