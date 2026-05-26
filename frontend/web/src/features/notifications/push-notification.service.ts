@@ -1,6 +1,7 @@
 import { API_BASE_URL } from '../../api.client';
-import { getMessagingInstance, isFirebaseConfigured, initFirebaseMessaging } from '../../firebase';
+import { isFirebaseConfigured, initFirebaseMessaging } from '../../firebase';
 import { getToken, onMessage } from 'firebase/messaging';
+import type { Messaging } from 'firebase/messaging';
 
 export interface NotificationPayload {
   type: string;
@@ -94,13 +95,16 @@ export class PushNotificationService {
     await this.registerToken(accessToken);
   }
 
-  private listenForegroundMessages(messaging: any): void {
+  private listenForegroundMessages(messaging: Messaging): void {
     onMessage(messaging, (payload: FcmTokenPayload) => {
       console.log('[PushNotification] Foreground message received:', payload);
 
       const title = payload.notification?.title ?? 'VNALO';
       const body = payload.notification?.body ?? '';
-      const data = payload.data ?? {};
+      const data: NotificationPayload = {
+        type: payload.data?.type ?? 'default',
+        ...(payload.data ?? {}),
+      };
 
       if (Notification.permission === 'granted') {
         const notification = new Notification(title, {
