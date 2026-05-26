@@ -61,7 +61,7 @@ case "${1:-}" in
   --health)
     log "Checking service health..."
     echo ""
-    for svc in core-service message-service media-service ai-service notification-service realtime-gateway; do
+    for svc in core-service message-service media-service ai-service content-service notification-service realtime-gateway; do
       status=$(docker compose ps "$svc" --format json 2>/dev/null | grep -o '"State":"[^"]*"' | cut -d'"' -f4 || echo "unknown")
       if [ "$status" = "running" ]; then
         echo -e "  ${GREEN}[OK]${NC} $svc"
@@ -151,7 +151,7 @@ sleep 10
 
 log "Checking service health..."
 UNHEALTHY=0
-for svc in core-service message-service media-service ai-service notification-service realtime-gateway; do
+for svc in core-service message-service media-service ai-service content-service notification-service realtime-gateway; do
     STATUS=$($DC ps "$svc" --format json 2>/dev/null | grep -o '"State":"[^"]*"' | cut -d'"' -f4 || echo "unknown")
     if [ "$STATUS" != "running" ]; then
         ((UNHEALTHY++))
