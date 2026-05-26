@@ -82,6 +82,13 @@ const STORAGE_KEY = 'vnalo_ai_chat_history'
 const DRAFT_KEY_PREFIX = 'vnalo_ai_web_compose_draft:'
 const MAX_API_HISTORY = 20
 
+function buildAiStorageKey(userId?: string | number | null) {
+  if (userId === undefined || userId === null || `${userId}`.trim().length === 0) {
+    return STORAGE_KEY
+  }
+  return `${STORAGE_KEY}:${userId}`
+}
+
 const PRESET_PROMPTS = [
   'Tóm tắt nhanh các tính năng chính của VNALO',
   'Giúp tôi soạn một tin nhắn từ chối lịch hẹn lịch sự',
@@ -350,6 +357,10 @@ function buildActionLabel(command: AiActionCommand) {
 export function AiChatPage() {
   const { accessToken, user } = useAuth()
   const navigate = useNavigate()
+  const historyStorageKey = useMemo(
+    () => buildAiStorageKey(user?.id as string | number | undefined),
+    [user?.id],
+  )
   const [messages, setMessages] = useState<AiMessage[]>([])
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -371,7 +382,7 @@ export function AiChatPage() {
   }, [])
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY)
+    const saved = localStorage.getItem(historyStorageKey)
     if (!saved) {
       setMessages([INITIAL_ASSISTANT_MESSAGE])
       return
@@ -384,12 +395,12 @@ export function AiChatPage() {
       console.warn('Failed to parse AI chat history', error)
       setMessages([INITIAL_ASSISTANT_MESSAGE])
     }
-  }, [])
+  }, [historyStorageKey])
 
   const saveMessages = (nextMessages: AiMessage[]) => {
     const normalized = normalizeStoredMessages(nextMessages)
     setMessages(normalized)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized))
+    localStorage.setItem(historyStorageKey, JSON.stringify(normalized))
   }
 
   useEffect(() => {
@@ -712,41 +723,43 @@ export function AiChatPage() {
   return (
     <div className='ai-chat-layout'>
       <aside className='ai-chat-sidebar'>
-        <div className='ai-assistant-card'>
-          <div className='ai-avatar-glow'>
-            <Sparkles size={28} />
+        <div className='ai-chat-sidebar-scroll'>
+          <div className='ai-assistant-card'>
+            <div className='ai-avatar-glow'>
+              <Sparkles size={28} />
+            </div>
+            <h3>VNALO AI Assistant</h3>
+            <p>Hỗ trợ trả lời câu hỏi, giải thích nhanh và gợi ý thao tác an toàn trong VNALO.</p>
           </div>
-          <h3>VNALO AI Assistant</h3>
-          <p>Hỗ trợ trả lời câu hỏi, giải thích nhanh và gợi ý thao tác an toàn trong VNALO.</p>
+
+          <div className='ai-presets-container'>
+            <span className='ai-presets-title'>Gợi ý câu hỏi</span>
+            {PRESET_PROMPTS.map((prompt) => (
+              <button
+                key={prompt}
+                type='button'
+                className='ai-preset-btn'
+                onClick={() => void handleSend(prompt)}
+                disabled={isAssistantBusy}
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
+
+          <div className='flex-grow' style={{ flexGrow: 1 }} />
+
+          <button
+            type='button'
+            className='ai-clear-btn flex items-center justify-center gap-2'
+            onClick={handleClearHistory}
+            disabled={isAssistantBusy}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+          >
+            <Trash2 size={14} />
+            Clear history
+          </button>
         </div>
-
-        <div className='ai-presets-container'>
-          <span className='ai-presets-title'>Gợi ý câu hỏi</span>
-          {PRESET_PROMPTS.map((prompt) => (
-            <button
-              key={prompt}
-              type='button'
-              className='ai-preset-btn'
-              onClick={() => void handleSend(prompt)}
-              disabled={isAssistantBusy}
-            >
-              {prompt}
-            </button>
-          ))}
-        </div>
-
-        <div className='flex-grow' style={{ flexGrow: 1 }} />
-
-        <button
-          type='button'
-          className='ai-clear-btn flex items-center justify-center gap-2'
-          onClick={handleClearHistory}
-          disabled={isAssistantBusy}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-        >
-          <Trash2 size={14} />
-          Clear history
-        </button>
       </aside>
 
       <main className='ai-chat-main'>
@@ -834,7 +847,6 @@ export function AiChatPage() {
               }}
             />
             <button type='submit' className='ai-send-btn' disabled={isAssistantBusy || !inputValue.trim()}>
-
               <Send size={18} />
             </button>
             <span className='ai-input-hint'>Enter để gửi, Shift + Enter để xuống dòng</span>
