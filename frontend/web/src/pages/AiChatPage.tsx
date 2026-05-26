@@ -747,8 +747,6 @@ export function AiChatPage() {
             ))}
           </div>
 
-          <div className='flex-grow' style={{ flexGrow: 1 }} />
-
           <button
             type='button'
             className='ai-clear-btn flex items-center justify-center gap-2'
