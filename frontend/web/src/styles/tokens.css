@@ -1,5 +1,14 @@
 :root,
 [data-theme='light'] {
+  --color-background: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-border: var(--border);
+  --color-text-primary: var(--text);
+  --color-text-secondary: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-dark: var(--primary-strong);
+  --color-danger: var(--danger);
   --bg: #eef3fb;
   --surface: #ffffff;
   --surface-2: #f8fbff;
@@ -56,6 +65,15 @@
 }
 
 [data-theme='dark'] {
+  --color-background: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-border: var(--border);
+  --color-text-primary: var(--text);
+  --color-text-secondary: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-dark: var(--primary-strong);
+  --color-danger: var(--danger);
   --bg: #1a1f2e;
   --surface: #242d3a;
   --surface-2: #2d3647;

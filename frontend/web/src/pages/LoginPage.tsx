@@ -79,7 +79,9 @@ export function LoginPage() {
           setQrExpired(true)
           window.clearInterval(timer)
         }
-      } catch (err) { }
+      } catch (err) {
+        // Silently continue polling; transient network errors will be retried on next tick.
+      }
     }, POLL_INTERVAL_MS)
 
     return () => {

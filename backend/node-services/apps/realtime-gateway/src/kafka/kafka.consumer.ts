@@ -14,7 +14,11 @@ export class KafkaConsumer implements OnModuleInit, OnModuleDestroy {
     private readonly configService: ConfigService,
     private readonly gateway: RealtimeGateway,
   ) {
-    const brokers = this.configService.get<string[]>('kafka.brokers') ?? ['localhost:9092'];
+    const brokers = this.configService.get<string[]>('kafka.brokers');
+    if (!brokers || brokers.length === 0) {
+      this.logger.error('Kafka brokers are not configured. Set KAFKA_BROKERS environment variable.');
+      return;
+    }
     const clientId = this.configService.get<string>('kafka.clientId') ?? 'vnalo-realtime-gateway';
 
     this.kafka = new Kafka({

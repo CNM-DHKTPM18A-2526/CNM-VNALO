@@ -1,0 +1,47 @@
+# =============================================================================
+# VNALO — Systemd Service Unit
+# Auto-restart VNALO services on server reboot
+#
+# INSTALLATION:
+#   1. Copy this file to /etc/systemd/system/vnalo.service
+#   2. Edit WorkingDirectory to match your setup
+#   3. Run: sudo systemctl daemon-reload
+#   4. Run: sudo systemctl enable vnalo
+#   5. Run: sudo systemctl start vnalo
+# =============================================================================
+
+[Unit]
+Description=VNALO Application Stack
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+# ---- EDIT THIS PATH TO MATCH YOUR SETUP ----
+WorkingDirectory=/home/ec2-user/CNM-VNALO/docker
+
+ExecStartPre=-/usr/bin/docker compose stop
+ExecStart=/usr/bin/docker compose up --build -d
+ExecStop=/usr/bin/docker compose stop
+ExecReload=/usr/bin/docker compose restart
+
+# Auto-restart on failure
+Restart=on-failure
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vnalo
+
+# Security
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/home/ec2-user/CNM-VNALO/docker
+
+[Install]
+WantedBy=multi-user.target

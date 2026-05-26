@@ -227,10 +227,10 @@ export const PremiumCallControls: React.FC<PremiumCallControlsProps> = ({
       <div className="hidden md:block" style={{ width: CONTROL_SIZE }} />
 
       {/* Main Controls Group */}
-      <div className="flex items-center justify-center gap-6">
+      <div className="grid grid-cols-3 items-center justify-items-center gap-6">
 
         {/* Camera Toggle */}
-        {!isAudioOnly && (
+        {!isAudioOnly ? (
           <button
             onClick={onToggleCamera}
             title={isCameraOn ? 'Tắt camera' : 'Bật camera'}
@@ -250,6 +250,8 @@ export const PremiumCallControls: React.FC<PremiumCallControlsProps> = ({
               <ChevronUp size={10} className="text-white/80" />
             </div>
           </button>
+        ) : (
+          <div style={{ width: CONTROL_SIZE, height: CONTROL_SIZE }} />
         )}
 
         {/* End Call — red, largest, center */}
@@ -336,57 +338,129 @@ export const IncomingCallBanner: React.FC<IncomingCallBannerProps> = ({
   const initials = peerName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
   const displayName = isGroup && conversationName ? conversationName : peerName
 
-  // ── SOUND: Play a ringtone using Web Audio API (no audio files needed) ──
+  // ── SOUND: Play a ringtone using Web Audio API (no audio files needed)
+  // Uses a pre-generated AudioBuffer with scheduled playback to ensure reliable
+  // audio even when the tab is in the background (setInterval is throttled there).
+  // ── Also shows a browser Notification when the tab is hidden.
   React.useEffect(() => {
     let audioCtx: AudioContext | null = null
     let gainNode: GainNode | null = null
-    let interval: ReturnType<typeof setInterval>
+    let loopTimeout: ReturnType<typeof setTimeout> | null = null
+    let audioBuffer: AudioBuffer | null = null
+
+    // ── Helper: play one ringtone burst from the pre-generated buffer ──
+    const playRingtone = () => {
+      if (!audioCtx || !audioBuffer || !gainNode) return
+      try {
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume()
+        }
+        const src = audioCtx.createBufferSource()
+        src.buffer = audioBuffer
+        src.connect(gainNode)
+        src.start()
+        // schedule the next burst to overlap slightly for a continuous ring
+        loopTimeout = setTimeout(playRingtone, 800)
+      } catch {
+        // Audio playback failed — silent fallback
+      }
+    }
+
+    // ── Helper: show a browser Notification when tab is hidden ──
+    const showBrowserNotification = () => {
+      if (typeof Notification === 'undefined') return
+      if (Notification.permission === 'granted') {
+        new Notification(
+          isAudioOnly ? 'Cuộc gọi thoại đến' : 'Cuộc gọi video đến',
+          {
+            body: displayName,
+            icon: resolvedAvatar ?? undefined,
+            tag: 'incoming-call',
+            silent: true, // We play sound ourselves via AudioContext
+          },
+        )
+      } else if (Notification.permission === 'default') {
+        Notification.requestPermission()
+      }
+    }
 
     try {
-      // Simple synthesized "ringing" tone (two alternating frequencies)
-      let isHigh = true
-      const RING_FREQ_HIGH = 440  // A4
-      const RING_FREQ_LOW  = 523  // C5
+      // ── AUDIO CONTEXT: use factory constructor for broad browser compat ──
+      const AudioContextClass =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+      audioCtx = new AudioContextClass()
 
-      audioCtx = new (window.AudioContext || (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)() as AudioContext
-      gainNode = audioCtx.createGain()
-      gainNode.gain.setValueAtTime(0, audioCtx.currentTime)
-      gainNode.connect(audioCtx.destination)
+      // Generate a ringtone waveform programmatically:
+      // Two tone bursts (A4=440Hz, C5=523Hz) per cycle, 200ms each, 100ms gap.
+      const SAMPLE_RATE = audioCtx.sampleRate
+      const BURST_DURATION = 0.2  // 200ms
+      const GAP_DURATION = 0.1    // 100ms
+      const CYCLE_DURATION = (BURST_DURATION + GAP_DURATION) * 2
+      const TOTAL_DURATION = CYCLE_DURATION
+      audioBuffer = audioCtx.createBuffer(1, SAMPLE_RATE * TOTAL_DURATION, SAMPLE_RATE)
+      const channelData = audioBuffer.getChannelData(0)
 
-      const playTone = (freq: number) => {
-        if (!audioCtx || !gainNode) return
-        const osc = audioCtx.createOscillator()
-        osc.type = 'sine'
-        osc.frequency.value = freq
-        osc.connect(gainNode)
-        osc.start()
-        osc.stop(audioCtx.currentTime + 0.2)
+      const BURST_SAMPLES = Math.floor(SAMPLE_RATE * BURST_DURATION)
+      const GAP_SAMPLES = Math.floor(SAMPLE_RATE * GAP_DURATION)
+      const HALF_CYCLE = BURST_SAMPLES + GAP_SAMPLES
+
+      // First half-cycle: A4 (440Hz)
+      for (let i = 0; i < BURST_SAMPLES; i++) {
+        // Apply a fade-in/fade-out envelope to avoid clicks
+        const env = Math.min(i / (SAMPLE_RATE * 0.01), 1.0)
+          * Math.min((BURST_SAMPLES - i) / (SAMPLE_RATE * 0.01), 1.0)
+        channelData[i] = Math.sin(2 * Math.PI * 440 * i / SAMPLE_RATE) * env * 0.15
+      }
+      // Gap after first burst
+      for (let i = 0; i < GAP_SAMPLES; i++) {
+        channelData[BURST_SAMPLES + i] = 0
+      }
+      // Second half-cycle: C5 (523Hz)
+      for (let i = 0; i < BURST_SAMPLES; i++) {
+        const env = Math.min(i / (SAMPLE_RATE * 0.01), 1.0)
+          * Math.min((BURST_SAMPLES - i) / (SAMPLE_RATE * 0.01), 1.0)
+        channelData[HALF_CYCLE + i] = Math.sin(2 * Math.PI * 523 * i / SAMPLE_RATE) * env * 0.15
+      }
+      // Gap after second burst
+      for (let i = 0; i < GAP_SAMPLES; i++) {
+        channelData[HALF_CYCLE + BURST_SAMPLES + i] = 0
       }
 
-      // Fade in on first tone
-      gainNode.gain.setValueAtTime(0, audioCtx.currentTime)
-      gainNode.gain.linearRampToValueAtTime(0.15, audioCtx.currentTime + 0.05)
+      gainNode = audioCtx.createGain()
+      gainNode.gain.setValueAtTime(0.8, audioCtx.currentTime)
+      gainNode.connect(audioCtx.destination)
 
-      // Play ringtone pattern: high, low, high, low, pause...
-      interval = setInterval(() => {
-        if (!audioCtx || !gainNode) return
-        playTone(isHigh ? RING_FREQ_HIGH : RING_FREQ_LOW)
-        isHigh = !isHigh
-      }, 300)
+      // Start the ringtone loop
+      playRingtone()
 
-      // ── VIBRATION: Mobile browsers ──
-      if ('vibrate' in navigator) {
-        navigator.vibrate([200, 100, 200, 100, 200])
+      // If tab is hidden, also show a browser Notification as a fallback
+      if (document.hidden) {
+        showBrowserNotification()
       }
     } catch {
       // Audio not supported — silent fallback
     }
 
-    return () => {
-      clearInterval(interval)
-      try { audioCtx?.close(); } catch { /* ignore */ }
+    // ── Visibility change: re-trigger notification when tab becomes hidden ──
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        showBrowserNotification()
+        // Resume AudioContext if it was suspended by the browser
+        if (audioCtx?.state === 'suspended') {
+          void audioCtx?.resume()
+          loopTimeout = setTimeout(playRingtone, 300)
+        }
+      }
     }
-  }, [])
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    return () => {
+      if (loopTimeout !== null) clearTimeout(loopTimeout)
+      try { audioCtx?.close(); } catch { /* ignore */ }
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [displayName, isAudioOnly, resolvedAvatar])
 
   return (
     <div className="fixed bottom-6 right-6 z-[1000] w-[320px] animate-in slide-in-from-bottom-10 duration-300 ease-out">

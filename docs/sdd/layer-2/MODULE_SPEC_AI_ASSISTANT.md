@@ -1,287 +1,278 @@
-# MODULE SPEC: AI ASSISTANT INTEGRATION
+﻿# MODULE SPEC - AI ASSISTANT
 
-> **Authority:** This document is the **Source of Truth** for AI Assistant behavior in VNALO. All statements using MUST, SHALL, and REQUIRED conform to RFC 2119.
+> Status: Implemented + guarded expansion in progress  
+> Last reconciled: 2026-05-22  
+> Source-of-truth scan: ai-service, mobile AI provider/widgets, mobile action dispatcher, web AI page, docker compose
 
-> **Module Owner:** ai-service (Java/Spring Boot) + Flutter AiAssistantProvider + Web ChatClient.
-> **Status:** TARGET — 2026-04-29
+## 1. Purpose
 
----
+The VNALO AI Assistant provides conversational help plus guarded in-app actions. It is not an autonomous agent that may mutate user data without confirmation. The backend may return an allow-listed `actionCommand`; clients must still resolve targets, disambiguate ambiguous names, ask for confirmation on risky actions, and execute only commands supported by that client surface.
 
-## 1. OVERVIEW
+## 2. Runtime Topology
 
-The AI Assistant provides a conversational interface embedded in the VNALO client, supporting voice input (STT), text input, AI response generation, and text-to-speech (TTS) playback. The assistant can also dispatch system actions to navigate the app.
-
-**Key Design Decisions:**
-- AI is **opt-in** (disabled by default) to respect user privacy
-- Conversation history is stored locally (mobile) and optionally synced to cloud
-- Gemini API is the primary provider; Ollama is the fallback for offline/on-prem deployments
-- AI Assistant is mobile-first; web equivalent is planned
-
----
-
-## 2. SCOPE
-
-### In Scope
-- AI state machine: idle → listening → thinking → speaking → idle
-- Voice input (STT) via device microphone
-- Text input via AI conversation board
-- AI response generation via ai-service (Gemini / Ollama)
-- TTS playback of AI responses in Vietnamese
-- System action dispatcher (navigation, open chat, start call)
-- Local history persistence (200-entry FIFO)
-- Mascot rendering (2D and 3D)
-
-### Out of Scope
-- Multi-modal AI input (vision)
-- AI-generated stickers or images
-- Group AI conversations
-- Web AI Assistant (current release)
-- Cloud backup (future release)
-
----
-
-## 3. SECURITY RULES
-
-### SR-1: AI Endpoint Authentication
-
-```
-REQUIRED: All requests to ai-service MUST include a valid JWT Bearer token.
-The token MUST be validated against the shared HS512 secret.
-Anonymous access to ai-service is PROHIBITED.
+```mermaid
+flowchart LR
+  Mobile[Flutter Mobile AI Surfaces] -->|POST /api/v1/ai/chat| Gateway[Nginx/API Gateway]
+  Web[Web AI Page] -->|POST /api/v1/ai/chat| Gateway
+  Gateway --> AI[ai-service :8094]
+  AI -->|Gemini REST + systemInstruction| Gemini[Google Gemini]
+  AI -->|optional fallback| Ollama[Ollama]
+  AI -->|internal secret| Core[core-service]
+  AI --> Redis[(Redis rate limit)]
+  Core --> DB[(Postgres AI history/settings)]
 ```
 
-### SR-2: User Isolation
+### 2.1 Environment Contract
 
-```
-REQUIRED: AI conversation history is scoped to the authenticated userId.
-ai-service MUST validate that the requesting userId matches the JWT subject.
-Cross-user history access is PROHIBITED.
-```
+| Variable | Owner | Required | Notes |
+|---|---|---:|---|
+| `GEMINI_API_KEY` | ai-service container | yes for live AI | Backend-only. Never expose to web/mobile clients. |
+| `GEMINI_MODEL` | ai-service container | no | Default can be overridden in docker env. |
+| `OLLAMA_ENABLED` | ai-service container | no | Default false on constrained EC2. |
+| `OLLAMA_URL` | ai-service container | no | Only valid when Ollama service is enabled and reachable. |
+| `AI_INTERNAL_SECRET` | ai-service + core-service | yes | Used for AI/core internal endpoints. |
+| `JWT_SECRET` | protected services | yes | Must be valid base64/base64url consistently with service implementation. |
 
-### SR-3: AI Response Validation
+`config/environments/.env` does not need to contain every AI secret if the active docker `.env` supplies them and `docker-compose config` resolves them into the service environment. Do not commit live API keys.
 
-```
-REQUIRED: ai-service MUST sanitize all AI-generated responses before returning.
-Content MUST be filtered for:
-  - PII (email, phone, national ID patterns)
-  - Malicious URLs
-  - Inappropriate content (platform policy)
-REQUIRED: System action commands MUST be validated against user permissions before dispatch.
-```
+## 3. Public API Contract
 
-### SR-4: Rate Limiting
+### 3.1 Chat
 
-```
-REQUIRED: ai-service MUST enforce per-user rate limiting on AI API calls.
-Limit: 20 requests per minute per user.
-Exceeding the limit: HTTP 429 with Retry-After header.
-```
+`POST /api/v1/ai/chat`
 
----
-
-## 4. AI STATE MACHINE
-
-```
-                    ┌──────────────────────────────────┐
-                    │          AiState.idle             │
-                    │  (Bubble visible if enabled)      │
-                    └──────────────┬───────────────────┘
-                                   │
-              ┌────────────────────┼────────────────────┐
-              │                    │                    │
-              ▼                    ▼                    ▼
-   [User taps]           [User types in]       [User taps mic]
-              │                    │                    │
-              ▼                    ▼                    ▼
-   AiState.listening   AiState.thinking      AiState.listening
-   (mic active,        (API call in          (STT active,
-    8s timeout)        progress,             8s max,
-                         25s timeout)        2s pause)
-              │                    │                    │
-              │                    │                    │
-              │         [Response received]◄───────────┘
-              │                    │
-              │                    ▼
-              │         AiState.speaking
-              │         (TTS playback vi-VN 0.5x)
-              │                    │
-              └────────────────────┘
-                                   │
-                          [TTS complete / stop]
-                                   │
-                                   ▼
-                    ┌──────────────────────────────────┐
-                    │          AiState.idle             │
-                    │  (Auto-hide after 12s idle)     │
-                    └──────────────────────────────────┘
-```
-
----
-
-## 5. CONFIGURATION
-
-### 5.1 AI Service Configuration
-
-| Parameter | Value | Source |
-|---|---|---|
-| Primary Provider | Gemini | env `GEMINI_API_KEY` |
-| Fallback Provider | Ollama | env `OLLAMA_BASE_URL` |
-| Model (Gemini) | `gemini-2.0-flash` | env `GEMINI_MODEL` |
-| Model (Ollama) | Configured locally | env `OLLAMA_MODEL` |
-| Request Timeout | 25 seconds | Hardcoded |
-| Rate Limit | 20 req/min/user | Hardcoded |
-| Max History Entries | 200 (FIFO) | Hardcoded |
-| Max STT Duration | 8 seconds | Hardcoded |
-| STT Silence Pause | 2 seconds | Hardcoded |
-| Idle Auto-Hide | 12 seconds | Hardcoded |
-| TTS Language | `vi-VN` | Hardcoded |
-| TTS Speech Rate | `0.5` | Hardcoded |
-
-### 5.2 Fallback Strategy
-
-```
-1. Attempt Gemini API call with configured API key
-2. IF Gemini returns 5xx or network error:
-     → Retry once with exponential backoff (1s delay)
-3. IF retry fails OR Gemini returns 429 (rate limit):
-     → Attempt Ollama fallback call (if OLLAMA_BASE_URL configured)
-4. IF Ollama fails OR not configured:
-     → Return error to client: "AI temporarily unavailable"
-5. Frontend: display error in bubble/board, state → idle
-```
-
----
-
-## 6. WEBSOCKET EVENTS
-
-### 6.1 Client → Server (AI-specific namespace)
-
-| Event | Payload | Description |
-|---|---|---|
-| `ai.chat` | `{ conversationHistory, userMessage, clientMessageId }` | Send message to AI |
-| `ai.abort` | `{ clientMessageId }` | Abort ongoing AI generation |
-
-### 6.2 Server → Client
-
-| Event | Payload | Description |
-|---|---|---|
-| `ai.response` | `{ clientMessageId, text, done, error? }` | AI response stream (can be chunked) |
-| `ai.error` | `{ code, message, clientMessageId }` | Error response |
-
----
-
-## 7. DATA FLOW
-
-### 7.1 Chat Message Format
+Request body:
 
 ```json
 {
-  "role": "user" | "assistant" | "system",
-  "text": "string",
-  "source": "voice" | "text" | "system",
-  "createdAt": "ISO8601",
-  "id": "uuid"
+  "prompt": "string",
+  "contextId": "string | null",
+  "analyzeIntent": true,
+  "enableDeepSummary": false,
+  "history": [
+    { "role": "user|assistant", "content": "string", "createdAt": "ISO8601", "clientEntryId": "uuid" }
+  ],
+  "clientUserEntryId": "uuid",
+  "clientAssistantEntryId": "uuid"
 }
 ```
 
-### 7.2 System Prompt
+Response body is wrapped by `ApiResponse.ok(data)`:
 
 ```json
 {
-  "role": "system",
-  "text": "Bạn là trợ lý AI của VNALO. Hãy trả lời bằng tiếng Việt, ngắn gọn, hữu ích. Không tiết lộ thông tin cá nhân. Chỉ trả lời các câu hỏi phù hợp.",
-  "source": "system"
+  "success": true,
+  "data": {
+    "textReply": "string",
+    "actionCommand": "string | null",
+    "actionParams": {},
+    "emotion": "neutral|thinking|joyful|...",
+    "estimatedTokens": 0,
+    "degraded": false,
+    "providerStatus": "LIVE_PROVIDER_ACTIVE|FALLBACK_PROVIDER_ACTIVE|AI_PROVIDER_UNAVAILABLE",
+    "conversationId": "uuid",
+    "userEntryId": "uuid",
+    "assistantEntryId": "uuid"
+  }
 }
 ```
 
----
+Accepted LLM aliases are normalized before returning to clients, for example `SEND_MESSAGE -> COMPOSE_MESSAGE`, `ADD_FRIEND -> SEND_FRIEND_REQUEST`, and `RENAME_GROUP -> CHANGE_GROUP_NAME`.
 
-## 8. SYSTEM ACTION DISPATCHER
+### 3.2 Health
 
-The AI can produce structured commands in its response. The client MUST parse and validate these before execution.
+Correct health path:
 
-### 8.1 Supported Commands
+`GET /api/v1/ai/actuator/health`
 
-| Command | Parameter | Validation | Action |
+A healthy container only means Spring Boot is up. Gemini/Ollama availability must be inferred from chat response `providerStatus`, `degraded`, and service logs.
+
+## 4. Provider Behavior
+
+| Condition | Expected behavior |
+|---|---|
+| Gemini success | Return response with `providerStatus=LIVE_PROVIDER_ACTIVE`, `degraded=false`. |
+| Gemini fails and Ollama enabled/reachable | Fall back to Ollama with `providerStatus=FALLBACK_PROVIDER_ACTIVE`, `degraded=true`. |
+| Gemini fails and Ollama disabled/unreachable | Return graceful emergency response with `providerStatus=AI_PROVIDER_UNAVAILABLE`, `degraded=true`. |
+| Provider outage + obvious local intent | Preserve safe local actions such as opening chat/call intent when schema is valid. |
+
+The EC2 t3.large deployment should not run `llama3.1:8b` in the same stack by default because memory pressure can destabilize other services.
+
+## 5. Rate Limit and History
+
+| Item | Runtime default |
+|---|---:|
+| Per-user AI chat rate limit | `ai.chat.rate-limit-per-user:5` per minute |
+| Global Gemini rate limit | `ai.chat.rate-limit-global:10` per minute |
+| Web request history window | latest 20 messages |
+| Mobile listening idle timeout target | at least 10 seconds before auto-stop when no speech is captured |
+
+The full AI conversation should optimistically append the user's message immediately, then show assistant typing until the response arrives.
+
+## 6. Client Surfaces
+
+### 6.1 Mobile Floating Bubble Board
+
+Files:
+
+- `frontend/mobile/lib/features/ai_assistant/widgets/ai_floating_bubble.dart`
+- `frontend/mobile/lib/features/ai_assistant/widgets/ai_chat_board.dart`
+
+Required behavior:
+
+- tap bubble once to open board; tap again to close
+- listening state must not auto-close before the 10-second idle timeout
+- listening visual must stay inside the mascot/bubble bounds
+- compact board should show recent turns, degraded/provider status, quick chips, copy feedback, and full conversation entry
+- placeholder controls must be hidden until implemented
+
+### 6.2 Mobile Full AI Conversation
+
+File: `frontend/mobile/lib/features/ai_assistant/screens/ai_conversation_screen.dart`
+
+Required behavior:
+
+- message list, background, typography, and composer must align with normal chat design grammar
+- user message appears immediately after send; assistant typing appears while waiting
+- mic action is explicit and stateful
+- status banner reflects provider availability and local/cloud history mode
+- action confirmations use bottom sheets with recipient cards and clear primary/secondary actions
+
+### 6.3 Web AI Page
+
+Files:
+
+- `frontend/web/src/pages/AiChatPage.tsx`
+- `frontend/web/src/features/chat/chat.api.ts`
+- `frontend/web/src/features/chat/components/ChatWindow.tsx`
+- `frontend/web/src/features/chat/components/MessageInput.tsx`
+- `frontend/web/src/styles/chat.css`
+
+Current behavior:
+
+- standalone AI chat page with localStorage history
+- consumes `textReply`, `actionCommand`, `actionParams`, `degraded`, and `providerStatus`
+- displays provider/degraded status
+- supports guarded navigation/open-chat/compose draft flow
+- stores compose draft in `localStorage` and injects it into the normal chat composer after navigation
+
+Web does not directly perform destructive or high-risk actions. Unsupported commands must show a recoverable message and direct the user to mobile/manual flow.
+
+## 7. System Action Commands
+
+### 7.1 Backend Allow-Listed Commands
+
+| Command | Minimum params | Risk | Client execution policy |
 |---|---|---|---|
-| `NAVIGATE_TO` | `page: string` | Page name must be in allowed list | Navigate to named tab |
-| `NAVIGATE_TO_SETTINGS` | none | Always valid | Navigate to settings |
-| `NAVIGATE_TO_CHAT` | none | Always valid | Switch to chat tab |
-| `NAVIGATE_TO_CONTACTS` | none | Always valid | Switch to contacts tab |
-| `OPEN_CHAT` | `target: string` | Conversation must exist | Push ChatDetailScreen |
-| `SEND_MESSAGE` | `target: string, content: string` | Conversation must exist, content sanitized | Open chat, prefilled text |
-| `START_CALL` | `target: string, callType: 'audio'|'video'` | Must be 1:1 conversation, user is participant | Push call screen |
-| `SEARCH_GLOBAL` | `keyword: string` | Keyword sanitized, non-empty | Trigger global search |
+| `NAVIGATE_TO` | `page` | low | Route only to allow-listed pages. |
+| `NAVIGATE_TO_SETTINGS` | none | low | Open settings/profile surface. |
+| `NAVIGATE_TO_CHAT` | none | low | Open chat tab/page. |
+| `NAVIGATE_TO_CONTACTS` | none | low | Open contacts tab/page. |
+| `NAVIGATE_TO_SCANNER` | none | medium | Mobile only; camera permission still required. |
+| `NAVIGATE_TO_TIMELINE` | none | low | Mobile only unless web route exists. |
+| `OPEN_CHAT` | `target` | medium | Resolve exact conversation; disambiguate if needed. |
+| `COMPOSE_MESSAGE` | `recipient`, `content` | medium | Open chat and prefill; sending requires user action/confirmation. |
+| `START_CALL` | `target`, optional `callType` | high | Confirm target and call type before starting. |
+| `RECALL_MESSAGE` | context/last message | destructive | Confirm before recalling. |
+| `CREATE_GROUP` | `groupName`, `memberNames[]` | high | Confirm members and name before creating. |
+| `MUTE_CONVERSATION` / `UNMUTE_CONVERSATION` | target/current chat | medium | Confirm when target is inferred. |
+| `PIN_MESSAGE` / `UNPIN_MESSAGE` | message/current context | medium | Confirm exact message. |
+| `OPEN_GROUP_SETTINGS` | target/current group | low | Open settings only. |
+| `OPEN_PROFILE` | `target` | low | Resolve exact user then open profile. |
+| `SEND_FRIEND_REQUEST` | `target` | medium | Confirm recipient before sending. |
+| `BLOCK_USER` / `UNBLOCK_USER` | `target` | destructive | Strong confirmation required. |
+| `CHANGE_GROUP_NAME` | `title` | high | Admin permission + confirmation. |
+| `ADD_GROUP_MEMBER` / `REMOVE_GROUP_MEMBER` | `memberNames[]` | high/destructive | Admin permission + confirmation. |
+| `TRANSFER_GROUP_OWNER` | `memberNames[]` | destructive | Strong confirmation required. |
+| `LEAVE_GROUP` / `DISBAND_GROUP` | target/current group | destructive | Strong confirmation required. |
 
-### 8.2 Command Parsing
+### 7.2 Client Coverage
 
-```
-AI response MAY contain structured JSON commands embedded in the text.
-Format: ```json { "action": "COMMAND_NAME", "params": {...} } ```
-Client MUST:
-  1. Extract JSON block from response text
-  2. Validate action against allowed command list
-  3. Validate params against parameter schema
-  4. Execute only if all validations pass
-  5. Strip command JSON from displayed text
-```
+| Capability | Mobile | Web |
+|---|---:|---:|
+| Navigation commands | supported where routes exist | supported for chat/contacts/profile/settings |
+| Open chat | supported with resolver | supported by inbox-name lookup |
+| Compose draft | supported; confirmation first | supported by draft injection into normal chat composer |
+| Start call | supported with confirmation | opens chat; user manually confirms call |
+| Group/admin/destructive actions | roadmap/guarded | not directly executed |
+| Send message immediately | not default | not supported |
 
-### 8.3 Command Guards
+The backend prompt must not list commands that are absent from the backend allow-list. Clients must not execute commands they do not support.
 
-| Guard | Condition | Action |
-|---|---|---|
-| Conversation not found | `findConversationByName(target)` returns null | Snackbar error |
-| Already in target chat | `activeConversationId == conversation.id` | Skip navigation |
-| Call screen active | `_isCallScreenActive == true` | Abort, no duplicate |
-| Group conversation for call | `!isDirect` | Snackbar: "chỉ hỗ trợ cuộc gọi 1-1" |
+## 8. Recipient Resolution Policy
 
----
-
-## 9. OBSERVABILITY
-
-### 9.1 Logging
-
-```
-ai-service MUST log:
-  - Request: userId, timestamp, input token count
-  - Response: userId, timestamp, output token count, latency
-  - Error: userId, error code, error message, provider
-  - Token usage: per-user, per-day aggregation
-```
-
-### 9.2 Metrics
-
-| Metric | Description |
+| Situation | Required UX |
 |---|---|
-| `ai_request_total` | Total AI API requests |
-| `ai_request_duration_seconds` | Request latency histogram |
-| `ai_provider_switch_total` | Count of Gemini → Ollama fallbacks |
-| `ai_rate_limit_exceeded_total` | Rate limit hit count |
-| `ai_error_total` | Error count by error type |
+| No target provided | Ask for target; do not execute. |
+| No match found | Show recoverable error and suggest contacts/search. |
+| One exact direct match | Continue to confirmation for risky actions. |
+| Multiple matches | Show disambiguation sheet before confirmation. |
+| Group and direct matches share name | Explicitly label direct/group and member count. |
+| More than five matches | Provide search/filter in disambiguation sheet. |
 
----
+## 9. Compose Message Policy
 
-## 10. EVIDENCE
+Default safe behavior:
 
-| Component | File |
+1. Resolve recipient.
+2. If ambiguous, ask user to choose.
+3. Show confirmation with recipient card and message preview.
+4. Default CTA: `Mở và điền sẵn`.
+5. Open chat and inject draft; user presses Send manually.
+
+Optional future behavior:
+
+- `Gửi ngay` may be offered only when recipient is unambiguous, content is explicit, and the user confirms in a high-emphasis modal.
+- `Gửi ngay` must never be the only or default action.
+
+## 10. Modal and Input Design Contract
+
+| Component | Required geometry |
 |---|---|
-| AI service controller | `backend/java-services/services/ai-service/src/.../controller/` |
-| AI service implementation | `backend/java-services/services/ai-service/src/.../service/` |
-| Flutter AI provider | `frontend/mobile/lib/features/ai_assistant/providers/ai_assistant_provider.dart` |
-| Flutter AI floating bubble | `frontend/mobile/lib/features/ai_assistant/widgets/ai_floating_bubble.dart` |
-| Flutter system action dispatcher | `frontend/mobile/lib/navigation/main_shell.dart` |
+| Bottom sheet top radius | 22-24 |
+| Drag handle | width 40-56, height 4-6, radius 999 or 2+ |
+| Primary/secondary CTA | min height 48-50, radius 12 |
+| Form/input field | radius 12, focused border width about 1.5 |
+| Pills/chips/handles | radius 999 |
+| Detail card inside modal | radius 12-16 unless intentionally card-like |
 
----
+AI confirmation sheets must show action type, recipient, target conversation type, and content preview as separate labeled sections. Destructive actions use error color and explicit destructive copy. Call confirmations must align text vertically with the call icon and show voice/video type.
 
-## 11. REMEDIATION CHECKLIST
+## 11. Observability
 
-| Item | Priority | Status |
-|---|---|---|
-| Enforce JWT validation on ai-service endpoints | CRITICAL | `[SPEC_ONLY]` |
-| Implement per-user rate limiting (20 req/min) | CRITICAL | `[SPEC_ONLY]` |
-| Implement Ollama fallback on Gemini 5xx | HIGH | `[SPEC_ONLY]` |
-| Implement AI response content sanitization (PII, malicious URLs) | CRITICAL | `[SPEC_ONLY]` |
-| Validate AI system commands against user permissions | CRITICAL | `[SPEC_ONLY]` |
-| Implement `NAVIGATE_TO_CONTACTS` and `SEARCH_GLOBAL` actions | MEDIUM | `[SPEC_ONLY]` |
-| Web AI Assistant equivalent | LOW | Planned |
-| Cloud backup for AI history | LOW | Planned |
+AI action logs must redact message content and include:
+
+- command
+- commandId/traceId when available
+- normalized command
+- target resolution outcome
+- confirmation/cancel outcome
+- degraded/provider status
+
+## 12. Verification Checklist
+
+| Check | Required command/manual test |
+|---|---|
+| AI backend contract | `./mvnw clean test "-Dtest=GeminiAiServiceTest,ChatServiceTest"` in `services/ai-service` |
+| Web TypeScript build | `npm run build` in `frontend/web` |
+| Web lint | `npm run lint` in `frontend/web`; currently fails on pre-existing broad lint debt, so targeted files/build must still pass |
+| Mobile provider syntax | `flutter analyze lib/features/ai_assistant/providers/ai_assistant_provider.dart` |
+| Compose ambiguous recipient | Manual: request message to duplicated display name |
+| Compose exact recipient | Manual: request message to exact friend, verify draft only |
+| Call direct recipient | Manual: request voice/video call, verify confirmation |
+| Group/destructive guard | Manual: request high-risk group/admin action, verify confirmation or unsupported guard |
+
+## 13. Current Remediation Backlog
+
+| Priority | Item |
+|---|---|
+| P0 | Keep branch hygiene: mobile-only on `ai-mobile-assistant`; backend/web/docs on `nguyenvu`. |
+| P0 | Ensure mobile listening idle timeout is at least 10 seconds and bubble state remains consistent. |
+| P0 | Ensure web/mobile AI text has no mojibake. |
+| P0 | Render degraded/provider status across mobile and web. |
+| P1 | Upgrade AI action confirmation and disambiguation sheets to design contract. |
+| P1 | Keep AI input bars aligned with normal chat/auth visual grammar. |
+| P1 | Hide placeholder image controls until implemented. |
+| P2 | Add richer recent transcript and retry/regenerate/copy-toast actions. |
+| P2 | Add client-side telemetry for action resolution and confirmation outcomes. |
+| P3 | Enable additional high-risk commands only after client dispatcher, permission checks, and confirmation UX are complete. |

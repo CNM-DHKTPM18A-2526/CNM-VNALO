@@ -36,6 +36,7 @@ type MessageInputProps = {
   members?: Array<{ userId: string; displayName: string; avatarUrl?: string | null }>
   suggestedReplies?: string[]
   onSelectSuggestedReply?: (reply: string) => void
+  initialText?: string
 }
 
 type FilePreviewItem = {
@@ -57,9 +58,11 @@ export function MessageInput({
   members = [],
   suggestedReplies = [],
   onSelectSuggestedReply,
+  initialText,
 }: MessageInputProps) {
   const { accessToken } = useAuth()
   const [messageText, setMessageText] = React.useState('')
+  const [mentions, setMentions] = React.useState<Array<{ displayName: string; userId: string }>>([])
   const [selectedFiles, setSelectedFiles] = React.useState<File[]>([])
 
   const handleSelectSuggestedReply = (reply: string) => {
@@ -100,6 +103,15 @@ export function MessageInput({
   const [error, setError] = React.useState('')
   const [isFocused, setIsFocused] = React.useState(false)
   const fileInputRef = React.useRef<HTMLInputElement | null>(null)
+
+  React.useEffect(() => {
+    const normalized = initialText?.trim()
+    if (!normalized) return
+    setMessageText(normalized)
+    setTimeout(() => {
+      messageInputRef.current?.focus()
+    }, 50)
+  }, [initialText])
   
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -130,15 +142,24 @@ export function MessageInput({
   const handleSelectMention = (member: { userId: string; displayName: string }) => {
     const before = messageText.substring(0, mentionState.cursorPos);
     const after = messageText.substring(messageInputRef.current?.selectionEnd || 0);
-    // Use \u200B (Zero Width Space) as an invisible marker, encoding ID for interactivity
-    const newText = `${before}\u200B@${member.displayName}|${member.userId}\u200B ${after}`;
+    const mentionText = `@${member.displayName} `;
+    const newText = `${before}${mentionText}${after}`;
     setMessageText(newText);
+    
+    // Add to mentions list
+    setMentions(prev => {
+      // Avoid duplicate metadata entries for the exact same display name if it's already there
+      const exists = prev.some(m => m.userId === member.userId && m.displayName === member.displayName);
+      if (exists) return prev;
+      return [...prev, { displayName: member.displayName, userId: member.userId }];
+    });
+
     setMentionState(prev => ({ ...prev, isOpen: false }));
     
     // Focus back to input
     setTimeout(() => {
       messageInputRef.current?.focus();
-      const newPos = before.length + member.displayName.length + 3; // +3 for markers and space
+      const newPos = before.length + mentionText.length;
       messageInputRef.current?.setSelectionRange(newPos, newPos);
     }, 0);
   };
@@ -243,8 +264,19 @@ export function MessageInput({
   }
 
   const submitMessage = (payload?: ChatComposePayload) => {
+    let processedText = messageText;
+    if (!payload) {
+      // Process mentions in the messageText
+      mentions.forEach(m => {
+        const target = `@${m.displayName}`;
+        if (processedText.includes(target)) {
+          processedText = processedText.replace(target, `\u200B@${m.displayName}|${m.userId}\u200B`);
+        }
+      });
+    }
+
     const draft = payload ?? {
-      text: messageText,
+      text: processedText,
       files: selectedFiles,
       sticker: null,
     }
@@ -266,6 +298,7 @@ export function MessageInput({
 
     onSend(draft)
     setMessageText('')
+    setMentions([])
     setSelectedFiles([])
     setError('')
   }
@@ -409,53 +442,37 @@ export function MessageInput({
           <ToolIconButton label='File' disabled={disabled} onClick={() => openFilePicker('file')}>
             <Paperclip size={24} />
           </ToolIconButton>
-          <ToolIconButton label='Mention' disabled={disabled}><AtSign size={24} /></ToolIconButton>
+          <ToolIconButton 
+            label='Mention' 
+            disabled={disabled}
+            onClick={() => {
+              if (disabled) return;
+              const pos = messageInputRef.current?.selectionStart || messageText.length;
+              const newText = messageText.substring(0, pos) + '@' + messageText.substring(pos);
+              setMessageText(newText);
+              setMentionState({
+                isOpen: true,
+                filter: '',
+                cursorPos: pos,
+                left: Math.min((pos + 1) * 8, 300)
+              });
+              setTimeout(() => {
+                messageInputRef.current?.focus();
+                messageInputRef.current?.setSelectionRange(pos + 1, pos + 1);
+              }, 0);
+            }}
+          >
+            <AtSign size={24} />
+          </ToolIconButton>
           <ToolIconButton label='Voice' disabled={disabled}><Mic size={24} /></ToolIconButton>
           <div className='flex-1' />
           <ToolIconButton label='More' disabled={disabled}><Ellipsis size={24} /></ToolIconButton>
         </div>
 
         <div className={`flex h-[48px] items-center gap-2 rounded-full transition relative ${isFocused ? 'bg-[var(--surface)] ring-1 ring-[#0068ff]/30 shadow-sm' : 'bg-[var(--input-bg)] border-0 shadow-inner'}`}>
-          <div 
-            className="absolute inset-0 px-3 flex items-center pointer-events-none whitespace-pre overflow-hidden text-[15px]"
-            style={{ 
-              letterSpacing: 'normal',
-              wordSpacing: 'normal',
-              lineHeight: 'normal',
-              fontFamily: 'inherit',
-              paddingTop: '0',
-              paddingBottom: '0'
-            }}
-          >
-            {messageText.split(/(\u200B@.*?\u200B)/g).map((part, i) => {
-              if (part.startsWith('\u200B@')) {
-                const displayName = part.replace(/\u200B/g, '').split('|')[0];
-                return (
-                  <span key={i} className="text-[#0068ff] font-medium">
-                    {displayName}
-                  </span>
-                );
-              }
-              return (
-                <span key={i} className="text-[var(--text)]">
-                  {part.replace(/\u200B/g, '')}
-                </span>
-              );
-            })}
-          </div>
           <input
             ref={messageInputRef}
-            className='h-full w-full border-0 bg-transparent text-[15px] outline-none placeholder:text-[var(--muted)] px-3 relative z-10'
-            style={{ 
-              color: 'transparent',
-              caretColor: isFocused ? '#0068ff' : '#1a1a1a',
-              letterSpacing: 'normal',
-              wordSpacing: 'normal',
-              lineHeight: 'normal',
-              fontFamily: 'inherit',
-              paddingTop: '0',
-              paddingBottom: '0'
-            }}
+            className='h-full w-full border-0 bg-transparent text-[15px] outline-none placeholder:text-[var(--muted)] px-3 text-[var(--text)] relative'
             placeholder={dynamicPlaceholder}
             value={messageText}
             disabled={disabled}

@@ -27,9 +27,20 @@ public class AiChatResponse {
     // Billing/Quota limits tracking
     private int estimatedTokens;
 
+    // True when the response was generated without a live AI provider.
+    private boolean degraded;
+
+    // Machine-readable provider/runtime status for clients and diagnostics.
+    private String providerStatus;
+
     // Stable, server-provided unique assistant conversation ID for this user session
     private String conversationId;
 
     private String userEntryId;
     private String assistantEntryId;
+
+    // Optional client hints for safer UI execution of AI-suggested actions.
+    private Boolean requiresConfirmation;
+    private String riskLevel;
 }
+

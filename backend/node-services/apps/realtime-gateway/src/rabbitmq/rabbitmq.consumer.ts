@@ -42,9 +42,11 @@ export class RabbitMQConsumer {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
-    const url =
-      this.configService.get<string>('rabbit.url') ??
-      'amqp://guest:guest@localhost:5672';
+    const url = this.configService.get<string>('rabbit.url');
+    if (!url) {
+      this.logger.error('RabbitMQ URL is not configured. Set RABBITMQ_URL environment variable.');
+      return;
+    }
     try {
       const connection = await amqplib.connect(url);
       const channel = await connection.createChannel();

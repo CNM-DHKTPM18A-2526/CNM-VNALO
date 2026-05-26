@@ -15,11 +15,19 @@ import org.springframework.web.bind.annotation.*;
 
 import iuh.cnm.vnalo.aiservice.dto.ApiResponse;
 
+import java.text.Normalizer;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
+import java.util.regex.Pattern;
+
 @Slf4j
 @RestController
 @RequestMapping("")
 @RequiredArgsConstructor
 public class AiInteractionController {
+
+    private static final Pattern DIACRITICS_PATTERN = Pattern.compile("\\p{M}+");
 
     private final GeminiAiService geminiAiService;
     private final ChatService chatService;
@@ -43,8 +51,7 @@ public class AiInteractionController {
                     .body(ApiResponse.error(429, e.getMessage()));
         } catch (RuntimeException e) {
             log.error("AI Interaction error: ", e);
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body(ApiResponse.error(503, "VNALO Brain is restarting."));
+            return ResponseEntity.ok(ApiResponse.ok(buildEmergencyFallbackResponse(request)));
         }
     }
 
@@ -94,5 +101,62 @@ public class AiInteractionController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error(500, "Failed to delete history: " + e.getMessage()));
         }
+    }
+
+    private AiChatResponse buildEmergencyFallbackResponse(AiChatRequest request) {
+        AiChatResponse fallback = AiChatResponse.builder()
+                .textReply("Xin loi, he thong AI dang ban. Ban vui long thu lai sau it phut.")
+                .emotion("neutral")
+                .estimatedTokens(0)
+                .degraded(true)
+                .providerStatus("AI_PROVIDER_UNAVAILABLE")
+                .build();
+
+        if (!request.isAnalyzeIntent()) {
+            return fallback;
+        }
+
+        String prompt = normalizeIntentText(request.getPrompt());
+        if (looksLikeCallIntent(prompt)) {
+            Map<String, Object> params = new HashMap<>();
+            params.put("callType", isVideoCallIntent(prompt) ? "video" : "voice");
+
+            fallback.setActionCommand("START_CALL");
+            fallback.setActionParams(params);
+            fallback.setTextReply("AI dang gap su co, nhung minh van co the bat dau cuoc goi cho ban.");
+        }
+
+        return fallback;
+    }
+
+    private boolean looksLikeCallIntent(String prompt) {
+        if (prompt.isBlank()) {
+            return false;
+        }
+
+        return prompt.contains("goi")
+                || prompt.contains("call")
+                || prompt.contains("phone")
+                || prompt.contains("dien thoai")
+                || prompt.contains("cuoc goi");
+    }
+
+    private boolean isVideoCallIntent(String prompt) {
+        return prompt.contains("video")
+                || prompt.contains("camera")
+                || prompt.contains("hinh")
+                || prompt.contains("cam");
+    }
+
+    private String normalizeIntentText(String input) {
+        if (input == null || input.isBlank()) {
+            return "";
+        }
+
+        String normalized = Normalizer.normalize(input.toLowerCase(Locale.ROOT), Normalizer.Form.NFD);
+        return DIACRITICS_PATTERN.matcher(normalized)
+                .replaceAll("")
+                .replace('đ', 'd')
+                .replace('Đ', 'D');
     }
 }

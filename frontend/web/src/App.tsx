@@ -12,6 +12,9 @@ import CallPage from './pages/CallPage'
 import { ContactsPage } from './pages/ContactsPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { AiChatPage } from './pages/AiChatPage'
+import SocialPage from './features/social/pages/SocialPage'
+import CreateStoryPage from './features/social/pages/CreateStoryPage'
+import StoryViewerPage from './features/social/pages/StoryViewerPage'
 import { UserStoreProvider } from './features/chat/context/UserStoreContext'
 import { NotificationProvider } from './features/notifications/NotificationContext'
 import './styles/app.css'
@@ -23,27 +26,44 @@ function App() {
     <UserStoreProvider>
       <NotificationProvider>
         <Routes>
-        <Route path='/login' element={isAuthenticated ? <Navigate replace to='/chat' /> : <LoginPage />} />
-        <Route path='/login/qr' element={isAuthenticated ? <Navigate replace to='/chat' /> : <QrLoginPage />} />
-        <Route path='/register' element={isAuthenticated ? <Navigate replace to='/chat' /> : <RegisterPage />} />
-        <Route path='/forgot-password' element={isAuthenticated ? <Navigate replace to='/chat' /> : <ForgotPasswordPage />} />
-        <Route
-          path='/'
-          element={
-            <ProtectedRoute>
-              <MainLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Navigate replace to='/chat' />} />
-          <Route path='chat/:conversationId?' element={<ChatPage />} />
-          <Route path='contacts' element={<ContactsPage />} />
-          <Route path='profile' element={<ProfilePage />} />
-          <Route path='chat-ai' element={<AiChatPage />} />
-        </Route>
-        <Route path='/call/:callId' element={<ProtectedRoute><CallPage /></ProtectedRoute>} />
-        <Route path='*' element={<Navigate replace to='/chat' />} />
-      </Routes>
+          <Route path='/login' element={isAuthenticated ? <Navigate replace to='/chat' /> : <LoginPage />} />
+          <Route path='/login/qr' element={isAuthenticated ? <Navigate replace to='/chat' /> : <QrLoginPage />} />
+          <Route path='/register' element={isAuthenticated ? <Navigate replace to='/chat' /> : <RegisterPage />} />
+          <Route path='/forgot-password' element={isAuthenticated ? <Navigate replace to='/chat' /> : <ForgotPasswordPage />} />
+          <Route
+            path='/'
+            element={
+              <ProtectedRoute>
+                <MainLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<Navigate replace to='/chat' />} />
+            <Route path='chat/:conversationId?' element={<ChatPage />} />
+            <Route path='contacts' element={<ContactsPage />} />
+            <Route path='profile' element={<ProfilePage />} />
+            <Route path='chat-ai' element={<AiChatPage />} />
+            <Route path='social' element={<SocialPage />} />
+          </Route>
+          <Route
+            path='/stories/create'
+            element={
+              <ProtectedRoute>
+                <CreateStoryPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path='/stories/:storyId'
+            element={
+              <ProtectedRoute>
+                <StoryViewerPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path='/call/:callId' element={<ProtectedRoute><CallPage /></ProtectedRoute>} />
+          <Route path='*' element={<Navigate replace to='/chat' />} />
+        </Routes>
       </NotificationProvider>
     </UserStoreProvider>
   )

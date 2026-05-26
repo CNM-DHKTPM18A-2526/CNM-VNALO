@@ -1117,12 +1117,25 @@ export async function sendAiChatMessage(
   token: string,
   prompt: string,
   history: Array<{ role: 'user' | 'assistant'; content: string }>
-): Promise<string> {
+): Promise<{
+  textReply: string
+  actionCommand?: string | null
+  actionParams?: Record<string, unknown> | null
+  degraded?: boolean
+  providerStatus?: string
+}> {
   try {
     const response = await aiApi.post('chat', { prompt, history }, {
       headers: { Authorization: `Bearer ${token}` }
     });
-    return response.data?.data?.textReply ?? '';
+    const data = response.data?.data;
+    return {
+      textReply: data?.textReply ?? '',
+      actionCommand: data?.actionCommand ?? null,
+      actionParams: data?.actionParams ?? null,
+      degraded: Boolean(data?.degraded),
+      providerStatus: data?.providerStatus,
+    };
   } catch (error) {
     console.error('[sendAiChatMessage] failed:', error);
     throw error;
