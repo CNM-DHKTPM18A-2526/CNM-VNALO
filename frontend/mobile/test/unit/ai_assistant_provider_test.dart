@@ -647,4 +647,50 @@ void main() {
 
     provider.dispose();
   });
+
+  test('conversation history is isolated per auth user scope', () async {
+    final provider = _buildProvider(
+      responses: {
+        'user-a': {'textReply': 'reply-a', 'emotion': 'neutral'},
+        'user-b': {'textReply': 'reply-b', 'emotion': 'neutral'},
+      },
+    );
+
+    await provider.bindAuthUser('user-a');
+    await provider.submitTextPrompt('user-a', source: 'scope_test');
+
+    expect(provider.conversationHistory, isNotEmpty);
+    expect(
+      provider.conversationHistory.any((entry) => entry.text == 'user-a'),
+      isTrue,
+    );
+
+    await provider.bindAuthUser('user-b');
+
+    expect(provider.conversationHistory, isEmpty);
+    expect(provider.aiResponse, isEmpty);
+
+    await provider.submitTextPrompt('user-b', source: 'scope_test');
+    expect(
+      provider.conversationHistory.any((entry) => entry.text == 'user-b'),
+      isTrue,
+    );
+    expect(
+      provider.conversationHistory.any((entry) => entry.text == 'user-a'),
+      isFalse,
+    );
+
+    await provider.bindAuthUser('user-a');
+
+    expect(
+      provider.conversationHistory.any((entry) => entry.text == 'user-a'),
+      isTrue,
+    );
+    expect(
+      provider.conversationHistory.any((entry) => entry.text == 'user-b'),
+      isFalse,
+    );
+
+    provider.dispose();
+  });
 }

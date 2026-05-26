@@ -335,6 +335,7 @@ class AiAssistantProvider with ChangeNotifier {
   static const String _serverConversationIdPrefKey =
       'vnalo_ai_server_conversation_id';
   static const String _syncedEntryIdsPrefKey = 'vnalo_ai_synced_entry_ids_v1';
+  static const String _guestScopeKey = 'guest';
   static const String _defaultLocaleId = 'vi_VN';
   static const Duration _aiTimeout = Duration(seconds: 25);
   static const Duration _sttListenFor = Duration(seconds: 10);
@@ -391,6 +392,7 @@ class AiAssistantProvider with ChangeNotifier {
   bool _conversationCreated = false;
   bool _cloudBackupEnabled = false;
   String? _serverConversationId;
+  String _activeScopeKey = _guestScopeKey;
   final Set<String> _syncedEntryIds = <String>{};
   final List<AiConversationEntry> _conversationHistory = [];
   final List<Map<String, String>> _sessionHistory = [];
@@ -415,6 +417,25 @@ class AiAssistantProvider with ChangeNotifier {
     _activeTraceId = _uuid.v4();
     _initTts();
     unawaited(_initPersistence());
+  }
+
+  String get _scopedHistoryPrefKey => _scopedPrefKey(_historyPrefKey);
+  String get _scopedConversationCreatedPrefKey =>
+      _scopedPrefKey(_conversationCreatedPrefKey);
+  String get _scopedCloudBackupPrefKey => _scopedPrefKey(_cloudBackupPrefKey);
+  String get _scopedServerConversationIdPrefKey =>
+      _scopedPrefKey(_serverConversationIdPrefKey);
+  String get _scopedSyncedEntryIdsPrefKey =>
+      _scopedPrefKey(_syncedEntryIdsPrefKey);
+
+  String _scopedPrefKey(String baseKey) => '${baseKey}_$_activeScopeKey';
+
+  String _resolveScopeKey(String? userId) {
+    final normalized = userId?.trim();
+    if (normalized == null || normalized.isEmpty) {
+      return _guestScopeKey;
+    }
+    return normalized;
   }
 
   // ------------------------- Public getters ---------------------------------
@@ -493,6 +514,36 @@ class AiAssistantProvider with ChangeNotifier {
   Stream<AiDisambiguationSelection> get disambiguationSelectionStream =>
       _disambiguationSelectionController.stream;
   AiClarificationState? get clarificationState => _clarificationState;
+
+  Future<void> bindAuthUser(String? userId) async {
+    final nextScopeKey = _resolveScopeKey(userId);
+    if (_activeScopeKey == nextScopeKey || _isDisposed) {
+      return;
+    }
+
+    _cancelActiveOperation(reason: 'auth_scope_change');
+    await _stopAllInteractions(
+      reason: 'auth_scope_change',
+      keepResponse: false,
+    );
+    _cancelIdleAutoHide();
+    _cloudBackupDebounceTimer?.cancel();
+
+    _activeScopeKey = nextScopeKey;
+    _resetScopedConversationState(clearCurrentResponse: true);
+
+    final prefs = await SharedPreferences.getInstance();
+    await _loadScopedPersistence(prefs: prefs, notify: false);
+
+    _logEvent(
+      'AUTH_SCOPE_BOUND',
+      data: {
+        'scopeKey': _activeScopeKey,
+        'historySize': _conversationHistory.length,
+      },
+    );
+    notifyListeners();
+  }
 
   void addActionFeedback(
     String message, {
@@ -928,20 +979,13 @@ class AiAssistantProvider with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await _loadMascot(prefs: prefs);
     _persistentEnabled = prefs.getBool(_visibilityPrefKey) ?? false;
-    _cloudBackupEnabled = prefs.getBool(_cloudBackupPrefKey) ?? false;
-    _conversationCreated = prefs.getBool(_conversationCreatedPrefKey) ?? false;
-    _serverConversationId = prefs.getString(_serverConversationIdPrefKey);
-    await _loadConversationHistory(prefs: prefs);
-    _loadSyncedEntryIds(prefs: prefs);
-
-    if (_cloudBackupEnabled && _serverConversationId != null) {
-      unawaited(_restoreConversationHistoryFromServer());
-    }
+    await _loadScopedPersistence(prefs: prefs, notify: false);
 
     _logEvent(
       'PERSISTENCE_LOADED',
       data: {
         'persistentEnabled': _persistentEnabled,
+        'scopeKey': _activeScopeKey,
         'mascotId': _currentMascot.id,
         'cloudBackupEnabled': _cloudBackupEnabled,
         'hasConversation': hasConversation,
@@ -952,9 +996,30 @@ class AiAssistantProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> _loadScopedPersistence({
+    required SharedPreferences prefs,
+    bool notify = true,
+  }) async {
+    _cloudBackupEnabled = prefs.getBool(_scopedCloudBackupPrefKey) ?? false;
+    _conversationCreated =
+        prefs.getBool(_scopedConversationCreatedPrefKey) ?? false;
+    _serverConversationId = prefs.getString(_scopedServerConversationIdPrefKey);
+    await _loadConversationHistory(prefs: prefs);
+    _loadSyncedEntryIds(prefs: prefs);
+
+    if (_cloudBackupEnabled && _serverConversationId != null) {
+      unawaited(_restoreConversationHistoryFromServer());
+    }
+
+    if (notify) {
+      notifyListeners();
+    }
+  }
+
   Future<void> _loadConversationHistory({SharedPreferences? prefs}) async {
     final store = prefs ?? await SharedPreferences.getInstance();
-    final raw = store.getString(_historyPrefKey);
+    final raw = store.getString(_scopedHistoryPrefKey);
+    _conversationHistory.clear();
     if (raw == null || raw.trim().isEmpty) {
       return;
     }
@@ -983,10 +1048,25 @@ class AiAssistantProvider with ChangeNotifier {
   }
 
   void _loadSyncedEntryIds({required SharedPreferences prefs}) {
-    final ids = prefs.getStringList(_syncedEntryIdsPrefKey) ?? const <String>[];
+    final ids =
+        prefs.getStringList(_scopedSyncedEntryIdsPrefKey) ?? const <String>[];
     _syncedEntryIds
       ..clear()
       ..addAll(ids.where((id) => id.trim().isNotEmpty));
+  }
+
+  void _resetScopedConversationState({bool clearCurrentResponse = false}) {
+    _conversationHistory.clear();
+    _syncedEntryIds.clear();
+    _conversationCreated = false;
+    _cloudBackupEnabled = false;
+    _sessionHistory.clear();
+    _lastUserPrompt = '';
+    _serverConversationId = null;
+    _clarificationState = null;
+    if (clearCurrentResponse) {
+      _aiResponse = '';
+    }
   }
 
   Future<void> _loadMascot({SharedPreferences? prefs}) async {
@@ -1070,7 +1150,7 @@ class AiAssistantProvider with ChangeNotifier {
     _cloudBackupEnabled = enabled;
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_cloudBackupPrefKey, enabled);
+    await prefs.setBool(_scopedCloudBackupPrefKey, enabled);
 
     _logEvent('CLOUD_BACKUP_SET', data: {'enabled': enabled, 'reason': reason});
 
@@ -1111,10 +1191,10 @@ class AiAssistantProvider with ChangeNotifier {
     }
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_historyPrefKey);
-    await prefs.remove(_serverConversationIdPrefKey);
-    await prefs.remove(_syncedEntryIdsPrefKey);
-    await prefs.setBool(_conversationCreatedPrefKey, false);
+    await prefs.remove(_scopedHistoryPrefKey);
+    await prefs.remove(_scopedServerConversationIdPrefKey);
+    await prefs.remove(_scopedSyncedEntryIdsPrefKey);
+    await prefs.setBool(_scopedConversationCreatedPrefKey, false);
 
     _logEvent(
       'CONVERSATION_HISTORY_CLEARED',
@@ -2156,7 +2236,7 @@ class AiAssistantProvider with ChangeNotifier {
 
     _conversationCreated = true;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_conversationCreatedPrefKey, true);
+    await prefs.setBool(_scopedConversationCreatedPrefKey, true);
     _logEvent('CONVERSATION_CREATED', data: {'source': source});
     notifyListeners();
   }
@@ -2203,17 +2283,20 @@ class AiAssistantProvider with ChangeNotifier {
   Future<void> _persistConversationHistory() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_conversationCreatedPrefKey, _conversationCreated);
+      await prefs.setBool(
+        _scopedConversationCreatedPrefKey,
+        _conversationCreated,
+      );
       if (_serverConversationId != null) {
         await prefs.setString(
-          _serverConversationIdPrefKey,
+          _scopedServerConversationIdPrefKey,
           _serverConversationId!,
         );
       } else {
-        await prefs.remove(_serverConversationIdPrefKey);
+        await prefs.remove(_scopedServerConversationIdPrefKey);
       }
       await prefs.setString(
-        _historyPrefKey,
+        _scopedHistoryPrefKey,
         jsonEncode(
           _conversationHistory.map((entry) => entry.toJson()).toList(),
         ),
@@ -2231,7 +2314,7 @@ class AiAssistantProvider with ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       final ids = _syncedEntryIds.toList(growable: false)..sort();
-      await prefs.setStringList(_syncedEntryIdsPrefKey, ids);
+      await prefs.setStringList(_scopedSyncedEntryIdsPrefKey, ids);
     } catch (error) {
       _logEvent(
         'SYNCED_ENTRY_IDS_PERSIST_ERROR',
