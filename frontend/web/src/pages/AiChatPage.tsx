@@ -796,6 +796,8 @@ export function AiChatPage() {
             ))}
           </div>
 
+          <div className='flex-grow' style={{ flexGrow: 1 }} />
+
           <button
             type='button'
             className='ai-clear-btn flex items-center justify-center gap-2'
@@ -804,7 +806,7 @@ export function AiChatPage() {
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
           >
             <Trash2 size={14} />
-            Clear history
+            Xóa lịch sử
           </button>
         </div>
       </aside>
@@ -858,7 +860,6 @@ export function AiChatPage() {
               </div>
             </div>
           ))}
-
           {isLoading && (
             <div className='ai-typing-indicator'>
               <span className='ai-typing-label'>{activeActionLabel ? `${activeActionLabel} đang được chuẩn bị` : 'Trợ lý AI đang soạn phản hồi'}</span>
