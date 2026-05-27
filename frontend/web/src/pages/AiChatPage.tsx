@@ -79,6 +79,7 @@ type ActionFeedbackState = {
   message: string
 }
 const STORAGE_KEY = 'vnalo_ai_chat_history'
+const LEGACY_STORAGE_KEY = STORAGE_KEY
 const DRAFT_KEY_PREFIX = 'vnalo_ai_web_compose_draft:'
 const MAX_API_HISTORY = 20
 
@@ -428,14 +429,20 @@ export function AiChatPage() {
     }
 
     const saved = localStorage.getItem(historyStorageKey)
-    if (!saved) {
+    const legacySaved = localStorage.getItem(LEGACY_STORAGE_KEY)
+    if (!saved && !legacySaved) {
       setMessages([INITIAL_ASSISTANT_MESSAGE])
       return
     }
 
     try {
-      const parsed = JSON.parse(saved)
-      setMessages(normalizeStoredMessages(parsed))
+      const parsed = JSON.parse(saved ?? legacySaved ?? 'null')
+      const normalized = normalizeStoredMessages(parsed)
+      setMessages(normalized)
+      if (!saved && legacySaved) {
+        localStorage.setItem(historyStorageKey, JSON.stringify(normalized))
+        localStorage.removeItem(LEGACY_STORAGE_KEY)
+      }
     } catch (error) {
       console.warn('Failed to parse AI chat history', error)
       setMessages([INITIAL_ASSISTANT_MESSAGE])
@@ -449,6 +456,7 @@ export function AiChatPage() {
       return
     }
     localStorage.setItem(historyStorageKey, JSON.stringify(normalized))
+    localStorage.removeItem(LEGACY_STORAGE_KEY)
   }
 
   useEffect(() => {
@@ -767,6 +775,10 @@ export function AiChatPage() {
     setRetryPrompt('')
     setPendingActionReview(null)
     setPendingResolution(null)
+    if (historyStorageKey) {
+      localStorage.removeItem(historyStorageKey)
+    }
+    localStorage.removeItem(LEGACY_STORAGE_KEY)
     saveMessages([
       {
         role: 'assistant',
