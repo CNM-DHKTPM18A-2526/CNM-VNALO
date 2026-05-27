@@ -855,10 +855,10 @@ export function AiChatPage() {
             <span className='ai-presets-title'>Gợi ý câu hỏi</span>
             {PRESET_PROMPTS.map((prompt) => (
               <button
-                key={prompt}
+                key={fixMojibakeText(prompt)}
                 type='button'
                 className='ai-preset-btn'
-                onClick={() => void handleSend(prompt)}
+                onClick={() => void handleSend(fixMojibakeText(prompt))}
                 disabled={isAssistantBusy}
               >
                 {prompt}
