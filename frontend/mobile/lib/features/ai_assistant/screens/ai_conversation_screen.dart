@@ -798,7 +798,7 @@ class _ActionPromptChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         decoration: BoxDecoration(
           color: AppColors.primary.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(AiAssistantTokens.pillRadius),
           border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
         ),
         child: Text(
@@ -958,7 +958,7 @@ class _AiTypingBubble extends StatelessWidget {
               topLeft: Radius.circular(AiAssistantTokens.buttonRadius),
               topRight: Radius.circular(AiAssistantTokens.buttonRadius),
               bottomLeft: Radius.circular(4),
-              bottomRight: Radius.circular(16),
+              bottomRight: Radius.circular(AiAssistantTokens.buttonRadius),
             ),
             border:
                 isDarkMode
