@@ -829,7 +829,7 @@ export function AiChatPage() {
               <span>{actionFeedback.message}</span>
               {actionFeedback.tone === 'error' && retryPrompt ? (
                 <button type='button' className='ai-banner-action' onClick={handleRetry} disabled={isAssistantBusy}>
-                  Retry
+                  Thử lại
                 </button>
               ) : null}
             </div>
@@ -851,7 +851,7 @@ export function AiChatPage() {
                     onClick={() => void handleAction(message, index)}
                     disabled={isLoading || actionBusyIndex !== null || pendingActionReview !== null || pendingResolution !== null}
                   >
-                    {actionBusyIndex === index ? 'Processing...' : buildActionLabel(message.actionCommand)}
+                    {actionBusyIndex === index ? 'Đang xử lý...' : buildActionLabel(message.actionCommand)}
                   </button>
                 </div>
               ) : null}
