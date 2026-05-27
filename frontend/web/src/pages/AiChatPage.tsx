@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Send, Sparkles, Trash2, X } from 'lucide-react'
 
@@ -410,6 +410,7 @@ export function AiChatPage() {
   const [pendingActionReview, setPendingActionReview] = useState<PendingActionReview | null>(null)
   const [retryPrompt, setRetryPrompt] = useState<string>('')
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const isUnmountedRef = useRef(false)
   const inFlightRequestRef = useRef(false)
@@ -451,7 +452,13 @@ export function AiChatPage() {
   }
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const container = messagesContainerRef.current
+    if (!container) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+      return
+    }
+
+    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
   }, [messages, isLoading, actionFeedback])
 
   const runtimeState = useMemo(() => resolveProviderPresentation(messages), [messages])
@@ -773,15 +780,15 @@ export function AiChatPage() {
     <div className='ai-chat-layout'>
       <aside className='ai-chat-sidebar'>
         <div className='ai-chat-sidebar-scroll'>
-          <div className='ai-assistant-card'>
+          <section className='ai-assistant-card' aria-label='Thông tin trợ lý AI'>
             <div className='ai-avatar-glow'>
               <Sparkles size={28} />
             </div>
             <h3>VNALO AI Assistant</h3>
             <p>Hỗ trợ trả lời câu hỏi, giải thích nhanh và gợi ý thao tác an toàn trong VNALO.</p>
-          </div>
+          </section>
 
-          <div className='ai-presets-container'>
+          <section className='ai-presets-container' aria-label='Gợi ý câu hỏi AI'>
             <span className='ai-presets-title'>Gợi ý câu hỏi</span>
             {PRESET_PROMPTS.map((prompt) => (
               <button
@@ -794,7 +801,7 @@ export function AiChatPage() {
                 {prompt}
               </button>
             ))}
-          </div>
+          </section>
 
           <div className='flex-grow' style={{ flexGrow: 1 }} />
 
@@ -822,7 +829,7 @@ export function AiChatPage() {
           </div>
         </header>
 
-        <div className='ai-chat-messages'>
+        <div className='ai-chat-messages' ref={messagesContainerRef} role='log' aria-live='polite' aria-relevant='additions text'>
           {runtimeState.degraded && <div className={runtimeState.bannerClassName}>{runtimeState.banner}</div>}
           {actionFeedback ? (
             <div className={`ai-runtime-banner ai-runtime-banner-${actionFeedback.tone}`}>

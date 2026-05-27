@@ -3464,3 +3464,13 @@
   background: color-mix(in srgb, var(--muted) 48%, transparent);
   border-radius: 999px;
 }
+
+/* AI web parity wave 6: deterministic scroll containers */
+.ai-chat-sidebar-scroll {
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.ai-chat-messages {
+  scrollbar-gutter: stable both-edges;
+}
