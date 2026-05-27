@@ -819,6 +819,28 @@ class MainShellState extends State<MainShell> {
         return;
       }
 
+      final isCallableFriend = await _isAiCallableFriend(peerUserId);
+      if (!mounted) return;
+      if (!isCallableFriend) {
+        _logAiFlow(
+          'AI_CALL_BLOCKED',
+          aiCommand: aiCmd,
+          extra: {
+            'reason': 'target_not_in_contacts',
+            'targetName': peerName,
+            'peerUserId': peerUserId,
+          },
+        );
+        _showErrorSnackBar(
+          AiCommandRouting.buildMissingTargetFeedback(
+            targetName: peerName,
+            targetType: 'liên hệ trong danh bạ',
+          ),
+          feedbackSource: 'ai_action_missing.contact',
+        );
+        return;
+      }
+
       await _handleAiStartCall(
         aiCmd,
         conversation: conversation,
@@ -1137,7 +1159,25 @@ class MainShellState extends State<MainShell> {
     return AiActionTargetMatcher.findUsersByName(users, name);
   }
 
-  Future<User?> _resolveAiFriend(
+  Future<bool> _isAiCallableFriend(String userId) async {
+    final normalizedUserId = userId.trim();
+    if (normalizedUserId.isEmpty) {
+      return false;
+    }
+
+    final contactProvider = context.read<ContactProvider>();
+    if (contactProvider.friends.isEmpty) {
+      await contactProvider.fetchFriends();
+    }
+    if (!mounted) {
+      return false;
+    }
+
+    return contactProvider.friends.any(
+      (friend) => friend.id.trim() == normalizedUserId,
+    );
+  }
+Future<User?> _resolveAiFriend(
     AiCommand aiCmd,
     Map<String, dynamic>? params, {
     String? fallbackName,
