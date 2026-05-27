@@ -144,6 +144,40 @@ class MainShellState extends State<MainShell> {
     _addAiActionInfo(message, feedbackSource: feedbackSource);
   }
 
+  String _resolveAiActionErrorSource(String message, {String? command}) {
+    final normalized = AiCommandRouting.normalizeSearchText(message);
+    if (normalized.contains('khong tim thay')) {
+      if (normalized.contains('cuoc tro chuyen') ||
+          normalized.contains('nhom')) {
+        return 'ai_action_missing.conversation';
+      }
+      if (normalized.contains('nguoi dung')) {
+        return 'ai_action_missing.user';
+      }
+      return 'ai_action_missing.contact';
+    }
+    if (normalized.contains('nhieu nguoi') ||
+        normalized.contains('noi ro hon') ||
+        normalized.contains('chon dung')) {
+      return 'ai_action_ambiguity.contact';
+    }
+    final suffix =
+        command == null || command.trim().isEmpty
+            ? 'unknown'
+            : _normalizeAiSystemAction(command);
+    return 'ai_action_failed.$suffix';
+  }
+
+  void _showAiActionExceptionFeedback(Object error, {String? command}) {
+    final message = error.toString().replaceFirst('Bad state: ', '').trim();
+    _showErrorSnackBar(
+      message.isEmpty
+          ? 'Minh gap truc trac khi thuc hien thao tac nay. Ban thu lai giup minh nhe.'
+          : message,
+      feedbackSource: _resolveAiActionErrorSource(message, command: command),
+    );
+  }
+
   void _rememberAiTargetContext({
     required String targetName,
     String? conversationId,
@@ -815,7 +849,10 @@ class MainShellState extends State<MainShell> {
     } else if (command == 'START_CALL') {
       if (!isDirect || peerUserId.isEmpty) {
         final callPlan = AiCallActionPlan.fromParams(params);
-        _showErrorSnackBar(callPlan.unsupportedGroupMessage);
+        _showErrorSnackBar(
+          callPlan.unsupportedGroupMessage,
+          feedbackSource: 'ai_action_unsupported.START_CALL',
+        );
         return;
       }
 
@@ -1177,7 +1214,8 @@ class MainShellState extends State<MainShell> {
       (friend) => friend.id.trim() == normalizedUserId,
     );
   }
-Future<User?> _resolveAiFriend(
+
+  Future<User?> _resolveAiFriend(
     AiCommand aiCmd,
     Map<String, dynamic>? params, {
     String? fallbackName,
@@ -1653,7 +1691,7 @@ Future<User?> _resolveAiFriend(
       await execute();
       if (mounted) _showSuccessSnackBar(plan.successMessage);
     } catch (error) {
-      _showErrorSnackBar(error.toString().replaceFirst('Bad state: ', ''));
+      _showAiActionExceptionFeedback(error, command: command);
     }
   }
 
