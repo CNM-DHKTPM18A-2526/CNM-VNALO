@@ -3397,3 +3397,70 @@
     max-width: 90%;
   }
 }
+/* AI web parity wave 5: lock sidebar + chat scroll behavior */
+.ai-chat-layout {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.ai-chat-sidebar {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ai-chat-sidebar-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--muted) 45%, transparent) transparent;
+}
+
+.ai-chat-sidebar-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.ai-chat-sidebar-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--muted) 48%, transparent);
+  border-radius: 999px;
+}
+
+.ai-chat-main {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ai-chat-header,
+.ai-chat-footer {
+  flex-shrink: 0;
+}
+
+.ai-chat-messages {
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--muted) 52%, transparent) transparent;
+}
+
+.ai-chat-messages::-webkit-scrollbar {
+  width: 8px;
+}
+
+.ai-chat-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ai-chat-messages::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--muted) 48%, transparent);
+  border-radius: 999px;
+}
