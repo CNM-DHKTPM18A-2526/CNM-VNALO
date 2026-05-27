@@ -239,7 +239,7 @@ class MainShellState extends State<MainShell> {
     }
 
     _addAiActionInfo(
-      'Đã chọn "$selectedName". Trợ lý đang tiếp tục thao tác trước đó.',
+      'ÄÃ£ chá»n "$selectedName". Trá»£ lÃ½ Ä‘ang tiáº¿p tá»¥c thao tÃ¡c trÆ°á»›c Ä‘Ã³.',
       feedbackSource: 'ai_action_resume.selection',
     );
 
@@ -308,7 +308,7 @@ class MainShellState extends State<MainShell> {
         extra: {'targetName': targetName, 'error': error.toString()},
       );
       _addAiActionInfo(
-        'Mình đã tìm thấy ${user.displayName}, nhưng chưa mở được cuộc trò chuyện. Vui lòng thử mở chat thủ công hoặc kiểm tra kết nối.',
+        'MÃ¬nh Ä‘Ã£ tÃ¬m tháº¥y ${user.displayName}, nhÆ°ng chÆ°a má»Ÿ Ä‘Æ°á»£c cuá»™c trÃ² chuyá»‡n. Vui lÃ²ng thá»­ má»Ÿ chat thá»§ cÃ´ng hoáº·c kiá»ƒm tra káº¿t ná»‘i.',
         feedbackSource: 'ai_action_failed.direct_conversation',
       );
       return null;
@@ -366,7 +366,7 @@ class MainShellState extends State<MainShell> {
         AiCommandRouting.buildAmbiguousTargetFeedback(
           targetName: targetName,
           candidates: matches.map((user) => user.displayName),
-          actionLabel: 'chọn đúng người nhận',
+          actionLabel: 'chá»n Ä‘Ãºng ngÆ°á»i nháº­n',
         ),
         feedbackSource: AiCommandRouting.buildAmbiguityFeedbackSource(
           scope: 'contact',
@@ -397,7 +397,7 @@ class MainShellState extends State<MainShell> {
     final page = (params?['page'] ?? '').toString().trim().toLowerCase();
 
     if (page.isEmpty) {
-      _showErrorSnackBar('Lệnh NAVIGATE_TO thiếu tham số `page`.');
+      _showErrorSnackBar('Lá»‡nh NAVIGATE_TO thiáº¿u tham sá»‘ `page`.');
       return;
     }
 
@@ -421,7 +421,9 @@ class MainShellState extends State<MainShell> {
         ).push(MaterialPageRoute(builder: (_) => const QrScannerScreen()));
         break;
       default:
-        _showErrorSnackBar('Không hỗ trợ điều hướng AI tới "$page".');
+        _showErrorSnackBar(
+          'KhÃ´ng há»— trá»£ Ä‘iá»u hÆ°á»›ng AI tá»›i "$page".',
+        );
     }
   }
 
@@ -429,9 +431,9 @@ class MainShellState extends State<MainShell> {
     final detail =
         payload['error']?.toString().trim().isNotEmpty == true
             ? payload['error'].toString().trim()
-            : 'Lỗi signaling cuộc gọi từ server.';
+            : 'Lá»—i signaling cuá»™c gá»i tá»« server.';
     _logAiFlow('AI_CALL_ERROR_SIGNAL', extra: {'detail': detail});
-    _showErrorSnackBar('Lỗi cuộc gọi: $detail');
+    _showErrorSnackBar('Lá»—i cuá»™c gá»i: $detail');
   }
 
   String _normalizeAiSystemAction(String command) {
@@ -553,7 +555,7 @@ class MainShellState extends State<MainShell> {
         extra: {'normalizedCommand': command, 'error': error.toString()},
       );
       _addAiActionInfo(
-        'Mình gặp trục trặc khi thực hiện thao tác này. Bạn thử lại hoặc mở thủ công giúp mình nhé.',
+        'MÃ¬nh gáº·p trá»¥c tráº·c khi thá»±c hiá»‡n thao tÃ¡c nÃ y. Báº¡n thá»­ láº¡i hoáº·c má»Ÿ thá»§ cÃ´ng giÃºp mÃ¬nh nhÃ©.',
         feedbackSource: 'ai_action_failed.unhandled',
       );
     }
@@ -573,7 +575,7 @@ class MainShellState extends State<MainShell> {
         extra: {'reason': 'missing_target_name'},
       );
       _showErrorSnackBar(
-        'Trợ lý AI chưa xác định được người nhận hoặc cuộc trò chuyện đích.',
+        'Trá»£ lÃ½ AI chÆ°a xÃ¡c Ä‘á»‹nh Ä‘Æ°á»£c ngÆ°á»i nháº­n hoáº·c cuá»™c trÃ² chuyá»‡n Ä‘Ã­ch.',
       );
       return;
     }
@@ -600,9 +602,9 @@ class MainShellState extends State<MainShell> {
         extra: {'targetName': targetName},
       );
       _showErrorSnackBar(
-        AiCommandRouting.buildMissingTargetFeedback(
+        AiCommandRouting.buildMissingTargetFeedbackForCommand(
+          command: command,
           targetName: targetName,
-          targetType: 'liên hệ hoặc cuộc trò chuyện',
         ),
         feedbackSource: 'ai_action_missing.conversation',
       );
@@ -634,7 +636,7 @@ class MainShellState extends State<MainShell> {
             (conversation) =>
                 conversation.getDisplayName(chatProvider.currentUserId ?? ''),
           ),
-          actionLabel: 'mở đúng cuộc trò chuyện',
+          actionLabel: 'má»Ÿ Ä‘Ãºng cuá»™c trÃ² chuyá»‡n',
         ),
         feedbackSource: AiCommandRouting.buildAmbiguityFeedbackSource(
           scope: 'conversation',
@@ -660,7 +662,7 @@ class MainShellState extends State<MainShell> {
       if (selectedConversation == null) {
         _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
         _addAiActionCancelled(
-          'Đã hủy thao tác vì bạn chưa chọn cuộc trò chuyện.',
+          'ÄÃ£ há»§y thao tÃ¡c vÃ¬ báº¡n chÆ°a chá»n cuá»™c trÃ² chuyá»‡n.',
         );
         return;
       }
@@ -695,7 +697,7 @@ class MainShellState extends State<MainShell> {
           extra: {'reason': 'empty_content'},
         );
         _showErrorSnackBar(
-          'Trợ lý AI không thể soạn tin nhắn vì nội dung trống.',
+          'Trá»£ lÃ½ AI khÃ´ng thá»ƒ soáº¡n tin nháº¯n vÃ¬ ná»™i dung trá»‘ng.',
         );
         return;
       }
@@ -718,7 +720,7 @@ class MainShellState extends State<MainShell> {
           },
         );
         _showSuccessSnackBar(
-          'Mình đang ở đúng cuộc trò chuyện với $peerName rồi.',
+          'MÃ¬nh Ä‘ang á»Ÿ Ä‘Ãºng cuá»™c trÃ² chuyá»‡n vá»›i $peerName rá»“i.',
         );
         setState(() => _currentIndex = 0);
         return;
@@ -745,19 +747,19 @@ class MainShellState extends State<MainShell> {
         final composeDecision = await AiActionConfirmationSheet.showForResult(
           context,
           icon: Icons.edit_note_rounded,
-          title: 'Xác nhận hỗ trợ nhắn tin',
+          title: 'XÃ¡c nháº­n há»— trá»£ nháº¯n tin',
           description:
-              'Bạn có thể mở cuộc trò chuyện để kiểm tra lại hoặc gửi ngay sau khi đã xác nhận đúng người nhận.',
-          confirmLabel: 'Mở và điền sẵn',
-          alternateLabel: 'Gửi ngay',
+              'Báº¡n cÃ³ thá»ƒ má»Ÿ cuá»™c trÃ² chuyá»‡n Ä‘á»ƒ kiá»ƒm tra láº¡i hoáº·c gá»­i ngay sau khi Ä‘Ã£ xÃ¡c nháº­n Ä‘Ãºng ngÆ°á»i nháº­n.',
+          confirmLabel: 'Má»Ÿ vÃ  Ä‘iá»n sáºµn',
+          alternateLabel: 'Gá»­i ngay',
           primaryDetail: peerName,
           secondaryDetail: prefilledText,
-          primaryDetailLabel: 'Người nhận',
-          secondaryDetailLabel: 'Tin nhắn',
+          primaryDetailLabel: 'NgÆ°á»i nháº­n',
+          secondaryDetailLabel: 'Tin nháº¯n',
         );
         if (composeDecision == AiActionConfirmationResult.cancelled) {
           _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
-          _addAiActionCancelled('Đã hủy thao tác soạn tin nhắn.');
+          _addAiActionCancelled('ÄÃ£ há»§y thao tÃ¡c soáº¡n tin nháº¯n.');
           return;
         }
         if (!mounted) return;
@@ -775,7 +777,7 @@ class MainShellState extends State<MainShell> {
               aiCommand: aiCmd,
               extra: {'conversationId': conversation.id},
             );
-            _showSuccessSnackBar('Đã gửi tin nhắn cho $peerName.');
+            _showSuccessSnackBar('ÄÃ£ gá»­i tin nháº¯n cho $peerName.');
           } else {
             chatProvider.injectAiComposeDraft(
               conversationId: conversation.id,
@@ -787,7 +789,7 @@ class MainShellState extends State<MainShell> {
               extra: {'conversationId': conversation.id},
             );
             _showSuccessSnackBar(
-              'Đã điền sẵn tin nhắn cho $peerName. Bạn kiểm tra rồi gửi nhé.',
+              'ÄÃ£ Ä‘iá»n sáºµn tin nháº¯n cho $peerName. Báº¡n kiá»ƒm tra rá»“i gá»­i nhÃ©.',
             );
           }
           setState(() => _currentIndex = 0);
@@ -810,10 +812,12 @@ class MainShellState extends State<MainShell> {
       );
 
       if (command == 'OPEN_CHAT') {
-        _showSuccessSnackBar('Đang mở cuộc trò chuyện với $peerName.');
+        _showSuccessSnackBar(
+          'Äang má»Ÿ cuá»™c trÃ² chuyá»‡n vá»›i $peerName.',
+        );
       } else if (!shouldSendImmediately && prefilledText != null) {
         _showSuccessSnackBar(
-          'Đang mở cuộc trò chuyện với $peerName và điền sẵn tin nhắn.',
+          'Äang má»Ÿ cuá»™c trÃ² chuyá»‡n vá»›i $peerName vÃ  Ä‘iá»n sáºµn tin nháº¯n.',
         );
       }
 
@@ -830,7 +834,7 @@ class MainShellState extends State<MainShell> {
             aiCommand: aiCmd,
             extra: {'conversationId': conversation.id},
           );
-          _showSuccessSnackBar('Đã gửi tin nhắn cho $peerName.');
+          _showSuccessSnackBar('ÄÃ£ gá»­i tin nháº¯n cho $peerName.');
         }
         await navigator.push(
           MaterialPageRoute(
@@ -869,9 +873,9 @@ class MainShellState extends State<MainShell> {
           },
         );
         _showErrorSnackBar(
-          AiCommandRouting.buildMissingTargetFeedback(
+          AiCommandRouting.buildMissingTargetFeedbackForCommand(
+            command: command,
             targetName: peerName,
-            targetType: 'liên hệ trong danh bạ',
           ),
           feedbackSource: 'ai_action_missing.contact',
         );
@@ -921,7 +925,7 @@ class MainShellState extends State<MainShell> {
       description: callPlan.description,
       confirmLabel: callPlan.confirmLabel,
       primaryDetail: peerName,
-      primaryDetailLabel: 'Người nhận',
+      primaryDetailLabel: 'NgÆ°á»i nháº­n',
     );
     if (!confirmed) {
       _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
@@ -940,8 +944,8 @@ class MainShellState extends State<MainShell> {
 
     _showSuccessSnackBar(
       callPlan.isVideo
-          ? 'Đang bắt đầu cuộc gọi video với $peerName.'
-          : 'Đang bắt đầu cuộc gọi thoại với $peerName.',
+          ? 'Äang báº¯t Ä‘áº§u cuá»™c gá»i video vá»›i $peerName.'
+          : 'Äang báº¯t Ä‘áº§u cuá»™c gá»i thoáº¡i vá»›i $peerName.',
     );
     _isCallScreenActive = true;
     _logAiFlow(
@@ -1027,7 +1031,7 @@ class MainShellState extends State<MainShell> {
         aiCommand: aiCmd,
         extra: {'reason': 'no_active_conversation_or_messages'},
       );
-      _showErrorSnackBar('Không có tin nhắn để thu hồi.');
+      _showErrorSnackBar('KhÃ´ng cÃ³ tin nháº¯n Ä‘á»ƒ thu há»“i.');
       return;
     }
 
@@ -1042,23 +1046,25 @@ class MainShellState extends State<MainShell> {
         aiCommand: aiCmd,
         extra: {'reason': 'no_self_message'},
       );
-      _showErrorSnackBar('Không tìm thấy tin nhắn của bạn để thu hồi.');
+      _showErrorSnackBar(
+        'KhÃ´ng tÃ¬m tháº¥y tin nháº¯n cá»§a báº¡n Ä‘á»ƒ thu há»“i.',
+      );
       return;
     }
 
     final confirmed = await AiActionConfirmationSheet.show(
       context,
       icon: Icons.undo_rounded,
-      title: 'Xác nhận thu hồi tin nhắn',
+      title: 'XÃ¡c nháº­n thu há»“i tin nháº¯n',
       description:
-          'Trợ lý sẽ thu hồi tin nhắn mới nhất của bạn trong cuộc trò chuyện hiện tại.',
-      confirmLabel: 'Thu hồi',
+          'Trá»£ lÃ½ sáº½ thu há»“i tin nháº¯n má»›i nháº¥t cá»§a báº¡n trong cuá»™c trÃ² chuyá»‡n hiá»‡n táº¡i.',
+      confirmLabel: 'Thu há»“i',
       secondaryDetail: lastMsg.content,
       destructive: AiActionPolicy.isDestructive('RECALL_MESSAGE'),
     );
     if (!confirmed) {
       _logAiFlow('AI_COMMAND_CANCELLED', aiCommand: aiCmd);
-      _addAiActionCancelled('Đã hủy thao tác thu hồi tin nhắn.');
+      _addAiActionCancelled('ÄÃ£ há»§y thao tÃ¡c thu há»“i tin nháº¯n.');
       return;
     }
     if (!mounted) return;
@@ -1097,7 +1103,9 @@ class MainShellState extends State<MainShell> {
     final byId = _conversationById(chatProvider, explicitId);
     if (byId != null) {
       if (requireGroup && byId.type.name != 'GROUP') {
-        _showErrorSnackBar('Cuộc trò chuyện đã chọn không phải nhóm.');
+        _showErrorSnackBar(
+          'Cuá»™c trÃ² chuyá»‡n Ä‘Ã£ chá»n khÃ´ng pháº£i nhÃ³m.',
+        );
         return null;
       }
       return byId;
@@ -1130,7 +1138,7 @@ class MainShellState extends State<MainShell> {
         _showErrorSnackBar(
           AiCommandRouting.buildMissingTargetFeedback(
             targetName: targetName,
-            targetType: 'cuộc trò chuyện',
+            targetType: 'cuá»™c trÃ² chuyá»‡n',
           ),
           feedbackSource: 'ai_action_missing.conversation',
         );
@@ -1158,7 +1166,7 @@ class MainShellState extends State<MainShell> {
             candidates: filtered.map(
               (conversation) => conversation.getDisplayName(currentUserId),
             ),
-            actionLabel: 'chọn đúng cuộc trò chuyện',
+            actionLabel: 'chá»n Ä‘Ãºng cuá»™c trÃ² chuyá»‡n',
           ),
           feedbackSource: AiCommandRouting.buildAmbiguityFeedbackSource(
             scope: 'conversation',
@@ -1186,8 +1194,8 @@ class MainShellState extends State<MainShell> {
 
     _showErrorSnackBar(
       requireGroup
-          ? 'Trợ lý chưa xác định được nhóm cần thao tác.'
-          : 'Trợ lý chưa xác định được cuộc trò chuyện cần thao tác.',
+          ? 'Trá»£ lÃ½ chÆ°a xÃ¡c Ä‘á»‹nh Ä‘Æ°á»£c nhÃ³m cáº§n thao tÃ¡c.'
+          : 'Trá»£ lÃ½ chÆ°a xÃ¡c Ä‘á»‹nh Ä‘Æ°á»£c cuá»™c trÃ² chuyá»‡n cáº§n thao tÃ¡c.',
     );
     return null;
   }
@@ -1240,7 +1248,7 @@ class MainShellState extends State<MainShell> {
       _showErrorSnackBar(
         AiCommandRouting.buildMissingTargetFeedback(
           targetName: name,
-          targetType: 'liên hệ trong danh bạ',
+          targetType: 'liÃªn há»‡ trong danh báº¡',
         ),
         feedbackSource: 'ai_action_missing.contact',
       );
@@ -1260,7 +1268,7 @@ class MainShellState extends State<MainShell> {
         AiCommandRouting.buildAmbiguousTargetFeedback(
           targetName: name,
           candidates: matches.map((user) => user.displayName),
-          actionLabel: 'chọn đúng liên hệ',
+          actionLabel: 'chá»n Ä‘Ãºng liÃªn há»‡',
         ),
         feedbackSource: AiCommandRouting.buildAmbiguityFeedbackSource(
           scope: 'contact',
@@ -1285,7 +1293,9 @@ class MainShellState extends State<MainShell> {
 
     final targetName = AiCommandRouting.extractTargetName(params);
     if (targetName.isEmpty) {
-      _showErrorSnackBar('Trợ lý chưa xác định được người dùng mục tiêu.');
+      _showErrorSnackBar(
+        'Trá»£ lÃ½ chÆ°a xÃ¡c Ä‘á»‹nh Ä‘Æ°á»£c ngÆ°á»i dÃ¹ng má»¥c tiÃªu.',
+      );
       return null;
     }
 
@@ -1296,7 +1306,7 @@ class MainShellState extends State<MainShell> {
       _showErrorSnackBar(
         AiCommandRouting.buildMissingTargetFeedback(
           targetName: targetName,
-          targetType: 'người dùng',
+          targetType: 'ngÆ°á»i dÃ¹ng',
         ),
         feedbackSource: 'ai_action_missing.user',
       );
@@ -1316,7 +1326,7 @@ class MainShellState extends State<MainShell> {
         AiCommandRouting.buildAmbiguousTargetFeedback(
           targetName: targetName,
           candidates: matches.map((user) => user.displayName),
-          actionLabel: 'chọn đúng người dùng',
+          actionLabel: 'chá»n Ä‘Ãºng ngÆ°á»i dÃ¹ng',
         ),
         feedbackSource: AiCommandRouting.buildAmbiguityFeedbackSource(
           scope: 'user',
@@ -1343,8 +1353,8 @@ class MainShellState extends State<MainShell> {
       if (matches.length != 1) {
         throw StateError(
           matches.isEmpty
-              ? 'Không tìm thấy thành viên "$name" trong nhóm.'
-              : 'Có nhiều thành viên tên "$name". Hãy nói rõ hơn.',
+              ? 'KhÃ´ng tÃ¬m tháº¥y thÃ nh viÃªn "$name" trong nhÃ³m.'
+              : 'CÃ³ nhiá»u thÃ nh viÃªn tÃªn "$name". HÃ£y nÃ³i rÃµ hÆ¡n.',
         );
       }
       resolved.add(matches.first);
@@ -1425,13 +1435,14 @@ class MainShellState extends State<MainShell> {
 
     final confirmed = await _confirmAiAction(
       icon: Icons.group_add_rounded,
-      title: 'Xác nhận tạo nhóm',
-      description: 'Trợ lý sẽ tạo nhóm mới với các thành viên đã chọn.',
-      confirmLabel: 'Tạo nhóm',
+      title: 'XÃ¡c nháº­n táº¡o nhÃ³m',
+      description:
+          'Trá»£ lÃ½ sáº½ táº¡o nhÃ³m má»›i vá»›i cÃ¡c thÃ nh viÃªn Ä‘Ã£ chá»n.',
+      confirmLabel: 'Táº¡o nhÃ³m',
       primaryDetail: plan.groupName,
-      primaryDetailLabel: 'Tên nhóm',
+      primaryDetailLabel: 'TÃªn nhÃ³m',
       secondaryDetail: plan.selectedMemberDetail(selectedUsers),
-      secondaryDetailLabel: 'Thành viên',
+      secondaryDetailLabel: 'ThÃ nh viÃªn',
     );
     if (!confirmed) {
       _addAiActionCancelled(plan.cancelMessage);
@@ -1508,7 +1519,7 @@ class MainShellState extends State<MainShell> {
       description: plan.description,
       confirmLabel: plan.confirmLabel,
       secondaryDetail: message.content,
-      secondaryDetailLabel: 'Tin nhắn',
+      secondaryDetailLabel: 'Tin nháº¯n',
     );
     if (!confirmed) {
       _addAiActionCancelled(plan.cancelMessage);
@@ -1564,7 +1575,7 @@ class MainShellState extends State<MainShell> {
       description: presentation.description,
       confirmLabel: presentation.confirmLabel,
       primaryDetail: user.displayName,
-      primaryDetailLabel: 'Liên hệ',
+      primaryDetailLabel: 'LiÃªn há»‡',
       destructive: destructive,
     );
     if (!confirmed) {
@@ -1628,8 +1639,8 @@ class MainShellState extends State<MainShell> {
             if (matches.length != 1) {
               throw StateError(
                 matches.isEmpty
-                    ? 'Không tìm thấy "$name" trong danh bạ.'
-                    : 'Có nhiều người tên "$name". Hãy nói rõ hơn.',
+                    ? 'KhÃ´ng tÃ¬m tháº¥y "$name" trong danh báº¡.'
+                    : 'CÃ³ nhiá»u ngÆ°á»i tÃªn "$name". HÃ£y nÃ³i rÃµ hÆ¡n.',
               );
             }
             users.add(matches.first);
@@ -1642,7 +1653,9 @@ class MainShellState extends State<MainShell> {
             plan.memberNames,
           );
           if (users.isEmpty) {
-            throw StateError('Trợ lý chưa xác định thành viên cần xóa.');
+            throw StateError(
+              'Trá»£ lÃ½ chÆ°a xÃ¡c Ä‘á»‹nh thÃ nh viÃªn cáº§n xÃ³a.',
+            );
           }
           for (final user in users) {
             await chatProvider.removeMember(conversation.id, user.id);
@@ -1654,7 +1667,9 @@ class MainShellState extends State<MainShell> {
             plan.memberNames,
           );
           if (users.length != 1) {
-            throw StateError('Cần chọn đúng một thành viên để chuyển quyền.');
+            throw StateError(
+              'Cáº§n chá»n Ä‘Ãºng má»™t thÃ nh viÃªn Ä‘á»ƒ chuyá»ƒn quyá»n.',
+            );
           }
           await chatProvider.transferOwnership(conversation.id, users.first.id);
           break;
@@ -1677,7 +1692,7 @@ class MainShellState extends State<MainShell> {
       primaryDetail: conversation.getDisplayName(
         chatProvider.currentUserId ?? '',
       ),
-      primaryDetailLabel: 'Nhóm',
+      primaryDetailLabel: 'NhÃ³m',
       secondaryDetail: plan.secondaryDetail,
       secondaryDetailLabel: plan.secondaryDetailLabel,
       destructive: destructive,
@@ -1752,7 +1767,7 @@ class MainShellState extends State<MainShell> {
       bottomNavigationBar: Consumer2<ChatProvider, ContactProvider>(
         builder: (context, chatProvider, contactProvider, child) {
           debugPrint(
-            'ðŸŽ¨ [MainShell] Rebuilding BottomNavigationBar (pendingFriendCount: ${contactProvider.pendingRequestCount})',
+            'Ã°Å¸Å½Â¨ [MainShell] Rebuilding BottomNavigationBar (pendingFriendCount: ${contactProvider.pendingRequestCount})',
           );
           int unreadCount = 0;
           for (var c in chatProvider.conversations) {

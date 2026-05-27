@@ -370,7 +370,7 @@ class AiCommandRouting {
   static String buildAmbiguousTargetFeedback({
     required String targetName,
     required Iterable<String> candidates,
-    String actionLabel = 'tiÃ¡ÂºÂ¿p tÃ¡Â»Â¥c',
+    String actionLabel = 'tiÃƒÂ¡Ã‚ÂºÃ‚Â¿p tÃƒÂ¡Ã‚Â»Ã‚Â¥c',
   }) {
     final cleanTarget = targetName.trim();
     final uniqueCandidates = candidates
@@ -381,22 +381,43 @@ class AiCommandRouting {
         .toList(growable: false);
 
     if (uniqueCandidates.isEmpty) {
-      return 'CÃƒÂ³ nhiÃ¡Â»Âu kÃ¡ÂºÂ¿t quÃ¡ÂºÂ£ khÃ¡Â»â€ºp "$cleanTarget". HÃƒÂ£y nÃƒÂ³i rÃƒÂµ hÃ†Â¡n Ã„â€˜Ã¡Â»Æ’ trÃ¡Â»Â£ lÃƒÂ½ $actionLabel.';
+      return 'CÃƒÆ’Ã‚Â³ nhiÃƒÂ¡Ã‚Â»Ã‚Âu kÃƒÂ¡Ã‚ÂºÃ‚Â¿t quÃƒÂ¡Ã‚ÂºÃ‚Â£ khÃƒÂ¡Ã‚Â»Ã¢â‚¬Âºp "$cleanTarget". HÃƒÆ’Ã‚Â£y nÃƒÆ’Ã‚Â³i rÃƒÆ’Ã‚Âµ hÃƒâ€ Ã‚Â¡n Ãƒâ€žÃ¢â‚¬ËœÃƒÂ¡Ã‚Â»Ã†â€™ trÃƒÂ¡Ã‚Â»Ã‚Â£ lÃƒÆ’Ã‚Â½ $actionLabel.';
     }
 
-    return 'MÃƒÂ¬nh tÃƒÂ¬m thÃ¡ÂºÂ¥y nhiÃ¡Â»Âu kÃ¡ÂºÂ¿t quÃ¡ÂºÂ£ cho "$cleanTarget": ${uniqueCandidates.join(', ')}. BÃ¡ÂºÂ¡n muÃ¡Â»â€˜n chÃ¡Â»Ân ai?';
+    return 'MÃƒÆ’Ã‚Â¬nh tÃƒÆ’Ã‚Â¬m thÃƒÂ¡Ã‚ÂºÃ‚Â¥y nhiÃƒÂ¡Ã‚Â»Ã‚Âu kÃƒÂ¡Ã‚ÂºÃ‚Â¿t quÃƒÂ¡Ã‚ÂºÃ‚Â£ cho "$cleanTarget": ${uniqueCandidates.join(', ')}. BÃƒÂ¡Ã‚ÂºÃ‚Â¡n muÃƒÂ¡Ã‚Â»Ã¢â‚¬Ëœn chÃƒÂ¡Ã‚Â»Ã‚Ân ai?';
   }
 
   static String buildMissingTargetFeedback({
     required String targetName,
     String targetType =
-        'ngÃ†Â°Ã¡Â»Âi hoÃ¡ÂºÂ·c cuÃ¡Â»â„¢c trÃƒÂ² chuyÃ¡Â»â€¡n',
+        'ngÃƒâ€ Ã‚Â°ÃƒÂ¡Ã‚Â»Ã‚Âi hoÃƒÂ¡Ã‚ÂºÃ‚Â·c cuÃƒÂ¡Ã‚Â»Ã¢â€žÂ¢c trÃƒÆ’Ã‚Â² chuyÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¡n',
   }) {
     final cleanTarget = targetName.trim();
     if (cleanTarget.isEmpty) {
-      return 'MÃƒÂ¬nh chÃ†Â°a xÃƒÂ¡c Ã„â€˜Ã¡Â»â€¹nh Ã„â€˜Ã†Â°Ã¡Â»Â£c $targetType. HÃƒÂ£y nÃƒÂ³i rÃƒÂµ tÃƒÂªn Ã„â€˜Ã¡Â»Æ’ trÃ¡Â»Â£ lÃƒÂ½ tiÃ¡ÂºÂ¿p tÃ¡Â»Â¥c.';
+      return 'MÃƒÆ’Ã‚Â¬nh chÃƒâ€ Ã‚Â°a xÃƒÆ’Ã‚Â¡c Ãƒâ€žÃ¢â‚¬ËœÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¹nh Ãƒâ€žÃ¢â‚¬ËœÃƒâ€ Ã‚Â°ÃƒÂ¡Ã‚Â»Ã‚Â£c $targetType. HÃƒÆ’Ã‚Â£y nÃƒÆ’Ã‚Â³i rÃƒÆ’Ã‚Âµ tÃƒÆ’Ã‚Âªn Ãƒâ€žÃ¢â‚¬ËœÃƒÂ¡Ã‚Â»Ã†â€™ trÃƒÂ¡Ã‚Â»Ã‚Â£ lÃƒÆ’Ã‚Â½ tiÃƒÂ¡Ã‚ÂºÃ‚Â¿p tÃƒÂ¡Ã‚Â»Ã‚Â¥c.';
     }
-    return 'MÃƒÂ¬nh chÃ†Â°a tÃƒÂ¬m thÃ¡ÂºÂ¥y $targetType "$cleanTarget". HÃƒÂ£y kiÃ¡Â»Æ’m tra lÃ¡ÂºÂ¡i tÃƒÂªn hoÃ¡ÂºÂ·c thÃ¡Â»Â­ nÃƒÂ³i rÃƒÂµ hÃ†Â¡n.';
+    return 'MÃƒÆ’Ã‚Â¬nh chÃƒâ€ Ã‚Â°a tÃƒÆ’Ã‚Â¬m thÃƒÂ¡Ã‚ÂºÃ‚Â¥y $targetType "$cleanTarget". HÃƒÆ’Ã‚Â£y kiÃƒÂ¡Ã‚Â»Ã†â€™m tra lÃƒÂ¡Ã‚ÂºÃ‚Â¡i tÃƒÆ’Ã‚Âªn hoÃƒÂ¡Ã‚ÂºÃ‚Â·c thÃƒÂ¡Ã‚Â»Ã‚Â­ nÃƒÆ’Ã‚Â³i rÃƒÆ’Ã‚Âµ hÃƒâ€ Ã‚Â¡n.';
+  }
+
+  static String buildMissingTargetFeedbackForCommand({
+    required String command,
+    required String targetName,
+  }) {
+    final normalizedCommand = normalizeSystemAction(command);
+    final targetType = switch (normalizedCommand) {
+      'START_CALL' => 'liên hệ trong danh bạ',
+      'COMPOSE_MESSAGE' => 'người nhận trong danh bạ',
+      'OPEN_CHAT' => 'liên hệ hoặc cuộc trò chuyện',
+      'OPEN_PROFILE' => 'liên hệ trong danh bạ',
+      'SEND_FRIEND_REQUEST' => 'người dùng',
+      'BLOCK_USER' || 'UNBLOCK_USER' => 'người dùng',
+      _ => 'người hoặc cuộc trò chuyện',
+    };
+
+    return buildMissingTargetFeedback(
+      targetName: targetName,
+      targetType: targetType,
+    );
   }
 
   static String buildAmbiguityFeedbackSource({

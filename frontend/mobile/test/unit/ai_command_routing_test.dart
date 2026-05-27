@@ -86,7 +86,7 @@ void main() {
 
   group('AiCommandRouting.normalizeParams', () {
     test('keeps typed maps intact', () {
-      final params = {'recipient': 'An', 'content': 'Xin chÃƒÂ o'};
+      final params = {'recipient': 'An', 'content': 'Xin chÃƒÆ’Ã‚Â o'};
       expect(AiCommandRouting.normalizeParams(params), same(params));
     });
 
@@ -104,14 +104,16 @@ void main() {
     test('extractTargetName checks common target keys in order', () {
       expect(
         AiCommandRouting.extractTargetName({
-          'recipient': '  BÃƒÂ¬nh  ',
+          'recipient': '  BÃƒÆ’Ã‚Â¬nh  ',
           'target': 'An',
         }),
         'An',
       );
       expect(
-        AiCommandRouting.extractTargetName({'contactName': 'CÃ†Â°Ã¡Â»Âng'}),
-        'CÃ†Â°Ã¡Â»Âng',
+        AiCommandRouting.extractTargetName({
+          'contactName': 'CÃƒâ€ Ã‚Â°ÃƒÂ¡Ã‚Â»Ã‚Âng',
+        }),
+        'CÃƒâ€ Ã‚Â°ÃƒÂ¡Ã‚Â»Ã‚Âng',
       );
       expect(AiCommandRouting.extractTargetName(null), isEmpty);
     });
@@ -119,19 +121,19 @@ void main() {
     test('extractPrefilledText only returns compose content', () {
       expect(
         AiCommandRouting.extractPrefilledText('COMPOSE_MESSAGE', {
-          'content': '  gÃ¡ÂºÂ·p nhau lÃƒÂºc 7h  ',
+          'content': '  gÃƒÂ¡Ã‚ÂºÃ‚Â·p nhau lÃƒÆ’Ã‚Âºc 7h  ',
         }),
-        'gÃ¡ÂºÂ·p nhau lÃƒÂºc 7h',
+        'gÃƒÂ¡Ã‚ÂºÃ‚Â·p nhau lÃƒÆ’Ã‚Âºc 7h',
       );
       expect(
         AiCommandRouting.extractPrefilledText('SEND_MESSAGE', {
-          'messageText': 'xin chÃƒÂ o',
+          'messageText': 'xin chÃƒÆ’Ã‚Â o',
         }),
-        'xin chÃƒÂ o',
+        'xin chÃƒÆ’Ã‚Â o',
       );
       expect(
         AiCommandRouting.extractPrefilledText('OPEN_CHAT', {
-          'content': 'xin chÃƒÂ o',
+          'content': 'xin chÃƒÆ’Ã‚Â o',
         }),
         isNull,
       );
@@ -159,37 +161,43 @@ void main() {
 
     test('extracts group metadata and member names', () {
       final params = {
-        'groupTitle': 'NhÃƒÂ³m Ã„â€˜i chÃ†Â¡i',
-        'members': ['An', 'BÃƒÂ¬nh'],
+        'groupTitle': 'NhÃƒÆ’Ã‚Â³m Ãƒâ€žÃ¢â‚¬Ëœi chÃƒâ€ Ã‚Â¡i',
+        'members': ['An', 'BÃƒÆ’Ã‚Â¬nh'],
       };
       expect(
         AiCommandRouting.extractGroupName(params),
-        'NhÃƒÂ³m Ã„â€˜i chÃ†Â¡i',
+        'NhÃƒÆ’Ã‚Â³m Ãƒâ€žÃ¢â‚¬Ëœi chÃƒâ€ Ã‚Â¡i',
       );
-      expect(AiCommandRouting.extractMemberNames(params), ['An', 'BÃƒÂ¬nh']);
+      expect(AiCommandRouting.extractMemberNames(params), [
+        'An',
+        'BÃƒÆ’Ã‚Â¬nh',
+      ]);
     });
 
     test('extracts fallback member name and conversation name', () {
       final params = {
-        'memberName': 'UyÃƒÂªn',
-        'conversationName': 'LÃ¡Â»â€ºp 18DHTPM',
+        'memberName': 'UyÃƒÆ’Ã‚Âªn',
+        'conversationName': 'LÃƒÂ¡Ã‚Â»Ã¢â‚¬Âºp 18DHTPM',
       };
-      expect(AiCommandRouting.extractMemberNames(params), ['UyÃƒÂªn']);
+      expect(AiCommandRouting.extractMemberNames(params), ['UyÃƒÆ’Ã‚Âªn']);
       expect(
         AiCommandRouting.extractConversationName(params),
-        'LÃ¡Â»â€ºp 18DHTPM',
+        'LÃƒÂ¡Ã‚Â»Ã¢â‚¬Âºp 18DHTPM',
       );
     });
 
     test('extracts new group title and friend request message', () {
       final params = {
-        'newName': 'NhÃƒÂ³m mÃ¡Â»â€ºi',
-        'note': 'KÃ¡ÂºÂ¿t bÃ¡ÂºÂ¡n nhÃƒÂ©',
+        'newName': 'NhÃƒÆ’Ã‚Â³m mÃƒÂ¡Ã‚Â»Ã¢â‚¬Âºi',
+        'note': 'KÃƒÂ¡Ã‚ÂºÃ‚Â¿t bÃƒÂ¡Ã‚ÂºÃ‚Â¡n nhÃƒÆ’Ã‚Â©',
       };
-      expect(AiCommandRouting.extractNewTitle(params), 'NhÃƒÂ³m mÃ¡Â»â€ºi');
+      expect(
+        AiCommandRouting.extractNewTitle(params),
+        'NhÃƒÆ’Ã‚Â³m mÃƒÂ¡Ã‚Â»Ã¢â‚¬Âºi',
+      );
       expect(
         AiCommandRouting.extractFriendRequestMessage(params),
-        'KÃ¡ÂºÂ¿t bÃ¡ÂºÂ¡n nhÃƒÂ©',
+        'KÃƒÂ¡Ã‚ÂºÃ‚Â¿t bÃƒÂ¡Ã‚ÂºÃ‚Â¡n nhÃƒÆ’Ã‚Â©',
       );
     });
   });
@@ -296,45 +304,66 @@ void main() {
   group('AiCommandRouting action feedback copy', () {
     test('builds ambiguity feedback with candidate names', () {
       final message = AiCommandRouting.buildAmbiguousTargetFeedback(
-        targetName: 'UyÃƒÂªn',
+        targetName: 'UyÃƒÆ’Ã‚Âªn',
         candidates: const [
-          'UyÃƒÂªn LÃƒÂ½',
-          'UyÃƒÂªn NguyÃ¡Â»â€¦n',
-          'UyÃƒÂªn TrÃ¡ÂºÂ§n',
-          'UyÃƒÂªn HoÃƒÂ ng',
-          'UyÃƒÂªn Ã„ÂÃ¡ÂºÂ·ng',
+          'UyÃƒÆ’Ã‚Âªn LÃƒÆ’Ã‚Â½',
+          'UyÃƒÆ’Ã‚Âªn NguyÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¦n',
+          'UyÃƒÆ’Ã‚Âªn TrÃƒÂ¡Ã‚ÂºÃ‚Â§n',
+          'UyÃƒÆ’Ã‚Âªn HoÃƒÆ’Ã‚Â ng',
+          'UyÃƒÆ’Ã‚Âªn Ãƒâ€žÃ‚ÂÃƒÂ¡Ã‚ÂºÃ‚Â·ng',
         ],
       );
 
-      expect(message, contains('UyÃƒÂªn LÃƒÂ½'));
-      expect(message, contains('UyÃƒÂªn NguyÃ¡Â»â€¦n'));
-      expect(message, isNot(contains('UyÃƒÂªn Ã„ÂÃ¡ÂºÂ·ng')));
+      expect(message, contains('UyÃƒÆ’Ã‚Âªn LÃƒÆ’Ã‚Â½'));
+      expect(message, contains('UyÃƒÆ’Ã‚Âªn NguyÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¦n'));
+      expect(message, isNot(contains('UyÃƒÆ’Ã‚Âªn Ãƒâ€žÃ‚ÂÃƒÂ¡Ã‚ÂºÃ‚Â·ng')));
     });
 
     test('builds missing target feedback with specific type', () {
       final message = AiCommandRouting.buildMissingTargetFeedback(
-        targetName: 'LÃƒÂ½ VÃƒÂ¢n',
-        targetType: 'liÃƒÂªn hÃ¡Â»â€¡ trong danh bÃ¡ÂºÂ¡',
+        targetName: 'LÃƒÆ’Ã‚Â½ VÃƒÆ’Ã‚Â¢n',
+        targetType: 'liÃƒÆ’Ã‚Âªn hÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¡ trong danh bÃƒÂ¡Ã‚ÂºÃ‚Â¡',
       );
 
-      expect(message, contains('liÃƒÂªn hÃ¡Â»â€¡ trong danh bÃ¡ÂºÂ¡'));
-      expect(message, contains('LÃƒÂ½ VÃƒÂ¢n'));
+      expect(
+        message,
+        contains('liÃƒÆ’Ã‚Âªn hÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¡ trong danh bÃƒÂ¡Ã‚ÂºÃ‚Â¡'),
+      );
+      expect(message, contains('LÃƒÆ’Ã‚Â½ VÃƒÆ’Ã‚Â¢n'));
     });
 
+    test('builds action-specific missing target feedback', () {
+      final callMessage = AiCommandRouting.buildMissingTargetFeedbackForCommand(
+        command: 'START_CALL',
+        targetName: 'L\u00FD V\u00E2n',
+      );
+      final composeMessage =
+          AiCommandRouting.buildMissingTargetFeedbackForCommand(
+            command: 'COMPOSE_MESSAGE',
+            targetName: 'L\u00FD V\u00E2n',
+          );
+
+      expect(callMessage, contains('li\u00EAn h\u1EC7 trong danh b\u1EA1'));
+      expect(
+        composeMessage,
+        contains('ng\u01B0\u1EDDi nh\u1EADn trong danh b\u1EA1'),
+      );
+      expect(callMessage, contains('L\u00FD V\u00E2n'));
+    });
     test('round-trips ambiguity candidate metadata in source', () {
       final source = AiCommandRouting.buildAmbiguityFeedbackSource(
         scope: 'contact',
         candidates: const [
-          'UyÃƒÂªn LÃƒÂ½',
-          'UyÃƒÂªn NguyÃ¡Â»â€¦n',
-          'UyÃƒÂªn LÃƒÂ½',
+          'UyÃƒÆ’Ã‚Âªn LÃƒÆ’Ã‚Â½',
+          'UyÃƒÆ’Ã‚Âªn NguyÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¦n',
+          'UyÃƒÆ’Ã‚Âªn LÃƒÆ’Ã‚Â½',
         ],
       );
 
       expect(source, startsWith('ai_action_ambiguity.contact::'));
       expect(
         AiCommandRouting.parseAmbiguityCandidatesFromSource(source),
-        const ['UyÃƒÂªn LÃƒÂ½', 'UyÃƒÂªn NguyÃ¡Â»â€¦n'],
+        const ['UyÃƒÆ’Ã‚Âªn LÃƒÆ’Ã‚Â½', 'UyÃƒÆ’Ã‚Âªn NguyÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¦n'],
       );
     });
   });
