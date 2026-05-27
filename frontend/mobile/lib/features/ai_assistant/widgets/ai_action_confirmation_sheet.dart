@@ -158,7 +158,7 @@ class AiActionConfirmationSheet extends StatelessWidget {
                               ? Colors.white.withValues(alpha: 0.04)
                               : const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(
-                        AiAssistantTokens.buttonRadius,
+                        AiAssistantTokens.cardRadius,
                       ),
                       border: Border.all(
                         color:
@@ -176,7 +176,7 @@ class AiActionConfirmationSheet extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: accent.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(
-                              AiAssistantTokens.buttonRadius,
+                              AiAssistantTokens.cardRadius,
                             ),
                           ),
                           child: Icon(icon, color: accent, size: 23),
@@ -221,7 +221,7 @@ class AiActionConfirmationSheet extends StatelessWidget {
                                 ? Colors.white.withValues(alpha: 0.06)
                                 : const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(
-                          AiAssistantTokens.buttonRadius,
+                          AiAssistantTokens.cardRadius,
                         ),
                         border: Border.all(
                           color:
