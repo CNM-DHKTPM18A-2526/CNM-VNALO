@@ -79,8 +79,60 @@ type ActionFeedbackState = {
   message: string
 }
 const STORAGE_KEY = 'vnalo_ai_chat_history'
+const LEGACY_STORAGE_KEY = STORAGE_KEY
 const DRAFT_KEY_PREFIX = 'vnalo_ai_web_compose_draft:'
 const MAX_API_HISTORY = 20
+
+const MOJIBAKE_CODEPOINTS = [0x00C3, 0x00C4, 0x00C2, 0x00C6, 0x00C5, 0x00D0]
+
+function mojibakeScore(value: string) {
+  let total = 0
+  for (const char of value) {
+    const code = char.codePointAt(0) ?? 0
+    if (MOJIBAKE_CODEPOINTS.includes(code)) {
+      total += 3
+    }
+    if (code >= 0x80 && code <= 0x9f) {
+      total += 4
+    }
+  }
+  return total
+}
+
+function tryDecodeUtf8Mojibake(value: string) {
+  const bytes: number[] = []
+  for (const char of value) {
+    const code = char.codePointAt(0) ?? 0
+    if (code > 255) {
+      return value
+    }
+    bytes.push(code)
+  }
+
+  return new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(bytes))
+}
+
+function fixMojibakeText(value: string) {
+  let best = value
+  let bestScore = mojibakeScore(value)
+
+  for (let pass = 0; pass < 4; pass += 1) {
+    const candidate = tryDecodeUtf8Mojibake(best)
+    if (!candidate || candidate === best) {
+      break
+    }
+
+    const candidateScore = mojibakeScore(candidate)
+    if (candidateScore >= bestScore) {
+      break
+    }
+
+    best = candidate
+    bestScore = candidateScore
+  }
+
+  return best
+}
 
 function buildAiStorageKey(userId?: string | number | null) {
   if (userId === undefined || userId === null || `${userId}`.trim().length === 0) {
@@ -138,7 +190,7 @@ function normalizeStoredMessages(payload: unknown): AiMessage[] {
       if (!item || typeof item !== 'object') return null
       const value = item as Record<string, unknown>
       const role = value.role === 'assistant' ? 'assistant' : value.role === 'user' ? 'user' : null
-      const content = typeof value.content === 'string' ? value.content.trim() : ''
+      const content = typeof value.content === 'string' ? fixMojibakeText(value.content).trim() : ''
       const timestamp = typeof value.timestamp === 'string' && value.timestamp.trim() ? value.timestamp : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       if (!role || !content) return null
 
@@ -428,14 +480,20 @@ export function AiChatPage() {
     }
 
     const saved = localStorage.getItem(historyStorageKey)
-    if (!saved) {
+    const legacySaved = localStorage.getItem(LEGACY_STORAGE_KEY)
+    if (!saved && !legacySaved) {
       setMessages([INITIAL_ASSISTANT_MESSAGE])
       return
     }
 
     try {
-      const parsed = JSON.parse(saved)
-      setMessages(normalizeStoredMessages(parsed))
+      const parsed = JSON.parse(saved ?? legacySaved ?? 'null')
+      const normalized = normalizeStoredMessages(parsed)
+      setMessages(normalized)
+      if (!saved && legacySaved) {
+        localStorage.setItem(historyStorageKey, JSON.stringify(normalized))
+        localStorage.removeItem(LEGACY_STORAGE_KEY)
+      }
     } catch (error) {
       console.warn('Failed to parse AI chat history', error)
       setMessages([INITIAL_ASSISTANT_MESSAGE])
@@ -449,6 +507,7 @@ export function AiChatPage() {
       return
     }
     localStorage.setItem(historyStorageKey, JSON.stringify(normalized))
+    localStorage.removeItem(LEGACY_STORAGE_KEY)
   }
 
   useEffect(() => {
@@ -767,6 +826,10 @@ export function AiChatPage() {
     setRetryPrompt('')
     setPendingActionReview(null)
     setPendingResolution(null)
+    if (historyStorageKey) {
+      localStorage.removeItem(historyStorageKey)
+    }
+    localStorage.removeItem(LEGACY_STORAGE_KEY)
     saveMessages([
       {
         role: 'assistant',
@@ -784,7 +847,7 @@ export function AiChatPage() {
             <div className='ai-avatar-glow'>
               <Sparkles size={28} />
             </div>
-            <h3>VNALO AI Assistant</h3>
+            <h3>{fixMojibakeText('VNALO AI Assistant')}</h3>
             <p>Hỗ trợ trả lời câu hỏi, giải thích nhanh và gợi ý thao tác an toàn trong VNALO.</p>
           </section>
 
@@ -803,8 +866,8 @@ export function AiChatPage() {
             ))}
           </section>
 
-          <div className='flex-grow' style={{ flexGrow: 1 }} />
-
+        </div>
+        <div className='ai-chat-sidebar-footer'>
           <button
             type='button'
             className='ai-clear-btn flex items-center justify-center gap-2'
@@ -823,17 +886,17 @@ export function AiChatPage() {
           <div className='ai-header-stack'>
             <div className='ai-header-info'>
               <div className={runtimeState.badgeClassName} />
-              <strong className='text-[15px] font-semibold'>{runtimeState.label}</strong>
+              <strong className='text-[15px] font-semibold'>{fixMojibakeText(runtimeState.label)}</strong>
             </div>
-            <span className='ai-header-helper'>{runtimeState.helper}</span>
+            <span className='ai-header-helper'>{fixMojibakeText(runtimeState.helper)}</span>
           </div>
         </header>
 
         <div className='ai-chat-messages' ref={messagesContainerRef} role='log' aria-live='polite' aria-relevant='additions text'>
-          {runtimeState.degraded && <div className={runtimeState.bannerClassName}>{runtimeState.banner}</div>}
+          {runtimeState.degraded && <div className={runtimeState.bannerClassName}>{fixMojibakeText(runtimeState.banner)}</div>}
           {actionFeedback ? (
             <div className={`ai-runtime-banner ai-runtime-banner-${actionFeedback.tone}`}>
-              <span>{actionFeedback.message}</span>
+              <span>{fixMojibakeText(actionFeedback.message)}</span>
               {actionFeedback.tone === 'error' && retryPrompt ? (
                 <button type='button' className='ai-banner-action' onClick={handleRetry} disabled={isAssistantBusy}>
                   Thử lại
@@ -848,7 +911,7 @@ export function AiChatPage() {
               className={message.role === 'assistant' ? 'ai-msg-bubble-ai' : 'ai-msg-bubble-user'}
             >
               <p className='text-[14.5px] whitespace-pre-wrap' style={{ margin: 0 }}>
-                {message.content}
+                {fixMojibakeText(message.content)}
               </p>
               {message.role === 'assistant' && message.actionCommand ? (
                 <div className='ai-action-row'>
@@ -914,8 +977,8 @@ export function AiChatPage() {
           <div className='modal-card ai-resolution-modal' onClick={(event) => event.stopPropagation()}>
             <div className='modal-header'>
               <div>
-                <h3 id='ai-action-review-title'>{pendingActionReview.title}</h3>
-                <p>{pendingActionReview.description}</p>
+                <h3 id='ai-action-review-title'>{fixMojibakeText(pendingActionReview.title)}</h3>
+                <p>{fixMojibakeText(pendingActionReview.description)}</p>
                 {renderActionPreview(pendingActionReview.preview)}
               </div>
               <button className='modal-close-btn' type='button' onClick={() => setPendingActionReview(null)} aria-label='Close'>
@@ -927,7 +990,7 @@ export function AiChatPage() {
                 Hủy
               </button>
               <button className='btn btn-primary' type='button' onClick={confirmPendingActionReview}>
-                {pendingActionReview.confirmLabel}
+                {fixMojibakeText(pendingActionReview.confirmLabel)}
               </button>
             </div>
           </div>

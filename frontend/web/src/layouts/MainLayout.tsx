@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+﻿import { useMemo, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 
 import { Sidebar } from '../shared/components/Sidebar'
@@ -34,12 +34,12 @@ export function MainLayout() {
       return t('pages.chat.title')
     }
 
-    if (location.pathname.startsWith('/chat')) {
-      return t('pages.chat.title')
-    }
-
     if (location.pathname.startsWith('/chat-ai')) {
       return 'AI Assistant'
+    }
+
+    if (location.pathname.startsWith('/chat')) {
+      return t('pages.chat.title')
     }
 
     return titleMap[location.pathname] ?? t('common.appName')
@@ -99,3 +99,4 @@ export function MainLayout() {
     </div>
   )
 }
+

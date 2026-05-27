@@ -15,6 +15,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -139,7 +140,14 @@ class GeminiAiServiceTest {
     }
 
     @Test
-    void interactWithGemini_blocksInvalidActionSchema() {
+    void interactWithGemini_blocksInvalidActionSchema() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        String rawReply = objectMapper.writeValueAsString(Map.of(
+                "textReply", "I will open profile.",
+                "actionCommand", "OPEN_PROFILE",
+                "actionParams", Map.of("foo", "bar"),
+                "emotion", "thinking"
+        ));
         String responseJson = """
                 {
                   "candidates": [
@@ -147,14 +155,14 @@ class GeminiAiServiceTest {
                       "content": {
                         "parts": [
                           {
-                            "text": "{\\\"textReply\\\":\\\"I will open profile.\\\",\\\"actionCommand\\\":\\\"OPEN_PROFILE\\\",\\\"actionParams\\\":{\\\"foo\\\":\\\"bar\\\"},\\\"emotion\\\":\\\"thinking\\\"}"
+                            "text": %s
                           }
                         ]
                       }
                     }
                   ]
                 }
-                """;
+                """.formatted(objectMapper.writeValueAsString(rawReply));
 
         when(geminiRestTemplate.exchange(any(String.class), eq(HttpMethod.POST), any(), eq(String.class)))
                 .thenReturn(ResponseEntity.ok(responseJson));
@@ -169,11 +177,54 @@ class GeminiAiServiceTest {
 
         assertNull(response.getActionCommand());
         assertNull(response.getActionParams());
-        assertEquals("I will open profile.", response.getTextReply());
+        assertFalse(response.getTextReply().toLowerCase().contains("open profile"));
         assertFalse(response.getRequiresConfirmation());
         assertEquals("low", response.getRiskLevel());
     }
 
+    @Test
+    void interactWithGemini_blocksComposeMessageWithoutContent() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        String rawReply = objectMapper.writeValueAsString(Map.of(
+                "textReply", "I will send the message.",
+                "actionCommand", "COMPOSE_MESSAGE",
+                "actionParams", Map.of("recipient", "Ly Tinh Van"),
+                "emotion", "thinking"
+        ));
+        String responseJson = """
+                {
+                  "candidates": [
+                    {
+                      "content": {
+                        "parts": [
+                          {
+                            "text": %s
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+                """.formatted(objectMapper.writeValueAsString(rawReply));
+
+        when(geminiRestTemplate.exchange(any(String.class), eq(HttpMethod.POST), any(), eq(String.class)))
+                .thenReturn(ResponseEntity.ok(responseJson));
+
+        AiChatResponse response = geminiAiService.interactWithGemini(
+                "user-1",
+                AiChatRequest.builder()
+                        .prompt("Message Ly Tinh Van")
+                        .analyzeIntent(true)
+                        .build()
+        );
+
+        assertNull(response.getActionCommand());
+        assertNull(response.getActionParams());
+        assertFalse(response.getTextReply().toLowerCase().contains("will send"));
+        assertFalse(response.getTextReply().isBlank());
+        assertFalse(response.getRequiresConfirmation());
+        assertEquals("low", response.getRiskLevel());
+    }
 
     @Test
     void interactWithGemini_rewritesPrematureSuccessComposeCopy() {
@@ -273,4 +324,3 @@ class GeminiAiServiceTest {
         assertEquals("low", response.getRiskLevel());
     }
 }
-
