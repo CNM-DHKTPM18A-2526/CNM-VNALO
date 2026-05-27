@@ -5,15 +5,15 @@ void main() {
   group('AiCommandRouting.normalizeSystemAction', () {
     test('maps localized navigation aliases', () {
       expect(
-        AiCommandRouting.normalizeSystemAction('Mở settings'),
+        AiCommandRouting.normalizeSystemAction('M\u1EDF settings'),
         'NAVIGATE_TO_SETTINGS',
       );
       expect(
-        AiCommandRouting.normalizeSystemAction('MỞ DANH BẠ'),
+        AiCommandRouting.normalizeSystemAction('M\u1EDF DANH B\u1EA0'),
         'NAVIGATE_TO_CONTACTS',
       );
       expect(
-        AiCommandRouting.normalizeSystemAction('mở chat'),
+        AiCommandRouting.normalizeSystemAction('m\u1EDF chat'),
         'NAVIGATE_TO_CHAT',
       );
     });
@@ -27,26 +27,17 @@ void main() {
         AiCommandRouting.normalizeSystemAction('message_contact'),
         'COMPOSE_MESSAGE',
       );
-      expect(
-        AiCommandRouting.normalizeSystemAction('open_chat'),
-        'OPEN_CHAT',
-      );
+      expect(AiCommandRouting.normalizeSystemAction('open_chat'), 'OPEN_CHAT');
       expect(
         AiCommandRouting.normalizeSystemAction('open_conversation'),
         'OPEN_CHAT',
       );
-      expect(
-        AiCommandRouting.normalizeSystemAction('go_to_chat'),
-        'OPEN_CHAT',
-      );
+      expect(AiCommandRouting.normalizeSystemAction('go_to_chat'), 'OPEN_CHAT');
       expect(
         AiCommandRouting.normalizeSystemAction('start_video_call'),
         'START_CALL',
       );
-      expect(
-        AiCommandRouting.normalizeSystemAction('make_call'),
-        'START_CALL',
-      );
+      expect(AiCommandRouting.normalizeSystemAction('make_call'), 'START_CALL');
       expect(
         AiCommandRouting.normalizeSystemAction('send_text'),
         'COMPOSE_MESSAGE',
@@ -95,7 +86,7 @@ void main() {
 
   group('AiCommandRouting.normalizeParams', () {
     test('keeps typed maps intact', () {
-      final params = {'recipient': 'An', 'content': 'Xin chào'};
+      final params = {'recipient': 'An', 'content': 'Xin chÃƒÂ o'};
       expect(AiCommandRouting.normalizeParams(params), same(params));
     });
 
@@ -113,14 +104,14 @@ void main() {
     test('extractTargetName checks common target keys in order', () {
       expect(
         AiCommandRouting.extractTargetName({
-          'recipient': '  Bình  ',
+          'recipient': '  BÃƒÂ¬nh  ',
           'target': 'An',
         }),
         'An',
       );
       expect(
-        AiCommandRouting.extractTargetName({'contactName': 'Cường'}),
-        'Cường',
+        AiCommandRouting.extractTargetName({'contactName': 'CÃ†Â°Ã¡Â»Âng'}),
+        'CÃ†Â°Ã¡Â»Âng',
       );
       expect(AiCommandRouting.extractTargetName(null), isEmpty);
     });
@@ -128,19 +119,19 @@ void main() {
     test('extractPrefilledText only returns compose content', () {
       expect(
         AiCommandRouting.extractPrefilledText('COMPOSE_MESSAGE', {
-          'content': '  gặp nhau lúc 7h  ',
+          'content': '  gÃ¡ÂºÂ·p nhau lÃƒÂºc 7h  ',
         }),
-        'gặp nhau lúc 7h',
+        'gÃ¡ÂºÂ·p nhau lÃƒÂºc 7h',
       );
       expect(
         AiCommandRouting.extractPrefilledText('SEND_MESSAGE', {
-          'messageText': 'xin chào',
+          'messageText': 'xin chÃƒÂ o',
         }),
-        'xin chào',
+        'xin chÃƒÂ o',
       );
       expect(
         AiCommandRouting.extractPrefilledText('OPEN_CHAT', {
-          'content': 'xin chào',
+          'content': 'xin chÃƒÂ o',
         }),
         isNull,
       );
@@ -168,25 +159,37 @@ void main() {
 
     test('extracts group metadata and member names', () {
       final params = {
-        'groupTitle': 'Nhóm đi chơi',
-        'members': ['An', 'Bình'],
+        'groupTitle': 'NhÃƒÂ³m Ã„â€˜i chÃ†Â¡i',
+        'members': ['An', 'BÃƒÂ¬nh'],
       };
-      expect(AiCommandRouting.extractGroupName(params), 'Nhóm đi chơi');
-      expect(AiCommandRouting.extractMemberNames(params), ['An', 'Bình']);
+      expect(
+        AiCommandRouting.extractGroupName(params),
+        'NhÃƒÂ³m Ã„â€˜i chÃ†Â¡i',
+      );
+      expect(AiCommandRouting.extractMemberNames(params), ['An', 'BÃƒÂ¬nh']);
     });
 
     test('extracts fallback member name and conversation name', () {
-      final params = {'memberName': 'Uyên', 'conversationName': 'Lớp 18DHTPM'};
-      expect(AiCommandRouting.extractMemberNames(params), ['Uyên']);
-      expect(AiCommandRouting.extractConversationName(params), 'Lớp 18DHTPM');
+      final params = {
+        'memberName': 'UyÃƒÂªn',
+        'conversationName': 'LÃ¡Â»â€ºp 18DHTPM',
+      };
+      expect(AiCommandRouting.extractMemberNames(params), ['UyÃƒÂªn']);
+      expect(
+        AiCommandRouting.extractConversationName(params),
+        'LÃ¡Â»â€ºp 18DHTPM',
+      );
     });
 
     test('extracts new group title and friend request message', () {
-      final params = {'newName': 'Nhóm mới', 'note': 'Kết bạn nhé'};
-      expect(AiCommandRouting.extractNewTitle(params), 'Nhóm mới');
+      final params = {
+        'newName': 'NhÃƒÂ³m mÃ¡Â»â€ºi',
+        'note': 'KÃ¡ÂºÂ¿t bÃ¡ÂºÂ¡n nhÃƒÂ©',
+      };
+      expect(AiCommandRouting.extractNewTitle(params), 'NhÃƒÂ³m mÃ¡Â»â€ºi');
       expect(
         AiCommandRouting.extractFriendRequestMessage(params),
-        'Kết bạn nhé',
+        'KÃ¡ÂºÂ¿t bÃ¡ÂºÂ¡n nhÃƒÂ©',
       );
     });
   });
@@ -194,43 +197,57 @@ void main() {
   group('AiCommandRouting flexible name matching', () {
     test('normalizes Vietnamese accents and spacing', () {
       expect(
-        AiCommandRouting.normalizeSearchText('  Lý   Tinh Vân  '),
+        AiCommandRouting.normalizeSearchText('  L\u00FD   Tinh V\u00E2n  '),
         'ly tinh van',
       );
       expect(
-        AiCommandRouting.normalizeSearchText('Đặng Thị Uyên'),
+        AiCommandRouting.normalizeSearchText(
+          '\u0110\u1EB7ng Th\u1ECB Uy\u00EAn',
+        ),
         'dang thi uyen',
       );
     });
 
     test('matches skipped middle names for contact resolution', () {
       expect(
-        AiCommandRouting.isFlexibleNameMatch('Lý Tinh Vân', 'lý vân'),
+        AiCommandRouting.isFlexibleNameMatch(
+          'L\u00FD Tinh V\u00E2n',
+          'l\u00FD v\u00E2n',
+        ),
         isTrue,
       );
       expect(
-        AiCommandRouting.isFlexibleNameMatch('Lý Tinh Vân', 'ly van'),
+        AiCommandRouting.isFlexibleNameMatch('L\u00FD Tinh V\u00E2n', 'ly van'),
         isTrue,
       );
       expect(
-        AiCommandRouting.isFlexibleNameMatch('Nguyễn Thị Uyên', 'uyen'),
+        AiCommandRouting.isFlexibleNameMatch(
+          'Nguy\u1EC5n Th\u1ECB Uy\u00EAn',
+          'uyen',
+        ),
         isTrue,
       );
       expect(
-        AiCommandRouting.isFlexibleNameMatch('Lý Tinh Vân', 'lý bình'),
+        AiCommandRouting.isFlexibleNameMatch(
+          'L\u00FD Tinh V\u00E2n',
+          'l\u00FD b\u00ECnh',
+        ),
         isFalse,
       );
     });
 
     test('ranks exact and suffix matches above loose flexible matches', () {
-      final exact = AiCommandRouting.computeNameMatchScore('Lý Vân', 'lý vân');
+      final exact = AiCommandRouting.computeNameMatchScore(
+        'L\u00FD V\u00E2n',
+        'l\u00FD v\u00E2n',
+      );
       final suffix = AiCommandRouting.computeNameMatchScore(
-        'Lý Tinh Vân',
-        'lý vân',
+        'L\u00FD Tinh V\u00E2n',
+        'l\u00FD v\u00E2n',
       );
       final loose = AiCommandRouting.computeNameMatchScore(
-        'Nguyễn Lý Tinh Vân',
-        'lý vân',
+        'Nguy\u1EC5n L\u00FD Tinh V\u00E2n',
+        'l\u00FD v\u00E2n',
       );
 
       expect(exact, greaterThan(suffix));
@@ -279,41 +296,45 @@ void main() {
   group('AiCommandRouting action feedback copy', () {
     test('builds ambiguity feedback with candidate names', () {
       final message = AiCommandRouting.buildAmbiguousTargetFeedback(
-        targetName: 'Uyên',
+        targetName: 'UyÃƒÂªn',
         candidates: const [
-          'Uyên Lý',
-          'Uyên Nguyễn',
-          'Uyên Trần',
-          'Uyên Hoàng',
-          'Uyên Đặng',
+          'UyÃƒÂªn LÃƒÂ½',
+          'UyÃƒÂªn NguyÃ¡Â»â€¦n',
+          'UyÃƒÂªn TrÃ¡ÂºÂ§n',
+          'UyÃƒÂªn HoÃƒÂ ng',
+          'UyÃƒÂªn Ã„ÂÃ¡ÂºÂ·ng',
         ],
       );
 
-      expect(message, contains('Uyên Lý'));
-      expect(message, contains('Uyên Nguyễn'));
-      expect(message, isNot(contains('Uyên Đặng')));
+      expect(message, contains('UyÃƒÂªn LÃƒÂ½'));
+      expect(message, contains('UyÃƒÂªn NguyÃ¡Â»â€¦n'));
+      expect(message, isNot(contains('UyÃƒÂªn Ã„ÂÃ¡ÂºÂ·ng')));
     });
 
     test('builds missing target feedback with specific type', () {
       final message = AiCommandRouting.buildMissingTargetFeedback(
-        targetName: 'Lý Vân',
-        targetType: 'liên hệ trong danh bạ',
+        targetName: 'LÃƒÂ½ VÃƒÂ¢n',
+        targetType: 'liÃƒÂªn hÃ¡Â»â€¡ trong danh bÃ¡ÂºÂ¡',
       );
 
-      expect(message, contains('liên hệ trong danh bạ'));
-      expect(message, contains('Lý Vân'));
+      expect(message, contains('liÃƒÂªn hÃ¡Â»â€¡ trong danh bÃ¡ÂºÂ¡'));
+      expect(message, contains('LÃƒÂ½ VÃƒÂ¢n'));
     });
 
     test('round-trips ambiguity candidate metadata in source', () {
       final source = AiCommandRouting.buildAmbiguityFeedbackSource(
         scope: 'contact',
-        candidates: const ['Uyên Lý', 'Uyên Nguyễn', 'Uyên Lý'],
+        candidates: const [
+          'UyÃƒÂªn LÃƒÂ½',
+          'UyÃƒÂªn NguyÃ¡Â»â€¦n',
+          'UyÃƒÂªn LÃƒÂ½',
+        ],
       );
 
       expect(source, startsWith('ai_action_ambiguity.contact::'));
       expect(
         AiCommandRouting.parseAmbiguityCandidatesFromSource(source),
-        const ['Uyên Lý', 'Uyên Nguyễn'],
+        const ['UyÃƒÂªn LÃƒÂ½', 'UyÃƒÂªn NguyÃ¡Â»â€¦n'],
       );
     });
   });

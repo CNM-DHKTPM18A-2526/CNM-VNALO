@@ -1,72 +1,72 @@
 class AiCommandRouting {
   static const Map<String, String> _vietnameseCharMap = {
-    'à': 'a',
-    'á': 'a',
-    'ạ': 'a',
-    'ả': 'a',
-    'ã': 'a',
-    'â': 'a',
-    'ầ': 'a',
-    'ấ': 'a',
-    'ậ': 'a',
-    'ẩ': 'a',
-    'ẫ': 'a',
-    'ă': 'a',
-    'ằ': 'a',
-    'ắ': 'a',
-    'ặ': 'a',
-    'ẳ': 'a',
-    'ẵ': 'a',
-    'è': 'e',
-    'é': 'e',
-    'ẹ': 'e',
-    'ẻ': 'e',
-    'ẽ': 'e',
-    'ê': 'e',
-    'ề': 'e',
-    'ế': 'e',
-    'ệ': 'e',
-    'ể': 'e',
-    'ễ': 'e',
-    'ì': 'i',
-    'í': 'i',
-    'ị': 'i',
-    'ỉ': 'i',
-    'ĩ': 'i',
-    'ò': 'o',
-    'ó': 'o',
-    'ọ': 'o',
-    'ỏ': 'o',
-    'õ': 'o',
-    'ô': 'o',
-    'ồ': 'o',
-    'ố': 'o',
-    'ộ': 'o',
-    'ổ': 'o',
-    'ỗ': 'o',
-    'ơ': 'o',
-    'ờ': 'o',
-    'ớ': 'o',
-    'ợ': 'o',
-    'ở': 'o',
-    'ỡ': 'o',
-    'ù': 'u',
-    'ú': 'u',
-    'ụ': 'u',
-    'ủ': 'u',
-    'ũ': 'u',
-    'ư': 'u',
-    'ừ': 'u',
-    'ứ': 'u',
-    'ự': 'u',
-    'ử': 'u',
-    'ữ': 'u',
-    'ỳ': 'y',
-    'ý': 'y',
-    'ỵ': 'y',
-    'ỷ': 'y',
-    'ỹ': 'y',
-    'đ': 'd',
+    '\u00E0': 'a',
+    '\u00E1': 'a',
+    '\u1EA1': 'a',
+    '\u1EA3': 'a',
+    '\u00E3': 'a',
+    '\u00E2': 'a',
+    '\u1EA7': 'a',
+    '\u1EA5': 'a',
+    '\u1EAD': 'a',
+    '\u1EA9': 'a',
+    '\u1EAB': 'a',
+    '\u0103': 'a',
+    '\u1EB1': 'a',
+    '\u1EAF': 'a',
+    '\u1EB7': 'a',
+    '\u1EB3': 'a',
+    '\u1EB5': 'a',
+    '\u00E8': 'e',
+    '\u00E9': 'e',
+    '\u1EB9': 'e',
+    '\u1EBB': 'e',
+    '\u1EBD': 'e',
+    '\u00EA': 'e',
+    '\u1EC1': 'e',
+    '\u1EBF': 'e',
+    '\u1EC7': 'e',
+    '\u1EC3': 'e',
+    '\u1EC5': 'e',
+    '\u00EC': 'i',
+    '\u00ED': 'i',
+    '\u1ECB': 'i',
+    '\u1EC9': 'i',
+    '\u0129': 'i',
+    '\u00F2': 'o',
+    '\u00F3': 'o',
+    '\u1ECD': 'o',
+    '\u1ECF': 'o',
+    '\u00F5': 'o',
+    '\u00F4': 'o',
+    '\u1ED3': 'o',
+    '\u1ED1': 'o',
+    '\u1ED9': 'o',
+    '\u1ED5': 'o',
+    '\u1ED7': 'o',
+    '\u01A1': 'o',
+    '\u1EDD': 'o',
+    '\u1EDB': 'o',
+    '\u1EE3': 'o',
+    '\u1EDF': 'o',
+    '\u1EE1': 'o',
+    '\u00F9': 'u',
+    '\u00FA': 'u',
+    '\u1EE5': 'u',
+    '\u1EE7': 'u',
+    '\u0169': 'u',
+    '\u01B0': 'u',
+    '\u1EEB': 'u',
+    '\u1EE9': 'u',
+    '\u1EF1': 'u',
+    '\u1EED': 'u',
+    '\u1EEF': 'u',
+    '\u1EF3': 'y',
+    '\u00FD': 'y',
+    '\u1EF5': 'y',
+    '\u1EF7': 'y',
+    '\u1EF9': 'y',
+    '\u0111': 'd',
   };
 
   static String normalizeSearchText(String value) {
@@ -168,14 +168,18 @@ class AiCommandRouting {
   }
 
   static String normalizeSystemAction(String command) {
-    switch (command.trim().toUpperCase()) {
-      case 'MỞ SETTINGS':
-      case 'CÀI ĐẶT':
+    final normalizedLocalized = normalizeSearchText(command);
+    switch (normalizedLocalized) {
+      case 'mo settings':
+      case 'cai dat':
         return 'NAVIGATE_TO_SETTINGS';
-      case 'MỞ DANH BẠ':
+      case 'mo danh ba':
         return 'NAVIGATE_TO_CONTACTS';
-      case 'MỞ CHAT':
+      case 'mo chat':
         return 'NAVIGATE_TO_CHAT';
+    }
+
+    switch (command.trim().toUpperCase()) {
       case 'OPEN_CHAT':
       case 'OPEN_CONVERSATION':
       case 'GO_TO_CHAT':
@@ -366,7 +370,7 @@ class AiCommandRouting {
   static String buildAmbiguousTargetFeedback({
     required String targetName,
     required Iterable<String> candidates,
-    String actionLabel = 'tiếp tục',
+    String actionLabel = 'tiÃ¡ÂºÂ¿p tÃ¡Â»Â¥c',
   }) {
     final cleanTarget = targetName.trim();
     final uniqueCandidates = candidates
@@ -377,21 +381,22 @@ class AiCommandRouting {
         .toList(growable: false);
 
     if (uniqueCandidates.isEmpty) {
-      return 'Có nhiều kết quả khớp "$cleanTarget". Hãy nói rõ hơn để trợ lý $actionLabel.';
+      return 'CÃƒÂ³ nhiÃ¡Â»Âu kÃ¡ÂºÂ¿t quÃ¡ÂºÂ£ khÃ¡Â»â€ºp "$cleanTarget". HÃƒÂ£y nÃƒÂ³i rÃƒÂµ hÃ†Â¡n Ã„â€˜Ã¡Â»Æ’ trÃ¡Â»Â£ lÃƒÂ½ $actionLabel.';
     }
 
-    return 'Mình tìm thấy nhiều kết quả cho "$cleanTarget": ${uniqueCandidates.join(', ')}. Bạn muốn chọn ai?';
+    return 'MÃƒÂ¬nh tÃƒÂ¬m thÃ¡ÂºÂ¥y nhiÃ¡Â»Âu kÃ¡ÂºÂ¿t quÃ¡ÂºÂ£ cho "$cleanTarget": ${uniqueCandidates.join(', ')}. BÃ¡ÂºÂ¡n muÃ¡Â»â€˜n chÃ¡Â»Ân ai?';
   }
 
   static String buildMissingTargetFeedback({
     required String targetName,
-    String targetType = 'người hoặc cuộc trò chuyện',
+    String targetType =
+        'ngÃ†Â°Ã¡Â»Âi hoÃ¡ÂºÂ·c cuÃ¡Â»â„¢c trÃƒÂ² chuyÃ¡Â»â€¡n',
   }) {
     final cleanTarget = targetName.trim();
     if (cleanTarget.isEmpty) {
-      return 'Mình chưa xác định được $targetType. Hãy nói rõ tên để trợ lý tiếp tục.';
+      return 'MÃƒÂ¬nh chÃ†Â°a xÃƒÂ¡c Ã„â€˜Ã¡Â»â€¹nh Ã„â€˜Ã†Â°Ã¡Â»Â£c $targetType. HÃƒÂ£y nÃƒÂ³i rÃƒÂµ tÃƒÂªn Ã„â€˜Ã¡Â»Æ’ trÃ¡Â»Â£ lÃƒÂ½ tiÃ¡ÂºÂ¿p tÃ¡Â»Â¥c.';
     }
-    return 'Mình chưa tìm thấy $targetType "$cleanTarget". Hãy kiểm tra lại tên hoặc thử nói rõ hơn.';
+    return 'MÃƒÂ¬nh chÃ†Â°a tÃƒÂ¬m thÃ¡ÂºÂ¥y $targetType "$cleanTarget". HÃƒÂ£y kiÃ¡Â»Æ’m tra lÃ¡ÂºÂ¡i tÃƒÂªn hoÃ¡ÂºÂ·c thÃ¡Â»Â­ nÃƒÂ³i rÃƒÂµ hÃ†Â¡n.';
   }
 
   static String buildAmbiguityFeedbackSource({
