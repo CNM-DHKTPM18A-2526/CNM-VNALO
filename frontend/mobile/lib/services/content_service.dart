@@ -107,8 +107,7 @@ class ContentService {
           'contentText': contentText ?? '',
           'mediaUrls': mediaUrls ?? [],
           'visibility': visibility,
-          if (includedIds != null) 'includedIds': includedIds,
-          if (excludedIds != null) 'excludedIds': excludedIds,
+          // Removed includedIds and excludedIds because backend doesn't support them
         },
       );
       final data = response['data'] ?? response;
