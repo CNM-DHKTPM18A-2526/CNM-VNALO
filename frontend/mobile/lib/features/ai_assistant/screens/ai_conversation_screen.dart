@@ -879,7 +879,7 @@ class _EmptyAiConversation extends StatelessWidget {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(AiAssistantTokens.buttonRadius),
             onTap: () => onQuickActionSelected(text),
             child: Ink(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -888,7 +888,9 @@ class _EmptyAiConversation extends StatelessWidget {
                     isDarkMode
                         ? DarkColors.surface
                         : Colors.white.withValues(alpha: 0.8),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(
+                  AiAssistantTokens.buttonRadius,
+                ),
                 border: Border.all(
                   color: AppColors.primary.withValues(alpha: 0.2),
                 ),

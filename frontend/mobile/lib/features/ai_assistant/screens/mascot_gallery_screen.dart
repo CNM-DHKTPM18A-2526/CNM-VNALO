@@ -4,6 +4,7 @@ import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/theme/app_typography.dart';
 import 'package:vnalo_mobile/features/ai_assistant/models/mascot_metadata.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
+import 'package:vnalo_mobile/features/ai_assistant/theme/ai_assistant_tokens.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_robot_avatar.dart';
 
 class MascotGalleryScreen extends StatefulWidget {
@@ -102,7 +103,9 @@ class _MascotGalleryScreenState extends State<MascotGalleryScreen> {
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           color: isDarkMode ? DarkColors.surface : Colors.white,
-                          borderRadius: BorderRadius.circular(28),
+                          borderRadius: BorderRadius.circular(
+                            AiAssistantTokens.sheetRadius,
+                          ),
                           border: Border.all(
                             color:
                                 isSelected
@@ -210,7 +213,9 @@ class _MascotGalleryScreenState extends State<MascotGalleryScreen> {
                                             : Colors.white,
                                     elevation: 0,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14),
+                                      borderRadius: BorderRadius.circular(
+                                        AiAssistantTokens.pillRadius,
+                                      ),
                                     ),
                                   ),
                                   child: Text(

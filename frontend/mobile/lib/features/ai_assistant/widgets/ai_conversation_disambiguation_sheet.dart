@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/theme/app_typography.dart';
+import 'package:vnalo_mobile/features/ai_assistant/theme/ai_assistant_tokens.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
 
 class AiConversationDisambiguationSheet extends StatefulWidget {
@@ -42,9 +43,9 @@ class AiConversationDisambiguationSheet extends StatefulWidget {
 
 class _AiConversationDisambiguationSheetState
     extends State<AiConversationDisambiguationSheet> {
-  static const double _sheetRadius = 18;
-  static const double _cardRadius = 10;
-  static const double _buttonRadius = 999;
+  static const double _sheetRadius = AiAssistantTokens.sheetRadius;
+  static const double _cardRadius = AiAssistantTokens.cardRadius;
+  static const double _buttonRadius = AiAssistantTokens.pillRadius;
 
   final TextEditingController _searchController = TextEditingController();
   String _keyword = '';
