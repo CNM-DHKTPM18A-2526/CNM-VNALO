@@ -536,6 +536,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         conversation: updated,
       };
 
+      // Broadcast to all sockets in the room (members who have joined this conversation room)
       this.server.to(room).emit('group.settingsChanged', payload);
       this.logger.log(
         `[Gateway.updateSettings] Group ${conversationId} settings updated by ${userId}`,
@@ -691,7 +692,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
       // STEP 1.5: G-008 — ENFORCE onlyAdminCanPost GUARD
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-      await this.conversationService.assertCanSendMessage(dto.conversationId, userId);
+      await this.conversationService.assertCanSendMessage(dto.conversationId, userId, dto.content);
 
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
       // STEP 2: SAVE TO DATABASE

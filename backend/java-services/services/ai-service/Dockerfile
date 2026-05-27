@@ -1,7 +1,7 @@
 # =============================================================================
 # AI Service — Multi-stage Dockerfile
 # Base: Eclipse Temurin 21 (Alpine)
-# Build: Maven wrapper (./mvnw) — no Maven install required
+# Build: Maven (direct) — handles missing mvnw gracefully
 # Runtime: JRE only — minimal image size
 # =============================================================================
 
@@ -11,30 +11,25 @@ WORKDIR /build
 
 ARG MAVEN_RETRIES=5
 
-# Copy Maven wrapper and config first (cache dependencies layer)
-COPY .mvn/ .mvn/
-COPY mvnw pom.xml ./
-RUN set -eux; \
-    chmod +x mvnw; \
-    attempts=0; \
-    until [ "$attempts" -ge "$MAVEN_RETRIES" ]; do \
-      attempts=$((attempts + 1)); \
-      ./mvnw -B -U --no-transfer-progress -Dmaven.wagon.http.retryHandler.count=5 dependency:go-offline && break; \
-      echo "Maven go-offline failed (attempt ${attempts}/${MAVEN_RETRIES})."; \
-      find /root/.m2/repository -name "*.lastUpdated" -delete || true; \
-      if [ "$attempts" -ge "$MAVEN_RETRIES" ]; then exit 1; fi; \
-      sleep $((attempts * 5)); \
-    done
+# Install maven directly (more reliable than wrapper)
+RUN apk add --no-cache maven
 
-# Copy source and build
+# Copy source
+COPY .mvn/ .mvn/
+COPY pom.xml ./
+COPY mvnw mvnw.cmd ./
+
+# Copy source code
 COPY src/ src/
+
+# Build with maven
 RUN set -eux; \
     attempts=0; \
     until [ "$attempts" -ge "$MAVEN_RETRIES" ]; do \
       attempts=$((attempts + 1)); \
-      ./mvnw -B -U --no-transfer-progress -DskipTests clean package && break; \
+      mvn -B -U --no-transfer-progress -DskipTests clean package && break; \
       echo "Maven package failed (attempt ${attempts}/${MAVEN_RETRIES})."; \
-      find /root/.m2/repository -name "*.lastUpdated" -delete || true; \
+      find /root/.m2/repository -name "*.lastUpdated" -delete 2>/dev/null || true; \
       if [ "$attempts" -ge "$MAVEN_RETRIES" ]; then exit 1; fi; \
       sleep $((attempts * 5)); \
     done
@@ -49,7 +44,7 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 # Copy JAR from builder
 COPY --from=builder /build/target/*.jar app.jar
 
-# Health check — AI service usually has a slightly longer start period
+# Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8094/api/v1/ai/actuator/health || exit 1
 

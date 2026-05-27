@@ -658,6 +658,7 @@ export class ConversationService {
   async assertCanSendMessage(
     conversationId: string,
     userId: string,
+    content?: string,
   ): Promise<ConversationMember> {
     const conversation = await this.getConversationOrFail(conversationId);
     const member = await this.assertMember(conversationId, userId);
@@ -669,6 +670,23 @@ export class ConversationService {
         );
       }
     }
+
+    if (content && conversation.type === ConversationType.GROUP) {
+      try {
+        const payload = JSON.parse(content);
+        const isAdminOrDeputy = member.role === 'ADMIN' || member.role === 'DEPUTY';
+        
+        if (payload.type === 'poll' && !conversation.allowMemberCreatePoll && !isAdminOrDeputy) {
+          throw new ForbiddenException('Only admin and deputy can create polls');
+        }
+        if (payload.type === 'note' && !conversation.allowMemberCreateNote && !isAdminOrDeputy) {
+          throw new ForbiddenException('Only admin and deputy can create notes');
+        }
+      } catch {
+        // Not valid JSON, regular text message
+      }
+    }
+
     return member;
   }
 

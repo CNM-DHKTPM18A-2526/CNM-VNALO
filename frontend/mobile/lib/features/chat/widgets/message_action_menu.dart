@@ -138,7 +138,7 @@ class MessageActionMenu extends StatelessWidget {
           const Color(0xFF1E88E5),
         ),
       );
-      if (!isAiAssistant && canPin) {
+      if (!isAiAssistant) {
         actionItems.add(
           _buildActionItem(
             context,
@@ -287,7 +287,7 @@ class MessageActionMenu extends StatelessWidget {
         ),
       );
 
-      if (!isAiAssistant && canPin) {
+      if (!isAiAssistant) {
         actionItems.add(
           _buildActionItem(
             context,

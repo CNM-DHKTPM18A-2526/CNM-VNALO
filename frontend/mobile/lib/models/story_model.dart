@@ -1,25 +1,43 @@
-import 'package:vnalo_mobile/models/user_model.dart';
-
 class Story {
   final String id;
-  final User author;
+  final String authorId;
   final String? mediaUrl;
+  final String? caption;
+  final String? visibility;
+  final DateTime? expiresAt;
   final DateTime createdAt;
-  final bool isMe;
 
   Story({
     required this.id,
-    required this.author,
+    required this.authorId,
     this.mediaUrl,
+    this.caption,
+    this.visibility,
+    this.expiresAt,
     required this.createdAt,
-    this.isMe = false,
   });
 
   factory Story.fromJson(Map<String, dynamic> json) => Story(
-    id: json['id'],
-    author: User.fromJson(json['author']),
+    id: json['storyId']?.toString() ?? json['id']?.toString() ?? '',
+    authorId: json['authorId']?.toString() ?? '',
     mediaUrl: json['mediaUrl'],
-    createdAt: DateTime.parse(json['createdAt']),
-    isMe: json['isMe'] ?? false,
+    caption: json['caption'],
+    visibility: json['visibility'],
+    expiresAt: json['expiresAt'] != null 
+        ? DateTime.tryParse(json['expiresAt'].toString()) 
+        : null,
+    createdAt: json['createdAt'] != null 
+        ? DateTime.parse(json['createdAt'].toString())
+        : DateTime.now(),
   );
+
+  Map<String, dynamic> toJson() => {
+    'storyId': id,
+    'authorId': authorId,
+    'mediaUrl': mediaUrl,
+    'caption': caption,
+    'visibility': visibility,
+    'expiresAt': expiresAt?.toIso8601String(),
+    'createdAt': createdAt.toIso8601String(),
+  };
 }

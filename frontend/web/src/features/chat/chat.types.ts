@@ -24,7 +24,13 @@ export type ConversationSummary = {
   inviteLink?: string | null
   allowMemberEditInfo?: boolean
   allowMemberPin?: boolean
+  allowMemberInvite?: boolean
+  allowMemberCreateNote?: boolean
+  allowMemberCreatePoll?: boolean
+  highlightAdminMessages?: boolean
+  showHistoryToNewMembers?: boolean
   joinMode?: 'OPEN' | 'APPROVAL' | string
+  description?: string
 }
 
 export type ChatMessageType = 'text' | 'image' | 'video' | 'file' | 'sticker' | 'system' | 'call' | 'poll'

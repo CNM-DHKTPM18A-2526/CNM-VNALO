@@ -258,6 +258,12 @@ class ChatListItem extends StatelessWidget {
 
   String? _textPreview(String content) {
     if (content.isEmpty) return null;
+    if (content.trim().startsWith('{"type":"poll"')) {
+      return '[Bình chọn]';
+    }
+    if (content.trim().startsWith('{"type":"note"')) {
+      return '[Ghi chú]';
+    }
     final uri = Uri.tryParse(content);
     if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
       return '[Link] $content';

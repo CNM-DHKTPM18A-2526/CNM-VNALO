@@ -1272,13 +1272,23 @@ export default function ChatPage() {
 
       setConversations(prev => prev.map(c => {
         if (c.id !== conversationId) return c;
-        // Merge settings from various possible backend field names
+        // Merge ALL settings from backend — covers all admin-changeable fields
         const settings = {
           name: data.isGroup || data.type === 'GROUP' ? (data.title || data.name || c.name) : c.name,
           avatarUrl: data.avatarUrl || data.avatar_url || c.avatarUrl,
+          description: data.description ?? c.description,
+          joinMode: data.joinMode ?? data.join_mode ?? c.joinMode,
+          // Permissions
           onlyAdminCanPost: Boolean(data.onlyAdminCanPost ?? data.only_admin_can_post ?? c.onlyAdminCanPost),
+          allowMemberInvite: data.allowMemberInvite !== undefined ? Boolean(data.allowMemberInvite) : (data.allow_member_invite !== undefined ? Boolean(data.allow_member_invite) : c.allowMemberInvite),
           allowMemberPin: Boolean(data.allowMemberPin ?? data.allow_member_pin ?? c.allowMemberPin),
           allowMemberEditInfo: Boolean(data.allowMemberEditInfo ?? data.allow_member_edit_info ?? c.allowMemberEditInfo),
+          allowMemberCreateNote: data.allowMemberCreateNote !== undefined ? Boolean(data.allowMemberCreateNote) : (data.allow_member_create_note !== undefined ? Boolean(data.allow_member_create_note) : (c as any).allowMemberCreateNote),
+          allowMemberCreatePoll: data.allowMemberCreatePoll !== undefined ? Boolean(data.allowMemberCreatePoll) : (data.allow_member_create_poll !== undefined ? Boolean(data.allow_member_create_poll) : (c as any).allowMemberCreatePoll),
+          // Message settings
+          highlightAdminMessages: data.highlightAdminMessages !== undefined ? Boolean(data.highlightAdminMessages) : (data.highlight_admin_messages !== undefined ? Boolean(data.highlight_admin_messages) : (c as any).highlightAdminMessages),
+          showHistoryToNewMembers: data.showHistoryToNewMembers !== undefined ? Boolean(data.showHistoryToNewMembers) : (data.show_history_to_new_members !== undefined ? Boolean(data.show_history_to_new_members) : (c as any).showHistoryToNewMembers),
+          // Members
           members: data.members || c.members,
           memberCount: (data.members || []).length || c.memberCount,
           updatedAt: new Date().toISOString(),
@@ -1341,7 +1351,7 @@ export default function ChatPage() {
     },
     onFriendshipUpdated: async (payload) => {
       if (!user || !accessToken || !payload.friendId) return;
-      console.log('[ChatPage] ÃƒÂ¯Ã‚Â¿Ã‚Â½ÃƒÂ¯Ã‚Â¿Ã‚Â½ Friendship updated via socket for friendId:', payload.friendId);
+      console.log('[ChatPage] 🔗 Friendship updated via socket for friendId:', payload.friendId);
 
       try {
         // 1. Ensure conversation is created in message-service
@@ -1355,6 +1365,18 @@ export default function ChatPage() {
         // because loadInbox updates the conversations state.
       } catch (error) {
         console.warn('[ChatPage] Failed to handle friendship update:', error);
+      }
+    },
+    onGroupUpdated: async (payload) => {
+      if (!accessToken || !payload?.conversationId) return;
+      console.log('[ChatPage] ⚙️ Group updated via socket for conversationId:', payload.conversationId);
+      try {
+        // Refresh conversation metadata to get new settings
+        await syncConversationMetadata(payload.conversationId);
+        // Also ensure conversations list in inbox is updated
+        await loadInbox(accessToken, payload.conversationId);
+      } catch (error) {
+        console.warn('[ChatPage] Failed to handle group update:', error);
       }
     },
     onMessageReceived: async (raw: RawMessage) => {
@@ -1829,9 +1851,32 @@ export default function ChatPage() {
       const conversationId = payload.conversationId || payload.conversation_id;
       if (!conversationId) return;
 
-      // Trigger full refresh to ensure all settings are synced correctly
+      // Inline apply from socket payload for instant 0-latency UI update
+      const inlineData = payload.conversation || payload.changes;
+      if (inlineData && typeof inlineData === 'object') {
+        setConversations(prev => prev.map(c => {
+          if (c.id !== conversationId) return c;
+          const d: any = inlineData;
+          const merged: any = { ...c };
+          if (d.title !== undefined || d.name !== undefined) merged.name = d.title || d.name || c.name;
+          if (d.avatarUrl !== undefined) merged.avatarUrl = d.avatarUrl;
+          if (d.description !== undefined) merged.description = d.description;
+          if (d.joinMode !== undefined) merged.joinMode = d.joinMode;
+          if (d.onlyAdminCanPost !== undefined) merged.onlyAdminCanPost = Boolean(d.onlyAdminCanPost);
+          if (d.allowMemberInvite !== undefined) merged.allowMemberInvite = Boolean(d.allowMemberInvite);
+          if (d.allowMemberPin !== undefined) merged.allowMemberPin = Boolean(d.allowMemberPin);
+          if (d.allowMemberEditInfo !== undefined) merged.allowMemberEditInfo = Boolean(d.allowMemberEditInfo);
+          if (d.allowMemberCreateNote !== undefined) merged.allowMemberCreateNote = Boolean(d.allowMemberCreateNote);
+          if (d.allowMemberCreatePoll !== undefined) merged.allowMemberCreatePoll = Boolean(d.allowMemberCreatePoll);
+          if (d.highlightAdminMessages !== undefined) merged.highlightAdminMessages = Boolean(d.highlightAdminMessages);
+          if (d.showHistoryToNewMembers !== undefined) merged.showHistoryToNewMembers = Boolean(d.showHistoryToNewMembers);
+          if (d.members) { merged.members = d.members; merged.memberCount = d.members.length; }
+          return merged;
+        }));
+      }
+
+      // Full refresh for guaranteed consistency
       void syncConversationMetadata(conversationId);
-      if (accessToken) void loadInbox(accessToken);
     },
     onGroupDisbanded: (payload) => {
       console.log('Group disbanded', payload.conversationId)

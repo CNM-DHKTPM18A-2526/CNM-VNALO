@@ -63,6 +63,16 @@ public class Post extends BaseAuditEntity {
     private Integer shareCount = 0;
 
     @Builder.Default
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "included_ids", columnDefinition = "jsonb")
+    private List<String> includedIds = new ArrayList<>();
+
+    @Builder.Default
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "excluded_ids", columnDefinition = "jsonb")
+    private List<String> excludedIds = new ArrayList<>();
+
+    @Builder.Default
     @Column(name = "status", nullable = false, length = 20)
     private String status = "ACTIVE";
 
@@ -76,6 +86,12 @@ public class Post extends BaseAuditEntity {
         }
         if (visibility == null || visibility.isBlank()) {
             visibility = "PUBLIC";
+        }
+        if (includedIds == null) {
+            includedIds = new ArrayList<>();
+        }
+        if (excludedIds == null) {
+            excludedIds = new ArrayList<>();
         }
         if (status == null || status.isBlank()) {
             status = "ACTIVE";

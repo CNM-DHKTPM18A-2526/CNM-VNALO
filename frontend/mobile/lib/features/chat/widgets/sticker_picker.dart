@@ -533,6 +533,7 @@ class _GifTabContentState extends State<_GifTabContent> {
 
               return GestureDetector(
                 onTap: () {
+                  // Gửi với marker [GIF] để khi hiển thị biết đây là GIF
                   context.read<ChatProvider>().sendGif(conversationId: widget.conversationId, gifUrl: resolvedUrl);
                   widget.onSelected();
                 },
@@ -541,14 +542,22 @@ class _GifTabContentState extends State<_GifTabContent> {
                   child: Builder(
                     builder: (context) {
                       final token = context.watch<AuthProvider>().accessToken;
-                      return CachedNetworkImage(
-                        imageUrl: resolvedUrl, 
-                        fit: BoxFit.cover, 
-                        httpHeaders: (token != null && AvatarResolver.isInternalUrl(resolvedUrl))
-                            ? {'Authorization': 'Bearer $token'}
-                            : const {},
-                        placeholder: (context, url) => Container(color: Colors.grey.withValues(alpha: 0.1)),
-                        errorWidget: (context, error, stackTrace) => const Center(child: Icon(Icons.error_outline)),
+                      final headers = (token != null && AvatarResolver.isInternalUrl(resolvedUrl))
+                          ? {'Authorization': 'Bearer $token'}
+                          : <String, String>{};
+                      // Sử dụng Image.network cho GIF để đảm bảo animation hoạt động
+                      return Image.network(
+                        resolvedUrl,
+                        fit: BoxFit.cover,
+                        headers: headers,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(color: Colors.grey.withValues(alpha: 0.1));
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          debugPrint('[_GifTabContent] GIF Error: $error for URL: $resolvedUrl');
+                          return const Center(child: Icon(Icons.error_outline, color: Colors.grey));
+                        },
                       );
                     }
                   ),

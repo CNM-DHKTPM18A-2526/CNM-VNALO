@@ -435,6 +435,7 @@ class ChatService {
     String? replyToContent,
     String? forwardFromMessageId,
     String? forwardFromConversationId,
+    String? clientMessageId,
   }) async {
     final response = await _apiService.post(
       _base,
@@ -452,6 +453,7 @@ class ChatService {
         if (replyToContent != null) 'replyToContent': replyToContent,
         if (forwardFromMessageId != null) 'forwardFromMessageId': forwardFromMessageId,
         if (forwardFromConversationId != null) 'forwardFromConversationId': forwardFromConversationId,
+        if (clientMessageId != null) 'clientMessageId': clientMessageId,
       },
     );
 
@@ -496,6 +498,15 @@ class ChatService {
 
   Future<void> deleteForMe(String messageId) async {
     await _apiService.delete(_base, '/messages/$messageId/for-me');
+  }
+
+  Future<Message> editMessage(String messageId, String content) async {
+    final response = await _apiService.patch(
+      _base,
+      '/messages/$messageId',
+      body: {'content': content},
+    );
+    return Message.fromJson(response['data'] ?? response);
   }
 
   Future<void> updateMemberNickname(String conversationId, String targetUserId, String nickname) async {

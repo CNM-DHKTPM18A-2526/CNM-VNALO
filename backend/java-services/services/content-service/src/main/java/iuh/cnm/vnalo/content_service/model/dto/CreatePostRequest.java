@@ -17,7 +17,11 @@ public class CreatePostRequest {
 
     /**
      * Allowed values:
-     * PUBLIC, FRIENDS, PRIVATE
+     * PUBLIC, FRIENDS, PRIVATE, SOME_FRIENDS, EXCEPT
      */
     private String visibility;
+
+    private List<String> includedIds;
+
+    private List<String> excludedIds;
 }

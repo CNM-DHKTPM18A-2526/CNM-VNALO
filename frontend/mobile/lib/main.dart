@@ -31,6 +31,7 @@ import 'package:vnalo_mobile/features/call/widgets/incoming_call_coordinator.dar
 import 'package:vnalo_mobile/features/call/services/group_call_tracker.dart';
 import 'package:vnalo_mobile/services/notification_service.dart';
 import 'package:vnalo_mobile/services/ai_service.dart';
+import 'package:vnalo_mobile/services/content_service.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
 import 'package:vnalo_mobile/features/ai_assistant/utils/ai_compose_draft_bus.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_floating_bubble.dart';
@@ -86,6 +87,10 @@ void main() async {
     'AI_SERVICE_URL',
     defaultValue: '',
   );
+  const contentServiceOverride = String.fromEnvironment(
+    'CONTENT_SERVICE_URL',
+    defaultValue: '',
+  );
 
   final env = Environment.values.firstWhere(
     (e) => e.name == envName,
@@ -97,6 +102,7 @@ void main() async {
     messageServiceUrl:
         messageServiceOverride.isEmpty ? null : messageServiceOverride,
     mediaServiceUrl: mediaServiceOverride.isEmpty ? null : mediaServiceOverride,
+    contentServiceUrl: contentServiceOverride.isEmpty ? null : contentServiceOverride,
     socketUrl: socketOverride.isEmpty ? null : socketOverride,
     aiServiceUrl: aiServiceOverride.isEmpty ? null : aiServiceOverride,
   );
@@ -106,6 +112,7 @@ void main() async {
     debugPrint('  core=${AppConfig.instance.coreServiceUrl}');
     debugPrint('  media=${AppConfig.instance.mediaServiceUrl}');
     debugPrint('  message=${AppConfig.instance.messageServiceUrl}');
+    debugPrint('  content=${AppConfig.instance.contentServiceUrl}');
     debugPrint('  socket=${AppConfig.instance.socketUrl}');
     if (AppConfig.isLikelyLocalOnlyHost(AppConfig.instance.coreServiceUrl)) {
       debugPrint(
@@ -192,6 +199,9 @@ class VnaloApp extends StatelessWidget {
           create: (_) => AiComposeDraftBus(),
           dispose: (_, bus) => bus.close(),
         ),
+        Provider<ContentService>(
+          create: (context) => ContentService(context.read<ApiService>()),
+        ),
         ChangeNotifierProvider<ThemeProvider>(
           create: (_) => ThemeProvider()..initialize(),
         ),
@@ -249,7 +259,7 @@ class VnaloApp extends StatelessWidget {
           },
         ),
         ChangeNotifierProvider<PostProvider>(
-          create: (_) => PostProvider(),
+          create: (context) => PostProvider(context.read<ContentService>()),
         ),
         ChangeNotifierProxyProvider<ChatProvider, ForwardProvider>(
           create: (context) => ForwardProvider(context.read<ChatProvider>()),

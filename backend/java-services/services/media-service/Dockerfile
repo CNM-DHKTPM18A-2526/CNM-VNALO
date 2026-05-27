@@ -1,7 +1,7 @@
 # =============================================================================
 # Media Service — Multi-stage Dockerfile
 # Base: Eclipse Temurin 21 (Alpine)
-# Build: Maven wrapper (./mvnw)
+# Build: Maven (direct) — more reliable
 # Runtime: JRE only
 # =============================================================================
 
@@ -9,14 +9,28 @@
 FROM eclipse-temurin:21-jdk-alpine AS builder
 WORKDIR /build
 
-# Copy Maven wrapper and config
-COPY .mvn/ .mvn/
-COPY mvnw pom.xml ./
-RUN chmod +x mvnw && ./mvnw dependency:go-offline -B
+ARG MAVEN_RETRIES=5
 
-# Copy source and build
+# Install maven directly
+RUN apk add --no-cache maven
+
+# Copy source
+COPY .mvn/ .mvn/
+COPY pom.xml ./
+COPY mvnw mvnw.cmd ./
 COPY src/ src/
-RUN ./mvnw clean package -DskipTests -B
+
+# Build with retry logic
+RUN set -eux; \
+    attempts=0; \
+    until [ "$attempts" -ge "$MAVEN_RETRIES" ]; do \
+      attempts=$((attempts + 1)); \
+      mvn -B -U --no-transfer-progress -DskipTests clean package && break; \
+      echo "Maven package failed (attempt ${attempts}/${MAVEN_RETRIES})."; \
+      find /root/.m2/repository -name "*.lastUpdated" -delete 2>/dev/null || true; \
+      if [ "$attempts" -ge "$MAVEN_RETRIES" ]; then exit 1; fi; \
+      sleep $((attempts * 5)); \
+    done
 
 # --- Stage 2: Runtime ---
 FROM eclipse-temurin:21-jre-alpine

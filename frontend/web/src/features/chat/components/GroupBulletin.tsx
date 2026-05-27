@@ -17,9 +17,13 @@ interface GroupBulletinProps {
   onSendPoll?: (poll: PollMetadata) => void;
   currentUserId?: string;
   reactionStates?: Record<string, any>;
+  // Permission props
+  allowMemberCreateNote?: boolean;
+  allowMemberCreatePoll?: boolean;
+  isModerator?: boolean;
 }
 
-export function GroupBulletin({ conversationId, token, messages, onJumpToMessage, onSendPoll, currentUserId, reactionStates }: GroupBulletinProps) {
+export function GroupBulletin({ conversationId, token, messages, onJumpToMessage, onSendPoll, currentUserId, reactionStates, allowMemberCreateNote = true, allowMemberCreatePoll = true, isModerator = false }: GroupBulletinProps) {
   const { userMap } = useUserStore();
   const [activeTab, setActiveTab] = React.useState<TabType>('all');
   const [pinnedItems, setPinnedItems] = React.useState<RawPinnedMessage[]>([]);
@@ -320,15 +324,27 @@ export function GroupBulletin({ conversationId, token, messages, onJumpToMessage
       <main className="flex-1 overflow-y-auto custom-scrollbar">
         {renderContent()}
         <div className="p-4 pt-2 space-y-2 mb-6 text-[var(--text)]">
-          <button className="w-full h-11 bg-[#e5efff] dark:bg-blue-900/20 text-[#005ae0] dark:text-sky-400 font-semibold rounded-md hover:bg-[#d0e3ff] dark:hover:bg-blue-900/30 transition-colors text-[14px] border-none cursor-pointer">
-            Tạo ghi chú
-          </button>
-          <button 
-            onClick={() => setShowCreatePoll(true)}
-            className="w-full h-11 bg-[#e5efff] dark:bg-blue-900/20 text-[#005ae0] dark:text-sky-400 font-semibold rounded-md hover:bg-[#d0e3ff] dark:hover:bg-blue-900/30 transition-colors text-[14px] border-none cursor-pointer"
-          >
-            Tạo bình chọn
-          </button>
+          {(isModerator || allowMemberCreateNote) ? (
+            <button className="w-full h-11 bg-[#e5efff] dark:bg-blue-900/20 text-[#005ae0] dark:text-sky-400 font-semibold rounded-md hover:bg-[#d0e3ff] dark:hover:bg-blue-900/30 transition-colors text-[14px] border-none cursor-pointer">
+              Tạo ghi chú
+            </button>
+          ) : (
+            <div className="w-full h-11 flex items-center justify-center bg-[var(--surface-muted,#f3f4f6)] dark:bg-gray-800/40 rounded-md text-[13px] text-[var(--muted)] select-none">
+              🔒 Chỉ trưởng/phó nhóm mới có thể tạo ghi chú
+            </div>
+          )}
+          {(isModerator || allowMemberCreatePoll) ? (
+            <button 
+              onClick={() => setShowCreatePoll(true)}
+              className="w-full h-11 bg-[#e5efff] dark:bg-blue-900/20 text-[#005ae0] dark:text-sky-400 font-semibold rounded-md hover:bg-[#d0e3ff] dark:hover:bg-blue-900/30 transition-colors text-[14px] border-none cursor-pointer"
+            >
+              Tạo bình chọn
+            </button>
+          ) : (
+            <div className="w-full h-11 flex items-center justify-center bg-[var(--surface-muted,#f3f4f6)] dark:bg-gray-800/40 rounded-md text-[13px] text-[var(--muted)] select-none">
+              🔒 Chỉ trưởng/phó nhóm mới có thể tạo bình chọn
+            </div>
+          )}
         </div>
       </main>
 

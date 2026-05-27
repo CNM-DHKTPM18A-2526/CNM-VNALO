@@ -79,7 +79,7 @@ export class MessageService {
     }
 
     // Verify sender membership and group posting permissions (consolidated check)
-    await this.conversationService.assertCanSendMessage(dto.conversationId, userId);
+    await this.conversationService.assertCanSendMessage(dto.conversationId, userId, dto.content);
     await this.assertNotBlockedForSend(dto.conversationId, userId);
 
     // Validate content based on message type
