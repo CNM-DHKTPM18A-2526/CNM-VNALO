@@ -339,6 +339,7 @@ void main() {
         find.byKey(const ValueKey('ai_conversation_activity_mic')),
         findsOneWidget,
       );
+      expect(find.textContaining('10'), findsAtLeastNWidgets(1));
       expect(tester.takeException(), isNull);
 
       await provider.stopListening(

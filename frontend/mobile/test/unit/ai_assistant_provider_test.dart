@@ -134,6 +134,21 @@ void main() {
     messenger.setMockMethodCallHandler(_ttsChannel, null);
   });
 
+  test('assistantActivityLabel mentions 10 second listening window', () async {
+    final provider = _buildProvider();
+
+    await provider.startListening(source: 'test');
+
+    expect(provider.state, AiState.listening);
+    expect(provider.assistantActivityLabel, contains('10'));
+    expect(provider.assistantActivityLabel.toLowerCase(), contains('nghe'));
+
+    await provider.stopListening(
+      reason: 'label_check_cleanup',
+      keepBubbleVisible: false,
+    );
+    provider.dispose();
+  });
   test('manual stop keeps bubble visible for quick retry', () async {
     final provider = _buildProvider();
 

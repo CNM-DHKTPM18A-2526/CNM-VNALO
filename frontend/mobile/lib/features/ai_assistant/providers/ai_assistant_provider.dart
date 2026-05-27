@@ -460,7 +460,10 @@ class AiAssistantProvider with ChangeNotifier {
   bool get isAssistantGenerating => _state == AiState.thinking;
   String get assistantActivityLabel {
     if (_state == AiState.listening) {
-      return 'Đang lắng nghe...';
+      if (_lastWords.isNotEmpty) {
+        return 'Đang nghe, bạn nói tiếp nhé...';
+      }
+      return 'Đang nghe... sẽ tự tắt sau ${_sttListenFor.inSeconds} giây nếu bạn chưa nói.';
     }
     if (_state == AiState.speaking) {
       return 'Đang phản hồi...';
