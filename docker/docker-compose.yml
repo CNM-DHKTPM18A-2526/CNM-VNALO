@@ -399,42 +399,42 @@ services:
           memory: 512M
           cpus: "0.5"
 
-  # content-service:
-  #   build:
-  #     context: ../backend/java-services/services/content-service
-  #     dockerfile: Dockerfile
-  #   restart: unless-stopped
-  #   ports:
-  #     - "8086:8086"
-  #   environment:
-  #     DB_HOST: postgres
-  #     DB_PORT: 5432
-  #     DB_NAME: vnalo_content
-  #     DB_USER: ${DB_USER:-postgres}
-  #     DB_PASS: ${DB_PASS:-postgres}
-  #     REDIS_HOST: redis
-  #     REDIS_PORT: 6379
-  #     SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
-  #     JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xss256k"
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     redis:
-  #       condition: service_healthy
-  #   networks:
-  #     - vnalo-network
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "nc -z localhost 8086 || exit 1"]
-  #     interval: 30s
-  #     timeout: 5s
-  #     retries: 3
-  #     start_period: 40s
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         memory: 512M
-  #         cpus: "0.5"
-
+  content-service:
+    build:
+      context: ../backend/java-services/services/content-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8086:8086"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${CONTENT_DB_NAME:-vnalo_content}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASS: ${DB_PASS:-postgres}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xss256k"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - vnalo-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8086/api/v1/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
   notification-service:
     build:
       context: ../backend/java-services/services/notification-service
@@ -496,6 +496,7 @@ services:
       - core-service
       - message-service
       - media-service
+      - content-service
       - realtime-gateway
     networks:
       - vnalo-network

@@ -18,6 +18,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -173,6 +174,82 @@ class GeminiAiServiceTest {
         assertEquals("low", response.getRiskLevel());
     }
 
+
+    @Test
+    void interactWithGemini_rewritesPrematureSuccessComposeCopy() {
+        String responseJson = """
+                {
+                  "candidates": [
+                    {
+                      "content": {
+                        "parts": [
+                          {
+                            "text": "{\\\"textReply\\\":\\\"I already sent the message.\\\",\\\"actionCommand\\\":\\\"COMPOSE_MESSAGE\\\",\\\"actionParams\\\":{\\\"recipient\\\":\\\"Ly Tinh Van\\\",\\\"content\\\":\\\"Hello\\\"},\\\"emotion\\\":\\\"joyful\\\"}"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+                """;
+
+        when(geminiRestTemplate.exchange(any(String.class), eq(HttpMethod.POST), any(), eq(String.class)))
+                .thenReturn(ResponseEntity.ok(responseJson));
+
+        AiChatResponse response = geminiAiService.interactWithGemini(
+                "user-1",
+                AiChatRequest.builder()
+                        .prompt("Message Ly Tinh Van Hello")
+                        .analyzeIntent(true)
+                        .build()
+        );
+
+        assertEquals("COMPOSE_MESSAGE", response.getActionCommand());
+        assertEquals("Ly Tinh Van", response.getActionParams().get("recipient"));
+        assertEquals("Hello", response.getActionParams().get("content"));
+        assertNotEquals("I already sent the message.", response.getTextReply());
+        assertFalse(response.getTextReply().toLowerCase().contains("sent the message"));
+        assertTrue(response.getRequiresConfirmation());
+        assertEquals("medium", response.getRiskLevel());
+    }
+
+    @Test
+    void interactWithGemini_rewritesPrematureSuccessCallCopy() {
+        String responseJson = """
+                {
+                  "candidates": [
+                    {
+                      "content": {
+                        "parts": [
+                          {
+                            "text": "{\\\"textReply\\\":\\\"I already started the call.\\\",\\\"actionCommand\\\":\\\"START_CALL\\\",\\\"actionParams\\\":{\\\"target\\\":\\\"Ly Tinh Van\\\",\\\"callType\\\":\\\"voice\\\"},\\\"emotion\\\":\\\"thinking\\\"}"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+                """;
+
+        when(geminiRestTemplate.exchange(any(String.class), eq(HttpMethod.POST), any(), eq(String.class)))
+                .thenReturn(ResponseEntity.ok(responseJson));
+
+        AiChatResponse response = geminiAiService.interactWithGemini(
+                "user-1",
+                AiChatRequest.builder()
+                        .prompt("Call Ly Tinh Van")
+                        .analyzeIntent(true)
+                        .build()
+        );
+
+        assertEquals("START_CALL", response.getActionCommand());
+        assertEquals("Ly Tinh Van", response.getActionParams().get("target"));
+        assertTrue(response.getTextReply().contains("chat AI"));
+        assertFalse(response.getTextReply().toLowerCase().contains("already started"));
+        assertTrue(response.getRequiresConfirmation());
+        assertEquals("medium", response.getRiskLevel());
+    }
+
     @Test
     void interactWithGemini_marksFallbackResponsesAsDegraded() {
         when(geminiRestTemplate.exchange(any(String.class), eq(HttpMethod.POST), any(), eq(String.class)))
@@ -196,3 +273,4 @@ class GeminiAiServiceTest {
         assertEquals("low", response.getRiskLevel());
     }
 }
+

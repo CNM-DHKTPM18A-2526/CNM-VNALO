@@ -3,10 +3,13 @@ package iuh.cnm.vnalo.content_service.service;
 import iuh.cnm.vnalo.content_service.exception.ApiException;
 import iuh.cnm.vnalo.content_service.exception.ErrorCode;
 import iuh.cnm.vnalo.content_service.model.dto.CreateStoryRequest;
+import iuh.cnm.vnalo.content_service.model.dto.StoryReactionResponse;
 import iuh.cnm.vnalo.content_service.model.dto.StoryResponse;
 import iuh.cnm.vnalo.content_service.model.dto.StoryViewResponse;
 import iuh.cnm.vnalo.content_service.model.entity.Story;
+import iuh.cnm.vnalo.content_service.model.entity.StoryReaction;
 import iuh.cnm.vnalo.content_service.model.entity.StoryView;
+import iuh.cnm.vnalo.content_service.repository.StoryReactionRepository;
 import iuh.cnm.vnalo.content_service.repository.StoryRepository;
 import iuh.cnm.vnalo.content_service.repository.StoryViewRepository;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +26,7 @@ public class StoryService {
 
     private final StoryRepository storyRepository;
     private final StoryViewRepository storyViewRepository;
+    private final StoryReactionRepository storyReactionRepository;
 
     @Transactional
     public StoryResponse createStory(UUID authorId, CreateStoryRequest request) {
@@ -98,6 +102,52 @@ public class StoryService {
     }
 
     @Transactional
+    public StoryReactionResponse reactToStory(UUID storyId, UUID userId, String reactionType) {
+        Story story = storyRepository.findByStoryIdAndStatusAndExpiresAtAfter(
+                        storyId,
+                        "ACTIVE",
+                        OffsetDateTime.now()
+                )
+                .orElseThrow(() -> new ApiException(ErrorCode.STORY_NOT_FOUND));
+
+        String normalizedReaction = reactionType == null || reactionType.isBlank()
+                ? "LOVE"
+                : reactionType.trim().toUpperCase();
+
+        StoryReaction storyReaction = storyReactionRepository.findByStoryIdAndUserId(story.getStoryId(), userId)
+                .orElseGet(() -> StoryReaction.builder()
+                        .storyId(story.getStoryId())
+                        .userId(userId)
+                        .build());
+
+        storyReaction.setReactionType(normalizedReaction);
+        StoryReaction saved = storyReactionRepository.save(storyReaction);
+        return mapReaction(saved);
+    }
+
+    @Transactional
+    public void removeStoryReaction(UUID storyId, UUID userId) {
+        if (!storyRepository.existsById(storyId)) {
+            throw new ApiException(ErrorCode.STORY_NOT_FOUND);
+        }
+
+        storyReactionRepository.findByStoryIdAndUserId(storyId, userId)
+                .ifPresent(storyReactionRepository::delete);
+    }
+
+    @Transactional(readOnly = true)
+    public List<StoryReactionResponse> getStoryReactions(UUID storyId) {
+        if (!storyRepository.existsById(storyId)) {
+            throw new ApiException(ErrorCode.STORY_NOT_FOUND);
+        }
+
+        return storyReactionRepository.findByStoryIdOrderByCreatedAtDesc(storyId)
+                .stream()
+                .map(this::mapReaction)
+                .toList();
+    }
+
+    @Transactional
     public int expireStories() {
         List<Story> expiredStories = storyRepository.findByStatusAndExpiresAtBefore(
                 "ACTIVE",
@@ -128,6 +178,16 @@ public class StoryService {
                 .storyId(storyView.getStoryId())
                 .viewerId(storyView.getViewerId())
                 .viewedAt(storyView.getViewedAt())
+                .build();
+    }
+
+    private StoryReactionResponse mapReaction(StoryReaction storyReaction) {
+        return StoryReactionResponse.builder()
+                .storyReactionId(storyReaction.getStoryReactionId())
+                .storyId(storyReaction.getStoryId())
+                .userId(storyReaction.getUserId())
+                .reactionType(storyReaction.getReactionType())
+                .createdAt(storyReaction.getCreatedAt())
                 .build();
     }
 }

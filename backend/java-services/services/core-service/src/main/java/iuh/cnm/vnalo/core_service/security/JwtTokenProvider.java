@@ -13,6 +13,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.*;
@@ -29,8 +30,21 @@ public class JwtTokenProvider {
 
     @PostConstruct
     public void init() {
-        byte[] keyBytes = Decoders.BASE64.decode(jwtConfig.getSecret());
+        byte[] keyBytes = decodeSecret(jwtConfig.getSecret());
         this.secretKey = Keys.hmacShaKeyFor(keyBytes);
+    }
+
+    private byte[] decodeSecret(String secret) {
+        String normalized = secret == null ? "" : secret.trim();
+        try {
+            return Decoders.BASE64.decode(normalized);
+        } catch (IllegalArgumentException base64Error) {
+            try {
+                return Decoders.BASE64URL.decode(normalized);
+            } catch (IllegalArgumentException base64UrlError) {
+                return normalized.getBytes(StandardCharsets.UTF_8);
+            }
+        }
     }
 
     public String generateAccessToken(UserDetails userDetails) {

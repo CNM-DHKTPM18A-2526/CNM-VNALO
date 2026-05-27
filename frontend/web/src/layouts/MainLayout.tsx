@@ -12,7 +12,10 @@ export function MainLayout() {
   const location = useLocation()
   const { user, logout } = useAuth()
   const { t } = useLanguage()
-  const isChatWorkspace = location.pathname === '/' || location.pathname.startsWith('/chat')
+  const isChatWorkspace =
+    location.pathname === '/' ||
+    location.pathname.startsWith('/chat') ||
+    location.pathname.startsWith('/chat-ai')
   const isContactsPage = location.pathname.startsWith('/contacts')
   const isSocialPage = location.pathname.startsWith('/social')
   const shouldShowTopbar = !isChatWorkspace && !isContactsPage && !isSocialPage
@@ -22,6 +25,7 @@ export function MainLayout() {
   const title = useMemo(() => {
     const titleMap: Record<string, string> = {
       '/chat': t('pages.chat.title'),
+      '/chat-ai': 'AI Assistant',
       '/contacts': t('pages.contacts.title'),
       '/profile': t('pages.profile.title'),
     }
@@ -32,6 +36,10 @@ export function MainLayout() {
 
     if (location.pathname.startsWith('/chat')) {
       return t('pages.chat.title')
+    }
+
+    if (location.pathname.startsWith('/chat-ai')) {
+      return 'AI Assistant'
     }
 
     return titleMap[location.pathname] ?? t('common.appName')

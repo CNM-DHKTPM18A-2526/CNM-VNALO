@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1039573747155",
+    "project_id": "iuh-cnm-vnalo",
+    "storage_bucket": "iuh-cnm-vnalo.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1039573747155:android:128b79d033b64475361b26",
+        "android_client_info": {
+          "package_name": "iuh.cnm.vnalo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAmgR7feQwJWdI_HWhb2OaC9Oj_tKAY9Kk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

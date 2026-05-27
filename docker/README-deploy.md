@@ -4,6 +4,7 @@
 
 ```bash
 cd /home/ec2-user/CNM-VNALO/docker
+chmod +x deploy.sh rollback.sh setup-ec2.sh
 
 # Deploy all services
 ./deploy.sh
@@ -19,7 +20,7 @@ cd /home/ec2-user/CNM-VNALO/docker
 
 ```bash
 # Chi build va deploy 1 service
-./deploy.sh core-service    # hoac ai-service, message-service, media-service, ...
+./deploy.sh content-service # hoac core-service, ai-service, message-service, media-service, ...
 ```
 
 ## Troubleshooting
