@@ -3474,3 +3474,54 @@
 .ai-chat-messages {
   scrollbar-gutter: stable both-edges;
 }
+
+
+/* AI web parity wave 7: fixed sidebar footer + explicit scrollbar visibility */
+.ai-chat-sidebar-scroll {
+  padding-bottom: 12px;
+}
+
+.ai-chat-sidebar-footer {
+  flex-shrink: 0;
+  display: flex;
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+}
+
+.ai-chat-sidebar-footer .ai-clear-btn {
+  width: 100%;
+  min-height: 38px;
+  border-radius: 999px;
+}
+
+.ai-chat-messages {
+  scroll-padding-bottom: 18px;
+}
+
+.ai-chat-messages::-webkit-scrollbar,
+.ai-chat-sidebar-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.ai-chat-messages::-webkit-scrollbar-thumb,
+.ai-chat-sidebar-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--muted) 58%, transparent);
+}
+
+.ai-input-wrapper {
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--input-bg) 92%, var(--surface));
+}
+
+.ai-input-hint {
+  opacity: 0.88;
+}
+
+@media (max-width: 900px) {
+  .ai-chat-sidebar-footer {
+    padding-top: 10px;
+    margin-top: 10px;
+  }
+}
