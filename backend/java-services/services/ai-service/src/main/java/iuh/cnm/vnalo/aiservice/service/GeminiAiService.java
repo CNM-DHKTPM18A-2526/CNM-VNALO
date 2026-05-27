@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -383,6 +384,46 @@ public class GeminiAiService {
 
         response.setRequiresConfirmation(requiresConfirmation);
         response.setRiskLevel(riskLevel);
+        response.setTextReply(safeActionReply(normalized, response.getTextReply(), requiresConfirmation));
+    }
+
+    private String safeActionReply(String command, String currentReply, boolean requiresConfirmation) {
+        String reply = currentReply == null ? "" : currentReply.trim();
+        if (!reply.isEmpty() && !containsPrematureSuccessClaim(reply)) {
+            return reply;
+        }
+
+        return switch (command) {
+            case "COMPOSE_MESSAGE" -> "Mình sẽ mở bước xác nhận để bạn kiểm tra người nhận và nội dung trước khi gửi.";
+            case "START_CALL" -> "Mình sẽ mở bước xác nhận cuộc gọi; nếu không tìm thấy người này trong danh bạ, ứng dụng sẽ báo ngay trong đoạn chat AI.";
+            case "OPEN_CHAT" -> "Mình sẽ tìm và mở cuộc trò chuyện phù hợp trong VNALO.";
+            case "CREATE_GROUP" -> "Mình sẽ mở bước xác nhận để bạn kiểm tra tên nhóm và thành viên trước khi tạo.";
+            case "RECALL_MESSAGE" -> "Mình sẽ mở bước xác nhận trước khi thu hồi tin nhắn phù hợp.";
+            case "BLOCK_USER", "UNBLOCK_USER", "REMOVE_GROUP_MEMBER", "TRANSFER_GROUP_OWNER", "LEAVE_GROUP", "DISBAND_GROUP" ->
+                    "Mình sẽ mở bước xác nhận an toàn trước khi thực hiện thao tác này.";
+            default -> requiresConfirmation
+                    ? "Mình sẽ mở bước xác nhận trước khi thực hiện thao tác này."
+                    : "Mình sẽ chuẩn bị thao tác này trong VNALO.";
+        };
+    }
+
+    private boolean containsPrematureSuccessClaim(String reply) {
+        String normalized = reply.toLowerCase(Locale.ROOT);
+        return normalized.contains("đã gửi")
+                || normalized.contains("da gui")
+                || normalized.contains("đã gọi")
+                || normalized.contains("da goi")
+                || normalized.contains("đang gọi")
+                || normalized.contains("dang goi")
+                || normalized.contains("đã tạo")
+                || normalized.contains("da tao")
+                || normalized.contains("đã thu hồi")
+                || normalized.contains("da thu hoi")
+                || normalized.contains("sent the message")
+                || normalized.contains("message sent")
+                || normalized.contains("started the call")
+                || normalized.contains("call started")
+                || normalized.contains("created the group");
     }
 
     private AiChatResponse parseFallbackResponse(String rawText, boolean isAnalyzingIntent) throws Exception {
@@ -403,7 +444,7 @@ public class GeminiAiService {
                 }
 
                 if (response.getActionCommand() != null && response.getTextReply().isEmpty()) {
-                    response.setTextReply("Đã rõ, tôi đang thực hiện lệnh của bạn...");
+                    response.setTextReply("Mình đã hiểu yêu cầu và sẽ mở bước phù hợp trong VNALO.");
                 }
 
                 return response;
@@ -522,7 +563,7 @@ public class GeminiAiService {
 
                 // If it's a valid action but textReply is empty, use a default acknowledgment
                 if (response.getActionCommand() != null && response.getTextReply().isEmpty()) {
-                    response.setTextReply("Đã rõ, tôi đang thực hiện lệnh của bạn...");
+                    response.setTextReply("Mình đã hiểu yêu cầu và sẽ mở bước phù hợp trong VNALO.");
                 }
 
                 return response;

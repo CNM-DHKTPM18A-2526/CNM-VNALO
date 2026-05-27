@@ -48,6 +48,11 @@
   min-height: 0;
 }
 
+.workspace-main-chat > .ai-chat-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .sidebar {
   color: var(--sidebar-text);
   padding: 20px 0 12px 0;

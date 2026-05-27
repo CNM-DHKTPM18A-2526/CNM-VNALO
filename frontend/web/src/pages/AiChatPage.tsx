@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Send, Sparkles, Trash2, X } from 'lucide-react'
 
@@ -81,6 +81,13 @@ type ActionFeedbackState = {
 const STORAGE_KEY = 'vnalo_ai_chat_history'
 const DRAFT_KEY_PREFIX = 'vnalo_ai_web_compose_draft:'
 const MAX_API_HISTORY = 20
+
+function buildAiStorageKey(userId?: string | number | null) {
+  if (userId === undefined || userId === null || `${userId}`.trim().length === 0) {
+    return null
+  }
+  return `${STORAGE_KEY}:${userId}`
+}
 
 const PRESET_PROMPTS = [
   'Tóm tắt nhanh các tính năng chính của VNALO',
@@ -332,24 +339,67 @@ function buildActionLabel(command: AiActionCommand) {
       return 'Mở cuộc trò chuyện'
     case 'COMPOSE_MESSAGE':
       return 'Mở chat và điền nháp'
-    case 'NAVIGATE_TO_CHAT':
-      return 'Go to Chat'
-    case 'NAVIGATE_TO_CONTACTS':
-      return 'Go to Contacts'
-    case 'OPEN_PROFILE':
-      return 'Go to Profile'
-    case 'NAVIGATE_TO':
-      return 'Go to destination'
+    case 'OPEN_GROUP_SETTINGS':
+      return 'Mở cài đặt nhóm'
     case 'START_CALL':
       return 'Mở chat để gọi'
+    case 'RECALL_MESSAGE':
+      return 'Thu hồi tin nhắn'
+    case 'CREATE_GROUP':
+      return 'Tạo nhóm mới'
+    case 'MUTE_CONVERSATION':
+      return 'Tắt thông báo cuộc trò chuyện'
+    case 'UNMUTE_CONVERSATION':
+      return 'Bật lại thông báo cuộc trò chuyện'
+    case 'PIN_MESSAGE':
+      return 'Ghim tin nhắn'
+    case 'UNPIN_MESSAGE':
+      return 'Bỏ ghim tin nhắn'
+    case 'SEND_FRIEND_REQUEST':
+      return 'Gửi lời mời kết bạn'
+    case 'BLOCK_USER':
+      return 'Chặn người dùng'
+    case 'UNBLOCK_USER':
+      return 'Bỏ chặn người dùng'
+    case 'CHANGE_GROUP_NAME':
+      return 'Đổi tên nhóm'
+    case 'ADD_GROUP_MEMBER':
+      return 'Thêm thành viên'
+    case 'REMOVE_GROUP_MEMBER':
+      return 'Xóa thành viên'
+    case 'TRANSFER_GROUP_OWNER':
+      return 'Chuyển quyền trưởng nhóm'
+    case 'LEAVE_GROUP':
+      return 'Rời nhóm'
+    case 'DISBAND_GROUP':
+      return 'Giải tán nhóm'
+    case 'NAVIGATE_TO':
+      return 'Đi đến trang yêu cầu'
+    case 'NAVIGATE_TO_SETTINGS':
+      return 'Mở cài đặt'
+    case 'NAVIGATE_TO_CHAT':
+      return 'Đi đến Chat'
+    case 'NAVIGATE_TO_CONTACTS':
+      return 'Đi đến Danh bạ'
+    case 'NAVIGATE_TO_SCANNER':
+      return 'Mở trình quét'
+    case 'NAVIGATE_TO_TIMELINE':
+      return 'Mở nhật ký'
+    case 'OPEN_PROFILE':
+      return 'Mở hồ sơ'
     default:
-      return 'Try this action'
+      return 'Thực hiện thao tác'
   }
+}
+
+function buildDeferredActionReply(command: AiActionCommand) {
+  return `Mình đã nhận diện yêu cầu: ${buildActionLabel(command)}. Hãy bấm nút bên dưới để mình kiểm tra đúng đối tượng và mở luồng an toàn.`
 }
 
 export function AiChatPage() {
   const { accessToken, user } = useAuth()
   const navigate = useNavigate()
+  const historyStorageKey = useMemo(() => buildAiStorageKey(user?.id as string | number | undefined), [user?.id])
   const [messages, setMessages] = useState<AiMessage[]>([])
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -360,6 +410,7 @@ export function AiChatPage() {
   const [pendingActionReview, setPendingActionReview] = useState<PendingActionReview | null>(null)
   const [retryPrompt, setRetryPrompt] = useState<string>('')
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const isUnmountedRef = useRef(false)
   const inFlightRequestRef = useRef(false)
@@ -371,7 +422,12 @@ export function AiChatPage() {
   }, [])
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY)
+    if (!historyStorageKey) {
+      setMessages([INITIAL_ASSISTANT_MESSAGE])
+      return
+    }
+
+    const saved = localStorage.getItem(historyStorageKey)
     if (!saved) {
       setMessages([INITIAL_ASSISTANT_MESSAGE])
       return
@@ -384,16 +440,25 @@ export function AiChatPage() {
       console.warn('Failed to parse AI chat history', error)
       setMessages([INITIAL_ASSISTANT_MESSAGE])
     }
-  }, [])
+  }, [historyStorageKey])
 
   const saveMessages = (nextMessages: AiMessage[]) => {
     const normalized = normalizeStoredMessages(nextMessages)
     setMessages(normalized)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized))
+    if (!historyStorageKey) {
+      return
+    }
+    localStorage.setItem(historyStorageKey, JSON.stringify(normalized))
   }
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const container = messagesContainerRef.current
+    if (!container) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+      return
+    }
+
+    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
   }, [messages, isLoading, actionFeedback])
 
   const runtimeState = useMemo(() => resolveProviderPresentation(messages), [messages])
@@ -453,7 +518,9 @@ export function AiChatPage() {
       const safeActionCommand = responseActionCommand && KNOWN_ACTION_COMMANDS.has(responseActionCommand) ? responseActionCommand : null
       const assistantMessage: AiMessage = {
         role: 'assistant',
-        content: aiResponse.textReply || 'Sorry, I cannot process that request right now.',
+        content: safeActionCommand
+          ? buildDeferredActionReply(safeActionCommand)
+          : aiResponse.textReply || 'Mình chưa thể xử lý yêu cầu này ngay lúc này.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         degraded: Boolean(aiResponse.degraded),
         providerStatus: (aiResponse.providerStatus as ProviderStatus | undefined) ?? null,
@@ -712,41 +779,43 @@ export function AiChatPage() {
   return (
     <div className='ai-chat-layout'>
       <aside className='ai-chat-sidebar'>
-        <div className='ai-assistant-card'>
-          <div className='ai-avatar-glow'>
-            <Sparkles size={28} />
-          </div>
-          <h3>VNALO AI Assistant</h3>
-          <p>Hỗ trợ trả lời câu hỏi, giải thích nhanh và gợi ý thao tác an toàn trong VNALO.</p>
+        <div className='ai-chat-sidebar-scroll'>
+          <section className='ai-assistant-card' aria-label='Thông tin trợ lý AI'>
+            <div className='ai-avatar-glow'>
+              <Sparkles size={28} />
+            </div>
+            <h3>VNALO AI Assistant</h3>
+            <p>Hỗ trợ trả lời câu hỏi, giải thích nhanh và gợi ý thao tác an toàn trong VNALO.</p>
+          </section>
+
+          <section className='ai-presets-container' aria-label='Gợi ý câu hỏi AI'>
+            <span className='ai-presets-title'>Gợi ý câu hỏi</span>
+            {PRESET_PROMPTS.map((prompt) => (
+              <button
+                key={prompt}
+                type='button'
+                className='ai-preset-btn'
+                onClick={() => void handleSend(prompt)}
+                disabled={isAssistantBusy}
+              >
+                {prompt}
+              </button>
+            ))}
+          </section>
+
+          <div className='flex-grow' style={{ flexGrow: 1 }} />
+
+          <button
+            type='button'
+            className='ai-clear-btn flex items-center justify-center gap-2'
+            onClick={handleClearHistory}
+            disabled={isAssistantBusy}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+          >
+            <Trash2 size={14} />
+            Xóa lịch sử
+          </button>
         </div>
-
-        <div className='ai-presets-container'>
-          <span className='ai-presets-title'>Gợi ý câu hỏi</span>
-          {PRESET_PROMPTS.map((prompt) => (
-            <button
-              key={prompt}
-              type='button'
-              className='ai-preset-btn'
-              onClick={() => void handleSend(prompt)}
-              disabled={isAssistantBusy}
-            >
-              {prompt}
-            </button>
-          ))}
-        </div>
-
-        <div className='flex-grow' style={{ flexGrow: 1 }} />
-
-        <button
-          type='button'
-          className='ai-clear-btn flex items-center justify-center gap-2'
-          onClick={handleClearHistory}
-          disabled={isAssistantBusy}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-        >
-          <Trash2 size={14} />
-          Clear history
-        </button>
       </aside>
 
       <main className='ai-chat-main'>
@@ -760,14 +829,14 @@ export function AiChatPage() {
           </div>
         </header>
 
-        <div className='ai-chat-messages'>
+        <div className='ai-chat-messages' ref={messagesContainerRef} role='log' aria-live='polite' aria-relevant='additions text'>
           {runtimeState.degraded && <div className={runtimeState.bannerClassName}>{runtimeState.banner}</div>}
           {actionFeedback ? (
             <div className={`ai-runtime-banner ai-runtime-banner-${actionFeedback.tone}`}>
               <span>{actionFeedback.message}</span>
               {actionFeedback.tone === 'error' && retryPrompt ? (
                 <button type='button' className='ai-banner-action' onClick={handleRetry} disabled={isAssistantBusy}>
-                  Retry
+                  Thử lại
                 </button>
               ) : null}
             </div>
@@ -789,7 +858,7 @@ export function AiChatPage() {
                     onClick={() => void handleAction(message, index)}
                     disabled={isLoading || actionBusyIndex !== null || pendingActionReview !== null || pendingResolution !== null}
                   >
-                    {actionBusyIndex === index ? 'Processing...' : buildActionLabel(message.actionCommand)}
+                    {actionBusyIndex === index ? 'Đang xử lý...' : buildActionLabel(message.actionCommand)}
                   </button>
                 </div>
               ) : null}
@@ -798,7 +867,6 @@ export function AiChatPage() {
               </div>
             </div>
           ))}
-
           {isLoading && (
             <div className='ai-typing-indicator'>
               <span className='ai-typing-label'>{activeActionLabel ? `${activeActionLabel} đang được chuẩn bị` : 'Trợ lý AI đang soạn phản hồi'}</span>
@@ -834,7 +902,6 @@ export function AiChatPage() {
               }}
             />
             <button type='submit' className='ai-send-btn' disabled={isAssistantBusy || !inputValue.trim()}>
-
               <Send size={18} />
             </button>
             <span className='ai-input-hint'>Enter để gửi, Shift + Enter để xuống dòng</span>

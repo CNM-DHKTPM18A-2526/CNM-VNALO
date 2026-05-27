@@ -1,6 +1,7 @@
 package iuh.cnm.vnalo.content_service.controller;
 
 import iuh.cnm.vnalo.content_service.model.dto.CreateStoryRequest;
+import iuh.cnm.vnalo.content_service.model.dto.StoryReactionResponse;
 import iuh.cnm.vnalo.content_service.model.dto.StoryResponse;
 import iuh.cnm.vnalo.content_service.model.dto.StoryViewResponse;
 import iuh.cnm.vnalo.content_service.service.StoryService;
@@ -19,7 +20,7 @@ import java.util.UUID;
 public class StoryController {
 
     private final StoryService storyService;
-    
+
     private UUID currentUserId(Authentication authentication) {
         return UUID.fromString(authentication.getName());
     }
@@ -59,5 +60,28 @@ public class StoryController {
     @GetMapping("/{storyId}/views")
     public List<StoryViewResponse> getStoryViews(@PathVariable UUID storyId) {
         return storyService.getStoryViews(storyId);
+    }
+
+    @PostMapping("/{storyId}/reactions")
+    public StoryReactionResponse reactToStory(
+            @PathVariable UUID storyId,
+            @RequestParam(defaultValue = "LOVE") String reactionType,
+            Authentication authentication
+    ) {
+        return storyService.reactToStory(storyId, currentUserId(authentication), reactionType);
+    }
+
+    @DeleteMapping("/{storyId}/reactions")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void removeStoryReaction(
+            @PathVariable UUID storyId,
+            Authentication authentication
+    ) {
+        storyService.removeStoryReaction(storyId, currentUserId(authentication));
+    }
+
+    @GetMapping("/{storyId}/reactions")
+    public List<StoryReactionResponse> getStoryReactions(@PathVariable UUID storyId) {
+        return storyService.getStoryReactions(storyId);
     }
 }
