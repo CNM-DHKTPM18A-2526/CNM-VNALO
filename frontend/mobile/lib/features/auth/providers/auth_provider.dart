@@ -62,6 +62,17 @@ class AuthProvider extends ChangeNotifier {
     };
   }
 
+  bool _isFatalAuthFailure(Object error) {
+    if (error is UnauthorizedException) {
+      return true;
+    }
+
+    if (error is ApiException) {
+      return error.statusCode == 401 || error.statusCode == 403;
+    }
+
+    return false;
+  }
   // Initialize the provider by checking if there's a valid token and fetching user info
   Future<void> initialize() async {
     _scopedUserId = await _storageService.getUserId();
@@ -79,9 +90,9 @@ class AuthProvider extends ChangeNotifier {
         _localSyncService.syncRecently();
       } catch (e) {
         debugPrint('[Auth] Error: Fetching profile failed: $e');
-        // If profile fetch fails, we might still be able to function if local cache exists,
-        // but if it's an auth error, we should clear.
-        // For now, keep the session but log the error.
+        if (_isFatalAuthFailure(e)) {
+          await logout();
+        }
       }
     }
     _isInitialized = true;
