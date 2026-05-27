@@ -11,8 +11,7 @@ class AiSttResiliencePolicy {
         normalized.contains('denied') ||
         normalized.contains('initialize') ||
         normalized.contains('notavailable') ||
-        normalized.contains('not available') ||
-        normalized.contains('network');
+        normalized.contains('not available');
   }
 
   static bool isTransientError(String rawError) {
@@ -25,7 +24,8 @@ class AiSttResiliencePolicy {
       return false;
     }
 
-    return normalized.contains('no_match') ||
+    return normalized.contains('network') ||
+        normalized.contains('no_match') ||
         normalized.contains('no match') ||
         normalized.contains('speech_timeout') ||
         normalized.contains('speech timeout') ||

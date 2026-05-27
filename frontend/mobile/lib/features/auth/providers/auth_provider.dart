@@ -29,6 +29,7 @@ class AuthProvider extends ChangeNotifier {
 
   /// Cached access token for synchronous access (e.g. image loading headers).
   String? _accessToken;
+  String? _scopedUserId;
 
   /// Set when the user is kicked out by another device.
   String? _kickoutReason;
@@ -44,6 +45,7 @@ class AuthProvider extends ChangeNotifier {
 
   /// Current access token (cached in memory for synchronous access).
   String? get accessToken => _accessToken;
+  String? get scopedUserId => _user?.id ?? _scopedUserId;
 
   String? get kickoutReason => _kickoutReason;
 
@@ -62,6 +64,7 @@ class AuthProvider extends ChangeNotifier {
 
   // Initialize the provider by checking if there's a valid token and fetching user info
   Future<void> initialize() async {
+    _scopedUserId = await _storageService.getUserId();
     final token = await _storageService.getAccessToken();
     if (token != null) {
       _accessToken = token;
@@ -70,6 +73,7 @@ class AuthProvider extends ChangeNotifier {
 
       try {
         _user = await _authService.getMe();
+        _scopedUserId = _user?.id ?? _scopedUserId;
         debugPrint('[Auth] Success: Profile hydrated.');
         // Trigger sync after successful hydration
         _localSyncService.syncRecently();
@@ -112,9 +116,11 @@ class AuthProvider extends ChangeNotifier {
 
       if (data['user'] != null) {
         await _storageService.saveUserId(data['user']['id']);
+        _scopedUserId = data['user']['id']?.toString();
         _user = User.fromJson(data['user']);
       } else {
         _user = await _authService.getMe();
+        _scopedUserId = _user?.id;
         await _storageService.saveUserId(_user!.id);
       }
 
@@ -268,6 +274,7 @@ class AuthProvider extends ChangeNotifier {
         displayName: displayName,
       );
       _user = hydrated.user;
+      _scopedUserId = _user?.id;
       await _storageService.saveUserId(_user!.id);
       if (hydrated.warning != null) {
         _warning = hydrated.warning;
@@ -543,6 +550,7 @@ class AuthProvider extends ChangeNotifier {
     await _storageService.clearAll();
     _user = null;
     _accessToken = null;
+    _scopedUserId = null;
     notifyListeners();
   }
 
@@ -622,6 +630,7 @@ class AuthProvider extends ChangeNotifier {
       _accessToken = result.accessToken;
 
       _user = await _authService.getMe();
+      _scopedUserId = _user?.id;
       await _storageService.saveUserId(_user!.id);
 
       _socketService.connect(result.accessToken);

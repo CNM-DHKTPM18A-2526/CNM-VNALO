@@ -398,6 +398,7 @@ class AiAssistantProvider with ChangeNotifier {
   final List<Map<String, String>> _sessionHistory = [];
   Timer? _cloudBackupDebounceTimer;
   int _historyClearGeneration = 0;
+  int _scopeLoadGeneration = 0;
 
   // ------------------------- Other ------------------------------------------
   MascotMetadata _currentMascot = MascotMetadata.defaultMascots.first;
@@ -531,12 +532,21 @@ class AiAssistantProvider with ChangeNotifier {
     );
     _cancelIdleAutoHide();
     _cloudBackupDebounceTimer?.cancel();
+    _scopeLoadGeneration++;
+    final loadGeneration = _scopeLoadGeneration;
 
     _activeScopeKey = nextScopeKey;
     _resetScopedConversationState(clearCurrentResponse: true);
 
     final prefs = await SharedPreferences.getInstance();
-    await _loadScopedPersistence(prefs: prefs, notify: false);
+    await _loadScopedPersistence(
+      prefs: prefs,
+      notify: false,
+      expectedGeneration: loadGeneration,
+    );
+    if (_isDisposed || loadGeneration != _scopeLoadGeneration) {
+      return;
+    }
 
     _logEvent(
       'AUTH_SCOPE_BOUND',
@@ -979,10 +989,18 @@ class AiAssistantProvider with ChangeNotifier {
   // ==================== PERSISTENCE =======================================
 
   Future<void> _initPersistence() async {
+    final loadGeneration = _scopeLoadGeneration;
     final prefs = await SharedPreferences.getInstance();
     await _loadMascot(prefs: prefs);
+    if (_isDisposed || loadGeneration != _scopeLoadGeneration) {
+      return;
+    }
     _persistentEnabled = prefs.getBool(_visibilityPrefKey) ?? false;
-    await _loadScopedPersistence(prefs: prefs, notify: false);
+    await _loadScopedPersistence(
+      prefs: prefs,
+      notify: false,
+      expectedGeneration: loadGeneration,
+    );
 
     _logEvent(
       'PERSISTENCE_LOADED',
@@ -1002,14 +1020,26 @@ class AiAssistantProvider with ChangeNotifier {
   Future<void> _loadScopedPersistence({
     required SharedPreferences prefs,
     bool notify = true,
+    int? expectedGeneration,
   }) async {
+    final loadGeneration = expectedGeneration ?? _scopeLoadGeneration;
+    if (_isDisposed || loadGeneration != _scopeLoadGeneration) {
+      return;
+    }
+
     _cloudBackupEnabled = prefs.getBool(_scopedCloudBackupPrefKey) ?? false;
     _conversationCreated =
         prefs.getBool(_scopedConversationCreatedPrefKey) ?? false;
     _serverConversationId = prefs.getString(_scopedServerConversationIdPrefKey);
     await _loadConversationHistory(prefs: prefs);
+    if (_isDisposed || loadGeneration != _scopeLoadGeneration) {
+      return;
+    }
     _loadSyncedEntryIds(prefs: prefs);
 
+    if (_isDisposed || loadGeneration != _scopeLoadGeneration) {
+      return;
+    }
     if (_cloudBackupEnabled && _serverConversationId != null) {
       unawaited(_restoreConversationHistoryFromServer());
     }
@@ -1058,12 +1088,16 @@ class AiAssistantProvider with ChangeNotifier {
   }
 
   void _resetScopedConversationState({bool clearCurrentResponse = false}) {
+    _historyClearGeneration++;
     _conversationHistory.clear();
     _syncedEntryIds.clear();
     _conversationCreated = false;
     _cloudBackupEnabled = false;
     _sessionHistory.clear();
     _lastUserPrompt = '';
+    _lastWords = '';
+    _lastFinalResultText = '';
+    _lastFinalResultAt = null;
     _serverConversationId = null;
     _clarificationState = null;
     if (clearCurrentResponse) {

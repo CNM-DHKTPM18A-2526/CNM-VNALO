@@ -262,7 +262,7 @@ class VnaloApp extends StatelessWidget {
           update: (context, auth, previous) {
             final provider =
                 previous ?? AiAssistantProvider(context.read<AiService>());
-            unawaited(provider.bindAuthUser(auth.user?.id));
+            unawaited(provider.bindAuthUser(auth.scopedUserId));
             return provider;
           },
         ),
