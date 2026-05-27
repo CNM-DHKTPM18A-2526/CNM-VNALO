@@ -1,4 +1,10 @@
-import axios from 'axios';
+import axios, { type AxiosError, type AxiosResponse } from 'axios'
+
+declare global {
+  interface Window {
+    __VNALO_API_ROOT__?: string
+  }
+}
 
 export function extractMessage(payload: unknown): string | null {
   if (!payload || typeof payload !== 'object') {
@@ -54,7 +60,7 @@ export const API_BASE_URL = forceHttps(import.meta.env.VITE_API_BASE_URL ?? (
 
 if (typeof window !== 'undefined') {
   // Store the root origin (without /api/v1) for media resolution
-  (window as any).__VNALO_API_ROOT__ = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
+  window.__VNALO_API_ROOT__ = API_BASE_URL.replace(/\/api\/v1\/?$/, '')
 }
 
 export const MESSAGE_API_URL = forceHttps(import.meta.env.VITE_MESSAGE_API_URL ?? API_BASE_URL);
@@ -137,9 +143,9 @@ const globalLogoutHandler = () => {
   }
 };
 
-const commonResponseInterceptor = [
-  (res: any) => res,
-  (err: any) => {
+const handleResponseSuccess = <T>(res: AxiosResponse<T>) => res
+
+const handleResponseError = (err: AxiosError) => {
     const status = err.response?.status;
     const isSilenced = status === 404 || status === 403; // Ignore noise for deleted/forbidden content
     
@@ -153,10 +159,10 @@ const commonResponseInterceptor = [
       globalLogoutHandler();
     }
     return Promise.reject(err);
-  }
-] as const;
+}
 
-api.interceptors.response.use(...commonResponseInterceptor);
-messageApi.interceptors.response.use(...commonResponseInterceptor);
-mediaApi.interceptors.response.use(...commonResponseInterceptor);
-aiApi.interceptors.response.use(...commonResponseInterceptor);
+api.interceptors.response.use(handleResponseSuccess, handleResponseError)
+messageApi.interceptors.response.use(handleResponseSuccess, handleResponseError)
+contentApi.interceptors.response.use(handleResponseSuccess, handleResponseError)
+mediaApi.interceptors.response.use(handleResponseSuccess, handleResponseError)
+aiApi.interceptors.response.use(handleResponseSuccess, handleResponseError)
