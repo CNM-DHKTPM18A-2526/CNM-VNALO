@@ -153,10 +153,10 @@ class _AiChatBoardState extends State<AiChatBoard> {
         decoration: BoxDecoration(
           color: bubbleColor,
           borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(16),
-            topRight: const Radius.circular(16),
-            bottomLeft: Radius.circular(isUser ? 16 : 4),
-            bottomRight: Radius.circular(isUser ? 4 : 16),
+            topLeft: Radius.circular(AiAssistantTokens.buttonRadius),
+            topRight: Radius.circular(AiAssistantTokens.buttonRadius),
+            bottomLeft: Radius.circular(isUser ? AiAssistantTokens.buttonRadius : 4),
+            bottomRight: Radius.circular(isUser ? 4 : AiAssistantTokens.buttonRadius),
           ),
           border:
               isUser
@@ -310,8 +310,8 @@ class _AiChatBoardState extends State<AiChatBoard> {
         decoration: BoxDecoration(
           color: bubbleColor,
           borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(16),
-            topRight: Radius.circular(16),
+            topLeft: Radius.circular(AiAssistantTokens.buttonRadius),
+            topRight: Radius.circular(AiAssistantTokens.buttonRadius),
             bottomLeft: Radius.circular(4),
             bottomRight: Radius.circular(16),
           ),

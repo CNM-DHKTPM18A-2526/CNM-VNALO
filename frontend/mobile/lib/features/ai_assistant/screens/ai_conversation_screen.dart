@@ -649,10 +649,10 @@ class _AiConversationMessageBubble extends StatelessWidget {
             decoration: BoxDecoration(
               color: isMine ? userBubbleColor : assistantBubbleColor,
               borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(16),
-                topRight: const Radius.circular(16),
-                bottomLeft: Radius.circular(isMine ? 16 : 4),
-                bottomRight: Radius.circular(isMine ? 4 : 16),
+                topLeft: Radius.circular(AiAssistantTokens.buttonRadius),
+                topRight: Radius.circular(AiAssistantTokens.buttonRadius),
+                bottomLeft: Radius.circular(isMine ? AiAssistantTokens.buttonRadius : 4),
+                bottomRight: Radius.circular(isMine ? 4 : AiAssistantTokens.buttonRadius),
               ),
               border:
                   isDarkMode
@@ -949,8 +949,8 @@ class _AiTypingBubble extends StatelessWidget {
                     ? DarkColors.chatBubbleReceived
                     : LightColors.chatBubbleReceived,
             borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(16),
-              topRight: Radius.circular(16),
+              topLeft: Radius.circular(AiAssistantTokens.buttonRadius),
+              topRight: Radius.circular(AiAssistantTokens.buttonRadius),
               bottomLeft: Radius.circular(4),
               bottomRight: Radius.circular(16),
             ),
