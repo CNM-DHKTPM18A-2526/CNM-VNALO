@@ -16,8 +16,6 @@ public class PostResponse {
     private String contentText;
     private List<String> mediaUrls;
     private String visibility;
-    private List<String> includedIds;
-    private List<String> excludedIds;
     private Integer likeCount;
     private Integer commentCount;
     private Integer shareCount;

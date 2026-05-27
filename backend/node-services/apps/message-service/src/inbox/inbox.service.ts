@@ -95,7 +95,11 @@ export class InboxService {
           : entry.lastMessagePreview,
         conversation: conv
           ? {
-              ...conv,
+              id: conv.id,
+              type: conv.type,
+              title: conv.title,
+              avatarUrl: conv.avatarUrl,
+              status: conv.status,
               members: (memberMap.get(conv.id) ?? []),
             }
           : null,

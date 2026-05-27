@@ -17,11 +17,7 @@ public class UpdatePostRequest {
 
     /**
      * Allowed values:
-     * PUBLIC, FRIENDS, PRIVATE, SOME_FRIENDS, EXCEPT
+     * PUBLIC, FRIENDS, PRIVATE
      */
     private String visibility;
-
-    private List<String> includedIds;
-
-    private List<String> excludedIds;
 }

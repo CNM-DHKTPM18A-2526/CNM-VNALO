@@ -1,8 +1,8 @@
 # =============================================================================
 # Core Service — Multi-stage Dockerfile
 # Base: Eclipse Temurin 21 (Alpine)
-# Build: Maven (direct) — more reliable
-# Runtime: JRE only
+# Build: Maven wrapper (./mvnw) — no Maven install required
+# Runtime: JRE only — minimal image size
 # =============================================================================
 
 # --- Stage 1: Build ---
@@ -11,23 +11,30 @@ WORKDIR /build
 
 ARG MAVEN_RETRIES=5
 
-# Install maven directly
-RUN apk add --no-cache maven
-
-# Copy source
+# Copy Maven wrapper and config first (cache dependencies layer)
 COPY .mvn/ .mvn/
-COPY pom.xml ./
-COPY mvnw mvnw.cmd ./
-COPY src/ src/
+COPY mvnw pom.xml ./
+RUN set -eux; \
+    chmod +x mvnw; \
+    attempts=0; \
+    until [ "$attempts" -ge "$MAVEN_RETRIES" ]; do \
+      attempts=$((attempts + 1)); \
+      ./mvnw -B -U --no-transfer-progress -Dmaven.wagon.http.retryHandler.count=5 dependency:go-offline && break; \
+      echo "Maven go-offline failed (attempt ${attempts}/${MAVEN_RETRIES})."; \
+      find /root/.m2/repository -name "*.lastUpdated" -delete || true; \
+      if [ "$attempts" -ge "$MAVEN_RETRIES" ]; then exit 1; fi; \
+      sleep $((attempts * 5)); \
+    done
 
-# Build with retry logic
+# Copy source and build
+COPY src/ src/
 RUN set -eux; \
     attempts=0; \
     until [ "$attempts" -ge "$MAVEN_RETRIES" ]; do \
       attempts=$((attempts + 1)); \
-      mvn -B -U --no-transfer-progress -DskipTests clean package && break; \
+      ./mvnw -B -U --no-transfer-progress -DskipTests clean package && break; \
       echo "Maven package failed (attempt ${attempts}/${MAVEN_RETRIES})."; \
-      find /root/.m2/repository -name "*.lastUpdated" -delete 2>/dev/null || true; \
+      find /root/.m2/repository -name "*.lastUpdated" -delete || true; \
       if [ "$attempts" -ge "$MAVEN_RETRIES" ]; then exit 1; fi; \
       sleep $((attempts * 5)); \
     done
@@ -42,7 +49,8 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 # Copy JAR from builder
 COPY --from=builder /build/target/*.jar app.jar
 
-# Health check
+# Spring Boot Actuator health check
+# context-path is /api/v1 but actuator is at /api/v1/actuator/health
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8081/api/v1/actuator/health || exit 1
 
