@@ -104,7 +104,7 @@ class _MascotGalleryScreenState extends State<MascotGalleryScreen> {
                         decoration: BoxDecoration(
                           color: isDarkMode ? DarkColors.surface : Colors.white,
                           borderRadius: BorderRadius.circular(
-                            AiAssistantTokens.sheetRadius,
+                            AiAssistantTokens.cardRadius,
                           ),
                           border: Border.all(
                             color:
@@ -147,7 +147,9 @@ class _MascotGalleryScreenState extends State<MascotGalleryScreen> {
                                                 )
                                                 : AppColors
                                                     .itemPressBackground),
-                                    borderRadius: BorderRadius.circular(999),
+                                    borderRadius: BorderRadius.circular(
+                                      AiAssistantTokens.pillRadius,
+                                    ),
                                   ),
                                   child: Text(
                                     isSelected

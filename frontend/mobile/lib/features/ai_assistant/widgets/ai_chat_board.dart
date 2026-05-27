@@ -155,8 +155,12 @@ class _AiChatBoardState extends State<AiChatBoard> {
           borderRadius: BorderRadius.only(
             topLeft: Radius.circular(AiAssistantTokens.buttonRadius),
             topRight: Radius.circular(AiAssistantTokens.buttonRadius),
-            bottomLeft: Radius.circular(isUser ? AiAssistantTokens.buttonRadius : 4),
-            bottomRight: Radius.circular(isUser ? 4 : AiAssistantTokens.buttonRadius),
+            bottomLeft: Radius.circular(
+              isUser ? AiAssistantTokens.buttonRadius : 4,
+            ),
+            bottomRight: Radius.circular(
+              isUser ? 4 : AiAssistantTokens.buttonRadius,
+            ),
           ),
           border:
               isUser
@@ -313,7 +317,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
             topLeft: Radius.circular(AiAssistantTokens.buttonRadius),
             topRight: Radius.circular(AiAssistantTokens.buttonRadius),
             bottomLeft: Radius.circular(4),
-            bottomRight: Radius.circular(16),
+            bottomRight: Radius.circular(AiAssistantTokens.buttonRadius),
           ),
           border: Border.all(
             color:
@@ -645,7 +649,10 @@ class _AiChatBoardState extends State<AiChatBoard> {
                                                 color: AppColors.primary
                                                     .withValues(alpha: 0.08),
                                                 borderRadius:
-                                                    BorderRadius.circular(999),
+                                                    BorderRadius.circular(
+                                                      AiAssistantTokens
+                                                          .pillRadius,
+                                                    ),
                                                 border: Border.all(
                                                   color: AppColors.primary
                                                       .withValues(alpha: 0.16),

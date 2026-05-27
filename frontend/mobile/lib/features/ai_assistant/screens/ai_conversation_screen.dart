@@ -651,8 +651,12 @@ class _AiConversationMessageBubble extends StatelessWidget {
               borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(AiAssistantTokens.buttonRadius),
                 topRight: Radius.circular(AiAssistantTokens.buttonRadius),
-                bottomLeft: Radius.circular(isMine ? AiAssistantTokens.buttonRadius : 4),
-                bottomRight: Radius.circular(isMine ? 4 : AiAssistantTokens.buttonRadius),
+                bottomLeft: Radius.circular(
+                  isMine ? AiAssistantTokens.buttonRadius : 4,
+                ),
+                bottomRight: Radius.circular(
+                  isMine ? 4 : AiAssistantTokens.buttonRadius,
+                ),
               ),
               border:
                   isDarkMode
@@ -690,7 +694,9 @@ class _AiConversationMessageBubble extends StatelessWidget {
                           _isClarificationBubble
                               ? AppColors.primary.withValues(alpha: 0.14)
                               : AppColors.warning.withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(999),
+                      borderRadius: BorderRadius.circular(
+                        AiAssistantTokens.pillRadius,
+                      ),
                     ),
                     child: Text(
                       _isClarificationBubble ? 'Cần làm rõ' : 'Chưa tìm thấy',
@@ -787,7 +793,7 @@ class _ActionPromptChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(999),
+      borderRadius: BorderRadius.circular(AiAssistantTokens.pillRadius),
       child: Ink(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         decoration: BoxDecoration(
