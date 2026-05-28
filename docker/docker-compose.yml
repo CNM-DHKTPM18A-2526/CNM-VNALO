@@ -115,7 +115,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8081:8081"
+      - "0.0.0.0:8081:8081"
     env_file:
       - ../config/environments/.env
       - .env
@@ -405,7 +405,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8086:8086"
+      - "0.0.0.0:8086:8086"
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
