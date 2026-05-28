@@ -26,14 +26,23 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
   bool _serviceAvailable = true;
   String? _errorMsg;
 
+  Future<void> checkService() async {
+    try {
+      final available = await _faceService.isServiceAvailable();
+      if (mounted) {
+        setState(() => _serviceAvailable = available);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _serviceAvailable = false);
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    void _checkService() async {
-      final available = await _faceService.isServiceAvailable();
-      if (mounted) setState(() => _serviceAvailable = available);
-    }
-    _checkService();
+    checkService();
   }
 
   @override
@@ -79,15 +88,17 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
 
       final userId = await _faceService.lookupUserId(identifier);
 
-      final verify = await _faceService.verifyFace(
+      final verifyResult = await _faceService.verifyFace(
         imageFile,
         userId,
       );
 
-      if (!verify.verified || verify.verificationToken == null) {
+      if (!mounted) return;
+
+      if (!verifyResult.verified || verifyResult.verificationToken == null) {
         setState(() {
           _isLoading = false;
-          _errorMsg = 'Khuôn mặt không khớp với tài khoản.';
+          _errorMsg = 'Khuôn mặt không khớp với tài khoản. Vui lòng thử lại.';
         });
         return;
       }
@@ -95,7 +106,7 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
       final auth = context.read<AuthProvider>();
       final info = await DeviceInfoUtil.getDeviceInfo();
       final success = await auth.loginWithFace(
-        verificationToken: verify.verificationToken!,
+        verificationToken: verifyResult.verificationToken!,
         deviceId: info.deviceId,
         deviceName: info.deviceName,
         platform: info.platform,

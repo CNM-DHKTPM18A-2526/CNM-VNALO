@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { FaceCapture } from './FaceCapture'
-import { enrollFace, checkLiveness } from '../face-auth.api'
+import { enrollFace } from '../face-auth.api'
 
 export type FaceEnrollmentProps = {
   token: string
@@ -15,7 +15,6 @@ export function FaceEnrollment({ token, onSuccess, onError, onCancel }: FaceEnro
   const [step, setStep] = useState<EnrollmentStep>('capture')
   const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null)
   const [capturedPreview, setCapturedPreview] = useState<string | null>(null)
-  const [capturedLiveness, setCapturedLiveness] = useState<{ isLive: boolean; score: number } | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const handleCapture = async (blob: Blob) => {
@@ -33,31 +32,14 @@ export function FaceEnrollment({ token, onSuccess, onError, onCancel }: FaceEnro
     setErrorMessage(null)
 
     try {
-      let livenessScore = 1.0
-
-      try {
-        const liveness = await checkLiveness(capturedBlob)
-        setCapturedLiveness({ isLive: liveness.pass, score: liveness.score })
-        livenessScore = liveness.score
-
-        if (!liveness.pass) {
-          setStep('error')
-          setErrorMessage('Khuôn mặt không hợp lệ. Vui lòng chụp lại.')
-          onError?.('Khuôn mặt không hợp lệ (liveness check failed).')
-          return
-        }
-      } catch {
-        // Liveness check optional - continue enrollment
-      }
-
       const deviceInfo = JSON.stringify({
         platform: 'WEB',
         userAgent: navigator.userAgent,
         timestamp: new Date().toISOString(),
       })
 
+      // Server enforces liveness — just enroll
       const result = await enrollFace(token, capturedBlob, {
-        livenessScore,
         deviceInfo,
       })
 
@@ -83,7 +65,6 @@ export function FaceEnrollment({ token, onSuccess, onError, onCancel }: FaceEnro
     }
     setCapturedBlob(null)
     setCapturedPreview(null)
-    setCapturedLiveness(null)
     setStep('capture')
     setErrorMessage(null)
   }
@@ -126,11 +107,7 @@ export function FaceEnrollment({ token, onSuccess, onError, onCancel }: FaceEnro
               className='face-enrollment-preview-image'
             />
           </div>
-          {capturedLiveness ? (
-            <p className='face-enrollment-liveness'>
-              Liveness score: {capturedLiveness.score.toFixed(2)}
-            </p>
-          ) : null}
+          {/* No liveness score display — internal info, not for users */}
           <div className='face-enrollment-actions'>
             <button
               type='button'

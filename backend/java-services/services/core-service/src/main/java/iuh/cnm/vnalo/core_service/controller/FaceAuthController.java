@@ -55,8 +55,6 @@ public class FaceAuthController {
     public ResponseEntity<ApiResponse<FaceEnrollmentResponse>> enrollFace(
             @AuthenticationPrincipal UserPrincipal currentUser,
             @RequestParam("image") MultipartFile image,
-            @RequestParam(value = "livenessScore", required = false, defaultValue = "1.0") Double clientLivenessScore,
-            @RequestParam(value = "qualityScore", required = false, defaultValue = "1.0") Double clientQualityScore,
             @RequestParam(value = "deviceInfo", required = false) String deviceInfo,
             HttpServletRequest request
     ) throws Exception {
@@ -65,14 +63,42 @@ public class FaceAuthController {
 
         UUID userId = currentUser.getId();
 
-        float[][][][] embeddingInput = preprocessImage(image, 112);
-        double livenessScore = clientLivenessScore != null ? clientLivenessScore : 1.0;
-        double qualityScore = clientQualityScore != null ? clientQualityScore : 1.0;
+        if (image == null || image.isEmpty()) {
+            throw new ApiException(ErrorCode.FACE_NO_FACE_DETECTED);
+        }
 
-        float[] embedding = extractEmbedding(embeddingInput);
+        // Decode image bytes once
+        byte[] imageBytes = image.getBytes();
+        BufferedImage decoded = imageProcessing.decodeImage(imageBytes);
+        if (decoded == null) {
+            throw new ApiException(ErrorCode.FACE_MODEL_ERROR, "Failed to decode image");
+        }
+
+        // 1. Enforce liveness on backend
+        float[][][][] livenessInput = imageProcessing.createLivenessInput(decoded);
+        double livenessScore = embeddingService.checkLiveness(livenessInput);
+        double livenessThreshold = faceAuthProperties.getLivenessThreshold().doubleValue();
+        if (livenessScore < livenessThreshold) {
+            log.warn("Enrollment liveness check failed for userId={}. Score: {}", userId, livenessScore);
+            throw new ApiException(ErrorCode.FACE_LIVENESS_FAILED,
+                    "Liveness check failed. Please use a real face photo.");
+        }
+
+        // 2. Extract embedding
+        float[][][][] embeddingInput = imageProcessing.createEmbeddingInput(decoded);
+        if (!embeddingService.isReady()) {
+            throw new ApiException(ErrorCode.FACE_SERVICE_UNAVAILABLE);
+        }
+        float[] embedding;
+        try {
+            embedding = embeddingService.extractEmbedding(embeddingInput);
+        } catch (Exception e) {
+            log.error("Face embedding extraction failed during enroll", e);
+            throw new ApiException(ErrorCode.FACE_MODEL_ERROR, "Embedding extraction failed: " + e.getMessage());
+        }
 
         FaceEnrollment enrollment = enrollmentService.enroll(
-                userId, embedding, livenessScore, qualityScore, deviceInfo);
+                userId, embedding, livenessScore, 1.0, deviceInfo);
 
         FaceEnrollmentResponse response = FaceEnrollmentResponse.builder()
                 .success(true)
@@ -82,7 +108,8 @@ public class FaceAuthController {
                 .version(enrollment.getVersion())
                 .build();
 
-        log.info("Face enrolled successfully: userId={}, version={}", userId, enrollment.getVersion());
+        log.info("Face enrolled successfully: userId={}, version={}, livenessScore={}",
+                userId, enrollment.getVersion(), String.format("%.3f", livenessScore));
         return ResponseEntity.ok(ApiResponse.success("Face enrolled successfully", response));
     }
 
@@ -96,8 +123,18 @@ public class FaceAuthController {
         checkEnabled();
         checkVerificationEnabled();
 
-        // 1. Compute Liveness on Backend
-        float[][][][] livenessInput = preprocessImage(image, 128);
+        if (image == null || image.isEmpty()) {
+            throw new ApiException(ErrorCode.FACE_NO_FACE_DETECTED);
+        }
+
+        // Decode image bytes ONCE — reuse for liveness and embedding
+        BufferedImage decoded = imageProcessing.decodeImage(image.getBytes());
+        if (decoded == null) {
+            throw new ApiException(ErrorCode.FACE_MODEL_ERROR, "Failed to decode image");
+        }
+
+        // 1. Compute Liveness on Backend (128x128)
+        float[][][][] livenessInput = imageProcessing.createLivenessInput(decoded);
         double livenessScore = embeddingService.checkLiveness(livenessInput);
         double livenessThreshold = faceAuthProperties.getLivenessThreshold().doubleValue();
         if (livenessScore < livenessThreshold) {
@@ -109,8 +146,8 @@ public class FaceAuthController {
             return ResponseEntity.ok(ApiResponse.success(response));
         }
 
-        // 2. Extract Embedding and Verify
-        float[][][][] embeddingInput = preprocessImage(image, 112);
+        // 2. Extract Embedding and Verify (112x112)
+        float[][][][] embeddingInput = imageProcessing.createEmbeddingInput(decoded);
         float[] probeEmbedding = extractEmbedding(embeddingInput);
 
         FaceVerificationService.VerificationResult result =

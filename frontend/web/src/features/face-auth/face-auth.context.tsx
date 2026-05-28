@@ -1,3 +1,8 @@
+/**
+ * @deprecated This context is currently unused (dead code).
+ * Face auth state is managed locally in each component.
+ * TODO: Either integrate this into the component tree or remove it.
+ */
 /* eslint-disable react-refresh/only-export-components */
 import React from 'react'
 import type { FaceStatusResponse, FaceEnrollmentState } from './face-auth.types'

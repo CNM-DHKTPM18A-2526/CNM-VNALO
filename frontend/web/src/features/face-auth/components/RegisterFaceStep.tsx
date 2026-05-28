@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { FaceCapture } from './FaceCapture'
-import { enrollFace, checkLiveness } from '../face-auth.api'
+import { enrollFace } from '../face-auth.api'
 
 type RegisterFaceStepProps = {
   token: string
@@ -49,21 +49,9 @@ export function RegisterFaceStep({ token, onComplete }: RegisterFaceStepProps) {
     setErrorMsg(null)
 
     try {
-      let livenessScore = 1.0
-      try {
-        const liveness = await checkLiveness(capturedBlob)
-        if (!liveness.pass) {
-          setErrorMsg('Khuôn mặt không hợp lệ. Vui lòng chụp lại với đủ ánh sáng.')
-          setStep('error')
-          return
-        }
-        livenessScore = liveness.score
-      } catch {
-        // Liveness check is optional
-      }
-
+      // Server enforces liveness — send image, let backend decide
       const deviceInfo = JSON.stringify({ platform: 'WEB', source: 'REGISTRATION' })
-      const result = await enrollFace(token, capturedBlob, { livenessScore, deviceInfo })
+      const result = await enrollFace(token, capturedBlob, { deviceInfo })
 
       if (result.success) {
         setStep('success')

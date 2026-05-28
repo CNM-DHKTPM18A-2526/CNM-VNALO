@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { verifyFace, checkLiveness, getFaceHealth, faceLogin, lookupUserId } from '../face-auth.api';
+import { verifyFace, getFaceHealth, faceLogin, lookupUserId } from '../face-auth.api';
 import { useAuth } from '../../auth/useAuth';
 
 type FaceLoginModalProps = {
@@ -143,13 +143,6 @@ export function FaceLoginModal({ onClose, onNotEnrolled, onSuccess }: FaceLoginM
 
     try {
       const blob = await captureFrame(videoRef.current);
-
-      const liveness = await checkLiveness(blob);
-      if (!liveness.pass) {
-        setErrorMsg('Không xác định được khuôn mặt thật. Vui lòng đảm bảo có đủ ánh sáng và thử lại.');
-        setStep('error');
-        return;
-      }
 
       const normId = normalizeIdentifier(identifier);
       const userId = await lookupUserId(normId);

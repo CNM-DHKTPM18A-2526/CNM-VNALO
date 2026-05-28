@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { FaceCapture } from './FaceCapture'
-import { enrollFace, deleteFaceEnrollment, getFaceStatus, checkLiveness } from '../face-auth.api'
+import { enrollFace, deleteFaceEnrollment, getFaceStatus } from '../face-auth.api'
 import type { FaceStatusResponse } from '../face-auth.types'
 
 export type FaceSettingsProps = {
@@ -228,21 +228,9 @@ function FaceEnrollmentPanel({
     setErrorMsg(null)
 
     try {
-      let livenessScore = 1.0
-      try {
-        const liveness = await checkLiveness(blob)
-        livenessScore = liveness.score
-        if (!liveness.pass) {
-          setErrorMsg('Khuôn mặt không hợp lệ (liveness check failed).')
-          setStep('capture')
-          return
-        }
-      } catch {
-        // optional
-      }
-
       const deviceInfo = JSON.stringify({ platform: 'WEB', userAgent: navigator.userAgent })
-      const result = await enrollFace(token, blob, { livenessScore, deviceInfo })
+      // Server enforces liveness — no need to pre-check
+      const result = await enrollFace(token, blob, { deviceInfo })
 
       if (result.success) {
         setStep('done')

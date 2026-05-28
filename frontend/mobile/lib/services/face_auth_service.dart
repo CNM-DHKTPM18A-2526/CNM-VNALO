@@ -34,7 +34,7 @@ class FaceAuthService {
     final response = await http.post(
       uri,
       headers: {'Content-Type': 'application/json'},
-      body: body.entries.map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value.toString())}').join('&'),
+      body: jsonEncode(body),
     );
     return _parseResponse(response);
   }
@@ -42,6 +42,35 @@ class FaceAuthService {
   Future<Map<String, dynamic>> _get(String endpoint) async {
     final uri = Uri.parse('$_base$endpoint');
     final response = await http.get(uri);
+    return _parseResponse(response);
+  }
+
+  Future<Map<String, dynamic>> _getWithAuth(String endpoint, String accessToken) async {
+    final uri = Uri.parse('$_base$endpoint');
+    final response = await http.get(
+      uri,
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+    return _parseResponse(response);
+  }
+
+  Future<Map<String, dynamic>> _postMultipartWithAuth(
+    String endpoint, {
+    required File file,
+    required Map<String, String> fields,
+    required String accessToken,
+  }) async {
+    final uri = Uri.parse('$_base$endpoint');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers['Authorization'] = 'Bearer $accessToken';
+    request.fields.addAll(fields);
+    request.files.add(await http.MultipartFile.fromPath(
+      'image',
+      file.path,
+      contentType: MediaType('image', 'jpeg'),
+    ));
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
     return _parseResponse(response);
   }
 
@@ -84,17 +113,50 @@ class FaceAuthService {
   /// Check if user has enrolled a face (requires auth token).
   Future<bool> isEnrolled(String accessToken) async {
     try {
-      final uri = Uri.parse('$_base/face/status');
-      final response = await http.get(
-        uri,
-        headers: {'Authorization': 'Bearer $accessToken'},
-      );
-      final data = Map<String, dynamic>.from(_tryParse(response.body));
+      final data = await _getWithAuth('/face/status', accessToken);
       final d = data['data'] as Map<String, dynamic>? ?? data;
       return d['enrolled'] == true;
     } catch (_) {
       return false;
     }
+  }
+
+  /// Get full enrollment status (requires auth token).
+  Future<Map<String, dynamic>> getEnrollmentStatus(String accessToken) async {
+    final data = await _getWithAuth('/face/status', accessToken);
+    return data['data'] as Map<String, dynamic>? ?? data;
+  }
+
+  /// Enroll face for an authenticated user.
+  Future<FaceEnrollResult> enrollFace(File image, String accessToken, {String? deviceInfo}) async {
+    final fields = <String, String>{};
+    if (deviceInfo != null) fields['deviceInfo'] = deviceInfo;
+    final data = await _postMultipartWithAuth(
+      '/face/enroll',
+      file: image,
+      fields: fields,
+      accessToken: accessToken,
+    );
+    final d = data['data'] as Map<String, dynamic>? ?? data;
+    final success = d['success'] == true;
+    if (!success) {
+      final msg = data['message']?.toString() ?? 'Đăng ký thất bại.';
+      throw ApiException(statusCode: 400, message: msg);
+    }
+    return FaceEnrollResult(
+      enrolledAt: d['enrolledAt']?.toString(),
+      version: (d['version'] as num?)?.toInt() ?? 1,
+    );
+  }
+
+  /// Delete face enrollment (requires auth token).
+  Future<void> deleteEnrollment(String accessToken) async {
+    final uri = Uri.parse('$_base/face/enrollment');
+    final response = await http.delete(
+      uri,
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+    _parseResponse(response);
   }
 
   /// Perform liveness check on a captured image.
@@ -201,7 +263,14 @@ class FaceLoginResult {
 class ApiException implements Exception {
   final int statusCode;
   final String message;
-  ApiException({required this.statusCode, required this.message});
+  final String? code;
+  ApiException({required this.statusCode, required this.message, this.code});
   @override
   String toString() => 'ApiException($statusCode): $message';
+}
+
+class FaceEnrollResult {
+  final String? enrolledAt;
+  final int version;
+  FaceEnrollResult({this.enrolledAt, required this.version});
 }

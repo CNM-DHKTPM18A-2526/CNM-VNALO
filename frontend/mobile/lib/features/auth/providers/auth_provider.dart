@@ -6,8 +6,7 @@ import 'package:vnalo_mobile/services/auth_events.dart';
 import 'package:vnalo_mobile/services/auth_service.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 import 'package:vnalo_mobile/services/storage_service.dart';
-import 'package:vnalo_mobile/services/face_auth_service.dart'
-    show FaceAuthService;
+import 'package:vnalo_mobile/services/face_auth_service.dart' show FaceAuthService;
 
 import 'package:vnalo_mobile/services/local_sync_service.dart';
 import 'package:vnalo_mobile/core/utils/device_info_util.dart';
@@ -637,6 +636,40 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  /// Enroll face for the currently logged-in user.
+  Future<dynamic> enrollFace(File imageFile) async {
+    final token = _accessToken ?? await _storageService.getAccessToken();
+    if (token == null || token.isEmpty) {
+      throw ApiException(statusCode: 401, message: 'Vui lòng đăng nhập trước khi đăng ký khuôn mặt.');
+    }
+    final faceService = FaceAuthService();
+    return faceService.enrollFace(
+      imageFile,
+      token,
+      deviceInfo: 'MOBILE',
+    );
+  }
+
+  /// Delete face enrollment for the currently logged-in user.
+  Future<void> deleteFaceEnrollment() async {
+    final token = _accessToken ?? await _storageService.getAccessToken();
+    if (token == null || token.isEmpty) {
+      throw ApiException(statusCode: 401, message: 'Vui lòng đăng nhập trước.');
+    }
+    final faceService = FaceAuthService();
+    await faceService.deleteEnrollment(token);
+  }
+
+  /// Check enrollment status for the current user.
+  Future<Map<String, dynamic>> getFaceEnrollmentStatus() async {
+    final token = _accessToken ?? await _storageService.getAccessToken();
+    if (token == null || token.isEmpty) {
+      throw ApiException(statusCode: 401, message: 'Vui lòng đăng nhập trước.');
+    }
+    final faceService = FaceAuthService();
+    return faceService.getEnrollmentStatus(token);
   }
 }
 
