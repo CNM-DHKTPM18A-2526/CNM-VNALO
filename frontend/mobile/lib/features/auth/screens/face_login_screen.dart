@@ -18,7 +18,7 @@ class FaceLoginScreen extends StatefulWidget {
 }
 
 class _FaceLoginScreenState extends State<FaceLoginScreen> {
-  final _userIdController = TextEditingController();
+  final _identifierController = TextEditingController();
   final _imagePicker = ImagePicker();
   final _faceService = FaceAuthService();
 
@@ -38,14 +38,14 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
 
   @override
   void dispose() {
-    _userIdController.dispose();
+    _identifierController.dispose();
     super.dispose();
   }
 
   Future<void> _captureAndVerify() async {
-    final userId = _userIdController.text.trim();
-    if (userId.isEmpty) {
-      setState(() => _errorMsg = 'Vui lòng nhập ID tài khoản');
+    final identifier = _identifierController.text.trim();
+    if (identifier.isEmpty) {
+      setState(() => _errorMsg = 'Vui lòng nhập số điện thoại hoặc email');
       return;
     }
 
@@ -77,16 +77,17 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
         return;
       }
 
+      final userId = await _faceService.lookupUserId(identifier);
+
       final verify = await _faceService.verifyFace(
         imageFile,
         userId,
-        livenessScore: liveness.score,
       );
 
-      if (!verify.verified) {
+      if (!verify.verified || verify.verificationToken == null) {
         setState(() {
           _isLoading = false;
-          _errorMsg = 'Khuôn mặt không khớp với tài khoản. Vui lòng kiểm tra lại ID.';
+          _errorMsg = 'Khuôn mặt không khớp với tài khoản.';
         });
         return;
       }
@@ -94,7 +95,7 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
       final auth = context.read<AuthProvider>();
       final info = await DeviceInfoUtil.getDeviceInfo();
       final success = await auth.loginWithFace(
-        userId: userId,
+        verificationToken: verify.verificationToken!,
         deviceId: info.deviceId,
         deviceName: info.deviceName,
         platform: info.platform,
@@ -165,13 +166,13 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
                   icon: Icons.face_rounded,
                   iconColor: primaryColor,
                   title: 'Xác thực bằng khuôn mặt',
-                  subtitle: 'Nhập ID tài khoản và chụp ảnh khuôn mặt để đăng nhập nhanh.',
+                  subtitle: 'Nhập số điện thoại hoặc email đã đăng ký và chụp ảnh khuôn mặt để đăng nhập nhanh.',
                   bgColor: primaryColor.withValues(alpha: 0.08),
                   isDark: isDarkMode,
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  'ID Tài khoản',
+                  'Số điện thoại hoặc Email',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -180,10 +181,10 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
                 ),
                 const SizedBox(height: 8),
                 TextField(
-                  controller: _userIdController,
+                  controller: _identifierController,
                   style: TextStyle(color: textColor),
                   decoration: InputDecoration(
-                    hintText: 'Nhập ID tài khoản (xem trong Cài đặt > Tài khoản)',
+                    hintText: 'Nhập số điện thoại hoặc email',
                     hintStyle: TextStyle(color: hintColor, fontSize: 14),
                     filled: true,
                     fillColor: isDarkMode ? DarkColors.surface : Colors.grey.shade50,
@@ -196,7 +197,7 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Bạn có thể xem ID tài khoản trong mục Cài đặt > Tài khoản trên app.',
+                  'Bạn cần đã đăng ký khuôn mặt trước đó trong mục Cài đặt.',
                   style: TextStyle(fontSize: 12, color: hintColor),
                 ),
                 if (_errorMsg != null) ...[

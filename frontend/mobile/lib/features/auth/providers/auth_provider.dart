@@ -596,7 +596,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<bool> loginWithFace({
-    required String userId,
+    required String verificationToken,
     required String deviceId,
     required String deviceName,
     required String platform,
@@ -609,7 +609,7 @@ class AuthProvider extends ChangeNotifier {
       // Import lazily to avoid circular deps
       final faceService = FaceAuthService();
       final result = await faceService.faceLogin(
-        userId: userId,
+        verificationToken: verificationToken,
         deviceId: deviceId,
         deviceName: deviceName,
         platform: platform,

@@ -113,12 +113,20 @@ class FaceAuthService {
     );
   }
 
-  /// Verify a face image against a known userId.
-  Future<FaceVerifyResult> verifyFace(File image, String userId, {double? livenessScore}) async {
-    final fields = <String, String>{'userId': userId};
-    if (livenessScore != null) {
-      fields['livenessScore'] = livenessScore.toString();
+  /// Lookup userId by phone or email.
+  Future<String> lookupUserId(String identifier) async {
+    final data = await _get('/auth/lookup?identifier=${Uri.encodeComponent(identifier)}');
+    final d = data['data'] as Map<String, dynamic>? ?? data;
+    final userId = d['userId']?.toString();
+    if (userId == null || userId.isEmpty) {
+      throw ApiException(statusCode: 404, message: 'Không tìm thấy tài khoản.');
     }
+    return userId;
+  }
+
+  /// Verify a face image against a known userId.
+  Future<FaceVerifyResult> verifyFace(File image, String userId) async {
+    final fields = <String, String>{'userId': userId};
     final data = await _postMultipart('/face/verify', file: image, fields: fields);
     final d = data['data'] as Map<String, dynamic>? ?? data;
     return FaceVerifyResult(
@@ -126,18 +134,19 @@ class FaceAuthService {
       confidence: (d['confidence'] as num?)?.toDouble(),
       threshold: (d['threshold'] as num?)?.toDouble(),
       decision: d['decision']?.toString(),
+      verificationToken: d['verificationToken']?.toString(),
     );
   }
 
   /// Create a session after face verification succeeded.
   Future<FaceLoginResult> faceLogin({
-    required String userId,
+    required String verificationToken,
     required String deviceId,
     required String deviceName,
     required String platform,
   }) async {
     final data = await _postJson('/auth/face-login', {
-      'userId': userId,
+      'verificationToken': verificationToken,
       'deviceId': deviceId,
       'deviceName': deviceName,
       'platform': platform,
@@ -173,11 +182,13 @@ class FaceVerifyResult {
   final double? confidence;
   final double? threshold;
   final String? decision;
+  final String? verificationToken;
   FaceVerifyResult({
     required this.verified,
     this.confidence,
     this.threshold,
     this.decision,
+    this.verificationToken,
   });
 }
 

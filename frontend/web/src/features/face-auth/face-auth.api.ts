@@ -176,11 +176,12 @@ export async function verifyFace(
     inferenceTimeMs: typeof data.inferenceTimeMs === 'number' ? data.inferenceTimeMs : null,
     errorCode: typeof data.errorCode === 'string' ? data.errorCode : null,
     message: typeof data.message === 'string' ? data.message : null,
+    verificationToken: typeof data.verificationToken === 'string' ? data.verificationToken : null,
   }
 }
 
 export async function faceLogin(
-  userId: string,
+  verificationToken: string,
   deviceId: string,
   deviceName: string,
   platform: string,
@@ -188,7 +189,7 @@ export async function faceLogin(
   const response = await fetch(`${API_BASE_URL}/auth/face-login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, deviceId, deviceName, platform }),
+    body: JSON.stringify({ verificationToken, deviceId, deviceName, platform }),
   })
 
   const json = (await response.json().catch(() => null)) as unknown

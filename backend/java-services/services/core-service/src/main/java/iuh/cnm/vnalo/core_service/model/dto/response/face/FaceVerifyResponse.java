@@ -17,4 +17,5 @@ public class FaceVerifyResponse {
     private Long inferenceTimeMs;
     private String errorCode;
     private String message;
+    private String verificationToken;
 }

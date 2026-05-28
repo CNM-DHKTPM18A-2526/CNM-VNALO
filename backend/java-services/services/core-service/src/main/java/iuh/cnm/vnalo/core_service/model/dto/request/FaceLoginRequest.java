@@ -15,8 +15,8 @@ import lombok.NoArgsConstructor;
 @Builder
 public class FaceLoginRequest {
 
-    @NotNull(message = "User ID is required")
-    private String userId;
+    @NotNull(message = "Verification Token is required")
+    private String verificationToken;
 
     @NotNull(message = "Device ID is required")
     private String deviceId;

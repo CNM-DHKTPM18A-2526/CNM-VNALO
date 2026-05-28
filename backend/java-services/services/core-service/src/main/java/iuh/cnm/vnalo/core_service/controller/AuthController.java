@@ -238,7 +238,7 @@ public class AuthController {
             HttpServletRequest httpRequest) {
 
         AuthResponse response = authService.faceLogin(
-                UUID.fromString(request.getUserId()),
+                request.getVerificationToken(),
                 httpRequest,
                 request.getDeviceId(),
                 request.getDeviceName(),

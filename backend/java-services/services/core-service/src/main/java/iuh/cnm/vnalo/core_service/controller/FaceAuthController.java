@@ -9,6 +9,7 @@ import iuh.cnm.vnalo.core_service.model.dto.response.face.FaceEnrollmentResponse
 import iuh.cnm.vnalo.core_service.model.dto.response.face.FaceStatusResponse;
 import iuh.cnm.vnalo.core_service.model.dto.response.face.FaceVerifyResponse;
 import iuh.cnm.vnalo.core_service.model.entity.face.FaceEnrollment;
+import iuh.cnm.vnalo.core_service.security.JwtTokenProvider;
 import iuh.cnm.vnalo.core_service.security.UserPrincipal;
 import iuh.cnm.vnalo.core_service.service.face.FaceEmbeddingService;
 import iuh.cnm.vnalo.core_service.service.face.FaceEnrollmentService;
@@ -46,6 +47,7 @@ public class FaceAuthController {
     private final FaceEmbeddingService embeddingService;
     private final FaceImageProcessingService imageProcessing;
     private final FaceAuthProperties faceAuthProperties;
+    private final JwtTokenProvider jwtTokenProvider;
 
     @PostMapping(value = "/enroll", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Enroll face", description = "Enrolls the user's face for authentication")
@@ -89,12 +91,25 @@ public class FaceAuthController {
     public ResponseEntity<ApiResponse<FaceVerifyResponse>> verifyFace(
             @RequestParam("image") MultipartFile image,
             @RequestParam("userId") UUID userId,
-            @RequestParam(value = "livenessScore", required = false, defaultValue = "1.0") Double clientLivenessScore,
             HttpServletRequest request
     ) throws Exception {
         checkEnabled();
         checkVerificationEnabled();
 
+        // 1. Compute Liveness on Backend
+        float[][][][] livenessInput = preprocessImage(image, 128);
+        double livenessScore = embeddingService.checkLiveness(livenessInput);
+        double livenessThreshold = faceAuthProperties.getLivenessThreshold().doubleValue();
+        if (livenessScore < livenessThreshold) {
+            log.warn("Liveness check failed for userId={}. Score: {}", userId, livenessScore);
+            FaceVerifyResponse response = FaceVerifyResponse.builder()
+                    .verified(false)
+                    .decision("SPOOF_DETECTED")
+                    .build();
+            return ResponseEntity.ok(ApiResponse.success(response));
+        }
+
+        // 2. Extract Embedding and Verify
         float[][][][] embeddingInput = preprocessImage(image, 112);
         float[] probeEmbedding = extractEmbedding(embeddingInput);
 
@@ -102,11 +117,16 @@ public class FaceAuthController {
                 verificationService.verifyWithEnrollment(
                         userId,
                         probeEmbedding,
-                        clientLivenessScore != null ? clientLivenessScore : 1.0,
+                        livenessScore,
                         getClientIp(request),
                         request.getHeader("X-Device-Id"),
                         request.getHeader("X-App-Version")
                 );
+
+        String verificationToken = null;
+        if (result.verified()) {
+            verificationToken = jwtTokenProvider.generateFaceVerificationToken(userId);
+        }
 
         FaceVerifyResponse response = FaceVerifyResponse.builder()
                 .verified(result.verified())
@@ -114,6 +134,7 @@ public class FaceAuthController {
                 .threshold(result.threshold())
                 .decision(result.decision())
                 .inferenceTimeMs(result.inferenceTimeMs())
+                .verificationToken(verificationToken)
                 .build();
 
         return ResponseEntity.ok(ApiResponse.success(response));

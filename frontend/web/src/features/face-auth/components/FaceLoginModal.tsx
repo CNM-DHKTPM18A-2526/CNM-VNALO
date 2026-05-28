@@ -154,16 +154,16 @@ export function FaceLoginModal({ onClose, onNotEnrolled, onSuccess }: FaceLoginM
       const normId = normalizeIdentifier(identifier);
       const userId = await lookupUserId(normId);
 
-      const verify = await verifyFace(blob, userId, { livenessScore: liveness.score });
+      const verify = await verifyFace(blob, userId);
 
-      if (!verify.verified) {
+      if (!verify.verified || !verify.verificationToken) {
         setErrorMsg('Khuôn mặt không khớp với tài khoản. Vui lòng thử lại hoặc đăng nhập bằng mật khẩu.');
         setStep('error');
         return;
       }
 
       const deviceId = resolveWebDeviceId();
-      const tokens = await faceLogin(userId, deviceId, 'VNALO Web', 'WEB');
+      const tokens = await faceLogin(verify.verificationToken, deviceId, 'VNALO Web', 'WEB');
       await loginWithAccessToken(tokens.accessToken);
       onSuccess();
     } catch (err) {

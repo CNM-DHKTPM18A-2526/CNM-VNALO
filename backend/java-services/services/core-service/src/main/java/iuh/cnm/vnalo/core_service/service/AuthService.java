@@ -407,12 +407,17 @@ public class AuthService {
      */
     @Transactional
     public AuthResponse faceLogin(
-            UUID accountId,
+            String verificationToken,
             HttpServletRequest httpRequest,
             String deviceId,
             String deviceName,
             String platform
     ) {
+        UUID accountId = jwtTokenProvider.validateFaceVerificationToken(verificationToken);
+        if (accountId == null) {
+            throw new ApiException(ErrorCode.AUTH_INVALID_CREDENTIALS, "Invalid or expired face verification token");
+        }
+
         AuthAccount account = authAccountRepository.findById(accountId)
                 .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
 

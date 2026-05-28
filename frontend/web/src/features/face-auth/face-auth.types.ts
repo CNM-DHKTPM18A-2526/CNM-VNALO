@@ -15,6 +15,7 @@ export type FaceVerifyResponse = {
   inferenceTimeMs: number | null
   errorCode: string | null
   message: string | null
+  verificationToken: string | null
 }
 
 export type FaceStatusResponse = {
