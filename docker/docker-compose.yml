@@ -136,6 +136,7 @@ services:
       FIREBASE_CREDENTIALS_PATH: file:///app/firebase-credentials/firebase-adminsdk.json
       KAFKA_SERVERS: kafka:9092
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xss256k"
+      AI_INTERNAL_SECRET: ${AI_INTERNAL_SECRET:-vnalo-ai-secret-key-default}
     depends_on:
       postgres:
         condition: service_healthy
