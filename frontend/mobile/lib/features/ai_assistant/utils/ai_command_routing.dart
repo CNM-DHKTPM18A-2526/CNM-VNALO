@@ -419,6 +419,19 @@ class AiCommandRouting {
     );
   }
 
+  static String buildMissingTargetFeedbackSourceForCommand(String command) {
+    final normalizedCommand = normalizeSystemAction(command);
+    return switch (normalizedCommand) {
+      'START_CALL' ||
+      'COMPOSE_MESSAGE' ||
+      'OPEN_PROFILE' => 'ai_action_missing.contact',
+      'SEND_FRIEND_REQUEST' ||
+      'BLOCK_USER' ||
+      'UNBLOCK_USER' => 'ai_action_missing.user',
+      _ => 'ai_action_missing.conversation',
+    };
+  }
+
   static String buildAmbiguityFeedbackSource({
     required String scope,
     required Iterable<String> candidates,

@@ -604,7 +604,10 @@ class MainShellState extends State<MainShell> {
           command: command,
           targetName: targetName,
         ),
-        feedbackSource: 'ai_action_missing.conversation',
+        feedbackSource:
+            AiCommandRouting.buildMissingTargetFeedbackSourceForCommand(
+              command,
+            ),
       );
       return;
     }

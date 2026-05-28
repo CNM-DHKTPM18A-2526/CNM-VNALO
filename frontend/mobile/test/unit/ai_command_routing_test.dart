@@ -327,6 +327,34 @@ void main() {
       );
       expect(callMessage, contains('L\u00FD V\u00E2n'));
     });
+
+    test('builds command-specific missing target feedback sources', () {
+      expect(
+        AiCommandRouting.buildMissingTargetFeedbackSourceForCommand(
+          'START_CALL',
+        ),
+        'ai_action_missing.contact',
+      );
+      expect(
+        AiCommandRouting.buildMissingTargetFeedbackSourceForCommand(
+          'COMPOSE_MESSAGE',
+        ),
+        'ai_action_missing.contact',
+      );
+      expect(
+        AiCommandRouting.buildMissingTargetFeedbackSourceForCommand(
+          'OPEN_CHAT',
+        ),
+        'ai_action_missing.conversation',
+      );
+      expect(
+        AiCommandRouting.buildMissingTargetFeedbackSourceForCommand(
+          'SEND_FRIEND_REQUEST',
+        ),
+        'ai_action_missing.user',
+      );
+    });
+
     test('round-trips ambiguity candidate metadata in source', () {
       final source = AiCommandRouting.buildAmbiguityFeedbackSource(
         scope: 'contact',
