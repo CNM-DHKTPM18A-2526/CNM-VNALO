@@ -19,6 +19,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [accessToken, setAccessToken] = React.useState<string | null>(initialToken)
   const [isBootstrapping, setIsBootstrapping] = React.useState(Boolean(initialToken))
 
+  const logout = React.useCallback(() => {
+    localStorage.removeItem(ACCESS_TOKEN_KEY)
+    setAccessToken(null)
+    setUser(null)
+    setIsBootstrapping(false)
+    window.dispatchEvent(new CustomEvent(AUTH_LOGOUT_EVENT))
+  }, [])
+
   React.useEffect(() => {
     if (!accessToken) {
       return
@@ -40,15 +48,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   React.useEffect(() => {
     const handleRevoked = () => {
-      console.log('[AuthContext] Auth revoked (401/403), logging out...');
-      logout();
-    };
+      console.log('[AuthContext] Auth revoked (401/403), logging out...')
+      logout()
+    }
 
-    window.addEventListener('vnalo:auth:revoked', handleRevoked);
+    window.addEventListener('vnalo:auth:revoked', handleRevoked)
     return () => {
-      window.removeEventListener('vnalo:auth:revoked', handleRevoked);
-    };
-  }, []);
+      window.removeEventListener('vnalo:auth:revoked', handleRevoked)
+    }
+  }, [logout])
 
   React.useEffect(() => {
     const handleStorage = (event: StorageEvent) => {
@@ -103,13 +111,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     })
   }
 
-  const logout = () => {
-    localStorage.removeItem(ACCESS_TOKEN_KEY)
-    setAccessToken(null)
-    setUser(null)
-    setIsBootstrapping(false)
-    window.dispatchEvent(new CustomEvent(AUTH_LOGOUT_EVENT))
-  }
 
   const value = React.useMemo<AuthContextValue>(
     () => ({
@@ -122,7 +123,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       updateUser,
       logout,
     }),
-    [accessToken, isBootstrapping, user],
+    [accessToken, isBootstrapping, user, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

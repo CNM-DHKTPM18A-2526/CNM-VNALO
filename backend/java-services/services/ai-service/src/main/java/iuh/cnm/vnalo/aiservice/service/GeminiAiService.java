@@ -167,14 +167,14 @@ public class GeminiAiService {
     private String buildSystemPrompt(iuh.cnm.vnalo.aiservice.dto.external.MascotSettingsDTO mascot, boolean enableDeepSummary) {
         StringBuilder sb = new StringBuilder(iuh.cnm.vnalo.aiservice.knowledge.SystemPrompt.VNALO_SYSTEM_PROMPT);
         if (enableDeepSummary) {
-            sb.append("\n\nLƯU Ý: Người dùng đã yêu cầu phản hồi sâu (Deep Summary). Hãy phân tích kỹ và trả lời chi tiết hơn bình thường.");
+            sb.append("\n\nLÃ†Â¯U ÃƒÂ: NgÃ†Â°Ã¡Â»Âi dÃƒÂ¹ng Ã„â€˜ÃƒÂ£ yÃƒÂªu cÃ¡ÂºÂ§u phÃ¡ÂºÂ£n hÃ¡Â»â€œi sÃƒÂ¢u (Deep Summary). HÃƒÂ£y phÃƒÂ¢n tÃƒÂ­ch kÃ¡Â»Â¹ vÃƒÂ  trÃ¡ÂºÂ£ lÃ¡Â»Âi chi tiÃ¡ÂºÂ¿t hÃ†Â¡n bÃƒÂ¬nh thÃ†Â°Ã¡Â»Âng.");
         }
         if (mascot != null) {
             sb.append("\n\n[DYNAMICS SETTINGS]");
-            sb.append("\n- Tên của bạn hiện tại là: ").append(mascot.getMascotName());
-            sb.append("\n- Cá tính của bạn: ").append(mascot.getPersonalityType());
+            sb.append("\n- TÃƒÂªn cÃ¡Â»Â§a bÃ¡ÂºÂ¡n hiÃ¡Â»â€¡n tÃ¡ÂºÂ¡i lÃƒÂ : ").append(mascot.getMascotName());
+            sb.append("\n- CÃƒÂ¡ tÃƒÂ­nh cÃ¡Â»Â§a bÃ¡ÂºÂ¡n: ").append(mascot.getPersonalityType());
             if (mascot.getCustomInstructions() != null && !mascot.getCustomInstructions().isBlank()) {
-                sb.append("\n- Chỉ dẫn đặc biệt từ người dùng: ").append(mascot.getCustomInstructions());
+                sb.append("\n- ChÃ¡Â»â€° dÃ¡ÂºÂ«n Ã„â€˜Ã¡ÂºÂ·c biÃ¡Â»â€¡t tÃ¡Â»Â« ngÃ†Â°Ã¡Â»Âi dÃƒÂ¹ng: ").append(mascot.getCustomInstructions());
             }
         }
         return sb.toString();
@@ -222,7 +222,7 @@ public class GeminiAiService {
                 response.setActionCommand(actionCommand);
             } else {
                 log.warn("Blocked untrusted/unsupported LLM actionCommand: {}", actionCommand);
-                response.setActionCommand(null);
+                blockActionCommand(response, actionCommand);
             }
         }
 
@@ -348,11 +348,36 @@ public class GeminiAiService {
             }
             if (!valid) {
                 log.warn("Blocked action command '{}' due to missing or invalid required schema fields in params: {}", cmd, cp);
-                response.setActionCommand(null);
-                response.setActionParams(null);
+                blockActionCommand(response, cmd);
             }
         }
         applyActionExecutionHints(response);
+    }
+
+    private void blockActionCommand(AiChatResponse response, String blockedCommand) {
+        response.setActionCommand(null);
+        response.setActionParams(null);
+        response.setRequiresConfirmation(false);
+        response.setRiskLevel("low");
+        response.setTextReply(safeBlockedActionReply(blockedCommand, response.getTextReply()));
+    }
+
+    private String safeBlockedActionReply(String blockedCommand, String currentReply) {
+        String command = blockedCommand == null ? "" : normalizeActionAlias(blockedCommand.trim().toUpperCase(Locale.ROOT));
+        String reply = currentReply == null ? "" : currentReply.trim();
+        if (!reply.isEmpty() && !containsPrematureSuccessClaim(reply) && !looksLikeActionPromise(reply)) {
+            return reply;
+        }
+        return switch (command) {
+            case "COMPOSE_MESSAGE" -> "Minh chua du thong tin nguoi nhan hoac noi dung tin nhan de chuan bi thao tac nay. Ban hay noi ro nguoi nhan va noi dung can gui.";
+            case "START_CALL", "OPEN_CHAT" -> "Minh chua xac dinh duoc dung nguoi hoac cuoc tro chuyen can mo. Ban hay noi ro ten trong danh ba hoac chon lai trong VNALO.";
+            case "CREATE_GROUP" -> "Minh chua du ten nhom hoac danh sach thanh vien de tao nhom. Ban hay cung cap ro ten nhom va cac thanh vien.";
+            case "OPEN_PROFILE", "SEND_FRIEND_REQUEST", "BLOCK_USER", "UNBLOCK_USER" -> "Minh chua xac dinh duoc dung nguoi dung muc tieu. Ban hay noi ro ten hoac thong tin lien he.";
+            case "NAVIGATE_TO" -> "Minh chua xac dinh duoc trang can mo trong VNALO. Ban hay noi ro Chat, Danh ba, Cai dat hoac Nhat ky.";
+            case "CHANGE_GROUP_NAME" -> "Minh chua du ten nhom moi de chuan bi thao tac doi ten.";
+            case "ADD_GROUP_MEMBER", "REMOVE_GROUP_MEMBER", "TRANSFER_GROUP_OWNER" -> "Minh chua xac dinh duoc dung thanh vien can thao tac. Ban hay noi ro ten thanh vien.";
+            default -> "Minh chua du thong tin an toan de chuan bi thao tac nay. Ban hay noi ro hon hoac thao tac thu cong trong VNALO.";
+        };
     }
 
     private void applyActionExecutionHints(AiChatResponse response) {
@@ -394,30 +419,43 @@ public class GeminiAiService {
         }
 
         return switch (command) {
-            case "COMPOSE_MESSAGE" -> "Mình sẽ mở bước xác nhận để bạn kiểm tra người nhận và nội dung trước khi gửi.";
-            case "START_CALL" -> "Mình sẽ mở bước xác nhận cuộc gọi; nếu không tìm thấy người này trong danh bạ, ứng dụng sẽ báo ngay trong đoạn chat AI.";
-            case "OPEN_CHAT" -> "Mình sẽ tìm và mở cuộc trò chuyện phù hợp trong VNALO.";
-            case "CREATE_GROUP" -> "Mình sẽ mở bước xác nhận để bạn kiểm tra tên nhóm và thành viên trước khi tạo.";
-            case "RECALL_MESSAGE" -> "Mình sẽ mở bước xác nhận trước khi thu hồi tin nhắn phù hợp.";
+            case "COMPOSE_MESSAGE" -> "MÃƒÂ¬nh sÃ¡ÂºÂ½ mÃ¡Â»Å¸ bÃ†Â°Ã¡Â»â€ºc xÃƒÂ¡c nhÃ¡ÂºÂ­n Ã„â€˜Ã¡Â»Æ’ bÃ¡ÂºÂ¡n kiÃ¡Â»Æ’m tra ngÃ†Â°Ã¡Â»Âi nhÃ¡ÂºÂ­n vÃƒÂ  nÃ¡Â»â„¢i dung trÃ†Â°Ã¡Â»â€ºc khi gÃ¡Â»Â­i.";
+            case "START_CALL" -> "MÃƒÂ¬nh sÃ¡ÂºÂ½ mÃ¡Â»Å¸ bÃ†Â°Ã¡Â»â€ºc xÃƒÂ¡c nhÃ¡ÂºÂ­n cuÃ¡Â»â„¢c gÃ¡Â»Âi; nÃ¡ÂºÂ¿u khÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y ngÃ†Â°Ã¡Â»Âi nÃƒÂ y trong danh bÃ¡ÂºÂ¡, Ã¡Â»Â©ng dÃ¡Â»Â¥ng sÃ¡ÂºÂ½ bÃƒÂ¡o ngay trong Ã„â€˜oÃ¡ÂºÂ¡n chat AI.";
+            case "OPEN_CHAT" -> "MÃƒÂ¬nh sÃ¡ÂºÂ½ tÃƒÂ¬m vÃƒÂ  mÃ¡Â»Å¸ cuÃ¡Â»â„¢c trÃƒÂ² chuyÃ¡Â»â€¡n phÃƒÂ¹ hÃ¡Â»Â£p trong VNALO.";
+            case "CREATE_GROUP" -> "MÃƒÂ¬nh sÃ¡ÂºÂ½ mÃ¡Â»Å¸ bÃ†Â°Ã¡Â»â€ºc xÃƒÂ¡c nhÃ¡ÂºÂ­n Ã„â€˜Ã¡Â»Æ’ bÃ¡ÂºÂ¡n kiÃ¡Â»Æ’m tra tÃƒÂªn nhÃƒÂ³m vÃƒÂ  thÃƒÂ nh viÃƒÂªn trÃ†Â°Ã¡Â»â€ºc khi tÃ¡ÂºÂ¡o.";
+            case "RECALL_MESSAGE" -> "MÃƒÂ¬nh sÃ¡ÂºÂ½ mÃ¡Â»Å¸ bÃ†Â°Ã¡Â»â€ºc xÃƒÂ¡c nhÃ¡ÂºÂ­n trÃ†Â°Ã¡Â»â€ºc khi thu hÃ¡Â»â€œi tin nhÃ¡ÂºÂ¯n phÃƒÂ¹ hÃ¡Â»Â£p.";
             case "BLOCK_USER", "UNBLOCK_USER", "REMOVE_GROUP_MEMBER", "TRANSFER_GROUP_OWNER", "LEAVE_GROUP", "DISBAND_GROUP" ->
-                    "Mình sẽ mở bước xác nhận an toàn trước khi thực hiện thao tác này.";
+                    "MÃƒÂ¬nh sÃ¡ÂºÂ½ mÃ¡Â»Å¸ bÃ†Â°Ã¡Â»â€ºc xÃƒÂ¡c nhÃ¡ÂºÂ­n an toÃƒÂ n trÃ†Â°Ã¡Â»â€ºc khi thÃ¡Â»Â±c hiÃ¡Â»â€¡n thao tÃƒÂ¡c nÃƒÂ y.";
             default -> requiresConfirmation
-                    ? "Mình sẽ mở bước xác nhận trước khi thực hiện thao tác này."
-                    : "Mình sẽ chuẩn bị thao tác này trong VNALO.";
+                    ? "MÃƒÂ¬nh sÃ¡ÂºÂ½ mÃ¡Â»Å¸ bÃ†Â°Ã¡Â»â€ºc xÃƒÂ¡c nhÃ¡ÂºÂ­n trÃ†Â°Ã¡Â»â€ºc khi thÃ¡Â»Â±c hiÃ¡Â»â€¡n thao tÃƒÂ¡c nÃƒÂ y."
+                    : "MÃƒÂ¬nh sÃ¡ÂºÂ½ chuÃ¡ÂºÂ©n bÃ¡Â»â€¹ thao tÃƒÂ¡c nÃƒÂ y trong VNALO.";
         };
+    }
+
+    private boolean looksLikeActionPromise(String reply) {
+        String normalized = reply.toLowerCase(Locale.ROOT);
+        return normalized.contains("i will ")
+                || normalized.contains("i'll ")
+                || normalized.contains("will open")
+                || normalized.contains("will send")
+                || normalized.contains("will call")
+                || normalized.contains("se mo")
+                || normalized.contains("se gui")
+                || normalized.contains("se goi")
+                || normalized.contains("chuan bi");
     }
 
     private boolean containsPrematureSuccessClaim(String reply) {
         String normalized = reply.toLowerCase(Locale.ROOT);
-        return normalized.contains("đã gửi")
+        return normalized.contains("Ã„â€˜ÃƒÂ£ gÃ¡Â»Â­i")
                 || normalized.contains("da gui")
-                || normalized.contains("đã gọi")
+                || normalized.contains("Ã„â€˜ÃƒÂ£ gÃ¡Â»Âi")
                 || normalized.contains("da goi")
-                || normalized.contains("đang gọi")
+                || normalized.contains("Ã„â€˜ang gÃ¡Â»Âi")
                 || normalized.contains("dang goi")
-                || normalized.contains("đã tạo")
+                || normalized.contains("Ã„â€˜ÃƒÂ£ tÃ¡ÂºÂ¡o")
                 || normalized.contains("da tao")
-                || normalized.contains("đã thu hồi")
+                || normalized.contains("Ã„â€˜ÃƒÂ£ thu hÃ¡Â»â€œi")
                 || normalized.contains("da thu hoi")
                 || normalized.contains("sent the message")
                 || normalized.contains("message sent")
@@ -444,7 +482,7 @@ public class GeminiAiService {
                 }
 
                 if (response.getActionCommand() != null && response.getTextReply().isEmpty()) {
-                    response.setTextReply("Mình đã hiểu yêu cầu và sẽ mở bước phù hợp trong VNALO.");
+                    response.setTextReply("MÃƒÂ¬nh Ã„â€˜ÃƒÂ£ hiÃ¡Â»Æ’u yÃƒÂªu cÃ¡ÂºÂ§u vÃƒÂ  sÃ¡ÂºÂ½ mÃ¡Â»Å¸ bÃ†Â°Ã¡Â»â€ºc phÃƒÂ¹ hÃ¡Â»Â£p trong VNALO.");
                 }
 
                 return response;
@@ -563,7 +601,7 @@ public class GeminiAiService {
 
                 // If it's a valid action but textReply is empty, use a default acknowledgment
                 if (response.getActionCommand() != null && response.getTextReply().isEmpty()) {
-                    response.setTextReply("Mình đã hiểu yêu cầu và sẽ mở bước phù hợp trong VNALO.");
+                    response.setTextReply("MÃƒÂ¬nh Ã„â€˜ÃƒÂ£ hiÃ¡Â»Æ’u yÃƒÂªu cÃ¡ÂºÂ§u vÃƒÂ  sÃ¡ÂºÂ½ mÃ¡Â»Å¸ bÃ†Â°Ã¡Â»â€ºc phÃƒÂ¹ hÃ¡Â»Â£p trong VNALO.");
                 }
 
                 return response;

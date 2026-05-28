@@ -46,7 +46,7 @@ export function LoginPage() {
       const session = await createQrLoginSession()
       setQrToken(session.token)
       setQrPayload(session.qrPayload)
-    } catch (err) {
+    } catch {
       setErrorMessage('Không thể khởi tạo QR.')
     } finally {
       setQrLoading(false)
@@ -79,7 +79,7 @@ export function LoginPage() {
           setQrExpired(true)
           window.clearInterval(timer)
         }
-      } catch (err) {
+      } catch {
         // Silently continue polling; transient network errors will be retried on next tick.
       }
     }, POLL_INTERVAL_MS)
