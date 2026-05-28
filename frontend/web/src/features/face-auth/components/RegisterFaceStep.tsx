@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { FaceCapture } from './FaceCapture'
 import { enrollFace } from '../face-auth.api'
 
@@ -14,14 +14,9 @@ export function RegisterFaceStep({ token, onComplete }: RegisterFaceStepProps) {
   const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  const streamRef = useRef<MediaStream | null>(null)
 
   useEffect(() => {
-    const stream = streamRef.current
     return () => {
-      if (stream) {
-        stream.getTracks().forEach(t => t.stop())
-      }
       if (preview) {
         URL.revokeObjectURL(preview)
       }

@@ -213,12 +213,13 @@ function FaceEnrollmentPanel({
 }) {
   const [blob, setBlob] = React.useState<Blob | null>(null)
   const [preview, setPreview] = React.useState<string | null>(null)
-  const [step, setStep] = React.useState<'capture' | 'processing' | 'done'>('capture')
+  const [step, setStep] = React.useState<'capture' | 'confirm' | 'processing' | 'done'>('capture')
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null)
 
   const handleCapture = (b: Blob) => {
     setBlob(b)
     setPreview(URL.createObjectURL(b))
+    setStep('confirm')
   }
 
   const handleSubmit = async () => {
@@ -267,19 +268,22 @@ function FaceEnrollmentPanel({
             Đưa khuôn mặt vào khung hình và nhấn chụp.
           </p>
           <FaceCapture onCapture={handleCapture} />
-          {preview && (
-            <div className='face-settings-preview-wrap'>
-              <img src={preview} alt='Preview' className='face-settings-preview-img' />
-              <button type='button' className='btn btn-ghost' onClick={handleRetake}>
-                Chụp lại
-              </button>
-              <button type='button' className='btn btn-primary' onClick={() => { void handleSubmit() }}>
-                Xác nhận đăng ký
-              </button>
-            </div>
-          )}
           {errorMsg ? <p className='face-settings-error'>{errorMsg}</p> : null}
         </>
+      )}
+      {step === 'confirm' && preview && (
+        <div className='face-settings-preview-wrap'>
+          <img src={preview} alt='Preview' className='face-settings-preview-img' />
+          <div className='face-settings-preview-actions' style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+            <button type='button' className='btn btn-ghost' onClick={handleRetake} style={{ flex: 1 }}>
+              Chụp lại
+            </button>
+            <button type='button' className='btn btn-primary' onClick={() => { void handleSubmit() }} style={{ flex: 1 }}>
+              Xác nhận đăng ký
+            </button>
+          </div>
+          {errorMsg ? <p className='face-settings-error'>{errorMsg}</p> : null}
+        </div>
       )}
       {step === 'processing' && (
         <div className='face-settings-processing'>

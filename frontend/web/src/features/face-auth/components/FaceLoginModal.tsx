@@ -110,8 +110,10 @@ export function FaceLoginModal({ onClose, onNotEnrolled, onSuccess }: FaceLoginM
       setIdentifierError('Vui lòng nhập số điện thoại hoặc email.');
       return;
     }
-    if (serviceAvailable === false) {
-      setStep('service-unavailable');
+    if (serviceAvailable !== true) {
+      if (serviceAvailable === false) {
+        setStep('service-unavailable');
+      }
       return;
     }
     setStep('camera');
@@ -226,8 +228,13 @@ export function FaceLoginModal({ onClose, onNotEnrolled, onSuccess }: FaceLoginM
                   <p className="face-login-field-error">{identifierError}</p>
                 )}
               </div>
-              <button className="face-login-primary-btn" onClick={handleFindAccount}>
-                Tiếp tục
+              <button
+                type='button'
+                className='btn btn-primary btn-block face-login-primary-btn'
+                onClick={() => { void handleFindAccount() }}
+                disabled={serviceAvailable === null}
+              >
+                {serviceAvailable === null ? 'Đang kiểm tra dịch vụ...' : 'Tiếp tục'}
               </button>
               <button className="face-login-secondary-link" onClick={onNotEnrolled}>
                 Chưa đăng ký khuôn mặt?

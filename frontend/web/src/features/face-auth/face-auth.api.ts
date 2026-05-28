@@ -82,20 +82,12 @@ export async function enrollFace(
   token: string,
   imageBlob: Blob,
   options?: {
-    livenessScore?: number
-    qualityScore?: number
     deviceInfo?: string
   },
 ): Promise<FaceEnrollmentResponse> {
   const formData = new FormData()
   formData.append('image', imageBlob, 'face.jpg')
 
-  if (options?.livenessScore !== undefined) {
-    formData.append('livenessScore', String(options.livenessScore))
-  }
-  if (options?.qualityScore !== undefined) {
-    formData.append('qualityScore', String(options.qualityScore))
-  }
   if (options?.deviceInfo) {
     formData.append('deviceInfo', options.deviceInfo)
   }
@@ -141,17 +133,10 @@ export async function deleteFaceEnrollment(token: string): Promise<void> {
 export async function verifyFace(
   imageBlob: Blob,
   userId: string,
-  options?: {
-    livenessScore?: number
-  },
 ): Promise<FaceVerifyResponse> {
   const formData = new FormData()
   formData.append('image', imageBlob, 'face.jpg')
   formData.append('userId', userId)
-
-  if (options?.livenessScore !== undefined) {
-    formData.append('livenessScore', String(options.livenessScore))
-  }
 
   const response = await fetch(`${API_BASE_URL}/face/verify`, {
     method: 'POST',
