@@ -15,6 +15,7 @@ import iuh.cnm.vnalo.core_service.service.face.FaceEmbeddingService;
 import iuh.cnm.vnalo.core_service.service.face.FaceEnrollmentService;
 import iuh.cnm.vnalo.core_service.service.face.FaceImageProcessingService;
 import iuh.cnm.vnalo.core_service.service.face.FaceVerificationService;
+import iuh.cnm.vnalo.core_service.service.face.RateLimitService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -48,6 +49,7 @@ public class FaceAuthController {
     private final FaceImageProcessingService imageProcessing;
     private final FaceAuthProperties faceAuthProperties;
     private final JwtTokenProvider jwtTokenProvider;
+    private final RateLimitService rateLimitService;
 
     @PostMapping(value = "/enroll", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Enroll face", description = "Enrolls the user's face for authentication")
@@ -123,6 +125,11 @@ public class FaceAuthController {
         checkEnabled();
         checkVerificationEnabled();
 
+        if (rateLimitService.isVerifyLocked(userId)) {
+            throw new ApiException(ErrorCode.FACE_LIVENESS_FAILED,
+                    "Quá nhiều lần thử thất bại. Tính năng xác thực khuôn mặt đang bị khóa tạm thời. Vui lòng đăng nhập bằng mật khẩu.");
+        }
+
         if (image == null || image.isEmpty()) {
             throw new ApiException(ErrorCode.FACE_NO_FACE_DETECTED);
         }
@@ -163,6 +170,9 @@ public class FaceAuthController {
         String verificationToken = null;
         if (result.verified()) {
             verificationToken = jwtTokenProvider.generateFaceVerificationToken(userId);
+            rateLimitService.resetVerifyFailures(userId);
+        } else {
+            rateLimitService.recordVerifyFailure(userId);
         }
 
         FaceVerifyResponse response = FaceVerifyResponse.builder()
@@ -180,9 +190,14 @@ public class FaceAuthController {
     @PostMapping(value = "/liveness-check", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Check liveness", description = "Checks if the face is live (not a spoof)")
     public ResponseEntity<ApiResponse<Map<String, Object>>> checkLiveness(
-            @RequestParam("image") MultipartFile image
+            @RequestParam("image") MultipartFile image,
+            HttpServletRequest request
     ) throws Exception {
         checkEnabled();
+
+        if (rateLimitService.isIpRateLimited(getClientIp(request))) {
+            throw new ApiException(ErrorCode.AUTH_TOO_MANY_REQUESTS, "Quá nhiều yêu cầu. Vui lòng thử lại sau.");
+        }
 
         float[][][][] livenessInput = preprocessImage(image, 128);
         double score = embeddingService.checkLiveness(livenessInput);

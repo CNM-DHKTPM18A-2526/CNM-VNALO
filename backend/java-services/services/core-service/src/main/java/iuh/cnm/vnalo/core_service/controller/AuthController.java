@@ -17,6 +17,7 @@ import iuh.cnm.vnalo.core_service.model.dto.response.OtpResponse;
 import iuh.cnm.vnalo.core_service.security.UserPrincipal;
 import iuh.cnm.vnalo.core_service.service.AuthService;
 import iuh.cnm.vnalo.core_service.service.SessionAuditService;
+import iuh.cnm.vnalo.core_service.service.face.RateLimitService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -41,6 +42,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final SessionAuditService sessionAuditService;
+    private final RateLimitService rateLimitService;
     private final OtpConfig otpConfig;
 
     /**
@@ -254,7 +256,19 @@ public class AuthController {
     @GetMapping("/lookup")
     @Operation(summary = "Lookup user by identifier", description = "Resolve phone or email to userId for face login")
     public ResponseEntity<ApiResponse<Map<String, String>>> lookupByIdentifier(
-            @RequestParam("identifier") String identifier) {
+            @RequestParam("identifier") String identifier,
+            HttpServletRequest request) {
+
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip != null && !ip.isBlank()) {
+            ip = ip.split(",")[0].trim();
+        } else {
+            ip = request.getRemoteAddr();
+        }
+
+        if (rateLimitService.isIpRateLimited(ip)) {
+            throw new ApiException(ErrorCode.AUTH_TOO_MANY_REQUESTS, "Quá nhiều yêu cầu tra cứu. Vui lòng thử lại sau.");
+        }
 
         UUID userId = authService.resolveAccountToUserId(identifier);
         return ResponseEntity.ok(ApiResponse.success(
