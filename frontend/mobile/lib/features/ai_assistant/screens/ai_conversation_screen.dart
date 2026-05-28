@@ -9,6 +9,7 @@ import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provid
 import 'package:vnalo_mobile/features/ai_assistant/theme/ai_assistant_tokens.dart';
 import 'package:vnalo_mobile/features/ai_assistant/utils/ai_command_routing.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
+import 'package:vnalo_mobile/navigation/main_shell.dart';
 
 class AiConversationScreen extends StatefulWidget {
   const AiConversationScreen({super.key});
@@ -96,6 +97,13 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
   void _applyQuickPrompt(String text) {
     final normalized = text.trim();
     if (normalized.isEmpty) {
+      return;
+    }
+    if (normalized == 'Mở danh bạ') {
+      MainShellState.globalKey.currentState?.setTabIndex(1);
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
       return;
     }
     _inputController.value = TextEditingValue(
@@ -476,10 +484,14 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
         isDarkMode ? DarkColors.textSecondary : AppColors.iconSubtle;
     final activeColor =
         provider.state == AiState.listening ? AppColors.error : iconColor;
+    const actionButtonConstraints = BoxConstraints.tightFor(
+      width: 40,
+      height: 40,
+    );
 
     return Container(
       key: const ValueKey('ai_conversation_input_bar'),
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
         color: Colors.transparent,
         border: Border(
@@ -498,6 +510,9 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
             IconButton(
               icon: Icon(Icons.auto_awesome_rounded, color: iconColor),
               onPressed: () => _inputFocusNode.requestFocus(),
+              padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+              constraints: actionButtonConstraints,
             ),
             Expanded(
               child: Container(
@@ -515,7 +530,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
                   onTapOutside: (_) => _inputFocusNode.unfocus(),
                   onSubmitted: (_) => _sendPrompt(provider),
                   minLines: 1,
-                  maxLines: 5,
+                  maxLines: 4,
                   style: AppTypography.bodyLarge.copyWith(
                     fontSize: 16,
                     color: isDarkMode ? Colors.white : Colors.black87,
@@ -548,6 +563,9 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
                   Icons.send,
                   color: isDarkMode ? DarkColors.primary : AppColors.primary,
                 ),
+                padding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+                constraints: actionButtonConstraints,
               )
             else
               IconButton(
@@ -563,6 +581,9 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
                       source: 'conversation_screen_mic',
                       surface: AiResponseSurface.conversation,
                     ),
+                padding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+                constraints: actionButtonConstraints,
               ),
           ],
         ),

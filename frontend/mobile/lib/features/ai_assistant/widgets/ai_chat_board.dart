@@ -12,6 +12,7 @@ import 'package:vnalo_mobile/features/ai_assistant/theme/ai_assistant_tokens.dar
 import 'package:vnalo_mobile/features/ai_assistant/utils/ai_command_routing.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_prompt_chips.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_status_pill.dart';
+import 'package:vnalo_mobile/navigation/main_shell.dart';
 
 class AiChatBoard extends StatefulWidget {
   final VoidCallback onClose;
@@ -81,6 +82,11 @@ class _AiChatBoardState extends State<AiChatBoard> {
   void _applyQuickPrompt(String text) {
     final normalized = text.trim();
     if (normalized.isEmpty) return;
+    if (normalized == 'Mở danh bạ') {
+      MainShellState.globalKey.currentState?.setTabIndex(1);
+      widget.onClose();
+      return;
+    }
     _inputController.value = TextEditingValue(
       text: normalized,
       selection: TextSelection.collapsed(offset: normalized.length),
@@ -264,6 +270,10 @@ class _AiChatBoardState extends State<AiChatBoard> {
                                     : 'Kiểm tra lại liên hệ tên ',
                               ),
                         ),
+                        _BoardActionChip(
+                          label: 'Mở danh bạ',
+                          onTap: () => _applyQuickPrompt('Mở danh bạ'),
+                        ),
                         if (widget.onOpenConversation != null)
                           _BoardActionChip(
                             label: 'Mở AI chat',
@@ -368,6 +378,10 @@ class _AiChatBoardState extends State<AiChatBoard> {
     final blurSigma = viewSize.shortestSide < 380 ? 8.0 : 14.0;
     final showAiTyping = aiProvider.isAssistantGenerating;
     final clarification = aiProvider.clarificationState;
+    const actionButtonConstraints = BoxConstraints.tightFor(
+      width: 40,
+      height: 40,
+    );
     final transcriptEntries =
         aiProvider.conversationHistory.length > 4
             ? aiProvider.conversationHistory.sublist(
@@ -725,6 +739,9 @@ class _AiChatBoardState extends State<AiChatBoard> {
                                   ? Colors.white70
                                   : AppColors.iconSubtle,
                         ),
+                        padding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                        constraints: actionButtonConstraints,
                       ),
                       Expanded(
                         child: TextField(
@@ -772,6 +789,9 @@ class _AiChatBoardState extends State<AiChatBoard> {
                                     : AppColors.primary,
                           ),
                           onPressed: _submitTextPrompt,
+                          padding: EdgeInsets.zero,
+                          visualDensity: VisualDensity.compact,
+                          constraints: actionButtonConstraints,
                         )
                       else
                         IconButton(
@@ -792,6 +812,9 @@ class _AiChatBoardState extends State<AiChatBoard> {
                                 source: 'ai_chat_board_mic_idle',
                                 surface: AiResponseSurface.bubble,
                               ),
+                          padding: EdgeInsets.zero,
+                          visualDensity: VisualDensity.compact,
+                          constraints: actionButtonConstraints,
                         ),
                     ],
                   ),
