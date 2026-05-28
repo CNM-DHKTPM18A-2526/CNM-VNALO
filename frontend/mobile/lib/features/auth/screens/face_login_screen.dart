@@ -77,14 +77,8 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
 
       final imageFile = File(pickedFile.path);
 
-      final liveness = await _faceService.checkLiveness(imageFile);
-      if (!liveness.pass) {
-        setState(() {
-          _isLoading = false;
-          _errorMsg = 'Không xác định được khuôn mặt thật. Vui lòng thử lại với ảnh rõ ràng.';
-        });
-        return;
-      }
+      // Backend now enforces liveness check internally during /face/verify.
+      // We no longer call /face/liveness-check here to avoid uploading the image twice.
 
       final userId = await _faceService.lookupUserId(identifier);
 
@@ -193,6 +187,7 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
                 const SizedBox(height: 8),
                 TextField(
                   controller: _identifierController,
+                  keyboardType: TextInputType.emailAddress,
                   style: TextStyle(color: textColor),
                   decoration: InputDecoration(
                     hintText: 'Nhập số điện thoại hoặc email',

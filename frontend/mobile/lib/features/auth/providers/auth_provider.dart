@@ -204,6 +204,10 @@ class AuthProvider extends ChangeNotifier {
     return _authService.getQrLoginSessionPreview(token);
   }
 
+  Future<FaceEnrollResult> enrollFace(File imageFile, String token) async {
+    return _faceAuthService.enrollFace(imageFile, token);
+  }
+
   Future<void> approveQrLoginSession({
     required String token,
     String? deviceId,

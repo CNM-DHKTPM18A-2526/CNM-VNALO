@@ -93,10 +93,15 @@ class FaceAuthService {
   }
 
   dynamic _tryParse(String raw) {
-    if (raw.trim().isEmpty) return {};
-    return (raw.startsWith('{') || raw.startsWith('['))
-        ? (jsonDecode(raw) as Map<String, dynamic>)
-        : {'data': raw};
+    if (raw.trim().isEmpty) return <String, dynamic>{};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is List) return <String, dynamic>{'errors': decoded};
+      return <String, dynamic>{'data': decoded};
+    } catch (_) {
+      return <String, dynamic>{'data': raw};
+    }
   }
 
   /// Check if face auth service is healthy.
@@ -140,6 +145,8 @@ class FaceAuthService {
     final d = data['data'] as Map<String, dynamic>? ?? data;
     final success = d['success'] == true;
     if (!success) {
+      // Note: Backend currently returns 400 on failure, so ApiException is thrown early in _parseResponse.
+      // This block acts as a fallback just in case backend returns 200 OK with success=false.
       final msg = data['message']?.toString() ?? 'Đăng ký thất bại.';
       throw ApiException(statusCode: 400, message: msg);
     }

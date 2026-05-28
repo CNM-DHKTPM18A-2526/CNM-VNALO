@@ -4,7 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
-import 'package:vnalo_mobile/services/face_auth_service.dart' show FaceAuthService;
+import 'package:vnalo_mobile/services/face_auth_service.dart' show FaceAuthService, ApiException;
 
 /// Screen to enroll or update the user's face for face authentication.
 /// Requires the user to be logged in.
@@ -113,13 +113,18 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen> {
 
       if (!mounted) return;
       setState(() => _step = _stepSuccess);
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _step = _stepError;
+          _errorMsg = e.message;
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
           _step = _stepError;
-          _errorMsg = e.toString().contains('ApiException') 
-            ? e.toString().split('message: ')[1].replaceAll(')', '') 
-            : 'Đăng ký thất bại. Vui lòng thử lại.';
+          _errorMsg = 'Đăng ký thất bại. Vui lòng thử lại.';
         });
       }
     }
