@@ -370,7 +370,7 @@ class AiCommandRouting {
   static String buildAmbiguousTargetFeedback({
     required String targetName,
     required Iterable<String> candidates,
-    String actionLabel = 'tiÃƒÂ¡Ã‚ÂºÃ‚Â¿p tÃƒÂ¡Ã‚Â»Ã‚Â¥c',
+    String actionLabel = 'tiếp tục',
   }) {
     final cleanTarget = targetName.trim();
     final uniqueCandidates = candidates
@@ -381,22 +381,21 @@ class AiCommandRouting {
         .toList(growable: false);
 
     if (uniqueCandidates.isEmpty) {
-      return 'CÃƒÆ’Ã‚Â³ nhiÃƒÂ¡Ã‚Â»Ã‚Âu kÃƒÂ¡Ã‚ÂºÃ‚Â¿t quÃƒÂ¡Ã‚ÂºÃ‚Â£ khÃƒÂ¡Ã‚Â»Ã¢â‚¬Âºp "$cleanTarget". HÃƒÆ’Ã‚Â£y nÃƒÆ’Ã‚Â³i rÃƒÆ’Ã‚Âµ hÃƒâ€ Ã‚Â¡n Ãƒâ€žÃ¢â‚¬ËœÃƒÂ¡Ã‚Â»Ã†â€™ trÃƒÂ¡Ã‚Â»Ã‚Â£ lÃƒÆ’Ã‚Â½ $actionLabel.';
+      return 'Có nhiều kết quả khớp "$cleanTarget". Hãy nói rõ hơn để trợ lý $actionLabel.';
     }
 
-    return 'MÃƒÆ’Ã‚Â¬nh tÃƒÆ’Ã‚Â¬m thÃƒÂ¡Ã‚ÂºÃ‚Â¥y nhiÃƒÂ¡Ã‚Â»Ã‚Âu kÃƒÂ¡Ã‚ÂºÃ‚Â¿t quÃƒÂ¡Ã‚ÂºÃ‚Â£ cho "$cleanTarget": ${uniqueCandidates.join(', ')}. BÃƒÂ¡Ã‚ÂºÃ‚Â¡n muÃƒÂ¡Ã‚Â»Ã¢â‚¬Ëœn chÃƒÂ¡Ã‚Â»Ã‚Ân ai?';
+    return 'Mình tìm thấy nhiều kết quả cho "$cleanTarget": ${uniqueCandidates.join(', ')}. Bạn muốn chọn ai?';
   }
 
   static String buildMissingTargetFeedback({
     required String targetName,
-    String targetType =
-        'ngÃƒâ€ Ã‚Â°ÃƒÂ¡Ã‚Â»Ã‚Âi hoÃƒÂ¡Ã‚ÂºÃ‚Â·c cuÃƒÂ¡Ã‚Â»Ã¢â€žÂ¢c trÃƒÆ’Ã‚Â² chuyÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¡n',
+    String targetType = 'người hoặc cuộc trò chuyện',
   }) {
     final cleanTarget = targetName.trim();
     if (cleanTarget.isEmpty) {
-      return 'MÃƒÆ’Ã‚Â¬nh chÃƒâ€ Ã‚Â°a xÃƒÆ’Ã‚Â¡c Ãƒâ€žÃ¢â‚¬ËœÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¹nh Ãƒâ€žÃ¢â‚¬ËœÃƒâ€ Ã‚Â°ÃƒÂ¡Ã‚Â»Ã‚Â£c $targetType. HÃƒÆ’Ã‚Â£y nÃƒÆ’Ã‚Â³i rÃƒÆ’Ã‚Âµ tÃƒÆ’Ã‚Âªn Ãƒâ€žÃ¢â‚¬ËœÃƒÂ¡Ã‚Â»Ã†â€™ trÃƒÂ¡Ã‚Â»Ã‚Â£ lÃƒÆ’Ã‚Â½ tiÃƒÂ¡Ã‚ÂºÃ‚Â¿p tÃƒÂ¡Ã‚Â»Ã‚Â¥c.';
+      return 'Mình chưa xác định được $targetType. Hãy nói rõ tên để trợ lý tiếp tục.';
     }
-    return 'MÃƒÆ’Ã‚Â¬nh chÃƒâ€ Ã‚Â°a tÃƒÆ’Ã‚Â¬m thÃƒÂ¡Ã‚ÂºÃ‚Â¥y $targetType "$cleanTarget". HÃƒÆ’Ã‚Â£y kiÃƒÂ¡Ã‚Â»Ã†â€™m tra lÃƒÂ¡Ã‚ÂºÃ‚Â¡i tÃƒÆ’Ã‚Âªn hoÃƒÂ¡Ã‚ÂºÃ‚Â·c thÃƒÂ¡Ã‚Â»Ã‚Â­ nÃƒÆ’Ã‚Â³i rÃƒÆ’Ã‚Âµ hÃƒâ€ Ã‚Â¡n.';
+    return 'Mình chưa tìm thấy $targetType "$cleanTarget". Hãy kiểm tra lại tên hoặc thử nói rõ hơn.';
   }
 
   static String buildMissingTargetFeedbackForCommand({

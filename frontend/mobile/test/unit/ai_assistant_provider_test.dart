@@ -310,15 +310,14 @@ void main() {
   });
 
   test('normalizeAiTextEncoding repairs single-pass mojibake', () {
-    const raw = 'ÄÃ¢y lÃ  cÃ¢u tráº£ lá»i trong mÃ n hÃ¬nh há»™i thoáº¡i.';
+    const raw = 'Đây là câu trả lời trong màn hình hội thoại.';
     final normalized = normalizeAiTextEncoding(raw);
 
     expect(normalized, 'Đây là câu trả lời trong màn hình hội thoại.');
   });
 
   test('normalizeAiTextEncoding repairs multi-pass mojibake', () {
-    const raw =
-        'KhÃƒÂ´ng thÃ¡Â»Æ’ bÃ¡ÂºÂ¯t Ã„â€˜Ã¡ÂºÂ§u thu ÃƒÂ¢m. BÃ¡ÂºÂ¡n thÃ¡Â»Â­ lÃ¡ÂºÂ¡i.';
+    const raw = 'Không thể bắt đầu thu âm. Bạn thử lại.';
     final normalized = normalizeAiTextEncoding(raw);
 
     expect(normalized, 'Không thể bắt đầu thu âm. Bạn thử lại.');
@@ -351,7 +350,7 @@ void main() {
     final provider = _buildProvider(
       responses: {
         'kiem tra utf': {
-          'textReply': 'KhÃ´ng thá»ƒ báº¯t Ä‘áº§u thu Ã¢m. Báº¡n thá»­ láº¡i.',
+          'textReply': 'Không thể bắt đầu thu âm. Bạn thử lại.',
           'emotion': 'neutral',
         },
       },

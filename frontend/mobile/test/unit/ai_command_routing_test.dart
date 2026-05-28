@@ -86,7 +86,7 @@ void main() {
 
   group('AiCommandRouting.normalizeParams', () {
     test('keeps typed maps intact', () {
-      final params = {'recipient': 'An', 'content': 'Xin chÃƒÆ’Ã‚Â o'};
+      final params = {'recipient': 'An', 'content': 'Xin chào'};
       expect(AiCommandRouting.normalizeParams(params), same(params));
     });
 
@@ -104,16 +104,14 @@ void main() {
     test('extractTargetName checks common target keys in order', () {
       expect(
         AiCommandRouting.extractTargetName({
-          'recipient': '  BÃƒÆ’Ã‚Â¬nh  ',
+          'recipient': '  Bình  ',
           'target': 'An',
         }),
         'An',
       );
       expect(
-        AiCommandRouting.extractTargetName({
-          'contactName': 'CÃƒâ€ Ã‚Â°ÃƒÂ¡Ã‚Â»Ã‚Âng',
-        }),
-        'CÃƒâ€ Ã‚Â°ÃƒÂ¡Ã‚Â»Ã‚Âng',
+        AiCommandRouting.extractTargetName({'contactName': 'Cường'}),
+        'Cường',
       );
       expect(AiCommandRouting.extractTargetName(null), isEmpty);
     });
@@ -121,19 +119,19 @@ void main() {
     test('extractPrefilledText only returns compose content', () {
       expect(
         AiCommandRouting.extractPrefilledText('COMPOSE_MESSAGE', {
-          'content': '  gÃƒÂ¡Ã‚ÂºÃ‚Â·p nhau lÃƒÆ’Ã‚Âºc 7h  ',
+          'content': '  gặp nhau lúc 7h  ',
         }),
-        'gÃƒÂ¡Ã‚ÂºÃ‚Â·p nhau lÃƒÆ’Ã‚Âºc 7h',
+        'gặp nhau lúc 7h',
       );
       expect(
         AiCommandRouting.extractPrefilledText('SEND_MESSAGE', {
-          'messageText': 'xin chÃƒÆ’Ã‚Â o',
+          'messageText': 'xin chào',
         }),
-        'xin chÃƒÆ’Ã‚Â o',
+        'xin chào',
       );
       expect(
         AiCommandRouting.extractPrefilledText('OPEN_CHAT', {
-          'content': 'xin chÃƒÆ’Ã‚Â o',
+          'content': 'xin chào',
         }),
         isNull,
       );
@@ -161,43 +159,25 @@ void main() {
 
     test('extracts group metadata and member names', () {
       final params = {
-        'groupTitle': 'NhÃƒÆ’Ã‚Â³m Ãƒâ€žÃ¢â‚¬Ëœi chÃƒâ€ Ã‚Â¡i',
-        'members': ['An', 'BÃƒÆ’Ã‚Â¬nh'],
+        'groupTitle': 'Nhóm đi chơi',
+        'members': ['An', 'Bình'],
       };
-      expect(
-        AiCommandRouting.extractGroupName(params),
-        'NhÃƒÆ’Ã‚Â³m Ãƒâ€žÃ¢â‚¬Ëœi chÃƒâ€ Ã‚Â¡i',
-      );
-      expect(AiCommandRouting.extractMemberNames(params), [
-        'An',
-        'BÃƒÆ’Ã‚Â¬nh',
-      ]);
+      expect(AiCommandRouting.extractGroupName(params), 'Nhóm đi chơi');
+      expect(AiCommandRouting.extractMemberNames(params), ['An', 'Bình']);
     });
 
     test('extracts fallback member name and conversation name', () {
-      final params = {
-        'memberName': 'UyÃƒÆ’Ã‚Âªn',
-        'conversationName': 'LÃƒÂ¡Ã‚Â»Ã¢â‚¬Âºp 18DHTPM',
-      };
-      expect(AiCommandRouting.extractMemberNames(params), ['UyÃƒÆ’Ã‚Âªn']);
-      expect(
-        AiCommandRouting.extractConversationName(params),
-        'LÃƒÂ¡Ã‚Â»Ã¢â‚¬Âºp 18DHTPM',
-      );
+      final params = {'memberName': 'Uyên', 'conversationName': 'Lớp 18DHTPM'};
+      expect(AiCommandRouting.extractMemberNames(params), ['Uyên']);
+      expect(AiCommandRouting.extractConversationName(params), 'Lớp 18DHTPM');
     });
 
     test('extracts new group title and friend request message', () {
-      final params = {
-        'newName': 'NhÃƒÆ’Ã‚Â³m mÃƒÂ¡Ã‚Â»Ã¢â‚¬Âºi',
-        'note': 'KÃƒÂ¡Ã‚ÂºÃ‚Â¿t bÃƒÂ¡Ã‚ÂºÃ‚Â¡n nhÃƒÆ’Ã‚Â©',
-      };
-      expect(
-        AiCommandRouting.extractNewTitle(params),
-        'NhÃƒÆ’Ã‚Â³m mÃƒÂ¡Ã‚Â»Ã¢â‚¬Âºi',
-      );
+      final params = {'newName': 'Nhóm mới', 'note': 'Kết bạn nhé'};
+      expect(AiCommandRouting.extractNewTitle(params), 'Nhóm mới');
       expect(
         AiCommandRouting.extractFriendRequestMessage(params),
-        'KÃƒÂ¡Ã‚ÂºÃ‚Â¿t bÃƒÂ¡Ã‚ÂºÃ‚Â¡n nhÃƒÆ’Ã‚Â©',
+        'Kết bạn nhé',
       );
     });
   });
@@ -304,32 +284,29 @@ void main() {
   group('AiCommandRouting action feedback copy', () {
     test('builds ambiguity feedback with candidate names', () {
       final message = AiCommandRouting.buildAmbiguousTargetFeedback(
-        targetName: 'UyÃƒÆ’Ã‚Âªn',
+        targetName: 'Uyên',
         candidates: const [
-          'UyÃƒÆ’Ã‚Âªn LÃƒÆ’Ã‚Â½',
-          'UyÃƒÆ’Ã‚Âªn NguyÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¦n',
-          'UyÃƒÆ’Ã‚Âªn TrÃƒÂ¡Ã‚ÂºÃ‚Â§n',
-          'UyÃƒÆ’Ã‚Âªn HoÃƒÆ’Ã‚Â ng',
-          'UyÃƒÆ’Ã‚Âªn Ãƒâ€žÃ‚ÂÃƒÂ¡Ã‚ÂºÃ‚Â·ng',
+          'Uyên Lý',
+          'Uyên Nguyễn',
+          'Uyên Trần',
+          'Uyên Hoàng',
+          'Uyên Đặng',
         ],
       );
 
-      expect(message, contains('UyÃƒÆ’Ã‚Âªn LÃƒÆ’Ã‚Â½'));
-      expect(message, contains('UyÃƒÆ’Ã‚Âªn NguyÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¦n'));
-      expect(message, isNot(contains('UyÃƒÆ’Ã‚Âªn Ãƒâ€žÃ‚ÂÃƒÂ¡Ã‚ÂºÃ‚Â·ng')));
+      expect(message, contains('Uyên Lý'));
+      expect(message, contains('Uyên Nguyễn'));
+      expect(message, isNot(contains('Uyên Đặng')));
     });
 
     test('builds missing target feedback with specific type', () {
       final message = AiCommandRouting.buildMissingTargetFeedback(
-        targetName: 'LÃƒÆ’Ã‚Â½ VÃƒÆ’Ã‚Â¢n',
-        targetType: 'liÃƒÆ’Ã‚Âªn hÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¡ trong danh bÃƒÂ¡Ã‚ÂºÃ‚Â¡',
+        targetName: 'Lý Vân',
+        targetType: 'liên hệ trong danh bạ',
       );
 
-      expect(
-        message,
-        contains('liÃƒÆ’Ã‚Âªn hÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¡ trong danh bÃƒÂ¡Ã‚ÂºÃ‚Â¡'),
-      );
-      expect(message, contains('LÃƒÆ’Ã‚Â½ VÃƒÆ’Ã‚Â¢n'));
+      expect(message, contains('liên hệ trong danh bạ'));
+      expect(message, contains('Lý Vân'));
     });
 
     test('builds action-specific missing target feedback', () {
@@ -353,17 +330,13 @@ void main() {
     test('round-trips ambiguity candidate metadata in source', () {
       final source = AiCommandRouting.buildAmbiguityFeedbackSource(
         scope: 'contact',
-        candidates: const [
-          'UyÃƒÆ’Ã‚Âªn LÃƒÆ’Ã‚Â½',
-          'UyÃƒÆ’Ã‚Âªn NguyÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¦n',
-          'UyÃƒÆ’Ã‚Âªn LÃƒÆ’Ã‚Â½',
-        ],
+        candidates: const ['Uyên Lý', 'Uyên Nguyễn', 'Uyên Lý'],
       );
 
       expect(source, startsWith('ai_action_ambiguity.contact::'));
       expect(
         AiCommandRouting.parseAmbiguityCandidatesFromSource(source),
-        const ['UyÃƒÆ’Ã‚Âªn LÃƒÆ’Ã‚Â½', 'UyÃƒÆ’Ã‚Âªn NguyÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¦n'],
+        const ['Uyên Lý', 'Uyên Nguyễn'],
       );
     });
   });
