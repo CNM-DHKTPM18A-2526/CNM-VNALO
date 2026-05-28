@@ -336,7 +336,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
               color: iconColor,
             ),
           const SizedBox(width: 8),
-          Expanded(
+          Flexible(
             child: Text(
               provider.assistantActivityLabel,
               maxLines: 1,
@@ -449,11 +449,11 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
         border: Border.all(color: borderColor),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: MainAxisSize.max,
         children: [
           Icon(icon, size: 14, color: color),
           const SizedBox(width: 6),
-          Expanded(
+          Flexible(
             child: Text(
               text,
               maxLines: 1,
@@ -462,6 +462,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
                 color: isDarkMode ? Colors.white70 : Colors.black87,
+                height: 1.35,
               ),
             ),
           ),
@@ -649,13 +650,17 @@ class _AiConversationMessageBubble extends StatelessWidget {
             decoration: BoxDecoration(
               color: isMine ? userBubbleColor : assistantBubbleColor,
               borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(AiAssistantTokens.buttonRadius),
-                topRight: Radius.circular(AiAssistantTokens.buttonRadius),
+                topLeft: Radius.circular(AiAssistantTokens.bubbleRadius),
+                topRight: Radius.circular(AiAssistantTokens.bubbleRadius),
                 bottomLeft: Radius.circular(
-                  isMine ? AiAssistantTokens.buttonRadius : 4,
+                  isMine
+                      ? AiAssistantTokens.bubbleRadius
+                      : AiAssistantTokens.bubbleTailRadius,
                 ),
                 bottomRight: Radius.circular(
-                  isMine ? 4 : AiAssistantTokens.buttonRadius,
+                  isMine
+                      ? AiAssistantTokens.bubbleTailRadius
+                      : AiAssistantTokens.bubbleRadius,
                 ),
               ),
               border:
