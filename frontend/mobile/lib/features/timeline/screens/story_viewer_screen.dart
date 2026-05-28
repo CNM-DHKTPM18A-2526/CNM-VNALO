@@ -4,6 +4,9 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/utils/avatar_resolver.dart';
 import 'package:vnalo_mobile/features/timeline/providers/post_provider.dart';
 import 'package:vnalo_mobile/models/story_model.dart';
+import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
+import 'package:vnalo_mobile/features/contacts/providers/contact_provider.dart';
+import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 
 class StoryViewerScreen extends StatefulWidget {
   final List<Story> stories;
@@ -136,6 +139,24 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final auth = context.read<AuthProvider>();
+    final contactProvider = context.read<ContactProvider>();
+
+    String authorName = _currentStory.authorId;
+    String? authorAvatar;
+
+    if (_currentStory.authorId == auth.user?.id) {
+      authorName = auth.user?.displayName ?? _currentStory.authorId;
+      authorAvatar = auth.user?.avatarUrl;
+    } else {
+      try {
+        final friend = contactProvider.friends.firstWhere((u) => u.id == _currentStory.authorId);
+        authorName = friend.displayName;
+        authorAvatar = friend.avatarUrl;
+      } catch (e) {
+        // Fallback to ID if friend not found
+      }
+    }
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -189,15 +210,10 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundImage: null,
-                    child: Text(
-                      _currentStory.authorId.isNotEmpty
-                          ? _currentStory.authorId.substring(0, 1).toUpperCase()
-                          : 'U',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                    ),
+                  AvatarWidget(
+                    imageUrl: authorAvatar,
+                    name: authorName,
+                    size: 36,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -205,7 +221,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _currentStory.authorId,
+                          authorName,
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
