@@ -346,6 +346,30 @@ void main() {
     provider.dispose();
   });
 
+  test(
+    'leaveConversationSurface can skip notify for dispose-safe teardown',
+    () {
+      final provider = _buildProvider();
+      var notifyCount = 0;
+      provider.addListener(() {
+        notifyCount += 1;
+      });
+
+      provider.enterConversationSurface(reason: 'test_enter');
+      expect(notifyCount, 1);
+
+      provider.leaveConversationSurface(
+        reason: 'test_leave_no_notify',
+        notify: false,
+      );
+
+      expect(notifyCount, 1);
+      expect(provider.isMascotVisible, isFalse);
+
+      provider.dispose();
+    },
+  );
+
   test('repairs mojibake AI responses before rendering and history', () async {
     final provider = _buildProvider(
       responses: {
