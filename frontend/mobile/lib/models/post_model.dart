@@ -11,6 +11,7 @@ class Post {
   final int shareCount;
   final String? status;
   final bool isLiked;
+  final String? myReactionType;
   final DateTime createdAt;
   final DateTime? updatedAt;
 
@@ -27,6 +28,7 @@ class Post {
     this.shareCount = 0,
     this.status,
     this.isLiked = false,
+    this.myReactionType,
     required this.createdAt,
     this.updatedAt,
   });
@@ -44,6 +46,7 @@ class Post {
     int? shareCount,
     String? status,
     bool? isLiked,
+    String? myReactionType,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -60,6 +63,7 @@ class Post {
       shareCount: shareCount ?? this.shareCount,
       status: status ?? this.status,
       isLiked: isLiked ?? this.isLiked,
+      myReactionType: myReactionType ?? this.myReactionType,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -80,6 +84,7 @@ class Post {
     shareCount: json['shareCount'] ?? 0,
     status: json['status'],
     isLiked: json['isLiked'] ?? false,
+    myReactionType: json['myReactionType'],
     createdAt: json['createdAt'] != null 
         ? DateTime.parse(json['createdAt'].toString()) 
         : DateTime.now(),
@@ -99,6 +104,7 @@ class Post {
     'shareCount': shareCount,
     'status': status,
     'isLiked': isLiked,
+    'myReactionType': myReactionType,
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt?.toIso8601String(),
   };

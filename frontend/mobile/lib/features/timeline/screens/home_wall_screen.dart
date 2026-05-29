@@ -13,9 +13,13 @@ import 'package:vnalo_mobile/features/timeline/screens/create_post_screen.dart';
 import 'package:vnalo_mobile/features/timeline/screens/story_viewer_screen.dart';
 import 'package:vnalo_mobile/features/search/screens/unified_search_screen.dart';
 import 'package:vnalo_mobile/features/timeline/screens/create_story_screen.dart';
-import 'package:vnalo_mobile/features/timeline/screens/photo_picker_screen.dart';
 import 'package:vnalo_mobile/features/timeline/screens/video_picker_screen.dart';
 import 'package:vnalo_mobile/features/timeline/screens/text_background_screen.dart';
+import 'package:vnalo_mobile/features/timeline/screens/profile_screen.dart';
+import 'package:vnalo_mobile/features/timeline/screens/comment_bottom_sheet.dart';
+import 'package:vnalo_mobile/features/timeline/screens/reactions_bottom_sheet.dart';
+import 'package:vnalo_mobile/core/widgets/video_player_widget.dart';
+import 'package:vnalo_mobile/core/widgets/reaction_popup.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
@@ -167,18 +171,7 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
   void _openVideoPicker(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => VideoPickerScreen(
-          onVideoSelected: (File file) {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => CreatePostScreen(
-                  initialType: PostType.video,
-                  initialFiles: [file],
-                ),
-              ),
-            );
-          },
-        ),
+        builder: (_) => const VideoPickerScreen(),
       ),
     );
   }
@@ -308,56 +301,77 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
         const SizedBox(height: 8),
 
         // Story Row (card style)
-        Container(
-          color: containerColor,
-          height: 200,
-          padding: const EdgeInsets.only(top: 12, bottom: 12),
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            itemCount: postProvider.stories.length + 1,
-            itemBuilder: (context, index) {
-              if (index == 0) {
-                return GestureDetector(
-                  onTap: () => _openCreateStory(context),
-                  child: _buildStoryCard(
-                    isDarkMode,
-                    imageUrl: auth.user?.avatarUrl,
-                    name: 'Tạo mới',
-                    isMe: true,
-                  ),
-                );
+        Builder(
+          builder: (context) {
+            // Group stories by authorId
+            final groupedStories = <String, List<dynamic>>{};
+            for (var story in postProvider.stories) {
+              if (!groupedStories.containsKey(story.authorId)) {
+                groupedStories[story.authorId] = [];
               }
-              final story = postProvider.stories[index - 1];
-              final contactProvider = context.read<ContactProvider>();
-              
-              String authorName = story.authorId;
-              String? authorAvatar;
+              groupedStories[story.authorId]!.add(story);
+            }
+            final uniqueAuthors = groupedStories.keys.toList();
 
-              if (story.authorId == auth.user?.id) {
-                authorName = auth.user?.displayName ?? story.authorId;
-                authorAvatar = auth.user?.avatarUrl;
-              } else {
-                try {
-                  final friend = contactProvider.friends.firstWhere((u) => u.id == story.authorId);
-                  authorName = friend.displayName;
-                  authorAvatar = friend.avatarUrl;
-                } catch (e) {
-                  // Fallback
-                }
-              }
+            return Container(
+              color: containerColor,
+              height: 200,
+              padding: const EdgeInsets.only(top: 12, bottom: 12),
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                itemCount: uniqueAuthors.length + 1,
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    return GestureDetector(
+                      onTap: () => _openCreateStory(context),
+                      child: _buildStoryCard(
+                        isDarkMode,
+                        bgImageUrl: auth.user?.avatarUrl,
+                        avatarUrl: auth.user?.avatarUrl,
+                        name: 'Tạo mới',
+                        isMe: true,
+                      ),
+                    );
+                  }
+                  
+                  final authorId = uniqueAuthors[index - 1];
+                  final userStories = groupedStories[authorId]!;
+                  final story = userStories.first;
+                  final contactProvider = context.read<ContactProvider>();
+                  
+                  String authorName = authorId;
+                  String? authorAvatar;
 
-              return GestureDetector(
-                onTap: () => _openStoryViewer(context, index - 1),
-                child: _buildStoryCard(
-                  isDarkMode,
-                  imageUrl: authorAvatar,
-                  name: authorName,
-                  isMe: false,
-                ),
-              );
-            },
-          ),
+                  if (authorId == auth.user?.id) {
+                    authorName = auth.user?.displayName ?? authorId;
+                    authorAvatar = auth.user?.avatarUrl;
+                  } else {
+                    try {
+                      final friend = contactProvider.friends.firstWhere((u) => u.id == authorId);
+                      authorName = friend.displayName;
+                      authorAvatar = friend.avatarUrl;
+                    } catch (e) {
+                      // Fallback
+                    }
+                  }
+
+                  final flatIndex = postProvider.stories.indexOf(story);
+
+                  return GestureDetector(
+                    onTap: () => _openStoryViewer(context, flatIndex),
+                    child: _buildStoryCard(
+                      isDarkMode,
+                      bgImageUrl: story.mediaUrl,
+                      avatarUrl: authorAvatar,
+                      name: authorName,
+                      isMe: false,
+                    ),
+                  );
+                },
+              ),
+            );
+          }
         ),
         const SizedBox(height: 8),
 
@@ -423,15 +437,15 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildStoryCard(bool isDarkMode, {String? imageUrl, required String name, bool isMe = false}) {
+  Widget _buildStoryCard(bool isDarkMode, {String? bgImageUrl, String? avatarUrl, required String name, bool isMe = false}) {
     return Container(
       width: 110,
       margin: const EdgeInsets.only(right: 8),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200,
-        image: imageUrl != null
-            ? DecorationImage(image: NetworkImage(imageUrl), fit: BoxFit.cover)
+        image: bgImageUrl != null && bgImageUrl.isNotEmpty
+            ? DecorationImage(image: NetworkImage(bgImageUrl), fit: BoxFit.cover)
             : null,
       ),
       child: Stack(
@@ -485,8 +499,8 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
                   border: Border.all(color: AppColors.primary, width: 2),
                 ),
                 child: ClipOval(
-                  child: imageUrl != null
-                      ? Image.network(imageUrl, fit: BoxFit.cover)
+                  child: avatarUrl != null && avatarUrl.isNotEmpty
+                      ? Image.network(avatarUrl, fit: BoxFit.cover)
                       : Container(
                           color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
                           child: Icon(Icons.person, size: 18,
@@ -539,110 +553,305 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
         final friend = contactProvider.friends.firstWhere((u) => u.id == post.authorId);
         authorName = friend.displayName;
         authorAvatar = friend.avatarUrl;
-      } catch (e) {
-        // Fallback to ID if friend not found
-      }
+      } catch (_) {}
     }
+
+    // Determine if post has video
+    final bool hasVideo = post.mediaUrls.isNotEmpty &&
+        (() {
+          final url = (post.mediaUrls[0] as String).toLowerCase();
+          return url.endsWith('.mp4') || url.endsWith('.mov') || url.endsWith('.webm') || url.contains('type=video');
+        })();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(16),
       color: cardColor,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              AvatarWidget(imageUrl: authorAvatar, name: authorName, size: 48),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      authorName,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+          // ─── Header ───────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 8, 8),
+            child: Row(
+              children: [
+                GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ProfileScreen(
+                        userId: post.authorId,
+                        userName: authorName,
+                        avatarUrl: authorAvatar,
+                      ),
                     ),
-                    Text(timeStr, style: TextStyle(color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary, fontSize: 12)),
+                  ),
+                  child: AvatarWidget(imageUrl: authorAvatar, name: authorName, size: 46),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        authorName,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          color: isDarkMode ? Colors.white : Colors.black87,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        timeStr,
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white38 : Colors.grey.shade500,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                PopupMenuButton<String>(
+                  icon: Icon(Icons.more_horiz, color: isDarkMode ? Colors.white38 : Colors.grey.shade500),
+                  onSelected: (value) {
+                    if (value == 'delete' && post.authorId == auth.user?.id) {
+                      _confirmDeletePost(context, post.id, postProvider);
+                    }
+                  },
+                  itemBuilder: (_) => [
+                    if (post.authorId == auth.user?.id)
+                      const PopupMenuItem(value: 'delete', child: Text('Xóa bài viết')),
                   ],
                 ),
-              ),
-              PopupMenuButton<String>(
-                icon: Icon(Icons.more_horiz, color: isDarkMode ? DarkColors.textHint : AppColors.iconSubtle),
-                onSelected: (value) {
-                  if (value == 'delete' && post.authorId == context.read<AuthProvider>().user?.id) {
-                    _confirmDeletePost(context, post.id, postProvider);
-                  }
-                },
-                itemBuilder: (context) => [
-                  if (post.authorId == context.read<AuthProvider>().user?.id)
-                    const PopupMenuItem(value: 'delete', child: Text('Xóa bài viết')),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(post.content,
-            style: TextStyle(
-              fontSize: 16,
-              color: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
+              ],
             ),
           ),
-          if (post.mediaUrls.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                AvatarResolver.resolveUrl(post.mediaUrls[0]) ?? post.mediaUrls[0],
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stack) => Container(
-                  height: 200,
-                  color: Colors.grey.shade200,
-                  child: const Center(child: Icon(Icons.broken_image, size: 48, color: Colors.grey)),
-                ),
-              ),
+
+          // ─── Content text ──────────────────────────────────
+          if ((post.content as String).isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              child: _ExpandableText(post.content as String, isDarkMode),
             ),
-          ],
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              GestureDetector(
-                onTap: () => postProvider.toggleLike(post.id),
-                child: Row(
-                  children: [
-                    Icon(
-                      post.isLiked ? Icons.favorite : Icons.favorite_border,
-                      size: 24,
-                      color: post.isLiked ? Colors.red : (isDarkMode ? DarkColors.textHint : AppColors.iconSubtle),
+
+          // ─── Media ────────────────────────────────────────
+          if (post.mediaUrls.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: hasVideo
+                  ? _buildVideoMedia(post.mediaUrls[0] as String, isDarkMode)
+                  : _buildImageGrid(post.mediaUrls.cast<String>(), isDarkMode),
+            ),
+
+          // ─── Reactions / Comment count row ────────────────
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              children: [
+                // Like heart button
+                Builder(
+                  builder: (likeCtx) => GestureDetector(
+                    onTap: () => postProvider.toggleLike(post.id),
+                    onLongPress: () {
+                      final RenderBox rb = likeCtx.findRenderObject() as RenderBox;
+                      showDialog(
+                        context: context,
+                        barrierColor: Colors.transparent,
+                        builder: (_) => ReactionPopup(
+                          position: rb.localToGlobal(Offset.zero),
+                          onReactionSelected: (type) => postProvider.toggleLike(post.id, reactionType: type),
+                        ),
+                      );
+                    },
+                      child: Row(
+                        children: [
+                          if (post.isLiked && post.myReactionType != null && post.myReactionType != 'LOVE')
+                            Text(
+                              reactions.firstWhere((r) => r.type == post.myReactionType, orElse: () => reactions[0]).emoji,
+                              style: const TextStyle(fontSize: 20),
+                            )
+                          else
+                            Icon(
+                              post.isLiked ? Icons.favorite : Icons.favorite_border,
+                              size: 22,
+                              color: post.isLiked
+                                  ? Colors.red
+                                  : (isDarkMode ? Colors.white54 : Colors.grey.shade600),
+                            ),
+                          const SizedBox(width: 5),
+                          Text(
+                            post.likeCount > 0 ? '${post.likeCount}' : 'Thích',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: post.isLiked
+                                  ? (post.myReactionType != null && post.myReactionType != 'LOVE'
+                                      ? reactions.firstWhere((r) => r.type == post.myReactionType, orElse: () => reactions[0]).color
+                                      : Colors.red)
+                                  : (isDarkMode ? Colors.white54 : Colors.grey.shade600),
+                              fontWeight: post.isLiked ? FontWeight.w600 : FontWeight.normal,
+                            ),
+                          ),
+                        ],
+                      ),
+                  ),
+                ),
+                const SizedBox(width: 20),
+                // Comment button
+                GestureDetector(
+                  onTap: () => _openComments(context, post),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.chat_bubble_outline,
+                        size: 22,
+                        color: isDarkMode ? Colors.white54 : Colors.grey.shade600,
+                      ),
+                      if ((post.commentCount as int) > 0) ...[
+                        const SizedBox(width: 5),
+                        Text(
+                          '${post.commentCount}',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isDarkMode ? Colors.white54 : Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                // Reactions avatars (replaces share button)
+                if ((post.likeCount as int) > 0)
+                  GestureDetector(
+                    onTap: () => _openReactions(context, post.id, post.likeCount as int),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: isDarkMode ? Colors.white10 : Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text('❤️', style: TextStyle(fontSize: 13)),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${post.likeCount}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDarkMode ? Colors.white60 : Colors.grey.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 4),
-                    Text('${post.likeCount}', style: TextStyle(color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary)),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 24),
-              GestureDetector(
-                onTap: () => _openComments(context, post.id),
-                child: Row(
-                  children: [
-                    Icon(Icons.chat_bubble_outline, size: 24, color: isDarkMode ? DarkColors.textHint : AppColors.iconSubtle),
-                    const SizedBox(width: 4),
-                    Text('${post.commentCount}', style: TextStyle(color: isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary)),
-                  ],
-                ),
-              ),
-            ],
+                  ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  void _openComments(BuildContext context, String postId) {
-    // TODO: Navigate to comments screen
+  /// Full-width video player with mute indicator overlay
+  Widget _buildVideoMedia(String rawUrl, bool isDarkMode) {
+    final resolvedUrl = AvatarResolver.resolveUrl(rawUrl) ?? rawUrl;
+    return VideoPlayerWidget(
+      url: resolvedUrl,
+      autoPlay: false,
+      looping: true,
+    );
+  }
+
+  /// Responsive image grid – 1 image full width, 2 side-by-side, 3+ 2-column grid (last spans if odd)
+  Widget _buildImageGrid(List<String> urls, bool isDarkMode) {
+    if (urls.length == 1) {
+      return _buildNetworkImage(urls[0]);
+    }
+    if (urls.length == 2) {
+      return Row(
+        children: [
+          Expanded(child: _buildNetworkImage(urls[0], height: 220)),
+          const SizedBox(width: 2),
+          Expanded(child: _buildNetworkImage(urls[1], height: 220)),
+        ],
+      );
+    }
+    // 3 or 4 images — 2x2 grid
+    final rows = <Widget>[];
+    for (int i = 0; i < urls.length; i += 2) {
+      final isLast = i + 1 >= urls.length;
+      rows.add(Row(
+        children: [
+          Expanded(child: _buildNetworkImage(urls[i], height: 180)),
+          if (!isLast) ...[
+            const SizedBox(width: 2),
+            Expanded(child: _buildNetworkImage(urls[i + 1], height: 180)),
+          ] else
+            const Expanded(child: SizedBox()),
+        ],
+      ));
+      if (i + 2 < urls.length) rows.add(const SizedBox(height: 2));
+    }
+    return Column(mainAxisSize: MainAxisSize.min, children: rows);
+  }
+
+  Widget _buildNetworkImage(String rawUrl, {double? height}) {
+    final url = AvatarResolver.resolveUrl(rawUrl) ?? rawUrl;
+    return SizedBox(
+      height: height,
+      child: Image.network(
+        url,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Container(
+          height: height ?? 200,
+          color: Colors.grey.shade200,
+          child: const Center(child: Icon(Icons.broken_image, size: 48, color: Colors.grey)),
+        ),
+      ),
+    );
+  }
+
+  void _openComments(BuildContext context, dynamic post) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => CommentBottomSheet(
+        postId: post.id,
+        initialLikeCount: post.likeCount,
+        isLiked: post.isLiked,
+        myReactionType: post.myReactionType,
+        topLikerEmoji: post.myReactionType != null && post.myReactionType != 'LOVE' 
+            ? reactions.firstWhere((r) => r.type == post.myReactionType, orElse: () => reactions[0]).emoji 
+            : null,
+      ),
+    );
+  }
+
+  void _openReactions(BuildContext context, String postId, int likeCount) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.5,
+        minChildSize: 0.3,
+        maxChildSize: 0.85,
+        expand: false,
+        builder: (_, controller) => ReactionsBottomSheet(
+          postId: postId,
+          likeCount: likeCount,
+        ),
+      ),
+    );
   }
 
   void _confirmDeletePost(BuildContext context, String postId, PostProvider postProvider) {
@@ -665,6 +874,45 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
             child: const Text('Xóa'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Expandable text widget — shows "Xem thêm" after 5 lines, like in Zalo
+class _ExpandableText extends StatefulWidget {
+  final String text;
+  final bool isDarkMode;
+
+  const _ExpandableText(this.text, this.isDarkMode);
+
+  @override
+  State<_ExpandableText> createState() => _ExpandableTextState();
+}
+
+class _ExpandableTextState extends State<_ExpandableText> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = widget.isDarkMode ? const Color(0xDEFFFFFF) : Colors.black87;
+    return GestureDetector(
+      onTap: () => setState(() => _expanded = !_expanded),
+      child: RichText(
+        text: TextSpan(
+          style: TextStyle(fontSize: 15, color: textColor, height: 1.4),
+          children: [
+            TextSpan(text: _expanded || widget.text.length <= 200 ? widget.text : '${widget.text.substring(0, 200)}'),
+            if (!_expanded && widget.text.length > 200)
+              TextSpan(
+                text: '...Xem thêm',
+                style: TextStyle(
+                  color: widget.isDarkMode ? Colors.blue.shade300 : const Color(0xFF1A73E8),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

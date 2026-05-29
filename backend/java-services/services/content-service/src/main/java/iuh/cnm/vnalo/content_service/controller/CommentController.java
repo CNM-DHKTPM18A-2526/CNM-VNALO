@@ -36,10 +36,11 @@ public class CommentController {
     @GetMapping("/posts/{postId}/comments")
     public CommentPageResponse getComments(
             @PathVariable UUID postId,
+            Authentication authentication,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return commentService.getCommentsByPost(postId, page, size);
+        return commentService.getCommentsByPost(postId, currentUserId(authentication), page, size);
     }
 
     @PutMapping("/comments/{commentId}")

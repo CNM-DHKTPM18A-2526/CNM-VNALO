@@ -66,6 +66,16 @@ public class Post extends BaseAuditEntity {
     @Column(name = "status", nullable = false, length = 20)
     private String status = "ACTIVE";
 
+    @Builder.Default
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "included_ids", columnDefinition = "jsonb")
+    private List<String> includedIds = new ArrayList<>();
+
+    @Builder.Default
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "excluded_ids", columnDefinition = "jsonb")
+    private List<String> excludedIds = new ArrayList<>();
+
     @PrePersist
     public void prePersist() {
         if (postId == null) {
@@ -88,6 +98,12 @@ public class Post extends BaseAuditEntity {
         }
         if (shareCount == null) {
             shareCount = 0;
+        }
+        if (includedIds == null) {
+            includedIds = new ArrayList<>();
+        }
+        if (excludedIds == null) {
+            excludedIds = new ArrayList<>();
         }
     }
 }

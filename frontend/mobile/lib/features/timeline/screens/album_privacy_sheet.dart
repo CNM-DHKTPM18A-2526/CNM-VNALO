@@ -57,7 +57,7 @@ class _AlbumPrivacySheetState extends State<AlbumPrivacySheet> {
       'iconColor': const Color(0xFF607D8B),
     },
     {
-      'value': 'EXCEPT',
+      'value': 'FRIENDS_EXCEPT',
       'title': 'Bạn bè ngoại trừ...',
       'subtitle': 'Chọn những bạn bè không được xem',
       'icon': Icons.person_remove_outlined,
@@ -95,7 +95,7 @@ class _AlbumPrivacySheetState extends State<AlbumPrivacySheet> {
   void _onPrivacySelected(String privacy) {
     setState(() {
       _selectedPrivacy = privacy;
-      if (privacy == 'EXCEPT') {
+      if (privacy == 'FRIENDS_EXCEPT') {
         _showSelectionList = true;
         _isSelectingForInclude = false;
         _loadFriends();
@@ -200,7 +200,7 @@ class _AlbumPrivacySheetState extends State<AlbumPrivacySheet> {
         final isSelected = _selectedPrivacy == option['value'];
 
         String subtitle = option['subtitle'] as String;
-        if (isSelected && option['value'] == 'EXCEPT' && _excludedIds.isNotEmpty) {
+        if (isSelected && option['value'] == 'FRIENDS_EXCEPT' && _excludedIds.isNotEmpty) {
           subtitle = '${_excludedIds.length} người bị loại trừ';
         } else if (isSelected && option['value'] == 'SOME_FRIENDS' && _includedIds.isNotEmpty) {
           subtitle = '${_includedIds.length} người được chọn';
@@ -208,7 +208,7 @@ class _AlbumPrivacySheetState extends State<AlbumPrivacySheet> {
 
         return InkWell(
           onTap: () {
-            if (isSelected && (option['value'] == 'EXCEPT' || option['value'] == 'SOME_FRIENDS')) {
+            if (isSelected && (option['value'] == 'FRIENDS_EXCEPT' || option['value'] == 'SOME_FRIENDS')) {
               // Clicked again on selected option -> open list
               setState(() {
                 _showSelectionList = true;

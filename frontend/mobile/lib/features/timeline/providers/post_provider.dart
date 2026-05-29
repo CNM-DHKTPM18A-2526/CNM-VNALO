@@ -117,34 +117,42 @@ class PostProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> toggleLike(String postId) async {
+  Future<bool> toggleLike(String postId, {String reactionType = 'LOVE'}) async {
     final postIndex = _posts.indexWhere((p) => p.id == postId);
     if (postIndex == -1) return false;
 
     final post = _posts[postIndex];
     final wasLiked = post.isLiked;
+    final oldReaction = post.myReactionType;
 
     // Optimistic update
     _posts[postIndex] = post.copyWith(
-      isLiked: !wasLiked,
-      likeCount: wasLiked ? post.likeCount - 1 : post.likeCount + 1,
+      isLiked: true, // If changing reaction, it's always liked
+      myReactionType: reactionType,
+      likeCount: wasLiked ? post.likeCount : post.likeCount + 1,
     );
     notifyListeners();
 
     try {
-      bool success;
-      if (wasLiked) {
+      bool success = false;
+      // If it was already liked and we tap with the same reaction (or default LOVE), we unlike it
+      if (wasLiked && reactionType == (oldReaction ?? 'LOVE')) {
         success = await _contentService.unlikePost(postId);
+        if (success) {
+          _posts[postIndex] = post.copyWith(
+            isLiked: false, 
+            myReactionType: null, 
+            likeCount: post.likeCount > 0 ? post.likeCount - 1 : 0
+          );
+        } else {
+          _posts[postIndex] = post; // Revert
+        }
       } else {
-        success = await _contentService.likePost(postId);
+        success = await _contentService.likePost(postId, reactionType: reactionType);
+        if (!success) _posts[postIndex] = post; // Revert
       }
-
-      if (!success) {
-        // Revert on failure
-        _posts[postIndex] = post;
-        notifyListeners();
-      }
-
+      
+      notifyListeners();
       return success;
     } catch (e) {
       // Revert on error
@@ -152,6 +160,16 @@ class PostProvider with ChangeNotifier {
       notifyListeners();
       debugPrint('[PostProvider] toggleLike error: $e');
       return false;
+    }
+  }
+
+  /// Called locally after a comment is submitted to update the UI count immediately.
+  void incrementCommentCount(String postId) {
+    final postIndex = _posts.indexWhere((p) => p.id == postId);
+    if (postIndex != -1) {
+      final post = _posts[postIndex];
+      _posts[postIndex] = post.copyWith(commentCount: post.commentCount + 1);
+      notifyListeners();
     }
   }
 

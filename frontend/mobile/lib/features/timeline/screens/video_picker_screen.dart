@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 
-class VideoPickerScreen extends StatefulWidget {
-  final Function(File) onVideoSelected;
+import 'package:vnalo_mobile/features/timeline/screens/video_preview_screen.dart';
+import 'package:vnalo_mobile/features/timeline/screens/create_post_screen.dart';
 
-  const VideoPickerScreen({super.key, required this.onVideoSelected});
+class VideoPickerScreen extends StatefulWidget {
+  const VideoPickerScreen({super.key});
 
   @override
   State<VideoPickerScreen> createState() => _VideoPickerScreenState();
@@ -20,8 +21,7 @@ class _VideoPickerScreenState extends State<VideoPickerScreen> {
     try {
       final video = await _picker.pickVideo(source: ImageSource.camera);
       if (video != null && mounted) {
-        widget.onVideoSelected(File(video.path));
-        Navigator.pop(context);
+        _goToPreview(File(video.path));
       }
     } catch (e) {
       debugPrint('[VideoPickerScreen] recordVideo error: $e');
@@ -32,14 +32,34 @@ class _VideoPickerScreenState extends State<VideoPickerScreen> {
     try {
       final video = await _picker.pickVideo(source: ImageSource.gallery);
       if (video != null && mounted) {
-        widget.onVideoSelected(File(video.path));
-        Navigator.pop(context);
+        _goToPreview(File(video.path));
       }
     } catch (e) {
       debugPrint('[VideoPickerScreen] pickVideo error: $e');
     }
   }
 
+  void _goToPreview(File file) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => VideoPreviewScreen(
+          videoFile: file,
+          onConfirm: (File confirmedFile, bool isMuted) {
+            // Push CreatePostScreen with video
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => CreatePostScreen(
+                  initialType: PostType.video,
+                  initialFiles: [confirmedFile],
+                  // Future: Handle isMuted here if CreatePostScreen supports it
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {

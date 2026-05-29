@@ -45,7 +45,7 @@ class Comment {
     id: json['commentId']?.toString() ?? json['id']?.toString() ?? '',
     postId: json['postId']?.toString() ?? '',
     authorId: json['authorId']?.toString() ?? '',
-    content: json['content'] ?? '',
+    content: json['contentText'] ?? json['content'] ?? '',
     parentCommentId: json['parentCommentId']?.toString(),
     replyCount: json['replyCount'] ?? 0,
     createdAt: json['createdAt'] != null 

@@ -9,6 +9,7 @@ import 'package:vnalo_mobile/features/timeline/providers/post_provider.dart';
 import 'package:vnalo_mobile/features/timeline/screens/album_privacy_sheet.dart';
 import 'package:vnalo_mobile/features/timeline/screens/theme_decoration_screen.dart';
 import 'package:vnalo_mobile/features/timeline/screens/text_background_screen.dart';
+import 'package:vnalo_mobile/core/widgets/video_player_widget.dart';
 import 'package:vnalo_mobile/models/post_model.dart';
 import 'package:vnalo_mobile/services/media_service.dart';
 
@@ -283,7 +284,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             MediaCategory.TIMELINE,
           );
           final mediaUrl = mediaService.getPublicUrl(mediaId);
-          mediaUrls.add(mediaUrl);
+          if (_currentType == PostType.video) {
+            mediaUrls.add('$mediaUrl?type=video');
+          } else {
+            mediaUrls.add(mediaUrl);
+          }
         }
       }
 
@@ -296,7 +301,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             mediaUrls: mediaUrls,
             visibility: _privacy,
             includedIds: _privacy == 'SOME_FRIENDS' ? _includedFriendIds : [],
-            excludedIds: _privacy == 'EXCEPT' ? _excludedFriendIds : [],
+            excludedIds: _privacy == 'FRIENDS_EXCEPT' ? _excludedFriendIds : [],
           );
         } else {
           post = await postProvider.createPost(
@@ -304,7 +309,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             mediaUrls: mediaUrls,
             visibility: _privacy,
             includedIds: _privacy == 'SOME_FRIENDS' ? _includedFriendIds : [],
-            excludedIds: _privacy == 'EXCEPT' ? _excludedFriendIds : [],
+            excludedIds: _privacy == 'FRIENDS_EXCEPT' ? _excludedFriendIds : [],
           );
         }
 
@@ -431,63 +436,35 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // "Aa / Brush" mock toggle button
-                Container(
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: isDarkMode ? Colors.white12 : Colors.blue.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: isDarkMode ? Colors.white24 : Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4),
-                          ],
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          'Aa',
-                          style: TextStyle(color: isDarkMode ? Colors.white : Colors.blue, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: Icon(Icons.brush, size: 16, color: isDarkMode ? Colors.white54 : Colors.blue),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
                 Center(
                   child: Padding(
                     padding: const EdgeInsets.only(right: 12),
-                    child: TextButton(
-                      onPressed: _isPosting ? null : _createPost,
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        minimumSize: Size.zero,
-                      ),
-                      child: _isPosting
-                          ? SizedBox(
-                              width: 16, height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
-                            )
-                          : Text(
-                              'Đăng', 
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold, 
-                                fontSize: 16, 
-                                color: (_contentController.text.trim().isNotEmpty || _selectedFiles.isNotEmpty) 
-                                    ? AppColors.primary 
-                                    : (isDarkMode ? Colors.white38 : Colors.grey),
+                    child: GestureDetector(
+                      onTap: (_isPosting || (_contentController.text.trim().isEmpty && _selectedFiles.isEmpty)) 
+                          ? null 
+                          : _createPost,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: (_contentController.text.trim().isNotEmpty || _selectedFiles.isNotEmpty) 
+                              ? AppColors.primary 
+                              : (isDarkMode ? Colors.white24 : Colors.blue.withOpacity(0.4)),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: _isPosting
+                            ? SizedBox(
+                                width: 16, height: 16,
+                                child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Text(
+                                'Đăng', 
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold, 
+                                  fontSize: 14, 
+                                  color: Colors.white,
+                                ),
                               ),
-                            ),
+                      ),
                     ),
                   ),
                 ),
@@ -556,35 +533,49 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                             width: double.infinity,
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(12),
-                              image: DecorationImage(
-                                image: FileImage(_selectedFiles[index]),
-                                fit: BoxFit.cover,
-                              ),
+                              // Removing DecorationImage here since it's moved into the Stack
                             ),
-                            // Set a fixed height or aspect ratio for the image
+                            // Set a fixed height or aspect ratio for the preview
                             height: MediaQuery.of(context).size.width * 1.2, 
                             child: Stack(
                               children: [
-                                // Sửa ảnh button
-                                Positioned(
-                                  top: 12,
-                                  left: 12,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: Colors.black45,
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: const Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.edit, color: Colors.white, size: 14),
-                                        SizedBox(width: 6),
-                                        Text('Sửa ảnh', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
-                                      ],
-                                    ),
+                                // Video or Image
+                                Positioned.fill(
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: _currentType == PostType.video
+                                        ? VideoPlayerWidget(
+                                            file: _selectedFiles[index],
+                                            autoPlay: true,
+                                            looping: true,
+                                          )
+                                        : Image.file(
+                                            _selectedFiles[index],
+                                            fit: BoxFit.cover,
+                                          ),
                                   ),
                                 ),
+                                // Sửa ảnh / Edit button (only for photos)
+                                if (_currentType != PostType.video)
+                                  Positioned(
+                                    top: 12,
+                                    left: 12,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black45,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.edit, color: Colors.white, size: 14),
+                                          SizedBox(width: 6),
+                                          Text('Sửa ảnh', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
                                 // Close button
                                 Positioned(
                                   top: 12,
@@ -988,7 +979,17 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image.file(_selectedFiles[index], fit: BoxFit.cover),
+                child: Builder(
+                  builder: (context) {
+                    final file = _selectedFiles[index];
+                    final lowerPath = file.path.toLowerCase();
+                    if (lowerPath.endsWith('.mp4') || lowerPath.endsWith('.mov') || lowerPath.endsWith('.webm')) {
+                      return VideoPlayerWidget(file: file);
+                    } else {
+                      return Image.file(file, fit: BoxFit.cover);
+                    }
+                  }
+                ),
               ),
               Positioned(
                 top: 4,
@@ -1094,7 +1095,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         return 'Chỉ mình tôi';
       case 'SOME_FRIENDS':
         return 'Một số bạn bè';
-      case 'EXCEPT':
+      case 'FRIENDS_EXCEPT':
         return 'Bạn bè ngoại trừ...';
       default:
         return 'Bạn bè VNALO';
@@ -1111,7 +1112,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         return _includedFriendIds.isEmpty 
           ? 'Chọn những bạn bè được xem' 
           : '${_includedFriendIds.length} người được chọn';
-      case 'EXCEPT':
+      case 'FRIENDS_EXCEPT':
         return _excludedFriendIds.isEmpty 
           ? 'Chọn những bạn bè không được xem'
           : '${_excludedFriendIds.length} người bị loại trừ';

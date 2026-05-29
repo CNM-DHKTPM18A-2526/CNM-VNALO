@@ -4,6 +4,8 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.List;
+
 @Getter
 @Setter
 public class CreateStoryRequest {
@@ -14,4 +16,8 @@ public class CreateStoryRequest {
     private String caption;
 
     private String visibility;
+
+    private List<String> includedIds;
+
+    private List<String> excludedIds;
 }

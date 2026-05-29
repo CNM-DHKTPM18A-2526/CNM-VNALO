@@ -28,15 +28,40 @@ public class StoryService {
     private final StoryViewRepository storyViewRepository;
     private final StoryReactionRepository storyReactionRepository;
 
+
+    private String normalizeVisibility(String visibility) {
+        if (visibility == null || visibility.isBlank()) {
+            return "PUBLIC";
+        }
+
+        String normalized = visibility.trim().toUpperCase();
+        return switch (normalized) {
+            case "PUBLIC", "FRIENDS", "PRIVATE", "SOME_FRIENDS", "FRIENDS_EXCEPT" -> normalized;
+            default -> "PUBLIC";
+        };
+    }
+
+    public boolean canViewStory(Story story, UUID userId) {
+        if (story.getAuthorId().equals(userId)) return true;
+
+        return switch (story.getVisibility()) {
+            case "PUBLIC", "FRIENDS" -> true;
+            case "SOME_FRIENDS" -> story.getIncludedIds() != null && story.getIncludedIds().contains(userId.toString());
+            case "FRIENDS_EXCEPT" -> story.getExcludedIds() == null || !story.getExcludedIds().contains(userId.toString());
+            case "PRIVATE" -> false;
+            default -> false;
+        };
+    }
+
     @Transactional
     public StoryResponse createStory(UUID authorId, CreateStoryRequest request) {
         Story story = Story.builder()
                 .authorId(authorId)
                 .mediaUrl(request.getMediaUrl())
                 .caption(request.getCaption())
-                .visibility(request.getVisibility() == null || request.getVisibility().isBlank()
-                        ? "PUBLIC"
-                        : request.getVisibility().trim().toUpperCase())
+                .visibility(normalizeVisibility(request.getVisibility()))
+                .includedIds(request.getIncludedIds() != null ? request.getIncludedIds() : List.of())
+                .excludedIds(request.getExcludedIds() != null ? request.getExcludedIds() : List.of())
                 .status("ACTIVE")
                 .expiresAt(OffsetDateTime.now().plusHours(24))
                 .build();
@@ -46,10 +71,11 @@ public class StoryService {
     }
 
     @Transactional(readOnly = true)
-    public List<StoryResponse> getActiveStories() {
-        List<Story> stories = storyRepository.findByStatusAndExpiresAtAfterOrderByCreatedAtDesc(
+    public List<StoryResponse> getActiveStories(UUID userId) {
+        List<Story> stories = storyRepository.findActiveStoriesForUser(
                 "ACTIVE",
-                OffsetDateTime.now()
+                OffsetDateTime.now(),
+                userId
         );
 
         return stories.stream().map(this::map).toList();
@@ -77,6 +103,10 @@ public class StoryService {
                 )
                 .orElseThrow(() -> new ApiException(ErrorCode.STORY_NOT_FOUND));
 
+        if (!canViewStory(story, viewerId)) {
+            throw new ApiException(ErrorCode.FORBIDDEN);
+        }
+
         if (storyViewRepository.existsByStoryIdAndViewerId(storyId, viewerId)) {
             return;
         }
@@ -91,9 +121,13 @@ public class StoryService {
     }
 
     @Transactional(readOnly = true)
-    public List<StoryViewResponse> getStoryViews(UUID storyId) {
+    public List<StoryViewResponse> getStoryViews(UUID storyId, UUID userId) {
         Story story = storyRepository.findById(storyId)
                 .orElseThrow(() -> new ApiException(ErrorCode.STORY_NOT_FOUND));
+
+        if (!story.getAuthorId().equals(userId)) {
+            throw new ApiException(ErrorCode.FORBIDDEN);
+        }
 
         return storyViewRepository.findByStoryIdOrderByViewedAtDesc(story.getStoryId())
                 .stream()
@@ -110,6 +144,10 @@ public class StoryService {
                 )
                 .orElseThrow(() -> new ApiException(ErrorCode.STORY_NOT_FOUND));
 
+        if (!canViewStory(story, userId)) {
+            throw new ApiException(ErrorCode.FORBIDDEN);
+        }
+
         String normalizedReaction = reactionType == null || reactionType.isBlank()
                 ? "LOVE"
                 : reactionType.trim().toUpperCase();
@@ -122,6 +160,9 @@ public class StoryService {
 
         storyReaction.setReactionType(normalizedReaction);
         StoryReaction saved = storyReactionRepository.save(storyReaction);
+        
+
+        
         return mapReaction(saved);
     }
 
@@ -136,9 +177,12 @@ public class StoryService {
     }
 
     @Transactional(readOnly = true)
-    public List<StoryReactionResponse> getStoryReactions(UUID storyId) {
-        if (!storyRepository.existsById(storyId)) {
-            throw new ApiException(ErrorCode.STORY_NOT_FOUND);
+    public List<StoryReactionResponse> getStoryReactions(UUID storyId, UUID userId) {
+        Story story = storyRepository.findById(storyId)
+                .orElseThrow(() -> new ApiException(ErrorCode.STORY_NOT_FOUND));
+
+        if (!story.getAuthorId().equals(userId)) {
+            throw new ApiException(ErrorCode.FORBIDDEN);
         }
 
         return storyReactionRepository.findByStoryIdOrderByCreatedAtDesc(storyId)
@@ -167,6 +211,8 @@ public class StoryService {
                 .mediaUrl(story.getMediaUrl())
                 .caption(story.getCaption())
                 .visibility(story.getVisibility())
+                .includedIds(story.getIncludedIds())
+                .excludedIds(story.getExcludedIds())
                 .expiresAt(story.getExpiresAt())
                 .createdAt(story.getCreatedAt())
                 .build();

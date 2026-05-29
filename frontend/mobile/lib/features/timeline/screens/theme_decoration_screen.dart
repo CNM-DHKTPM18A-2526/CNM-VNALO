@@ -112,7 +112,7 @@ class _ThemeDecorationScreenState extends State<ThemeDecorationScreen> {
       case 'PRIVATE': return 'Mình tôi';
       case 'CONTACTS': return 'Bạn bè từ danh bạ';
       case 'GROUP': return 'Bạn bè trong nhóm';
-      case 'EXCEPT': return 'Bạn bè ngoại trừ';
+      case 'FRIENDS_EXCEPT': return 'Bạn bè ngoại trừ';
       default: return 'Bạn bè VNALO';
     }
   }

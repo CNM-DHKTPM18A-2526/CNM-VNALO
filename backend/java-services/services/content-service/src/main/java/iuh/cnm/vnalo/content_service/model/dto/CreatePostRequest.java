@@ -20,4 +20,8 @@ public class CreatePostRequest {
      * PUBLIC, FRIENDS, PRIVATE
      */
     private String visibility;
+
+    private List<String> includedIds;
+
+    private List<String> excludedIds;
 }

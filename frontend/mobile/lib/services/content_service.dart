@@ -30,6 +30,8 @@ class ContentService {
     required String mediaUrl,
     String? caption,
     String visibility = 'PUBLIC',
+    List<String>? includedIds,
+    List<String>? excludedIds,
   }) async {
     final response = await _apiService.post(
       _base,
@@ -38,6 +40,8 @@ class ContentService {
         'mediaUrl': mediaUrl,
         'caption': caption ?? '',
         'visibility': visibility,
+        if (includedIds != null) 'includedIds': includedIds,
+        if (excludedIds != null) 'excludedIds': excludedIds,
       },
     );
     final data = response['data'] ?? response;
@@ -107,7 +111,8 @@ class ContentService {
           'contentText': contentText ?? '',
           'mediaUrls': mediaUrls ?? [],
           'visibility': visibility,
-          // Removed includedIds and excludedIds because backend doesn't support them
+          if (includedIds != null) 'includedIds': includedIds,
+          if (excludedIds != null) 'excludedIds': excludedIds,
         },
       );
       final data = response['data'] ?? response;
@@ -166,9 +171,9 @@ class ContentService {
 
   // ==================== LIKE API ====================
 
-  Future<bool> likePost(String postId) async {
+  Future<bool> likePost(String postId, {String reactionType = 'LOVE'}) async {
     try {
-      await _apiService.post(_base, '/posts/$postId/like', body: {});
+      await _apiService.post(_base, '/posts/$postId/like?reactionType=$reactionType');
       return true;
     } catch (e) {
       debugPrint('[ContentService] likePost error: $e');
@@ -183,6 +188,24 @@ class ContentService {
     } catch (e) {
       debugPrint('[ContentService] unlikePost error: $e');
       return false;
+    }
+  }
+
+  // ==================== SHARE API ====================
+
+  // ==================== REACTIONS/LIKES LIST API ====================
+
+  Future<List<Map<String, dynamic>>> getPostLikers(String postId) async {
+    try {
+      final response = await _apiService.get(_base, '/posts/$postId/likes');
+      final data = response['data'] ?? response;
+      if (data is List) {
+        return List<Map<String, dynamic>>.from(data);
+      }
+      return [];
+    } catch (e) {
+      debugPrint('[ContentService] getPostLikers error: $e');
+      return [];
     }
   }
 
@@ -209,7 +232,7 @@ class ContentService {
     String? parentCommentId,
   }) async {
     try {
-      final body = <String, dynamic>{'content': content};
+      final body = <String, dynamic>{'contentText': content};
       if (parentCommentId != null) body['parentCommentId'] = parentCommentId;
 
       final response = await _apiService.post(_base, '/posts/$postId/comments', body: body);
@@ -283,14 +306,18 @@ class TimelineResult {
 class CommentPageResult {
   final List<Comment> comments;
   final bool hasMore;
+  final int total;
 
-  CommentPageResult({required this.comments, required this.hasMore});
+  CommentPageResult({required this.comments, required this.hasMore, this.total = 0});
 
   factory CommentPageResult.fromJson(Map<String, dynamic> json) {
     List<Comment> comments = [];
     bool hasMore = false;
+    int total = 0;
 
-    if (json['content'] is List) {
+    if (json['items'] is List) {
+      comments = (json['items'] as List).map<Comment>((c) => Comment.fromJson(c)).toList();
+    } else if (json['content'] is List) {
       comments = (json['content'] as List).map<Comment>((c) => Comment.fromJson(c)).toList();
     } else if (json is List) {
       comments = (json as List).map<Comment>((c) => Comment.fromJson(c)).toList();
@@ -301,7 +328,13 @@ class CommentPageResult {
     } else if (json['last'] == false) {
       hasMore = true;
     }
+    
+    if (json['totalElements'] is int) {
+      total = json['totalElements'];
+    } else {
+      total = comments.length;
+    }
 
-    return CommentPageResult(comments: comments, hasMore: hasMore);
+    return CommentPageResult(comments: comments, hasMore: hasMore, total: total);
   }
 }

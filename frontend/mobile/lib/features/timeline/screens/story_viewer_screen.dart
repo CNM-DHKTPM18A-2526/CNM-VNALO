@@ -7,6 +7,7 @@ import 'package:vnalo_mobile/models/story_model.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/contacts/providers/contact_provider.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
+import 'package:vnalo_mobile/core/widgets/video_player_widget.dart';
 
 class StoryViewerScreen extends StatefulWidget {
   final List<Story> stories;
@@ -103,11 +104,15 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
     if (mediaUrl != null && mediaUrl.isNotEmpty) {
       final resolvedUrl = AvatarResolver.resolveUrl(mediaUrl) ?? mediaUrl;
       final isGif = resolvedUrl.toLowerCase().contains('.gif');
+      final lowerUrl = resolvedUrl.toLowerCase();
+      final isVideo = lowerUrl.endsWith('.mp4') || lowerUrl.endsWith('.mov') || lowerUrl.endsWith('.webm');
 
       return Stack(
         fit: StackFit.expand,
         children: [
-          if (isGif)
+          if (isVideo)
+            VideoPlayerWidget(url: resolvedUrl, autoPlay: true)
+          else if (isGif)
             Image.network(
               resolvedUrl,
               fit: BoxFit.contain,
