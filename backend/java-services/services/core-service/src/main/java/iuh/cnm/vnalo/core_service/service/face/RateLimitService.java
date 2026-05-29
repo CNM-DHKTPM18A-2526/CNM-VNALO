@@ -69,6 +69,14 @@ public class RateLimitService {
     }
 
     /**
+     * Rate limit for /face/enroll endpoint — 10 req/min/IP.
+     * Uses "enroll:" prefix to keep bucket separate.
+     */
+    public boolean isEnrollIpRateLimited(String ip) {
+        return checkIpWindow("enroll:" + ip, 10);
+    }
+
+    /**
      * Internal sliding-window check keyed by an arbitrary string.
      * Thread-safe per entry via synchronized block.
      */

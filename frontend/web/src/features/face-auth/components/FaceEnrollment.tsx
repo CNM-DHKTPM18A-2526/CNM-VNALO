@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { FaceCapture } from './FaceCapture'
-import { enrollFace } from '../face-auth.api'
+import { enrollFace, withTimeout } from '../face-auth.api'
 
 export type FaceEnrollmentProps = {
   token: string
@@ -39,9 +39,11 @@ export function FaceEnrollment({ token, onSuccess, onError, onCancel }: FaceEnro
       })
 
       // Server enforces liveness — just enroll
-      const result = await enrollFace(token, capturedBlob, {
-        deviceInfo,
-      })
+      const result = await withTimeout(
+        enrollFace(token, capturedBlob, { deviceInfo }),
+        20_000,
+        'Đăng ký khuôn mặt'
+      )
 
       if (result.success) {
         setStep('success')

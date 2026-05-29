@@ -139,13 +139,15 @@ export function FaceLoginModal({ onClose, onNotEnrolled, onSuccess }: FaceLoginM
   async function handleCapture() {
     if (!videoRef.current) return;
     setStep('verifying');
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
-      streamRef.current = null;
-    }
 
     try {
       const blob = await captureFrame(videoRef.current);
+      
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
+      
       const normId = normalizeIdentifier(identifier);
 
       const userId = await withTimeout(

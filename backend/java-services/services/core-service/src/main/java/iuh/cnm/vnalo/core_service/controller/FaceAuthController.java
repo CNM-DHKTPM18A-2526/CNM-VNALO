@@ -63,6 +63,10 @@ public class FaceAuthController {
         checkEnabled();
         checkEnrollmentEnabled();
 
+        if (rateLimitService.isEnrollIpRateLimited(getClientIp(request))) {
+            throw new ApiException(ErrorCode.AUTH_TOO_MANY_REQUESTS, "Quá nhiều yêu cầu đăng ký khuôn mặt. Vui lòng thử lại sau.");
+        }
+
         UUID userId = currentUser.getId();
 
         if (image == null || image.isEmpty()) {
