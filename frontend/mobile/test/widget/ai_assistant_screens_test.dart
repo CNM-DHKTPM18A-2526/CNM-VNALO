@@ -186,6 +186,61 @@ void main() {
     provider.dispose();
   });
 
+  testWidgets('ai conversation contacts shortcut closes assistant locally', (
+    tester,
+  ) async {
+    final provider = _buildProvider();
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: provider),
+          ChangeNotifierProvider(create: (_) => LanguageProvider()),
+        ],
+        child: MaterialApp(
+          home: Builder(
+            builder:
+                (context) => Scaffold(
+                  body: Center(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const AiConversationScreen(),
+                          ),
+                        );
+                      },
+                      child: const Text('Open AI'),
+                    ),
+                  ),
+                ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open AI'));
+    await tester.pumpAndSettle();
+
+    provider.addActionFeedback(
+      'Không tìm thấy liên hệ trong danh bạ.',
+      source: 'ai_action_missing.contact',
+      responseSurface: AiResponseSurface.conversation,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('ai_conversation_input')), findsOneWidget);
+    expect(find.text('Mở danh bạ'), findsOneWidget);
+
+    await tester.tap(find.text('Mở danh bạ'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Open AI'), findsOneWidget);
+    expect(find.byKey(const ValueKey('ai_conversation_input')), findsNothing);
+
+    provider.dispose();
+  });
+
   testWidgets(
     'ai conversation screen hides mascot bubble while open and restores on close',
     (tester) async {

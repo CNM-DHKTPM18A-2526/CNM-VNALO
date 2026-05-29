@@ -348,6 +348,52 @@ void main() {
     provider.dispose();
   });
 
+  testWidgets('bubble board contacts shortcut closes board locally', (
+    tester,
+  ) async {
+    final provider = _buildProvider();
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: provider,
+        child: MaterialApp(
+          home: const Scaffold(),
+          builder: _bubbleOverlayBuilder,
+        ),
+      ),
+    );
+
+    await provider.summonMascot(
+      startListening: false,
+      persist: false,
+      source: 'board_contacts_shortcut_test',
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('ai_bubble_toggle_board')));
+    await tester.pumpAndSettle();
+
+    provider.addActionFeedback(
+      'Không tìm thấy liên hệ trong danh bạ.',
+      source: 'ai_action_missing.contact',
+      keepBubbleVisible: true,
+      responseSurface: AiResponseSurface.bubble,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('ai_chat_board')), findsOneWidget);
+    expect(find.text('Mở danh bạ'), findsOneWidget);
+
+    await tester.tap(find.text('Mở danh bạ'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('ai_chat_board')), findsNothing);
+    expect(find.byKey(const ValueKey('ai_bubble_root')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    provider.dispose();
+  });
+
   testWidgets(
     'conversation screen response does not auto-open floating bubble board',
     (tester) async {

@@ -50,7 +50,10 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
 
   @override
   void dispose() {
-    _provider?.leaveConversationSurface();
+    _provider?.leaveConversationSurface(
+      reason: 'ai_conversation_dispose',
+      notify: false,
+    );
     _inputController.dispose();
     _inputFocusNode.dispose();
     _scrollController.dispose();

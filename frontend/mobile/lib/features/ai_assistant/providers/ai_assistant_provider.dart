@@ -685,7 +685,10 @@ class AiAssistantProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void leaveConversationSurface({String reason = 'conversation_close'}) {
+  void leaveConversationSurface({
+    String reason = 'conversation_close',
+    bool notify = true,
+  }) {
     if (_activeSurface != AiResponseSurface.conversation) {
       return;
     }
@@ -700,7 +703,9 @@ class AiAssistantProvider with ChangeNotifier {
       }
     }
     _logEvent('SURFACE_LEAVE_CONVERSATION', data: {'reason': reason});
-    notifyListeners();
+    if (notify) {
+      notifyListeners();
+    }
   }
 
   void _setProvisionallyVisible(bool visible, {required String reason}) {
