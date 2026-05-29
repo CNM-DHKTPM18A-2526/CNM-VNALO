@@ -14,21 +14,37 @@ public class FirebaseHealthIndicator implements HealthIndicator {
 
     @Override
     public Health health() {
+        if (!firebaseConfig.isEnabled()) {
+            return Health.up()
+                    .withDetail("firebase", "disabled")
+                    .withDetail("reason", "Firebase is intentionally disabled for this environment")
+                    .build();
+        }
+
         if (!firebaseConfig.isInitialized()) {
             return Health.down()
-                    .withDetail("reason", "Firebase is not initialized or disabled")
+                    .withDetail("firebase", "initialization_failed")
+                    .withDetail("reason", "Firebase is enabled but not initialized")
                     .build();
         }
 
         if (FirebaseApp.getApps().isEmpty()) {
             return Health.down()
+                    .withDetail("firebase", "no_registered_apps")
                     .withDetail("reason", "No Firebase apps registered")
                     .build();
         }
 
+        FirebaseApp app = FirebaseApp.getApps().get(0);
+        String appName = app.getName() != null ? app.getName() : "DEFAULT";
+        String projectId = app.getOptions() != null && app.getOptions().getProjectId() != null
+                ? app.getOptions().getProjectId()
+                : "unknown";
+
         return Health.up()
-                .withDetail("name", FirebaseApp.getApps().get(0).getName())
-                .withDetail("projectId", FirebaseApp.getApps().get(0).getOptions().getProjectId())
+                .withDetail("firebase", "initialized")
+                .withDetail("name", appName)
+                .withDetail("projectId", projectId)
                 .build();
     }
 }

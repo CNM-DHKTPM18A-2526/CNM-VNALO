@@ -28,9 +28,10 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 # Copy JAR from builder
 COPY --from=builder /build/target/*.jar app.jar
 
-# Health check
+# Health check: validate the service port instead of actuator details so
+# Docker health does not depend on security filters or optional Firebase health.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8087/api/v1/actuator/health || exit 1
+  CMD nc -z localhost 8087 || exit 1
 
 EXPOSE 8087
 
