@@ -179,66 +179,63 @@ class _LoginPasswordScreenState extends State<LoginPasswordScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(52),
-                          side: BorderSide(color: isDarkMode ? DarkColors.divider : LightColors.divider),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                        ),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const FaceLoginScreen(),
-                            ),
-                          );
-                        },
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.face_rounded,
-                              size: 20,
-                              color: isDarkMode ? DarkColors.primary : AppColors.primary,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Đăng nhập khuôn mặt',
-                              style: TextStyle(
-                                color: isDarkMode ? DarkColors.textPrimary : const Color(0xFF111827),
-                                fontSize: 15,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: isDarkMode ? Colors.amber.shade900 : Colors.amber.shade100,
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                      side: BorderSide(color: isDarkMode ? DarkColors.divider : LightColors.divider),
+                      foregroundColor: isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(999),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.science_outlined, size: 12, color: isDarkMode ? Colors.amber.shade200 : Colors.amber.shade800),
-                          const SizedBox(width: 3),
-                          Text(
-                            'thử nghiệm',
-                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isDarkMode ? Colors.amber.shade200 : Colors.amber.shade900),
-                          ),
-                        ],
-                      ),
                     ),
-                  ],
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const FaceLoginScreen(),
+                        ),
+                      );
+                    },
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.face_rounded,
+                          size: 20,
+                          color: isDarkMode ? DarkColors.primary : AppColors.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Đăng nhập khuôn mặt',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isDarkMode ? Colors.amber.shade900 : Colors.amber.shade100,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            'thử nghiệm',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: isDarkMode ? Colors.amber.shade200 : Colors.amber.shade900,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
