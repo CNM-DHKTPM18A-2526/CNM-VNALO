@@ -92,7 +92,30 @@ export default function SocialPage() {
 
   // Optimistic prepend: thêm bài viết mới lên đầu feed ngay lập tức
   const handlePostCreated = (newPost: Post) => {
-    setPosts(prev => [newPost, ...prev]);
+    setPosts(prev => {
+      // Avoid exact duplicates by postId.
+      if (prev.some(post => post.postId === newPost.postId)) {
+        return prev;
+      }
+
+      const isServerPost = !newPost.postId.startsWith('local-');
+      if (isServerPost) {
+        // Reconcile: replace a matching optimistic local post when server response arrives.
+        const localIndex = prev.findIndex(post =>
+          post.postId.startsWith('local-')
+          && post.contentText === newPost.contentText
+          && JSON.stringify(post.mediaUrls ?? []) === JSON.stringify(newPost.mediaUrls ?? [])
+        );
+
+        if (localIndex >= 0) {
+          const next = [...prev];
+          next.splice(localIndex, 1);
+          return [newPost, ...next];
+        }
+      }
+
+      return [newPost, ...prev];
+    });
   };
 
   useEffect(() => {
