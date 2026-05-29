@@ -66,6 +66,19 @@ async function captureFrame(video: HTMLVideoElement): Promise<Blob> {
   });
 }
 
+/** Races a promise against a timeout, rejecting with a user-friendly message on timeout. */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`${label} quá thời gian chờ (${ms / 1000}s). Vui lòng kiểm tra kết nối và thử lại.`)),
+        ms
+      )
+    ),
+  ]);
+}
+
 export function FaceLoginModal({ onClose, onNotEnrolled, onSuccess }: FaceLoginModalProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -145,20 +158,37 @@ export function FaceLoginModal({ onClose, onNotEnrolled, onSuccess }: FaceLoginM
 
     try {
       const blob = await captureFrame(videoRef.current);
-
       const normId = normalizeIdentifier(identifier);
-      const userId = await lookupUserId(normId);
 
-      const verify = await verifyFace(blob, userId);
+      const userId = await withTimeout(
+        lookupUserId(normId),
+        10_000,
+        'Tra cứu tài khoản'
+      );
+
+      const verify = await withTimeout(
+        verifyFace(blob, userId),
+        20_000,
+        'Xác thực khuôn mặt'
+      );
 
       if (!verify.verified || !verify.verificationToken) {
-        setErrorMsg('Khuôn mặt không khớp với tài khoản. Vui lòng thử lại hoặc đăng nhập bằng mật khẩu.');
+        const isSpoofDetected = verify.decision === 'SPOOF_DETECTED';
+        setErrorMsg(
+          isSpoofDetected
+            ? 'Phát hiện ảnh giả mạo. Vui lòng sử dụng khuôn mặt thật và thử lại.'
+            : 'Khuôn mặt không khớp với tài khoản. Vui lòng thử lại hoặc đăng nhập bằng mật khẩu.'
+        );
         setStep('error');
         return;
       }
 
       const deviceId = resolveWebDeviceId();
-      const tokens = await faceLogin(verify.verificationToken, deviceId, 'VNALO Web', 'WEB');
+      const tokens = await withTimeout(
+        faceLogin(verify.verificationToken, deviceId, 'VNALO Web', 'WEB'),
+        10_000,
+        'Đăng nhập'
+      );
       await loginWithAccessToken(tokens.accessToken);
       onSuccess();
     } catch (err) {
