@@ -242,9 +242,6 @@ export function ConversationInfo({
           onSendPoll={onSendPoll}
           currentUserId={currentUserId}
           reactionStates={reactionStates}
-          allowMemberCreateNote={Boolean(conversation.allowMemberCreateNote ?? true)}
-          allowMemberCreatePoll={Boolean(conversation.allowMemberCreatePoll ?? true)}
-          isModerator={isModerator}
         />
       ) : showMembersView ? (
         <MemberListView 
@@ -775,15 +772,13 @@ function GroupManagementView({
           />
           <PermissionCheckbox 
             label="Tạo mới ghi chú, nhắc hẹn" 
-            checked={conversation.allowMemberCreateNote ?? true}
+            checked={true}
             disabled={!isModerator}
-            onChange={(val) => handleToggle('allowMemberCreateNote', val)}
           />
           <PermissionCheckbox 
             label="Tạo mới bình chọn" 
-            checked={conversation.allowMemberCreatePoll ?? true}
+            checked={true} 
             disabled={!isModerator}
-            onChange={(val) => handleToggle('allowMemberCreatePoll', val)}
           />
           <PermissionCheckbox 
             label="Cho phép thành viên gửi tin nhắn" 

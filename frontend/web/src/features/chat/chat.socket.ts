@@ -344,8 +344,6 @@ export class ChatSocketService {
     this.socket.on('group.roleChanged', handleGroupRoleChanged)
     this.socket.on('group.disbanded', handleGroupDisbanded)
     this.socket.on('group.updated', handleGroupUpdated)
-    // Also listen to group.settingsChanged (backend event name) and route to same handler
-    this.socket.on('group.settingsChanged', handleGroupUpdated)
     this.socket.on('friendship.updated', handleFriendshipUpdated)
 
     console.log('[ChatSocketService] âœ… All event listeners attached')
