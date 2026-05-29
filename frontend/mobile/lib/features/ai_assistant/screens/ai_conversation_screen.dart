@@ -483,6 +483,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
   }
 
   Widget _buildInputBar(AiAssistantProvider provider, bool isDarkMode) {
+    final bgColor = isDarkMode ? DarkColors.surface : LightColors.surface;
     final iconColor =
         isDarkMode ? DarkColors.textSecondary : AppColors.iconSubtle;
     final activeColor =
@@ -496,7 +497,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
       key: const ValueKey('ai_conversation_input_bar'),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.transparent,
+        color: bgColor,
         border: Border(
           top: BorderSide(
             color: isDarkMode ? DarkColors.divider : AppColors.itemDivider,

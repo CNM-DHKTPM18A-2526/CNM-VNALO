@@ -717,7 +717,8 @@ class _AiChatBoardState extends State<AiChatBoard> {
                     isCompactLayout ? 6 : 8,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.transparent,
+                    color:
+                        isDarkMode ? DarkColors.surface : LightColors.surface,
                     border: Border(
                       top: BorderSide(
                         color:
