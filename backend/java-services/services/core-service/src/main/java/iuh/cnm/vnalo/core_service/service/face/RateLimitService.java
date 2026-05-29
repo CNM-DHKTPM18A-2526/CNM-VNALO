@@ -1,6 +1,7 @@
 package iuh.cnm.vnalo.core_service.service.face;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -15,8 +16,8 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>Two mechanisms:
  * <ol>
- *   <li>IP-based sliding window — protects {@code /face/liveness-check} and {@code /auth/lookup}
- *       from enumeration / oracle attacks.</li>
+ *   <li>IP-based sliding window — protects public endpoints from enumeration / oracle attacks.
+ *       Each endpoint type uses a separate key-space to prevent cross-contamination of buckets.</li>
  *   <li>UserId-based failure counter — locks {@code /face/verify} temporarily after repeated
  *       failures to prevent brute-force face spoofing attacks.</li>
  * </ol>
@@ -32,7 +33,7 @@ public class RateLimitService {
     // IP-based sliding-window rate limiting
     // -------------------------------------------------------------------------
 
-    /** Max requests per window per IP for public face/lookup endpoints. */
+    /** Max requests per window per IP per endpoint. */
     private static final int IP_MAX_REQUESTS = 10;
 
     /** Sliding window duration in milliseconds (1 minute). */
@@ -44,14 +45,30 @@ public class RateLimitService {
     private final Map<String, IpEntry> ipWindows = new ConcurrentHashMap<>();
 
     /**
-     * Returns {@code true} if the given IP has exceeded the rate limit.
-     * Call this before processing the request; if it returns true, reject immediately.
+     * Rate limit for /auth/lookup endpoint — 10 req/min/IP.
+     * Uses "lookup:" prefix to keep bucket separate from other endpoints.
      */
-    public boolean isIpRateLimited(String ip) {
-        if (ip == null || ip.isBlank()) return false;
+    public boolean isLookupRateLimited(String ip) {
+        return checkIpWindow("lookup:" + ip);
+    }
+
+    /**
+     * Rate limit for /face/liveness-check endpoint — 10 req/min/IP.
+     * Uses "liveness:" prefix to keep bucket separate from other endpoints.
+     */
+    public boolean isLivenessRateLimited(String ip) {
+        return checkIpWindow("liveness:" + ip);
+    }
+
+    /**
+     * Internal sliding-window check keyed by an arbitrary string.
+     * Thread-safe per entry via synchronized block.
+     */
+    private boolean checkIpWindow(String key) {
+        if (key == null || key.isBlank()) return false;
 
         long now = Instant.now().toEpochMilli();
-        IpEntry entry = ipWindows.computeIfAbsent(ip, k -> new IpEntry());
+        IpEntry entry = ipWindows.computeIfAbsent(key, k -> new IpEntry());
 
         synchronized (entry) {
             Deque<Long> window = entry.timestamps;
@@ -62,7 +79,7 @@ public class RateLimitService {
             }
 
             if (window.size() >= IP_MAX_REQUESTS) {
-                log.warn("[RateLimit] IP={} exceeded {} req/min limit", ip, IP_MAX_REQUESTS);
+                log.warn("[RateLimit] key={} exceeded {} req/min limit", key, IP_MAX_REQUESTS);
                 return true;
             }
 
@@ -72,10 +89,19 @@ public class RateLimitService {
         }
     }
 
-    /** Periodically called to evict stale IP entries (avoid unbounded growth). */
+    /**
+     * Periodically evict stale IP entries to prevent unbounded memory growth.
+     * Runs every 2 minutes automatically via Spring scheduling.
+     */
+    @Scheduled(fixedRate = 120_000)
     public void evictStaleIpEntries() {
         long cutoff = Instant.now().toEpochMilli() - IP_EVICT_AFTER_MS;
+        int before = ipWindows.size();
         ipWindows.entrySet().removeIf(e -> e.getValue().lastSeen < cutoff);
+        int evicted = before - ipWindows.size();
+        if (evicted > 0) {
+            log.info("[RateLimit] Evicted {} stale IP entries", evicted);
+        }
     }
 
     // -------------------------------------------------------------------------

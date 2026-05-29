@@ -266,7 +266,7 @@ public class AuthController {
             ip = request.getRemoteAddr();
         }
 
-        if (rateLimitService.isIpRateLimited(ip)) {
+        if (rateLimitService.isLookupRateLimited(ip)) {
             throw new ApiException(ErrorCode.AUTH_TOO_MANY_REQUESTS, "Quá nhiều yêu cầu tra cứu. Vui lòng thử lại sau.");
         }
 

@@ -126,7 +126,7 @@ public class FaceAuthController {
         checkVerificationEnabled();
 
         if (rateLimitService.isVerifyLocked(userId)) {
-            throw new ApiException(ErrorCode.FACE_LIVENESS_FAILED,
+            throw new ApiException(ErrorCode.FACE_RATE_LIMITED,
                     "Quá nhiều lần thử thất bại. Tính năng xác thực khuôn mặt đang bị khóa tạm thời. Vui lòng đăng nhập bằng mật khẩu.");
         }
 
@@ -195,7 +195,7 @@ public class FaceAuthController {
     ) throws Exception {
         checkEnabled();
 
-        if (rateLimitService.isIpRateLimited(getClientIp(request))) {
+        if (rateLimitService.isLivenessRateLimited(getClientIp(request))) {
             throw new ApiException(ErrorCode.AUTH_TOO_MANY_REQUESTS, "Quá nhiều yêu cầu. Vui lòng thử lại sau.");
         }
 
