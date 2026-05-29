@@ -49,7 +49,7 @@ public class RateLimitService {
      * Uses "lookup:" prefix to keep bucket separate from other endpoints.
      */
     public boolean isLookupRateLimited(String ip) {
-        return checkIpWindow("lookup:" + ip);
+        return checkIpWindow("lookup:" + ip, IP_MAX_REQUESTS);
     }
 
     /**
@@ -57,14 +57,22 @@ public class RateLimitService {
      * Uses "liveness:" prefix to keep bucket separate from other endpoints.
      */
     public boolean isLivenessRateLimited(String ip) {
-        return checkIpWindow("liveness:" + ip);
+        return checkIpWindow("liveness:" + ip, IP_MAX_REQUESTS);
+    }
+
+    /**
+     * Rate limit for /face/verify endpoint — 20 req/min/IP.
+     * Uses "verify:" prefix to keep bucket separate.
+     */
+    public boolean isVerifyIpRateLimited(String ip) {
+        return checkIpWindow("verify:" + ip, 20);
     }
 
     /**
      * Internal sliding-window check keyed by an arbitrary string.
      * Thread-safe per entry via synchronized block.
      */
-    private boolean checkIpWindow(String key) {
+    private boolean checkIpWindow(String key, int maxRequests) {
         if (key == null || key.isBlank()) return false;
 
         long now = Instant.now().toEpochMilli();
@@ -78,8 +86,8 @@ public class RateLimitService {
                 window.pollFirst();
             }
 
-            if (window.size() >= IP_MAX_REQUESTS) {
-                log.warn("[RateLimit] key={} exceeded {} req/min limit", key, IP_MAX_REQUESTS);
+            if (window.size() >= maxRequests) {
+                log.warn("[RateLimit] key={} exceeded {} req/min limit", key, maxRequests);
                 return true;
             }
 

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
@@ -92,7 +93,9 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
       if (!verifyResult.verified || verifyResult.verificationToken == null) {
         setState(() {
           _isLoading = false;
-          _errorMsg = 'Khuôn mặt không khớp với tài khoản. Vui lòng thử lại.';
+          _errorMsg = verifyResult.decision == 'SPOOF_DETECTED'
+              ? 'Phát hiện ảnh giả mạo. Vui lòng sử dụng khuôn mặt thật.'
+              : 'Khuôn mặt không khớp với tài khoản. Vui lòng thử lại.';
         });
         return;
       }
@@ -124,7 +127,11 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMsg = e is ApiException ? e.message : 'Đã xảy ra lỗi. Vui lòng thử lại.';
+          if (e is TimeoutException) {
+            _errorMsg = 'Quá thời gian chờ máy chủ. Vui lòng thử lại.';
+          } else {
+            _errorMsg = e is ApiException ? e.message : 'Đã xảy ra lỗi. Vui lòng thử lại.';
+          }
         });
       }
     }

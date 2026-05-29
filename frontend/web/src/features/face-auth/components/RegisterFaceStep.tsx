@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { FaceCapture } from './FaceCapture'
-import { enrollFace } from '../face-auth.api'
+import { enrollFace, withTimeout } from '../face-auth.api'
 
 type RegisterFaceStepProps = {
   token: string
@@ -46,7 +46,11 @@ export function RegisterFaceStep({ token, onComplete }: RegisterFaceStepProps) {
     try {
       // Server enforces liveness — send image, let backend decide
       const deviceInfo = JSON.stringify({ platform: 'WEB', source: 'REGISTRATION' })
-      const result = await enrollFace(token, capturedBlob, { deviceInfo })
+      const result = await withTimeout(
+        enrollFace(token, capturedBlob, { deviceInfo }),
+        20_000,
+        'Đăng ký khuôn mặt'
+      )
 
       if (result.success) {
         setStep('success')

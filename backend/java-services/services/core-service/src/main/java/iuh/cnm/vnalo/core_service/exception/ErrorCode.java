@@ -21,6 +21,7 @@ public enum ErrorCode {
     AUTH_OTP_INVALID("AUTH_010", "Invalid OTP"),
     AUTH_OTP_MAX_ATTEMPTS("AUTH_011", "Maximum OTP attempts exceeded"),
     AUTH_OTP_RATE_LIMITED("AUTH_012", "Too many OTP requests, please try again later"),
+    AUTH_TOO_MANY_REQUESTS("AUTH_012_B", "Too many requests, please try again later"),
     AUTH_OTP_COOLDOWN("AUTH_013", "Please wait before requesting another OTP"),
     AUTH_OTP_REQUIRED("AUTH_014", "OTP verification is required"),
     AUTH_PASSWORD_MISMATCH("AUTH_015", "Current password is incorrect"),

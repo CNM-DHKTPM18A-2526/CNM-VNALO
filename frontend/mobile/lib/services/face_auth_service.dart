@@ -24,7 +24,7 @@ class FaceAuthService {
       contentType: MediaType('image', 'jpeg'),
     ));
 
-    final streamed = await request.send();
+    final streamed = await request.send().timeout(const Duration(seconds: 15));
     final response = await http.Response.fromStream(streamed);
     return _parseResponse(response);
   }
@@ -35,13 +35,13 @@ class FaceAuthService {
       uri,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(body),
-    );
+    ).timeout(const Duration(seconds: 15));
     return _parseResponse(response);
   }
 
   Future<Map<String, dynamic>> _get(String endpoint) async {
     final uri = Uri.parse('$_base$endpoint');
-    final response = await http.get(uri);
+    final response = await http.get(uri).timeout(const Duration(seconds: 15));
     return _parseResponse(response);
   }
 
@@ -50,7 +50,7 @@ class FaceAuthService {
     final response = await http.get(
       uri,
       headers: {'Authorization': 'Bearer $accessToken'},
-    );
+    ).timeout(const Duration(seconds: 15));
     return _parseResponse(response);
   }
 
@@ -69,7 +69,7 @@ class FaceAuthService {
       file.path,
       contentType: MediaType('image', 'jpeg'),
     ));
-    final streamed = await request.send();
+    final streamed = await request.send().timeout(const Duration(seconds: 15));
     final response = await http.Response.fromStream(streamed);
     return _parseResponse(response);
   }

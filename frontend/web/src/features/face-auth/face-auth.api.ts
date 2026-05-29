@@ -13,6 +13,19 @@ type ApiResponse<T> = {
   message?: string
 }
 
+/** Races a promise against a timeout, rejecting with a user-friendly message on timeout. */
+export function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`${label} quá thời gian chờ (${ms / 1000}s). Vui lòng kiểm tra kết nối và thử lại.`)),
+        ms
+      )
+    ),
+  ]);
+}
+
 function extractMessage(payload: unknown): string | null {
   if (!payload || typeof payload !== 'object') {
     return null

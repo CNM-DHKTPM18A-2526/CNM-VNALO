@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { verifyFace, getFaceHealth, faceLogin, lookupUserId } from '../face-auth.api';
+import { verifyFace, getFaceHealth, faceLogin, lookupUserId, withTimeout } from '../face-auth.api';
 import { useAuth } from '../../auth/useAuth';
 
 type FaceLoginModalProps = {
@@ -66,18 +66,6 @@ async function captureFrame(video: HTMLVideoElement): Promise<Blob> {
   });
 }
 
-/** Races a promise against a timeout, rejecting with a user-friendly message on timeout. */
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<never>((_, reject) =>
-      setTimeout(
-        () => reject(new Error(`${label} quá thời gian chờ (${ms / 1000}s). Vui lòng kiểm tra kết nối và thử lại.`)),
-        ms
-      )
-    ),
-  ]);
-}
 
 export function FaceLoginModal({ onClose, onNotEnrolled, onSuccess }: FaceLoginModalProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);

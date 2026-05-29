@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { FaceCapture } from './FaceCapture'
-import { enrollFace, deleteFaceEnrollment, getFaceStatus } from '../face-auth.api'
+import { enrollFace, deleteFaceEnrollment, getFaceStatus, withTimeout } from '../face-auth.api'
 import type { FaceStatusResponse } from '../face-auth.types'
 
 export type FaceSettingsProps = {
@@ -231,7 +231,11 @@ function FaceEnrollmentPanel({
     try {
       const deviceInfo = JSON.stringify({ platform: 'WEB', userAgent: navigator.userAgent })
       // Server enforces liveness — no need to pre-check
-      const result = await enrollFace(token, blob, { deviceInfo })
+      const result = await withTimeout(
+        enrollFace(token, blob, { deviceInfo }),
+        20_000,
+        'Đăng ký khuôn mặt'
+      )
 
       if (result.success) {
         setStep('done')

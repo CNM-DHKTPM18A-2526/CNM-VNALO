@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -114,7 +115,11 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen> {
       if (mounted) {
         setState(() {
           _step = _stepError;
-          _errorMsg = 'Đăng ký thất bại. Vui lòng thử lại.';
+          if (e is TimeoutException) {
+            _errorMsg = 'Quá thời gian chờ máy chủ. Vui lòng thử lại.';
+          } else {
+            _errorMsg = 'Đăng ký thất bại. Vui lòng thử lại.';
+          }
         });
       }
     }
