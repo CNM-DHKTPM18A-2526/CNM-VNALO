@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -12,6 +13,8 @@ import 'package:vnalo_mobile/features/timeline/screens/text_background_screen.da
 import 'package:vnalo_mobile/core/widgets/video_player_widget.dart';
 import 'package:vnalo_mobile/models/post_model.dart';
 import 'package:vnalo_mobile/services/media_service.dart';
+import 'package:photo_manager/photo_manager.dart';
+import 'package:vnalo_mobile/core/widgets/text_background_post_widget.dart';
 
 enum PostType { photo, video, album, textBackground }
 
@@ -47,6 +50,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   String? _selectedTheme;
   bool _isAlbumMode = false;
 
+  // Gallery Panel
+  int _activeTab = -1; // -1: none, 0: smiley, 1: image, 2: video, 3: link, 4: location
+  List<AssetEntity> _recentMedia = [];
+  bool _isLoadingMedia = false;
+  final FocusNode _focusNode = FocusNode();
+
   @override
   void initState() {
     super.initState();
@@ -64,7 +73,53 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   void dispose() {
     _contentController.dispose();
     _albumNameController.dispose();
+    _focusNode.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchRecentMedia(RequestType type) async {
+    final PermissionState ps = await PhotoManager.requestPermissionExtend();
+    if (!ps.isAuth) {
+      return;
+    }
+    setState(() {
+      _isLoadingMedia = true;
+    });
+    
+    final List<AssetPathEntity> paths = await PhotoManager.getAssetPathList(
+      type: type,
+      onlyAll: true,
+    );
+    
+    if (paths.isNotEmpty) {
+      final List<AssetEntity> media = await paths.first.getAssetListPaged(page: 0, size: 20);
+      setState(() {
+        _recentMedia = media;
+        _isLoadingMedia = false;
+      });
+    } else {
+      setState(() {
+        _recentMedia = [];
+        _isLoadingMedia = false;
+      });
+    }
+  }
+
+  void _onTabSelected(int index) {
+    setState(() {
+      if (_activeTab == index && !_focusNode.hasFocus) {
+        _activeTab = -1; // toggle off
+      } else {
+        _activeTab = index;
+        _focusNode.unfocus(); // hide keyboard
+        
+        if (index == 1) { // Image
+          _fetchRecentMedia(RequestType.image);
+        } else if (index == 2) { // Video
+          _fetchRecentMedia(RequestType.video);
+        }
+      }
+    });
   }
 
   Future<void> _pickPhotos() async {
@@ -235,6 +290,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => TextBackgroundScreen(
+          initialTextContent: _currentType == PostType.textBackground ? _contentController.text : null,
           onTextCreated: (content) {
             setState(() {
               _contentController.text = content;
@@ -356,7 +412,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 style: TextStyle(
                   color: isDarkMode ? Colors.white : Colors.black,
                   fontWeight: FontWeight.bold,
-                  fontSize: 17,
+                  fontSize: 18,
                 ),
               )
             : GestureDetector(
@@ -364,14 +420,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      _privacy == 'FRIENDS' ? Icons.group : 
-                      _privacy == 'PRIVATE' ? Icons.lock : 
-                      _privacy == 'SOME_FRIENDS' ? Icons.person_add : Icons.person_remove,
-                      color: isDarkMode ? Colors.white54 : Colors.grey.shade600,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
                     Flexible(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -380,6 +428,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              Icon(Icons.group, color: isDarkMode ? Colors.white : Colors.black, size: 16),
+                              const SizedBox(width: 6),
                               Flexible(
                                 child: Text(
                                   _getPrivacyDisplayTitle(),
@@ -392,7 +442,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                                 ),
                               ),
                               const SizedBox(width: 4),
-                              Icon(Icons.arrow_drop_down, color: isDarkMode ? Colors.white : Colors.black, size: 18),
+                              Icon(Icons.arrow_drop_down, color: isDarkMode ? Colors.white : Colors.black, size: 20),
                             ],
                           ),
                           Text(
@@ -410,114 +460,192 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 ),
               ),
         actions: [
+          if (!_isAlbumMode)
+            GestureDetector(
+              onTap: _openTextBackground,
+              child: Container(
+                margin: const EdgeInsets.only(right: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.blue,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
+                    const Text('Aa', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.brush, color: Colors.white, size: 14),
+                  ],
+                ),
+              ),
+            ),
           if (_isAlbumMode)
             Center(
               child: Padding(
                 padding: const EdgeInsets.only(right: 16),
-                child: TextButton(
-                  onPressed: _isPosting ? null : _createPost,
+                child: GestureDetector(
+                  onTap: _isPosting ? null : _createPost,
                   child: _isPosting
                       ? SizedBox(
                           width: 20, height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                          child: CircularProgressIndicator(strokeWidth: 2, color: isDarkMode ? Colors.white54 : Colors.grey),
                         )
                       : Text(
                           'LƯU',
                           style: TextStyle(
-                            color: AppColors.primary,
+                            color: (_albumNameController.text.trim().isNotEmpty && _selectedFiles.isNotEmpty) 
+                                ? Colors.blue 
+                                : (isDarkMode ? Colors.white38 : Colors.grey.shade400),
                             fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                            fontSize: 15,
                           ),
                         ),
                 ),
               ),
             )
           else
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: GestureDetector(
-                      onTap: (_isPosting || (_contentController.text.trim().isEmpty && _selectedFiles.isEmpty)) 
-                          ? null 
-                          : _createPost,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: (_contentController.text.trim().isNotEmpty || _selectedFiles.isNotEmpty) 
-                              ? AppColors.primary 
-                              : (isDarkMode ? Colors.white24 : Colors.blue.withOpacity(0.4)),
-                          borderRadius: BorderRadius.circular(20),
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: GestureDetector(
+                  onTap: (_isPosting || (_contentController.text.trim().isEmpty && _selectedFiles.isEmpty)) 
+                      ? null 
+                      : _createPost,
+                  child: _isPosting
+                      ? SizedBox(
+                          width: 20, height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: isDarkMode ? Colors.white54 : Colors.grey),
+                        )
+                      : Text(
+                          'Đăng', 
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold, 
+                            fontSize: 15, 
+                            color: (_contentController.text.trim().isNotEmpty || _selectedFiles.isNotEmpty) 
+                                ? Colors.blue 
+                                : (isDarkMode ? Colors.white38 : Colors.grey.shade400),
+                          ),
                         ),
-                        child: _isPosting
-                            ? SizedBox(
-                                width: 16, height: 16,
-                                child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                              )
-                            : const Text(
-                                'Đăng', 
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold, 
-                                  fontSize: 14, 
-                                  color: Colors.white,
-                                ),
-                              ),
-                      ),
-                    ),
-                  ),
                 ),
-              ],
+              ),
             ),
         ],
       ),
-      body: _isAlbumMode ? _buildAlbumMode(context) : _buildNormalMode(context),
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Column(
+          children: [
+            Expanded(
+              child: _isAlbumMode ? _buildAlbumMode(context) : _buildNormalMode(context),
+            ),
+            // Bottom Toolbar and Panel
+            _buildBottomToolbar(isDarkMode),
+            if (_activeTab != -1 && MediaQuery.of(context).viewInsets.bottom == 0 && !_isAlbumMode)
+              _buildGalleryPanel(isDarkMode),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _buildNormalMode(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    return Column(
-      children: [
-        Expanded(
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Content input
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                  child: TextField(
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Content input
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+            child: _currentType == PostType.textBackground && _contentController.text.startsWith('[TEXT_BACKGROUND:')
+                ? GestureDetector(
+                    onTap: _openTextBackground,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: TextBackgroundPostWidget(rawContent: _contentController.text),
+                    ),
+                  )
+                : TextField(
                     controller: _contentController,
+                    focusNode: _focusNode,
                     maxLines: null,
                     minLines: 1,
                     decoration: InputDecoration(
-                      hintText: _currentType == PostType.textBackground 
-                          ? 'Nội dung đã được tạo với nền chữ...' 
-                          : 'Bạn đang nghĩ gì?',
+                      hintText: 'Bạn đang nghĩ gì?',
                       border: InputBorder.none,
-                      hintStyle: TextStyle(color: isDarkMode ? Colors.white38 : Colors.grey, fontSize: 16),
+                      filled: false,
+                      fillColor: Colors.transparent,
+                      hintStyle: TextStyle(
+                        color: isDarkMode ? Colors.white38 : Colors.grey.shade500, 
+                        fontSize: 24,
+                        fontWeight: FontWeight.w400,
+                      ),
+                      contentPadding: EdgeInsets.zero,
                     ),
-                    style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontSize: 16),
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black, 
+                      fontSize: 24,
+                      fontWeight: FontWeight.w400,
+                    ),
                   ),
-                ),
+          ),
 
-                // Outline action buttons row
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    children: [
-                      _buildOutlineButton(Icons.music_note, 'Thêm nhạc', Colors.purple.shade300),
-                      const SizedBox(width: 8),
-                      _buildOutlineButton(Icons.collections, 'Thêm vào album', Colors.green),
-                      const SizedBox(width: 8),
-                      _buildOutlineButton(Icons.local_offer, 'Với bạn bè', Colors.grey.shade700),
-                    ],
+          // Aa Circle avatar + Outline action buttons row
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (_selectedFiles.isEmpty && _contentController.text.trim().isEmpty)
+                  Container(
+                    width: 40,
+                    height: 40,
+                    margin: const EdgeInsets.only(right: 12),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Text('Aa', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isDarkMode ? Colors.white : Colors.black87)),
+                        const Positioned(
+                          right: 2,
+                          bottom: 2,
+                          child: Icon(Icons.color_lens, size: 14, color: Colors.blue),
+                        ),
+                      ],
+                    ),
+                  ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        if (_selectedFiles.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: _buildOutlineButton(Icons.music_note, 'Nhạc', isDarkMode ? Colors.white : Colors.black87),
+                          ),
+                        if (_selectedFiles.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: _buildOutlineButton(Icons.photo_library_outlined, 'Album', isDarkMode ? Colors.white : Colors.black87),
+                          ),
+                        if (_selectedFiles.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: _buildOutlineButton(Icons.collections, 'Thêm vào album', Colors.green),
+                          ),
+                        _buildOutlineButton(Icons.local_offer_outlined, 'Với bạn bè', isDarkMode ? Colors.white : Colors.black87),
+                      ],
+                    ),
                   ),
                 ),
+              ],
+            ),
+          ),
                 
                 const SizedBox(height: 16),
 
@@ -620,12 +748,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   ),
               ],
             ),
-          ),
-        ),
-        
-        // Bottom Toolbar
-        _buildBottomToolbar(isDarkMode),
-      ],
     );
   }
 
@@ -657,59 +779,132 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   Widget _buildBottomToolbar(bool isDarkMode) {
+    if (_isAlbumMode) return const SizedBox.shrink();
+    
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: isDarkMode ? DarkColors.appBarBg : Colors.white,
         border: Border(top: BorderSide(color: isDarkMode ? Colors.white10 : Colors.grey.shade200)),
       ),
       child: SafeArea(
         top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        bottom: _activeTab == -1 && MediaQuery.of(context).viewInsets.bottom == 0,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: [
-                // Text background circle
-                Container(
-                  width: 36,
-                  height: 36,
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: isDarkMode ? Colors.white24 : Colors.grey.shade300),
-                  ),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Text('Aa', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isDarkMode ? Colors.white : Colors.black87)),
-                      const Positioned(
-                        right: 2,
-                        bottom: 2,
-                        child: Icon(Icons.color_lens, size: 12, color: Colors.blue),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            GestureDetector(
+              onTap: () => _onTabSelected(0),
+              child: Icon(Icons.mood, color: _activeTab == 0 ? Colors.blue : (isDarkMode ? Colors.white60 : Colors.grey.shade600), size: 28),
             ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Icon(Icons.face, color: isDarkMode ? Colors.white60 : Colors.grey.shade600, size: 28),
-                GestureDetector(
-                  onTap: _showPhotoOptions,
-                  child: Icon(Icons.photo_outlined, color: isDarkMode ? Colors.white60 : Colors.grey.shade600, size: 28),
-                ),
-                Icon(Icons.play_circle_outline, color: isDarkMode ? Colors.white60 : Colors.grey.shade600, size: 28),
-                Icon(Icons.link, color: isDarkMode ? Colors.white60 : Colors.grey.shade600, size: 28),
-                Icon(Icons.location_on_outlined, color: isDarkMode ? Colors.white60 : Colors.grey.shade600, size: 28),
-              ],
+            GestureDetector(
+              onTap: () => _onTabSelected(1),
+              child: Icon(Icons.photo_outlined, color: _activeTab == 1 ? Colors.blue : (isDarkMode ? Colors.white60 : Colors.grey.shade600), size: 28),
+            ),
+            GestureDetector(
+              onTap: () => _onTabSelected(2),
+              child: Icon(Icons.play_circle_outline, color: _activeTab == 2 ? Colors.blue : (isDarkMode ? Colors.white60 : Colors.grey.shade600), size: 28),
+            ),
+            GestureDetector(
+              onTap: () => _onTabSelected(3),
+              child: Icon(Icons.link, color: _activeTab == 3 ? Colors.blue : (isDarkMode ? Colors.white60 : Colors.grey.shade600), size: 28),
+            ),
+            GestureDetector(
+              onTap: () => _onTabSelected(4),
+              child: Icon(Icons.location_on_outlined, color: _activeTab == 4 ? Colors.blue : (isDarkMode ? Colors.white60 : Colors.grey.shade600), size: 28),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildGalleryPanel(bool isDarkMode) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.4,
+      color: isDarkMode ? DarkColors.scaffold : Colors.white,
+      child: _isLoadingMedia 
+          ? const Center(child: CircularProgressIndicator())
+          : GridView.builder(
+              padding: const EdgeInsets.all(2),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 2,
+                mainAxisSpacing: 2,
+              ),
+              itemCount: _recentMedia.length + 1,
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  return GestureDetector(
+                    onTap: _activeTab == 1 ? _takePhoto : _pickVideos,
+                    child: Container(
+                      color: isDarkMode ? Colors.white10 : Colors.grey.shade100,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(_activeTab == 1 ? Icons.camera_alt_outlined : Icons.videocam_outlined, 
+                               size: 32, color: isDarkMode ? Colors.white54 : Colors.black54),
+                          const SizedBox(height: 8),
+                          Text(_activeTab == 1 ? 'Chụp ảnh' : 'Quay video', 
+                               style: TextStyle(fontSize: 13, color: isDarkMode ? Colors.white70 : Colors.black87)),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+                
+                final asset = _recentMedia[index - 1];
+                return GestureDetector(
+                  onTap: () async {
+                    final file = await asset.file;
+                    if (file != null) {
+                      setState(() {
+                        _selectedFiles.add(file);
+                        _currentType = _activeTab == 1 ? PostType.photo : PostType.video;
+                      });
+                    }
+                  },
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      FutureBuilder<Uint8List?>(
+                        future: asset.thumbnailDataWithSize(const ThumbnailSize.square(200)),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+                          }
+                          if (snapshot.hasData && snapshot.data != null) {
+                            return Image.memory(snapshot.data!, fit: BoxFit.cover);
+                          }
+                          return Container(color: Colors.grey.shade300);
+                        },
+                      ),
+                      if (asset.type == AssetType.video)
+                        Positioned(
+                          bottom: 4,
+                          right: 4,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(4)),
+                            child: Text(
+                              _formatDuration(asset.videoDuration),
+                              style: const TextStyle(color: Colors.white, fontSize: 10),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
+    );
+  }
+
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, "0");
+    String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
+    String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
+    return "$twoDigitMinutes:$twoDigitSeconds";
   }
 
   Widget _buildAlbumMode(BuildContext context) {
@@ -724,40 +919,44 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         children: [
           // Album name input (large, bold placeholder)
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+            padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
             child: TextField(
               controller: _albumNameController,
               decoration: InputDecoration(
                 hintText: 'Nhập tên album',
                 hintStyle: TextStyle(
-                  color: isDarkMode ? Colors.white30 : Colors.grey.shade300,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w500,
+                  color: isDarkMode ? Colors.white38 : Colors.grey.shade400,
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
                 ),
                 border: InputBorder.none,
+                filled: false,
+                fillColor: Colors.transparent,
                 contentPadding: EdgeInsets.zero,
               ),
               style: TextStyle(
                 color: textPrimary,
-                fontSize: 22,
-                fontWeight: FontWeight.w500,
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ),
 
           // Description input (smaller, not required)
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: TextField(
               controller: _contentController,
               maxLines: 3,
               decoration: InputDecoration(
                 hintText: 'Thêm mô tả (không bắt buộc)',
-                hintStyle: TextStyle(color: textHint, fontSize: 15),
+                hintStyle: TextStyle(color: textHint, fontSize: 16),
                 border: InputBorder.none,
+                filled: false,
+                fillColor: Colors.transparent,
                 contentPadding: EdgeInsets.zero,
               ),
-              style: TextStyle(color: textPrimary, fontSize: 15),
+              style: TextStyle(color: textPrimary, fontSize: 16),
             ),
           ),
 
@@ -914,9 +1113,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               Text(
                 'Chưa có ảnh nào',
                 style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                  color: isDarkMode ? Colors.white60 : Colors.black54,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: isDarkMode ? Colors.white : Colors.black87,
                 ),
               ),
               const SizedBox(height: 6),
@@ -924,22 +1123,22 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 'Thêm ảnh tại đây để xem trước cùng với\nchủ đề trang trí.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 13,
-                  color: isDarkMode ? Colors.white38 : Colors.grey.shade500,
+                  fontSize: 14,
+                  color: isDarkMode ? Colors.white54 : Colors.grey.shade500,
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _showPhotoOptions,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
+                  backgroundColor: Colors.blueAccent,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                  padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
                 ),
                 child: const Text(
                   'THÊM ẢNH',
-                  style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1),
+                  style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5, fontSize: 14),
                 ),
               ),
             ],
@@ -1090,7 +1289,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   String _getPrivacyDisplayTitle() {
     switch (_privacy) {
       case 'FRIENDS':
-        return 'Bạn bè VNALO';
+        return 'Bạn bè Zalo';
       case 'PRIVATE':
         return 'Chỉ mình tôi';
       case 'SOME_FRIENDS':
@@ -1098,14 +1297,14 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       case 'FRIENDS_EXCEPT':
         return 'Bạn bè ngoại trừ...';
       default:
-        return 'Bạn bè VNALO';
+        return 'Bạn bè Zalo';
     }
   }
 
   String _getPrivacyDisplaySubtitle() {
     switch (_privacy) {
       case 'FRIENDS':
-        return 'Tất cả bạn bè trên VNALO';
+        return 'Trừ bạn bè đã bị chặn xem';
       case 'PRIVATE':
         return 'Chỉ mình bạn được xem';
       case 'SOME_FRIENDS':
@@ -1117,7 +1316,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           ? 'Chọn những bạn bè không được xem'
           : '${_excludedFriendIds.length} người bị loại trừ';
       default:
-        return 'Tất cả bạn bè trên VNALO';
+        return 'Trừ bạn bè đã bị chặn xem';
     }
   }
 

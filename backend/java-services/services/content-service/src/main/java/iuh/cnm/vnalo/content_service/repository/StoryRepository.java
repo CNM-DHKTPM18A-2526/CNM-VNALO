@@ -18,9 +18,7 @@ public interface StoryRepository extends JpaRepository<Story, UUID> {
     @Query(value = "SELECT * FROM content.story s WHERE s.status = :status AND s.expires_at > :now AND (" +
             " s.author_id = :userId OR " +
             " s.visibility = 'PUBLIC' OR " +
-            " s.visibility = 'FRIENDS' OR " +
-            " (s.visibility = 'SOME_FRIENDS' AND s.included_ids @> CAST(CONCAT('[', '\"', CAST(:userId AS text), '\"', ']') AS jsonb)) OR " +
-            " (s.visibility = 'FRIENDS_EXCEPT' AND NOT (s.excluded_ids @> CAST(CONCAT('[', '\"', CAST(:userId AS text), '\"', ']') AS jsonb))) " +
+            " s.visibility = 'FRIENDS' " +
             ") ORDER BY s.created_at DESC", nativeQuery = true)
     List<Story> findActiveStoriesForUser(
             @Param("status") String status,

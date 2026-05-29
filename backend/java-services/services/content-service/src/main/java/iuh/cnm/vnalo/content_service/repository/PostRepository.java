@@ -16,16 +16,12 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
     @Query(value = "SELECT * FROM content.post p WHERE p.status = :status AND (" +
             " p.author_id = :userId OR " +
             " p.visibility = 'PUBLIC' OR " +
-            " p.visibility = 'FRIENDS' OR " +
-            " (p.visibility = 'SOME_FRIENDS' AND p.included_ids @> CAST(CONCAT('[', '\"', CAST(:userId AS text), '\"', ']') AS jsonb)) OR " +
-            " (p.visibility = 'FRIENDS_EXCEPT' AND NOT (p.excluded_ids @> CAST(CONCAT('[', '\"', CAST(:userId AS text), '\"', ']') AS jsonb))) " +
+            " p.visibility = 'FRIENDS' " +
             ") ORDER BY p.created_at DESC",
             countQuery = "SELECT count(*) FROM content.post p WHERE p.status = :status AND (" +
             " p.author_id = :userId OR " +
             " p.visibility = 'PUBLIC' OR " +
-            " p.visibility = 'FRIENDS' OR " +
-            " (p.visibility = 'SOME_FRIENDS' AND p.included_ids @> CAST(CONCAT('[', '\"', CAST(:userId AS text), '\"', ']') AS jsonb)) OR " +
-            " (p.visibility = 'FRIENDS_EXCEPT' AND NOT (p.excluded_ids @> CAST(CONCAT('[', '\"', CAST(:userId AS text), '\"', ']') AS jsonb))) " +
+            " p.visibility = 'FRIENDS' " +
             ")",
             nativeQuery = true)
     Page<Post> findTimelineForUser(@Param("status") String status, @Param("userId") UUID userId, Pageable pageable);
@@ -33,16 +29,12 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
     @Query(value = "SELECT * FROM content.post p WHERE p.status = :status AND p.author_id = :targetUserId AND (" +
             " :targetUserId = :requesterId OR " +
             " p.visibility = 'PUBLIC' OR " +
-            " p.visibility = 'FRIENDS' OR " +
-            " (p.visibility = 'SOME_FRIENDS' AND p.included_ids @> CAST(CONCAT('[', '\"', CAST(:requesterId AS text), '\"', ']') AS jsonb)) OR " +
-            " (p.visibility = 'FRIENDS_EXCEPT' AND NOT (p.excluded_ids @> CAST(CONCAT('[', '\"', CAST(:requesterId AS text), '\"', ']') AS jsonb))) " +
+            " p.visibility = 'FRIENDS' " +
             ") ORDER BY p.created_at DESC",
             countQuery = "SELECT count(*) FROM content.post p WHERE p.status = :status AND p.author_id = :targetUserId AND (" +
             " :targetUserId = :requesterId OR " +
             " p.visibility = 'PUBLIC' OR " +
-            " p.visibility = 'FRIENDS' OR " +
-            " (p.visibility = 'SOME_FRIENDS' AND p.included_ids @> CAST(CONCAT('[', '\"', CAST(:requesterId AS text), '\"', ']') AS jsonb)) OR " +
-            " (p.visibility = 'FRIENDS_EXCEPT' AND NOT (p.excluded_ids @> CAST(CONCAT('[', '\"', CAST(:requesterId AS text), '\"', ']') AS jsonb))) " +
+            " p.visibility = 'FRIENDS' " +
             ")",
             nativeQuery = true)
     Page<Post> findTimelineForUserProfile(

@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 
+import 'package:vnalo_mobile/core/utils/text_background_utils.dart';
+
 class TextBackgroundScreen extends StatefulWidget {
   final Function(String) onTextCreated;
+  final String? initialTextContent;
 
-  const TextBackgroundScreen({super.key, required this.onTextCreated});
+  const TextBackgroundScreen({
+    super.key, 
+    required this.onTextCreated,
+    this.initialTextContent,
+  });
 
   @override
   State<TextBackgroundScreen> createState() => _TextBackgroundScreenState();
@@ -20,27 +27,24 @@ class _TextBackgroundScreenState extends State<TextBackgroundScreen> {
   bool _isItalic = false;
   int _textAlign = 1; // 0=left, 1=center, 2=right
 
-  final List<Map<String, dynamic>> _backgrounds = [
-    {'id': 'gradient_blue',    'name': 'Xanh dương', 'colors': [const Color(0xFF667eea), const Color(0xFF764ba2)]},
-    {'id': 'gradient_pink',    'name': 'Hồng',        'colors': [const Color(0xFFf093fb), const Color(0xFFf5576c)]},
-    {'id': 'gradient_green',   'name': 'Xanh lá',     'colors': [const Color(0xFF11998e), const Color(0xFF38ef7d)]},
-    {'id': 'gradient_orange',  'name': 'Cam',          'colors': [const Color(0xFFff9a9e), const Color(0xFFfecfef)]},
-    {'id': 'gradient_sunset',  'name': 'Hoàng hôn',   'colors': [const Color(0xFFffecd2), const Color(0xFFfcb69f)]},
-    {'id': 'gradient_purple',  'name': 'Tím',          'colors': [const Color(0xFFa18cd1), const Color(0xFFfbc2eb)]},
-    {'id': 'gradient_love',    'name': 'Yêu thương',  'colors': [const Color(0xFFff9a9e), const Color(0xFFfad0c4)]},
-    {'id': 'gradient_galaxy',  'name': 'Vũ trụ',      'colors': [const Color(0xFF0f0c29), const Color(0xFF302b63), const Color(0xFF24243e)]},
-    {'id': 'gradient_ocean',   'name': 'Biển',         'colors': [const Color(0xFF2c3e50), const Color(0xFF4ca1af)]},
-    {'id': 'gradient_fire',    'name': 'Lửa',          'colors': [const Color(0xFFff416c), const Color(0xFFff4b2b)]},
-    {'id': 'gradient_gold',    'name': 'Vàng',         'colors': [const Color(0xFFf7971e), const Color(0xFFffd200)]},
-    {'id': 'gradient_night',   'name': 'Đêm',          'colors': [const Color(0xFF232526), const Color(0xFF414345)]},
-  ];
-
-  final List<Map<String, dynamic>> _fonts = [
-    {'id': 'Default',   'name': 'Mặc định', 'family': null},
-    {'id': 'Serif',     'name': 'Serif',    'family': 'serif'},
-    {'id': 'Monospace', 'name': 'Mono',     'family': 'monospace'},
-    {'id': 'Cursive',   'name': 'Nghiêng',  'family': 'cursive'},
-  ];
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialTextContent != null && widget.initialTextContent!.startsWith('[TEXT_BACKGROUND:')) {
+      final regex = RegExp(r'^\[TEXT_BACKGROUND:(.*?)\|(.*?)\|(\d+)\|(\d+)\|(.*?)\|(.*?)\|(\d+)\](.*)$', dotAll: true);
+      final match = regex.firstMatch(widget.initialTextContent!);
+      if (match != null) {
+        _selectedBgId = match.group(1)!;
+        _selectedFontId = match.group(2)!;
+        _textColor = Color(int.tryParse(match.group(3)!) ?? Colors.white.value);
+        _fontSize = double.tryParse(match.group(4)!) ?? 28.0;
+        _fontWeight = match.group(5) == 'bold' ? FontWeight.bold : FontWeight.w500;
+        _isItalic = match.group(6) == 'true';
+        _textAlign = int.tryParse(match.group(7)!) ?? 1;
+        _textController.text = match.group(8)!;
+      }
+    }
+  }
 
   final List<Color> _textColors = [
     Colors.white,
@@ -57,15 +61,8 @@ class _TextBackgroundScreenState extends State<TextBackgroundScreen> {
     const Color(0xFFFF6F00),
   ];
 
-  List<Color> get _bgColors {
-    final bg = _backgrounds.firstWhere((b) => b['id'] == _selectedBgId, orElse: () => {'colors': [Colors.blue]});
-    return (bg['colors'] as List<Color>?) ?? [Colors.blue];
-  }
-
-  String? get _fontFamily {
-    final font = _fonts.firstWhere((f) => f['id'] == _selectedFontId, orElse: () => {'family': null});
-    return font['family'] as String?;
-  }
+  List<Color> get _bgColors => TextBackgroundUtils.getBgColors(_selectedBgId);
+  String? get _fontFamily => TextBackgroundUtils.getFontFamily(_selectedFontId);
 
   TextAlign get _textAlignValue {
     switch (_textAlign) {
@@ -89,9 +86,9 @@ class _TextBackgroundScreenState extends State<TextBackgroundScreen> {
       return;
     }
     final content =
-        '[TEXT_BACKGROUND:$_selectedBgId|$_selectedFontId|${_textColor.toARGB32()}|${_fontSize.toInt()}|${_fontWeight == FontWeight.bold ? 'bold' : 'normal'}|$_isItalic|$_textAlign]${_textController.text}';
-    widget.onTextCreated(content);
+        '[TEXT_BACKGROUND:$_selectedBgId|$_selectedFontId|${_textColor.value}|${_fontSize.toInt()}|${_fontWeight == FontWeight.bold ? 'bold' : 'normal'}|$_isItalic|$_textAlign]${_textController.text}';
     Navigator.pop(context);
+    widget.onTextCreated(content);
   }
 
   @override
@@ -181,6 +178,8 @@ class _TextBackgroundScreenState extends State<TextBackgroundScreen> {
                             fontWeight: _fontWeight,
                           ),
                           border: InputBorder.none,
+                          filled: false,
+                          fillColor: Colors.transparent,
                         ),
                       ),
                     ),
@@ -225,51 +224,54 @@ class _TextBackgroundScreenState extends State<TextBackgroundScreen> {
                 // ---- Row 1: Text formatting tools ----
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                  child: Row(
-                    children: [
-                      // Bold
-                      _buildFormatButton(
-                        label: 'B',
-                        weight: FontWeight.bold,
-                        isActive: _fontWeight == FontWeight.bold,
-                        onTap: () => setState(() {
-                          _fontWeight = _fontWeight == FontWeight.bold ? FontWeight.normal : FontWeight.bold;
-                        }),
-                        isDarkMode: isDarkMode,
-                      ),
-                      const SizedBox(width: 8),
-                      // Italic
-                      _buildFormatButton(
-                        label: 'I',
-                        weight: FontWeight.normal,
-                        isActive: _isItalic,
-                        isItalic: true,
-                        onTap: () => setState(() => _isItalic = !_isItalic),
-                        isDarkMode: isDarkMode,
-                      ),
-                      const SizedBox(width: 16),
-                      // Font size -
-                      _buildSizeButton(Icons.text_decrease, () {
-                        if (_fontSize > 14) setState(() => _fontSize -= 2);
-                      }, isDarkMode),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${_fontSize.toInt()}',
-                        style: TextStyle(
-                          color: isDarkMode ? Colors.white70 : Colors.black54,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        // Bold
+                        _buildFormatButton(
+                          label: 'B',
+                          weight: FontWeight.bold,
+                          isActive: _fontWeight == FontWeight.bold,
+                          onTap: () => setState(() {
+                            _fontWeight = _fontWeight == FontWeight.bold ? FontWeight.normal : FontWeight.bold;
+                          }),
+                          isDarkMode: isDarkMode,
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Font size +
-                      _buildSizeButton(Icons.text_increase, () {
-                        if (_fontSize < 52) setState(() => _fontSize += 2);
-                      }, isDarkMode),
-                      const Spacer(),
-                      // Font selector chips
-                      ..._fonts.map((f) => _buildFontChip(f, isDarkMode)),
-                    ],
+                        const SizedBox(width: 8),
+                        // Italic
+                        _buildFormatButton(
+                          label: 'I',
+                          weight: FontWeight.normal,
+                          isActive: _isItalic,
+                          isItalic: true,
+                          onTap: () => setState(() => _isItalic = !_isItalic),
+                          isDarkMode: isDarkMode,
+                        ),
+                        const SizedBox(width: 16),
+                        // Font size -
+                        _buildSizeButton(Icons.text_decrease, () {
+                          if (_fontSize > 14) setState(() => _fontSize -= 2);
+                        }, isDarkMode),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${_fontSize.toInt()}',
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white70 : Colors.black54,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Font size +
+                        _buildSizeButton(Icons.text_increase, () {
+                          if (_fontSize < 52) setState(() => _fontSize += 2);
+                        }, isDarkMode),
+                        const SizedBox(width: 16),
+                        // Font selector chips
+                        ...TextBackgroundUtils.fonts.map((f) => _buildFontChip(f, isDarkMode)),
+                      ],
+                    ),
                   ),
                 ),
 
@@ -279,9 +281,9 @@ class _TextBackgroundScreenState extends State<TextBackgroundScreen> {
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: _backgrounds.length,
+                    itemCount: TextBackgroundUtils.backgrounds.length,
                     itemBuilder: (context, i) {
-                      final bg = _backgrounds[i];
+                      final bg = TextBackgroundUtils.backgrounds[i];
                       final colors = bg['colors'] as List<Color>;
                       final isSelected = _selectedBgId == bg['id'];
                       return GestureDetector(
@@ -318,7 +320,7 @@ class _TextBackgroundScreenState extends State<TextBackgroundScreen> {
                     itemCount: _textColors.length,
                     itemBuilder: (context, i) {
                       final color = _textColors[i];
-                      final isSelected = _textColor.toARGB32() == color.toARGB32();
+                      final isSelected = _textColor.value == color.value;
                       return GestureDetector(
                         onTap: () => setState(() => _textColor = color),
                         child: Container(
@@ -331,7 +333,7 @@ class _TextBackgroundScreenState extends State<TextBackgroundScreen> {
                             border: Border.all(
                               color: isSelected
                                   ? AppColors.primary
-                                  : (color.toARGB32() == Colors.white.toARGB32()
+                                  : (color.value == Colors.white.value
                                       ? Colors.grey.shade400
                                       : Colors.transparent),
                               width: isSelected ? 3 : 1.5,
@@ -344,7 +346,7 @@ class _TextBackgroundScreenState extends State<TextBackgroundScreen> {
                               ? Icon(
                                   Icons.check,
                                   size: 16,
-                                  color: color.toARGB32() == Colors.white.toARGB32() ? Colors.black : Colors.white,
+                                  color: color.value == Colors.white.value ? Colors.black : Colors.white,
                                 )
                               : null,
                         ),

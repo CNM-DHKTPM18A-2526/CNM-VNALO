@@ -4,7 +4,6 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.time.OffsetDateTime;
-import java.util.List;
 import java.util.UUID;
 
 @Getter
@@ -20,10 +19,6 @@ public class StoryResponse {
     private String caption;
 
     private String visibility;
-
-    private List<String> includedIds;
-
-    private List<String> excludedIds;
 
     private OffsetDateTime expiresAt;
 

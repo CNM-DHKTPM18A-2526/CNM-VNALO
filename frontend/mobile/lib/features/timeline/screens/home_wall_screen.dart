@@ -20,6 +20,7 @@ import 'package:vnalo_mobile/features/timeline/screens/comment_bottom_sheet.dart
 import 'package:vnalo_mobile/features/timeline/screens/reactions_bottom_sheet.dart';
 import 'package:vnalo_mobile/core/widgets/video_player_widget.dart';
 import 'package:vnalo_mobile/core/widgets/reaction_popup.dart';
+import 'package:vnalo_mobile/core/widgets/text_background_post_widget.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
@@ -632,7 +633,9 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
           if ((post.content as String).isNotEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-              child: _ExpandableText(post.content as String, isDarkMode),
+              child: (post.content as String).startsWith('[TEXT_BACKGROUND:')
+                  ? TextBackgroundPostWidget(rawContent: post.content as String)
+                  : _ExpandableText(post.content as String, isDarkMode),
             ),
 
           // ─── Media ────────────────────────────────────────

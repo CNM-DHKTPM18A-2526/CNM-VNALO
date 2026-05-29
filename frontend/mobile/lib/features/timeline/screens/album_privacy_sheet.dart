@@ -36,10 +36,17 @@ class _AlbumPrivacySheetState extends State<AlbumPrivacySheet> {
 
   final List<Map<String, dynamic>> _privacyOptions = [
     {
+      'value': 'PUBLIC',
+      'title': 'Tất cả mọi người',
+      'subtitle': 'Bất kỳ ai cũng có thể xem',
+      'icon': Icons.public,
+      'iconColor': Colors.blue,
+    },
+    {
       'value': 'FRIENDS',
       'title': 'Bạn bè VNALO',
-      'subtitle': 'Tất cả bạn bè trên VNALO',
-      'icon': Icons.group_outlined,
+      'subtitle': 'Chỉ bạn bè trên VNALO mới xem được',
+      'icon': Icons.people_outline,
       'iconColor': const Color(0xFF607D8B),
     },
     {
@@ -47,20 +54,6 @@ class _AlbumPrivacySheetState extends State<AlbumPrivacySheet> {
       'title': 'Chỉ mình tôi',
       'subtitle': 'Chỉ mình bạn được xem',
       'icon': Icons.lock_outline,
-      'iconColor': const Color(0xFF607D8B),
-    },
-    {
-      'value': 'SOME_FRIENDS',
-      'title': 'Một số bạn bè',
-      'subtitle': 'Chọn những bạn bè được xem',
-      'icon': Icons.person_add_outlined,
-      'iconColor': const Color(0xFF607D8B),
-    },
-    {
-      'value': 'FRIENDS_EXCEPT',
-      'title': 'Bạn bè ngoại trừ...',
-      'subtitle': 'Chọn những bạn bè không được xem',
-      'icon': Icons.person_remove_outlined,
       'iconColor': const Color(0xFF607D8B),
     },
   ];

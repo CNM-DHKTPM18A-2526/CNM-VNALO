@@ -34,8 +34,6 @@ public class PostService {
                 .contentText(request.getContentText())
                 .mediaUrls(request.getMediaUrls() != null ? request.getMediaUrls() : new ArrayList<>())
                 .visibility(visibility)
-                .includedIds(request.getIncludedIds() != null ? request.getIncludedIds() : new ArrayList<>())
-                .excludedIds(request.getExcludedIds() != null ? request.getExcludedIds() : new ArrayList<>())
                 .status("ACTIVE")
                 .build();
 
@@ -114,14 +112,6 @@ public class PostService {
             post.setVisibility(normalizeVisibility(request.getVisibility()));
         }
 
-        if (request.getIncludedIds() != null) {
-            post.setIncludedIds(request.getIncludedIds());
-        }
-
-        if (request.getExcludedIds() != null) {
-            post.setExcludedIds(request.getExcludedIds());
-        }
-
         Post saved = postRepository.saveAndFlush(post);
         return toResponse(saved);
     }
@@ -160,7 +150,7 @@ public class PostService {
 
         String normalized = visibility.trim().toUpperCase(Locale.ROOT);
         return switch (normalized) {
-            case "PUBLIC", "FRIENDS", "PRIVATE", "SOME_FRIENDS", "FRIENDS_EXCEPT" -> normalized;
+            case "PUBLIC", "FRIENDS", "PRIVATE" -> normalized;
             default -> "PUBLIC";
         };
     }
@@ -170,8 +160,6 @@ public class PostService {
         
         return switch (post.getVisibility()) {
             case "PUBLIC", "FRIENDS" -> true; // content-service doesn't enforce friends
-            case "SOME_FRIENDS" -> post.getIncludedIds() != null && post.getIncludedIds().contains(userId.toString());
-            case "FRIENDS_EXCEPT" -> post.getExcludedIds() == null || !post.getExcludedIds().contains(userId.toString());
             case "PRIVATE" -> false;
             default -> false;
         };
@@ -184,8 +172,6 @@ public class PostService {
                 .contentText(post.getContentText())
                 .mediaUrls(post.getMediaUrls())
                 .visibility(post.getVisibility())
-                .includedIds(post.getIncludedIds())
-                .excludedIds(post.getExcludedIds())
                 .likeCount(post.getLikeCount())
                 .commentCount(post.getCommentCount())
                 .shareCount(post.getShareCount())

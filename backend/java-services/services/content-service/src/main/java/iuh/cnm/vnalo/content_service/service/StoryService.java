@@ -36,7 +36,7 @@ public class StoryService {
 
         String normalized = visibility.trim().toUpperCase();
         return switch (normalized) {
-            case "PUBLIC", "FRIENDS", "PRIVATE", "SOME_FRIENDS", "FRIENDS_EXCEPT" -> normalized;
+            case "PUBLIC", "FRIENDS", "PRIVATE" -> normalized;
             default -> "PUBLIC";
         };
     }
@@ -46,8 +46,6 @@ public class StoryService {
 
         return switch (story.getVisibility()) {
             case "PUBLIC", "FRIENDS" -> true;
-            case "SOME_FRIENDS" -> story.getIncludedIds() != null && story.getIncludedIds().contains(userId.toString());
-            case "FRIENDS_EXCEPT" -> story.getExcludedIds() == null || !story.getExcludedIds().contains(userId.toString());
             case "PRIVATE" -> false;
             default -> false;
         };
@@ -60,8 +58,6 @@ public class StoryService {
                 .mediaUrl(request.getMediaUrl())
                 .caption(request.getCaption())
                 .visibility(normalizeVisibility(request.getVisibility()))
-                .includedIds(request.getIncludedIds() != null ? request.getIncludedIds() : List.of())
-                .excludedIds(request.getExcludedIds() != null ? request.getExcludedIds() : List.of())
                 .status("ACTIVE")
                 .expiresAt(OffsetDateTime.now().plusHours(24))
                 .build();
@@ -211,8 +207,6 @@ public class StoryService {
                 .mediaUrl(story.getMediaUrl())
                 .caption(story.getCaption())
                 .visibility(story.getVisibility())
-                .includedIds(story.getIncludedIds())
-                .excludedIds(story.getExcludedIds())
                 .expiresAt(story.getExpiresAt())
                 .createdAt(story.getCreatedAt())
                 .build();
