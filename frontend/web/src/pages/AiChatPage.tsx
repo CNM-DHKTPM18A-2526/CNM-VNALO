@@ -861,7 +861,7 @@ export function AiChatPage() {
                 onClick={() => void handleSend(fixMojibakeText(prompt))}
                 disabled={isAssistantBusy}
               >
-                {prompt}
+                {fixMojibakeText(prompt)}
               </button>
             ))}
           </section>
@@ -964,7 +964,7 @@ export function AiChatPage() {
                 }
               }}
             />
-            <button type='submit' className='ai-send-btn' disabled={isAssistantBusy || !inputValue.trim()}>
+            <button type='submit' className='ai-send-btn' disabled={isAssistantBusy || !inputValue.trim()} aria-label='Gửi tin nhắn cho trợ lý AI'>
               <Send size={18} />
             </button>
             <span className='ai-input-hint'>Enter để gửi, Shift + Enter để xuống dòng</span>
