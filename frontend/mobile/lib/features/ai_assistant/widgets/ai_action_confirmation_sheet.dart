@@ -6,6 +6,8 @@ import 'package:vnalo_mobile/features/ai_assistant/theme/ai_assistant_tokens.dar
 enum AiActionConfirmationResult { cancelled, confirmed, alternate }
 
 class AiActionConfirmationSheet extends StatelessWidget {
+  static const double actionButtonHeight = 56;
+
   final IconData icon;
   final String title;
   final String description;
@@ -257,9 +259,11 @@ class AiActionConfirmationSheet extends StatelessWidget {
                   ],
                   const SizedBox(height: 16),
                   SizedBox(
+                    key: const ValueKey('ai_action_confirm_button_box'),
                     width: double.infinity,
-                    height: 48,
+                    height: actionButtonHeight,
                     child: ElevatedButton(
+                      key: const ValueKey('ai_action_confirm_button'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: accent,
                         foregroundColor: Colors.white,
@@ -286,9 +290,11 @@ class AiActionConfirmationSheet extends StatelessWidget {
                   if (alternateLabel != null) ...[
                     const SizedBox(height: 10),
                     SizedBox(
+                      key: const ValueKey('ai_action_alternate_button_box'),
                       width: double.infinity,
-                      height: 48,
+                      height: actionButtonHeight,
                       child: ElevatedButton(
+                        key: const ValueKey('ai_action_alternate_button'),
                         onPressed:
                             () => Navigator.of(
                               context,
@@ -316,9 +322,11 @@ class AiActionConfirmationSheet extends StatelessWidget {
                   ],
                   const SizedBox(height: 12),
                   SizedBox(
+                    key: const ValueKey('ai_action_cancel_button_box'),
                     width: double.infinity,
-                    height: 48,
+                    height: actionButtonHeight,
                     child: ElevatedButton(
+                      key: const ValueKey('ai_action_cancel_button'),
                       onPressed:
                           () => Navigator.of(
                             context,

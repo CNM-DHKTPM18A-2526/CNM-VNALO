@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vnalo_mobile/features/ai_assistant/theme/ai_assistant_tokens.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_action_confirmation_sheet.dart';
 import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_conversation_disambiguation_sheet.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
@@ -203,7 +204,6 @@ void main() {
     expect(await result, isNull);
   });
 
-
   testWidgets('AI confirmation sheet keeps description aligned with icon block', (
     tester,
   ) async {
@@ -237,13 +237,14 @@ void main() {
     await tester.pumpAndSettle();
 
     final titleTop = tester.getTopLeft(find.text('Xác nhận gọi thoại')).dy;
-    final descTop = tester
-        .getTopLeft(
-          find.text(
-            'Trợ lý sẽ bắt đầu cuộc gọi tới liên hệ đã chọn sau khi bạn xác nhận.',
-          ),
-        )
-        .dy;
+    final descTop =
+        tester
+            .getTopLeft(
+              find.text(
+                'Trợ lý sẽ bắt đầu cuộc gọi tới liên hệ đã chọn sau khi bạn xác nhận.',
+              ),
+            )
+            .dy;
 
     expect(descTop, greaterThan(titleTop));
     expect(tester.takeException(), isNull);
@@ -296,6 +297,82 @@ void main() {
     expect(find.text('Bắt đầu gọi'), findsOneWidget);
     expect(find.text('Hủy'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('AI confirmation sheet uses auth-like pill action buttons', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder:
+              (context) => Scaffold(
+                body: Center(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      AiActionConfirmationSheet.showForResult(
+                        context,
+                        icon: Icons.call_rounded,
+                        title: 'Xác nhận gọi thoại',
+                        description: 'Kiểm tra chuẩn button pill.',
+                        confirmLabel: 'Bắt đầu gọi',
+                        alternateLabel: 'Gửi ngay',
+                      );
+                    },
+                    child: const Text('Open'),
+                  ),
+                ),
+              ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    final confirmBox = tester.widget<SizedBox>(
+      find.byKey(const ValueKey('ai_action_confirm_button_box')),
+    );
+    final alternateBox = tester.widget<SizedBox>(
+      find.byKey(const ValueKey('ai_action_alternate_button_box')),
+    );
+    final cancelBox = tester.widget<SizedBox>(
+      find.byKey(const ValueKey('ai_action_cancel_button_box')),
+    );
+
+    expect(confirmBox.height, AiActionConfirmationSheet.actionButtonHeight);
+    expect(alternateBox.height, AiActionConfirmationSheet.actionButtonHeight);
+    expect(cancelBox.height, AiActionConfirmationSheet.actionButtonHeight);
+
+    final confirmButton = tester.widget<ElevatedButton>(
+      find.byKey(const ValueKey('ai_action_confirm_button')),
+    );
+    final alternateButton = tester.widget<ElevatedButton>(
+      find.byKey(const ValueKey('ai_action_alternate_button')),
+    );
+    final cancelButton = tester.widget<ElevatedButton>(
+      find.byKey(const ValueKey('ai_action_cancel_button')),
+    );
+
+    final confirmShape =
+        confirmButton.style?.shape?.resolve({}) as RoundedRectangleBorder?;
+    final alternateShape =
+        alternateButton.style?.shape?.resolve({}) as RoundedRectangleBorder?;
+    final cancelShape =
+        cancelButton.style?.shape?.resolve({}) as RoundedRectangleBorder?;
+
+    expect(
+      confirmShape?.borderRadius,
+      BorderRadius.circular(AiAssistantTokens.pillRadius),
+    );
+    expect(
+      alternateShape?.borderRadius,
+      BorderRadius.circular(AiAssistantTokens.pillRadius),
+    );
+    expect(
+      cancelShape?.borderRadius,
+      BorderRadius.circular(AiAssistantTokens.pillRadius),
+    );
   });
 
   testWidgets('AI disambiguation sheet remains stable on compact viewport', (
