@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/models/message_reaction_model.dart';
 import 'package:vnalo_mobile/models/user_model.dart';
 
@@ -93,22 +94,10 @@ class ReactionDetailScreen extends StatelessWidget {
                   ),
                   child: ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    leading: CircleAvatar(
-                      radius: 20,
-                      backgroundImage: user?.avatarUrl != null
-                          ? NetworkImage(user!.avatarUrl!)
-                          : null,
-                      backgroundColor: Colors.grey[300],
-                      child: user?.avatarUrl == null
-                          ? Text(
-                              user?.displayName?.substring(0, 1).toUpperCase() ?? 'U',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            )
-                          : null,
+                    leading: AvatarWidget(
+                      imageUrl: user?.avatarUrl,
+                      name: user?.displayName ?? user?.phone ?? 'Unknown',
+                      size: 40,
                     ),
                     title: Text(
                       user?.displayName ?? user?.phone ?? 'Unknown',
@@ -152,3 +141,5 @@ class ReactionDetailScreen extends StatelessWidget {
     }
   }
 }
+
+

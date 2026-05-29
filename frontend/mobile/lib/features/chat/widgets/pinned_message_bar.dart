@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
@@ -7,6 +8,7 @@ import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/localization/language_provider.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
+import 'package:vnalo_mobile/core/utils/avatar_resolver.dart';
 
 class PinnedMessageBar extends StatefulWidget {
   final String conversationId;
@@ -79,7 +81,7 @@ class _PinnedMessageBarState extends State<PinnedMessageBar> with SingleTickerPr
       default:
         final text = message.content ?? '';
         if (text.isEmpty) {
-          return common.imageLabel ?? 'Tin nhắn';
+          return common.imageLabel;
         }
         return text;
     }
@@ -182,17 +184,10 @@ class _PinnedMessageBarState extends State<PinnedMessageBar> with SingleTickerPr
                         ),
                         // Thumbnail preview (if image)
                         if (pins[_currentPage].messageType == MessageType.IMAGE && pins[_currentPage].mediaUrl != null)
-                          Container(
-                            width: 36,
-                            height: 36,
+                          _PinnedImageThumbnail(
+                            imageUrl: pins[_currentPage].mediaUrl!,
+                            size: 36,
                             margin: const EdgeInsets.only(right: 4),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(4),
-                              image: DecorationImage(
-                                image: NetworkImage(pins[_currentPage].mediaUrl!),
-                                fit: BoxFit.cover,
-                              ),
-                            ),
                           ),
                       ],
                     ),
@@ -398,26 +393,69 @@ class _PinnedMessageBarState extends State<PinnedMessageBar> with SingleTickerPr
 
   Widget? _buildThumbnail(Message msg) {
     if (msg.messageType == MessageType.IMAGE && msg.mediaUrl != null) {
-      return Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(6),
-          image: DecorationImage(
-            image: NetworkImage(msg.mediaUrl!),
-            fit: BoxFit.cover,
-          ),
-        ),
+      return _PinnedImageThumbnail(
+        imageUrl: msg.mediaUrl!,
+        size: 40,
+        borderRadius: BorderRadius.circular(6),
       );
     }
     return null;
   }
 
-  String _formatDate(DateTime date) {
-    return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-  }
 }
 
+
+class _PinnedImageThumbnail extends StatelessWidget {
+  final String imageUrl;
+  final double size;
+  final EdgeInsetsGeometry? margin;
+  final BorderRadius borderRadius;
+
+  const _PinnedImageThumbnail({
+    required this.imageUrl,
+    required this.size,
+    this.margin,
+    this.borderRadius = const BorderRadius.all(Radius.circular(4)),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final token = context.read<AuthProvider>().accessToken;
+    final resolvedUrl = AvatarResolver.resolveUrl(imageUrl) ?? imageUrl;
+
+    return Container(
+      width: size,
+      height: size,
+      margin: margin,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(borderRadius: borderRadius),
+      child: CachedNetworkImage(
+        imageUrl: resolvedUrl,
+        fit: BoxFit.cover,
+        fadeInDuration: Duration.zero,
+        fadeOutDuration: Duration.zero,
+        httpHeaders: token != null && AvatarResolver.isInternalUrl(resolvedUrl)
+            ? {'Authorization': 'Bearer $token'}
+            : const {},
+        placeholder: (_, __) => _fallback(context),
+        errorWidget: (_, __, ___) => _fallback(context),
+      ),
+    );
+  }
+
+  Widget _fallback(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      color: isDarkMode ? Colors.white10 : Colors.black12,
+      alignment: Alignment.center,
+      child: Icon(
+        Icons.broken_image_outlined,
+        size: size * 0.45,
+        color: isDarkMode ? Colors.white54 : Colors.black45,
+      ),
+    );
+  }
+}
 // ─── Pin Limit Dialog (shown when user tries to pin a 4th message) ───
 
 class _PinLimitDialog extends StatefulWidget {
@@ -467,7 +505,6 @@ class _PinLimitDialogState extends State<_PinLimitDialog> {
   @override
   Widget build(BuildContext context) {
     final chat = context.read<ChatProvider>();
-    final canAddNew = _currentPins.length < 3;
 
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 40),
@@ -546,17 +583,11 @@ class _PinLimitDialogState extends State<_PinLimitDialog> {
                           ),
                           // Thumbnail (if image)
                           if (msg.messageType == MessageType.IMAGE && msg.mediaUrl != null)
-                            Container(
-                              width: 36,
-                              height: 36,
+                            _PinnedImageThumbnail(
+                              imageUrl: msg.mediaUrl!,
+                              size: 36,
                               margin: const EdgeInsets.only(left: 8),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(6),
-                                image: DecorationImage(
-                                  image: NetworkImage(msg.mediaUrl!),
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
+                              borderRadius: BorderRadius.circular(6),
                             ),
                           const SizedBox(width: 8),
                           // Remove button
@@ -682,3 +713,7 @@ class _PinLimitDialogState extends State<_PinLimitDialog> {
     );
   }
 }
+
+
+
+

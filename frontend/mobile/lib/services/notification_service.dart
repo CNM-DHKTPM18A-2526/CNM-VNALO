@@ -105,15 +105,12 @@ class NotificationService {
 
   static void _onCallKitEvent(CallEvent? event) {
     if (event == null) return;
-    developer.log('[NotificationService] CallKit Event: ${event.event}');
+    developer.log('[NotificationService] CallKit Event: ${event.eventName}');
 
-    switch (event.event) {
-      case Event.actionCallAccept:
-        // Handle acceptance - redirection is typically handled by IncomingCallCoordinator
-        // but we can log it here.
+    switch (event) {
+      case CallEventActionCallAccept():
         break;
-      case Event.actionCallDecline:
-        // Handle decline
+      case CallEventActionCallDecline():
         break;
       default:
         break;
@@ -143,8 +140,6 @@ class NotificationService {
         handle: isGroup ? 'Cuộc gọi nhóm' : 'VNALO',
         type: audioOnly ? 0 : 1, // 0: Audio, 1: Video
         duration: 30000,
-        textAccept: 'Trả lời',
-        textDecline: 'Từ chối',
         missedCallNotification: const NotificationParams(
           showNotification: true,
           isShowCallback: true,
@@ -165,6 +160,8 @@ class NotificationService {
           backgroundColor: '#0068FF',
           backgroundUrl: 'assets/images/call_bg.png',
           actionColor: '#4CAF50',
+          textAccept: 'Trả lời',
+          textDecline: 'Từ chối',
           incomingCallNotificationChannelName: 'VNALO Incoming Call',
         ),
         ios: const IOSParams(
@@ -280,3 +277,5 @@ class NotificationService {
     );
   }
 }
+
+

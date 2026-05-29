@@ -148,14 +148,21 @@ class _IncomingCallCoordinatorState extends State<IncomingCallCoordinator> {
     }
   }
 
-  void _onCallKitEvent(CallEvent? event) {
+  Future<void> _onCallKitEvent(CallEvent? event) async {
     if (event == null) return;
-    if (event.event == Event.actionCallAccept) {
-      final data = event.body['extra'] as Map<dynamic, dynamic>?;
-      if (data == null) return;
-      
-      _handleAcceptedFromCallKit(data.cast<String, dynamic>());
+    if (event is! CallEventActionCallAccept) return;
+
+    final activeCalls = await FlutterCallkitIncoming.activeCalls();
+    Map<String, dynamic>? acceptedExtra;
+    for (final call in activeCalls) {
+      if (call.id == event.id) {
+        acceptedExtra = call.extra;
+        break;
+      }
     }
+    if (acceptedExtra == null) return;
+
+    await _handleAcceptedFromCallKit(Map<String, dynamic>.from(acceptedExtra));
   }
 
   Future<void> _handleAcceptedFromCallKit(Map<String, dynamic> data) async {
@@ -348,3 +355,5 @@ class _IncomingCallCoordinatorState extends State<IncomingCallCoordinator> {
     return const SizedBox.shrink();
   }
 }
+
+

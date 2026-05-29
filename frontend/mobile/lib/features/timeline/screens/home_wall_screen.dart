@@ -1,9 +1,11 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/localization/language_provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
+import 'package:vnalo_mobile/core/utils/avatar_resolver.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/timeline/providers/post_provider.dart';
 import 'package:vnalo_mobile/features/search/screens/unified_search_screen.dart';
@@ -321,7 +323,36 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
             const SizedBox(height: 12),
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: Image.network(post.mediaUrls[0], width: double.infinity, fit: BoxFit.cover),
+              child: Builder(
+                builder: (context) {
+                  final token = context.read<AuthProvider>().accessToken;
+                  final resolvedUrl = AvatarResolver.resolveUrl(post.mediaUrls[0]) ?? post.mediaUrls[0];
+                  return CachedNetworkImage(
+                    imageUrl: resolvedUrl,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    httpHeaders: token != null && AvatarResolver.isInternalUrl(resolvedUrl)
+                        ? {'Authorization': 'Bearer $token'}
+                        : const {},
+                    placeholder: (_, __) => Container(
+                      height: 180,
+                      width: double.infinity,
+                      color: isDarkMode ? DarkColors.surface : LightColors.surface,
+                    ),
+                    errorWidget: (_, __, ___) => Container(
+                      height: 180,
+                      width: double.infinity,
+                      color: isDarkMode ? DarkColors.surface : LightColors.surface,
+                      alignment: Alignment.center,
+                      child: Icon(
+                        Icons.broken_image_outlined,
+                        color: isDarkMode ? DarkColors.textHint : LightColors.textHint,
+                        size: 32,
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
           ],
           const SizedBox(height: 16),
@@ -341,3 +372,7 @@ class _HomeWallScreenState extends State<HomeWallScreen> with SingleTickerProvid
     );
   }
 }
+
+
+
+

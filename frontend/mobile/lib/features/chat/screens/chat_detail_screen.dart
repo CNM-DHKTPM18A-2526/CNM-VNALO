@@ -218,6 +218,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         final isDirect =
             conv.type == ConversationType.DIRECT || widget.friendUser != null;
         final wallpaperUrl = conv.personalWallpaperUrl ?? conv.wallpaperUrl;
+        final resolvedWallpaperUrl = AvatarResolver.resolveUrl(wallpaperUrl);
 
         final isRestrictedSending =
             conv.type == ConversationType.GROUP &&
@@ -376,10 +377,20 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           ),
           body: Container(
             decoration:
-                wallpaperUrl != null
+                resolvedWallpaperUrl != null
                     ? BoxDecoration(
                       image: DecorationImage(
-                        image: CachedNetworkImageProvider(wallpaperUrl),
+                        image: CachedNetworkImageProvider(
+                          resolvedWallpaperUrl,
+                          headers:
+                              (context.read<AuthProvider>().accessToken != null &&
+                                      AvatarResolver.isInternalUrl(resolvedWallpaperUrl))
+                                  ? {
+                                    'Authorization':
+                                        'Bearer ${context.read<AuthProvider>().accessToken}',
+                                  }
+                                  : {},
+                        ),
                         fit: BoxFit.cover,
                         colorFilter: ColorFilter.mode(
                           Colors.black.withValues(
@@ -1159,3 +1170,5 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     );
   }
 }
+
+

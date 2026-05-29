@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
@@ -10,6 +11,7 @@ import 'package:vnalo_mobile/features/call/services/group_call_tracker.dart';
 import 'package:vnalo_mobile/features/call/services/ringtone_service.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
+import 'package:vnalo_mobile/core/utils/avatar_resolver.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:vnalo_mobile/features/call/models/call_log_message.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
@@ -968,11 +970,20 @@ class _CameraOffPlaceholder extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        if (avatarUrl != null)
-          Image.network(
-            avatarUrl!,
+        if ((AvatarResolver.resolveUrl(avatarUrl) ?? avatarUrl) != null)
+          CachedNetworkImage(
+            imageUrl: AvatarResolver.resolveUrl(avatarUrl) ?? avatarUrl!,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => const SizedBox(),
+            fadeInDuration: Duration.zero,
+            fadeOutDuration: Duration.zero,
+            httpHeaders: (context.read<AuthProvider>().accessToken != null &&
+                    AvatarResolver.isInternalUrl(AvatarResolver.resolveUrl(avatarUrl) ?? avatarUrl))
+                ? {
+                    'Authorization': 'Bearer ${context.read<AuthProvider>().accessToken}',
+                  }
+                : const {},
+            placeholder: (_, __) => const SizedBox(),
+            errorWidget: (_, __, ___) => const SizedBox(),
           ),
         BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
@@ -1027,3 +1038,5 @@ class _LocalParticipantProxy {
     this.avatarUrl,
   });
 }
+
+

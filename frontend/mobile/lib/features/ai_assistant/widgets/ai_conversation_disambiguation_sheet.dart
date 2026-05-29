@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/theme/app_typography.dart';
+import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/ai_assistant/theme/ai_assistant_tokens.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
 
@@ -391,80 +392,11 @@ class _ConversationAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final foreground = isDark ? Colors.white : const Color(0xFF0F172A);
-    final background = isDark
-        ? Colors.white.withValues(alpha: 0.14)
-        : const Color(0xFFE2E8F0);
-    final normalizedUrl = imageUrl?.trim();
-    final hasImage = normalizedUrl != null && normalizedUrl.isNotEmpty;
-
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: background,
-      ),
-      clipBehavior: Clip.antiAlias,
-      alignment: Alignment.center,
-      child: hasImage
-          ? Image.network(
-              normalizedUrl,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _ConversationAvatarFallback(
-                name: name,
-                foreground: foreground,
-              ),
-              loadingBuilder: (context, child, progress) {
-                if (progress == null) {
-                  return child;
-                }
-                return _ConversationAvatarFallback(
-                  name: name,
-                  foreground: foreground,
-                );
-              },
-            )
-          : _ConversationAvatarFallback(name: name, foreground: foreground),
+    return AvatarWidget(
+      imageUrl: imageUrl,
+      name: name,
+      size: size,
     );
   }
 }
 
-class _ConversationAvatarFallback extends StatelessWidget {
-  final String name;
-  final Color foreground;
-
-  const _ConversationAvatarFallback({
-    required this.name,
-    required this.foreground,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      _avatarInitials(name),
-      maxLines: 1,
-      overflow: TextOverflow.clip,
-      style: AppTypography.labelLarge.copyWith(
-        color: foreground,
-        fontWeight: FontWeight.w700,
-      ),
-    );
-  }
-}
-
-String _avatarInitials(String name) {
-  final parts = name
-      .trim()
-      .split(RegExp(r'\\s+'))
-      .where((part) => part.isNotEmpty)
-      .toList(growable: false);
-  if (parts.isEmpty) {
-    return '?';
-  }
-  if (parts.length == 1) {
-    return parts.first.substring(0, 1).toUpperCase();
-  }
-  return (parts.first.substring(0, 1) + parts.last.substring(0, 1))
-      .toUpperCase();
-}
