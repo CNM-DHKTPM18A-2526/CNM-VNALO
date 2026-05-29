@@ -448,6 +448,36 @@ function buildDeferredActionReply(command: AiActionCommand) {
   return `Mình đã nhận diện yêu cầu: ${buildActionLabel(command)}. Hãy bấm nút bên dưới để mình kiểm tra đúng đối tượng và mở luồng an toàn.`
 }
 
+function buildMissingConversationFeedback(command: AiActionCommand, target: string) {
+  const targetLabel = target ? `"${target}"` : 'người/cuộc trò chuyện đó'
+
+  if (command === 'START_CALL') {
+    return `Mình không tìm thấy ${targetLabel} trong danh bạ hoặc danh sách trò chuyện của bạn, nên chưa thể chuẩn bị cuộc gọi. Hãy kiểm tra lại tên hoặc kết bạn trước khi gọi.`
+  }
+
+  if (command === 'COMPOSE_MESSAGE') {
+    return `Mình không tìm thấy ${targetLabel} trong danh bạ hoặc danh sách trò chuyện của bạn, nên chưa thể mở chat và điền nháp. Hãy kiểm tra lại tên người nhận.`
+  }
+
+  return `Mình không tìm thấy ${targetLabel} trong danh bạ hoặc danh sách trò chuyện của bạn. Hãy kiểm tra lại tên hoặc chọn thủ công trong Chat.`
+}
+
+function buildActionSuccessFeedback(command: AiActionCommand) {
+  if (command === 'START_CALL') {
+    return 'Đã mở đúng cuộc trò chuyện. Hãy bấm nút gọi để xác nhận cuộc gọi trên web.'
+  }
+
+  if (command === 'COMPOSE_MESSAGE') {
+    return 'Đã mở đúng cuộc trò chuyện và lưu nội dung nháp nếu AI có cung cấp. Hãy kiểm tra lại trước khi gửi.'
+  }
+
+  if (HIGH_RISK_ACTION_COMMANDS.has(command)) {
+    return 'Đã mở đúng cuộc trò chuyện. Hãy tự kiểm tra kỹ và xác nhận thủ công trước khi thực hiện thao tác nhạy cảm.'
+  }
+
+  return 'Đã mở đúng cuộc trò chuyện đích.'
+}
+
 export function AiChatPage() {
   const { accessToken, user } = useAuth()
   const navigate = useNavigate()
@@ -508,6 +538,28 @@ export function AiChatPage() {
     }
     localStorage.setItem(historyStorageKey, JSON.stringify(normalized))
     localStorage.removeItem(LEGACY_STORAGE_KEY)
+  }
+
+  const appendAssistantFeedback = (
+    content: string,
+    options?: Partial<Pick<AiMessage, 'degraded' | 'providerStatus'>>,
+  ) => {
+    const feedbackMessage: AiMessage = {
+      role: 'assistant',
+      content,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      degraded: options?.degraded,
+      providerStatus: options?.providerStatus ?? null,
+    }
+
+    setMessages((currentMessages) => {
+      const nextMessages = normalizeStoredMessages([...currentMessages, feedbackMessage])
+      if (historyStorageKey) {
+        localStorage.setItem(historyStorageKey, JSON.stringify(nextMessages))
+        localStorage.removeItem(LEGACY_STORAGE_KEY)
+      }
+      return nextMessages
+    })
   }
 
   useEffect(() => {
@@ -635,6 +687,7 @@ export function AiChatPage() {
       if (directPath) {
         navigate(directPath)
         setActionFeedback({ tone: 'success', message: 'Đã mở đúng màn hình bạn yêu cầu trong VNALO.' })
+        appendAssistantFeedback('Mình đã mở đúng màn hình bạn yêu cầu trong VNALO.')
         return
       }
 
@@ -679,6 +732,7 @@ export function AiChatPage() {
         if (!target) {
           navigate('/chat')
           setActionFeedback({ tone: 'warning', message: 'AI chưa xác định được cuộc trò chuyện cụ thể. Mình đã mở Chat để bạn tự chọn.' })
+          appendAssistantFeedback('Mình chưa xác định được người nhận hoặc cuộc trò chuyện cụ thể, nên đã mở Chat để bạn tự chọn thủ công.')
           return
         }
 
@@ -706,13 +760,16 @@ export function AiChatPage() {
             targetLabel: target,
           })
           setActionFeedback({ tone: 'info', message: `Mình tìm thấy ${candidateConversations.length} cuộc trò chuyện khớp với "${target}". Hãy chọn đúng đối tượng trước khi tiếp tục.` })
+          appendAssistantFeedback(`Mình tìm thấy ${candidateConversations.length} cuộc trò chuyện khớp với "${target}". Hãy chọn đúng đối tượng trong danh sách xác nhận để mình tiếp tục an toàn.`)
           return
         }
 
         const matched = candidateConversations[0]
 
         if (!matched) {
-          setActionFeedback({ tone: 'warning', message: `Chưa tìm thấy cuộc trò chuyện phù hợp với "${target}".` })
+          const missingFeedback = buildMissingConversationFeedback(command, target)
+          setActionFeedback({ tone: 'warning', message: missingFeedback })
+          appendAssistantFeedback(missingFeedback)
           return
         }
 
@@ -724,13 +781,9 @@ export function AiChatPage() {
         }
 
         navigate(`/chat/${matched.id}`)
-        if (command === 'START_CALL') {
-          setActionFeedback({ tone: 'success', message: 'Đã mở cuộc trò chuyện. Hãy bấm nút gọi để xác nhận cuộc gọi trên web.' })
-        } else if (HIGH_RISK_ACTION_COMMANDS.has(command)) {
-          setActionFeedback({ tone: 'warning', message: 'Đã mở đúng cuộc trò chuyện. Hãy tự xác nhận trước khi thực hiện thao tác nhạy cảm.' })
-        } else {
-          setActionFeedback({ tone: 'success', message: 'Đã mở đúng cuộc trò chuyện đích.' })
-        }
+        const successFeedback = buildActionSuccessFeedback(command)
+        setActionFeedback({ tone: HIGH_RISK_ACTION_COMMANDS.has(command) ? 'warning' : 'success', message: successFeedback })
+        appendAssistantFeedback(successFeedback)
         return
       }
 
@@ -744,7 +797,9 @@ export function AiChatPage() {
       })
     } catch (error) {
       console.error('AI action execution failed:', error)
-      setActionFeedback({ tone: 'error', message: 'Chưa thể thực thi thao tác AI trên web lúc này. Vui lòng thử lại hoặc thao tác thủ công.' })
+      const errorFeedback = 'Chưa thể thực thi thao tác AI trên web lúc này. Vui lòng thử lại hoặc thao tác thủ công.'
+      setActionFeedback({ tone: 'error', message: errorFeedback })
+      appendAssistantFeedback(errorFeedback, { degraded: true, providerStatus: 'AI_PROVIDER_UNAVAILABLE' })
     } finally {
       setActionBusyIndex(null)
       setActiveActionLabel('')
@@ -783,6 +838,7 @@ export function AiChatPage() {
       navigate(pendingActionReview.path)
     }
     setActionFeedback({ tone: 'info', message: pendingActionReview.feedback })
+    appendAssistantFeedback(pendingActionReview.feedback)
     setPendingActionReview(null)
   }
 
@@ -793,6 +849,11 @@ export function AiChatPage() {
 
     setPendingResolution(null)
     navigate(`/chat/${conversation.id}`)
+    appendAssistantFeedback(
+      resolution.command === 'COMPOSE_MESSAGE' && resolution.draft
+        ? `Mình đã mở đúng cuộc trò chuyện với "${conversation.name}" và lưu sẵn nội dung nháp để bạn kiểm tra trước khi gửi.`
+        : `Mình đã mở đúng cuộc trò chuyện với "${conversation.name}" để bạn tiếp tục thao tác an toàn.`,
+    )
   }
 
   useEffect(() => {
