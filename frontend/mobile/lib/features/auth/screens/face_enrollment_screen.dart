@@ -4,7 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
-import 'package:vnalo_mobile/services/face_auth_service.dart' show FaceAuthService, ApiException;
+import 'package:vnalo_mobile/services/face_auth_service.dart' show ApiException;
 
 /// Screen to enroll or update the user's face for face authentication.
 /// Requires the user to be logged in.
@@ -26,7 +26,6 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen> {
   static const _stepError = 'error';
 
   final _imagePicker = ImagePicker();
-  final _faceService = FaceAuthService();
 
   _Step _step = _stepIdle;
   File? _capturedImage;
@@ -97,16 +96,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen> {
     });
 
     try {
-      // Client-side liveness pre-check for UX only
-      final liveness = await _faceService.checkLiveness(_capturedImage!);
-      if (!liveness.pass) {
-        setState(() {
-          _step = _stepError;
-          _errorMsg = 'Không xác định được khuôn mặt thật. Vui lòng chụp lại với ánh sáng đầy đủ.';
-        });
-        return;
-      }
-
+      // Backend enforces liveness on /face/enroll — no separate client call needed.
       if (!mounted) return;
       final auth = context.read<AuthProvider>();
       await auth.enrollFace(_capturedImage!);
