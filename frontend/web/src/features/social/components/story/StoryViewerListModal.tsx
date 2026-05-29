@@ -37,9 +37,7 @@ export function StoryViewerListModal({
                   <div className="story-viewer-name">{userMap[viewer.viewerId]?.displayName || 'Người dùng'}</div>
                   <div className="story-viewer-time">{new Date(viewer.viewedAt).toLocaleString()}</div>
                 </div>
-                {reactedUserIds.has(viewer.viewerId) ? (
-                  <div className="story-viewer-reaction-badge">❤️</div>
-                ) : null}
+                {reactedUserIds.has(viewer.viewerId) ? <div className="story-viewer-reaction-badge">❤️</div> : null}
               </div>
             ))
           )}

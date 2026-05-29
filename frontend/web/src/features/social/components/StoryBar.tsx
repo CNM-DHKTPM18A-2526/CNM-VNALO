@@ -26,8 +26,12 @@ export function StoryBar({ stories, authorProfiles = {}, currentUserId = null }:
         stories: authorStories.sort((left, right) => left.createdAt.localeCompare(right.createdAt)),
         latestStoryAt: authorStories.reduce((latest, story) => (story.createdAt > latest ? story.createdAt : latest), authorStories[0]?.createdAt ?? ''),
       }))
-      .sort((left, right) => right.latestStoryAt.localeCompare(left.latestStoryAt));
-  }, [stories]);
+      .sort((left, right) => {
+        if (left.authorId === currentUserId && right.authorId !== currentUserId) return -1;
+        if (right.authorId === currentUserId && left.authorId !== currentUserId) return 1;
+        return right.latestStoryAt.localeCompare(left.latestStoryAt);
+      });
+  }, [stories, currentUserId]);
 
   const openStoryGroup = (authorStories: Story[]) => {
     if (authorStories.length === 0) return;

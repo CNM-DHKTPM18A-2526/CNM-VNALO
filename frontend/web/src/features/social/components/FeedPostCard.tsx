@@ -6,6 +6,7 @@ import { useUserStore } from '../../chat/context/UserStoreContext';
 import { MEDIA_API_URL } from '../../../api.client';
 import MediaLightbox from './MediaLightbox';
 import { REACTION_OPTIONS } from '../../chat/chat.constants';
+import { formatRelativeTime, formatFullDate } from '../../../utils/time';
 
 type AuthorProfile = {
   displayName: string
@@ -211,6 +212,12 @@ export function FeedPostCard({
     setIsCommentEmojiPickerOpen(false);
   };
 
+  const focusCommentComposer = () => {
+    // focus a tick later to ensure modal is fully open
+    window.setTimeout(() => commentInputRef.current?.focus(), 0);
+    setIsCommentEmojiPickerOpen(false);
+  };
+
   const cancelEditComment = () => {
     setEditingCommentId(null);
     setEditingCommentText('');
@@ -260,6 +267,23 @@ export function FeedPostCard({
 
   const canEditComment = (comment: ApiComment) => Boolean(currentUserId && comment.authorId === currentUserId);
 
+  const handleSubmitComment = async () => {
+    if (!accessToken || isPostingComment || !commentInput.trim()) return;
+
+    setIsPostingComment(true);
+    try {
+      const created = await socialApi.createComment(accessToken, post.postId, commentInput.trim());
+      setComments(prev => prev ? [created, ...prev] : [created]);
+      setCommentInput('');
+      setIsCommentEmojiPickerOpen(false);
+      onCommentCreated(post.postId, (post.commentCount || 0) + 1);
+    } catch (e) {
+      console.error('Create comment failed', e);
+    } finally {
+      setIsPostingComment(false);
+    }
+  };
+
   return (
     <div className="feed-post-card">
       <div className="post-header">
@@ -268,7 +292,7 @@ export function FeedPostCard({
           <div className="post-author-details">
             <span className="post-author-name">{authorName}</span>
             <div className="post-meta">
-              <span>{new Date(post.createdAt).toLocaleString()}</span>
+              <span title={formatFullDate(new Date(post.createdAt))}>{formatRelativeTime(new Date(post.createdAt))}</span>
               <span>•</span>
               <Icon name={post.visibility === 'PUBLIC' ? 'group' : 'user'} size={12} />
             </div>
@@ -380,14 +404,24 @@ export function FeedPostCard({
               localArr = [];
             }
 
-            if (data && Array.isArray(data) && data.length > 0) {
+            // Normalize server response shapes: accept Array, { data: [] }, { items: [] }
+            let serverList: any[] = [];
+            if (Array.isArray(data)) serverList = data as any[];
+            else if (data && Array.isArray((data as any).data)) serverList = (data as any).data;
+            else if (data && Array.isArray((data as any).items)) serverList = (data as any).items;
+
+            if (serverList && serverList.length > 0) {
               // merge server data with local cache (server first), dedupe by userId
               const map = new Map<string, { userId: string; likedAt?: string }>();
-              data.forEach((d: any) => map.set(d.userId, { userId: d.userId, likedAt: d.likedAt }));
+              serverList.forEach((d: any) => {
+                const uid = typeof d.userId === 'string' ? d.userId : (d.userId && (d.userId.id || d.userId.uuid) ? (d.userId.id || d.userId.uuid) : String(d.userId));
+                map.set(uid, { userId: uid, likedAt: d.likedAt });
+              });
               localArr.forEach(l => { if (!map.has(l.userId)) map.set(l.userId, l); });
               const merged = Array.from(map.values());
               setLikers(merged);
-              void Promise.all(merged.slice(0, 10).map(d => ensureUser(accessToken, d.userId).catch(() => null)));
+              // Prefetch profiles for all likers so modal shows names/avatars
+              void Promise.all(merged.map(d => ensureUser(accessToken, d.userId).catch(() => null)));
               return;
             }
 
@@ -395,8 +429,8 @@ export function FeedPostCard({
             const fallbackList: { userId: string; likedAt?: string }[] = [];
             if (localArr.length > 0) {
               fallbackList.push(...localArr);
-              // prefetch profiles
-              void Promise.all(localArr.slice(0, 10).map(d => ensureUser(accessToken, d.userId).catch(() => null)));
+              // prefetch profiles for local cache
+              void Promise.all(localArr.map(d => ensureUser(accessToken, d.userId).catch(() => null)));
             } else {
               try {
                 if (currentUserId && localStorage.getItem(`liked:${currentUserId}:${post.postId}`) === '1') {
@@ -513,145 +547,194 @@ export function FeedPostCard({
         <div className="social-modal-overlay" onClick={() => setIsCommentsOpen(false)}>
           <div className="social-modal-content" onClick={e => e.stopPropagation()}>
             <div className="social-modal-header">
-              <h3>Bài viết</h3>
+              <h3>{`Bài viết của ${authorName}`}</h3>
               <button type="button" className="composer-btn" onClick={() => setIsCommentsOpen(false)} style={{ padding: '4px' }}>
                 <Icon name="close" size={20} />
               </button>
             </div>
+
             <div className="social-modal-body">
               <div className="comment-post-preview">
                 <div className="post-author-info">
                   <UserAvatar imageUrl={authorAvatar} name={authorName} size="sm" />
                   <div className="post-author-details">
                     <span className="post-author-name">{authorName}</span>
-                    <div className="post-meta"><span>{new Date(post.createdAt).toLocaleString()}</span></div>
+                    <div className="post-meta">
+                      <span title={formatFullDate(new Date(post.createdAt))}>{formatRelativeTime(new Date(post.createdAt))}</span>
+                    </div>
                   </div>
                 </div>
-                    <div className="post-content">{post.contentText}</div>
 
-                    {mediaCount > 0 && (
-                      <div className="modal-media-preview">
-                        {displayMedia.length === 1 ? (
-                          (() => {
-                            const finalUrl = getMediaUrl(displayMedia[0]);
-                            const isVideo = /\.(mp4|webm|ogg)(\?.*)?$/.test(finalUrl);
-                            return isVideo ? (
-                              <video src={finalUrl} className="modal-media-single" controls preload="metadata" />
-                            ) : (
-                              <img src={finalUrl} alt="" className="modal-media-single" />
-                            );
-                          })()
+                <div className="post-content">{post.contentText}</div>
+
+                {mediaCount > 0 && (
+                  <div className="modal-media-preview">
+                    {displayMedia.length === 1 ? (
+                      (() => {
+                        const finalUrl = getMediaUrl(displayMedia[0]);
+                        const isVideo = /\.(mp4|webm|ogg)(\?.*)?$/.test(finalUrl);
+                        return isVideo ? (
+                          <video src={finalUrl} className="modal-media-single" controls preload="metadata" />
                         ) : (
-                          <div className={`feed-media-grid grid-${Math.min(4, displayMedia.length)}`}>
-                            {displayMedia.map((url, idx) => {
-                              const finalUrl = getMediaUrl(url);
-                              const isVideo = /\.(mp4|webm|ogg)(\?.*)?$/.test(finalUrl);
-                              return (
-                                <div key={idx} className="media-item-wrapper" onClick={() => setLightboxIndex(idx)}>
-                                  {isVideo ? (
-                                    <video src={finalUrl} className="media-item" controls preload="metadata" />
-                                  ) : (
-                                    <img src={finalUrl} alt="" className="media-item" loading="lazy" />
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
+                          <img src={finalUrl} alt="" className="modal-media-single" />
+                        );
+                      })()
+                    ) : (
+                      <div className={`feed-media-grid grid-${Math.min(4, displayMedia.length)}`}>
+                        {displayMedia.map((url, idx) => {
+                          const finalUrl = getMediaUrl(url);
+                          const isVideo = /\.(mp4|webm|ogg)(\?.*)?$/.test(finalUrl);
+                          return (
+                            <div key={idx} className="media-item-wrapper" onClick={() => setLightboxIndex(idx)}>
+                              {isVideo ? (
+                                <video src={finalUrl} className="media-item" controls preload="metadata" />
+                              ) : (
+                                <img src={finalUrl} alt="" className="media-item" loading="lazy" />
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
+                  </div>
+                )}
+
+                <div className="modal-post-actions">
+                  <button className={`post-action-btn ${isLiked ? 'liked' : ''}`} onClick={handleLike} disabled={isLiking}>
+                    <Icon name={isLiked ? 'heartFill' : 'heart'} size={18} />
+                    {isLiked ? 'Đã thích' : 'Thích'}
+                  </button>
+                  <button className="post-action-btn" onClick={() => focusCommentComposer()}>
+                    <Icon name="chat" size={18} />
+                    Bình luận
+                  </button>
+                </div>
               </div>
 
-              <div className="comments-list">
+              <div className={`comments-list ${comments && comments.length === 0 ? 'comments-list-empty' : ''}`}>
                 {comments === null && <div>Đang tải bình luận…</div>}
-                {comments && comments.length === 0 && <div>Chưa có bình luận nào</div>}
-                {comments && comments.map(c => (
-                  <div key={c.commentId} className="comment-row">
-                    <UserAvatar imageUrl={userMap[c.authorId]?.avatarUrl ?? null} name={userMap[c.authorId]?.displayName ?? c.authorId} size="sm" />
-                    <div className="comment-body">
-                      <div className="comment-row-header">
-                        <div className="comment-author-wrap">
-                          <div className="comment-author">{userMap[c.authorId]?.displayName ?? c.authorId}</div>
-                          <div className="comment-time">{new Date(c.createdAt).toLocaleString()}</div>
-                        </div>
-                        {canManageComment(c) && (
-                          <div className="comment-menu-wrapper">
-                            <button
-                              type="button"
-                              className="comment-menu-trigger"
-                              aria-haspopup="menu"
-                              aria-expanded={activeCommentMenuId === c.commentId}
-                              onClick={() => setActiveCommentMenuId(prev => prev === c.commentId ? null : c.commentId)}
-                            >
-                              <Icon name="more" size={18} />
-                            </button>
-                            {activeCommentMenuId === c.commentId && (
-                              <div className="post-menu comment-menu" role="menu">
-                                {canEditComment(c) && (
-                                  <button
-                                    type="button"
-                                    className="post-menu-item"
-                                    role="menuitem"
-                                    onClick={() => startEditComment(c)}
-                                  >
-                                    Chỉnh sửa bình luận
-                                  </button>
-                                )}
+                {comments && comments.length === 0 && (
+                  <div className="comment-empty-state">
+                    <div className="comment-empty-state-icon">
+                      <Icon name="file" size={56} />
+                    </div>
+                    <div className="comment-empty-state-title">Chưa có bình luận nào</div>
+                    <div className="comment-empty-state-subtitle">Hãy là người đầu tiên bình luận.</div>
+                  </div>
+                )}
+                {comments && comments.length > 0 && comments.map((comment) => {
+                  const authorProfile = userMap[comment.authorId];
+                  const commentText = comment.contentText ?? (comment as { content?: string }).content ?? '';
+
+                  return (
+                    <div key={comment.commentId} className="comment-row">
+                      <UserAvatar imageUrl={authorProfile?.avatarUrl ?? null} name={authorProfile?.displayName ?? comment.authorId} size="sm" />
+                      <div className="comment-body">
+                        <div className="comment-bubble">
+                          <div className="comment-row-header">
+                            <div className="comment-author-wrap">
+                              <div className="comment-author">{authorProfile?.displayName ?? comment.authorId}</div>
+                            </div>
+
+                            {canManageComment(comment) && (
+                              <div className="comment-menu-wrapper">
                                 <button
                                   type="button"
-                                  className="post-menu-item post-menu-item-danger"
-                                  role="menuitem"
-                                  onClick={() => confirmDeleteComment(c)}
+                                  className="comment-menu-trigger"
+                                  aria-haspopup="menu"
+                                  aria-expanded={activeCommentMenuId === comment.commentId}
+                                  onClick={() => setActiveCommentMenuId(prev => prev === comment.commentId ? null : comment.commentId)}
                                 >
-                                  Xóa bình luận
+                                  <Icon name="more" size={18} />
                                 </button>
+
+                                {activeCommentMenuId === comment.commentId && (
+                                  <div className="post-menu comment-menu" role="menu">
+                                    {canEditComment(comment) && (
+                                      <button
+                                        type="button"
+                                        className="post-menu-item"
+                                        role="menuitem"
+                                        onClick={() => startEditComment(comment)}
+                                      >
+                                        Chỉnh sửa bình luận
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      className="post-menu-item post-menu-item-danger"
+                                      role="menuitem"
+                                      onClick={() => confirmDeleteComment(comment)}
+                                    >
+                                      Xóa bình luận
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
-                        )}
-                      </div>
 
-                      {editingCommentId === c.commentId ? (
-                        <div className="comment-edit-box">
-                          <textarea
-                            className="comment-input comment-edit-input"
-                            value={editingCommentText}
-                            onChange={e => setEditingCommentText(e.target.value)}
-                            rows={2}
-                          />
-                          <div className="comment-edit-actions">
-                            <button type="button" className="composer-btn" onClick={cancelEditComment}>
-                              Hủy
-                            </button>
-                            <button
-                              type="button"
-                              className="composer-btn primary"
-                              disabled={isSavingCommentEdit || !editingCommentText.trim()}
-                              onClick={saveCommentEdit}
-                            >
-                              {isSavingCommentEdit ? 'Đang lưu…' : 'Lưu'}
-                            </button>
-                          </div>
+                          {editingCommentId === comment.commentId ? (
+                            <div className="comment-edit-box">
+                              <textarea
+                                className="comment-input comment-edit-input"
+                                value={editingCommentText}
+                                onChange={e => setEditingCommentText(e.target.value)}
+                                rows={2}
+                              />
+                              <div className="comment-edit-actions">
+                                <button type="button" className="composer-btn" onClick={cancelEditComment}>
+                                  Hủy
+                                </button>
+                                <button
+                                  type="button"
+                                  className="composer-btn primary"
+                                  disabled={isSavingCommentEdit || !editingCommentText.trim()}
+                                  onClick={saveCommentEdit}
+                                >
+                                  {isSavingCommentEdit ? 'Đang lưu…' : 'Lưu'}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="comment-text">{commentText}</div>
+                              <div className="comment-time comment-time-below">
+                                <span title={formatFullDate(new Date(comment.createdAt))}>{formatRelativeTime(new Date(comment.createdAt))}</span>
+                              </div>
+                            </>
+                          )}
                         </div>
-                      ) : (
-                        <div className="comment-text">{(c as any).contentText ?? (c as any).content}</div>
-                      )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
+
             <div className="social-modal-footer">
-              <div className="comment-input-row">
-                <div className="comment-compose-shell">
+              <div className="comment-composer">
+                <UserAvatar
+                  imageUrl={currentUserId ? (userMap[currentUserId]?.avatarUrl ?? null) : null}
+                  name={currentUserId ? (userMap[currentUserId]?.displayName ?? 'Bạn') : 'Bạn'}
+                  size="sm"
+                />
+                <div className="comment-composer-main">
                   <textarea
                     ref={commentInputRef}
-                    className="comment-input"
+                    className="comment-compose-input"
                     placeholder="Viết bình luận..."
                     value={commentInput}
                     onChange={e => setCommentInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        void handleSubmitComment();
+                      }
+                    }}
                     rows={1}
                   />
+
                   {isCommentEmojiPickerOpen && (
                     <div className="social-emoji-picker comment-emoji-picker" role="group" aria-label="Chọn emoji cho bình luận">
                       {emojiOptions.map((emoji, idx) => (
@@ -667,27 +750,27 @@ export function FeedPostCard({
                       ))}
                     </div>
                   )}
+
+                  <div className="comment-composer-actions">
+                    <button
+                      type="button"
+                      className="composer-btn comment-emoji-toggle"
+                      title="Thêm emoji"
+                      onClick={() => setIsCommentEmojiPickerOpen(prev => !prev)}
+                      aria-pressed={isCommentEmojiPickerOpen}
+                    >
+                      <Icon name="smile" size={18} />
+                    </button>
+                    <button
+                      type="button"
+                      className={`composer-btn comment-send-btn ${commentInput.trim() ? 'has-text' : ''}`}
+                      disabled={isPostingComment || !commentInput.trim()}
+                      onClick={() => void handleSubmitComment()}
+                    >
+                      {isPostingComment ? 'Đang gửi…' : 'Gửi'}
+                    </button>
+                  </div>
                 </div>
-                <button className="composer-btn primary" disabled={isPostingComment || !commentInput.trim()} onClick={async () => {
-                  if (!accessToken) return;
-                  setIsPostingComment(true);
-                  try {
-                    const created = await socialApi.createComment(accessToken, post.postId, commentInput.trim());
-                    // prepend optimistic
-                    setComments(prev => prev ? [created, ...prev] : [created]);
-                    setCommentInput('');
-                    setIsCommentEmojiPickerOpen(false);
-                    // notify parent to update comment count
-                    onCommentCreated(post.postId, (post.commentCount || 0) + 1);
-                  } catch (e) {
-                    console.error('Create comment failed', e);
-                  } finally {
-                    setIsPostingComment(false);
-                  }
-                }}>{isPostingComment ? 'Đang gửi…' : 'Gửi'}</button>
-                <button type="button" className="composer-btn" title="Thêm emoji" onClick={() => setIsCommentEmojiPickerOpen(prev => !prev)} aria-pressed={isCommentEmojiPickerOpen}>
-                  <Icon name="smile" size={20} />
-                </button>
               </div>
             </div>
           </div>
