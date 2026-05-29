@@ -38,6 +38,10 @@ public class FirebaseConfig {
         return firebaseInitialized;
     }
 
+    public boolean isEnabled() {
+        return firebaseEnabled;
+    }
+
     @PostConstruct
     public void init() {
         if (!firebaseEnabled) {

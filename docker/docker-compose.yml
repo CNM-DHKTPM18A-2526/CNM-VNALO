@@ -470,7 +470,7 @@ services:
     networks:
       - vnalo-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8087/api/v1/actuator/health"]
+      test: ["CMD-SHELL", "nc -z localhost 8087 || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
