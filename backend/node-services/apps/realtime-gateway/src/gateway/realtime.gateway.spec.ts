@@ -25,6 +25,9 @@ describe('RealtimeGateway', () => {
       id: 'socket-1',
       handshake: { auth: {}, query: {} },
       disconnect: jest.fn(),
+      join: jest.fn().mockResolvedValue(undefined),
+      leave: jest.fn().mockResolvedValue(undefined),
+      rooms: new Set(),
       data: {},
     } as any;
 
@@ -38,6 +41,9 @@ describe('RealtimeGateway', () => {
       id: 'socket-2',
       handshake: { auth: { token: 'token' } },
       disconnect: jest.fn(),
+      join: jest.fn().mockResolvedValue(undefined),
+      leave: jest.fn().mockResolvedValue(undefined),
+      rooms: new Set(),
       data: {},
     } as any;
     jwtService.verify.mockReturnValue({ sub: 'user-1', phone: '123' } as any);

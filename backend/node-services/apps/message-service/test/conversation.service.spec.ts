@@ -14,6 +14,9 @@ import {
 import { ConversationDirectMap } from '../src/entities/conversation-direct-map.entity';
 import { ConversationJoinRequest } from '../src/entities/conversation-join-request.entity';
 import { ConversationInbox } from '../src/entities/conversation-inbox.entity';
+import { KafkaProducerService } from '../src/kafka/kafka-producer.service';
+import { MessageService } from '../src/message/message.service';
+import { MembershipCacheService } from '../src/conversation/membership-cache.service';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 
 describe('ConversationService', () => {
@@ -82,6 +85,24 @@ describe('ConversationService', () => {
                 delete: jest.fn().mockResolvedValue({ affected: 1 }),
               }),
             ),
+          },
+        },
+        {
+          provide: KafkaProducerService,
+          useValue: {
+            produce: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: MessageService,
+          useValue: {
+            // Add necessary methods if needed
+          },
+        },
+        {
+          provide: MembershipCacheService,
+          useValue: {
+            // Add necessary methods if needed
           },
         },
       ],
