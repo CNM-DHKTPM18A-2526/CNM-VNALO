@@ -914,7 +914,7 @@ class _EmptyAiConversation extends StatelessWidget {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: BorderRadius.circular(AiAssistantTokens.buttonRadius),
+            borderRadius: BorderRadius.circular(AiAssistantTokens.pillRadius),
             onTap: () => onQuickActionSelected(text),
             child: Ink(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -924,7 +924,7 @@ class _EmptyAiConversation extends StatelessWidget {
                         ? DarkColors.surface
                         : Colors.white.withValues(alpha: 0.8),
                 borderRadius: BorderRadius.circular(
-                  AiAssistantTokens.buttonRadius,
+                  AiAssistantTokens.pillRadius,
                 ),
                 border: Border.all(
                   color: AppColors.primary.withValues(alpha: 0.2),
@@ -984,10 +984,10 @@ class _AiTypingBubble extends StatelessWidget {
                     ? DarkColors.chatBubbleReceived
                     : LightColors.chatBubbleReceived,
             borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(AiAssistantTokens.buttonRadius),
-              topRight: Radius.circular(AiAssistantTokens.buttonRadius),
+              topLeft: Radius.circular(AiAssistantTokens.bubbleRadius),
+              topRight: Radius.circular(AiAssistantTokens.bubbleRadius),
               bottomLeft: Radius.circular(4),
-              bottomRight: Radius.circular(AiAssistantTokens.buttonRadius),
+              bottomRight: Radius.circular(AiAssistantTokens.bubbleRadius),
             ),
             border:
                 isDarkMode
