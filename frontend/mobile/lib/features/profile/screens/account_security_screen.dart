@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
+import 'package:vnalo_mobile/features/auth/screens/face_enrollment_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/personal_info_screen.dart';
 import 'package:vnalo_mobile/features/profile/screens/update_password_screen.dart';
 
@@ -138,6 +139,21 @@ class AccountSecurityScreen extends StatelessWidget {
               onChanged: (_) {},
               activeThumbColor: isDarkMode ? DarkColors.primary : AppColors.primary,
             ),
+          ),
+          _divider(dividerColor),
+          _tile(
+            context,
+            icon: Icons.face_retouching_natural,
+            title: 'Đăng nhập bằng khuôn mặt',
+            subtitle: 'Quản lý nhận diện khuôn mặt AI',
+            backgroundColor: sectionBg,
+            isDarkMode: isDarkMode,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const FaceEnrollmentScreen()),
+              );
+            },
           ),
           _divider(dividerColor),
           _tile(

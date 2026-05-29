@@ -1,4 +1,5 @@
 import React, { type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { changePassword } from '../auth/auth.api'
 import { useAuth } from '../auth/useAuth'
@@ -42,6 +43,7 @@ export function PasswordToggleIcon({ visible }: { visible: boolean }) {
 type SettingsModalContentProps = {
   onChangePasswordSuccess?: () => void
   showChangePasswordButton?: boolean
+  onClose?: () => void
 }
 
 type ActiveTab = 'general' | 'appearance' | 'language' | 'security'
@@ -68,7 +70,9 @@ function SettingsRow({ title, description, action, className = '' }: SettingsRow
 export function SettingsModalContent({
   onChangePasswordSuccess,
   showChangePasswordButton = true,
+  onClose,
 }: SettingsModalContentProps) {
+  const navigate = useNavigate()
   const { accessToken, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const { language, setLanguage, t } = useLanguage()
@@ -299,6 +303,25 @@ export function SettingsModalContent({
                       <Icon name='settings' />
                     </span>
                     {t('settings.securityChangeButton')}
+                  </button>
+                }
+              />
+              <SettingsRow
+                title='Đăng nhập khuôn mặt (AI)'
+                description='Quản lý dữ liệu khuôn mặt để đăng nhập nhanh không cần mật khẩu.'
+                action={
+                  <button
+                    className='btn btn-primary settings-security-action'
+                    type='button'
+                    onClick={() => {
+                      onClose?.()
+                      navigate('/face-auth')
+                    }}
+                  >
+                    <span className='settings-security-action-icon' aria-hidden='true'>
+                      <Icon name='user' />
+                    </span>
+                    Cài đặt
                   </button>
                 }
               />

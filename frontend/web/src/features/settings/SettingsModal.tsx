@@ -26,7 +26,7 @@ export function SettingsModal({ isOpen, onClose, onChangePasswordSuccess }: Sett
           </button>
         </div>
         <div className='modal-body modal-body-settings'>
-          <SettingsModalContent onChangePasswordSuccess={onChangePasswordSuccess} />
+          <SettingsModalContent onChangePasswordSuccess={onChangePasswordSuccess} onClose={onClose} />
         </div>
       </div>
     </div>
