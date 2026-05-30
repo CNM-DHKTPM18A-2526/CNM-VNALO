@@ -625,6 +625,91 @@
   scrollbar-color: color-mix(in srgb, var(--muted) 55%, transparent) transparent;
 }
 
+/* Responsive adjustments for chat window */
+@media (max-width: 980px) {
+  .chat-layout {
+    grid-template-columns: 280px 1fr;
+  }
+
+  /* hide right side panel on narrower screens */
+  .chat-side-panel {
+    display: none;
+  }
+
+  .chat-window-header-copy h2 {
+    font-size: 14px;
+  }
+
+  .chat-window-messages {
+    padding: 12px;
+  }
+
+  .chat-window {
+    /* ensure chat window fills available height */
+    min-height: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Single-column layout on small screens */
+  .chat-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .chat-list-panel {
+    display: none;
+  }
+
+  .chat-side-panel {
+    display: none;
+  }
+
+  .chat-window-header {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  .chat-window-header-main {
+    gap: 8px;
+  }
+
+  .chat-window-header-copy h2 {
+    font-size: 15px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .chat-window-messages {
+    padding: 10px;
+  }
+
+  /* Make message input sticky to bottom for better mobile UX */
+  .message-input {
+    position: sticky;
+    bottom: 0;
+    z-index: 6;
+    padding: 8px 10px;
+  }
+
+  .message-input .ui-textfield-input {
+    min-height: 36px;
+  }
+
+  /* compact action buttons */
+  .chat-header-action-btn,
+  .message-action-btn {
+    width: 28px;
+    height: 28px;
+  }
+
+  /* avoid extra large avatars on mobile */
+  .chat-window-header .user-avatar {
+    width: 36px;
+    height: 36px;
+  }
+}
+
 .chat-window-messages::-webkit-scrollbar,
 .chat-list::-webkit-scrollbar {
   width: 6px;
@@ -1497,6 +1582,20 @@
     grid-template-columns: 1fr;
     min-height: auto;
     height: auto;
+  }
+
+  /* When sidebar is closed we still want the chat window to occupy full width on small screens */
+  .chat-layout.chat-layout-sidebar-closed {
+    grid-template-columns: 1fr !important;
+    height: auto;
+  }
+
+  .chat-layout.chat-layout-sidebar-closed .chat-list-panel {
+    display: none !important;
+  }
+
+  .chat-layout.chat-layout-sidebar-closed .chat-side-panel {
+    display: none !important;
   }
 
   .chat-toolbar-row {
@@ -3425,5 +3524,32 @@
 
   .ai-chat-footer {
     padding: 8px;
+  }
+}
+
+/* Ensure chat window remains visible and fills viewport on small screens */
+@media (max-width: 640px) {
+  .chat-layout {
+    height: 100vh;
+    min-height: 0;
+  }
+
+  .chat-window {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .chat-window-messages {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  /* Ensure message input remains visible */
+  .message-input {
+    z-index: 10;
   }
 }

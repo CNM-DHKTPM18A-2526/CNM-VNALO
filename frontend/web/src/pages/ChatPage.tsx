@@ -5450,6 +5450,7 @@ export default function ChatPage() {
         onMessageContextMenuAction={handleMessageContextMenuAction}
         onVotePoll={handleVotePoll}
         onInitiateCall={handleInitiateCall}
+        onOpenAddMembers={() => setIsAddMembersOpen(true)}
       />
 
       <CreateGroupModal

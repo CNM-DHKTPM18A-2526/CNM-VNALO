@@ -63,6 +63,7 @@ type ChatWindowProps = {
   onUnpinMessage?: (messageId: string) => void
   onTogglePin?: (message: ChatMessage) => void
   onInitiateCall?: (type: 'audio' | 'video') => void
+  onOpenAddMembers?: () => void
   onVotePoll?: (messageId: string, optionId: string) => void
   members?: Array<{ userId: string; displayName: string; avatarUrl?: string | null }>
 }
@@ -98,6 +99,7 @@ export function ChatWindow({
   onUnpinMessage,
   onInitiateCall,
   onVotePoll,
+  onOpenAddMembers,
 }: ChatWindowProps) {
   const { userMap } = useUserStore()
   const { t } = useLanguage()
@@ -148,16 +150,47 @@ export function ChatWindow({
   }, [conversation?.id, onLoadConversationMessages])
 
   useEffect(() => {
-    if (!conversation || isLoadingMessages) {
-      return
-    }
+    if (!conversation || isLoadingMessages) return
 
     const container = messagesContainerRef.current
-    if (!container) {
-      return
+    if (!container) return
+
+    // If the user is actively scrolled up (not near the bottom), avoid
+    // forcibly scrolling them down every time messages update. Only
+    // auto-scroll when the user is near the bottom or when switching to a
+    // different conversation.
+    const prevConvId = (messagesContainerRef as any)._prevConversationId as string | undefined
+    const isNewConversation = prevConvId !== conversation.id
+
+    const distanceFromBottom = container.scrollHeight - (container.scrollTop + container.clientHeight)
+    const NEAR_BOTTOM_THRESHOLD = 160 // px
+
+    const scrollToBottom = (behavior: ScrollBehavior = 'auto') => {
+      try {
+        // Prefer smooth scrolling when user is near bottom, otherwise jump.
+        container.scrollTo({ top: container.scrollHeight, behavior })
+      } catch (e) {
+        // fallback for older browsers
+        container.scrollTop = container.scrollHeight
+      }
     }
 
-    container.scrollTop = container.scrollHeight
+    if (isNewConversation) {
+      // When switching conversations the DOM may still be painting or images loading.
+      // Use rAF + timeout to ensure we reliably scroll to the bottom instead of landing at the top.
+      requestAnimationFrame(() => scrollToBottom('auto'))
+      // Second pass in case layout changes after images/fonts load
+      setTimeout(() => scrollToBottom('auto'), 120)
+    } else if (distanceFromBottom <= NEAR_BOTTOM_THRESHOLD) {
+      scrollToBottom('smooth')
+    }
+
+    // store last conversation id on the ref node so it persists across renders
+    try {
+      ;(messagesContainerRef as any)._prevConversationId = conversation.id
+    } catch (e) {
+      // ignore
+    }
   }, [conversation, conversationMessages.length, isLoadingMessages])
 
   useEffect(() => {
@@ -295,20 +328,35 @@ export function ChatWindow({
           </div>
         </div>
         <div className='chat-window-header-actions'>
-          <button
-            className='chat-header-action-btn'
-            type='button'
-            onClick={() => onInitiateCall?.('audio')}
-          >
-            <Icon name='phone' />
-          </button>
-          <button
-            className='chat-header-action-btn'
-            type='button'
-            onClick={() => onInitiateCall?.('video')}
-          >
-            <Icon name='video' />
-          </button>
+          {!conversation.isCloud ? (
+            <>
+              {conversation.isGroup ? (
+                <button
+                  className='chat-header-action-btn'
+                  type='button'
+                  onClick={() => onOpenAddMembers?.()}
+                  title='Thêm thành viên'
+                >
+                  <Icon name='userPlus' />
+                </button>
+              ) : (
+                <button
+                  className='chat-header-action-btn'
+                  type='button'
+                  onClick={() => onInitiateCall?.('audio')}
+                >
+                  <Icon name='phone' />
+                </button>
+              )}
+              <button
+                className='chat-header-action-btn'
+                type='button'
+                onClick={() => onInitiateCall?.('video')}
+              >
+                <Icon name='video' />
+              </button>
+            </>
+          ) : null}
           <button
             className={rightSidebarContent === 'search' || rightSidebarContent === 'global-search' ? 'chat-header-action-btn chat-header-action-btn-active' : 'chat-header-action-btn'}
             type='button'

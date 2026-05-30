@@ -39,7 +39,7 @@ export function UserAvatar({
   memberAvatars = [],
   extraCount = 0
 }: UserAvatarProps) {
-  const mergedClassName = `user-avatar ${sizeClass[size]}${className ? ` ${className}` : ''}`
+  const mergedClassName = `user-avatar ${isGroup ? 'user-avatar-group' : ''} ${sizeClass[size]}${className ? ` ${className}` : ''}`
   const resolvedImageUrl = resolveMediaUrl(imageUrl);
 
   if (isCloud) {
@@ -86,7 +86,7 @@ export function UserAvatar({
   if (isGroup) {
     const iconSize = size === 'sm' ? 14 : size === 'lg' ? 40 : size === 'xl' ? 64 : 20
     return (
-      <span className={`${mergedClassName} flex items-center justify-center bg-gray-200`}>
+      <span className={`${mergedClassName} user-avatar-group-default flex items-center justify-center bg-gray-200`}>
         <Users size={iconSize} className="text-gray-500" />
       </span>
     )

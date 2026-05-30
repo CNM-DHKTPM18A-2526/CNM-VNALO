@@ -776,7 +776,21 @@
   width: min(960px, 100%);
 }
 
+.modal-card-custom {
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+}
+
 .modal-card-image .modal-body {
+  padding: 0;
+}
+
+.modal-body-custom {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
   padding: 0;
 }
 
@@ -879,6 +893,10 @@
   gap: 10px;
 }
 
+.modal-card-custom .modal-footer {
+  flex: 0 0 auto;
+}
+
 .modal-field {
   display: grid;
   gap: 8px;
@@ -961,6 +979,11 @@
 @media (max-width: 640px) {
   .modal-card {
     border-radius: 16px;
+  }
+
+  .modal-card-custom {
+    width: calc(100vw - 18px);
+    max-height: calc(100vh - 18px);
   }
 
   .modal-header,

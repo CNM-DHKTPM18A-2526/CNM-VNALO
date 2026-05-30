@@ -5,6 +5,7 @@ import { Sidebar } from '../shared/components/Sidebar'
 import { Topbar } from '../shared/components/Topbar'
 import { SettingsModal } from '../features/settings/SettingsModal'
 import { ScreenCaptureModal } from '../features/chat/components/ScreenCaptureModal'
+import { AccountInfoModal } from '../shared/components/AccountInfoModal'
 import { useAuth } from '../features/auth/useAuth'
 import { useLanguage } from '../shared/i18n/LanguageContext'
 
@@ -18,9 +19,11 @@ export function MainLayout() {
     location.pathname.startsWith('/chat-ai')
   const isContactsPage = location.pathname.startsWith('/contacts')
   const isSocialPage = location.pathname.startsWith('/social')
-  const shouldShowTopbar = !isChatWorkspace && !isContactsPage && !isSocialPage
+  const isStoriesPage = location.pathname.startsWith('/stories')
+  const shouldShowTopbar = !isChatWorkspace && !isContactsPage && !isSocialPage && !isStoriesPage
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
   const [isCaptureModalOpen, setIsCaptureModalOpen] = useState(false)
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false)
 
   const title = useMemo(() => {
     const titleMap: Record<string, string> = {
@@ -62,6 +65,14 @@ export function MainLayout() {
     setIsCaptureModalOpen(true)
   }
 
+  const handleOpenAccount = () => {
+    setIsAccountModalOpen(true)
+  }
+
+  const handleCloseAccount = () => {
+    setIsAccountModalOpen(false)
+  }
+
   const handleSendCapture = (file: File) => {
     console.log('Capture file to send:', file)
     // Here we would ideally find the current chat and send the file
@@ -70,7 +81,11 @@ export function MainLayout() {
 
   return (
     <div className='app-shell'>
-      <Sidebar onOpenSettingsModal={handleOpenSettings} onOpenCaptureModal={handleOpenCapture} />
+      <Sidebar
+        onOpenSettingsModal={handleOpenSettings}
+        onOpenCaptureModal={handleOpenCapture}
+        onOpenAccountModal={handleOpenAccount}
+      />
       <section className='workspace'>
         {shouldShowTopbar ? (
           <Topbar
@@ -79,6 +94,7 @@ export function MainLayout() {
             userName={user?.name ?? user?.email ?? 'VNALO User'}
             onLogout={logout}
             onOpenSettingsModal={handleOpenSettings}
+            onOpenAccountModal={handleOpenAccount}
           />
         ) : null}
         <main className={
@@ -96,6 +112,7 @@ export function MainLayout() {
 
       <SettingsModal isOpen={isSettingsModalOpen} onClose={handleCloseSettings} onChangePasswordSuccess={handleChangePasswordSuccess} />
       <ScreenCaptureModal isOpen={isCaptureModalOpen} onClose={() => setIsCaptureModalOpen(false)} onSend={handleSendCapture} />
+      <AccountInfoModal isOpen={isAccountModalOpen} onClose={handleCloseAccount} />
     </div>
   )
 }

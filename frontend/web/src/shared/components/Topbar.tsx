@@ -11,9 +11,10 @@ type TopbarProps = {
   userAvatarUrl?: string | null
   onLogout: () => void
   onOpenSettingsModal?: () => void
+  onOpenAccountModal?: () => void
 }
 
-export function Topbar({ title, userName, userAvatarUrl, onLogout, onOpenSettingsModal }: TopbarProps) {
+export function Topbar({ title, userName, userAvatarUrl, onLogout, onOpenSettingsModal, onOpenAccountModal }: TopbarProps) {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false)
   const menuRef = React.useRef<HTMLDivElement | null>(null)
   const menuItemRefs = React.useRef<Array<HTMLButtonElement | null>>([])
@@ -25,7 +26,7 @@ export function Topbar({ title, userName, userAvatarUrl, onLogout, onOpenSetting
       key: 'profile',
       label: t('topbar.menuProfile'),
       icon: 'user' as const,
-      onSelect: () => navigate('/profile'),
+      onSelect: () => onOpenAccountModal?.(),
     },
     {
       key: 'settings',

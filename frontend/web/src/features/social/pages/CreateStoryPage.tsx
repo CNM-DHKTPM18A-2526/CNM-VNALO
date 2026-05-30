@@ -36,7 +36,6 @@ export default function CreateStoryPage() {
   return (
     <div className="story-page-shell">
       <aside className="story-page-sidebar">
-        <button type="button" className="story-page-back" onClick={() => navigate('/social')}>← Quay về Nhật ký</button>
         <div className="story-page-user">
           <img
             src={currentUserProfile.avatarUrl ?? undefined}
