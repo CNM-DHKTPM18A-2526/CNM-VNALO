@@ -14,9 +14,12 @@ export function RegisterFaceStep({ token, onComplete }: RegisterFaceStepProps) {
   const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const isMounted = useRef<boolean>(true)
 
   useEffect(() => {
+    isMounted.current = true
     return () => {
+      isMounted.current = false
       if (preview) {
         URL.revokeObjectURL(preview)
       }
@@ -52,14 +55,19 @@ export function RegisterFaceStep({ token, onComplete }: RegisterFaceStepProps) {
         'Đăng ký khuôn mặt'
       )
 
+      if (!isMounted.current) return
+
       if (result.success) {
         setStep('success')
-        setTimeout(() => onComplete(true), 1200)
+        setTimeout(() => {
+          if (isMounted.current) onComplete(true)
+        }, 1200)
       } else {
         setErrorMsg(result.message ?? 'Đăng ký khuôn mặt thất bại.')
         setStep('error')
       }
     } catch (err) {
+      if (!isMounted.current) return
       setErrorMsg(err instanceof Error ? err.message : 'Đã xảy ra lỗi.')
       setStep('error')
     }
@@ -76,12 +84,8 @@ export function RegisterFaceStep({ token, onComplete }: RegisterFaceStepProps) {
           <div className='register-face-capture-wrapper'>
             <FaceCapture
               onCapture={handleCapture}
-              onCameraError={(msg) => setErrorMsg(msg)}
             />
           </div>
-          {errorMsg && (
-            <p className='register-face-error'>{errorMsg}</p>
-          )}
           <div className='register-face-actions'>
             <button
               type='button'

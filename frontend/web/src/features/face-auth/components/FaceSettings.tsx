@@ -32,28 +32,36 @@ export function FaceSettings({ token, onStatusChange }: FaceSettingsProps) {
   const [showEnrollment, setShowEnrollment] = useState(false)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
+  const isMounted = useRef<boolean>(true)
+
   const loadStatus = React.useCallback(async () => {
     setState('loading')
     setErrorMessage(null)
 
     try {
       const result = await getFaceStatus(token)
+      if (!isMounted.current) return
       setStatus(result)
       const enrolled = result.enrolled
       setState(enrolled ? 'enrolled' : 'not-enrolled')
       onStatusChange?.(enrolled)
     } catch (err) {
+      if (!isMounted.current) return
       setErrorMessage(err instanceof Error ? err.message : 'Không thể tải trạng thái face auth.')
       setState('error')
     }
   }, [token, onStatusChange])
 
   useEffect(() => {
+    isMounted.current = true
     const timer = window.setTimeout(() => {
       void loadStatus()
     }, 0)
 
-    return () => window.clearTimeout(timer)
+    return () => {
+      isMounted.current = false
+      window.clearTimeout(timer)
+    }
   }, [loadStatus])
 
   const handleDelete = async () => {
@@ -67,11 +75,13 @@ export function FaceSettings({ token, onStatusChange }: FaceSettingsProps) {
 
     try {
       await deleteFaceEnrollment(token)
+      if (!isMounted.current) return
       setSuccessMessage('Đã xóa đăng ký khuôn mặt thành công.')
       setStatus(null)
       setState('not-enrolled')
       onStatusChange?.(false)
     } catch (err) {
+      if (!isMounted.current) return
       setErrorMessage(err instanceof Error ? err.message : 'Không thể xóa đăng ký.')
       setState('enrolled')
     }
@@ -216,6 +226,15 @@ function FaceEnrollmentPanel({
   const [step, setStep] = React.useState<'capture' | 'confirm' | 'processing' | 'done'>('capture')
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null)
 
+  const isMounted = React.useRef<boolean>(true)
+
+  React.useEffect(() => {
+    isMounted.current = true
+    return () => {
+      isMounted.current = false
+    }
+  }, [])
+
   const handleCapture = (b: Blob) => {
     setBlob(b)
     setPreview(URL.createObjectURL(b))
@@ -237,14 +256,19 @@ function FaceEnrollmentPanel({
         'Đăng ký khuôn mặt'
       )
 
+      if (!isMounted.current) return
+
       if (result.success) {
         setStep('done')
-        setTimeout(() => onSuccess(result.enrolledAt ?? new Date().toISOString(), result.version ?? 1), 1500)
+        setTimeout(() => {
+          if (isMounted.current) onSuccess(result.enrolledAt ?? new Date().toISOString(), result.version ?? 1)
+        }, 1500)
       } else {
         setErrorMsg(result.message ?? 'Đăng ký thất bại.')
         setStep('capture')
       }
     } catch (err) {
+      if (!isMounted.current) return
       setErrorMsg(err instanceof Error ? err.message : 'Đã xảy ra lỗi.')
       setStep('capture')
     }

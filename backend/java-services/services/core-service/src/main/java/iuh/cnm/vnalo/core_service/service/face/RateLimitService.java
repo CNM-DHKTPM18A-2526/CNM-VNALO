@@ -110,13 +110,27 @@ public class RateLimitService {
      * Runs every 2 minutes automatically via Spring scheduling.
      */
     @Scheduled(fixedRate = 120_000)
-    public void evictStaleIpEntries() {
-        long cutoff = Instant.now().toEpochMilli() - IP_EVICT_AFTER_MS;
-        int before = ipWindows.size();
-        ipWindows.entrySet().removeIf(e -> e.getValue().lastSeen < cutoff);
-        int evicted = before - ipWindows.size();
-        if (evicted > 0) {
-            log.info("[RateLimit] Evicted {} stale IP entries", evicted);
+    public void evictStaleEntries() {
+        long now = Instant.now().toEpochMilli();
+        long ipCutoff = now - IP_EVICT_AFTER_MS;
+        long verifyCutoff = now - VERIFY_LOCK_DURATION_MS;
+
+        int beforeIp = ipWindows.size();
+        ipWindows.entrySet().removeIf(e -> e.getValue().lastSeen < ipCutoff);
+        int evictedIp = beforeIp - ipWindows.size();
+        if (evictedIp > 0) {
+            log.info("[RateLimit] Evicted {} stale IP entries", evictedIp);
+        }
+
+        int beforeVerify = verifyFailures.size();
+        verifyFailures.entrySet().removeIf(e -> {
+            FailureRecord record = e.getValue();
+            return (record.lockedUntil > 0 && now >= record.lockedUntil) || 
+                   (record.lockedUntil == 0 && record.lastFailureAt < verifyCutoff);
+        });
+        int evictedVerify = beforeVerify - verifyFailures.size();
+        if (evictedVerify > 0) {
+            log.info("[RateLimit] Evicted {} stale verify failure records", evictedVerify);
         }
     }
 

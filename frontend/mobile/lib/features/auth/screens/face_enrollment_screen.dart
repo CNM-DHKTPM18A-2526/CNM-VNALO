@@ -257,17 +257,17 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen> {
               margin: const EdgeInsets.only(bottom: 16),
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Colors.red.shade50,
+                color: isDarkMode ? Colors.red.shade900.withValues(alpha: 0.2) : Colors.red.shade50,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                  Icon(Icons.error_outline, color: isDarkMode ? Colors.red.shade200 : Colors.red.shade700, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       _errorMsg!,
-                      style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+                      style: TextStyle(color: isDarkMode ? Colors.red.shade200 : Colors.red.shade700, fontSize: 13),
                     ),
                   ),
                 ],

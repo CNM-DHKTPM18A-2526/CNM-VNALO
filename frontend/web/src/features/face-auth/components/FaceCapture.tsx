@@ -17,10 +17,12 @@ export function FaceCapture({
 }: FaceCaptureProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const isMounted = useRef<boolean>(true)
   const [cameraState, setCameraState] = useState<CameraState>('idle')
   const [cameraError, setCameraError] = useState<string | null>(null)
 
   useEffect(() => {
+    isMounted.current = true
     if (disabled) {
       stopCameraStream(streamRef.current)
       streamRef.current = null
@@ -34,6 +36,11 @@ export function FaceCapture({
 
       try {
         const stream = await createCameraStream()
+        if (!isMounted.current) {
+          stopCameraStream(stream)
+          return
+        }
+
         if (!stream) {
           throw new Error('Trình duyệt không hỗ trợ camera.')
         }
@@ -46,6 +53,7 @@ export function FaceCapture({
           await videoRef.current.play()
         }
       } catch (err) {
+        if (!isMounted.current) return
         const msg = getCameraErrorMessage(err)
         setCameraError(msg)
         setCameraState('error')
@@ -56,6 +64,7 @@ export function FaceCapture({
     void startCamera()
 
     return () => {
+      isMounted.current = false
       stopCameraStream(streamRef.current)
       streamRef.current = null
       setCameraState('stopped')
@@ -67,6 +76,9 @@ export function FaceCapture({
 
     setCameraState('capturing')
     const blob = await captureFrame(videoRef.current)
+    
+    if (!isMounted.current) return
+    
     setCameraState('active')
 
     if (blob) {

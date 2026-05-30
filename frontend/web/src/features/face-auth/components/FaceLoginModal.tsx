@@ -70,6 +70,7 @@ async function captureFrame(video: HTMLVideoElement): Promise<Blob> {
 export function FaceLoginModal({ onClose, onNotEnrolled, onSuccess }: FaceLoginModalProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const isMounted = useRef<boolean>(true);
   const { loginWithAccessToken } = useAuth();
 
   const [step, setStep] = useState<LoginStep>('identifier');
@@ -82,24 +83,26 @@ export function FaceLoginModal({ onClose, onNotEnrolled, onSuccess }: FaceLoginM
   async function checkServiceHealth() {
     try {
       const health = await getFaceHealth();
-      setServiceAvailable(health.enabled && health.modelReady);
+      if (isMounted.current) {
+        setServiceAvailable(health.enabled && health.modelReady);
+      }
     } catch {
-      setServiceAvailable(false);
+      if (isMounted.current) setServiceAvailable(false);
     }
   }
 
   useEffect(() => {
+    isMounted.current = true;
     const timer = window.setTimeout(() => {
       void checkServiceHealth();
     }, 0);
 
-    return () => window.clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
     return () => {
+      isMounted.current = false;
+      window.clearTimeout(timer);
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
       }
     };
   }, []);
@@ -118,7 +121,7 @@ export function FaceLoginModal({ onClose, onNotEnrolled, onSuccess }: FaceLoginM
       return;
     }
     setStep('camera');
-    setTimeout(() => { void initCamera(); }, 100);
+    setTimeout(() => { if (isMounted.current) void initCamera(); }, 100);
   }
 
   async function initCamera() {
@@ -126,13 +129,17 @@ export function FaceLoginModal({ onClose, onNotEnrolled, onSuccess }: FaceLoginM
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
       });
+      if (!isMounted.current) {
+        stream.getTracks().forEach(t => t.stop());
+        return;
+      }
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
     } catch (err) {
-      setCameraError(getCameraErrorMessage(err));
+      if (isMounted.current) setCameraError(getCameraErrorMessage(err));
     }
   }
 
@@ -201,15 +208,15 @@ export function FaceLoginModal({ onClose, onNotEnrolled, onSuccess }: FaceLoginM
     >
       <div className="face-login-modal" role="dialog" aria-modal="true" aria-labelledby="face-login-modal-title">
         <div className="face-login-modal-header">
-          <span className="face-login-modal-title" id="face-login-modal-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 8, verticalAlign: 'middle' }} aria-hidden="true">
+          <span className="face-login-modal-title" id="face-login-modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
               <circle cx="12" cy="7" r="4"></circle>
             </svg>
             Đăng nhập khuôn mặt
+            <span className="auth-face-badge">thử nghiệm</span>
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span className="auth-face-badge">thử nghiệm</span>
             <button className="face-login-modal-close" onClick={onClose} aria-label="Đóng">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="18" y1="6" x2="6" y2="18"></line>

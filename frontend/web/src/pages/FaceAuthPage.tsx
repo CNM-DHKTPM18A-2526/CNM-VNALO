@@ -1,11 +1,9 @@
-import { useState } from 'react'
 import { FaceSettings } from '../features/face-auth/components/FaceSettings'
 import { useAuth } from '../features/auth/useAuth'
 import { Card } from '../shared/components/ui/Card'
 
 export function FaceAuthPage() {
   const { accessToken } = useAuth()
-  const [refreshKey, setRefreshKey] = useState(0)
 
   if (!accessToken) {
     return (
@@ -32,11 +30,7 @@ export function FaceAuthPage() {
       </div>
 
       <Card className='face-auth-page-card'>
-        <FaceSettings
-          key={refreshKey}
-          token={accessToken}
-          onStatusChange={() => setRefreshKey((k) => k + 1)}
-        />
+        <FaceSettings token={accessToken} />
       </Card>
     </div>
   )
