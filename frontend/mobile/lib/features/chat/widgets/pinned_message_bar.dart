@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
@@ -80,6 +81,18 @@ class _PinnedMessageBarState extends State<PinnedMessageBar> with SingleTickerPr
         final text = message.content ?? '';
         if (text.isEmpty) {
           return common.imageLabel ?? 'Tin nhắn';
+        }
+        // Parse JSON note/poll content
+        if (text.trimLeft().startsWith('{')) {
+          try {
+            final json = jsonDecode(text) as Map<String, dynamic>;
+            final type = json['type'] as String? ?? '';
+            if (type == 'note') {
+              return '[Ghi chú] ${json['content'] ?? ''}';
+            } else if (type == 'poll') {
+              return '[Bình chọn] ${json['question'] ?? ''}';
+            }
+          } catch (_) {}
         }
         return text;
     }
@@ -460,7 +473,20 @@ class _PinLimitDialogState extends State<_PinLimitDialog> {
       case MessageType.STICKER:
         return '[Sticker]';
       default:
-        return msg.content ?? '';
+        final text = msg.content ?? '';
+        // Parse JSON note/poll content
+        if (text.trimLeft().startsWith('{')) {
+          try {
+            final json = jsonDecode(text) as Map<String, dynamic>;
+            final type = json['type'] as String? ?? '';
+            if (type == 'note') {
+              return '[Ghi chú] ${json['content'] ?? ''}';
+            } else if (type == 'poll') {
+              return '[Bình chọn] ${json['question'] ?? ''}';
+            }
+          } catch (_) {}
+        }
+        return text;
     }
   }
 

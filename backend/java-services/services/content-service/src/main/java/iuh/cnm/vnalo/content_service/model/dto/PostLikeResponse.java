@@ -11,5 +11,8 @@ import java.util.UUID;
 public class PostLikeResponse {
 
     private UUID userId;
+    
+    private String reactionType;
+
     private OffsetDateTime likedAt;
 }

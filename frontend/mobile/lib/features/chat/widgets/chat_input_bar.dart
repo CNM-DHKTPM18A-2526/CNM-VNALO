@@ -11,7 +11,7 @@ import 'package:vnalo_mobile/features/chat/widgets/mention_autocomplete.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/conversation_member_model.dart';
 import 'package:vnalo_mobile/features/chat/widgets/voice_recording_overlay.dart';
-import 'package:vnalo_mobile/features/chat/widgets/poll_widget.dart';
+import 'package:vnalo_mobile/features/chat/screens/group_board_screen.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:record/record.dart';
@@ -585,6 +585,31 @@ class _ChatInputBarState extends State<ChatInputBar> {
 
   void _showAttachmentMenu(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final chatProvider = context.read<ChatProvider>();
+    final conv = chatProvider.conversations
+        .where((c) => c.id == widget.conversationId)
+        .firstOrNull;
+    if (conv == null) return;
+    final isGroup = widget.isGroup && conv.type == ConversationType.GROUP;
+    
+    bool canCreateNote = true;
+    bool canCreatePoll = true;
+    
+    if (isGroup) {
+      final userId = chatProvider.currentUserId;
+      final myMember = conv.members.firstWhere(
+        (m) => m.userId == userId,
+        orElse: () => ConversationMember(
+          conversationId: conv.id,
+          userId: userId ?? '',
+          role: MemberRole.MEMBER,
+          joinedAt: DateTime.now(),
+        ),
+      );
+      final isAdminOrDeputy = myMember.role == MemberRole.ADMIN || myMember.role == MemberRole.DEPUTY;
+      canCreateNote = conv.allowMemberCreateNote || isAdminOrDeputy;
+      canCreatePoll = conv.allowMemberCreatePoll || isAdminOrDeputy;
+    }
     
     showModalBottomSheet(
       context: context,
@@ -636,6 +661,15 @@ class _ChatInputBarState extends State<ChatInputBar> {
                   }),
                   _buildMenuButton(context, isDarkMode, Icons.alarm, AppColors.warning, 'Nhắc hẹn', () {
                     Navigator.pop(context);
+                    if (!canCreateNote) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Bạn không có quyền tạo nhắc hẹn'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                      return;
+                    }
                     showDialog(
                       context: context,
                       builder: (_) => ReminderDialog(
@@ -647,18 +681,19 @@ class _ChatInputBarState extends State<ChatInputBar> {
                   }),
                   _buildMenuButton(context, isDarkMode, Icons.poll_rounded, AppColors.primary, 'Bình chọn', () {
                     Navigator.pop(context);
-                    showDialog(
-                      context: context,
-                      builder: (_) => CreatePollDialog(
-                        conversationId: widget.conversationId,
-                        onCreate: (question, options) {
-                          final encoded = 'question=${Uri.encodeComponent(question)}&options=${options.map((o) => Uri.encodeComponent(o)).join('|')}&totalVotes=0';
-                          if (widget.onSendWithType != null) {
-                            widget.onSendWithType!(encoded, 'POLL');
-                          } else {
-                            widget.onSend(encoded);
-                          }
-                        },
+                    if (!canCreatePoll) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Bạn không có quyền tạo bình chọn'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                      return;
+                    }
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => GroupBoardScreen(conversation: conv, initialTabIndex: 1),
                       ),
                     );
                   }),

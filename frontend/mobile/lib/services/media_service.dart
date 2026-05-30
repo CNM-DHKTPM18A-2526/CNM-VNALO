@@ -61,6 +61,10 @@ class MediaService {
     );
 
     final data = response['data'] ?? response;
+    final url = data['url']?.toString();
+    if (url != null && url.isNotEmpty) {
+      return url;
+    }
     return data['mediaId']?.toString() ?? data['id']?.toString() ?? '';
   }
 
