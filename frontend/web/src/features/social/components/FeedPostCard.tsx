@@ -181,6 +181,86 @@ export function FeedPostCard({
   const [isSavingCommentEdit, setIsSavingCommentEdit] = useState(false);
   const [commentToDelete, setCommentToDelete] = useState<ApiComment | null>(null);
   const [isDeletingComment, setIsDeletingComment] = useState(false);
+  const commentCountDisplay = comments === null ? (post.commentCount || 0) : comments.length;
+
+  const openLikersModal = async () => {
+    setIsLikersOpen(true);
+    setLikers(null);
+    try {
+      if (!accessToken) {
+        // No auth: fallback to localStorage
+        const fallback: { userId: string; likedAt?: string }[] = [];
+        try {
+          if (currentUserId && localStorage.getItem(`liked:${currentUserId}:${post.postId}`) === '1') {
+            fallback.push({ userId: currentUserId, likedAt: new Date().toISOString() });
+          }
+        } catch (e) {}
+        setLikers(fallback);
+        return;
+      }
+
+      const data = await socialApi.getPostLikers(accessToken, post.postId).catch(() => null);
+      // read local per-post cache
+      let localArr: { userId: string; likedAt?: string }[] = [];
+      try {
+        const key = `likedUsers:${post.postId}`;
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const ids: string[] = JSON.parse(raw);
+          localArr = ids.map(id => ({ userId: id }));
+        }
+      } catch (e) {
+        localArr = [];
+      }
+
+      // Normalize server response shapes: accept Array, { data: [] }, { items: [] }
+      let serverList: any[] = [];
+      if (Array.isArray(data)) serverList = data as any[];
+      else if (data && Array.isArray((data as any).data)) serverList = (data as any).data;
+      else if (data && Array.isArray((data as any).items)) serverList = (data as any).items;
+
+      if (serverList && serverList.length > 0) {
+        // merge server data with local cache (server first), dedupe by userId
+        const map = new Map<string, { userId: string; likedAt?: string }>();
+        serverList.forEach((d: any) => {
+          const uid = typeof d.userId === 'string' ? d.userId : (d.userId && (d.userId.id || d.userId.uuid) ? (d.userId.id || d.userId.uuid) : String(d.userId));
+          map.set(uid, { userId: uid, likedAt: d.likedAt });
+        });
+        localArr.forEach(l => { if (!map.has(l.userId)) map.set(l.userId, l); });
+        const merged = Array.from(map.values());
+        setLikers(merged);
+        // Prefetch profiles for all likers so modal shows names/avatars
+        void Promise.all(merged.map(d => ensureUser(accessToken, d.userId).catch(() => null)));
+        return;
+      }
+
+      // Server returned empty list — use fallback local per-post cache or current user
+      const fallbackList: { userId: string; likedAt?: string }[] = [];
+      if (localArr.length > 0) {
+        fallbackList.push(...localArr);
+        // prefetch profiles for local cache
+        void Promise.all(localArr.map(d => ensureUser(accessToken, d.userId).catch(() => null)));
+      } else {
+        try {
+          if (currentUserId && localStorage.getItem(`liked:${currentUserId}:${post.postId}`) === '1') {
+            fallbackList.push({ userId: currentUserId, likedAt: new Date().toISOString() });
+            void ensureUser(accessToken, currentUserId).catch(() => null);
+          }
+        } catch (e) {}
+      }
+
+      setLikers(fallbackList);
+    } catch (e) {
+      console.warn('Failed to fetch likers', e);
+      const fallbackErr: { userId: string; likedAt?: string }[] = [];
+      try {
+        if (currentUserId && localStorage.getItem(`liked:${currentUserId}:${post.postId}`) === '1') {
+          fallbackErr.push({ userId: currentUserId, likedAt: new Date().toISOString() });
+        }
+      } catch (err) {}
+      setLikers(fallbackErr);
+    }
+  };
 
   const emojiOptions = [...REACTION_OPTIONS.map(item => item.emoji), '😊', '🥳', '✨', '💖', '😄', '🤩', '🙌', '🔥'];
 
@@ -284,6 +364,22 @@ export function FeedPostCard({
     }
   };
 
+  const openCommentsModal = async () => {
+    setIsCommentsOpen(true);
+    setComments(null);
+    try {
+      if (!accessToken) {
+        setComments([]);
+        return;
+      }
+      const res = await socialApi.getComments(accessToken, post.postId, 0, 50).catch(() => ({ items: [] }));
+      setComments(res.items || []);
+    } catch (e) {
+      console.warn('Failed to fetch comments', e);
+      setComments([]);
+    }
+  };
+
   return (
     <div className="feed-post-card">
       <div className="post-header">
@@ -372,115 +468,35 @@ export function FeedPostCard({
         <MediaLightbox items={post.mediaUrls} startIndex={lightboxIndex} onClose={() => setLightboxIndex(null)} />
       )}
 
-      <div className="post-stats">
-        <button type="button" className="post-stats-like-count" onClick={async () => {
-          // Open likers modal and fetch list; fallback to local cache (current user's like) if server returns nothing
-          setIsLikersOpen(true);
-          setLikers(null);
-          try {
-            if (!accessToken) {
-              // No auth: fallback to localStorage
-              const fallback: { userId: string; likedAt?: string }[] = [];
-              try {
-                if (currentUserId && localStorage.getItem(`liked:${currentUserId}:${post.postId}`) === '1') {
-                  fallback.push({ userId: currentUserId, likedAt: new Date().toISOString() });
-                }
-              } catch (e) {}
-              setLikers(fallback);
-              return;
-            }
+      <div className="post-stats post-card-footer">
+        <div className="post-stats-counts post-card-footer-counts">
+          <button
+            type="button"
+            className={`post-stats-like-count ${isLiked ? 'liked' : ''}`}
+            onClick={handleLike}
+            disabled={isLiking}
+            aria-label={isLiked ? 'Bỏ thích' : 'Thích'}
+          >
+            <Icon name={isLiked ? 'heartFill' : 'heart'} size={16} />
+            <span>{post.likeCount}</span>
+          </button>
+          <button type="button" className="post-stats-comment-count" onClick={() => void openCommentsModal()} aria-label="Bình luận">
+            <Icon name="chat" size={16} />
+            <span>{post.commentCount}</span>
+          </button>
+        </div>
 
-            const data = await socialApi.getPostLikers(accessToken, post.postId).catch(() => null);
-            // read local per-post cache
-            let localArr: { userId: string; likedAt?: string }[] = [];
-            try {
-              const key = `likedUsers:${post.postId}`;
-              const raw = localStorage.getItem(key);
-              if (raw) {
-                const ids: string[] = JSON.parse(raw);
-                localArr = ids.map(id => ({ userId: id }));
-              }
-            } catch (e) {
-              localArr = [];
-            }
-
-            // Normalize server response shapes: accept Array, { data: [] }, { items: [] }
-            let serverList: any[] = [];
-            if (Array.isArray(data)) serverList = data as any[];
-            else if (data && Array.isArray((data as any).data)) serverList = (data as any).data;
-            else if (data && Array.isArray((data as any).items)) serverList = (data as any).items;
-
-            if (serverList && serverList.length > 0) {
-              // merge server data with local cache (server first), dedupe by userId
-              const map = new Map<string, { userId: string; likedAt?: string }>();
-              serverList.forEach((d: any) => {
-                const uid = typeof d.userId === 'string' ? d.userId : (d.userId && (d.userId.id || d.userId.uuid) ? (d.userId.id || d.userId.uuid) : String(d.userId));
-                map.set(uid, { userId: uid, likedAt: d.likedAt });
-              });
-              localArr.forEach(l => { if (!map.has(l.userId)) map.set(l.userId, l); });
-              const merged = Array.from(map.values());
-              setLikers(merged);
-              // Prefetch profiles for all likers so modal shows names/avatars
-              void Promise.all(merged.map(d => ensureUser(accessToken, d.userId).catch(() => null)));
-              return;
-            }
-
-            // Server returned empty list — use fallback local per-post cache or current user
-            const fallbackList: { userId: string; likedAt?: string }[] = [];
-            if (localArr.length > 0) {
-              fallbackList.push(...localArr);
-              // prefetch profiles for local cache
-              void Promise.all(localArr.map(d => ensureUser(accessToken, d.userId).catch(() => null)));
-            } else {
-              try {
-                if (currentUserId && localStorage.getItem(`liked:${currentUserId}:${post.postId}`) === '1') {
-                  fallbackList.push({ userId: currentUserId, likedAt: new Date().toISOString() });
-                  void ensureUser(accessToken, currentUserId).catch(() => null);
-                }
-              } catch (e) {}
-            }
-
-            setLikers(fallbackList);
-          } catch (e) {
-            console.warn('Failed to fetch likers', e);
-            const fallbackErr: { userId: string; likedAt?: string }[] = [];
-            try {
-              if (currentUserId && localStorage.getItem(`liked:${currentUserId}:${post.postId}`) === '1') {
-                fallbackErr.push({ userId: currentUserId, likedAt: new Date().toISOString() });
-              }
-            } catch (err) {}
-            setLikers(fallbackErr);
-          }
-        }}>
-          {post.likeCount} Thích
-        </button>
-        <span>{post.commentCount} Bình luận</span>
-      </div>
-
-      <div className="post-actions">
-        <button className={`post-action-btn ${isLiked ? 'liked' : ''}`} onClick={handleLike} disabled={isLiking}>
-          <Icon name={isLiked ? 'heartFill' : 'heart'} size={20} />
-          {isLiked ? 'Đã thích' : 'Thích'}
-        </button>
-        <button className="post-action-btn" onClick={async () => {
-          setIsCommentsOpen(true);
-          setComments(null);
-          try {
-            if (!accessToken) {
-              setComments([]);
-              return;
-            }
-            const res = await socialApi.getComments(accessToken, post.postId, 0, 50).catch(() => ({ items: [] }));
-            setComments(res.items || []);
-          } catch (e) {
-            console.warn('Failed to fetch comments', e);
-            setComments([]);
-          }
-        }}>
-          <Icon name="chat" size={20} />
-          Bình luận
-        </button>
-        {/* Share button intentionally removed per UX request */}
+        {(post.likeCount || 0) > 0 && (
+          <button
+            type="button"
+            className="post-action-btn post-action-btn-likers"
+            onClick={() => void openLikersModal()}
+            aria-label="Ai đã thích"
+            title="Ai đã thích"
+          >
+            <Icon name="heartFill" size={18} />
+          </button>
+        )}
       </div>
 
       {isConfirmOpen && (
@@ -508,7 +524,7 @@ export function FeedPostCard({
       )}
 
       {isLikersOpen && (
-        <div className="social-modal-overlay" onClick={() => setIsLikersOpen(false)}>
+        <div className="social-modal-overlay social-modal-overlay-likers" onClick={() => setIsLikersOpen(false)}>
           <div className="social-modal-content" onClick={e => e.stopPropagation()}>
             <div className="social-modal-header">
               <h3>Ai đã thích</h3>
@@ -528,16 +544,12 @@ export function FeedPostCard({
                         <UserAvatar imageUrl={profile?.avatarUrl ?? null} name={profile?.displayName ?? l.userId} size="sm" />
                         <div className="liker-info">
                           <div className="liker-name">{profile?.displayName ?? l.userId}</div>
-                          {l.likedAt && <div className="liker-time">{new Date(l.likedAt).toLocaleString()}</div>}
                         </div>
                       </div>
                     );
                   })}
                 </div>
               )}
-            </div>
-            <div className="social-modal-footer">
-              <button type="button" className="composer-btn" onClick={() => setIsLikersOpen(false)}>Đóng</button>
             </div>
           </div>
         </div>
@@ -600,14 +612,33 @@ export function FeedPostCard({
                 )}
 
                 <div className="modal-post-actions">
-                  <button className={`post-action-btn ${isLiked ? 'liked' : ''}`} onClick={handleLike} disabled={isLiking}>
-                    <Icon name={isLiked ? 'heartFill' : 'heart'} size={18} />
-                    {isLiked ? 'Đã thích' : 'Thích'}
-                  </button>
-                  <button className="post-action-btn" onClick={() => focusCommentComposer()}>
-                    <Icon name="chat" size={18} />
-                    Bình luận
-                  </button>
+                  <div className="modal-post-action-item">
+                    <button className={`post-action-btn ${isLiked ? 'liked' : ''}`} onClick={handleLike} disabled={isLiking}>
+                      <Icon name={isLiked ? 'heartFill' : 'heart'} size={18} />
+                    </button>
+                    <span className="modal-post-action-count" aria-label={`${post.likeCount || 0} lượt yêu thích`}>
+                      {post.likeCount || 0}
+                    </span>
+                  </div>
+                  <div className="modal-post-action-item">
+                    <button className="post-action-btn" onClick={() => focusCommentComposer()}>
+                      <Icon name="chat" size={18} />
+                    </button>
+                    <span className="modal-post-action-count" aria-label={`${commentCountDisplay} bình luận`}>
+                      {commentCountDisplay}
+                    </span>
+                  </div>
+                  {(post.likeCount || 0) > 0 && (
+                    <button
+                      type="button"
+                      className="post-action-btn post-action-btn-likers"
+                      onClick={() => void openLikersModal()}
+                      aria-label="Ai đã thích"
+                      title="Ai đã thích"
+                    >
+                      <Icon name="heartFill" size={18} />
+                    </button>
+                  )}
                 </div>
               </div>
 

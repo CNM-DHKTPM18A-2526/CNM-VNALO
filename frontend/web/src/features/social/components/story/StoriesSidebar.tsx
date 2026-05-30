@@ -25,6 +25,19 @@ export function StoriesSidebar({
   const navigate = useNavigate();
   const viewersByStoryId = useStoryStore(state => state.viewersByStoryId);
 
+  const isViewedByCurrentUser = (storyId: string, authorId: string) => {
+    if (!currentUserId || authorId === currentUserId) return true;
+
+    const viewedByStore = (viewersByStoryId[storyId] ?? []).some(viewer => viewer.viewerId === currentUserId);
+    if (viewedByStore) return true;
+
+    try {
+      return localStorage.getItem(`story:viewed:${currentUserId}:${storyId}`) === '1';
+    } catch {
+      return false;
+    }
+  };
+
   const groupedStories = useMemo<StoryGroupItem[]>(() => {
     const byAuthor = new Map<string, Story[]>();
 
@@ -41,7 +54,7 @@ export function StoriesSidebar({
         latestStoryAt: authorStories.reduce((latest, item) => (item.createdAt > latest ? item.createdAt : latest), authorStories[0]?.createdAt ?? ''),
         unreadCount: authorStories.reduce((count, item) => {
           if (!currentUserId || authorId === currentUserId) return count;
-          const viewedByCurrentUser = (viewersByStoryId[item.storyId] ?? []).some(viewer => viewer.viewerId === currentUserId);
+          const viewedByCurrentUser = isViewedByCurrentUser(item.storyId, authorId);
           return viewedByCurrentUser ? count : count + 1;
         }, 0),
       }))
@@ -53,6 +66,7 @@ export function StoriesSidebar({
   }, [stories, currentUserId, viewersByStoryId]);
 
   const activeUserGroup = groupedStories.find(group => group.authorId === currentUserId) ?? null;
+  const otherGroups = groupedStories.filter(group => group.authorId !== currentUserId);
 
   return (
     <aside className="stories-sidebar" onClick={event => event.stopPropagation()}>
@@ -76,14 +90,22 @@ export function StoriesSidebar({
         <h2 className="stories-sidebar-section-title">Tin của bạn</h2>
         <CreateStoryCard onClick={() => navigate('/stories/create')} />
         {activeUserGroup ? (
-          <div className="stories-sidebar-my-story-label">Bạn đang có {activeUserGroup.stories.length} tin</div>
+          <>
+            <StoryList
+              groups={[activeUserGroup]}
+              currentStoryId={currentStoryId}
+              currentUserId={currentUserId}
+              authorProfiles={authorProfiles}
+              onSelectStory={onSelectStory}
+            />
+          </>
         ) : null}
       </section>
 
       <section className="stories-sidebar-section stories-sidebar-section-list">
         <h2 className="stories-sidebar-section-title">Tất cả tin</h2>
         <StoryList
-          groups={groupedStories}
+          groups={otherGroups}
           currentStoryId={currentStoryId}
           currentUserId={currentUserId}
           authorProfiles={authorProfiles}

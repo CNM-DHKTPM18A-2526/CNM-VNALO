@@ -44,23 +44,10 @@ function App() {
             <Route path='profile' element={<ProfilePage />} />
             <Route path='chat-ai' element={<AiChatPage />} />
             <Route path='social' element={<SocialPage />} />
+            <Route path='stories/create' element={<CreateStoryPage />} />
+            <Route path='stories/:storyId' element={<StoryViewerPage />} />
           </Route>
-          <Route
-            path='/stories/create'
-            element={
-              <ProtectedRoute>
-                <CreateStoryPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path='/stories/:storyId'
-            element={
-              <ProtectedRoute>
-                <StoryViewerPage />
-              </ProtectedRoute>
-            }
-          />
+          
           <Route path='/call/:callId' element={<ProtectedRoute><CallPage /></ProtectedRoute>} />
           <Route path='*' element={<Navigate replace to='/chat' />} />
         </Routes>

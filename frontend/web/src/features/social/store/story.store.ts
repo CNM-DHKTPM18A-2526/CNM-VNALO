@@ -34,7 +34,7 @@ const DEFAULT_DRAFT: StoryDraft = {
   mediaType: null,
   caption: '',
   background: 'linear-gradient(180deg, #0f172a 0%, #111827 50%, #030712 100%)',
-  textColor: '#ffffff',
+  textColor: '#000000',
   fontSize: 28,
   fontWeight: 700,
   textAlign: 'center',
