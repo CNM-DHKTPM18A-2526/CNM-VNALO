@@ -218,17 +218,17 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.red.shade50,
+                      color: isDarkMode ? Colors.red.shade900.withValues(alpha: 0.2) : Colors.red.shade50,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                        Icon(Icons.error_outline, color: isDarkMode ? Colors.red.shade200 : Colors.red.shade700, size: 20),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             _errorMsg!,
-                            style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+                            style: TextStyle(color: isDarkMode ? Colors.red.shade200 : Colors.red.shade700, fontSize: 13),
                           ),
                         ),
                       ],
@@ -283,18 +283,18 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: Colors.amber.shade50,
+                      color: isDarkMode ? Colors.amber.shade900.withValues(alpha: 0.2) : Colors.amber.shade50,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.amber.shade200),
+                      border: Border.all(color: isDarkMode ? Colors.amber.shade900.withValues(alpha: 0.5) : Colors.amber.shade200),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.science_outlined, color: Colors.amber.shade700, size: 20),
+                        Icon(Icons.science_outlined, color: isDarkMode ? Colors.amber.shade300 : Colors.amber.shade700, size: 20),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             'Tính năng đang trong giai đoạn thử nghiệm.',
-                            style: TextStyle(fontSize: 13, color: Colors.amber.shade900),
+                            style: TextStyle(fontSize: 13, color: isDarkMode ? Colors.amber.shade200 : Colors.amber.shade900),
                           ),
                         ),
                       ],

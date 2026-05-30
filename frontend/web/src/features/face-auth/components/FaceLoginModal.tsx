@@ -246,6 +246,7 @@ export function FaceLoginModal({ onClose, onNotEnrolled, onSuccess }: FaceLoginM
                   type="text"
                   className="face-login-identifier-input"
                   placeholder="Số điện thoại hoặc email"
+                  aria-label="Số điện thoại hoặc email"
                   value={identifier}
                   onChange={(e) => { setIdentifier(e.target.value); setIdentifierError(null); }}
                   onKeyDown={(e) => { if (e.key === 'Enter') void handleFindAccount(); }}
@@ -319,8 +320,16 @@ export function FaceLoginModal({ onClose, onNotEnrolled, onSuccess }: FaceLoginM
                 </svg>
               </div>
               <p className="face-login-error-text">{errorMsg}</p>
-              <button className="face-login-primary-btn" onClick={handleRetry}>
-                Thử lại
+              <button className="face-login-primary-btn" onClick={() => {
+                setStep('camera');
+                setErrorMsg(null);
+                setCameraError(null);
+                setTimeout(() => { if (isMounted.current) void initCamera(); }, 100);
+              }}>
+                Chụp lại khuôn mặt
+              </button>
+              <button className="face-login-secondary-link" style={{ marginTop: 12 }} onClick={handleRetry}>
+                Đổi số điện thoại / email
               </button>
             </div>
           )}
