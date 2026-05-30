@@ -1,3 +1,4 @@
+// File encoding: UTF-8
 import React from 'react'
 import { createPortal } from 'react-dom'
 

@@ -104,6 +104,7 @@ export function ChatWindow({
   const { userMap } = useUserStore()
   const { t } = useLanguage()
   const messagesContainerRef = useRef<HTMLDivElement | null>(null)
+  const previousMessageCountRef = useRef<number>(0)
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null)
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null)
   const [replyMessage, setReplyMessage] = useState<ChatMessage | null>(null)
@@ -161,6 +162,7 @@ export function ChatWindow({
     // different conversation.
     const prevConvId = (messagesContainerRef as any)._prevConversationId as string | undefined
     const isNewConversation = prevConvId !== conversation.id
+    const firstLoadMessagesForConversation = prevConvId === conversation.id && previousMessageCountRef.current === 0 && conversationMessages.length > 0
 
     const distanceFromBottom = container.scrollHeight - (container.scrollTop + container.clientHeight)
     const NEAR_BOTTOM_THRESHOLD = 160 // px
@@ -175,11 +177,11 @@ export function ChatWindow({
       }
     }
 
-    if (isNewConversation) {
-      // When switching conversations the DOM may still be painting or images loading.
-      // Use rAF + timeout to ensure we reliably scroll to the bottom instead of landing at the top.
+    if (isNewConversation || firstLoadMessagesForConversation) {
+      // When switching conversations or when messages for the just-switched
+      // conversation finish loading, aggressively ensure the viewport is
+      // at the bottom. Use rAF + timeout to account for DOM/asset painting.
       requestAnimationFrame(() => scrollToBottom('auto'))
-      // Second pass in case layout changes after images/fonts load
       setTimeout(() => scrollToBottom('auto'), 120)
     } else if (distanceFromBottom <= NEAR_BOTTOM_THRESHOLD) {
       scrollToBottom('smooth')
@@ -191,6 +193,11 @@ export function ChatWindow({
     } catch (e) {
       // ignore
     }
+
+    // persist last seen message count so subsequent updates can detect
+    // first-load transitions (e.g. messages arrive after a conversation
+    // switch and the initial scroll landed at the top)
+    previousMessageCountRef.current = conversationMessages.length
   }, [conversation, conversationMessages.length, isLoadingMessages])
 
   useEffect(() => {

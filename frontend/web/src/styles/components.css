@@ -770,6 +770,8 @@
   background: var(--surface);
   box-shadow: 0 30px 60px rgba(15, 35, 74, 0.22);
   overflow: hidden;
+  /* Ensure modal text uses a font stack with Vietnamese glyph support */
+  font-family: 'Segoe UI', 'Noto Sans', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
 .modal-card-image {
