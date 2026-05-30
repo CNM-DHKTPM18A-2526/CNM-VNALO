@@ -1,10 +1,11 @@
-﻿import { useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 
 import { Sidebar } from '../shared/components/Sidebar'
 import { Topbar } from '../shared/components/Topbar'
 import { SettingsModal } from '../features/settings/SettingsModal'
 import { ScreenCaptureModal } from '../features/chat/components/ScreenCaptureModal'
+import { GlobalIncomingCallBridge } from '../features/chat/components/GlobalIncomingCallBridge'
 import { useAuth } from '../features/auth/useAuth'
 import { useLanguage } from '../shared/i18n/LanguageContext'
 
@@ -96,6 +97,7 @@ export function MainLayout() {
 
       <SettingsModal isOpen={isSettingsModalOpen} onClose={handleCloseSettings} onChangePasswordSuccess={handleChangePasswordSuccess} />
       <ScreenCaptureModal isOpen={isCaptureModalOpen} onClose={() => setIsCaptureModalOpen(false)} onSend={handleSendCapture} />
+      <GlobalIncomingCallBridge />
     </div>
   )
 }
