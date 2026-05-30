@@ -1,5 +1,4 @@
 import React, { type KeyboardEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
 
 import { useLanguage } from '../i18n/LanguageContext'
 import { Icon } from './Icon'
@@ -19,7 +18,6 @@ export function Topbar({ title, userName, userAvatarUrl, onLogout, onOpenSetting
   const menuRef = React.useRef<HTMLDivElement | null>(null)
   const menuItemRefs = React.useRef<Array<HTMLButtonElement | null>>([])
   const { t } = useLanguage()
-  const navigate = useNavigate()
 
   const menuItems = [
     {
