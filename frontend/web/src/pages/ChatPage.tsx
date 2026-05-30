@@ -3005,21 +3005,6 @@ export default function ChatPage() {
   // We do NOT need to send anything to the server for incoming calls.
   }, [selectedConversation, currentUserId, emitSendMessage, accessToken, updateConversationAfterMessage]);
 
-  // const isAnsweringRef = useRef(false); // removed as unused
-  const handleAnswerCall = useCallback(async (audioOnlyParam?: boolean) => {
-    if (!callState.callId) return;
-    const peerName = (callState.peerId && userMap[callState.peerId]?.displayName && userMap[callState.peerId].displayName !== 'Người dùng')
-      ? userMap[callState.peerId].displayName
-      : (selectedConversation?.name || "Người dùng");
-    const peerAvatar = callState.peerId ? userMap[callState.peerId]?.avatarUrl : "";
-    const url = `/call/${callState.callId}?type=direct&conversationId=${callState.conversationId}&peerId=${callState.peerId}&audioOnly=${audioOnlyParam === true || callState.type === "audio"}&isCaller=false&peerName=${encodeURIComponent(peerName)}&peerAvatar=${encodeURIComponent(peerAvatar || "")}`;
-    console.log("[CALL][ANSWER-POPUP]", { url });
-    const width = window.screen.availWidth;
-    const height = window.screen.availHeight;
-    window.open(url, "VnaloCall", `width=${width},height=${height},menubar=no,toolbar=no,location=no,status=no`);
-    setCallState(prev => ({ ...prev, isOpen: false }));
-  }, [callState, userMap]);
-
 
 
 
@@ -5652,25 +5637,21 @@ export default function ChatPage() {
           conversationName={incomingGroupCall.conversationName}
           isAudioOnly={incomingGroupCall.audioOnly}
           onAnswer={() => {
-            const url = `/call/${incomingGroupCall.callId}?type=group&conversationId=${incomingGroupCall.conversationId}&audioOnly=${incomingGroupCall.audioOnly}&isCaller=false&peerName=${encodeURIComponent(incomingGroupCall.conversationName)}&peerAvatar=${encodeURIComponent(incomingGroupCall.callerAvatar || "")}`;
+            const params = new URLSearchParams({
+              type: "group",
+              conversationId: incomingGroupCall.conversationId,
+              audioOnly: String(incomingGroupCall.audioOnly),
+              isCaller: "false",
+              peerName: incomingGroupCall.conversationName,
+              peerAvatar: incomingGroupCall.callerAvatar || "",
+            });
+            const url = `/call/${incomingGroupCall.callId}?${params.toString()}`;
             const width = window.screen.availWidth;
             const height = window.screen.availHeight;
             window.open(url, "VnaloCall", `width=${width},height=${height},menubar=no,toolbar=no,location=no,status=no`);
             declineGroupCall();
           }}
           onDecline={declineGroupCall}
-        />
-      ) : (callState.isOpen && (callState as any).direction === 'incoming' && callState.status === 'connecting') ? (
-        <IncomingCallBanner
-          peerName={(callState.peerId && userMap[callState.peerId]?.displayName && userMap[callState.peerId].displayName !== 'Người dùng')
-            ? userMap[callState.peerId].displayName
-            : (selectedConversation?.name || "Người dùng")
-          }
-          peerAvatar={callState.peerId ? userMap[callState.peerId]?.avatarUrl : selectedConversation?.avatarUrl}
-          isGroup={false}
-          isAudioOnly={callState.type === 'audio'}
-          onAnswer={handleAnswerCall}
-          onDecline={() => handleEndCall({ reason: 'reject', direction: 'incoming' })}
         />
       ) : null}
 
