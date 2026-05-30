@@ -804,7 +804,11 @@ class MessageBubble extends StatelessWidget {
   }
 
   Color _callLogTitleColor(CallOutcome outcome, bool isDarkMode) {
-    return const Color(0xFFE04040);
+    if (outcome == CallOutcome.missed) {
+      return const Color(0xFFE04040);
+    }
+
+    return isDarkMode ? Colors.white : LightColors.textPrimary;
   }
 
   Widget _buildImageGrid(BuildContext context, bool isDarkMode) {
