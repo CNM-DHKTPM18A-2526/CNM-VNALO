@@ -93,8 +93,8 @@ export function FaceCapture({
       <div className='face-capture-viewfinder'>
         {cameraError ? (
           <div className='face-capture-error'>
-            <span className='face-capture-error-icon'>⚠️</span>
-            <p>{cameraError}</p>
+            <span className='face-capture-error-icon' style={{fontSize: 24, marginBottom: 8}}>⚠️</span>
+            <p style={{margin: 0}}>{cameraError}</p>
           </div>
         ) : (
           <>
@@ -105,34 +105,40 @@ export function FaceCapture({
               muted
               autoPlay
             />
-            <div className='face-capture-overlay'>
-              <div className='face-capture-guide' />
-            </div>
+            {cameraState === 'active' || cameraState === 'capturing' ? (
+              <>
+                <div className='face-capture-guide-mask'>
+                  {cameraState === 'active' && <div className='face-capture-scanning-line' />}
+                </div>
+              </>
+            ) : null}
           </>
         )}
       </div>
 
-      <button
-        type='button'
-        className='face-capture-btn'
-        onClick={handleCapture}
-        disabled={disabled || cameraState !== 'active'}
-        aria-label={cameraState === 'requesting' ? 'Đang yêu cầu quyền camera...' : cameraState === 'capturing' ? 'Đang chụp ảnh...' : 'Chụp ảnh khuôn mặt'}
-      >
-        <span className='face-capture-btn-ring'>
-          {cameraState === 'capturing' ? (
-            <span className='face-capture-btn-spinner' />
-          ) : null}
-        </span>
-      </button>
-
       <p className='face-capture-hint'>
         {cameraState === 'requesting'
-          ? 'Đang yêu cầu quyền camera...'
+          ? 'Đang yêu cầu camera...'
           : cameraState === 'capturing'
-            ? 'Đang chụp...'
-            : 'Đưa khuôn mặt vào khung hình'}
+            ? 'Đang phân tích...'
+            : 'Đưa khuôn mặt vào trong khung'}
       </p>
+
+      <div className='face-capture-btn-container'>
+        <button
+          type='button'
+          className='face-capture-btn'
+          onClick={handleCapture}
+          disabled={disabled || cameraState !== 'active'}
+          aria-label={cameraState === 'requesting' ? 'Đang yêu cầu camera...' : cameraState === 'capturing' ? 'Đang phân tích...' : 'Chụp ảnh khuôn mặt'}
+        >
+          <div className='face-capture-btn-inner'>
+            {cameraState === 'capturing' ? (
+              <div className='face-capture-btn-spinner' />
+            ) : null}
+          </div>
+        </button>
+      </div>
     </div>
   )
 }
