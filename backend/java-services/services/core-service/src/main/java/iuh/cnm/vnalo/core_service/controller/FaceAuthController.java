@@ -58,10 +58,16 @@ public class FaceAuthController {
             @AuthenticationPrincipal UserPrincipal currentUser,
             @RequestParam("image") MultipartFile image,
             @RequestParam(value = "deviceInfo", required = false) String deviceInfo,
+            @RequestParam(value = "agreedToTerms", defaultValue = "false") boolean agreedToTerms,
+            @RequestParam(value = "termsVersion", defaultValue = "1.0") String termsVersion,
             HttpServletRequest request
     ) throws Exception {
         checkEnabled();
         checkEnrollmentEnabled();
+
+        if (!agreedToTerms) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR, "Bạn phải đồng ý với điều khoản sử dụng dữ liệu khuôn mặt.");
+        }
 
         if (rateLimitService.isEnrollIpRateLimited(getClientIp(request))) {
             throw new ApiException(ErrorCode.AUTH_TOO_MANY_REQUESTS, "Quá nhiều yêu cầu đăng ký khuôn mặt. Vui lòng thử lại sau.");
@@ -104,7 +110,7 @@ public class FaceAuthController {
         }
 
         FaceEnrollment enrollment = enrollmentService.enroll(
-                userId, embedding, livenessScore, 1.0, deviceInfo);
+                userId, embedding, livenessScore, 1.0, deviceInfo, agreedToTerms, termsVersion);
 
         FaceEnrollmentResponse response = FaceEnrollmentResponse.builder()
                 .success(true)
@@ -114,10 +120,11 @@ public class FaceAuthController {
                 .version(enrollment.getVersion())
                 .build();
 
-        log.info("Face enrolled successfully: userId={}, version={}, livenessScore={}",
-                userId, enrollment.getVersion(), String.format("%.3f", livenessScore));
+        log.info("Face enrolled successfully: userId={}, version={}, livenessScore={}, consentVersion={}",
+                userId, enrollment.getVersion(), String.format("%.3f", livenessScore), termsVersion);
         return ResponseEntity.ok(ApiResponse.success("Face enrolled successfully", response));
     }
+
 
     @PostMapping(value = "/verify", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Verify face", description = "Verifies a face against the enrolled face")

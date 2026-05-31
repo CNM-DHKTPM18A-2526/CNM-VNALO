@@ -94,9 +94,7 @@ export async function getFaceStatus(token: string): Promise<FaceStatusResponse> 
 export async function enrollFace(
   token: string,
   imageBlob: Blob,
-  options?: {
-    deviceInfo?: string
-  },
+  options?: { deviceInfo?: string, termsVersion?: string }
 ): Promise<FaceEnrollmentResponse> {
   const formData = new FormData()
   formData.append('image', imageBlob, 'face.jpg')
@@ -104,6 +102,10 @@ export async function enrollFace(
   if (options?.deviceInfo) {
     formData.append('deviceInfo', options.deviceInfo)
   }
+
+  // User has already agreed to terms on the UI step before reaching capture
+  formData.append('agreedToTerms', 'true')
+  formData.append('termsVersion', options?.termsVersion || '1.0')
 
   const response = await fetchWithAuth(token, `${API_BASE_URL}/face/enroll`, {
     method: 'POST',

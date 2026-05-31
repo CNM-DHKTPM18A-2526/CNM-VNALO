@@ -61,4 +61,11 @@ public class FaceEnrollment {
      */
     @Column(name = "device_info", columnDefinition = "jsonb")
     private String deviceInfo;
+
+    @Column(name = "terms_version", length = 50)
+    private String termsVersion;
+
+    @Column(name = "consent_agreed", nullable = false)
+    @Builder.Default
+    private Boolean consentAgreed = false;
 }

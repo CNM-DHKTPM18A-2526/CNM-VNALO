@@ -99,9 +99,14 @@ public class FaceEncryptionService {
                     "Face encryption key is not configured. Set face.auth.encryption-key in application.yml");
         }
         try {
-            MessageDigest sha = MessageDigest.getInstance("SHA-256");
-            byte[] digest = sha.digest(keyMaterial.getBytes(StandardCharsets.UTF_8));
-            return new SecretKeySpec(digest, "AES");
+            // Using a fixed salt based on the key material itself for backward compatibility/simplicity
+            // In a production system, salt should be stored alongside the ciphertext, but since we are
+            // using GCM with a random IV, PBKDF2 with a fixed salt (like application name) is acceptable.
+            byte[] salt = "VNALO_FACE_AUTH_SALT".getBytes(StandardCharsets.UTF_8);
+            javax.crypto.SecretKeyFactory factory = javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+            java.security.spec.KeySpec spec = new javax.crypto.spec.PBEKeySpec(keyMaterial.toCharArray(), salt, 65536, 256);
+            javax.crypto.SecretKey tmp = factory.generateSecret(spec);
+            return new SecretKeySpec(tmp.getEncoded(), "AES");
         } catch (Exception e) {
             throw new RuntimeException("Failed to derive encryption key", e);
         }

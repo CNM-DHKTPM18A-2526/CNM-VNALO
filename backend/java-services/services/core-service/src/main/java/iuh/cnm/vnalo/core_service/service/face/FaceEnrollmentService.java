@@ -31,7 +31,8 @@ public class FaceEnrollmentService {
      */
     @Transactional
     public FaceEnrollment enroll(UUID userId, float[] embedding,
-                                double livenessScore, double qualityScore, String deviceInfo) {
+                                double livenessScore, double qualityScore, String deviceInfo,
+                                boolean agreedToTerms, String termsVersion) {
         Optional<FaceEnrollment> existing = faceEnrollmentRepository.findByUserId(userId);
 
         String encrypted = faceEncryptionService.encrypt(embedding);
@@ -46,6 +47,8 @@ public class FaceEnrollmentService {
             enrollment.setDeviceInfo(deviceInfo);
             enrollment.setEnrolledAt(Instant.now());
             enrollment.setIsActive(true);
+            enrollment.setConsentAgreed(agreedToTerms);
+            enrollment.setTermsVersion(termsVersion);
             log.info("Re-enrolling face for userId={}, new version={}", userId, enrollment.getVersion());
         } else {
             enrollment = FaceEnrollment.builder()
@@ -57,12 +60,15 @@ public class FaceEnrollmentService {
                     .isActive(true)
                     .version(1)
                     .enrolledAt(Instant.now())
+                    .consentAgreed(agreedToTerms)
+                    .termsVersion(termsVersion)
                     .build();
             log.info("Enrolling face for userId={}", userId);
         }
 
         return faceEnrollmentRepository.save(enrollment);
     }
+
 
     /**
      * Retrieves the encrypted embedding string for a user.

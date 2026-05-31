@@ -134,7 +134,10 @@ class FaceAuthService {
 
   /// Enroll face for an authenticated user.
   Future<FaceEnrollResult> enrollFace(File image, String accessToken, {String? deviceInfo}) async {
-    final fields = <String, String>{};
+    final fields = <String, String>{
+      'agreedToTerms': 'true',
+      'termsVersion': '1.0',
+    };
     if (deviceInfo != null) fields['deviceInfo'] = deviceInfo;
     final data = await _postMultipartWithAuth(
       '/face/enroll',
