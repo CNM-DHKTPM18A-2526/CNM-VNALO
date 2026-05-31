@@ -41,7 +41,7 @@ public class SecurityConfig {
                     .requestMatchers("/auth/logout-all", "/auth/change-password", "/auth/password/change", "/auth/login-devices", "/auth/qr/sessions/*/approve").authenticated()
                         .requestMatchers("/api/v1/ai/internal/**", "/api/v1/ai/mascot/internal/**").hasRole("INTERNAL")
                         // All face authentication endpoints are handled by permitAll() below
-                        .requestMatchers("/api/v1/face/**", "/api/v1/auth/face-login", "/api/v1/auth/lookup").permitAll()
+                        .requestMatchers("/face/**", "/auth/face-login", "/auth/lookup").permitAll()
                         .requestMatchers("/auth/**", "/swagger-ui/**", "/swagger-ui.html",
                                 "/v3/api-docs/**", "/h2-console/**", "/error").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
