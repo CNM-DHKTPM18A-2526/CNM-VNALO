@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/services/face_auth_service.dart' show ApiException;
-import 'package:vnalo_mobile/features/auth/widgets/bank_face_scanner.dart';
+import 'package:vnalo_mobile/features/auth/widgets/smart_face_scanner.dart';
 
 /// Screen to enroll or update the user's face for face authentication.
 /// Requires the user to be logged in.
@@ -157,7 +157,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen> {
     Color primaryColor,
   ) {
     if (_step == _stepCapturing) {
-      return BankFaceScanner(
+      return SmartFaceScanner(
         onCapture: _onImageCaptured,
         onCancel: () => setState(() => _step = _stepIdle),
       );

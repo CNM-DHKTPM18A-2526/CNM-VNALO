@@ -7,7 +7,7 @@ import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/services/face_auth_service.dart';
 import 'package:vnalo_mobile/navigation/main_shell.dart';
 import 'package:vnalo_mobile/core/utils/device_info_util.dart';
-import 'package:vnalo_mobile/features/auth/widgets/bank_face_scanner.dart';
+import 'package:vnalo_mobile/features/auth/widgets/smart_face_scanner.dart';
 
 class FaceLoginScreen extends StatefulWidget {
   final String? initialPhone;
@@ -155,7 +155,7 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
           style: TextStyle(color: appBarFg, fontSize: 18, fontWeight: FontWeight.w600),
         ),
       ),
-      body: _isScanning ? BankFaceScanner(
+      body: _isScanning ? SmartFaceScanner(
         onCapture: _captureAndVerify,
         onCancel: () => setState(() => _isScanning = false),
       ) : SafeArea(
