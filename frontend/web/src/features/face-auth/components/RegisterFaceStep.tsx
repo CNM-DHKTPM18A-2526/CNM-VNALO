@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { FaceCapture } from './FaceCapture'
 import { enrollFace, withTimeout } from '../face-auth.api'
 
@@ -7,10 +7,10 @@ type RegisterFaceStepProps = {
   onComplete: (enrolled: boolean) => void
 }
 
-type FaceStep = 'capture' | 'confirm' | 'processing' | 'success' | 'error'
+type FaceStep = 'terms' | 'capture' | 'confirm' | 'processing' | 'success' | 'error'
 
 export function RegisterFaceStep({ token, onComplete }: RegisterFaceStepProps) {
-  const [step, setStep] = useState<FaceStep>('capture')
+  const [step, setStep] = useState<FaceStep>('terms')
   const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -75,6 +75,48 @@ export function RegisterFaceStep({ token, onComplete }: RegisterFaceStepProps) {
 
   return (
     <div className='register-face-step'>
+      {step === 'terms' && (
+        <div className='register-face-terms'>
+          <div className='register-face-header'>
+            <h3>Điều khoản bảo mật</h3>
+            <p>Vui lòng đọc kỹ trước khi đăng ký khuôn mặt.</p>
+          </div>
+          <div className='register-face-terms-content' style={{ background: 'var(--auth-bg)', padding: '16px', borderRadius: '8px', fontSize: '14px', lineHeight: '1.6', marginBottom: '24px', textAlign: 'left', color: 'var(--auth-text-sub)' }}>
+            <p style={{ marginBottom: '8px' }}>
+              <strong>1. Mục đích thu thập:</strong> Dữ liệu khuôn mặt của bạn chỉ được sử dụng duy nhất cho mục đích xác thực và bảo mật tài khoản (đăng nhập không cần mật khẩu).
+            </p>
+            <p style={{ marginBottom: '8px' }}>
+              <strong>2. Cam kết phi thương mại:</strong> Vnalo cam kết tuyệt đối không sử dụng dữ liệu sinh trắc học của bạn cho bất kỳ mục đích thương mại, quảng cáo hay chia sẻ cho bên thứ ba nào.
+            </p>
+            <p style={{ marginBottom: '8px' }}>
+              <strong>3. Lưu trữ & mã hóa:</strong> Dữ liệu được mã hóa AES-256 và lưu trữ cho đến khi bạn chủ động xóa hoặc vô hiệu hóa tài khoản.
+            </p>
+            <p style={{ marginBottom: '8px' }}>
+              <strong>4. Quyền rút lại đồng ý:</strong> Bạn có quyền xóa dữ liệu khuôn mặt bất cứ lúc nào trong phần Cài đặt {'>'} Bảo mật. Sau khi xóa, bạn sẽ không thể đăng nhập bằng khuôn mặt cho đến khi đăng ký lại.
+            </p>
+            <p>
+              <strong>5. Tuân thủ pháp luật:</strong> Việc xử lý dữ liệu tuân thủ nghiêm ngặt các quy định pháp luật về bảo vệ dữ liệu cá nhân. Mọi thắc mắc hoặc khiếu nại, vui lòng liên hệ: <strong>support@vnalo.fit</strong>
+            </p>
+          </div>
+          <div className='register-face-actions'>
+            <button
+              type='button'
+              className='btn btn-primary'
+              onClick={() => setStep('capture')}
+            >
+              Đồng ý và Tiếp tục
+            </button>
+            <button
+              type='button'
+              className='btn btn-ghost'
+              onClick={() => onComplete(false)}
+            >
+              Bỏ qua
+            </button>
+          </div>
+        </div>
+      )}
+
       {step === 'capture' && (
         <>
           <div className='register-face-header'>
