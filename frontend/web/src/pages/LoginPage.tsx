@@ -18,7 +18,8 @@ export function LoginPage() {
   const { setLanguage, language, t } = useLanguage()
   const { theme, toggleTheme } = useTheme()
 
-  const [loginMode, setLoginMode] = React.useState<'qr' | 'password'>('qr')
+  const enableQrLogin = import.meta.env.VITE_ENABLE_QR_LOGIN !== 'false'
+  const [loginMode, setLoginMode] = React.useState<'qr' | 'password'>(enableQrLogin ? 'qr' : 'password')
   const [showMenu, setShowMenu] = React.useState(false)
   const [showFaceModal, setShowFaceModal] = React.useState(false)
   
@@ -139,22 +140,26 @@ export function LoginPage() {
             <span className='auth-header-title'>
                 {loginMode === 'qr' ? t('auth.qrLogin') : t('auth.loginEyebrow')}
             </span>
-            <button className='auth-menu-btn' onClick={() => setShowMenu(!showMenu)}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="3" y1="12" x2="21" y2="12"></line>
-                    <line x1="3" y1="6" x2="21" y2="6"></line>
-                    <line x1="3" y1="18" x2="21" y2="18"></line>
-                </svg>
-            </button>
-            {showMenu && (
-                <div className='auth-dropdown'>
-                    <div className='auth-dropdown-item' onClick={() => {
-                        setLoginMode(loginMode === 'qr' ? 'password' : 'qr');
-                        setShowMenu(false);
-                    }}>
-                        {loginMode === 'qr' ? t('auth.loginEyebrow') : t('auth.qrLogin')}
+            {enableQrLogin && (
+              <>
+                <button className='auth-menu-btn' onClick={() => setShowMenu(!showMenu)}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                </button>
+                {showMenu && (
+                    <div className='auth-dropdown'>
+                        <div className='auth-dropdown-item' onClick={() => {
+                            setLoginMode(loginMode === 'qr' ? 'password' : 'qr');
+                            setShowMenu(false);
+                        }}>
+                            {loginMode === 'qr' ? t('auth.loginEyebrow') : t('auth.qrLogin')}
+                        </div>
                     </div>
-                </div>
+                )}
+              </>
             )}
           </div>
 
@@ -193,7 +198,6 @@ export function LoginPage() {
                     <circle cx='12' cy='7' r='4' />
                   </svg>
                   Đăng nhập bằng khuôn mặt
-                  <span className='auth-face-badge'>thử nghiệm</span>
                 </button>
               </div>
             ) : (
@@ -233,7 +237,6 @@ export function LoginPage() {
                     <circle cx='12' cy='7' r='4' />
                   </svg>
                   Đăng nhập bằng khuôn mặt
-                  <span className='auth-face-badge'>thử nghiệm</span>
                 </button>
               </form>
             )}
