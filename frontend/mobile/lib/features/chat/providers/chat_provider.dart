@@ -1598,6 +1598,21 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
         final idx = _conversations.indexWhere((c) => c.id == conversationId);
         if (idx >= 0) {
           final local = _conversations[idx];
+          
+          // Handle member nickname changes (for sync across devices/clients)
+          final dynamic nicknameChanges = changes['memberNicknames'];
+          var updatedMembers = List<ConversationMember>.from(local.members);
+          if (nicknameChanges != null && nicknameChanges is Map) {
+            for (final entry in (nicknameChanges as Map).entries) {
+              final userId = entry.key.toString();
+              final newNickname = entry.value as String?;
+              final memberIdx = updatedMembers.indexWhere((m) => m.userId == userId);
+              if (memberIdx >= 0) {
+                updatedMembers[memberIdx] = updatedMembers[memberIdx].copyWith(nickname: newNickname);
+              }
+            }
+          }
+          
           _conversations[idx] = local.copyWith(
             title: changes['title'] as String? ?? local.title,
             description: changes['description'] as String? ?? local.description,
@@ -1613,6 +1628,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
             showHistoryToNewMembers: changes['showHistoryToNewMembers'] as bool? ?? local.showHistoryToNewMembers,
             allowMemberCreateNote: changes['allowMemberCreateNote'] as bool? ?? local.allowMemberCreateNote,
             allowMemberCreatePoll: changes['allowMemberCreatePoll'] as bool? ?? local.allowMemberCreatePoll,
+            members: updatedMembers,
           );
           notifyListeners();
           debugPrint('[ChatProvider] Group settings applied inline from changes map');
@@ -2473,9 +2489,21 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<List<Message>> getSharedMedia(String conversationId, {String? type}) async {
     try {
-      return await _chatService.searchMedia(conversationId, messageType: type, limit: 10);
+      return await _chatService.searchMedia(conversationId, messageType: type, limit: 50);
     } catch (e) {
       debugPrint('getSharedMedia error: $e');
+      return [];
+    }
+  }
+
+  Future<List<Message>> getAllMediaForConversation(String conversationId, {int limit = 100}) async {
+    try {
+      // Try to get all messages with media
+      final messages = await _chatService.getMessages(conversationId, limit: limit);
+      // Filter to only messages with media (TEXT with URL will be filtered separately in MediaViewer)
+      return messages.where((m) => m.hasMedia || m.messageType == MessageType.VIDEO || m.messageType == MessageType.FILE || m.messageType == MessageType.AUDIO).toList();
+    } catch (e) {
+      debugPrint('getAllMediaForConversation error: $e');
       return [];
     }
   }

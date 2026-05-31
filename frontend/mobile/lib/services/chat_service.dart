@@ -510,9 +510,16 @@ class ChatService {
   }
 
   Future<void> updateMemberNickname(String conversationId, String targetUserId, String nickname) async {
-    await _apiService.patch(_base, '/conversations/$conversationId/member/$targetUserId', body: {
-      'nickname': nickname,
-    });
+    try {
+      await _apiService.patch(_base, '/conversations/$conversationId/member/$targetUserId', body: {
+        'nickname': nickname,
+      });
+      // The API should emit a WebSocket event (group.settingsChanged or member.updated)
+      // which ChatProvider will handle via socket listeners.
+    } catch (e) {
+      debugPrint('[ChatService] updateMemberNickname error: $e');
+      rethrow;
+    }
   }
 
   Future<void> updateWallpaper(String conversationId, String wallpaperUrl, {bool isGlobal = true}) async {

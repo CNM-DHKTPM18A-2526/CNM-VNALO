@@ -224,12 +224,14 @@ class VnaloApp extends StatelessWidget {
           create: (ctx) => ContactProvider(
             ctx.read<FriendService>(),
             ctx.read<SocketService>(),
+            ctx.read<UserService>(),
           ),
           update: (ctx, auth, socket, contact) {
             final currentContact = contact ??
                 ContactProvider(
                   ctx.read<FriendService>(),
                   socket,
+                  ctx.read<UserService>(),
                 );
             currentContact.update(auth.user?.id, socket);
             return currentContact;

@@ -374,6 +374,23 @@ class CommonTexts {
       _isVi
           ? ['Tất cả', 'Văn bản', 'Ảnh', 'File', 'Link']
           : ['All', 'Text', 'Image', 'File', 'Link'];
+
+  // Media Viewer
+  String get mediaAndDocs => _isVi ? 'Ảnh, file, link' : 'Media & Docs';
+  List<String> get mediaViewerTabs =>
+      _isVi
+          ? ['Tất cả', 'Ảnh', 'File', 'Link', 'Voice']
+          : ['All', 'Images', 'Files', 'Links', 'Voice'];
+  String get allLabel => _isVi ? 'Tất cả' : 'All';
+  String get imagesTab => _isVi ? 'Ảnh' : 'Images';
+  String get filesTab => _isVi ? 'File' : 'Files';
+  String get linksTab => _isVi ? 'Link' : 'Links';
+  String get voiceTab => _isVi ? 'Voice' : 'Voice';
+  String get noImagesNote => _isVi ? 'Chưa có ảnh nào' : 'No images yet';
+  String get noFilesNote => _isVi ? 'Chưa có file nào' : 'No files yet';
+  String get noLinksNote => _isVi ? 'Chưa có link nào' : 'No links yet';
+  String get noVoiceNotesNote => _isVi ? 'Chưa có tin nhắn thoại nào' : 'No voice notes yet';
+  String get sharedMediaTitle => _isVi ? 'Phương tiện đã chia sẻ' : 'Shared Media';
   String formatDocDate(DateTime dt) =>
       _isVi
           ? '${dt.day} tháng ${dt.month}, ${dt.year}'
@@ -486,8 +503,16 @@ class CommonTexts {
       _isVi ? 'Tạo nhóm với $name' : 'Create group with $name';
   String addToGroupLabel(String name) =>
       _isVi ? 'Thêm $name vào nhóm' : 'Add $name to group';
-  String get viewSharedGroupsAction =>
+  String viewSharedGroupsAction =>
       _isVi ? 'Xem nhóm chung' : 'View shared groups';
+  String sharedGroupsWith(String name) =>
+      _isVi ? 'Nhóm chung với $name' : 'Shared groups with $name';
+  String get noSharedGroups =>
+      _isVi ? 'Không có nhóm chung' : 'No shared groups';
+  String addToGroupTitle(String name) =>
+      _isVi ? 'Thêm $name vào nhóm' : 'Add $name to group';
+  String noGroupsToAdd(String name) =>
+      _isVi ? 'Không có nhóm để thêm $name' : 'No groups to add $name';
   String get pinConversationAction =>
       _isVi ? 'Ghim trò chuyện' : 'Pin conversation';
   String get hideConversationAction =>

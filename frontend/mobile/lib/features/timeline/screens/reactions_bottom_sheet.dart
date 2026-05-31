@@ -69,23 +69,15 @@ class _ReactionsBottomSheetState extends State<ReactionsBottomSheet> {
   String _resolveUserName(String userId) {
     final auth = context.read<AuthProvider>();
     if (userId == auth.user?.id) return auth.user?.displayName ?? userId;
-    try {
-      final contact = context.read<ContactProvider>().friends.firstWhere((u) => u.id == userId);
-      return contact.displayName;
-    } catch (_) {
-      return userId;
-    }
+    final user = context.read<ContactProvider>().getUserById(userId);
+    return user?.displayName ?? userId;
   }
 
   String? _resolveAvatar(String userId) {
     final auth = context.read<AuthProvider>();
     if (userId == auth.user?.id) return auth.user?.avatarUrl;
-    try {
-      final contact = context.read<ContactProvider>().friends.firstWhere((u) => u.id == userId);
-      return contact.avatarUrl;
-    } catch (_) {
-      return null;
-    }
+    final user = context.read<ContactProvider>().getUserById(userId);
+    return user?.avatarUrl;
   }
 
   @override

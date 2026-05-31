@@ -41,27 +41,53 @@ class User {
     this.friendshipStatus,
   });
 
-  factory User.fromJson(Map<String, dynamic> json) => User(
-    id: json['id'],
-    phone: json['phone'],
-    email: json['email'],
-    displayName: json['displayName'] ?? json['display_name'] ?? '',
-    avatarUrl: json['avatarUrl'] ?? json['avatar_url'],
-    coverUrl: json['coverUrl'] ?? json['cover_url'],
-    gender: json['gender'],
-    dob: json['dob'] != null ? DateTime.parse(json['dob']) : null,
-    bio: json['bio'],
-    statusMessage: json['statusMessage'] ?? json['status_message'],
-    statusMessageType: json['statusMessageType'],
-    qrCodeUrl: json['qrCodeUrl'],
-    region: json['region'],
-    isVerified: json['isVerified'] ?? json['is_verified'] ?? false,
-    isOfficialAccount: json['isOfficialAccount'] ?? false,
-    followerCount: json['followerCount'] ?? 0,
-    isOnline: json['isOnline'] ?? false,
-    lastSeen: json['lastSeen'] != null ? DateTime.tryParse(json['lastSeen'].toString()) : null,
-    friendshipStatus: json['friendshipStatus'] ?? json['friendship_status'],
-  );
+  factory User.fromJson(Map<String, dynamic> json) {
+    // Support multiple field name variations
+    final id = json['id']?.toString() ?? '';
+    final displayName = json['displayName']?.toString() ?? 
+                       json['display_name']?.toString() ?? 
+                       json['name']?.toString() ?? 
+                       json['username']?.toString() ?? 
+                       'User';
+    
+    // Support multiple avatar field names
+    final avatarValue = json['avatarUrl'] ?? 
+                        json['avatar_url'] ?? 
+                        json['avatar'] ?? 
+                        json['profilePicture'] ?? 
+                        json['profile_picture'] ?? 
+                        json['photoUrl'] ?? 
+                        json['photo_url'] ?? 
+                        json['imageUrl'] ?? 
+                        json['image_url'];
+    
+    final coverValue = json['coverUrl'] ?? 
+                       json['cover_url'] ?? 
+                       json['cover'] ?? 
+                       json['backgroundUrl'];
+    
+    return User(
+      id: id,
+      phone: json['phone']?.toString(),
+      email: json['email']?.toString(),
+      displayName: displayName,
+      avatarUrl: avatarValue?.toString(),
+      coverUrl: coverValue?.toString(),
+      gender: json['gender']?.toString(),
+      dob: json['dob'] != null ? DateTime.parse(json['dob'].toString()) : null,
+      bio: json['bio']?.toString(),
+      statusMessage: json['statusMessage']?.toString() ?? json['status_message']?.toString(),
+      statusMessageType: json['statusMessageType']?.toString(),
+      qrCodeUrl: json['qrCodeUrl']?.toString(),
+      region: json['region']?.toString(),
+      isVerified: json['isVerified'] ?? json['is_verified'] ?? false,
+      isOfficialAccount: json['isOfficialAccount'] ?? json['is_official_account'] ?? false,
+      followerCount: json['followerCount'] ?? json['follower_count'] ?? 0,
+      isOnline: json['isOnline'] ?? json['is_online'] ?? false,
+      lastSeen: json['lastSeen'] != null ? DateTime.tryParse(json['lastSeen'].toString()) : null,
+      friendshipStatus: json['friendshipStatus']?.toString() ?? json['friendship_status']?.toString(),
+    );
+  }
 
   User copyWith({
     String? id,

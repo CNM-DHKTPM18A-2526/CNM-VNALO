@@ -21,7 +21,6 @@ import 'package:vnalo_mobile/features/chat/screens/join_group_screen.dart';
 import 'package:vnalo_mobile/features/search/screens/unified_search_screen.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
-import 'package:vnalo_mobile/models/message_model.dart';
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
@@ -225,10 +224,23 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 )),
           ];
 
-          allItems.sort((a, b) {
-            if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
+          // Sort items: pinned first, then by timestamp
+          // Cloud item always goes to the TOP of unpinned items (most recent position)
+          final pinnedItems = allItems.where((item) => item.isPinned).toList();
+          final unpinnedItems = allItems.where((item) => !item.isPinned).toList();
+          
+          // Sort unpinned items by timestamp descending (newest first), but cloud always at TOP
+          unpinnedItems.sort((a, b) {
+            // Always put cloud at TOP (most recent position)
+            if (a.type == _UnifiedChatItemType.cloud) return -1;
+            if (b.type == _UnifiedChatItemType.cloud) return 1;
             return b.timestamp.compareTo(a.timestamp);
           });
+          
+          // Sort pinned items by timestamp descending
+          pinnedItems.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+          
+          final sortedItems = [...pinnedItems, ...unpinnedItems];
 
           final pinnedTileColor = isDarkMode ? const Color(0xFF1A1A1A) : const Color(0xFFF0F2F5);
           final regularTileColor = isDarkMode ? DarkColors.surface : Colors.white;
@@ -237,9 +249,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
             onRefresh: () => chatProvider.loadInbox(),
             color: AppColors.primary,
             child: ListView.separated(
-              itemCount: allItems.length,
+              itemCount: sortedItems.length,
               separatorBuilder: (context, index) {
-                final item = allItems[index];
+                final item = sortedItems[index];
                 final bgColor = item.isPinned ? pinnedTileColor : regularTileColor;
                 return Container(
                   color: bgColor,
@@ -254,7 +266,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 );
               },
               itemBuilder: (context, index) {
-                final item = allItems[index];
+                final item = sortedItems[index];
                 final tileColor = item.isPinned ? pinnedTileColor : regularTileColor;
                 final secondaryTextColor = isDarkMode ? DarkColors.textSecondary : LightColors.textSecondary;
 

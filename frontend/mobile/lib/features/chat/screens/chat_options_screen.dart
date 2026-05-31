@@ -11,6 +11,10 @@ import 'package:vnalo_mobile/models/message_model.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/chat/screens/wallpaper_selection_screen.dart';
+import 'package:vnalo_mobile/features/chat/screens/media_viewer_screen.dart';
+import 'package:vnalo_mobile/features/chat/screens/create_group_screen.dart';
+import 'package:vnalo_mobile/features/chat/screens/add_friend_to_group_screen.dart';
+import 'package:vnalo_mobile/features/chat/screens/shared_groups_screen.dart';
 
 class ChatOptionsScreen extends StatefulWidget {
   final Conversation conversation;
@@ -200,7 +204,7 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
           _buildMediaSection(isDarkMode),
           const SizedBox(height: 8),
           // ── Interaction Settings ──
-          _buildInteractionSettings(displayName, isDarkMode),
+          _buildInteractionSettings(displayName, otherMember.userId, isDarkMode),
           const SizedBox(height: 8),
           // ── Conversation Settings ──
           _buildConversationSettings(currentConv, isDarkMode),
@@ -333,6 +337,18 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
     );
   }
 
+  void _openMediaViewer() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MediaViewerScreen(
+          conversationId: widget.conversation.id,
+          conversationName: widget.conversation.getDisplayName(context.read<AuthProvider>().user?.id ?? ''),
+        ),
+      ),
+    );
+  }
+
   // ========================= MEDIA SECTION =========================
 
   Widget _buildMediaSection(bool isDarkMode) {
@@ -342,7 +358,7 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildTile(CupertinoIcons.photo_on_rectangle, common.mediaDocsLinksAction, showChevron: false),
+          _buildTile(CupertinoIcons.photo_on_rectangle, common.mediaDocsLinksAction, showChevron: false, onTap: _openMediaViewer),
           if (_isLoadingMedia)
             const Padding(
               padding: EdgeInsets.only(left: 56, bottom: 16),
@@ -368,26 +384,29 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
                       itemCount: _recentMedia.length.clamp(0, 4),
                       itemBuilder: (context, index) {
                         final m = _recentMedia[index];
-                        return Container(
-                          margin: const EdgeInsets.only(right: 4),
-                          width: 72,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(6),
-                            color: isDarkMode ? DarkColors.scaffold : Colors.grey.shade200,
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: CachedNetworkImage(
-                            imageUrl: m.mediaUrl ?? '',
-                            fit: BoxFit.cover,
-                            placeholder: (ctx, url) => Container(color: isDarkMode ? Colors.white10 : Colors.grey.shade200),
-                            errorWidget: (ctx, url, err) => const Icon(Icons.broken_image, color: Colors.grey),
+                        return GestureDetector(
+                          onTap: _openMediaViewer,
+                          child: Container(
+                            margin: const EdgeInsets.only(right: 4),
+                            width: 72,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(6),
+                              color: isDarkMode ? DarkColors.scaffold : Colors.grey.shade200,
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: CachedNetworkImage(
+                              imageUrl: m.mediaUrl ?? '',
+                              fit: BoxFit.cover,
+                              placeholder: (ctx, url) => Container(color: isDarkMode ? Colors.white10 : Colors.grey.shade200),
+                              errorWidget: (ctx, url, err) => const Icon(Icons.broken_image, color: Colors.grey),
+                            ),
                           ),
                         );
                       },
                     ),
                   ),
                   GestureDetector(
-                    onTap: () => _showComingSoon('Kho tư liệu'),
+                    onTap: _openMediaViewer,
                     child: Container(
                       width: 44,
                       height: 72,
@@ -409,18 +428,48 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
 
   // ========================= INTERACTION SETTINGS =========================
 
-  Widget _buildInteractionSettings(String name, bool isDarkMode) {
+  Widget _buildInteractionSettings(String name, String otherUserId, bool isDarkMode) {
     final common = CommonTexts.of(context);
     return Container(
       color: isDarkMode ? DarkColors.surface : Colors.white,
       child: Column(
         children: [
-          _buildTile(CupertinoIcons.person_2, common.createGroupWithLabel(name), showChevron: false),
+          _buildTile(CupertinoIcons.person_2, common.createGroupWithLabel(name),
+            onTap: () => _createGroupWith(otherUserId, name)),
           _buildDivider(),
-          _buildTile(CupertinoIcons.person_badge_plus, common.addToGroupLabel(name), showChevron: false),
+          _buildTile(CupertinoIcons.person_badge_plus, common.addToGroupLabel(name),
+            onTap: () => _addToGroup(otherUserId, name)),
           _buildDivider(),
-          _buildTile(CupertinoIcons.person_2_fill, common.viewSharedGroupsAction, showChevron: false),
+          _buildTile(CupertinoIcons.person_2_fill, common.viewSharedGroupsAction,
+            onTap: () => _viewSharedGroups(otherUserId, name)),
         ],
+      ),
+    );
+  }
+
+  void _createGroupWith(String userId, String name) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreateGroupScreen(preselectedUserId: userId, preselectedUserName: name),
+      ),
+    );
+  }
+
+  void _addToGroup(String userId, String name) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddFriendToGroupScreen(targetUserId: userId, targetUserName: name),
+      ),
+    );
+  }
+
+  void _viewSharedGroups(String userId, String name) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SharedGroupsScreen(targetUserId: userId, targetUserName: name),
       ),
     );
   }

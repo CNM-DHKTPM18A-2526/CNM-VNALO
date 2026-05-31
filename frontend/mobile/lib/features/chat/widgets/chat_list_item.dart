@@ -33,6 +33,8 @@ class ChatListItem extends StatelessWidget {
     final avatarVersion = context.watch<AvatarCacheProvider>().versionForUser(avatarOwnerId);
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final common = CommonTexts.of(context);
+    
+    debugPrint('[ChatListItem] displayAvatar=$displayAvatar displayName=$displayName');
 
     final chat = context.watch<ChatProvider>();
     final otherMember = _getOtherMember(conversation, currentUserId);

@@ -17,7 +17,10 @@ import 'package:vnalo_mobile/services/media_service.dart';
 import 'package:vnalo_mobile/services/api_service.dart';
 
 class CreateGroupScreen extends StatefulWidget {
-  const CreateGroupScreen({super.key});
+  final String? preselectedUserId;
+  final String? preselectedUserName;
+
+  const CreateGroupScreen({super.key, this.preselectedUserId, this.preselectedUserName});
 
   @override
   State<CreateGroupScreen> createState() => _CreateGroupScreenState();
@@ -55,6 +58,17 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> with SingleTicker
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _loadFriends();
+
+    // Auto-select preselected user after friends are loaded
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.preselectedUserId != null && _selectedUserIds.isEmpty) {
+        _toggleSelection(widget.preselectedUserId!);
+        // If name controller is empty, pre-fill with their name
+        if (_nameController.text.isEmpty && widget.preselectedUserName != null) {
+          _nameController.text = '${widget.preselectedUserName} và bạn';
+        }
+      }
+    });
   }
 
   @override
@@ -238,7 +252,8 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> with SingleTicker
   }
 
   Future<void> _createGroup() async {
-    if (_selectedUserIds.length < 2) {
+    final minMembers = widget.preselectedUserId != null ? 2 : 2;
+    if (_selectedUserIds.length < minMembers) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Vui lòng chọn ít nhất 2 thành viên để tạo nhóm')),
       );
@@ -337,9 +352,11 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> with SingleTicker
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Nhóm mới',
-              style: TextStyle(
+            Text(
+              widget.preselectedUserId != null
+                  ? 'Tạo nhóm với ${widget.preselectedUserName ?? 'bạn'}'
+                  : 'Nhóm mới',
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
                 color: Colors.white,
