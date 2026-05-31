@@ -667,18 +667,26 @@ function buildActionLabel(command: AiActionCommand) {
     case "COMPOSE_MESSAGE":
       return "Mở chat và điền nháp";
     case "NAVIGATE_TO_CHAT":
-      return "Go to Chat";
+      return "Mở Chat";
     case "NAVIGATE_TO_CONTACTS":
-      return "Go to Contacts";
+      return "Mở Danh bạ";
     case "OPEN_PROFILE":
-      return "Go to Profile";
+      return "Mở hồ sơ";
     case "NAVIGATE_TO":
-      return "Go to destination";
+      return "Mở màn hình đích";
     case "START_CALL":
       return "Mở chat để gọi";
     default:
-      return "Try this action";
+      return "Thử thao tác này";
   }
+}
+
+function getFocusableElements(container: HTMLElement) {
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ),
+  ).filter((element) => !element.hasAttribute("hidden"));
 }
 
 export function AiChatPage() {
@@ -698,6 +706,9 @@ export function AiChatPage() {
   const [retryPrompt, setRetryPrompt] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const actionReviewDialogRef = useRef<HTMLDivElement | null>(null);
+  const resolutionDialogRef = useRef<HTMLDivElement | null>(null);
+  const lastFocusedElementRef = useRef<HTMLElement | null>(null);
   const isUnmountedRef = useRef(false);
   const inFlightRequestRef = useRef(false);
 
@@ -750,6 +761,83 @@ export function AiChatPage() {
     input.style.height = "0px";
     input.style.height = `${Math.min(input.scrollHeight, 132)}px`;
   }, [inputValue]);
+
+  useEffect(() => {
+    const activeDialog = pendingActionReview
+      ? actionReviewDialogRef.current
+      : pendingResolution
+        ? resolutionDialogRef.current
+        : null;
+
+    if (!activeDialog) {
+      if (lastFocusedElementRef.current) {
+        lastFocusedElementRef.current.focus();
+        lastFocusedElementRef.current = null;
+      }
+      document.body.style.overflow = "";
+      return;
+    }
+
+    lastFocusedElementRef.current =
+      document.activeElement as HTMLElement | null;
+    document.body.style.overflow = "hidden";
+
+    const focusables = getFocusableElements(activeDialog);
+    const preferred = focusables[0] ?? activeDialog;
+    window.requestAnimationFrame(() => {
+      preferred.focus();
+    });
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setPendingActionReview(null);
+        setPendingResolution(null);
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const currentFocusables = getFocusableElements(activeDialog);
+      if (!currentFocusables.length) {
+        event.preventDefault();
+        activeDialog.focus();
+        return;
+      }
+
+      const first = currentFocusables[0];
+      const last = currentFocusables[currentFocusables.length - 1];
+      const activeElement = document.activeElement as HTMLElement | null;
+
+      if (event.shiftKey) {
+        if (
+          !activeElement ||
+          activeElement === first ||
+          !activeDialog.contains(activeElement)
+        ) {
+          event.preventDefault();
+          last.focus();
+        }
+        return;
+      }
+
+      if (
+        !activeElement ||
+        activeElement === last ||
+        !activeDialog.contains(activeElement)
+      ) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = "";
+    };
+  }, [pendingActionReview, pendingResolution]);
 
   const handleSend = async (textToSend?: string) => {
     const query = (textToSend ?? inputValue).trim();
@@ -1115,24 +1203,6 @@ export function AiChatPage() {
     navigate(`/chat/${conversation.id}`);
   };
 
-  useEffect(() => {
-    if (!pendingActionReview && !pendingResolution) {
-      return;
-    }
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") {
-        return;
-      }
-
-      setPendingActionReview(null);
-      setPendingResolution(null);
-    };
-
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [pendingActionReview, pendingResolution]);
-
   const handleRetry = () => {
     if (!retryPrompt || isAssistantBusy) {
       return;
@@ -1350,6 +1420,8 @@ export function AiChatPage() {
         >
           <div
             className="modal-card ai-resolution-modal"
+            ref={actionReviewDialogRef}
+            tabIndex={-1}
             onClick={(event) => event.stopPropagation()}
           >
             <div className="modal-header">
@@ -1397,6 +1469,8 @@ export function AiChatPage() {
         >
           <div
             className="modal-card ai-resolution-modal"
+            ref={resolutionDialogRef}
+            tabIndex={-1}
             onClick={(event) => event.stopPropagation()}
           >
             <div className="modal-header">
