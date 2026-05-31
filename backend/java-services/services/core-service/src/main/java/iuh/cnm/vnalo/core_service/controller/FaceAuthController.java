@@ -87,7 +87,7 @@ public class FaceAuthController {
         if (livenessScore < livenessThreshold) {
             log.warn("Enrollment liveness check failed for userId={}. Score: {}", userId, livenessScore);
             throw new ApiException(ErrorCode.FACE_LIVENESS_FAILED,
-                    "Liveness check failed. Please use a real face photo.");
+                    "Không thể xác thực thực thể sống. Vui lòng đảm bảo khuôn mặt rõ nét và không bị che khuất.");
         }
 
         // 2. Extract embedding
