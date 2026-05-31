@@ -2,12 +2,12 @@ import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/services/face_auth_service.dart';
 import 'package:vnalo_mobile/navigation/main_shell.dart';
 import 'package:vnalo_mobile/core/utils/device_info_util.dart';
+import 'package:vnalo_mobile/features/auth/widgets/bank_face_scanner.dart';
 
 class FaceLoginScreen extends StatefulWidget {
   final String? initialPhone;
@@ -20,10 +20,10 @@ class FaceLoginScreen extends StatefulWidget {
 
 class _FaceLoginScreenState extends State<FaceLoginScreen> {
   final _identifierController = TextEditingController();
-  final _imagePicker = ImagePicker();
   final _faceService = FaceAuthService();
 
   bool _isLoading = false;
+  bool _isScanning = false;
   bool _serviceAvailable = true;
   String? _errorMsg;
 
@@ -52,7 +52,7 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
     super.dispose();
   }
 
-  Future<void> _captureAndVerify() async {
+  Future<void> _startScanning() async {
     final identifier = _identifierController.text.trim();
     if (identifier.isEmpty) {
       setState(() => _errorMsg = 'Vui lòng nhập số điện thoại hoặc email');
@@ -60,24 +60,21 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
     }
 
     setState(() {
+      _isScanning = true;
+      _errorMsg = null;
+    });
+  }
+
+  Future<void> _captureAndVerify(File imageFile) async {
+    final identifier = _identifierController.text.trim();
+
+    setState(() {
+      _isScanning = false;
       _isLoading = true;
       _errorMsg = null;
     });
 
     try {
-      final pickedFile = await _imagePicker.pickImage(
-        source: ImageSource.camera,
-        preferredCameraDevice: CameraDevice.front,
-        imageQuality: 85,
-      );
-
-      if (pickedFile == null) {
-        setState(() => _isLoading = false);
-        return;
-      }
-
-      final imageFile = File(pickedFile.path);
-
       // Backend now enforces liveness check internally during /face/verify.
       // We no longer call /face/liveness-check here to avoid uploading the image twice.
 
@@ -148,7 +145,7 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
 
     return Scaffold(
       backgroundColor: scaffoldBg,
-      appBar: AppBar(
+      appBar: _isScanning ? null : AppBar(
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
@@ -158,7 +155,10 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
           style: TextStyle(color: appBarFg, fontSize: 18, fontWeight: FontWeight.w600),
         ),
       ),
-      body: SafeArea(
+      body: _isScanning ? BankFaceScanner(
+        onCapture: _captureAndVerify,
+        onCancel: () => setState(() => _isScanning = false),
+      ) : SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -253,7 +253,7 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: _captureAndVerify,
+                      onPressed: _startScanning,
                       style: ElevatedButton.styleFrom(
                         minimumSize: const Size.fromHeight(56),
                         backgroundColor: primaryColor,
@@ -266,38 +266,6 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
                         'Mở camera & xác thực',
                         style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(child: Divider(color: hintColor)),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text('hoặc', style: TextStyle(color: hintColor, fontSize: 13)),
-                      ),
-                      Expanded(child: Divider(color: hintColor)),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: isDarkMode ? Colors.amber.shade900.withValues(alpha: 0.2) : Colors.amber.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: isDarkMode ? Colors.amber.shade900.withValues(alpha: 0.5) : Colors.amber.shade200),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.science_outlined, color: isDarkMode ? Colors.amber.shade300 : Colors.amber.shade700, size: 20),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Tính năng đang trong giai đoạn thử nghiệm.',
-                            style: TextStyle(fontSize: 13, color: isDarkMode ? Colors.amber.shade200 : Colors.amber.shade900),
-                          ),
-                        ),
-                      ],
                     ),
                   ),
                 ],

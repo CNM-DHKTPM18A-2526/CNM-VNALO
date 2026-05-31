@@ -1,11 +1,11 @@
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/services/face_auth_service.dart' show ApiException;
+import 'package:vnalo_mobile/features/auth/widgets/bank_face_scanner.dart';
 
 /// Screen to enroll or update the user's face for face authentication.
 /// Requires the user to be logged in.
@@ -20,13 +20,12 @@ typedef _Step = String;
 
 class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen> {
   static const _stepIdle = 'idle';
+  static const _stepTerms = 'terms';
   static const _stepCapturing = 'capturing';
   static const _stepConfirm = 'confirm';
   static const _stepProcessing = 'processing';
   static const _stepSuccess = 'success';
   static const _stepError = 'error';
-
-  final _imagePicker = ImagePicker();
 
   _Step _step = _stepIdle;
   File? _capturedImage;
@@ -57,35 +56,19 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen> {
     }
   }
 
-  Future<void> _pickImage() async {
+  void _startCamera() {
     setState(() {
       _step = _stepCapturing;
       _errorMsg = null;
     });
+  }
 
-    try {
-      final picked = await _imagePicker.pickImage(
-        source: ImageSource.camera,
-        preferredCameraDevice: CameraDevice.front,
-        imageQuality: 90,
-      );
-
-      if (picked == null) {
-        setState(() => _step = _stepIdle);
-        return;
-      }
-
-      setState(() {
-        _capturedImage = File(picked.path);
-        _previewPath = picked.path;
-        _step = _stepConfirm;
-      });
-    } catch (e) {
-      setState(() {
-        _step = _stepError;
-        _errorMsg = 'Không thể mở camera. Vui lòng thử lại.';
-      });
-    }
+  void _onImageCaptured(File captured) {
+    setState(() {
+      _capturedImage = captured;
+      _previewPath = captured.path;
+      _step = _stepConfirm;
+    });
   }
 
   Future<void> _confirmEnroll() async {
@@ -173,6 +156,12 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen> {
     Color hintColor,
     Color primaryColor,
   ) {
+    if (_step == _stepCapturing) {
+      return BankFaceScanner(
+        onCapture: _onImageCaptured,
+        onCancel: () => setState(() => _step = _stepIdle),
+      );
+    }
     if (_step == _stepSuccess) {
       return _buildSuccess(textColor, primaryColor);
     }
@@ -250,6 +239,52 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen> {
               label: Text('Chụp lại', style: TextStyle(color: textColor, fontSize: 15)),
             ),
           ),
+        ] else if (_step == _stepTerms) ...[
+          Text('Điều khoản bảo mật', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: textColor)),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDarkMode ? DarkColors.surface : const Color(0xFFF9FAFB),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('1. Mục đích thu thập:', style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+                Text('Dữ liệu khuôn mặt chỉ được sử dụng cho mục đích xác thực và bảo mật tài khoản.\n', style: TextStyle(fontSize: 13, color: hintColor)),
+                Text('2. Cam kết phi thương mại:', style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+                Text('Vnalo không sử dụng dữ liệu sinh trắc học cho bất kỳ mục đích quảng cáo, thương mại hay chia sẻ cho bên thứ ba.\n', style: TextStyle(fontSize: 13, color: hintColor)),
+                Text('3. Lưu trữ & mã hóa:', style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+                Text('Dữ liệu được mã hóa AES-256 và lưu trữ cho đến khi bạn chủ động xóa hoặc vô hiệu hóa tài khoản.\n', style: TextStyle(fontSize: 13, color: hintColor)),
+                Text('4. Quyền rút lại đồng ý:', style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+                Text('Bạn có quyền xóa dữ liệu bất cứ lúc nào trong Cài đặt > Bảo mật. Sau khi xóa, bạn không thể đăng nhập bằng khuôn mặt cho đến khi đăng ký lại.\n', style: TextStyle(fontSize: 13, color: hintColor)),
+                Text('5. Tuân thủ pháp luật:', style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+                Text('Việc xử lý dữ liệu tuân thủ nghiêm ngặt các quy định pháp luật về bảo vệ dữ liệu cá nhân. Liên hệ: support@vnalo.fit', style: TextStyle(fontSize: 13, color: hintColor)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _startCamera,
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(56),
+                backgroundColor: primaryColor,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+              ),
+              child: const Text('Đồng ý & Tiếp tục', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton(
+              onPressed: () => setState(() => _step = _stepIdle),
+              child: Text('Bỏ qua', style: TextStyle(color: hintColor, fontSize: 15)),
+            ),
+          ),
         ] else ...[
           // Error msg
           if (_step == _stepError && _errorMsg != null)
@@ -273,7 +308,6 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen> {
                 ],
               ),
             ),
-          // Instruction
           Text(
             '1. Đảm bảo có đủ ánh sáng\n2. Nhìn thẳng vào camera\n3. Không đeo kính, khẩu trang',
             style: TextStyle(fontSize: 14, color: hintColor, height: 1.8),
@@ -282,7 +316,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: _step == _stepCapturing ? null : _pickImage,
+              onPressed: () => setState(() => _step = _stepTerms),
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size.fromHeight(56),
                 backgroundColor: primaryColor,
@@ -290,7 +324,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen> {
               ),
               icon: const Icon(Icons.camera_alt_rounded, color: Colors.white),
               label: const Text(
-                'Mở camera & chụp ảnh',
+                'Bắt đầu đăng ký',
                 style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
               ),
             ),
