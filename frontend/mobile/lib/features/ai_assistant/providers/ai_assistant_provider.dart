@@ -456,8 +456,39 @@ class AiAssistantProvider with ChangeNotifier {
   AiThinkingPhase get thinkingPhase => _thinkingPhase;
   bool get isProviderUnavailable =>
       _providerStatus == 'AI_PROVIDER_UNAVAILABLE';
+  bool get isProviderTimeout => _providerStatus == 'AI_PROVIDER_TIMEOUT';
+  bool get isProviderNetworkUnavailable =>
+      _providerStatus == 'AI_NETWORK_UNAVAILABLE';
+  bool get isProviderEndpointMissing =>
+      _providerStatus == 'AI_ENDPOINT_NOT_FOUND';
+  bool get isProviderAuthRequired => _providerStatus == 'AI_AUTH_REQUIRED';
+  bool get isProviderRateLimited => _providerStatus == 'AI_RATE_LIMITED';
   bool get isFallbackProviderActive =>
       _providerStatus == 'FALLBACK_PROVIDER_ACTIVE';
+  String get providerIssueMessage {
+    if (_isResponseDegraded && _providerStatus == 'LIVE_PROVIDER_ACTIVE') {
+      return 'AI đang chạy ở chế độ dự phòng.';
+    }
+
+    return switch (_providerStatus) {
+      'AI_PROVIDER_TIMEOUT' =>
+        'AI phản hồi chậm. Vui lòng thử lại sau vài giây.',
+      'AI_NETWORK_UNAVAILABLE' =>
+        'Không kết nối được AI. Kiểm tra mạng rồi thử lại.',
+      'AI_ENDPOINT_NOT_FOUND' =>
+        'Cấu hình endpoint AI chưa đúng. Vui lòng kiểm tra môi trường dev/prod.',
+      'AI_AUTH_REQUIRED' =>
+        'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+      'AI_RATE_LIMITED' =>
+        'Bạn đang gửi quá nhanh. Vui lòng thử lại sau vài giây.',
+      'AI_PROVIDER_UNAVAILABLE' =>
+        'AI đang tạm thời không sẵn sàng. Một số thao tác cục bộ vẫn dùng được.',
+      'FALLBACK_PROVIDER_ACTIVE' => 'AI đang chạy ở chế độ dự phòng.',
+      'AI_REQUEST_FAILED' => 'Yêu cầu AI chưa hoàn tất. Vui lòng thử lại.',
+      _ => 'AI đang hoạt động',
+    };
+  }
+
   bool get isAssistantGenerating => _state == AiState.thinking;
   String get assistantActivityLabel {
     if (_state == AiState.listening) {
@@ -585,6 +616,8 @@ class AiAssistantProvider with ChangeNotifier {
         candidates: AiCommandRouting.parseAmbiguityCandidatesFromSource(source),
         createdAt: DateTime.now().toUtc(),
       );
+    } else {
+      _clarificationState = null;
     }
     _addConversationEntry(
       role: AiConversationRole.assistant,
@@ -823,6 +856,14 @@ class AiAssistantProvider with ChangeNotifier {
     return _lastFinalResultAt != null && _lastFinalResultText.trim().isNotEmpty;
   }
 
+  SpeechListenOptions _speechListenOptions() {
+    return SpeechListenOptions(
+      cancelOnError: true,
+      partialResults: true,
+      listenMode: ListenMode.dictation,
+    );
+  }
+
   bool _shouldIgnorePrematureSttEnd({required bool isPermanentError}) {
     return AiSttResiliencePolicy.shouldHoldListening(
       isListening: _state == AiState.listening,
@@ -853,19 +894,19 @@ class AiAssistantProvider with ChangeNotifier {
       }
 
       try {
+        // ignore: deprecated_member_use
         await _stt.listen(
           onResult:
               (result) =>
                   _handleSpeechResult(result, token: token, traceId: traceId),
           onSoundLevelChange: _handleSoundLevelChange,
+          // ignore: deprecated_member_use
           listenFor: _sttListenFor,
+          // ignore: deprecated_member_use
           pauseFor: _sttPauseFor,
+          // ignore: deprecated_member_use
           localeId: _resolvedLocaleId ?? _defaultLocaleId,
-          listenOptions: SpeechListenOptions(
-            cancelOnError: true,
-            partialResults: true,
-            listenMode: ListenMode.dictation,
-          ),
+          listenOptions: _speechListenOptions(),
         );
         _logEvent(
           'STT_LISTEN_RESTARTED',
@@ -1242,6 +1283,7 @@ class AiAssistantProvider with ChangeNotifier {
     _conversationCreated = false;
     _sessionHistory.clear();
     _lastUserPrompt = '';
+    _clarificationState = null;
     _serverConversationId = null;
 
     if (clearCurrentResponse) {
@@ -1298,6 +1340,7 @@ class AiAssistantProvider with ChangeNotifier {
 
     _persistentEnabled = false;
     _provisionallyVisible = false;
+    _clarificationState = null;
     _aiResponse = '';
 
     final prefs = await SharedPreferences.getInstance();
@@ -1485,19 +1528,19 @@ class AiAssistantProvider with ChangeNotifier {
 
     try {
       _startListenGuard(token: token, traceId: traceId);
+      // ignore: deprecated_member_use
       await _stt.listen(
         onResult:
             (result) =>
                 _handleSpeechResult(result, token: token, traceId: traceId),
         onSoundLevelChange: _handleSoundLevelChange,
+        // ignore: deprecated_member_use
         listenFor: _sttListenFor,
+        // ignore: deprecated_member_use
         pauseFor: _sttPauseFor,
+        // ignore: deprecated_member_use
         localeId: _resolvedLocaleId ?? _defaultLocaleId,
-        listenOptions: SpeechListenOptions(
-          cancelOnError: true,
-          partialResults: true,
-          listenMode: ListenMode.dictation,
-        ),
+        listenOptions: _speechListenOptions(),
       );
 
       _logEvent(
@@ -1834,18 +1877,22 @@ class AiAssistantProvider with ChangeNotifier {
         return;
       }
 
+      final normalizedResponse = _normalizeAiResponsePayload(response);
       _aiResponse =
           normalizeAiTextEncoding(
-            (response['textReply'] ?? '').toString(),
+            (normalizedResponse['textReply'] ?? '').toString(),
           ).trim();
-      _currentEmotion = (response['emotion'] ?? 'neutral').toString();
+      _currentEmotion =
+          (normalizedResponse['emotion'] ?? response['emotion'] ?? 'neutral')
+              .toString();
       _updateProviderRuntimeState(
-        degraded: response['degraded'] == true,
+        degraded: normalizedResponse['degraded'] == true,
         providerStatus:
-            (response['providerStatus'] ?? 'LIVE_PROVIDER_ACTIVE').toString(),
+            (normalizedResponse['providerStatus'] ?? 'LIVE_PROVIDER_ACTIVE')
+                .toString(),
       );
-      final actionCommand = response['actionCommand']?.toString();
-      final actionParams = response['actionParams'];
+      final actionCommand = normalizedResponse['actionCommand']?.toString();
+      final actionParams = normalizedResponse['actionParams'];
 
       if (response['conversationId'] != null) {
         _serverConversationId = response['conversationId'].toString();
@@ -1863,7 +1910,12 @@ class AiAssistantProvider with ChangeNotifier {
       }
 
       if (hasActionCommand) {
-        _aiResponse = '';
+        _aiResponse = _actionPendingMessage(actionCommand);
+        _recordAssistantHistory(
+          text: _aiResponse,
+          source: 'ai_action_pending.${actionCommand.toUpperCase()}',
+          entryId: response['assistantEntryId']?.toString() ?? assistantEntryId,
+        );
         _thinkingPhase = AiThinkingPhase.executingAction;
         notifyListeners();
         _executeSystemAction(actionCommand, actionParams, traceId: traceId);
@@ -2031,7 +2083,8 @@ class AiAssistantProvider with ChangeNotifier {
 
       _aiResponse =
           normalizeAiTextEncoding(
-            (response['textReply'] ?? '').toString(),
+            (_normalizeAiResponsePayload(response)['textReply'] ?? '')
+                .toString(),
           ).trim();
       _updateProviderRuntimeState(
         degraded: response['degraded'] == true,
@@ -2119,10 +2172,13 @@ class AiAssistantProvider with ChangeNotifier {
     String? userEntryId,
     String? assistantEntryId,
   }) async {
-    if (event == 'AI_TIMEOUT' || event == 'AI_ERROR') {
+    if (event == 'AI_TIMEOUT' ||
+        event == 'AI_ERROR' ||
+        event == 'CONTEXT_TIMEOUT' ||
+        event == 'CONTEXT_ERROR') {
       _updateProviderRuntimeState(
         degraded: true,
-        providerStatus: 'AI_PROVIDER_UNAVAILABLE',
+        providerStatus: _resolveProviderStatusForFailure(event, error),
       );
     }
 
@@ -2170,26 +2226,292 @@ class AiAssistantProvider with ChangeNotifier {
     }
   }
 
+  Map<String, dynamic> _normalizeAiResponsePayload(
+    Map<String, dynamic> response,
+  ) {
+    final normalized = Map<String, dynamic>.from(response);
+    final rawTextReply = normalized['textReply']?.toString();
+    final embeddedPayload = _tryDecodeEmbeddedAiPayload(rawTextReply);
+    final displayText = _coerceAssistantDisplayText(
+      rawTextReply,
+    );
+    if (displayText.isNotEmpty) {
+      normalized['textReply'] = displayText;
+    }
+    if (embeddedPayload == null) {
+      return normalized;
+    }
+
+    final embeddedText =
+        normalizeAiTextEncoding(
+          (embeddedPayload['textReply'] ?? '').toString(),
+        ).trim();
+    if (embeddedText.isNotEmpty) {
+      normalized['textReply'] = embeddedText;
+    }
+
+    for (final key in const [
+      'actionCommand',
+      'actionParams',
+      'emotion',
+      'providerStatus',
+      'degraded',
+      'conversationId',
+      'assistantEntryId',
+    ]) {
+      final candidate = embeddedPayload[key];
+      if (_isBlankAiPayloadValue(normalized[key]) &&
+          !_isBlankAiPayloadValue(candidate)) {
+        normalized[key] = candidate;
+      }
+    }
+
+    return normalized;
+  }
+
+  String _coerceAssistantDisplayText(String? rawTextReply) {
+    if (rawTextReply == null) {
+      return '';
+    }
+
+    final normalized = normalizeAiTextEncoding(rawTextReply).trim();
+    if (normalized.isEmpty) {
+      return '';
+    }
+
+    final structuredPayload = _tryDecodeStructuredAiPayload(normalized);
+    if (structuredPayload == null) {
+      return normalized;
+    }
+
+    final embeddedText =
+        normalizeAiTextEncoding(
+          (structuredPayload['textReply'] ??
+                  structuredPayload['summary'] ??
+                  structuredPayload['message'] ??
+                  structuredPayload['description'] ??
+                  structuredPayload['result'] ??
+                  '')
+              .toString(),
+        ).trim();
+    if (embeddedText.isNotEmpty && embeddedText != normalized) {
+      return embeddedText;
+    }
+
+    final bulletLines = <String>[];
+    final scalarLabelMap = <String, String>{
+      'intent': 'Ý định',
+      'sentiment': 'Cảm xúc',
+      'language': 'Ngôn ngữ',
+      'ocrText': 'Văn bản nhận diện',
+      'caption': 'Mô tả',
+      'scene': 'Bối cảnh',
+    };
+    for (final entry in scalarLabelMap.entries) {
+      final value = structuredPayload[entry.key]?.toString().trim();
+      if (value != null && value.isNotEmpty) {
+        bulletLines.add('- ${entry.value}: $value');
+      }
+    }
+
+    final collectionLabelMap = <String, String>{
+      'objects': 'Đối tượng',
+      'labels': 'Nhãn',
+      'faces': 'Khuôn mặt',
+      'texts': 'Văn bản',
+      'keywords': 'Từ khóa',
+    };
+    for (final entry in collectionLabelMap.entries) {
+      final summary = _summarizeStructuredAiCollection(
+        structuredPayload[entry.key],
+      );
+      if (summary != null && summary.isNotEmpty) {
+        bulletLines.add('- ${entry.value}: $summary');
+      }
+    }
+
+    if (bulletLines.isEmpty) {
+      return normalized;
+    }
+
+    return 'Kết quả phân tích:\n${bulletLines.join('\n')}';
+  }
+
+  Map<String, dynamic>? _tryDecodeStructuredAiPayload(String rawTextReply) {
+    if (!rawTextReply.startsWith('{') || !rawTextReply.endsWith('}')) {
+      return null;
+    }
+
+    try {
+      final decoded = jsonDecode(rawTextReply);
+      if (decoded is! Map) {
+        return null;
+      }
+      return decoded.map((key, value) => MapEntry(key.toString(), value));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String? _summarizeStructuredAiCollection(Object? value) {
+    if (value is! List || value.isEmpty) {
+      return null;
+    }
+
+    final normalizedItems = value
+        .take(3)
+        .map((item) {
+          if (item is String) {
+            return item.trim();
+          }
+          if (item is Map) {
+            for (final key in const [
+              'name',
+              'label',
+              'text',
+              'title',
+              'value',
+            ]) {
+              final candidate = item[key]?.toString().trim();
+              if (candidate != null && candidate.isNotEmpty) {
+                return candidate;
+              }
+            }
+          }
+          return item.toString().trim();
+        })
+        .where((item) => item.isNotEmpty)
+        .toList(growable: false);
+
+    if (normalizedItems.isEmpty) {
+      return null;
+    }
+
+    final suffix = value.length > normalizedItems.length ? '…' : '';
+    return '${normalizedItems.join(', ')}$suffix';
+  }
+
+  Map<String, dynamic>? _tryDecodeEmbeddedAiPayload(String? rawTextReply) {
+    if (rawTextReply == null) {
+      return null;
+    }
+
+    final normalized = normalizeAiTextEncoding(rawTextReply).trim();
+    if (!normalized.startsWith('{') || !normalized.endsWith('}')) {
+      return null;
+    }
+
+    try {
+      final decoded = jsonDecode(normalized);
+      if (decoded is! Map) {
+        return null;
+      }
+
+      final payload = decoded.map(
+        (key, value) => MapEntry(key.toString(), value),
+      );
+      if (!payload.containsKey('textReply')) {
+        return null;
+      }
+      return payload;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  bool _isBlankAiPayloadValue(Object? value) {
+    if (value == null) {
+      return true;
+    }
+    if (value is String) {
+      return value.trim().isEmpty;
+    }
+    return false;
+  }
+
   String _resolveAssistantErrorMessage(
     Object error, {
     required String fallbackMessage,
   }) {
     if (error is ApiException) {
-      final normalizedMessage = normalizeAiTextEncoding(error.message).trim();
-      if (normalizedMessage.isNotEmpty) {
-        return normalizedMessage;
+      if (error.statusCode == 0) {
+        final normalized = error.message.toLowerCase();
+        if (normalized.contains('timed out')) {
+          return 'AI phản hồi chậm. Vui lòng thử lại sau vài giây.';
+        }
+        if (normalized.contains('internet') ||
+            normalized.contains('socket') ||
+            normalized.contains('client error')) {
+          return 'Không kết nối được AI. Kiểm tra mạng rồi thử lại.';
+        }
+        return 'Không thể kết nối tới AI. Vui lòng thử lại.';
       }
 
       if (error.statusCode == 401 || error.statusCode == 403) {
         return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
       }
 
+      if (error.statusCode == 404) {
+        return 'Không tìm thấy endpoint AI. Vui lòng kiểm tra cấu hình môi trường.';
+      }
+
       if (error.statusCode == 429) {
-        return 'Bạn đang gửi quá nhanh. Vui lòng thử lại sau ít giây.';
+        return 'Bạn đang gửi quá nhanh. Vui lòng thử lại sau vài giây.';
+      }
+
+      if (error.statusCode >= 500) {
+        return 'AI đang tạm thời không sẵn sàng. Vui lòng thử lại sau.';
+      }
+
+      final normalizedMessage = normalizeAiTextEncoding(error.message).trim();
+      if (normalizedMessage.isNotEmpty) {
+        return normalizedMessage;
       }
     }
 
     return fallbackMessage;
+  }
+
+  String _resolveProviderStatusForFailure(String event, Object? error) {
+    if (event == 'AI_TIMEOUT' || event == 'CONTEXT_TIMEOUT') {
+      return 'AI_PROVIDER_TIMEOUT';
+    }
+
+    if (error is ApiException) {
+      final message = error.message.toLowerCase();
+      if (error.statusCode == 0) {
+        if (message.contains('timed out')) {
+          return 'AI_PROVIDER_TIMEOUT';
+        }
+        return 'AI_NETWORK_UNAVAILABLE';
+      }
+      if (error.statusCode == 401 || error.statusCode == 403) {
+        return 'AI_AUTH_REQUIRED';
+      }
+      if (error.statusCode == 404) {
+        return 'AI_ENDPOINT_NOT_FOUND';
+      }
+      if (error.statusCode == 429) {
+        return 'AI_RATE_LIMITED';
+      }
+      if (error.statusCode >= 500) {
+        return 'AI_PROVIDER_UNAVAILABLE';
+      }
+    }
+
+    return 'AI_REQUEST_FAILED';
+  }
+
+  String _actionPendingMessage(String command) {
+    return switch (command.trim().toUpperCase()) {
+      'OPEN_CHAT' => 'Mình sẽ mở cuộc trò chuyện phù hợp.',
+      'COMPOSE_MESSAGE' => 'Mình sẽ chuẩn bị tin nhắn để bạn kiểm tra.',
+      'CREATE_GROUP' => 'Mình sẽ chuẩn bị tạo nhóm và chờ bạn xác nhận.',
+      'START_CALL' => 'Mình sẽ chuẩn bị cuộc gọi và chờ bạn xác nhận.',
+      'NAVIGATE_TO' => 'Mình sẽ điều hướng tới màn hình phù hợp.',
+      'RECALL_MESSAGE' => 'Mình sẽ kiểm tra tin nhắn có thể thu hồi.',
+      _ => 'Mình sẽ thực hiện thao tác phù hợp.',
+    };
   }
 
   Future<void> _stopAllInteractions({
@@ -2795,6 +3117,7 @@ class AiAssistantProvider with ChangeNotifier {
   }
 
   void clearAiResponse({bool keepBubbleVisible = true}) {
+    _clarificationState = null;
     _aiResponse = '';
     if (keepBubbleVisible && !_persistentEnabled) {
       _setProvisionallyVisible(true, reason: 'response_cleared.keep_visible');

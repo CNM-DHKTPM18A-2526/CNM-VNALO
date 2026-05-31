@@ -39,7 +39,10 @@ class AiChatBoard extends StatefulWidget {
 class _AiChatBoardState extends State<AiChatBoard> {
   final TextEditingController _inputController = TextEditingController();
   final FocusNode _inputFocusNode = FocusNode();
+  final ScrollController _scrollController = ScrollController();
   bool _hasText = false;
+  int _lastTranscriptSize = 0;
+  bool _lastTypingState = false;
 
   @override
   void initState() {
@@ -59,20 +62,62 @@ class _AiChatBoardState extends State<AiChatBoard> {
     _inputController.removeListener(_handleInputChanged);
     _inputController.dispose();
     _inputFocusNode.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _clearInputField() {
+    _inputController.value = const TextEditingValue();
+    if (_hasText) {
+      setState(() {
+        _hasText = false;
+      });
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _inputController.text.isEmpty) {
+        return;
+      }
+      _inputController.value = const TextEditingValue();
+    });
+  }
+
+  void _restoreInputField(String text) {
+    if (!mounted) {
+      return;
+    }
+    _inputController.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
+
+  void _queueScrollToLatest() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) {
+        return;
+      }
+      final position = _scrollController.position;
+      _scrollController.animateTo(
+        position.maxScrollExtent,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
+  Future<void> _openFullConversation() async {
+    widget.onOpenConversation?.call();
   }
 
   void _submitTextPrompt() {
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
 
-    _inputController.clear();
-    setState(() {
-      _hasText = false;
-    });
+    _clearInputField();
     try {
       unawaited(widget.onSubmitPrompt(text));
     } catch (_) {
+      _restoreInputField(text);
       // Provider handles async failures; this guards only synchronous dispatch.
     }
 
@@ -82,7 +127,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
   void _applyQuickPrompt(String text) {
     final normalized = text.trim();
     if (normalized.isEmpty) return;
-    if (normalized == 'Mở danh bạ') {
+    if (normalized == AiPromptChips.openContactsPrompt) {
       MainShellState.globalKey.currentState?.setTabIndex(1);
       widget.onClose();
       return;
@@ -111,17 +156,19 @@ class _AiChatBoardState extends State<AiChatBoard> {
   Widget _buildHeaderAction({
     required Key key,
     required IconData icon,
+    String? tooltip,
     required VoidCallback? onPressed,
   }) {
     return IconButton(
       key: key,
-      icon: Icon(icon, size: 17),
+      tooltip: tooltip,
+      icon: Icon(icon, size: 16),
       color: Colors.white,
       onPressed: onPressed,
       padding: EdgeInsets.zero,
       visualDensity: VisualDensity.compact,
-      constraints: const BoxConstraints.tightFor(width: 32, height: 32),
-      splashRadius: 18,
+      constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+      splashRadius: 16,
     );
   }
 
@@ -271,8 +318,11 @@ class _AiChatBoardState extends State<AiChatBoard> {
                               ),
                         ),
                         _BoardActionChip(
-                          label: 'Mở danh bạ',
-                          onTap: () => _applyQuickPrompt('Mở danh bạ'),
+                          label: AiPromptChips.openContactsPrompt,
+                          onTap:
+                              () => _applyQuickPrompt(
+                                AiPromptChips.openContactsPrompt,
+                              ),
                         ),
                         if (widget.onOpenConversation != null)
                           _BoardActionChip(
@@ -389,6 +439,13 @@ class _AiChatBoardState extends State<AiChatBoard> {
             )
             : aiProvider.conversationHistory;
 
+    if (_lastTranscriptSize != transcriptEntries.length ||
+        _lastTypingState != showAiTyping) {
+      _lastTranscriptSize = transcriptEntries.length;
+      _lastTypingState = showAiTyping;
+      _queueScrollToLatest();
+    }
+
     final borderColor =
         isDarkMode
             ? const Color(0xFF5DA6FF).withValues(alpha: 0.35)
@@ -500,24 +557,26 @@ class _AiChatBoardState extends State<AiChatBoard> {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      Wrap(
-                        spacing: 0,
-                        runSpacing: 0,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           if (widget.onOpenConversation != null)
                             _buildHeaderAction(
                               key: const ValueKey('ai_chat_open_conversation'),
                               icon: Icons.open_in_full,
-                              onPressed: widget.onOpenConversation,
+                              tooltip: 'Mở chat AI đầy đủ',
+                              onPressed: _openFullConversation,
                             ),
                           _buildHeaderAction(
                             key: const ValueKey('ai_chat_clear'),
                             icon: Icons.clear_all,
+                            tooltip: 'Xóa đoạn chat nhanh',
                             onPressed: widget.onClear,
                           ),
                           _buildHeaderAction(
                             key: const ValueKey('ai_chat_close'),
                             icon: Icons.close,
+                            tooltip: 'Đóng trợ lý',
                             onPressed: widget.onClose,
                           ),
                         ],
@@ -566,9 +625,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    aiProvider.isProviderUnavailable
-                                        ? 'AI đang bảo trì. Một số thao tác cục bộ vẫn có thể dùng.'
-                                        : 'AI đang chạy ở chế độ dự phòng.',
+                                    aiProvider.providerIssueMessage,
                                     style: TextStyle(
                                       color:
                                           isDarkMode
@@ -584,6 +641,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
                           ),
                         Expanded(
                           child: SingleChildScrollView(
+                            controller: _scrollController,
                             child:
                                 transcriptEntries.isEmpty
                                     ? Container(
@@ -702,9 +760,11 @@ class _AiChatBoardState extends State<AiChatBoard> {
                   AiPromptChips(
                     compact: true,
                     onSelected: (prompt) {
-                      _inputController.text = prompt;
-                      _inputController.selection = TextSelection.collapsed(
-                        offset: prompt.length,
+                      _inputController.value = TextEditingValue(
+                        text: prompt,
+                        selection: TextSelection.collapsed(
+                          offset: prompt.length,
+                        ),
                       );
                       _inputFocusNode.requestFocus();
                     },
@@ -717,8 +777,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
                     isCompactLayout ? 6 : 8,
                   ),
                   decoration: BoxDecoration(
-                    color:
-                        isDarkMode ? DarkColors.surface : LightColors.surface,
+                    color: isDarkMode ? DarkColors.surface : Colors.white,
                     border: Border(
                       top: BorderSide(
                         color:

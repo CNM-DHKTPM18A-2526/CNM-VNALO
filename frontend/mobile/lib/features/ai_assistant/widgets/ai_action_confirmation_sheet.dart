@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/theme/app_typography.dart';
+import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
 import 'package:vnalo_mobile/features/ai_assistant/theme/ai_assistant_tokens.dart';
 
 enum AiActionConfirmationResult { cancelled, confirmed, alternate }
@@ -15,6 +16,8 @@ class AiActionConfirmationSheet extends StatelessWidget {
   final String cancelLabel;
   final String? alternateLabel;
   final String? primaryDetail;
+  final String? primaryAvatarUrl;
+  final String? primaryAvatarName;
   final String? secondaryDetail;
   final String? primaryDetailLabel;
   final String? secondaryDetailLabel;
@@ -29,6 +32,8 @@ class AiActionConfirmationSheet extends StatelessWidget {
     this.cancelLabel = 'Hủy',
     this.alternateLabel,
     this.primaryDetail,
+    this.primaryAvatarUrl,
+    this.primaryAvatarName,
     this.secondaryDetail,
     this.primaryDetailLabel,
     this.secondaryDetailLabel,
@@ -44,6 +49,8 @@ class AiActionConfirmationSheet extends StatelessWidget {
     String cancelLabel = 'Hủy',
     String? alternateLabel,
     String? primaryDetail,
+    String? primaryAvatarUrl,
+    String? primaryAvatarName,
     String? secondaryDetail,
     String? primaryDetailLabel,
     String? secondaryDetailLabel,
@@ -58,6 +65,8 @@ class AiActionConfirmationSheet extends StatelessWidget {
       cancelLabel: cancelLabel,
       alternateLabel: alternateLabel,
       primaryDetail: primaryDetail,
+      primaryAvatarUrl: primaryAvatarUrl,
+      primaryAvatarName: primaryAvatarName,
       secondaryDetail: secondaryDetail,
       primaryDetailLabel: primaryDetailLabel,
       secondaryDetailLabel: secondaryDetailLabel,
@@ -75,6 +84,8 @@ class AiActionConfirmationSheet extends StatelessWidget {
     String cancelLabel = 'Hủy',
     String? alternateLabel,
     String? primaryDetail,
+    String? primaryAvatarUrl,
+    String? primaryAvatarName,
     String? secondaryDetail,
     String? primaryDetailLabel,
     String? secondaryDetailLabel,
@@ -94,6 +105,8 @@ class AiActionConfirmationSheet extends StatelessWidget {
                 cancelLabel: cancelLabel,
                 alternateLabel: alternateLabel,
                 primaryDetail: primaryDetail,
+                primaryAvatarUrl: primaryAvatarUrl,
+                primaryAvatarName: primaryAvatarName,
                 secondaryDetail: secondaryDetail,
                 primaryDetailLabel: primaryDetailLabel,
                 secondaryDetailLabel: secondaryDetailLabel,
@@ -236,12 +249,25 @@ class AiActionConfirmationSheet extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           if (primaryDetail != null)
-                            _DetailBlock(
-                              label: primaryDetailLabel ?? 'Đích đến',
-                              value: primaryDetail!,
-                              color: textPrimary,
-                              labelColor: textSecondary,
-                              emphasized: true,
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                AvatarWidget(
+                                  imageUrl: primaryAvatarUrl,
+                                  name: primaryAvatarName ?? primaryDetail!,
+                                  size: 42,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _DetailBlock(
+                                    label: primaryDetailLabel ?? 'Đích đến',
+                                    value: primaryDetail!,
+                                    color: textPrimary,
+                                    labelColor: textSecondary,
+                                    emphasized: true,
+                                  ),
+                                ),
+                              ],
                             ),
                           if (secondaryDetail != null) ...[
                             if (primaryDetail != null)

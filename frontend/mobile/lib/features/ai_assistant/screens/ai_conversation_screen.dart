@@ -8,6 +8,7 @@ import 'package:vnalo_mobile/core/utils/date_formatter.dart';
 import 'package:vnalo_mobile/features/ai_assistant/providers/ai_assistant_provider.dart';
 import 'package:vnalo_mobile/features/ai_assistant/theme/ai_assistant_tokens.dart';
 import 'package:vnalo_mobile/features/ai_assistant/utils/ai_command_routing.dart';
+import 'package:vnalo_mobile/features/ai_assistant/widgets/ai_prompt_chips.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/navigation/main_shell.dart';
 
@@ -64,10 +65,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
 
-    _inputController.clear();
-    setState(() {
-      _hasText = false;
-    });
+    _clearInputField();
 
     try {
       unawaited(
@@ -78,10 +76,36 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
         ),
       );
     } catch (_) {
+      _restoreInputField(text);
       // Provider handles async failures; this guards only synchronous dispatch.
     }
 
     _inputFocusNode.requestFocus();
+  }
+
+  void _clearInputField() {
+    _inputController.value = const TextEditingValue();
+    if (_hasText) {
+      setState(() {
+        _hasText = false;
+      });
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _inputController.text.isEmpty) {
+        return;
+      }
+      _inputController.value = const TextEditingValue();
+    });
+  }
+
+  void _restoreInputField(String text) {
+    if (!mounted) {
+      return;
+    }
+    _inputController.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
   }
 
   void _queueScrollToLatest() {
@@ -102,7 +126,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
     if (normalized.isEmpty) {
       return;
     }
-    if (normalized == 'Mở danh bạ') {
+    if (normalized == AiPromptChips.openContactsPrompt) {
       MainShellState.globalKey.currentState?.setTabIndex(1);
       if (Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
@@ -372,10 +396,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
             ? 'Cuộc trò chuyện được mã hóa và sao lưu trên Cloud.'
             : 'Chế độ Local-first: dữ liệu chỉ lưu trên thiết bị này.';
     final showDegradedBanner = provider.isResponseDegraded;
-    final degradedText =
-        provider.isProviderUnavailable
-            ? 'AI đang bảo trì. Một số thao tác cục bộ vẫn có thể tiếp tục.'
-            : 'AI đang chạy ở chế độ dự phòng.';
+    final degradedText = provider.providerIssueMessage;
     final clarification = provider.clarificationState;
     final clarificationText =
         clarification == null
@@ -483,7 +504,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
   }
 
   Widget _buildInputBar(AiAssistantProvider provider, bool isDarkMode) {
-    final bgColor = isDarkMode ? DarkColors.surface : LightColors.surface;
+    final bgColor = isDarkMode ? DarkColors.surface : Colors.white;
     final iconColor =
         isDarkMode ? DarkColors.textSecondary : AppColors.iconSubtle;
     final activeColor =
@@ -781,8 +802,11 @@ class _AiConversationMessageBubble extends StatelessWidget {
                             ),
                       ),
                       _ActionPromptChip(
-                        label: 'Mở danh bạ',
-                        onTap: () => onQuickActionSelected('Mở danh bạ'),
+                        label: AiPromptChips.openContactsPrompt,
+                        onTap:
+                            () => onQuickActionSelected(
+                              AiPromptChips.openContactsPrompt,
+                            ),
                       ),
                     ],
                   ),

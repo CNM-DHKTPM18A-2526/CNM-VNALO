@@ -54,9 +54,29 @@ class AiStatusPill extends StatelessWidget {
   }
 
   (String, Color, IconData) _resolveVisualState() {
+    if (providerStatus == 'AI_PROVIDER_TIMEOUT') {
+      return ('Phản hồi chậm', const Color(0xFFF59E0B), Icons.timer_outlined);
+    }
+
+    if (providerStatus == 'AI_NETWORK_UNAVAILABLE') {
+      return ('Mất kết nối', const Color(0xFFF59E0B), Icons.wifi_off_rounded);
+    }
+
+    if (providerStatus == 'AI_ENDPOINT_NOT_FOUND') {
+      return ('Sai cấu hình', const Color(0xFFEF4444), Icons.error_outline);
+    }
+
+    if (providerStatus == 'AI_AUTH_REQUIRED') {
+      return ('Cần đăng nhập', const Color(0xFFEF4444), Icons.lock_outline);
+    }
+
+    if (providerStatus == 'AI_RATE_LIMITED') {
+      return ('Gửi quá nhanh', const Color(0xFFF59E0B), Icons.speed_rounded);
+    }
+
     if (providerStatus == 'AI_PROVIDER_UNAVAILABLE') {
       return (
-        'AI đang bảo trì',
+        'AI tạm gián đoạn',
         const Color(0xFFF59E0B),
         Icons.warning_amber_rounded,
       );

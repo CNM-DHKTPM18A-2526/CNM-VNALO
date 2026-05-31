@@ -653,6 +653,39 @@ void main() {
   });
 
   test(
+    'submitTextPrompt unwraps nested AI json payload before rendering',
+    () async {
+      final provider = _buildProvider(
+        responses: {
+          'tao nhom cho toi': {
+            'textReply':
+                '{"textReply":"Tuyet voi! Toi se chuan bi tao nhom cho ban.","actionCommand":"CREATE_GROUP","actionParams":{"groupName":"Luc Gia Gia","memberNames":["Ly Tinh Van","Luc Gia Gia"]},"emotion":"joyful"}',
+            'emotion': 'neutral',
+          },
+        },
+      );
+
+      final commandFuture = provider.systemActionStream.first;
+      await provider.submitTextPrompt(
+        'tao nhom cho toi',
+        source: 'nested_json',
+      );
+      final command = await commandFuture;
+
+      expect(command.command, 'CREATE_GROUP');
+      expect(provider.aiResponse, isNotEmpty);
+      expect(provider.aiResponse, isNot(contains('{"textReply"')));
+      expect(provider.aiResponse, isNot(contains('actionCommand')));
+      expect(
+        provider.conversationHistory.last.source,
+        'ai_action_pending.CREATE_GROUP',
+      );
+
+      provider.dispose();
+    },
+  );
+
+  test(
     'submitTextPrompt with action command defers assistant text reply',
     () async {
       final provider = _buildProvider(
@@ -674,7 +707,7 @@ void main() {
       final command = await commandFuture;
 
       expect(command.command, 'COMPOSE_MESSAGE');
-      expect(provider.aiResponse, isEmpty);
+      expect(provider.aiResponse, contains('tin nhắn'));
 
       final assistantReplies = provider.conversationHistory
           .where(
@@ -684,7 +717,14 @@ void main() {
           )
           .toList(growable: false);
       expect(assistantReplies, isEmpty);
-      expect(provider.conversationHistory.last.role, AiConversationRole.user);
+      expect(
+        provider.conversationHistory.last.role,
+        AiConversationRole.assistant,
+      );
+      expect(
+        provider.conversationHistory.last.source,
+        'ai_action_pending.COMPOSE_MESSAGE',
+      );
 
       provider.dispose();
     },
@@ -710,7 +750,7 @@ void main() {
     final command = await commandFuture;
 
     expect(command.command, 'START_CALL');
-    expect(provider.aiResponse, isEmpty);
+    expect(provider.aiResponse, contains('cuộc gọi'));
     expect(
       provider.lastConversationPreview,
       isNot(contains('Toi se chuan bi')),
@@ -764,6 +804,46 @@ void main() {
     await provider.setCloudBackupEnabled(true, reason: 'unit_test');
 
     expect(provider.cloudBackupEnabled, isTrue);
+
+    provider.dispose();
+  });
+
+  test('clearAiResponse also clears clarification state', () async {
+    final provider = _buildProvider();
+
+    provider.addActionFeedback(
+      'Bạn muốn gọi cho ai?',
+      source: 'ai_action_ambiguity.contact',
+      keepBubbleVisible: true,
+    );
+
+    expect(provider.clarificationState, isNotNull);
+
+    provider.clearAiResponse(keepBubbleVisible: true);
+
+    expect(provider.aiResponse, isEmpty);
+    expect(provider.clarificationState, isNull);
+
+    provider.dispose();
+  });
+
+  test('non-ambiguity feedback clears stale clarification state', () async {
+    final provider = _buildProvider();
+
+    provider.addActionFeedback(
+      'Bạn muốn gọi cho ai?',
+      source: 'ai_action_ambiguity.contact',
+      keepBubbleVisible: true,
+    );
+    expect(provider.clarificationState, isNotNull);
+
+    provider.addActionFeedback(
+      'Đã mở cuộc trò chuyện.',
+      source: 'ai_action_success',
+      keepBubbleVisible: true,
+    );
+
+    expect(provider.clarificationState, isNull);
 
     provider.dispose();
   });
