@@ -955,6 +955,16 @@ body.theme-dark .auth-lang-btn:hover {
   100% { top: 110%; opacity: 0; }
 }
 
+@keyframes faceScanLine {
+  0% { top: 20%; }
+  100% { top: 80%; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .face-capture-btn-container {
   position: absolute;
   bottom: 20px;
