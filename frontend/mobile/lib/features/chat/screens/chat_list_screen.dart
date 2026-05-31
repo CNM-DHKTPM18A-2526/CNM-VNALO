@@ -224,23 +224,17 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 )),
           ];
 
-          // Sort items: pinned first, then by timestamp
-          // Cloud item always goes to the TOP of unpinned items (most recent position)
-          final pinnedItems = allItems.where((item) => item.isPinned).toList();
-          final unpinnedItems = allItems.where((item) => !item.isPinned).toList();
+          final cloudItems = allItems.where((item) => item.type == _UnifiedChatItemType.cloud).toList();
+          final pinnedItems = allItems.where((item) => item.isPinned && item.type != _UnifiedChatItemType.cloud).toList();
+          final unpinnedItems = allItems.where((item) => !item.isPinned && item.type != _UnifiedChatItemType.cloud).toList();
           
-          // Sort unpinned items by timestamp descending (newest first), but cloud always at TOP
-          unpinnedItems.sort((a, b) {
-            // Always put cloud at TOP (most recent position)
-            if (a.type == _UnifiedChatItemType.cloud) return -1;
-            if (b.type == _UnifiedChatItemType.cloud) return 1;
-            return b.timestamp.compareTo(a.timestamp);
-          });
+          // Sort unpinned items by timestamp descending
+          unpinnedItems.sort((a, b) => b.timestamp.compareTo(a.timestamp));
           
           // Sort pinned items by timestamp descending
           pinnedItems.sort((a, b) => b.timestamp.compareTo(a.timestamp));
           
-          final sortedItems = [...pinnedItems, ...unpinnedItems];
+          final sortedItems = [...cloudItems, ...pinnedItems, ...unpinnedItems];
 
           final pinnedTileColor = isDarkMode ? const Color(0xFF1A1A1A) : const Color(0xFFF0F2F5);
           final regularTileColor = isDarkMode ? DarkColors.surface : Colors.white;
