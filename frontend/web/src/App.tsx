@@ -1,52 +1,101 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Suspense, lazy } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
 
-import { ProtectedRoute } from './features/auth/ProtectedRoute'
-import { useAuth } from './features/auth/useAuth'
-import { MainLayout } from './layouts/MainLayout'
-import { LoginPage } from './pages/LoginPage'
-import { QrLoginPage } from './pages/QrLoginPage'
-import { RegisterPage } from './pages/RegisterPage'
-import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
-import ChatPage from './pages/ChatPage'
-import CallPage from './pages/CallPage'
-import { ContactsPage } from './pages/ContactsPage'
-import { ProfilePage } from './pages/ProfilePage'
-import { AiChatPage } from './pages/AiChatPage'
-import SocialPage from './features/social/pages/SocialPage'
-import CreateStoryPage from './features/social/pages/CreateStoryPage'
-import StoryViewerPage from './features/social/pages/StoryViewerPage'
-import { UserStoreProvider } from './features/chat/context/UserStoreContext'
-import { NotificationProvider } from './features/notifications/NotificationContext'
-import './styles/app.css'
+import { ProtectedRoute } from "./features/auth/ProtectedRoute";
+import { useAuth } from "./features/auth/useAuth";
+import { MainLayout } from "./layouts/MainLayout";
+import { LoginPage } from "./pages/LoginPage";
+import { QrLoginPage } from "./pages/QrLoginPage";
+import { RegisterPage } from "./pages/RegisterPage";
+import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
+import ChatPage from "./pages/ChatPage";
+import CallPage from "./pages/CallPage";
+import { ContactsPage } from "./pages/ContactsPage";
+import { ProfilePage } from "./pages/ProfilePage";
+import SocialPage from "./features/social/pages/SocialPage";
+import CreateStoryPage from "./features/social/pages/CreateStoryPage";
+import StoryViewerPage from "./features/social/pages/StoryViewerPage";
+import { UserStoreProvider } from "./features/chat/context/UserStoreContext";
+import { NotificationProvider } from "./features/notifications/NotificationContext";
+import "./styles/app.css";
+
+const AiChatPage = lazy(() =>
+  import("./pages/AiChatPage").then((module) => ({
+    default: module.AiChatPage,
+  })),
+);
 
 function App() {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated } = useAuth();
 
   return (
     <UserStoreProvider>
       <NotificationProvider>
         <Routes>
-          <Route path='/login' element={isAuthenticated ? <Navigate replace to='/chat' /> : <LoginPage />} />
-          <Route path='/login/qr' element={isAuthenticated ? <Navigate replace to='/chat' /> : <QrLoginPage />} />
-          <Route path='/register' element={isAuthenticated ? <Navigate replace to='/chat' /> : <RegisterPage />} />
-          <Route path='/forgot-password' element={isAuthenticated ? <Navigate replace to='/chat' /> : <ForgotPasswordPage />} />
           <Route
-            path='/'
+            path="/login"
+            element={
+              isAuthenticated ? <Navigate replace to="/chat" /> : <LoginPage />
+            }
+          />
+          <Route
+            path="/login/qr"
+            element={
+              isAuthenticated ? (
+                <Navigate replace to="/chat" />
+              ) : (
+                <QrLoginPage />
+              )
+            }
+          />
+          <Route
+            path="/register"
+            element={
+              isAuthenticated ? (
+                <Navigate replace to="/chat" />
+              ) : (
+                <RegisterPage />
+              )
+            }
+          />
+          <Route
+            path="/forgot-password"
+            element={
+              isAuthenticated ? (
+                <Navigate replace to="/chat" />
+              ) : (
+                <ForgotPasswordPage />
+              )
+            }
+          />
+          <Route
+            path="/"
             element={
               <ProtectedRoute>
                 <MainLayout />
               </ProtectedRoute>
             }
           >
-            <Route index element={<Navigate replace to='/chat' />} />
-            <Route path='chat/:conversationId?' element={<ChatPage />} />
-            <Route path='contacts' element={<ContactsPage />} />
-            <Route path='profile' element={<ProfilePage />} />
-            <Route path='chat-ai' element={<AiChatPage />} />
-            <Route path='social' element={<SocialPage />} />
+            <Route index element={<Navigate replace to="/chat" />} />
+            <Route path="chat/:conversationId?" element={<ChatPage />} />
+            <Route path="contacts" element={<ContactsPage />} />
+            <Route path="profile" element={<ProfilePage />} />
+            <Route
+              path="chat-ai"
+              element={
+                <Suspense
+                  fallback={
+                    <div className="page-loading">Đang tải Trợ lý AI...</div>
+                  }
+                >
+                  <AiChatPage />
+                </Suspense>
+              }
+            />
+            <Route path="social" element={<SocialPage />} />
           </Route>
           <Route
-            path='/stories/create'
+            path="/stories/create"
             element={
               <ProtectedRoute>
                 <CreateStoryPage />
@@ -54,19 +103,26 @@ function App() {
             }
           />
           <Route
-            path='/stories/:storyId'
+            path="/stories/:storyId"
             element={
               <ProtectedRoute>
                 <StoryViewerPage />
               </ProtectedRoute>
             }
           />
-          <Route path='/call/:callId' element={<ProtectedRoute><CallPage /></ProtectedRoute>} />
-          <Route path='*' element={<Navigate replace to='/chat' />} />
+          <Route
+            path="/call/:callId"
+            element={
+              <ProtectedRoute>
+                <CallPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="*" element={<Navigate replace to="/chat" />} />
         </Routes>
       </NotificationProvider>
     </UserStoreProvider>
-  )
+  );
 }
 
-export default App
+export default App;
