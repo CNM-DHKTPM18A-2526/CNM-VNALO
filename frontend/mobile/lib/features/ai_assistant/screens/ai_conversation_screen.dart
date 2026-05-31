@@ -65,7 +65,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
 
-    _clearInputField();
+    _clearInputField(text);
 
     try {
       unawaited(
@@ -83,7 +83,7 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
     _inputFocusNode.requestFocus();
   }
 
-  void _clearInputField() {
+  void _clearInputField(String submittedText) {
     _inputController.value = const TextEditingValue();
     if (_hasText) {
       setState(() {
@@ -91,7 +91,11 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
       });
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _inputController.text.isEmpty) {
+      if (!mounted) {
+        return;
+      }
+      final currentText = _inputController.text.trim();
+      if (currentText.isEmpty || currentText != submittedText.trim()) {
         return;
       }
       _inputController.value = const TextEditingValue();
@@ -395,8 +399,12 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
         provider.cloudBackupEnabled
             ? 'Cuộc trò chuyện được mã hóa và sao lưu trên Cloud.'
             : 'Chế độ Local-first: dữ liệu chỉ lưu trên thiết bị này.';
-    final showDegradedBanner = provider.isResponseDegraded;
-    final degradedText = provider.providerIssueMessage;
+    final showProviderIssue = provider.hasProviderIssue;
+    final issueText = provider.providerIssueMessage;
+    final isWarningIssue =
+        provider.isProviderHardFailure ||
+        provider.isProviderRateLimited ||
+        provider.isProviderTimeout;
     final clarification = provider.clarificationState;
     final clarificationText =
         clarification == null
@@ -431,18 +439,15 @@ class _AiConversationScreenState extends State<AiConversationScreen> {
             background: Colors.transparent,
             borderColor: Colors.transparent,
           ),
-          if (showDegradedBanner) ...[
+          if (showProviderIssue) ...[
             const SizedBox(height: 5),
             _buildInfoPill(
               icon:
-                  provider.isProviderUnavailable
+                  isWarningIssue
                       ? Icons.warning_amber_rounded
                       : Icons.sync_problem_rounded,
-              text: degradedText,
-              color:
-                  provider.isProviderUnavailable
-                      ? AppColors.warning
-                      : AppColors.primary,
+              text: issueText,
+              color: isWarningIssue ? AppColors.warning : AppColors.primary,
               isDarkMode: isDarkMode,
               background: Colors.transparent,
               borderColor: Colors.transparent,

@@ -447,6 +447,14 @@ class AiAssistantProvider with ChangeNotifier {
   String get aiResponse => _aiResponse;
   bool get isResponseDegraded => _isResponseDegraded;
   String get providerStatus => _providerStatus;
+  bool get hasProviderIssue =>
+      _isResponseDegraded || _providerStatus != 'LIVE_PROVIDER_ACTIVE';
+  bool get isProviderHardFailure =>
+      _providerStatus == 'AI_PROVIDER_UNAVAILABLE' ||
+      _providerStatus == 'AI_ENDPOINT_NOT_FOUND' ||
+      _providerStatus == 'AI_AUTH_REQUIRED' ||
+      _providerStatus == 'AI_NETWORK_UNAVAILABLE' ||
+      _providerStatus == 'AI_REQUEST_FAILED';
   AiResponseSurface get lastResponseSurface => _lastResponseSurface;
   bool get shouldBubbleAutoShowResponse =>
       _lastResponseSurface == AiResponseSurface.bubble ||
@@ -2232,9 +2240,7 @@ class AiAssistantProvider with ChangeNotifier {
     final normalized = Map<String, dynamic>.from(response);
     final rawTextReply = normalized['textReply']?.toString();
     final embeddedPayload = _tryDecodeEmbeddedAiPayload(rawTextReply);
-    final displayText = _coerceAssistantDisplayText(
-      rawTextReply,
-    );
+    final displayText = _coerceAssistantDisplayText(rawTextReply);
     if (displayText.isNotEmpty) {
       normalized['textReply'] = displayText;
     }

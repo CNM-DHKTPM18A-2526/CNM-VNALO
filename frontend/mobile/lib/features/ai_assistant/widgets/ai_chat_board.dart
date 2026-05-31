@@ -43,6 +43,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
   bool _hasText = false;
   int _lastTranscriptSize = 0;
   bool _lastTypingState = false;
+  String? _lastClarificationKey;
 
   @override
   void initState() {
@@ -66,7 +67,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
     super.dispose();
   }
 
-  void _clearInputField() {
+  void _clearInputField(String submittedText) {
     _inputController.value = const TextEditingValue();
     if (_hasText) {
       setState(() {
@@ -74,7 +75,11 @@ class _AiChatBoardState extends State<AiChatBoard> {
       });
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _inputController.text.isEmpty) {
+      if (!mounted) {
+        return;
+      }
+      final currentText = _inputController.text.trim();
+      if (currentText.isEmpty || currentText != submittedText.trim()) {
         return;
       }
       _inputController.value = const TextEditingValue();
@@ -91,14 +96,18 @@ class _AiChatBoardState extends State<AiChatBoard> {
     );
   }
 
-  void _queueScrollToLatest() {
+  void _queueScrollToLatest({double bottomInset = 0}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scrollController.hasClients) {
         return;
       }
       final position = _scrollController.position;
-      _scrollController.animateTo(
+      final target = (position.maxScrollExtent - bottomInset).clamp(
+        position.minScrollExtent,
         position.maxScrollExtent,
+      );
+      _scrollController.animateTo(
+        target,
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOutCubic,
       );
@@ -113,7 +122,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
 
-    _clearInputField();
+    _clearInputField(text);
     try {
       unawaited(widget.onSubmitPrompt(text));
     } catch (_) {
@@ -159,16 +168,20 @@ class _AiChatBoardState extends State<AiChatBoard> {
     String? tooltip,
     required VoidCallback? onPressed,
   }) {
-    return IconButton(
-      key: key,
-      tooltip: tooltip,
-      icon: Icon(icon, size: 16),
-      color: Colors.white,
-      onPressed: onPressed,
-      padding: EdgeInsets.zero,
-      visualDensity: VisualDensity.compact,
-      constraints: const BoxConstraints.tightFor(width: 30, height: 30),
-      splashRadius: 16,
+    return Semantics(
+      label: tooltip,
+      button: true,
+      enabled: onPressed != null,
+      child: IconButton(
+        key: key,
+        icon: Icon(icon, size: 16),
+        color: Colors.white,
+        onPressed: onPressed,
+        padding: EdgeInsets.zero,
+        visualDensity: VisualDensity.compact,
+        constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+        splashRadius: 16,
+      ),
     );
   }
 
@@ -424,10 +437,16 @@ class _AiChatBoardState extends State<AiChatBoard> {
         widget.maxHeight ??
         (viewSize.height > 760 ? 440.0 : viewSize.height * 0.58);
     final isCompactLayout = boardMaxHeight < 360 || viewSize.shortestSide < 360;
-    final showPromptChips = !isCompactLayout && boardMaxHeight >= 380;
+    final clarification = aiProvider.clarificationState;
+    final showPromptChips =
+        clarification == null && !isCompactLayout && boardMaxHeight >= 380;
     final blurSigma = viewSize.shortestSide < 380 ? 8.0 : 14.0;
     final showAiTyping = aiProvider.isAssistantGenerating;
-    final clarification = aiProvider.clarificationState;
+    final showProviderIssue = aiProvider.hasProviderIssue;
+    final isWarningIssue =
+        aiProvider.isProviderHardFailure ||
+        aiProvider.isProviderRateLimited ||
+        aiProvider.isProviderTimeout;
     const actionButtonConstraints = BoxConstraints.tightFor(
       width: 40,
       height: 40,
@@ -439,11 +458,18 @@ class _AiChatBoardState extends State<AiChatBoard> {
             )
             : aiProvider.conversationHistory;
 
+    final clarificationKey =
+        clarification == null
+            ? null
+            : '${clarification.source}:${clarification.candidates.join('|')}';
+
     if (_lastTranscriptSize != transcriptEntries.length ||
-        _lastTypingState != showAiTyping) {
+        _lastTypingState != showAiTyping ||
+        _lastClarificationKey != clarificationKey) {
       _lastTranscriptSize = transcriptEntries.length;
       _lastTypingState = showAiTyping;
-      _queueScrollToLatest();
+      _lastClarificationKey = clarificationKey;
+      _queueScrollToLatest(bottomInset: clarificationKey == null ? 0 : 132);
     }
 
     final borderColor =
@@ -548,7 +574,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
                                 child: AiStatusPill(
                                   state: aiProvider.state,
                                   compact: true,
-                                  degraded: aiProvider.isResponseDegraded,
+                                  degraded: aiProvider.hasProviderIssue,
                                   providerStatus: aiProvider.providerStatus,
                                 ),
                               ),
@@ -595,7 +621,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        if (aiProvider.isResponseDegraded)
+                        if (showProviderIssue)
                           Container(
                             margin: const EdgeInsets.only(bottom: 10),
                             padding: const EdgeInsets.symmetric(
@@ -603,24 +629,31 @@ class _AiChatBoardState extends State<AiChatBoard> {
                               vertical: 9,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(
-                                0xFFF59E0B,
-                              ).withValues(alpha: isDarkMode ? 0.16 : 0.12),
+                              color: (isWarningIssue
+                                      ? const Color(0xFFF59E0B)
+                                      : AppColors.primary)
+                                  .withValues(alpha: isDarkMode ? 0.16 : 0.12),
                               borderRadius: BorderRadius.circular(
                                 AiAssistantTokens.fieldRadius,
                               ),
                               border: Border.all(
-                                color: const Color(
-                                  0xFFF59E0B,
-                                ).withValues(alpha: 0.35),
+                                color: (isWarningIssue
+                                        ? const Color(0xFFF59E0B)
+                                        : AppColors.primary)
+                                    .withValues(alpha: 0.35),
                               ),
                             ),
                             child: Row(
                               children: [
-                                const Icon(
-                                  Icons.warning_amber_rounded,
+                                Icon(
+                                  isWarningIssue
+                                      ? Icons.warning_amber_rounded
+                                      : Icons.sync_problem_rounded,
                                   size: 16,
-                                  color: Color(0xFFF59E0B),
+                                  color:
+                                      isWarningIssue
+                                          ? const Color(0xFFF59E0B)
+                                          : AppColors.primary,
                                 ),
                                 const SizedBox(width: 8),
                                 Expanded(

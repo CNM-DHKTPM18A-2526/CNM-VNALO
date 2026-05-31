@@ -27,8 +27,8 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
   static const double _bubbleRootHeight = 106;
   static const String _positionXPrefKey = 'vnalo_ai_bubble_x';
   static const String _positionYPrefKey = 'vnalo_ai_bubble_y';
-  static const double _trashHoverDistance = 72;
-  static const double _trashAttractionDistance = 126;
+  static const double _trashHoverDistance = 64;
+  static const double _trashAttractionDistance = 108;
   static const double _trashActivationBandFromBottom = 260;
 
   Offset _position = const Offset(20, 100);
@@ -417,8 +417,6 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
           }
           _toggleBoard(provider);
         },
-        onLongPress:
-            () => provider.onPrimaryAction(source: 'bubble_long_press'),
       ),
     );
   }
@@ -618,7 +616,17 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
       minBoardTop,
       availableHeight - boardHeight - padding.bottom - 16.0,
     );
-    final boardTop = desiredTop.clamp(minBoardTop, maxBoardTop).toDouble();
+    const boardGap = 10.0;
+    final topCandidate = _position.dy - boardHeight - boardGap;
+    final bottomCandidate = _position.dy + _bubbleRootHeight + boardGap;
+    final canPlaceAbove = topCandidate >= minBoardTop;
+    final canPlaceBelow = bottomCandidate <= maxBoardTop;
+    final boardTop =
+        canPlaceAbove
+            ? topCandidate
+            : canPlaceBelow
+            ? bottomCandidate
+            : desiredTop.clamp(minBoardTop, maxBoardTop).toDouble();
 
     final latestAssistantEntryId = _latestAssistantEntryId(aiProvider);
     final hasNewBubbleResponse =
