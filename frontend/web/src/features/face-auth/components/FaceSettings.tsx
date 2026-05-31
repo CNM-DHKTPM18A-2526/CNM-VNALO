@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { FaceCapture } from './FaceCapture'
 import { enrollFace, deleteFaceEnrollment, getFaceStatus, withTimeout } from '../face-auth.api'
 import type { FaceStatusResponse } from '../face-auth.types'
@@ -223,7 +223,7 @@ function FaceEnrollmentPanel({
 }) {
   const [blob, setBlob] = React.useState<Blob | null>(null)
   const [preview, setPreview] = React.useState<string | null>(null)
-  const [step, setStep] = React.useState<'capture' | 'confirm' | 'processing' | 'done'>('capture')
+  const [step, setStep] = React.useState<'terms' | 'capture' | 'confirm' | 'processing' | 'done'>('terms')
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null)
 
   const isMounted = React.useRef<boolean>(true)
@@ -284,6 +284,42 @@ function FaceEnrollmentPanel({
 
   return (
     <div className='face-settings face-settings-enrolling'>
+      {step === 'terms' && (
+        <>
+          <div className='face-settings-enroll-header'>
+            <h3>Điều khoản bảo mật</h3>
+            <button type='button' className='btn btn-ghost' onClick={onCancel}>
+              ← Quay lại
+            </button>
+          </div>
+          <div style={{ background: 'var(--auth-bg)', padding: '16px', borderRadius: '8px', fontSize: '14px', lineHeight: '1.6', marginBottom: '16px', textAlign: 'left', color: 'var(--auth-text-sub)' }}>
+            <p style={{ marginBottom: '8px' }}>
+              <strong>1. Mục đích thu thập:</strong> Dữ liệu khuôn mặt chỉ dùng cho xác thực và bảo mật tài khoản.
+            </p>
+            <p style={{ marginBottom: '8px' }}>
+              <strong>2. Cam kết phi thương mại:</strong> Vnalo không sử dụng dữ liệu sinh trắc học cho quảng cáo, thương mại hay chia sẻ bên thứ ba.
+            </p>
+            <p style={{ marginBottom: '8px' }}>
+              <strong>3. Lưu trữ & mã hóa:</strong> Dữ liệu được mã hóa AES-256 và lưu trữ cho đến khi bạn xóa hoặc vô hiệu hóa tài khoản.
+            </p>
+            <p style={{ marginBottom: '8px' }}>
+              <strong>4. Quyền rút lại đồng ý:</strong> Bạn có thể xóa dữ liệu bất cứ lúc nào trong Cài đặt {'>'} Bảo mật.
+            </p>
+            <p>
+              <strong>5. Tuân thủ pháp luật:</strong> Liên hệ: <strong>support@vnalo.fit</strong>
+            </p>
+          </div>
+          <div className='face-settings-actions'>
+            <button type='button' className='btn btn-primary' onClick={() => setStep('capture')}>
+              Đồng ý và Tiếp tục
+            </button>
+            <button type='button' className='btn btn-ghost' onClick={onCancel}>
+              Hủy bỏ
+            </button>
+          </div>
+        </>
+      )}
+
       {step === 'capture' && (
         <>
           <div className='face-settings-enroll-header'>

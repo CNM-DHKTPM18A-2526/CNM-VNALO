@@ -214,7 +214,6 @@ export function FaceLoginModal({ onClose, onNotEnrolled, onSuccess }: FaceLoginM
               <circle cx="12" cy="7" r="4"></circle>
             </svg>
             Đăng nhập khuôn mặt
-            <span className="auth-face-badge">thử nghiệm</span>
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button className="face-login-modal-close" onClick={onClose} aria-label="Đóng">
@@ -272,10 +271,10 @@ export function FaceLoginModal({ onClose, onNotEnrolled, onSuccess }: FaceLoginM
 
           {step === 'camera' && (
             <div className="face-login-camera">
-              <div className="face-login-camera-wrapper">
-                <video ref={videoRef} className="face-login-video" playsInline muted autoPlay />
-                <div className="face-login-camera-overlay">
-                  <div className="face-login-camera-guide" />
+              <div className="face-login-camera-wrapper" style={{ background: '#000', borderRadius: '16px' }}>
+                <video ref={videoRef} className="face-login-video" style={{ transform: 'scaleX(-1)' }} playsInline muted autoPlay />
+                <div className="face-capture-guide-mask">
+                  <div className="face-capture-scanning-line" />
                 </div>
               </div>
               {cameraError ? (
