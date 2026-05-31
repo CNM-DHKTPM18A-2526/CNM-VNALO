@@ -1907,7 +1907,8 @@
 }
 
 [data-theme='light'] .story-preview-caption {
-  background: rgba(255,255,255,0.9);
+  /* remove heavy white box in light theme so caption appears transparent */
+  background: transparent;
   color: var(--color-text-primary);
   text-shadow: none;
 }
