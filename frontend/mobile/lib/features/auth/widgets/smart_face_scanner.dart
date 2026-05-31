@@ -193,6 +193,28 @@ class _SmartFaceScannerState extends State<SmartFaceScanner> with SingleTickerPr
       }
     }
 
+    // Check face size — must be large enough for quality embedding
+    final box = face.boundingBox;
+    final faceWidthRatio = box.width / imgWidth;
+    final faceHeightRatio = box.height / imgHeight;
+
+    if (faceWidthRatio < 0.2 || faceHeightRatio < 0.2) {
+      _updateState('Tiến lại gần hơn', Colors.orange, 0);
+      return;
+    }
+    if (faceWidthRatio > 0.85) {
+      _updateState('Lùi ra xa hơn một chút', Colors.orange, 0);
+      return;
+    }
+
+    // Check face is roughly centered (within center 60% of frame)
+    final faceCenterX = (box.left + box.right) / 2 / imgWidth;
+    final faceCenterY = (box.top + box.bottom) / 2 / imgHeight;
+    if ((faceCenterX - 0.5).abs() > 0.25 || (faceCenterY - 0.5).abs() > 0.25) {
+      _updateState('Đưa mặt vào giữa khung', Colors.orange, 0);
+      return;
+    }
+
     // Face is good!
     _updateState('Giữ nguyên...', Colors.green, _validFramesCount + 1);
 

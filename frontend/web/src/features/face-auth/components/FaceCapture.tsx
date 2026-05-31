@@ -137,17 +137,27 @@ export function FaceCapture({
               setIsValidFace(false)
               validFramesRef.current = 0
             } else {
-              setHintText('Giữ nguyên...')
-              setBorderColor('#22c55e')
-              setIsValidFace(true)
-              validFramesRef.current += 1
+              // Check face is roughly centered (within central 60% of frame)
+              const faceCenterX = (box.originX + box.width / 2) / video.videoWidth
+              const faceCenterY = (box.originY + box.height / 2) / video.videoHeight
+              if (Math.abs(faceCenterX - 0.5) > 0.25 || Math.abs(faceCenterY - 0.5) > 0.25) {
+                setHintText('Đưa mặt vào giữa khung')
+                setBorderColor('orange')
+                setIsValidFace(false)
+                validFramesRef.current = 0
+              } else {
+                // All checks passed
+                setHintText('Giữ nguyên...')
+                setBorderColor('#22c55e')
+                setIsValidFace(true)
+                validFramesRef.current += 1
 
-              if (validFramesRef.current >= REQUIRED_VALID_FRAMES) {
-                hasAutoCapturedRef.current = true
-                isProcessingRef.current = false
-                // Auto-capture
-                void doAutoCapture()
-                return // stop the loop
+                if (validFramesRef.current >= REQUIRED_VALID_FRAMES) {
+                  hasAutoCapturedRef.current = true
+                  isProcessingRef.current = false
+                  void doAutoCapture()
+                  return // stop the loop
+                }
               }
             }
           }
