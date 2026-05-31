@@ -74,15 +74,32 @@
 }
 
 .sidebar-profile-link {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 999px;
   padding: 0;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  transition: all 0.2s ease;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
   overflow: hidden;
 }
 
 .sidebar-profile-link:hover {
-  border-color: #fff;
+  border-color: rgba(255, 255, 255, 0.4);
+  background-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
+  transform: translateY(-1px) scale(1.03);
+}
+
+.sidebar-profile-link:active {
+  transform: translateY(0) scale(0.99);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+}
+
+.sidebar-profile-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #fff 22%, transparent), 0 8px 18px rgba(0, 0, 0, 0.16);
 }
 
 .sidebar-nav {
@@ -284,6 +301,15 @@
   font-weight: 700;
   overflow: hidden;
   position: relative;
+}
+
+/* Default group avatar (placeholder) should not show outer ring and shouldn't clip inner image */
+.user-avatar.user-avatar-group-default {
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+  border-radius: 8px !important;
+  padding: 0 !important;
 }
 
 .avatar-sm {
@@ -594,6 +620,8 @@
 /* Group avatar collage styling */
 .group-avatar-collage {
   background: var(--surface) !important;
+  /* allow inner images to overflow so they aren't clipped by outer circular masks */
+  overflow: visible !important;
 }
 .group-avatar-collage img,
 .group-avatar-collage div {

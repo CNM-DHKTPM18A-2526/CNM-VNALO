@@ -188,7 +188,6 @@ export function StoryEditor({
       <div className="story-editor-body">
         <div className="story-editor-left">
           <div className="story-editor-card">
-            <div className="story-editor-section-title">Ảnh/Video</div>
             {draft.mode === 'media' && draft.mediaUrl ? (
               <>
                 <div className="story-overlay-editor-block">
@@ -251,7 +250,6 @@ export function StoryEditor({
 
         <div className="story-editor-right">
           <div className="story-editor-card story-editor-crop-card">
-            <div className="story-editor-section-title">{draft.mode === 'text' ? 'Preview' : 'Crop ảnh'}</div>
             {draft.mode === 'text' ? (
               <div className="story-preview-section story-preview-section-text">
                 <div className="story-preview-stage story-preview-stage-text">
@@ -331,7 +329,7 @@ async function renderTextStoryBlob(draft: StoryDraft): Promise<Blob> {
 
   context.textAlign = draft.textAlign;
   context.textBaseline = 'middle';
-  context.fillStyle = draft.textColor || '#ffffff';
+  context.fillStyle = draft.textColor || '#000000';
   context.font = `${draft.fontWeight} ${draft.fontSize * 2}px Inter, system-ui, sans-serif`;
 
   const lines = wrapCanvasText(context, draft.caption.trim(), STORY_WIDTH * 0.66);
@@ -433,7 +431,7 @@ function drawCaption(
 ) {
   context.textAlign = draft.textAlign;
   context.textBaseline = 'middle';
-  context.fillStyle = draft.textColor || '#ffffff';
+  context.fillStyle = draft.textColor || '#000000';
   context.font = `${draft.fontWeight} ${draft.fontSize * 2}px Inter, system-ui, sans-serif`;
 
   const lines = wrapCanvasText(context, draft.caption.trim(), STORY_WIDTH * 0.66);

@@ -84,6 +84,32 @@ const normalizeMediaUrl = (url: string) => {
 
 export const MEDIA_API_URL = normalizeMediaUrl(rawMediaUrl);
 
+const normalizeAiApiUrl = (rawUrl: string) => {
+  let cleaned = rawUrl.trim().replace(/\/+$/, '');
+  if (!cleaned) {
+    return `${API_BASE_URL}/ai`;
+  }
+
+  if (cleaned.endsWith('/api/v1/ai')) {
+    return cleaned;
+  }
+
+  if (cleaned.endsWith('/api/v1')) {
+    return `${cleaned}/ai`;
+  }
+
+  if (/\/api\/v\d+/.test(cleaned)) {
+    cleaned = cleaned.replace(/\/api\/v\d+.*$/, '/api/v1/ai');
+    return cleaned;
+  }
+
+  return `${cleaned}/api/v1/ai`;
+};
+
+export const AI_API_URL = normalizeAiApiUrl(
+  forceHttps(import.meta.env.VITE_AI_API_URL ?? import.meta.env.VITE_AI_URL ?? `${API_BASE_URL}/ai`)
+);
+
 export const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL ?? (
   typeof window !== 'undefined'
     ? window.location.origin
@@ -107,7 +133,7 @@ export const mediaApi = axios.create({
 });
 
 export const aiApi = axios.create({
-  baseURL: `${API_BASE_URL}/ai`,
+  baseURL: AI_API_URL,
 });
 
 api.interceptors.request.use(req => {

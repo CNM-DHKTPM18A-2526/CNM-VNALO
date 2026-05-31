@@ -469,10 +469,10 @@
 .story-color-input {
   width: 100%;
   height: 48px;
-  padding: 6px;
-  border: 1px solid rgba(148, 163, 184, 0.22);
+  padding: 0;
+  border: none;
   border-radius: 14px;
-  background: rgba(2, 6, 23, 0.72);
+  background: transparent;
   cursor: pointer;
 }
 
@@ -1121,12 +1121,13 @@
 }
 
 .story-viewer-reaction-badge {
-  padding: 4px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 800;
+  padding: 0;
+  border-radius: 0;
+  font-size: 14px;
+  font-weight: 400;
   color: #ff4d6d;
-  background: rgba(255, 77, 109, 0.14);
+  background: transparent;
+  line-height: 1;
 }
 
 .story-viewer-body {
@@ -1268,6 +1269,14 @@
   color: #fff;
   cursor: pointer;
   border: 1px solid rgba(255,255,255,0.06);
+  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.story-btn-reaction:hover,
+.story-btn-reaction:focus-visible {
+  transform: translateY(-1px) scale(1.05);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .story-btn-reaction.active {
@@ -1479,7 +1488,6 @@
   color: var(--color-text-primary);
 }
 
-.story-viewer-time,
 .story-viewer-empty {
   color: var(--color-text-secondary);
   font-size: 12px;
@@ -1492,14 +1500,14 @@
 
 .story-viewer-reaction-badge {
   margin-left: auto;
-  background: var(--danger);
-  color: #fff;
-  width: 36px;
-  height: 36px;
-  display: grid;
+  background: transparent;
+  color: #ff4d6d;
+  width: auto;
+  height: auto;
+  display: inline-flex;
   place-items: center;
-  border-radius: 999px;
-  font-size: 14px;
+  border-radius: 0;
+  font-size: 18px;
 }
 
 @media (max-width: 1100px) {
@@ -1619,6 +1627,14 @@
   color: var(--color-text-primary);
 }
 
+/* VNALO logo color for light mode: black bold, no background */
+[data-theme='light'] .stories-sidebar-logo {
+  color: #000;
+  font-weight: 800;
+  background: transparent;
+  box-shadow: none;
+}
+
 [data-theme='light'] .story-caption-input,
 [data-theme='light'] .story-text-input {
   background: var(--input-bg);
@@ -1727,7 +1743,8 @@
 
 [data-theme='light'] .stories-sidebar-logo {
   background: transparent;
-  color: #fff;
+  color: #000;
+  font-weight: 800;
   box-shadow: none;
 }
 
@@ -1751,14 +1768,14 @@
 }
 
 [data-theme='light'] .story-create-panel {
-  background: var(--surface);
-  border: 1px solid var(--color-border);
+  background: transparent;
+  border: none;
   color: var(--color-text-primary);
-  box-shadow: var(--shadow-soft);
+  box-shadow: none;
 }
 
 [data-theme='light'] .story-create-panel:hover {
-  background: var(--surface-hover);
+  background: rgba(255, 255, 255, 0.35);
 }
 
 [data-theme='light'] .story-create-panel-avatar {

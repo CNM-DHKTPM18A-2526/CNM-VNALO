@@ -347,6 +347,7 @@ export const IncomingCallBanner: React.FC<IncomingCallBannerProps> = ({
     let gainNode: GainNode | null = null
     let loopTimeout: ReturnType<typeof setTimeout> | null = null
     let audioBuffer: AudioBuffer | null = null
+    let activeNotification: Notification | null = null
 
     // ── Helper: play one ringtone burst from the pre-generated buffer ──
     const playRingtone = () => {
@@ -370,7 +371,7 @@ export const IncomingCallBanner: React.FC<IncomingCallBannerProps> = ({
     const showBrowserNotification = () => {
       if (typeof Notification === 'undefined') return
       if (Notification.permission === 'granted') {
-        new Notification(
+        activeNotification = new Notification(
           isAudioOnly ? 'Cuộc gọi thoại đến' : 'Cuộc gọi video đến',
           {
             body: displayName,
@@ -379,6 +380,14 @@ export const IncomingCallBanner: React.FC<IncomingCallBannerProps> = ({
             silent: true, // We play sound ourselves via AudioContext
           },
         )
+        activeNotification.onclick = () => {
+          try {
+            window.focus()
+            activeNotification?.close()
+          } catch {
+            // no-op
+          }
+        }
       } else if (Notification.permission === 'default') {
         Notification.requestPermission()
       }
@@ -457,6 +466,7 @@ export const IncomingCallBanner: React.FC<IncomingCallBannerProps> = ({
 
     return () => {
       if (loopTimeout !== null) clearTimeout(loopTimeout)
+      try { activeNotification?.close() } catch { /* ignore */ }
       try { audioCtx?.close(); } catch { /* ignore */ }
       document.removeEventListener('visibilitychange', onVisibilityChange)
     }

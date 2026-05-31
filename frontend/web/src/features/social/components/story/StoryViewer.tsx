@@ -87,16 +87,40 @@ export function StoryViewer({
     }
   }, [startStoryId, stories]);
 
-  useEffect(() => {
-    // Only update route/parent when the active story differs from the incoming startStoryId
-    if (!story) return;
-    if (story.storyId === startStoryId) return;
+  // Keep track of the last startStoryId we observed so we can detect when the
+  // parent/route initiated a change (clicking sidebar) vs when the viewer
+  // itself changed the active story (next/prev or auto-advance). If the
+  // parent changed `startStoryId`, skip navigating back to avoid a toggle loop.
+  const prevStartRef = useRef<string | null>(startStoryId ?? null);
 
+  useEffect(() => {
+    if (!story) return;
+
+    // If the active story already matches the requested startStoryId, update
+    // our prevStartRef and do nothing.
+    if (story.storyId === startStoryId) {
+      prevStartRef.current = startStoryId;
+      return;
+    }
+
+    // If the startStoryId prop recently changed (parent/route initiated the
+    // navigation) then skip navigating here — the parent will control the
+    // route. We detect that by comparing the incoming startStoryId with the
+    // last observed value.
+    if (startStoryId && startStoryId !== prevStartRef.current) {
+      prevStartRef.current = startStoryId;
+      return;
+    }
+
+    // Otherwise, this change was initiated inside the viewer (next/prev/auto),
+    // so inform the parent or update the route.
     if (onSelectStory) {
       onSelectStory(story.storyId);
     } else {
       navigate(`/stories/${story.storyId}`, { replace: false });
     }
+
+    prevStartRef.current = story.storyId;
   }, [onSelectStory, story?.storyId, startStoryId, navigate]);
 
   const canDelete = useMemo(() => Boolean(story && currentUserId && story.authorId === currentUserId), [story, currentUserId]);
@@ -117,6 +141,23 @@ export function StoryViewer({
   useEffect(() => {
     if (!story || !token) return;
     storyStore.setActiveStory(story.storyId);
+    if (currentUserId) {
+      const existing = storyStore.getState().viewersByStoryId[story.storyId] ?? [];
+      if (!existing.some(viewer => viewer.viewerId === currentUserId)) {
+        const optimisticViewer: StoryViewerEntry = {
+          viewId: `${story.storyId}:${currentUserId}:local`,
+          storyId: story.storyId,
+          viewerId: currentUserId,
+          viewedAt: new Date().toISOString(),
+        };
+        storyStore.setViewers(story.storyId, [optimisticViewer, ...existing]);
+      }
+      try {
+        localStorage.setItem(`story:viewed:${currentUserId}:${story.storyId}`, '1');
+      } catch {
+        // ignore storage errors
+      }
+    }
     void socialApi.viewStory(token, story.storyId).catch(() => null);
     void socialApi.getStoryViews(token, story.storyId)
       .then(list => {

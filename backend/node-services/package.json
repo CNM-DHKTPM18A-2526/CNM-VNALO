@@ -87,6 +87,12 @@
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
+    "transformIgnorePatterns": [
+      "node_modules/(?!uuid/)"
+    ],
+    "moduleNameMapper": {
+      "^uuid$": "uuid"
+    },
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],
@@ -94,6 +100,17 @@
     "testEnvironment": "node",
     "roots": [
       "<rootDir>/apps/"
+    ],
+    "globals": {
+      "ts-jest": {
+        "useESM": true,
+        "tsconfig": {
+          "module": "esnext"
+        }
+      }
+    },
+    "extensionsToTreatAsEsm": [
+      ".ts"
     ]
   }
 }
