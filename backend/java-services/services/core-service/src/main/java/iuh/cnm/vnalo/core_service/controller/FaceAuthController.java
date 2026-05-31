@@ -154,6 +154,13 @@ public class FaceAuthController {
         double livenessThreshold = faceAuthProperties.getLivenessThreshold().doubleValue();
         if (livenessScore < livenessThreshold) {
             log.warn("Liveness check failed for userId={}. Score: {}", userId, livenessScore);
+            
+            verificationService.logSpoofingAttempt(
+                    userId, livenessScore, getClientIp(request),
+                    request.getHeader("X-Device-Id"), request.getHeader("X-App-Version")
+            );
+            rateLimitService.recordVerifyFailure(userId);
+
             FaceVerifyResponse response = FaceVerifyResponse.builder()
                     .verified(false)
                     .decision("SPOOF_DETECTED")

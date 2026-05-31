@@ -77,6 +77,29 @@ public class FaceVerificationService {
     }
 
     /**
+     * Logs a spoofing attempt when liveness check fails.
+     */
+    @Transactional
+    public void logSpoofingAttempt(UUID userId, double livenessScore, String ipAddress, String deviceId, String appVersion) {
+        double threshold = faceAuthProperties.getLivenessThreshold().doubleValue();
+        FaceVerificationLog auditLog = FaceVerificationLog.builder()
+                .userId(userId)
+                .verified(false)
+                .confidence(BigDecimal.ZERO)
+                .livenessScore(BigDecimal.valueOf(livenessScore))
+                .threshold(BigDecimal.valueOf(threshold))
+                .ipAddress(ipAddress)
+                .deviceId(deviceId)
+                .appVersion(appVersion)
+                .inferenceTimeMs(0)
+                .createdAt(Instant.now())
+                .build();
+        logRepository.save(auditLog);
+        log.warn("Spoofing attempt logged for userId={}: livenessScore={}, threshold={}",
+                userId, String.format("%.4f", livenessScore), String.format("%.2f", threshold));
+    }
+
+    /**
      * Computes cosine similarity between two vectors.
      * Since embeddings are L2-normalized, dot product equals cosine similarity.
      */
