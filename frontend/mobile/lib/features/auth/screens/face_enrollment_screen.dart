@@ -139,7 +139,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen> {
         ),
       ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: _loadingStatus
               ? const Center(child: CircularProgressIndicator())

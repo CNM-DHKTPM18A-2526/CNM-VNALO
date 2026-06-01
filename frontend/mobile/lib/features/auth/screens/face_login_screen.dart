@@ -159,7 +159,7 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
         onCapture: _captureAndVerify,
         onCancel: () => setState(() => _isScanning = false),
       ) : SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
