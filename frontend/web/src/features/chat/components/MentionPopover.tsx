@@ -79,7 +79,7 @@ export const MentionPopover: React.FC<MentionPopoverProps> = ({
             onMouseEnter={() => setSelectedIndex(index)}
           >
             { (option as any).icon === 'at' ? (
-              <div className="w-7 h-7 min-w-7 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-sm">
+              <div className="mention-avatar-fixed mention-avatar-at">
                 @
               </div>
             ) : (
@@ -87,6 +87,7 @@ export const MentionPopover: React.FC<MentionPopoverProps> = ({
                 name={option.displayName}
                 imageUrl={(option as any).avatarUrl}
                 size="sm"
+                className="mention-avatar-fixed"
               />
             )}
             <div className="flex flex-col min-w-0">

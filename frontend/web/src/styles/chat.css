@@ -5141,3 +5141,41 @@
     transform: none;
   }
 }
+
+/* Fixed AI assistant avatar and mention popover avatar sizing */
+.user-avatar-ai {
+  background: color-mix(in srgb, var(--primary-soft) 78%, var(--surface));
+  color: var(--primary);
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border));
+}
+
+.mention-avatar-fixed,
+.mention-avatar-fixed.user-avatar,
+.mention-avatar-at {
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  max-width: 32px !important;
+  min-height: 32px !important;
+  max-height: 32px !important;
+  border-radius: 999px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 0 0 32px !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+.mention-avatar-at {
+  background: var(--primary);
+  color: white;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.mention-avatar-fixed .user-avatar-image {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}

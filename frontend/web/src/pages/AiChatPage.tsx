@@ -152,6 +152,7 @@ const STORAGE_KEY = 'vnalo_ai_chat_history'
 const LEGACY_STORAGE_KEY = STORAGE_KEY
 const DRAFT_KEY_PREFIX = 'vnalo_ai_web_compose_draft:'
 const PENDING_PROMPT_KEY = 'vnalo_ai_web_pending_prompt'
+const AI_ASSISTANT_META_KEY_PREFIX = 'vnalo_ai_chat_meta:'
 const MAX_API_HISTORY = 20
 
 const MOJIBAKE_CODEPOINTS = [0x00C3, 0x00C4, 0x00C2, 0x00C6, 0x00C5, 0x00D0]
@@ -205,6 +206,11 @@ function normalizeIncomingText(value: string) {
   return best
 }
 
+
+function writeAiAssistantMeta(userId: string | number | undefined | null, meta: { preview: string; timestamp: string }) {
+  if (userId === undefined || userId === null || `${userId}`.trim().length === 0) return
+  localStorage.setItem(`${AI_ASSISTANT_META_KEY_PREFIX}${userId}`, JSON.stringify(meta))
+}
 function buildAiStorageKey(userId?: string | number | null) {
   if (userId === undefined || userId === null || `${userId}`.trim().length === 0) {
     return null
@@ -637,7 +643,9 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
     setMessages(normalized)
     const latestActivity = [...normalized].reverse().find((message) => message.content.trim())
     if (latestActivity && latestActivity !== INITIAL_ASSISTANT_MESSAGE) {
-      onActivity?.({ preview: getAiMessagePreview(latestActivity), timestamp: new Date().toISOString() })
+      const activity = { preview: getAiMessagePreview(latestActivity), timestamp: new Date().toISOString() }
+      writeAiAssistantMeta(user?.id, activity)
+      onActivity?.(activity)
     }
     if (!historyStorageKey) {
       return
@@ -664,7 +672,9 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
         localStorage.setItem(historyStorageKey, JSON.stringify(nextMessages))
         localStorage.removeItem(LEGACY_STORAGE_KEY)
       }
-      onActivity?.({ preview: getAiMessagePreview(feedbackMessage), timestamp: new Date().toISOString() })
+      const activity = { preview: getAiMessagePreview(feedbackMessage), timestamp: new Date().toISOString() }
+      writeAiAssistantMeta(user?.id, activity)
+      onActivity?.(activity)
       return nextMessages
     })
   }
@@ -1079,7 +1089,7 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
                 <span className={runtimeState.badgeClassName} />
                 <span>{runtimeState.label}</span>
               </div>
-              <span className='ai-header-helper'>{runtimeState.helper}</span>
+              <span className='ai-header-helper'>Đang hoạt động</span>
             </div>
           </div>
         </header>
