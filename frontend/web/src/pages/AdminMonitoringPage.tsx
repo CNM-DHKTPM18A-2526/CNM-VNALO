@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 
 import { API_BASE_URL, AI_API_URL, MEDIA_API_URL, MESSAGE_API_URL } from '../api.client'
 import { useAuth } from '../features/auth/useAuth'
@@ -6,6 +6,7 @@ import { useLanguage } from '../shared/i18n/LanguageContext'
 import '../styles/admin-monitoring.css'
 
 type MonitorStatus = 'ok' | 'warning' | 'error'
+type EventSeverity = 'info' | 'warning' | 'error'
 
 type ServiceProbe = {
   name: string
@@ -23,6 +24,7 @@ type SessionAudit = {
   deviceName?: string
   deviceIdMasked?: string
   detail?: string
+  severity?: EventSeverity
   createdAt?: string
 }
 
@@ -80,6 +82,14 @@ type MonitoringSummary = {
 }
 
 const timeoutMs = 4500
+const rangeOptions = [
+  { value: 6, label: '6h' },
+  { value: 24, label: '24h' },
+  { value: 72, label: '72h' },
+  { value: 168, label: '7d' },
+]
+const eventTypeOptions = ['ALL', 'LOGIN_SUCCESS', 'LOGIN_FAILED', 'QR_LOGIN_APPROVED', 'SESSION_REVOKED_LOGOUT', 'SESSION_REVOKED_LOGOUT_ALL']
+const platformOptions = ['ALL', 'WEB', 'ANDROID', 'IOS']
 
 async function fetchWithTimeout(url: string, token?: string | null) {
   const controller = new AbortController()
@@ -119,6 +129,25 @@ function resolveApiError(response: Response, fallback: string) {
   return `${fallback} (${response.status})`
 }
 
+function buildQuery(filters: { windowHours: number; limit: number; eventType: string; platform: string }) {
+  const params = new URLSearchParams({
+    windowHours: String(filters.windowHours),
+    limit: String(filters.limit),
+  })
+  if (filters.eventType !== 'ALL') params.set('eventType', filters.eventType)
+  if (filters.platform !== 'ALL') params.set('platform', filters.platform)
+  return params.toString()
+}
+
+function formatWindowLabel(hours: number, language: string) {
+  if (language === 'vi') {
+    if (hours === 168) return '7 ngày gần nhất'
+    return `${hours} giờ gần nhất`
+  }
+  if (hours === 168) return 'Last 7 days'
+  return `Last ${hours} hours`
+}
+
 export function AdminMonitoringPage() {
   const { language } = useLanguage()
   const { user, accessToken } = useAuth()
@@ -127,84 +156,101 @@ export function AdminMonitoringPage() {
     .map((email: string) => email.trim().toLowerCase())
     .filter(Boolean)
   const hasUiHintAccess = Boolean(user?.email && adminMonitoringEmails.includes(user.email.toLowerCase()))
+
   const [services, setServices] = React.useState<ServiceProbe[]>([])
   const [summary, setSummary] = React.useState<MonitoringSummary | null>(null)
   const [audits, setAudits] = React.useState<SessionAudit[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [lastUpdated, setLastUpdated] = React.useState<Date | null>(null)
   const [monitoringError, setMonitoringError] = React.useState<string | null>(null)
+  const [windowHours, setWindowHours] = React.useState(24)
+  const [selectedEventType, setSelectedEventType] = React.useState('ALL')
+  const [selectedPlatform, setSelectedPlatform] = React.useState('ALL')
+  const [autoRefresh, setAutoRefresh] = React.useState(true)
+
   const labels = language === 'vi'
     ? {
         title: 'Giám sát vận hành',
-        subtitle: 'Theo dõi trạng thái dịch vụ, sự kiện phiên đăng nhập và rủi ro vận hành mà không hiển thị dữ liệu nhạy cảm.',
-        accessNote: 'Trang này yêu cầu email nằm trong allowlist admin ở backend. UI chỉ là gợi ý, backend vẫn là lớp kiểm soát chính.',
+        subtitle: 'Theo dõi sức khỏe dịch vụ, hành vi đăng nhập và tín hiệu rủi ro mà không lộ dữ liệu nhạy cảm.',
+        accessNote: 'Trang này yêu cầu email nằm trong allowlist admin ở backend. UI chỉ là gợi ý; backend mới là lớp kiểm soát thực sự.',
         refresh: 'Làm mới',
+        refreshing: 'Đang tải...',
         serviceHealth: 'Trạng thái dịch vụ',
-        sessionAudits: 'Sự kiện phiên gần đây',
-        summary: 'Tổng quan 24 giờ',
+        sessionAudits: 'Sự kiện gần đây',
+        summary: 'Tổng quan',
         dataGuard: 'Nguyên tắc dữ liệu an toàn',
-        noAudits: 'Chưa có sự kiện phiên hoặc API chưa trả dữ liệu.',
+        healthyServices: 'Dịch vụ khỏe mạnh',
+        needsAttention: 'Cần chú ý',
+        sessionEvents: 'Sự kiện đang hiển thị',
         updated: 'Cập nhật',
-        healthyServices: 'Dịch vụ OK',
-        needsAttention: 'Cần kiểm tra',
-        sessionEvents: 'Sự kiện phiên',
-        totalAccounts: 'Tổng tài khoản',
-        failedLoginCount: 'Failed login count',
-        failedLoginDetail: 'Tổng failed_login_count hiện tại',
-        qrApproved: 'QR approved 24h',
-        qrApprovedDetail: 'Lượt QR approval gần đây',
+        noAudits: 'Chưa có sự kiện phù hợp với bộ lọc hiện tại.',
+        totalAccounts: 'Tài khoản toàn hệ thống',
+        failedLoginCount: 'Tổng số lần đăng nhập lỗi',
+        failedLoginDetail: 'Theo dõi rủi ro brute-force và lockout',
+        qrApproved: 'QR được duyệt',
+        qrApprovedDetail: 'Số phiên QR duyệt trong khung thời gian đã chọn',
+        consentFresh: 'Consent mới',
         activeAccounts: 'Tài khoản hoạt động',
-        activeRefreshTokens: 'Refresh token còn hiệu lực',
-        loginFailures: 'Login fail 24h',
-        otpVerified: 'OTP xác thực 24h',
-        consentGranted: 'Consent đã ghi nhận',
-        consentFresh: 'Consent 24h',
+        activeRefreshTokens: 'Refresh token hoạt động',
+        loginFailures: 'Login lỗi',
+        otpVerified: 'OTP xác thực',
+        consentGranted: 'Consent đã cấp',
+        filters: 'Bộ lọc',
+        range: 'Khung thời gian',
+        eventType: 'Loại sự kiện',
+        platform: 'Nền tảng',
+        autoRefresh: 'Tự làm mới 30s',
+        accessMode: 'Chế độ truy cập',
+        keySignals: 'Tín hiệu chính',
+        serviceSummary: 'Tóm tắt dịch vụ',
+        eventSummary: 'Tóm tắt sự kiện',
       }
     : {
         title: 'Operations Monitoring',
-        subtitle: 'Monitor service status, session events, and operational risks without exposing sensitive user data.',
-        accessNote: 'This page requires backend admin allowlist access. The UI hint is not the security boundary; the backend is authoritative.',
+        subtitle: 'Track service health, sign-in behavior, and operational risk signals without exposing sensitive data.',
+        accessNote: 'This page requires backend allowlist access. The UI hint is not a security boundary; the backend remains authoritative.',
         refresh: 'Refresh',
+        refreshing: 'Refreshing...',
         serviceHealth: 'Service health',
-        sessionAudits: 'Recent session events',
-        summary: '24-hour summary',
+        sessionAudits: 'Recent events',
+        summary: 'Overview',
         dataGuard: 'Safe data guardrails',
-        noAudits: 'No session events yet or the API returned no data.',
-        updated: 'Updated',
         healthyServices: 'Healthy services',
         needsAttention: 'Needs attention',
-        sessionEvents: 'Session events',
+        sessionEvents: 'Displayed events',
+        updated: 'Updated',
+        noAudits: 'No events match the current filters.',
         totalAccounts: 'Total accounts',
-        failedLoginCount: 'Failed login count',
-        failedLoginDetail: 'Current accumulated failed_login_count',
-        qrApproved: 'QR approved 24h',
-        qrApprovedDetail: 'Recent QR approvals',
+        failedLoginCount: 'Failed login attempts',
+        failedLoginDetail: 'Watch brute-force and lockout pressure',
+        qrApproved: 'QR approvals',
+        qrApprovedDetail: 'QR sessions approved in the selected window',
+        consentFresh: 'Fresh consent',
         activeAccounts: 'Active accounts',
         activeRefreshTokens: 'Active refresh tokens',
-        loginFailures: 'Login failures 24h',
-        otpVerified: 'OTP verified 24h',
-        consentGranted: 'Recorded consents',
-        consentFresh: 'Consent 24h',
+        loginFailures: 'Failed logins',
+        otpVerified: 'Verified OTPs',
+        consentGranted: 'Granted consent',
+        filters: 'Filters',
+        range: 'Time window',
+        eventType: 'Event type',
+        platform: 'Platform',
+        autoRefresh: 'Auto-refresh every 30s',
+        accessMode: 'Access mode',
+        keySignals: 'Key signals',
+        serviceSummary: 'Service summary',
+        eventSummary: 'Event summary',
       }
 
   const load = React.useCallback(async () => {
-    if (!accessToken) {
-      setServices([])
-      setSummary(null)
-      setAudits([])
-      setLastUpdated(null)
-      setMonitoringError(null)
-      setIsLoading(false)
-      return
-    }
-
     setIsLoading(true)
     setMonitoringError(null)
-    const probes = [
-      { name: 'core-service', url: `${API_BASE_URL}/actuator/health` },
-      { name: 'message-service', url: `${MESSAGE_API_URL}/health` },
-      { name: 'media-service', url: MEDIA_API_URL.replace(/\/media\/?$/, '/media/actuator/health') },
-      { name: 'ai-service', url: `${AI_API_URL}/actuator/health` },
+
+    const probes: ServiceProbe[] = [
+      { name: 'core-service', url: `${API_BASE_URL}/actuator/health`, status: 'warning', detail: 'pending' },
+      { name: 'message-service', url: `${MESSAGE_API_URL}/health`, status: 'warning', detail: 'pending' },
+      { name: 'media-service', url: `${MEDIA_API_URL}/health`, status: 'warning', detail: 'pending' },
+      { name: 'ai-service', url: `${AI_API_URL}/health`, status: 'warning', detail: 'pending' },
     ]
 
     const serviceResults = await Promise.all(
@@ -220,9 +266,15 @@ export function AdminMonitoringPage() {
     )
 
     try {
+      const query = buildQuery({
+        windowHours,
+        limit: 20,
+        eventType: selectedEventType,
+        platform: selectedPlatform,
+      })
       const [summaryResponse, eventsResponse] = await Promise.all([
-        fetchWithTimeout(`${API_BASE_URL}/admin/monitoring/summary`, accessToken),
-        fetchWithTimeout(`${API_BASE_URL}/admin/monitoring/events?limit=12`, accessToken),
+        fetchWithTimeout(`${API_BASE_URL}/admin/monitoring/summary?windowHours=${windowHours}`, accessToken),
+        fetchWithTimeout(`${API_BASE_URL}/admin/monitoring/events?${query}`, accessToken),
       ])
       if (!summaryResponse.ok) throw new Error(resolveApiError(summaryResponse, 'Monitoring summary failed'))
       if (!eventsResponse.ok) throw new Error(resolveApiError(eventsResponse, 'Monitoring events failed'))
@@ -240,22 +292,32 @@ export function AdminMonitoringPage() {
     setServices(serviceResults)
     setLastUpdated(new Date())
     setIsLoading(false)
-  }, [accessToken])
+  }, [accessToken, selectedEventType, selectedPlatform, windowHours])
 
   React.useEffect(() => {
     void load()
   }, [load])
 
+  React.useEffect(() => {
+    if (!autoRefresh) return undefined
+    const timer = window.setInterval(() => {
+      void load()
+    }, 30000)
+    return () => window.clearInterval(timer)
+  }, [autoRefresh, load])
+
   const okCount = services.filter((service) => service.status === 'ok').length
   const issueCount = services.filter((service) => service.status !== 'ok').length
+  const warningCount = audits.filter((audit) => audit.severity === 'warning').length
+  const errorCount = audits.filter((audit) => audit.severity === 'error').length
   const summaryCards = [
-    { label: labels.activeAccounts, value: summary?.accounts?.active ?? 0 },
-    { label: labels.activeRefreshTokens, value: summary?.sessions?.activeRefreshTokens ?? 0 },
-    { label: 'AI messages 24h', value: summary?.ai?.messagesLast24Hours ?? 0 },
-    { label: labels.loginFailures, value: summary?.audits?.loginFailureLast24Hours ?? 0 },
-    { label: labels.otpVerified, value: summary?.otp?.verifiedLast24Hours ?? 0 },
-    { label: labels.consentGranted, value: summary?.consent?.grantedTotal ?? 0 },
-    { label: 'QR pending', value: summary?.qr?.pendingNow ?? 0 },
+    { label: labels.activeAccounts, value: summary?.accounts?.active ?? 0, tone: 'neutral' },
+    { label: labels.activeRefreshTokens, value: summary?.sessions?.activeRefreshTokens ?? 0, tone: 'neutral' },
+    { label: 'AI messages', value: summary?.ai?.messagesLast24Hours ?? 0, tone: 'neutral' },
+    { label: labels.loginFailures, value: summary?.audits?.loginFailureLast24Hours ?? 0, tone: 'danger' },
+    { label: labels.otpVerified, value: summary?.otp?.verifiedLast24Hours ?? 0, tone: 'neutral' },
+    { label: labels.consentGranted, value: summary?.consent?.grantedTotal ?? 0, tone: 'neutral' },
+    { label: 'QR pending', value: summary?.qr?.pendingNow ?? 0, tone: 'warning' },
   ]
 
   return (
@@ -266,12 +328,44 @@ export function AdminMonitoringPage() {
           <h1>{labels.title}</h1>
           <p>{labels.subtitle}</p>
         </div>
-        <button type='button' onClick={() => void load()} disabled={isLoading}>{isLoading ? '...' : labels.refresh}</button>
+        <div className='admin-monitoring-hero-actions'>
+          <label className='admin-monitoring-toggle'>
+            <input type='checkbox' checked={autoRefresh} onChange={(event) => setAutoRefresh(event.target.checked)} />
+            <span>{labels.autoRefresh}</span>
+          </label>
+          <button type='button' onClick={() => void load()} disabled={isLoading}>{isLoading ? labels.refreshing : labels.refresh}</button>
+        </div>
       </header>
 
       {!hasUiHintAccess ? <div className='admin-monitoring-note admin-monitoring-denied'>{labels.accessNote}</div> : null}
       {monitoringError ? <div className='admin-monitoring-note admin-monitoring-error'>{monitoringError}</div> : null}
-      {summary?.accessMode ? <div className='admin-monitoring-note'>Access mode: {summary.accessMode}</div> : null}
+
+      <section className='admin-monitoring-panel'>
+        <div className='admin-monitoring-panel-title'>
+          <h2>{labels.filters}</h2>
+          <span>{formatWindowLabel(windowHours, language)}</span>
+        </div>
+        <div className='admin-monitoring-filters'>
+          <label>
+            <span>{labels.range}</span>
+            <select value={windowHours} onChange={(event) => setWindowHours(Number(event.target.value))}>
+              {rangeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>{labels.eventType}</span>
+            <select value={selectedEventType} onChange={(event) => setSelectedEventType(event.target.value)}>
+              {eventTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>{labels.platform}</span>
+            <select value={selectedPlatform} onChange={(event) => setSelectedPlatform(event.target.value)}>
+              {platformOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </label>
+        </div>
+      </section>
 
       <section className='admin-monitoring-grid'>
         <article className='admin-monitoring-card'>
@@ -286,21 +380,39 @@ export function AdminMonitoringPage() {
           <span>{labels.sessionEvents}</span>
           <strong>{audits.length}</strong>
         </article>
+        <article className='admin-monitoring-card'>
+          <span>Warnings</span>
+          <strong>{warningCount}</strong>
+        </article>
+        <article className='admin-monitoring-card'>
+          <span>Errors</span>
+          <strong>{errorCount}</strong>
+        </article>
+        <article className='admin-monitoring-card'>
+          <span>{labels.accessMode}</span>
+          <strong>{summary?.accessMode ?? 'N/A'}</strong>
+        </article>
       </section>
 
-      <section className='admin-monitoring-grid'>
-        {summaryCards.map((card) => (
-          <article className='admin-monitoring-card' key={card.label}>
-            <span>{card.label}</span>
-            <strong>{card.value}</strong>
-          </article>
-        ))}
+      <section className='admin-monitoring-panel'>
+        <div className='admin-monitoring-panel-title'>
+          <h2>{labels.keySignals}</h2>
+          {lastUpdated ? <span>{labels.updated}: {lastUpdated.toLocaleTimeString()}</span> : null}
+        </div>
+        <div className='admin-monitoring-grid compact'>
+          {summaryCards.map((card) => (
+            <article className={`admin-monitoring-card tone-${card.tone}`} key={card.label}>
+              <span>{card.label}</span>
+              <strong>{card.value}</strong>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section className='admin-monitoring-panel'>
         <div className='admin-monitoring-panel-title'>
           <h2>{labels.serviceHealth}</h2>
-          {lastUpdated ? <span>{labels.updated}: {lastUpdated.toLocaleTimeString()}</span> : null}
+          <span>{labels.serviceSummary}</span>
         </div>
         <div className='admin-monitoring-service-list'>
           {services.map((service) => (
@@ -325,7 +437,7 @@ export function AdminMonitoringPage() {
           <div className='admin-monitoring-event-row'>
             <strong>{labels.totalAccounts}</strong>
             <span>Active / locked / disabled / pending</span>
-            <time>{summary?.accounts?.total ?? 0}</time>
+            <time>{`${summary?.accounts?.active ?? 0} / ${summary?.accounts?.locked ?? 0} / ${summary?.accounts?.disabled ?? 0} / ${summary?.accounts?.pendingVerification ?? 0}`}</time>
           </div>
           <div className='admin-monitoring-event-row'>
             <strong>{labels.failedLoginCount}</strong>
@@ -348,16 +460,25 @@ export function AdminMonitoringPage() {
       <section className='admin-monitoring-panel'>
         <div className='admin-monitoring-panel-title'>
           <h2>{labels.sessionAudits}</h2>
+          <span>{labels.eventSummary}</span>
         </div>
         {audits.length === 0 ? (
           <p className='admin-monitoring-empty'>{labels.noAudits}</p>
         ) : (
           <div className='admin-monitoring-event-list'>
             {audits.map((audit, index) => (
-              <div className='admin-monitoring-event-row' key={audit.auditId ?? index}>
-                <strong>{audit.eventType ?? 'SESSION_EVENT'}</strong>
-                <span>{audit.platform ?? 'WEB'} - {audit.deviceName ?? 'Unknown device'} - {audit.detail ?? 'session update'}</span>
-                <time>{audit.createdAt ? new Date(audit.createdAt).toLocaleString() : '-'}</time>
+              <div className='admin-monitoring-event-row admin-monitoring-event-rich' key={audit.auditId ?? index}>
+                <div className='admin-monitoring-event-main'>
+                  <div className='admin-monitoring-event-heading'>
+                    <strong>{audit.eventType ?? 'SESSION_EVENT'}</strong>
+                    <span className={`admin-monitoring-severity ${audit.severity ?? 'info'}`}>{audit.severity ?? 'info'}</span>
+                  </div>
+                  <span>{audit.platform ?? 'WEB'} • {audit.deviceName ?? 'Unknown device'} • {audit.detail ?? 'session update'}</span>
+                </div>
+                <div className='admin-monitoring-event-meta'>
+                  <small>{audit.deviceIdMasked ?? 'N/A'}</small>
+                  <time>{audit.createdAt ? new Date(audit.createdAt).toLocaleString() : '-'}</time>
+                </div>
               </div>
             ))}
           </div>
@@ -367,9 +488,9 @@ export function AdminMonitoringPage() {
       <section className='admin-monitoring-panel'>
         <h2>{labels.dataGuard}</h2>
         <ul className='admin-monitoring-guardrails'>
-          <li>{language === 'vi' ? 'Không hiển thị mật khẩu, OTP, token, nội dung tin nhắn riêng tư hoặc embedding khuôn mặt.' : 'Do not expose passwords, OTPs, tokens, private message content, or face embeddings.'}</li>
-          <li>{language === 'vi' ? 'Chỉ log metadata tối thiểu cần cho vận hành, bảo mật và điều tra lỗi.' : 'Log only the minimum metadata needed for operations, security, and debugging.'}</li>
-          <li>{language === 'vi' ? 'API admin production phải kiểm tra quyền ở backend, không chỉ ẩn UI.' : 'Production admin APIs must enforce roles on the backend, not only hide UI.'}</li>
+          <li>{language === 'vi' ? 'Không hiển thị mật khẩu, OTP, token, nội dung riêng tư hoặc embedding khuôn mặt.' : 'Do not expose passwords, OTPs, tokens, private content, or face embeddings.'}</li>
+          <li>{language === 'vi' ? 'Chỉ hiển thị metadata tối thiểu phục vụ vận hành, bảo mật và điều tra lỗi.' : 'Expose only the minimum metadata needed for operations, security, and incident analysis.'}</li>
+          <li>{language === 'vi' ? 'Phân quyền production phải tiếp tục được kiểm soát ở backend thay vì chỉ ẩn UI.' : 'Production authorization must remain backend-enforced instead of being UI-only.'}</li>
         </ul>
       </section>
     </div>

@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -31,6 +32,10 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class AdminMonitoringService {
+    private static final int DEFAULT_WINDOW_HOURS = 24;
+    private static final int MIN_WINDOW_HOURS = 1;
+    private static final int MAX_WINDOW_HOURS = 168;
+
     private final AuthAccountRepository authAccountRepository;
     private final AuthLegalConsentRepository authLegalConsentRepository;
     private final RefreshTokenRepository refreshTokenRepository;
@@ -41,11 +46,11 @@ public class AdminMonitoringService {
     private final AdminMonitoringProperties adminMonitoringProperties;
 
     @Transactional(readOnly = true)
-    public AdminMonitoringSummaryResponse getSummary(UUID requesterId) {
+    public AdminMonitoringSummaryResponse getSummary(UUID requesterId, Integer windowHours) {
         assertMonitoringAccess(requesterId);
         Instant now = Instant.now();
-        Instant since24h = now.minusSeconds(24 * 60 * 60L);
-        OffsetDateTime since24hOffset = OffsetDateTime.ofInstant(since24h, ZoneOffset.UTC);
+        Instant since = resolveSince(windowHours, now);
+        OffsetDateTime sinceOffset = OffsetDateTime.ofInstant(since, ZoneOffset.UTC);
 
         return new AdminMonitoringSummaryResponse(
                 now,
@@ -61,51 +66,60 @@ public class AdminMonitoringService {
                 ),
                 new AdminMonitoringSummaryResponse.SessionStats(
                         refreshTokenRepository.countActiveTokens(now),
-                        refreshTokenRepository.countRevokedSince(since24h),
+                        refreshTokenRepository.countRevokedSince(since),
                         refreshTokenRepository.countActiveMobileSessions(now)
                 ),
                 new AdminMonitoringSummaryResponse.AuditStats(
                         authSessionAuditRepository.count(),
-                        authSessionAuditRepository.countByCreatedAtAfter(since24h),
-                        authSessionAuditRepository.countByEventTypeSince("LOGIN_SUCCESS", since24h),
-                        authSessionAuditRepository.countByEventTypeSince("LOGIN_FAILED", since24h),
-                        authSessionAuditRepository.countByEventTypeSince("SESSION_REVOKED_LOGOUT", since24h) + authSessionAuditRepository.countByEventTypeSince("SESSION_REVOKED_LOGOUT_ALL", since24h),
-                        authSessionAuditRepository.countByEventTypeSince("QR_LOGIN_APPROVED", since24h)
+                        authSessionAuditRepository.countByCreatedAtAfter(since),
+                        authSessionAuditRepository.countByEventTypeSince("LOGIN_SUCCESS", since),
+                        authSessionAuditRepository.countByEventTypeSince("LOGIN_FAILED", since),
+                        authSessionAuditRepository.countByEventTypeSince("SESSION_REVOKED_LOGOUT", since)
+                                + authSessionAuditRepository.countByEventTypeSince("SESSION_REVOKED_LOGOUT_ALL", since),
+                        authSessionAuditRepository.countByEventTypeSince("QR_LOGIN_APPROVED", since)
                 ),
                 new AdminMonitoringSummaryResponse.OtpStats(
-                        authOtpRepository.countByCreatedAtAfter(since24h),
-                        authOtpRepository.countByPurposeAndCreatedAtAfter(OtpPurpose.REGISTER, since24h),
-                        authOtpRepository.countByPurposeAndCreatedAtAfter(OtpPurpose.RESET_PASSWORD, since24h),
-                        authOtpRepository.countByVerifiedAtAfter(since24h)
+                        authOtpRepository.countByCreatedAtAfter(since),
+                        authOtpRepository.countByPurposeAndCreatedAtAfter(OtpPurpose.REGISTER, since),
+                        authOtpRepository.countByPurposeAndCreatedAtAfter(OtpPurpose.RESET_PASSWORD, since),
+                        authOtpRepository.countByVerifiedAtAfter(since)
                 ),
                 new AdminMonitoringSummaryResponse.AiStats(
-                        aiChatHistoryRepository.countByCreatedAtAfter(since24hOffset),
-                        aiChatHistoryRepository.countByRoleAndCreatedAtAfter("user", since24hOffset),
-                        aiChatHistoryRepository.countByRoleAndCreatedAtAfter("assistant", since24hOffset),
-                        aiChatHistoryRepository.countDistinctUsersSince(since24hOffset)
+                        aiChatHistoryRepository.countByCreatedAtAfter(sinceOffset),
+                        aiChatHistoryRepository.countByRoleAndCreatedAtAfter("user", sinceOffset),
+                        aiChatHistoryRepository.countByRoleAndCreatedAtAfter("assistant", sinceOffset),
+                        aiChatHistoryRepository.countDistinctUsersSince(sinceOffset)
                 ),
                 new AdminMonitoringSummaryResponse.QrStats(
-                        authQrLoginSessionRepository.countByCreatedAtAfter(since24h),
+                        authQrLoginSessionRepository.countByCreatedAtAfter(since),
                         authQrLoginSessionRepository.countByStatus(QrLoginSessionStatus.PENDING),
-                        authQrLoginSessionRepository.countByApprovedAtAfter(since24h),
-                        authQrLoginSessionRepository.countByConsumedAtAfter(since24h),
+                        authQrLoginSessionRepository.countByApprovedAtAfter(since),
+                        authQrLoginSessionRepository.countByConsumedAtAfter(since),
                         authQrLoginSessionRepository.countByStatus(QrLoginSessionStatus.REJECTED)
                 ),
                 new AdminMonitoringSummaryResponse.ConsentStats(
                         authLegalConsentRepository.countByGrantedTrue(),
                         authLegalConsentRepository.countByConsentTypeAndGrantedTrue("TERMS_OF_USE"),
                         authLegalConsentRepository.countByConsentTypeAndGrantedTrue("PRIVACY_POLICY"),
-                        authLegalConsentRepository.countByConsentTypeAndGrantedTrueAndGrantedAtAfter("TERMS_OF_USE", since24h),
-                        authLegalConsentRepository.countByConsentTypeAndGrantedTrueAndGrantedAtAfter("PRIVACY_POLICY", since24h)
+                        authLegalConsentRepository.countByConsentTypeAndGrantedTrueAndGrantedAtAfter("TERMS_OF_USE", since),
+                        authLegalConsentRepository.countByConsentTypeAndGrantedTrueAndGrantedAtAfter("PRIVACY_POLICY", since)
                 )
         );
     }
 
     @Transactional(readOnly = true)
-    public List<AdminMonitoringEventResponse> getRecentEvents(UUID requesterId, int limit) {
+    public List<AdminMonitoringEventResponse> getRecentEvents(UUID requesterId, int limit, Integer windowHours, String eventType, String platform) {
         assertMonitoringAccess(requesterId);
         int pageSize = Math.max(1, Math.min(limit, 50));
-        return authSessionAuditRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(0, pageSize))
+        Instant since = resolveSince(windowHours, Instant.now());
+        String normalizedEventType = normalizeOptionalFilter(eventType);
+        String normalizedPlatform = normalizeOptionalFilter(platform);
+        return authSessionAuditRepository.findMonitoringEvents(
+                        since,
+                        normalizedEventType,
+                        normalizedPlatform,
+                        PageRequest.of(0, pageSize)
+                )
                 .stream()
                 .map(this::toEventResponse)
                 .toList();
@@ -130,16 +144,46 @@ public class AdminMonitoringService {
         }
     }
 
+    private Instant resolveSince(Integer windowHours, Instant now) {
+        int safeWindowHours = windowHours == null ? DEFAULT_WINDOW_HOURS : Math.max(MIN_WINDOW_HOURS, Math.min(windowHours, MAX_WINDOW_HOURS));
+        return now.minusSeconds(safeWindowHours * 60L * 60L);
+    }
+
+    private String normalizeOptionalFilter(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        return value.trim();
+    }
+
     private String normalizeEmail(String email) {
         return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
     }
 
     private AdminMonitoringEventResponse toEventResponse(AuthSessionAudit event) {
         return new AdminMonitoringEventResponse(
-                event.getAuditId(), event.getEventType(), event.getSessionType(), event.getTrustLevel(),
-                event.getPlatform(), sanitizeDeviceName(event.getDeviceName()), maskDeviceId(event.getDeviceId()),
-                sanitizeDetail(event.getDetail()), event.getCreatedAt()
+                event.getAuditId(),
+                event.getEventType(),
+                event.getSessionType(),
+                event.getTrustLevel(),
+                event.getPlatform(),
+                sanitizeDeviceName(event.getDeviceName()),
+                maskDeviceId(event.getDeviceId()),
+                sanitizeDetail(event.getDetail()),
+                resolveSeverity(event),
+                event.getCreatedAt()
         );
+    }
+
+    private String resolveSeverity(AuthSessionAudit event) {
+        String eventType = event.getEventType() == null ? "" : event.getEventType().toUpperCase(Locale.ROOT);
+        if (eventType.contains("FAILED") || eventType.contains("REJECTED") || eventType.contains("LOCKED")) {
+            return "error";
+        }
+        if (eventType.contains("REVOKED") || eventType.contains("PENDING") || eventType.contains("CHALLENGE")) {
+            return "warning";
+        }
+        return "info";
     }
 
     private String sanitizeDeviceName(String deviceName) {
