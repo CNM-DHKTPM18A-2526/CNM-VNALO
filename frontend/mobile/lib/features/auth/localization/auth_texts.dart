@@ -62,7 +62,9 @@ class AuthTexts {
   String get agreeTermB =>
       _isVi
           ? 'Tôi đồng ý với điều khoản Mạng xã hội của VNALO'
-          : 'I agree to VNALO Social Network Terms';
+          : 'I agree to VNALO Privacy and Data Processing Policy';
+  String get viewTerms => _isVi ? 'Xem điều khoản' : 'View terms';
+  String get viewPrivacy => _isVi ? 'Xem quyền riêng tư' : 'View privacy';
 
   String get loginFailed => _isVi ? 'Đăng nhập thất bại' : 'Login failed';
   String get registerFailed => _isVi ? 'Đăng ký thất bại' : 'Register failed';

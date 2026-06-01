@@ -1,7 +1,8 @@
 package iuh.cnm.vnalo.core_service.model.dto.request;
 
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -42,8 +43,25 @@ public class RegisterRequest {
     @Size(min = 2, max = 100, message = "Display name must be between 2 and 100 characters")
     @Pattern(regexp = "^(?!.*\\d).+$", message = "Display name must not contain numbers")
     private String displayName;
-    
+
     private Gender gender;
 
     private LocalDate dob;
+
+    @AssertTrue(message = "Terms acceptance is required")
+    @Builder.Default
+    private boolean acceptedTerms = false;
+
+    @AssertTrue(message = "Privacy acceptance is required")
+    @Builder.Default
+    private boolean acceptedPrivacy = false;
+
+    @Size(max = 32, message = "Legal version must not exceed 32 characters")
+    private String legalVersion;
+
+    @Size(max = 100, message = "Device name must not exceed 100 characters")
+    private String deviceName;
+
+    @Size(max = 20, message = "Platform must not exceed 20 characters")
+    private String platform;
 }
