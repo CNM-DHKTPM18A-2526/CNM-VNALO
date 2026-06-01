@@ -381,6 +381,7 @@ services:
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}
       AI_RATE_LIMIT: ${AI_RATE_LIMIT:-5}
       AI_RATE_LIMIT_GLOBAL: ${AI_RATE_LIMIT_GLOBAL:-10}
+      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173,http://vnalo.fit,https://vnalo.fit}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       AI_INTERNAL_SECRET: ${AI_INTERNAL_SECRET}
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xss256k"
