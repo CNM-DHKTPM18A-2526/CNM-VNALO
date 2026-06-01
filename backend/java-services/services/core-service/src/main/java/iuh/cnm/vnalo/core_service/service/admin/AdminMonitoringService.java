@@ -1,5 +1,8 @@
 package iuh.cnm.vnalo.core_service.service.admin;
 
+import iuh.cnm.vnalo.core_service.config.AdminMonitoringProperties;
+import iuh.cnm.vnalo.core_service.exception.ApiException;
+import iuh.cnm.vnalo.core_service.exception.ErrorCode;
 import iuh.cnm.vnalo.core_service.model.dto.response.admin.AdminMonitoringEventResponse;
 import iuh.cnm.vnalo.core_service.model.dto.response.admin.AdminMonitoringSummaryResponse;
 import iuh.cnm.vnalo.core_service.model.entity.auth.AuthSessionAudit;
@@ -21,6 +24,8 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Locale;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -31,16 +36,18 @@ public class AdminMonitoringService {
     private final AuthOtpRepository authOtpRepository;
     private final AuthQrLoginSessionRepository authQrLoginSessionRepository;
     private final AiChatHistoryRepository aiChatHistoryRepository;
+    private final AdminMonitoringProperties adminMonitoringProperties;
 
     @Transactional(readOnly = true)
-    public AdminMonitoringSummaryResponse getSummary() {
+    public AdminMonitoringSummaryResponse getSummary(UUID requesterId) {
+        assertMonitoringAccess(requesterId);
         Instant now = Instant.now();
         Instant since24h = now.minusSeconds(24 * 60 * 60L);
         OffsetDateTime since24hOffset = OffsetDateTime.ofInstant(since24h, ZoneOffset.UTC);
 
         return new AdminMonitoringSummaryResponse(
                 now,
-                "AUTHENTICATED_MVP",
+                "ADMIN_ALLOWLIST",
                 new AdminMonitoringSummaryResponse.AccountStats(
                         authAccountRepository.count(),
                         authAccountRepository.countByStatus(AccountStatus.ACTIVE),
@@ -86,12 +93,36 @@ public class AdminMonitoringService {
     }
 
     @Transactional(readOnly = true)
-    public List<AdminMonitoringEventResponse> getRecentEvents(int limit) {
+    public List<AdminMonitoringEventResponse> getRecentEvents(UUID requesterId, int limit) {
+        assertMonitoringAccess(requesterId);
         int pageSize = Math.max(1, Math.min(limit, 50));
         return authSessionAuditRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(0, pageSize))
                 .stream()
                 .map(this::toEventResponse)
                 .toList();
+    }
+
+    public boolean canAccess(UUID requesterId) {
+        if (requesterId == null || adminMonitoringProperties.allowedEmails().isEmpty()) {
+            return false;
+        }
+        return authAccountRepository.findById(requesterId)
+                .map(account -> normalizeEmail(account.getEmail()))
+                .filter(email -> !email.isBlank())
+                .map(email -> adminMonitoringProperties.allowedEmails().stream()
+                        .map(this::normalizeEmail)
+                        .anyMatch(email::equals))
+                .orElse(false);
+    }
+
+    private void assertMonitoringAccess(UUID requesterId) {
+        if (!canAccess(requesterId)) {
+            throw new ApiException(ErrorCode.ACCESS_DENIED, "Admin monitoring access denied");
+        }
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
     }
 
     private AdminMonitoringEventResponse toEventResponse(AuthSessionAudit event) {

@@ -156,7 +156,14 @@ extension on LegalDocumentType {
               ],
             ),
             _LegalSection(
-              title: '4. Giám sát vận hành và quyền kiểm soát',
+              title: '4. Lưu trữ dữ liệu và quyền của bạn',
+              body: [
+                'VNALO chỉ nên giữ dữ liệu trong thời gian cần thiết cho vận hành, bảo mật và nghĩa vụ pháp lý, sau đó cần xóa hoặc ẩn danh theo chính sách nội bộ.',
+                'Bạn có thể yêu cầu hỗ trợ cập nhật hồ sơ, đổi quyền thiết bị hoặc vô hiệu hóa face-auth nếu sản phẩm hỗ trợ.',
+              ],
+            ),
+            _LegalSection(
+              title: '5. Giám sát vận hành và quyền kiểm soát',
               body: [
                 'VNALO có thể ghi nhận sự kiện đăng nhập, đăng xuất, QR approval, lỗi dịch vụ và trạng thái push token để vận hành hệ thống.',
                 'Dashboard admin không nên hiển thị mật khẩu, OTP, token hoặc dữ liệu sinh trắc học thô.',

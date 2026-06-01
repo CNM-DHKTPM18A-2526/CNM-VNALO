@@ -1,4 +1,4 @@
-﻿import React from 'react'
+import React from 'react'
 
 import { API_BASE_URL, AI_API_URL, MEDIA_API_URL, MESSAGE_API_URL } from '../api.client'
 import { useAuth } from '../features/auth/useAuth'
@@ -106,14 +106,15 @@ function extractData<T>(payload: unknown): T | null {
   return (obj.data ?? payload) as T
 }
 
-function isLikelyAdmin(email?: string | null) {
-  if (!email) return false
-  return /(^admin@|\.admin@|@admin\.)/i.test(email)
-}
 
 export function AdminMonitoringPage() {
   const { language } = useLanguage()
   const { user, accessToken } = useAuth()
+  const adminMonitoringEmails = (import.meta.env.VITE_ADMIN_MONITORING_ALLOWED_EMAILS ?? '')
+    .split(',')
+    .map((email: string) => email.trim().toLowerCase())
+    .filter(Boolean)
+  const canRequestMonitoring = Boolean(user?.email && adminMonitoringEmails.includes(user.email.toLowerCase()))
   const [services, setServices] = React.useState<ServiceProbe[]>([])
   const [summary, setSummary] = React.useState<MonitoringSummary | null>(null)
   const [audits, setAudits] = React.useState<SessionAudit[]>([])
@@ -123,7 +124,7 @@ export function AdminMonitoringPage() {
     ? {
         title: 'Giám sát vận hành',
         subtitle: 'Theo dõi trạng thái dịch vụ, sự kiện phiên đăng nhập và các rủi ro cần kiểm tra mà không hiển thị dữ liệu nhạy cảm.',
-        accessNote: 'Trang này là dashboard MVP có API metadata thật. Backend production vẫn cần bổ sung role admin để khóa quyền nghiêm ngặt.',
+        accessNote: 'Trang này yêu cầu quyền admin allowlist phía backend và chỉ hiển thị metadata.',
         refresh: 'Làm mới',
         serviceHealth: 'Trạng thái dịch vụ',
         sessionAudits: 'Sự kiện phiên gần đây',
@@ -135,7 +136,7 @@ export function AdminMonitoringPage() {
     : {
         title: 'Operations Monitoring',
         subtitle: 'Monitor service status, session events, and risks without exposing sensitive user data.',
-        accessNote: 'This MVP dashboard uses real metadata APIs. Production backend still needs strict admin role enforcement.',
+        accessNote: 'This dashboard requires backend admin allowlist access and only displays metadata.',
         refresh: 'Refresh',
         serviceHealth: 'Service health',
         sessionAudits: 'Recent session events',
@@ -146,6 +147,15 @@ export function AdminMonitoringPage() {
       }
 
   const load = React.useCallback(async () => {
+    if (!canRequestMonitoring) {
+      setServices([])
+      setSummary(null)
+      setAudits([])
+      setLastUpdated(null)
+      setIsLoading(false)
+      return
+    }
+
     setIsLoading(true)
     const probes = [
       { name: 'core-service', url: `${API_BASE_URL}/actuator/health` },
@@ -183,7 +193,7 @@ export function AdminMonitoringPage() {
     setServices(serviceResults)
     setLastUpdated(new Date())
     setIsLoading(false)
-  }, [accessToken])
+  }, [accessToken, canRequestMonitoring])
 
   React.useEffect(() => {
     void load()
@@ -211,7 +221,7 @@ export function AdminMonitoringPage() {
         <button type='button' onClick={() => void load()} disabled={isLoading}>{isLoading ? '...' : labels.refresh}</button>
       </header>
 
-      {!isLikelyAdmin(user?.email) ? <div className='admin-monitoring-note'>{labels.accessNote}</div> : null}
+      {!canRequestMonitoring ? <div className='admin-monitoring-note admin-monitoring-denied'>{labels.accessNote}</div> : null}
       {summary?.accessMode ? <div className='admin-monitoring-note'>Access mode: {summary.accessMode}</div> : null}
 
       <section className='admin-monitoring-grid'>

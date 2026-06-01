@@ -1,4 +1,4 @@
-﻿import { Link } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 
 import { useLanguage } from '../shared/i18n/LanguageContext'
 import '../styles/legal.css'
@@ -86,7 +86,14 @@ const content: Record<'vi' | 'en', Record<LegalPageKind, { title: string; subtit
           ],
         },
         {
-          title: '5. Giám sát vận hành và quyền của bạn',
+          title: '5. Lưu trữ dữ liệu và quyền của bạn',
+          body: [
+            'VNALO chỉ nên lưu dữ liệu trong thời gian cần thiết cho vận hành, bảo mật, nghĩa vụ pháp lý và xử lý tranh chấp; sau đó cần xóa hoặc ẩn danh theo chính sách nội bộ.',
+            'Bạn có quyền yêu cầu hỗ trợ cập nhật hồ sơ, thay đổi quyền thiết bị, vô hiệu hóa face-auth và nhận giải thích về các nhóm dữ liệu đang được xử lý.',
+          ],
+        },
+        {
+          title: '6. Giám sát vận hành và quyền của bạn',
           body: [
             'VNALO có thể ghi nhận sự kiện đăng nhập, đăng xuất, QR approval, lỗi dịch vụ, trạng thái push token và sự kiện bảo mật để vận hành hệ thống.',
             'Bạn có thể cập nhật hồ sơ, thay đổi quyền thiết bị và yêu cầu hỗ trợ về dữ liệu cá nhân qua kênh hỗ trợ của dự án.',
@@ -168,7 +175,14 @@ const content: Record<'vi' | 'en', Record<LegalPageKind, { title: string; subtit
           ],
         },
         {
-          title: '5. Operations monitoring and your controls',
+          title: '5. Retention and your rights',
+          body: [
+            'VNALO should retain data only for the period needed for operations, security, legal obligations, and dispute handling, then delete or anonymize it according to internal policy.',
+            'You can request support to update profile data, change device permissions, disable face-auth, and understand which categories of data are being processed.',
+          ],
+        },
+        {
+          title: '6. Operations monitoring and your controls',
           body: [
             'VNALO may record login, logout, QR approval, service errors, push token state, and security events to operate the system.',
             'You can update your profile, change device permissions, and request support about personal data through the project support channel.',
