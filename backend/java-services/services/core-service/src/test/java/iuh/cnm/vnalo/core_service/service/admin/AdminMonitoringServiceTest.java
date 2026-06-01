@@ -1,13 +1,11 @@
 package iuh.cnm.vnalo.core_service.service.admin;
 
-import iuh.cnm.vnalo.core_service.config.AdminMonitoringProperties;
 import iuh.cnm.vnalo.core_service.exception.ApiException;
 import iuh.cnm.vnalo.core_service.exception.ErrorCode;
 import iuh.cnm.vnalo.core_service.model.dto.response.admin.AdminMonitoringEventPageResponse;
 import iuh.cnm.vnalo.core_service.model.dto.response.admin.AdminMonitoringEventResponse;
 import iuh.cnm.vnalo.core_service.model.dto.response.admin.AdminMonitoringSummaryResponse;
 import iuh.cnm.vnalo.core_service.model.dto.response.admin.AdminMonitoringTrendPointResponse;
-import iuh.cnm.vnalo.core_service.model.entity.auth.AuthAccount;
 import iuh.cnm.vnalo.core_service.model.entity.auth.AuthSessionAudit;
 import iuh.cnm.vnalo.core_service.model.enums.AccountStatus;
 import iuh.cnm.vnalo.core_service.model.enums.OtpPurpose;
@@ -16,6 +14,7 @@ import iuh.cnm.vnalo.core_service.repository.ai.AiChatHistoryRepository;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthAccountRepository;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthLegalConsentRepository;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthOtpRepository;
+import iuh.cnm.vnalo.core_service.repository.auth.AuthPermissionRepository;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthQrLoginSessionRepository;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthSessionAuditRepository;
 import iuh.cnm.vnalo.core_service.repository.auth.RefreshTokenRepository;
@@ -29,7 +28,6 @@ import org.springframework.data.domain.Pageable;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -51,6 +49,7 @@ class AdminMonitoringServiceTest {
     @Mock private AuthOtpRepository authOtpRepository;
     @Mock private AuthQrLoginSessionRepository authQrLoginSessionRepository;
     @Mock private AiChatHistoryRepository aiChatHistoryRepository;
+    @Mock private AuthPermissionRepository authPermissionRepository;
 
     private UUID adminId;
     private AdminMonitoringService service;
@@ -66,20 +65,13 @@ class AdminMonitoringServiceTest {
                 authOtpRepository,
                 authQrLoginSessionRepository,
                 aiChatHistoryRepository,
-                new AdminMonitoringProperties(List.of("Admin@vnalo.fit"))
+                authPermissionRepository
         );
     }
 
     @Test
-    void shouldDenyAccessWhenEmailNotAllowlisted() {
-        AuthAccount account = AuthAccount.builder()
-                .email("user@vnalo.fit")
-                .phone("+84900000000")
-                .passwordHash("hash")
-                .status(AccountStatus.ACTIVE)
-                .build();
-        account.setId(adminId);
-        when(authAccountRepository.findById(adminId)).thenReturn(Optional.of(account));
+    void shouldDenyAccessWhenPermissionMissing() {
+        when(authPermissionRepository.accountHasPermission(adminId, AdminMonitoringService.PERMISSION_MONITORING_VIEW)).thenReturn(false);
 
         ApiException exception = assertThrows(ApiException.class, () -> service.getSummary(adminId, 24));
 
@@ -87,9 +79,8 @@ class AdminMonitoringServiceTest {
     }
 
     @Test
-    void shouldReturnSummaryForAllowlistedEmail() {
-        AuthAccount account = adminAccount();
-        when(authAccountRepository.findById(adminId)).thenReturn(Optional.of(account));
+    void shouldReturnSummaryForAuthorizedAdmin() {
+        when(authPermissionRepository.accountHasPermission(adminId, AdminMonitoringService.PERMISSION_MONITORING_VIEW)).thenReturn(true);
         when(authAccountRepository.count()).thenReturn(10L);
         when(authAccountRepository.countByStatus(AccountStatus.ACTIVE)).thenReturn(8L);
         when(authAccountRepository.countByStatus(AccountStatus.LOCKED)).thenReturn(1L);
@@ -99,20 +90,20 @@ class AdminMonitoringServiceTest {
         when(authAccountRepository.sumFailedLoginCount()).thenReturn(5L);
         when(refreshTokenRepository.countActiveTokens(any(Instant.class))).thenReturn(4L);
         when(refreshTokenRepository.countRevokedSince(any(Instant.class))).thenReturn(1L);
-        when(refreshTokenRepository.countActiveMobileSessions(any(Instant.class))).thenReturn(3L);
-        when(authSessionAuditRepository.count()).thenReturn(12L);
-        when(authSessionAuditRepository.countByCreatedAtAfter(any(Instant.class))).thenReturn(6L);
-        when(authSessionAuditRepository.countByEventTypeSince(eq("LOGIN_SUCCESS"), any(Instant.class))).thenReturn(2L);
-        when(authSessionAuditRepository.countByEventTypeSince(eq("LOGIN_FAILED"), any(Instant.class))).thenReturn(3L);
+        when(refreshTokenRepository.countActiveMobileSessions(any(Instant.class))).thenReturn(2L);
+        when(authSessionAuditRepository.count()).thenReturn(20L);
+        when(authSessionAuditRepository.countByCreatedAtAfter(any(Instant.class))).thenReturn(10L);
+        when(authSessionAuditRepository.countByEventTypeSince(eq("LOGIN_SUCCESS"), any(Instant.class))).thenReturn(6L);
+        when(authSessionAuditRepository.countByEventTypeSince(eq("LOGIN_FAILED"), any(Instant.class))).thenReturn(1L);
         when(authSessionAuditRepository.countByEventTypeSince(eq("SESSION_REVOKED_LOGOUT"), any(Instant.class))).thenReturn(1L);
         when(authSessionAuditRepository.countByEventTypeSince(eq("SESSION_REVOKED_LOGOUT_ALL"), any(Instant.class))).thenReturn(1L);
         when(authSessionAuditRepository.countByEventTypeSince(eq("QR_LOGIN_APPROVED"), any(Instant.class))).thenReturn(2L);
-        when(authOtpRepository.countByCreatedAtAfter(any(Instant.class))).thenReturn(7L);
         when(authOtpRepository.countByPurposeAndCreatedAtAfter(eq(OtpPurpose.REGISTER), any(Instant.class))).thenReturn(3L);
         when(authOtpRepository.countByPurposeAndCreatedAtAfter(eq(OtpPurpose.RESET_PASSWORD), any(Instant.class))).thenReturn(2L);
-        when(authOtpRepository.countByVerifiedAtAfter(any(Instant.class))).thenReturn(5L);
-        when(aiChatHistoryRepository.countByCreatedAtAfter(any(OffsetDateTime.class))).thenReturn(9L);
-        when(aiChatHistoryRepository.countByRoleAndCreatedAtAfter(eq("user"), any(OffsetDateTime.class))).thenReturn(4L);
+        when(authOtpRepository.countByCreatedAtAfter(any(Instant.class))).thenReturn(7L);
+        when(authOtpRepository.countByVerifiedAtAfter(any(Instant.class))).thenReturn(4L);
+        when(aiChatHistoryRepository.countByCreatedAtAfter(any(OffsetDateTime.class))).thenReturn(7L);
+        when(aiChatHistoryRepository.countByRoleAndCreatedAtAfter(eq("user"), any(OffsetDateTime.class))).thenReturn(2L);
         when(aiChatHistoryRepository.countByRoleAndCreatedAtAfter(eq("assistant"), any(OffsetDateTime.class))).thenReturn(5L);
         when(aiChatHistoryRepository.countDistinctUsersSince(any(OffsetDateTime.class))).thenReturn(3L);
         when(authQrLoginSessionRepository.countByCreatedAtAfter(any(Instant.class))).thenReturn(6L);
@@ -129,6 +120,7 @@ class AdminMonitoringServiceTest {
         AdminMonitoringSummaryResponse summary = service.getSummary(adminId, 24);
 
         assertNotNull(summary);
+        assertEquals(AdminMonitoringService.ACCESS_MODE_RBAC, summary.accessMode());
         assertEquals(8L, summary.accounts().active());
         assertEquals(3L, summary.ai().distinctActiveUsersLast24Hours());
         assertEquals(2L, summary.consent().termsLast24Hours());
@@ -136,7 +128,7 @@ class AdminMonitoringServiceTest {
 
     @Test
     void shouldReturnPagedEventsWithSeverityAndHasMore() {
-        AuthAccount account = adminAccount();
+        when(authPermissionRepository.accountHasPermission(adminId, AdminMonitoringService.PERMISSION_MONITORING_VIEW)).thenReturn(true);
         AuthSessionAudit failed = AuthSessionAudit.builder()
                 .eventType("LOGIN_FAILED")
                 .platform("WEB")
@@ -153,8 +145,6 @@ class AdminMonitoringServiceTest {
                 .detail("logout all sessions")
                 .createdAt(Instant.now().minusSeconds(60))
                 .build();
-        account.setId(adminId);
-        when(authAccountRepository.findById(adminId)).thenReturn(Optional.of(account));
         when(authSessionAuditRepository.findMonitoringEvents(any(Instant.class), eq("LOGIN_FAILED"), eq("WEB"), any(Pageable.class)))
                 .thenReturn(List.of(failed, revoked));
 
@@ -173,9 +163,7 @@ class AdminMonitoringServiceTest {
 
     @Test
     void shouldReturnTrendPoints() {
-        AuthAccount account = adminAccount();
-        account.setId(adminId);
-        when(authAccountRepository.findById(adminId)).thenReturn(Optional.of(account));
+        when(authPermissionRepository.accountHasPermission(adminId, AdminMonitoringService.PERMISSION_MONITORING_VIEW)).thenReturn(true);
         AuthSessionAuditRepository.MonitoringTrendProjection projection = new AuthSessionAuditRepository.MonitoringTrendProjection() {
             @Override public Instant getBucket() { return Instant.parse("2026-06-01T08:00:00Z"); }
             @Override public long getTotal() { return 5; }
@@ -191,16 +179,5 @@ class AdminMonitoringServiceTest {
         assertEquals(5L, trend.get(0).total());
         assertEquals(2L, trend.get(0).warning());
         assertEquals(1L, trend.get(0).error());
-    }
-
-    private AuthAccount adminAccount() {
-        AuthAccount account = AuthAccount.builder()
-                .email("admin@vnalo.fit")
-                .phone("+84900000000")
-                .passwordHash("hash")
-                .status(AccountStatus.ACTIVE)
-                .build();
-        account.setId(adminId);
-        return account;
     }
 }
