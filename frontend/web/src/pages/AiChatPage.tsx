@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Mic, Paperclip, Send, Sparkles, Trash2, X } from 'lucide-react'
+import { Bot, Mic, Paperclip, Send, Sparkles, Trash2, X } from 'lucide-react'
 
 import { extractMessage } from '../api.client'
 import { useAuth } from '../features/auth/useAuth'
@@ -221,7 +221,7 @@ const PRESET_PROMPTS = [
 
 const INITIAL_ASSISTANT_MESSAGE: AiMessage = {
   role: 'assistant',
-  content: 'Xin chào! Mình là Trợ lý AI VNALO. Mình có thể trả lời câu hỏi và gợi ý thao tác an toàn trong hệ thống.',
+  content: 'Xin chào! Mình là VNALO AI Assistant. Mình có thể trả lời câu hỏi và gợi ý thao tác an toàn trong hệ thống.',
   timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
 }
 
@@ -1010,14 +1010,9 @@ export function AiChatPage() {
       <aside className='ai-chat-sidebar'>
         <div className='ai-chat-sidebar-scroll'>
           <section className='ai-assistant-card ai-context-card' aria-label='Ngữ cảnh trợ lý AI'>
-            <div className='ai-context-card-header'>
-              <div className='ai-avatar-glow'>
-                <Sparkles size={22} />
-              </div>
-              <div>
-                <h3>VNALO AI</h3>
-                <p>Hỏi chung trong hệ thống</p>
-              </div>
+            <div>
+              <h3>VNALO AI Assistant</h3>
+              <p>Đoạn chat riêng 1:1 với trợ lý trong VNALO.</p>
             </div>
             <div className='ai-context-status'>
               <span className={runtimeState.badgeClassName} />
@@ -1058,10 +1053,14 @@ export function AiChatPage() {
 
       <main className='ai-chat-main'>
         <header className='ai-chat-header'>
+          <div className='ai-header-avatar' aria-hidden='true'>
+            <Bot size={20} />
+          </div>
           <div className='ai-header-stack'>
             <div className='ai-header-info'>
-              <div className={runtimeState.badgeClassName} />
-              <strong className='text-[15px] font-semibold'>{runtimeState.label}</strong>
+              <strong className='text-[15px] font-semibold'>VNALO AI Assistant</strong>
+              <span className={runtimeState.badgeClassName} />
+              <span>{runtimeState.label}</span>
             </div>
             <span className='ai-header-helper'>{runtimeState.helper}</span>
           </div>
@@ -1085,10 +1084,6 @@ export function AiChatPage() {
               key={`${message.role}-${message.timestamp}-${index}`}
               className={message.role === 'assistant' ? 'ai-msg-bubble-ai' : 'ai-msg-bubble-user'} data-role={message.role}
             >
-              <div className='ai-message-meta'>
-                <span className='ai-message-role'>{message.role === 'assistant' ? 'VNALO AI' : 'Bạn'}</span>
-                {message.role === 'assistant' && message.providerStatus ? <span className='ai-message-status'>{message.providerStatus === 'FALLBACK_PROVIDER_ACTIVE' ? 'Fallback' : message.providerStatus === 'LIVE_PROVIDER_ACTIVE' ? 'Live' : 'Tạm gián đoạn'}</span> : null}
-              </div>
               <p className='ai-message-text'>{message.content}</p>
               {message.role === 'assistant' && message.actionCommand ? (
                 <div className='ai-action-row'>
@@ -1131,7 +1126,7 @@ export function AiChatPage() {
               <textarea
                 ref={inputRef}
                 className='ai-input-field'
-                placeholder='Nhắn điều bạn cần cho Trợ lý AI...'
+                placeholder='Nhắn điều bạn cần cho VNALO AI Assistant...'
                 value={inputValue}
                 onChange={(event) => setInputValue(event.target.value)}
                 disabled={pendingActionReview !== null || pendingResolution !== null}
@@ -1149,7 +1144,7 @@ export function AiChatPage() {
               <button type='button' className='ai-composer-tool-btn' aria-label='Nhập bằng giọng nói' disabled>
                 <Mic size={18} />
               </button>
-              <button type='submit' className='ai-send-btn' disabled={isAssistantBusy || !inputValue.trim()} aria-label='Gửi tin nhắn cho trợ lý AI'>
+              <button type='submit' className='ai-send-btn' disabled={isAssistantBusy || !inputValue.trim()} aria-label='Gửi tin nhắn cho VNALO AI Assistant'>
                 <Send size={18} />
               </button>
             </div>
