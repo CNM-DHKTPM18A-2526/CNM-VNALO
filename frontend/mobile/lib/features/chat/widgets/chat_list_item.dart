@@ -98,7 +98,7 @@ class ChatListItem extends StatelessWidget {
         child: ListTile(
           onTap: onTap,
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          leading: (conversation.type == ConversationType.GROUP && (conversation.avatarUrl == null || conversation.avatarUrl!.isEmpty))
+          leading: (conversation.type == ConversationType.GROUP && (conversation.avatarUrl == null || conversation.avatarUrl!.trim().isEmpty))
               ? GroupAvatar(
                   members: conversation.members
                       .where((m) => m.userId != currentUserId)

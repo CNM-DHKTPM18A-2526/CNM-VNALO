@@ -15,6 +15,7 @@ import 'package:vnalo_mobile/features/chat/screens/media_viewer_screen.dart';
 import 'package:vnalo_mobile/features/chat/screens/create_group_screen.dart';
 import 'package:vnalo_mobile/features/chat/screens/add_friend_to_group_screen.dart';
 import 'package:vnalo_mobile/features/chat/screens/shared_groups_screen.dart';
+import 'package:vnalo_mobile/services/block_service.dart';
 
 class ChatOptionsScreen extends StatefulWidget {
   final Conversation conversation;
@@ -76,21 +77,28 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
     final controller = TextEditingController(text: otherMember.nickname ?? '');
     final common = CommonTexts.of(context, listen: false);
 
-    final newNickname = await showCupertinoDialog<String>(
+    final newNickname = await showDialog<String>(
       context: context,
-      builder: (context) => CupertinoAlertDialog(
+      builder: (context) => AlertDialog(
         title: Text(common.editNicknameAction),
         content: Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: CupertinoTextField(
+          padding: const EdgeInsets.only(top: 8),
+          child: TextField(
             controller: controller,
-            placeholder: common.nicknamePlaceholder,
+            decoration: InputDecoration(
+              hintText: common.nicknamePlaceholder,
+              border: const OutlineInputBorder(),
+              isDense: true,
+            ),
             autofocus: true,
           ),
         ),
         actions: [
-          CupertinoDialogAction(onPressed: () => Navigator.pop(context), child: Text(common.cancel)),
-          CupertinoDialogAction(
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(common.cancel, style: TextStyle(color: Colors.grey[600])),
+          ),
+          ElevatedButton(
             onPressed: () => Navigator.pop(context, controller.text),
             child: Text(common.save),
           ),
@@ -98,8 +106,18 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
       ),
     );
 
-    if (newNickname != null && mounted) {
-      await context.read<ChatProvider>().updateMemberNickname(widget.conversation.id, otherMember.userId, newNickname);
+    if (newNickname != null) {
+      try {
+        await context.read<ChatProvider>().updateMemberNickname(widget.conversation.id, otherMember.userId, newNickname);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đổi tên gợi nhớ thành công')));
+        }
+      } catch (e) {
+        debugPrint('Failed to update nickname: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Không thể đổi tên. Vui lòng thử lại.')));
+        }
+      }
     }
   }
 
@@ -169,6 +187,10 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
     final provider = context.watch<ChatProvider>();
     final currentConv = provider.conversations.firstWhere((c) => c.id == widget.conversation.id, orElse: () => widget.conversation);
     final currentUserId = context.watch<AuthProvider>().user?.id ?? '';
+    final otherMember = currentConv.members.firstWhere(
+      (m) => m.userId != currentUserId,
+      orElse: () => currentConv.members.isNotEmpty ? currentConv.members.first : ConversationMember(conversationId: currentConv.id, userId: 'unknown', joinedAt: DateTime.now()),
+    );
     final displayName = currentConv.getDisplayName(currentUserId);
     final avatarUrl = currentConv.getDisplayAvatarUrl(currentUserId);
     final common = CommonTexts.of(context);
@@ -318,8 +340,6 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
       color: isDarkMode ? DarkColors.surface : Colors.white,
       child: Column(
         children: [
-          _buildTile(CupertinoIcons.pencil, common.editNicknameAction, onTap: _editNickname, showChevron: true),
-          _buildDivider(),
           _buildTile(CupertinoIcons.star, common.markAsFavoriteAction,
             trailing: CupertinoSwitch(
               value: conv.isFavorite,
@@ -520,6 +540,148 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
 
   // ========================= SECURITY / DANGER ZONE =========================
 
+  Future<void> _openBlockManagement(String otherUserId, String displayName) async {
+    final blockService = context.read<BlockService>();
+
+    bool youBlocked = false;
+    bool blockedYou = false;
+
+    // Default when currently blocked (backend defaults): messages=true, calls=true
+    bool blockMessages = true;
+    bool blockCalls = true;
+
+    try {
+      final res = await blockService.checkBlockStatus(otherUserId);
+      final data = res['data'];
+      if (data is Map) {
+        youBlocked = data['youBlocked'] == true;
+        blockedYou = data['blockedYou'] == true;
+      }
+
+      if (youBlocked) {
+        // Fetch current flags from /blocks list (best effort)
+        final listRes = await blockService.getBlockedUsers(page: 0, size: 50);
+        final listData = listRes['data'];
+        final content = listData is Map<String, dynamic> ? (listData['content'] as List?) : null;
+        final match = (content ?? const [])
+            .whereType<Map>()
+            .cast<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .where((e) => e['userId']?.toString() == otherUserId)
+            .toList();
+        if (match.isNotEmpty) {
+          final m = match.first;
+          blockMessages = m['blockMessages'] == true;
+          blockCalls = m['blockCalls'] == true;
+        }
+      } else {
+        // Not blocked yet: start all off
+        blockMessages = false;
+        blockCalls = false;
+      }
+    } catch (e) {
+      debugPrint('[ChatOptions] checkBlockStatus error: $e');
+    }
+
+    if (!mounted) return;
+
+    await showCupertinoModalPopup<void>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            Future<void> applyChange() async {
+              final anyOn = blockMessages || blockCalls;
+              try {
+                if (!anyOn) {
+                  if (youBlocked) {
+                    await blockService.unblockUser(otherUserId);
+                    youBlocked = false;
+                  }
+                } else {
+                  if (!youBlocked) {
+                    await blockService.blockUser(
+                      otherUserId,
+                      blockMessages: blockMessages,
+                      blockCalls: blockCalls,
+                    );
+                    youBlocked = true;
+                  } else {
+                    await blockService.updateBlock(
+                      otherUserId,
+                      blockMessages: blockMessages,
+                      blockCalls: blockCalls,
+                    );
+                  }
+                }
+              } catch (e) {
+                debugPrint('[ChatOptions] applyChange error: $e');
+              }
+            }
+
+            return CupertinoActionSheet(
+              title: Text(displayName),
+              message: Text(blockedYou ? 'Người này đã chặn bạn' : 'Quản lý quyền chặn cho người dùng này'),
+              actions: [
+                CupertinoActionSheetAction(
+                  onPressed: () {},
+                  isDefaultAction: true,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Chặn tin nhắn'),
+                      CupertinoSwitch(
+                        value: blockMessages,
+                        onChanged: (v) async {
+                          setSheetState(() => blockMessages = v);
+                          await applyChange();
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                CupertinoActionSheetAction(
+                  onPressed: () {},
+                  isDefaultAction: true,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Chặn cuộc gọi'),
+                      CupertinoSwitch(
+                        value: blockCalls,
+                        onChanged: (v) async {
+                          setSheetState(() => blockCalls = v);
+                          await applyChange();
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                if (youBlocked)
+                  CupertinoActionSheetAction(
+                    isDestructiveAction: true,
+                    onPressed: () async {
+                      await blockService.unblockUser(otherUserId);
+                      setSheetState(() {
+                        youBlocked = false;
+                        blockMessages = false;
+                        blockCalls = false;
+                      });
+                    },
+                    child: const Text('Bỏ chặn'),
+                  ),
+              ],
+              cancelButton: CupertinoActionSheetAction(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Đóng'),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildSecurityActions(bool isDarkMode) {
     final common = CommonTexts.of(context);
     return Container(
@@ -528,7 +690,24 @@ class _ChatOptionsScreenState extends State<ChatOptionsScreen> {
         children: [
           _buildTile(CupertinoIcons.exclamationmark_triangle, common.reportUserAction, showChevron: false),
           _buildDivider(),
-          _buildTile(CupertinoIcons.nosign, common.blockMgmtAction, showChevron: true),
+          _buildTile(
+            CupertinoIcons.nosign,
+            common.blockMgmtAction,
+            showChevron: true,
+            onTap: () {
+              final provider = context.read<ChatProvider>();
+              final currentConv = provider.conversations.firstWhere((c) => c.id == widget.conversation.id, orElse: () => widget.conversation);
+              final currentUserId = context.read<AuthProvider>().user?.id ?? '';
+              final otherMember = currentConv.members.firstWhere(
+                (m) => m.userId != currentUserId,
+                orElse: () => currentConv.members.isNotEmpty
+                    ? currentConv.members.first
+                    : ConversationMember(conversationId: currentConv.id, userId: 'unknown', joinedAt: DateTime.now()),
+              );
+              final displayName = currentConv.getDisplayName(currentUserId);
+              _openBlockManagement(otherMember.userId, displayName);
+            },
+          ),
           _buildDivider(),
           _buildTile(CupertinoIcons.clock, common.chatStorageAction, showChevron: false),
           _buildDivider(),

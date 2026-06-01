@@ -503,7 +503,7 @@ class CommonTexts {
       _isVi ? 'Tạo nhóm với $name' : 'Create group with $name';
   String addToGroupLabel(String name) =>
       _isVi ? 'Thêm $name vào nhóm' : 'Add $name to group';
-  String viewSharedGroupsAction =>
+  String get viewSharedGroupsAction =>
       _isVi ? 'Xem nhóm chung' : 'View shared groups';
   String sharedGroupsWith(String name) =>
       _isVi ? 'Nhóm chung với $name' : 'Shared groups with $name';

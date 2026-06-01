@@ -41,11 +41,11 @@ class _SharedGroupsScreenState extends State<SharedGroupsScreen> {
     });
 
     try {
-      final chatProvider = context.read<ChatProvider>();
-      final myUserId = context.read<AuthProvider>().currentUser?.id ?? '';
+    final chatProvider = context.read<ChatProvider>();
+    final myUserId = context.read<AuthProvider>().user?.id ?? '';
 
-      // Get all conversations from the provider (already loaded in inbox)
-      final allConversations = chatProvider.conversations;
+    // Get all conversations from the provider (already loaded in inbox)
+    final allConversations = chatProvider.conversations;
 
       // Filter to GROUP conversations that both users are members of
       final shared = allConversations.where((conv) {
@@ -87,16 +87,15 @@ class _SharedGroupsScreenState extends State<SharedGroupsScreen> {
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
-        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
+        backgroundColor: isDarkMode ? DarkColors.appBarBg : AppColors.primary,
         elevation: 0,
-        forceMaterialTransparency: !isDarkMode,
-        iconTheme: IconThemeData(color: isDarkMode ? Colors.white : Colors.white),
+        iconTheme: const IconThemeData(color: Colors.white),
         title: Text(
           common.sharedGroupsWith(widget.targetUserName),
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
-            color: isDarkMode ? Colors.white : Colors.white,
+            color: Colors.white,
           ),
         ),
       ),
@@ -211,12 +210,11 @@ class _GroupListItem extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
-                AvatarWidget(
-                  imageUrl: conversation.avatarUrl,
-                  name: conversation.title ?? 'Nhóm',
-                  size: 48,
-                  radius: 24,
-                ),
+              AvatarWidget(
+                imageUrl: conversation.avatarUrl,
+                name: conversation.title ?? 'Nhóm',
+                size: 48,
+              ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(

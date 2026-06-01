@@ -43,7 +43,7 @@ class _AddFriendToGroupScreenState extends State<AddFriendToGroupScreen> {
 
     try {
       final chatProvider = context.read<ChatProvider>();
-      final myUserId = context.read<AuthProvider>().currentUser?.id ?? '';
+      final myUserId = context.read<AuthProvider>().user?.id ?? '';
 
       // Get all group conversations where I am a member
       final allConversations = chatProvider.conversations;
@@ -156,16 +156,15 @@ class _AddFriendToGroupScreenState extends State<AddFriendToGroupScreen> {
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
-        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
+        backgroundColor: isDarkMode ? DarkColors.appBarBg : AppColors.primary,
         elevation: 0,
-        forceMaterialTransparency: !isDarkMode,
-        iconTheme: IconThemeData(color: isDarkMode ? Colors.white : Colors.white),
+        iconTheme: const IconThemeData(color: Colors.white),
         title: Text(
           common.addToGroupTitle(widget.targetUserName),
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
-            color: isDarkMode ? Colors.white : Colors.white,
+            color: Colors.white,
           ),
         ),
       ),
@@ -301,7 +300,6 @@ class _GroupItemWidget extends StatelessWidget {
                 imageUrl: item.conversation.avatarUrl,
                 name: item.conversation.title ?? 'Nhóm',
                 size: 48,
-                radius: 24,
               ),
               const SizedBox(width: 12),
               Expanded(

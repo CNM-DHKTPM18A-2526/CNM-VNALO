@@ -30,7 +30,9 @@ class ContactProvider with ChangeNotifier {
 
   void _startPolling() {
     _pollingTimer?.cancel();
-    _pollingTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+    // Avoid unnecessary polling. Prefer socket events; use polling as fallback.
+    final intervalSeconds = _currentUserId == null ? 10 : 30;
+    _pollingTimer = Timer.periodic(Duration(seconds: intervalSeconds), (timer) {
        fetchIncomingRequests();
     });
   }
@@ -83,7 +85,8 @@ class ContactProvider with ChangeNotifier {
       needsReinit = true;
     }
 
-    if (_currentUserId != userId) {
+    final userChanged = _currentUserId != userId;
+    if (userChanged) {
       debugPrint('🟢 [ContactProvider] User ID changed: $_currentUserId -> $userId');
       _currentUserId = userId;
       needsReinit = true;
@@ -102,7 +105,9 @@ class ContactProvider with ChangeNotifier {
     if (needsReinit && userId != null) {
       _initSocketListeners();
       _startPolling();
+      // Ensure both lists are up-to-date after login/reinit.
       fetchIncomingRequests();
+      fetchFriends();
     }
   }
 

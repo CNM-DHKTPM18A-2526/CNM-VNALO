@@ -31,7 +31,6 @@ class AvatarResolver {
         url.contains('s3.') ||
         url.contains('cloudfront.net') ||
         url.contains('digitaloceanspaces.com') ||
-        url.contains('vnalo.fit') ||
         url.contains('cdn.')) {
       return false;
     }

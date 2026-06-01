@@ -33,6 +33,7 @@ class MediaService {
       return '${baseUri.scheme}://${baseUri.authority}$mediaId';
     }
 
+    // We must append /media/public/ because _base is strictly /api/v1 due to normalization
     return '$_base/media/public/$mediaId';
   }
 
@@ -166,47 +167,72 @@ class MediaService {
   }
 
   Future<List<Map<String, dynamic>>> getStickerPacks() async {
-    final response = await _apiService.get(_base, '/stickers/packs');
-    final data = response['data'] ?? response;
-    if (data is Map && data['content'] is List) {
-       return List<Map<String, dynamic>>.from(data['content']);
-    }
-    if (data is List) {
-      return List<Map<String, dynamic>>.from(data);
+    try {
+      final response = await _apiService.get(_base, '/media/stickers/packs');
+      final data = response['data'] ?? response;
+      if (data is Map && data['content'] is List) {
+        return List<Map<String, dynamic>>.from(data['content']);
+      }
+      if (data is List) {
+        return List<Map<String, dynamic>>.from(data);
+      }
+    } catch (e) {
+      debugPrint('[MediaService] getStickerPacks error: $e');
     }
     return [];
   }
 
   Future<List<Map<String, dynamic>>> getStickersInPack(String packId) async {
-    final response = await _apiService.get(_base, '/stickers/packs/$packId');
-    final data = response['data'] ?? response;
-    if (data is Map && data['stickers'] is List) {
-      return List<Map<String, dynamic>>.from(data['stickers']);
+    try {
+      final response = await _apiService.get(_base, '/media/stickers/packs/$packId');
+      final data = response['data'] ?? response;
+      if (data is Map && data['stickers'] is List) {
+        return List<Map<String, dynamic>>.from(data['stickers']);
+      }
+    } catch (e) {
+      debugPrint('[MediaService] getStickersInPack error: $e');
     }
     return [];
   }
+
   Future<List<Map<String, dynamic>>> getMyPacks() async {
-    final response = await _apiService.get(_base, '/stickers/my-packs');
-    final data = response['data'] ?? response;
-    if (data is List) {
-      return List<Map<String, dynamic>>.from(data);
+    try {
+      final response = await _apiService.get(_base, '/media/stickers/my-packs');
+      final data = response['data'] ?? response;
+      if (data is List) {
+        return List<Map<String, dynamic>>.from(data);
+      }
+    } catch (e) {
+      debugPrint('[MediaService] getMyPacks error: $e');
     }
     return [];
   }
 
   Future<void> installPack(String packId) async {
-    await _apiService.post(_base, '/stickers/packs/$packId/download', body: {});
+    try {
+      await _apiService.post(_base, '/media/stickers/packs/$packId/download', body: {});
+    } catch (e) {
+      debugPrint('[MediaService] installPack error: $e');
+    }
   }
 
   Future<void> recordStickerUsage(String stickerId) async {
-    await _apiService.post(_base, '/stickers/$stickerId/use', body: {});
+    try {
+      await _apiService.post(_base, '/media/stickers/$stickerId/use', body: {});
+    } catch (e) {
+      debugPrint('[MediaService] recordStickerUsage error: $e');
+    }
   }
 
   Future<List<Map<String, dynamic>>> getRecentStickers({int limit = 20}) async {
-    final response = await _apiService.get(_base, '/stickers/recent?limit=$limit');
-    final data = response['data'] ?? response;
-    if (data is List) {
-      return List<Map<String, dynamic>>.from(data);
+    try {
+      final response = await _apiService.get(_base, '/media/stickers/recent?limit=$limit');
+      final data = response['data'] ?? response;
+      if (data is List) {
+        return List<Map<String, dynamic>>.from(data);
+      }
+    } catch (e) {
+      debugPrint('[MediaService] getRecentStickers error: $e');
     }
     return [];
   }

@@ -55,6 +55,15 @@ class ApiService {
     return _request('PATCH', baseUrl, endpoint, body: body, queryParams: queryParams);
   }
 
+  Future<Map<String, dynamic>> put(
+    String baseUrl,
+    String endpoint, {
+    Map<String, dynamic>? body,
+    Map<String, String>? queryParams,
+  }) {
+    return _request('PUT', baseUrl, endpoint, body: body, queryParams: queryParams);
+  }
+
   Future<Map<String, dynamic>> postMultipart(
     String baseUrl,
     String endpoint, {
@@ -180,6 +189,11 @@ class ApiService {
         case 'PATCH':
           response = await http
               .patch(url, headers: headers, body: encodedBody)
+              .timeout(_timeout);
+          break;
+        case 'PUT':
+          response = await http
+              .put(url, headers: headers, body: encodedBody)
               .timeout(_timeout);
           break;
         case 'DELETE':

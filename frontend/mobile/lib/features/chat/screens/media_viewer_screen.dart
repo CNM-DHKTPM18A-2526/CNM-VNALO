@@ -177,9 +177,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> with SingleTicker
     return Scaffold(
       backgroundColor: bgColor,
       appBar: AppBar(
-        forceMaterialTransparency: !isDarkMode,
         elevation: 0,
-        backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
+        backgroundColor: isDarkMode ? DarkColors.appBarBg : AppColors.primary,
         foregroundColor: Colors.white,
         iconTheme: const IconThemeData(color: Colors.white),
         title: Column(

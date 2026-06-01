@@ -186,21 +186,18 @@ class _SystemMessageState extends State<SystemMessage>
     }
 
     _SystemEvent? parsedEvent;
-    if (widget.content.startsWith('{')) {
+    final trimmedContent = widget.content.trim();
+    
+    if (trimmedContent.startsWith('{')) {
       try {
         final data = Map<String, dynamic>.from(
-          json.decode(widget.content) as Map<String, dynamic>,
+          json.decode(trimmedContent) as Map<String, dynamic>,
         );
         final action = data['action'] as String?;
         parsedEvent = _parseEvent(data, action);
-      } catch (_) {
-        parsedEvent = _SystemEvent(
-          icon: Icons.info_outline,
-          iconColor: Colors.grey,
-          text: widget.content,
-          actorId: null,
-          targetIds: null,
-        );
+      } catch (e) {
+        debugPrint('SystemMessage JSON parse error: $e for content: $trimmedContent');
+        parsedEvent = null;
       }
     }
 
