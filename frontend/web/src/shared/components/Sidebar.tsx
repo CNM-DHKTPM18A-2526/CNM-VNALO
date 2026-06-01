@@ -33,6 +33,7 @@ export function Sidebar({ onOpenSettingsModal, onOpenCaptureModal }: SidebarProp
     { to: '/chat/my-documents', labelKey: 'sidebar.documents', icon: 'folder' as const },
     { labelKey: 'sidebar.todo', icon: 'capture' as const, onClick: onOpenCaptureModal },
     { to: '/tools', labelKey: 'sidebar.tools', icon: 'briefcase' as const },
+    { to: '/admin/monitoring', labelKey: 'sidebar.monitoring', icon: 'database' as const },
   ]
 
   const handleOpenSettings = () => {

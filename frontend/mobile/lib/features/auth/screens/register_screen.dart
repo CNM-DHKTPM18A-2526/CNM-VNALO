@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -12,6 +13,7 @@ import 'package:vnalo_mobile/core/utils/api_error_mapper.dart';
 import 'package:vnalo_mobile/features/auth/localization/auth_texts.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/auth/screens/login_screen.dart';
+import 'package:vnalo_mobile/features/legal/screens/legal_document_screen.dart';
 import 'package:vnalo_mobile/features/auth/widgets/otp_input.dart';
 import 'package:vnalo_mobile/navigation/main_shell.dart';
 import 'package:vnalo_mobile/features/auth/widgets/phone_input.dart';
@@ -888,9 +890,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
             activeColor: isDarkMode ? DarkColors.primary : AppColors.primary,
             contentPadding: EdgeInsets.zero,
             side: BorderSide(color: isDarkMode ? DarkColors.divider : const Color(0xFFD1D5DB), width: 1.5),
-            title: Text(
-              t.agreeTermA,
-              style: TextStyle(fontSize: 16, color: isDarkMode ? DarkColors.textPrimary : const Color(0xFF252525)),
+            title: RichText(
+              text: TextSpan(
+                style: TextStyle(fontSize: 16, color: isDarkMode ? DarkColors.textPrimary : const Color(0xFF252525), height: 1.45),
+                children: [
+                  TextSpan(text: '${t.agreeTermA} '),
+                  TextSpan(
+                    text: t.viewTerms,
+                    style: TextStyle(
+                      color: isDarkMode ? DarkColors.primary : AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    recognizer: TapGestureRecognizer()
+                      ..onTap = () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const LegalDocumentScreen(type: LegalDocumentType.terms),
+                          ),
+                        );
+                      },
+                  ),
+                ],
+              ),
             ),
           ),
           CheckboxListTile(
@@ -901,9 +923,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
             activeColor: isDarkMode ? DarkColors.primary : AppColors.primary,
             contentPadding: EdgeInsets.zero,
             side: BorderSide(color: isDarkMode ? DarkColors.divider : const Color(0xFFD1D5DB), width: 1.5),
-            title: Text(
-              t.agreeTermB,
-              style: TextStyle(fontSize: 16, color: isDarkMode ? DarkColors.textPrimary : const Color(0xFF252525)),
+            title: RichText(
+              text: TextSpan(
+                style: TextStyle(fontSize: 16, color: isDarkMode ? DarkColors.textPrimary : const Color(0xFF252525), height: 1.45),
+                children: [
+                  TextSpan(text: '${t.agreeTermB} '),
+                  TextSpan(
+                    text: t.viewPrivacy,
+                    style: TextStyle(
+                      color: isDarkMode ? DarkColors.primary : AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    recognizer: TapGestureRecognizer()
+                      ..onTap = () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const LegalDocumentScreen(type: LegalDocumentType.privacy),
+                          ),
+                        );
+                      },
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 16),

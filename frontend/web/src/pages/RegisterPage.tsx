@@ -18,6 +18,7 @@ type RegisterFormState = {
   gender: Gender | ''
   password: string
   confirmPassword: string
+  acceptLegal: boolean
 }
 
 type RegisterErrors = Partial<Record<keyof RegisterFormState | 'otpCode', string>>
@@ -51,7 +52,7 @@ function isAtLeastAge(dobIso: string, minAge: number, referenceDate = new Date()
   return age >= minAge
 }
 
-function validateRegisterForm(values: RegisterFormState): RegisterErrors {
+function validateRegisterForm(values: RegisterFormState, t: (key: string) => string): RegisterErrors {
   const errors: RegisterErrors = {}
   const normalizedPhone = normalizeVietnamPhone(values.phone)
   const normalizedEmail = values.email.trim().toLowerCase()
@@ -73,6 +74,8 @@ function validateRegisterForm(values: RegisterFormState): RegisterErrors {
 
   if (values.confirmPassword !== values.password) errors.confirmPassword = 'Mật khẩu chưa khớp'
 
+  if (!values.acceptLegal) errors.acceptLegal = t('auth.termsRequired')
+
   return errors
 }
 
@@ -89,6 +92,7 @@ export function RegisterPage() {
     gender: '',
     password: '',
     confirmPassword: '',
+    acceptLegal: false,
   })
   const [otpCode, setOtpCode] = React.useState('')
   const [normalizedPhone, setNormalizedPhone] = React.useState('')
@@ -109,7 +113,7 @@ export function RegisterPage() {
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault()
-    const nextErrors = validateRegisterForm(form)
+    const nextErrors = validateRegisterForm(form, t)
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
 
@@ -245,6 +249,20 @@ export function RegisterPage() {
                   onChange={(e) => setField('confirmPassword', e.target.value)}
                 />
                 {errors.confirmPassword && <span className='auth-field-error'>{errors.confirmPassword}</span>}
+
+                <label className='auth-legal-consent'>
+                  <input
+                    type='checkbox'
+                    checked={form.acceptLegal}
+                    onChange={(e) => setField('acceptLegal', e.target.checked)}
+                    style={{ marginRight: 8 }}
+                  />
+                  {t('auth.termsPrefix')}{' '}
+                  <Link to='/legal/terms'>{t('auth.termsLinkLabel')}</Link>{' '}
+                  {t('auth.andConnector')}{' '}
+                  <Link to='/legal/privacy'>{t('auth.privacyLinkLabel')}</Link>.
+                </label>
+                {errors.acceptLegal && <span className='auth-field-error'>{errors.acceptLegal}</span>}
 
                 {errorMessage && <p className='auth-form-error'>{errorMessage}</p>}
 
