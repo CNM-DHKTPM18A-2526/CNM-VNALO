@@ -415,3 +415,135 @@
     justify-items: start;
   }
 }
+
+.admin-monitoring-success {
+  color: #166534;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.admin-monitoring-secondary-button,
+.admin-monitoring-rbac-form button,
+.admin-monitoring-rbac-row button {
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #0f172a;
+  font-weight: 800;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+.admin-monitoring-secondary-button:hover:not(:disabled),
+.admin-monitoring-rbac-form button:hover:not(:disabled),
+.admin-monitoring-rbac-row button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: #2563eb;
+  color: #1d4ed8;
+}
+
+.admin-monitoring-rbac-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.4fr) minmax(180px, 0.8fr) minmax(200px, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  background: #f8fafc;
+}
+
+.admin-monitoring-rbac-form label {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.admin-monitoring-rbac-form label span,
+.admin-monitoring-rbac-row small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.admin-monitoring-rbac-form input,
+.admin-monitoring-rbac-form select {
+  min-height: 44px;
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #0f172a;
+  padding: 0 14px;
+}
+
+.admin-monitoring-rbac-form button {
+  min-height: 44px;
+  border-color: #1d4ed8;
+  background: #1d4ed8;
+  color: #ffffff;
+}
+
+.admin-monitoring-rbac-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.admin-monitoring-rbac-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.4fr) minmax(180px, 1fr) minmax(180px, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.admin-monitoring-rbac-row div {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.admin-monitoring-rbac-row strong,
+.admin-monitoring-rbac-row span,
+.admin-monitoring-rbac-row time {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-monitoring-rbac-row span {
+  width: fit-content;
+  max-width: 100%;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.admin-monitoring-rbac-row button {
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+/* admin-monitoring-rbac-responsive */
+@media (max-width: 1024px) {
+  .admin-monitoring-rbac-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 820px) {
+  .admin-monitoring-rbac-form,
+  .admin-monitoring-rbac-row {
+    grid-template-columns: 1fr;
+  }
+}
