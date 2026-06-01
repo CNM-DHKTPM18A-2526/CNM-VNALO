@@ -1,4 +1,4 @@
-﻿import React from 'react'
+import React from 'react'
 
 import { API_BASE_URL, AI_API_URL, MEDIA_API_URL, MESSAGE_API_URL } from '../api.client'
 import { useAuth } from '../features/auth/useAuth'
@@ -26,6 +26,20 @@ type SessionAudit = {
   detail?: string
   severity?: EventSeverity
   createdAt?: string
+}
+
+type EventTrendPoint = {
+  bucket: string
+  total: number
+  warning: number
+  error: number
+}
+
+type EventPage = {
+  page: number
+  limit: number
+  hasMore: boolean
+  items: SessionAudit[]
 }
 
 type MonitoringSummary = {
@@ -129,11 +143,19 @@ function resolveApiError(response: Response, fallback: string) {
   return `${fallback} (${response.status})`
 }
 
-function buildQuery(filters: { windowHours: number; limit: number; eventType: string; platform: string }) {
+function buildEventsQuery(filters: { windowHours: number; limit: number; page: number; eventType: string; platform: string }) {
   const params = new URLSearchParams({
     windowHours: String(filters.windowHours),
     limit: String(filters.limit),
+    page: String(filters.page),
   })
+  if (filters.eventType !== 'ALL') params.set('eventType', filters.eventType)
+  if (filters.platform !== 'ALL') params.set('platform', filters.platform)
+  return params.toString()
+}
+
+function buildTrendQuery(filters: { windowHours: number; eventType: string; platform: string }) {
+  const params = new URLSearchParams({ windowHours: String(filters.windowHours) })
   if (filters.eventType !== 'ALL') params.set('eventType', filters.eventType)
   if (filters.platform !== 'ALL') params.set('platform', filters.platform)
   return params.toString()
@@ -148,6 +170,63 @@ function formatWindowLabel(hours: number, language: string) {
   return `Last ${hours} hours`
 }
 
+function formatBucketLabel(value: string, language: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+  return language === 'vi'
+    ? date.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
+    : date.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', month: '2-digit', day: '2-digit' })
+}
+
+function toCsv(rows: SessionAudit[]) {
+  const headers = ['created_at', 'event_type', 'severity', 'platform', 'device_name', 'device_id_masked', 'detail']
+  const escape = (input: string) => `"${input.replaceAll('"', '""')}"`
+  const body = rows.map((row) => [
+    row.createdAt ?? '',
+    row.eventType ?? '',
+    row.severity ?? 'info',
+    row.platform ?? '',
+    row.deviceName ?? '',
+    row.deviceIdMasked ?? '',
+    row.detail ?? '',
+  ].map((value) => escape(value)).join(','))
+  return [headers.join(','), ...body].join('\n')
+}
+
+function downloadCsv(csv: string, filename: string) {
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const link = document.createElement('a')
+  const url = URL.createObjectURL(blob)
+  link.href = url
+  link.setAttribute('download', filename)
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+function TrendBars({ points, language }: { points: EventTrendPoint[]; language: string }) {
+  if (points.length === 0) return <p className='admin-monitoring-empty'>{language === 'vi' ? 'Chưa có dữ liệu trend.' : 'No trend data yet.'}</p>
+  const maxValue = Math.max(...points.map((point) => point.total), 1)
+
+  return (
+    <div className='admin-monitoring-trend-list'>
+      {points.map((point, index) => {
+        const height = Math.max((point.total / maxValue) * 100, 4)
+        return (
+          <div className='admin-monitoring-trend-item' key={`${point.bucket}-${index}`}>
+            <div className='admin-monitoring-trend-bar-wrap'>
+              <div className='admin-monitoring-trend-bar' style={{ height: `${height}%` }} />
+            </div>
+            <strong>{point.total}</strong>
+            <small>{formatBucketLabel(point.bucket, language)}</small>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export function AdminMonitoringPage() {
   const { language } = useLanguage()
   const { user, accessToken } = useAuth()
@@ -160,6 +239,7 @@ export function AdminMonitoringPage() {
   const [services, setServices] = React.useState<ServiceProbe[]>([])
   const [summary, setSummary] = React.useState<MonitoringSummary | null>(null)
   const [audits, setAudits] = React.useState<SessionAudit[]>([])
+  const [trend, setTrend] = React.useState<EventTrendPoint[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [lastUpdated, setLastUpdated] = React.useState<Date | null>(null)
   const [monitoringError, setMonitoringError] = React.useState<string | null>(null)
@@ -167,6 +247,9 @@ export function AdminMonitoringPage() {
   const [selectedEventType, setSelectedEventType] = React.useState('ALL')
   const [selectedPlatform, setSelectedPlatform] = React.useState('ALL')
   const [autoRefresh, setAutoRefresh] = React.useState(true)
+  const [page, setPage] = React.useState(0)
+  const [hasMore, setHasMore] = React.useState(false)
+  const [pageLimit] = React.useState(20)
 
   const labels = language === 'vi'
     ? {
@@ -175,9 +258,11 @@ export function AdminMonitoringPage() {
         accessNote: 'Trang này yêu cầu email nằm trong allowlist admin ở backend. UI chỉ là gợi ý; backend mới là lớp kiểm soát thực sự.',
         refresh: 'Làm mới',
         refreshing: 'Đang tải...',
+        exportCsv: 'Xuất CSV',
         serviceHealth: 'Trạng thái dịch vụ',
         sessionAudits: 'Sự kiện gần đây',
         summary: 'Tổng quan',
+        trend: 'Xu hướng sự kiện',
         dataGuard: 'Nguyên tắc dữ liệu an toàn',
         healthyServices: 'Dịch vụ khỏe mạnh',
         needsAttention: 'Cần chú ý',
@@ -204,6 +289,9 @@ export function AdminMonitoringPage() {
         keySignals: 'Tín hiệu chính',
         serviceSummary: 'Tóm tắt dịch vụ',
         eventSummary: 'Tóm tắt sự kiện',
+        previousPage: 'Trang trước',
+        nextPage: 'Trang sau',
+        page: 'Trang',
       }
     : {
         title: 'Operations Monitoring',
@@ -211,9 +299,11 @@ export function AdminMonitoringPage() {
         accessNote: 'This page requires backend allowlist access. The UI hint is not a security boundary; the backend remains authoritative.',
         refresh: 'Refresh',
         refreshing: 'Refreshing...',
+        exportCsv: 'Export CSV',
         serviceHealth: 'Service health',
         sessionAudits: 'Recent events',
         summary: 'Overview',
+        trend: 'Event trend',
         dataGuard: 'Safe data guardrails',
         healthyServices: 'Healthy services',
         needsAttention: 'Needs attention',
@@ -240,6 +330,9 @@ export function AdminMonitoringPage() {
         keySignals: 'Key signals',
         serviceSummary: 'Service summary',
         eventSummary: 'Event summary',
+        previousPage: 'Previous page',
+        nextPage: 'Next page',
+        page: 'Page',
       }
 
   const load = React.useCallback(async () => {
@@ -266,33 +359,49 @@ export function AdminMonitoringPage() {
     )
 
     try {
-      const query = buildQuery({
+      const eventsQuery = buildEventsQuery({
         windowHours,
-        limit: 20,
+        limit: pageLimit,
+        page,
         eventType: selectedEventType,
         platform: selectedPlatform,
       })
-      const [summaryResponse, eventsResponse] = await Promise.all([
+      const trendQuery = buildTrendQuery({
+        windowHours,
+        eventType: selectedEventType,
+        platform: selectedPlatform,
+      })
+
+      const [summaryResponse, eventsResponse, trendResponse] = await Promise.all([
         fetchWithTimeout(`${API_BASE_URL}/admin/monitoring/summary?windowHours=${windowHours}`, accessToken),
-        fetchWithTimeout(`${API_BASE_URL}/admin/monitoring/events?${query}`, accessToken),
+        fetchWithTimeout(`${API_BASE_URL}/admin/monitoring/events?${eventsQuery}`, accessToken),
+        fetchWithTimeout(`${API_BASE_URL}/admin/monitoring/events/trend?${trendQuery}`, accessToken),
       ])
       if (!summaryResponse.ok) throw new Error(resolveApiError(summaryResponse, 'Monitoring summary failed'))
       if (!eventsResponse.ok) throw new Error(resolveApiError(eventsResponse, 'Monitoring events failed'))
+      if (!trendResponse.ok) throw new Error(resolveApiError(trendResponse, 'Monitoring trend failed'))
 
       const summaryPayload = (await summaryResponse.json().catch(() => null)) as unknown
       const eventsPayload = (await eventsResponse.json().catch(() => null)) as unknown
+      const trendPayload = (await trendResponse.json().catch(() => null)) as unknown
+
+      const eventPage = extractData<EventPage>(eventsPayload)
       setSummary(extractData<MonitoringSummary>(summaryPayload))
-      setAudits(extractArray(eventsPayload) as SessionAudit[])
+      setAudits(eventPage?.items ?? (extractArray(eventsPayload) as SessionAudit[]))
+      setHasMore(Boolean(eventPage?.hasMore))
+      setTrend((extractArray(trendPayload) as EventTrendPoint[]).slice(-24))
     } catch (error) {
       setSummary(null)
       setAudits([])
+      setTrend([])
+      setHasMore(false)
       setMonitoringError(error instanceof Error ? error.message : 'Monitoring API unavailable')
     }
 
     setServices(serviceResults)
     setLastUpdated(new Date())
     setIsLoading(false)
-  }, [accessToken, selectedEventType, selectedPlatform, windowHours])
+  }, [accessToken, page, pageLimit, selectedEventType, selectedPlatform, windowHours])
 
   React.useEffect(() => {
     void load()
@@ -306,10 +415,15 @@ export function AdminMonitoringPage() {
     return () => window.clearInterval(timer)
   }, [autoRefresh, load])
 
+  React.useEffect(() => {
+    setPage(0)
+  }, [windowHours, selectedEventType, selectedPlatform])
+
   const okCount = services.filter((service) => service.status === 'ok').length
   const issueCount = services.filter((service) => service.status !== 'ok').length
   const warningCount = audits.filter((audit) => audit.severity === 'warning').length
   const errorCount = audits.filter((audit) => audit.severity === 'error').length
+
   const summaryCards = [
     { label: labels.activeAccounts, value: summary?.accounts?.active ?? 0, tone: 'neutral' },
     { label: labels.activeRefreshTokens, value: summary?.sessions?.activeRefreshTokens ?? 0, tone: 'neutral' },
@@ -319,6 +433,13 @@ export function AdminMonitoringPage() {
     { label: labels.consentGranted, value: summary?.consent?.grantedTotal ?? 0, tone: 'neutral' },
     { label: 'QR pending', value: summary?.qr?.pendingNow ?? 0, tone: 'warning' },
   ]
+
+  const handleExportCsv = () => {
+    if (audits.length === 0) return
+    const csv = toCsv(audits)
+    const stamp = new Date().toISOString().replaceAll(':', '-')
+    downloadCsv(csv, `monitoring-events-page-${page + 1}-${stamp}.csv`)
+  }
 
   return (
     <div className='admin-monitoring-page'>
@@ -333,7 +454,10 @@ export function AdminMonitoringPage() {
             <input type='checkbox' checked={autoRefresh} onChange={(event) => setAutoRefresh(event.target.checked)} />
             <span>{labels.autoRefresh}</span>
           </label>
-          <button type='button' onClick={() => void load()} disabled={isLoading}>{isLoading ? labels.refreshing : labels.refresh}</button>
+          <div className='admin-monitoring-action-row'>
+            <button type='button' onClick={handleExportCsv} disabled={audits.length === 0}>{labels.exportCsv}</button>
+            <button type='button' onClick={() => void load()} disabled={isLoading}>{isLoading ? labels.refreshing : labels.refresh}</button>
+          </div>
         </div>
       </header>
 
@@ -411,6 +535,14 @@ export function AdminMonitoringPage() {
 
       <section className='admin-monitoring-panel'>
         <div className='admin-monitoring-panel-title'>
+          <h2>{labels.trend}</h2>
+          <span>{formatWindowLabel(windowHours, language)}</span>
+        </div>
+        <TrendBars points={trend} language={language} />
+      </section>
+
+      <section className='admin-monitoring-panel'>
+        <div className='admin-monitoring-panel-title'>
           <h2>{labels.serviceHealth}</h2>
           <span>{labels.serviceSummary}</span>
         </div>
@@ -483,6 +615,11 @@ export function AdminMonitoringPage() {
             ))}
           </div>
         )}
+        <div className='admin-monitoring-pagination'>
+          <button type='button' onClick={() => setPage((value) => Math.max(0, value - 1))} disabled={page === 0 || isLoading}>{labels.previousPage}</button>
+          <span>{labels.page} {page + 1}</span>
+          <button type='button' onClick={() => setPage((value) => value + 1)} disabled={!hasMore || isLoading}>{labels.nextPage}</button>
+        </div>
       </section>
 
       <section className='admin-monitoring-panel'>

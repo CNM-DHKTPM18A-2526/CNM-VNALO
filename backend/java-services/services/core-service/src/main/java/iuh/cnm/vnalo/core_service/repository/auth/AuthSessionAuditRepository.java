@@ -13,6 +13,13 @@ import java.util.UUID;
 
 @Repository
 public interface AuthSessionAuditRepository extends JpaRepository<AuthSessionAudit, UUID> {
+    interface MonitoringTrendProjection {
+        Instant getBucket();
+        long getTotal();
+        long getWarning();
+        long getError();
+    }
+
     List<AuthSessionAudit> findByAccountIdOrderByCreatedAtDesc(UUID accountId, Pageable pageable);
 
     List<AuthSessionAudit> findAllByOrderByCreatedAtDesc(Pageable pageable);
@@ -34,5 +41,28 @@ public interface AuthSessionAuditRepository extends JpaRepository<AuthSessionAud
             @Param("eventType") String eventType,
             @Param("platform") String platform,
             Pageable pageable
+    );
+
+    @Query(value = """
+            SELECT date_trunc(:bucketUnit, created_at) AS bucket,
+                   COUNT(*) AS total,
+                   SUM(CASE WHEN upper(coalesce(event_type, '')) LIKE '%REVOKED%'
+                             OR upper(coalesce(event_type, '')) LIKE '%PENDING%'
+                             OR upper(coalesce(event_type, '')) LIKE '%CHALLENGE%' THEN 1 ELSE 0 END) AS warning,
+                   SUM(CASE WHEN upper(coalesce(event_type, '')) LIKE '%FAILED%'
+                             OR upper(coalesce(event_type, '')) LIKE '%REJECTED%'
+                             OR upper(coalesce(event_type, '')) LIKE '%LOCKED%' THEN 1 ELSE 0 END) AS error
+            FROM auth_session_audit
+            WHERE created_at >= :since
+              AND (:eventType IS NULL OR event_type = :eventType)
+              AND (:platform IS NULL OR lower(platform) = lower(:platform))
+            GROUP BY bucket
+            ORDER BY bucket ASC
+            """, nativeQuery = true)
+    List<MonitoringTrendProjection> findMonitoringTrend(
+            @Param("since") Instant since,
+            @Param("bucketUnit") String bucketUnit,
+            @Param("eventType") String eventType,
+            @Param("platform") String platform
     );
 }

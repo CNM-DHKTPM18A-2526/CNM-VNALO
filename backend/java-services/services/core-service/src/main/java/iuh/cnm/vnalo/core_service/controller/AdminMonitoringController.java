@@ -3,8 +3,9 @@ package iuh.cnm.vnalo.core_service.controller;
 import iuh.cnm.vnalo.core_service.exception.ApiException;
 import iuh.cnm.vnalo.core_service.exception.ErrorCode;
 import iuh.cnm.vnalo.core_service.model.dto.response.ApiResponse;
-import iuh.cnm.vnalo.core_service.model.dto.response.admin.AdminMonitoringEventResponse;
+import iuh.cnm.vnalo.core_service.model.dto.response.admin.AdminMonitoringEventPageResponse;
 import iuh.cnm.vnalo.core_service.model.dto.response.admin.AdminMonitoringSummaryResponse;
+import iuh.cnm.vnalo.core_service.model.dto.response.admin.AdminMonitoringTrendPointResponse;
 import iuh.cnm.vnalo.core_service.security.UserPrincipal;
 import iuh.cnm.vnalo.core_service.service.admin.AdminMonitoringService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,17 +38,32 @@ public class AdminMonitoringController {
     }
 
     @GetMapping("/events")
-    @Operation(summary = "Recent monitoring events", description = "Authenticated recent session and security events")
-    public ResponseEntity<ApiResponse<List<AdminMonitoringEventResponse>>> getRecentEvents(
+    @Operation(summary = "Recent monitoring events", description = "Authenticated paged session and security events")
+    public ResponseEntity<ApiResponse<AdminMonitoringEventPageResponse>> getRecentEvents(
             @AuthenticationPrincipal UserPrincipal currentUser,
-            @RequestParam(defaultValue = "12") int limit,
+            @RequestParam(defaultValue = "20") Integer limit,
+            @RequestParam(defaultValue = "0") Integer page,
             @RequestParam(defaultValue = "24") Integer windowHours,
             @RequestParam(required = false) String eventType,
             @RequestParam(required = false) String platform
     ) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Monitoring events retrieved",
-                adminMonitoringService.getRecentEvents(resolveUserId(currentUser), limit, windowHours, eventType, platform)
+                adminMonitoringService.getRecentEvents(resolveUserId(currentUser), limit, page, windowHours, eventType, platform)
+        ));
+    }
+
+    @GetMapping("/events/trend")
+    @Operation(summary = "Monitoring event trend", description = "Authenticated event trend grouped by hour")
+    public ResponseEntity<ApiResponse<List<AdminMonitoringTrendPointResponse>>> getEventTrend(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @RequestParam(defaultValue = "24") Integer windowHours,
+            @RequestParam(required = false) String eventType,
+            @RequestParam(required = false) String platform
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Monitoring trend retrieved",
+                adminMonitoringService.getEventTrend(resolveUserId(currentUser), windowHours, eventType, platform)
         ));
     }
 

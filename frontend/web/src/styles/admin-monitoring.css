@@ -1,4 +1,4 @@
-﻿.admin-monitoring-page {
+.admin-monitoring-page {
   width: 100%;
   min-height: 100%;
   padding: 28px;
@@ -29,6 +29,14 @@
   flex-direction: column;
   gap: 12px;
   align-items: flex-end;
+}
+
+.admin-monitoring-action-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
 }
 
 .admin-monitoring-toggle {
@@ -70,9 +78,11 @@
   cursor: pointer;
 }
 
-.admin-monitoring-hero button:disabled {
-  opacity: 0.72;
-  cursor: wait;
+.admin-monitoring-hero button:disabled,
+.admin-monitoring-pagination button:disabled,
+.admin-monitoring-action-row button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .admin-monitoring-note {
@@ -174,6 +184,58 @@
   color: #0f172a;
 }
 
+.admin-monitoring-trend-list {
+  min-height: 220px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(42px, 1fr));
+  gap: 10px;
+  align-items: end;
+  padding: 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.admin-monitoring-trend-item {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: 140px auto auto;
+  gap: 8px;
+  align-items: end;
+  justify-items: center;
+}
+
+.admin-monitoring-trend-bar-wrap {
+  width: 100%;
+  height: 140px;
+  display: flex;
+  align-items: end;
+  justify-content: center;
+}
+
+.admin-monitoring-trend-bar {
+  width: min(100%, 30px);
+  min-height: 4px;
+  border-radius: 999px 999px 8px 8px;
+  background: linear-gradient(180deg, #0068ff 0%, #38bdf8 100%);
+  box-shadow: 0 10px 20px rgba(0, 104, 255, 0.16);
+}
+
+.admin-monitoring-trend-item strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.admin-monitoring-trend-item small {
+  max-width: 100%;
+  color: #64748b;
+  font-size: 11px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .admin-monitoring-service-list,
 .admin-monitoring-event-list {
   display: grid;
@@ -266,6 +328,29 @@
 .admin-monitoring-dot.warning { background: #f59e0b; }
 .admin-monitoring-dot.error { background: #dc2626; }
 
+.admin-monitoring-pagination {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.admin-monitoring-pagination button {
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #0f172a;
+  font-weight: 800;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+
+.admin-monitoring-pagination span {
+  color: #475569;
+  font-weight: 700;
+}
+
 .admin-monitoring-guardrails {
   margin: 12px 0 0;
   padding-left: 20px;
@@ -283,7 +368,9 @@
 @media (max-width: 820px) {
   .admin-monitoring-hero,
   .admin-monitoring-panel-title,
-  .admin-monitoring-hero-actions {
+  .admin-monitoring-hero-actions,
+  .admin-monitoring-action-row,
+  .admin-monitoring-pagination {
     flex-direction: column;
     align-items: stretch;
   }

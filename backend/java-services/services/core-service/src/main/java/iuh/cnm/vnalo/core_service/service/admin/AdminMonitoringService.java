@@ -3,8 +3,10 @@ package iuh.cnm.vnalo.core_service.service.admin;
 import iuh.cnm.vnalo.core_service.config.AdminMonitoringProperties;
 import iuh.cnm.vnalo.core_service.exception.ApiException;
 import iuh.cnm.vnalo.core_service.exception.ErrorCode;
+import iuh.cnm.vnalo.core_service.model.dto.response.admin.AdminMonitoringEventPageResponse;
 import iuh.cnm.vnalo.core_service.model.dto.response.admin.AdminMonitoringEventResponse;
 import iuh.cnm.vnalo.core_service.model.dto.response.admin.AdminMonitoringSummaryResponse;
+import iuh.cnm.vnalo.core_service.model.dto.response.admin.AdminMonitoringTrendPointResponse;
 import iuh.cnm.vnalo.core_service.model.entity.auth.AuthSessionAudit;
 import iuh.cnm.vnalo.core_service.model.enums.AccountStatus;
 import iuh.cnm.vnalo.core_service.model.enums.OtpPurpose;
@@ -35,6 +37,8 @@ public class AdminMonitoringService {
     private static final int DEFAULT_WINDOW_HOURS = 24;
     private static final int MIN_WINDOW_HOURS = 1;
     private static final int MAX_WINDOW_HOURS = 168;
+    private static final int DEFAULT_EVENT_LIMIT = 20;
+    private static final int MAX_EVENT_LIMIT = 100;
 
     private final AuthAccountRepository authAccountRepository;
     private final AuthLegalConsentRepository authLegalConsentRepository;
@@ -108,20 +112,57 @@ public class AdminMonitoringService {
     }
 
     @Transactional(readOnly = true)
-    public List<AdminMonitoringEventResponse> getRecentEvents(UUID requesterId, int limit, Integer windowHours, String eventType, String platform) {
+    public AdminMonitoringEventPageResponse getRecentEvents(
+            UUID requesterId,
+            Integer limit,
+            Integer page,
+            Integer windowHours,
+            String eventType,
+            String platform
+    ) {
         assertMonitoringAccess(requesterId);
-        int pageSize = Math.max(1, Math.min(limit, 50));
+        int safeLimit = limit == null ? DEFAULT_EVENT_LIMIT : Math.max(1, Math.min(limit, MAX_EVENT_LIMIT));
+        int safePage = page == null ? 0 : Math.max(0, page);
         Instant since = resolveSince(windowHours, Instant.now());
-        String normalizedEventType = normalizeOptionalFilter(eventType);
-        String normalizedPlatform = normalizeOptionalFilter(platform);
-        return authSessionAuditRepository.findMonitoringEvents(
-                        since,
-                        normalizedEventType,
-                        normalizedPlatform,
-                        PageRequest.of(0, pageSize)
-                )
-                .stream()
+        String normalizedEventType = normalizeOptionalFilter(eventType, true);
+        String normalizedPlatform = normalizeOptionalFilter(platform, true);
+
+        List<AuthSessionAudit> fetchedEvents = authSessionAuditRepository.findMonitoringEvents(
+                since,
+                normalizedEventType,
+                normalizedPlatform,
+                PageRequest.of(safePage, safeLimit + 1)
+        );
+
+        boolean hasMore = fetchedEvents.size() > safeLimit;
+        List<AdminMonitoringEventResponse> items = fetchedEvents.stream()
+                .limit(safeLimit)
                 .map(this::toEventResponse)
+                .toList();
+
+        return new AdminMonitoringEventPageResponse(safePage, safeLimit, hasMore, items);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AdminMonitoringTrendPointResponse> getEventTrend(
+            UUID requesterId,
+            Integer windowHours,
+            String eventType,
+            String platform
+    ) {
+        assertMonitoringAccess(requesterId);
+        Instant since = resolveSince(windowHours, Instant.now());
+        String normalizedEventType = normalizeOptionalFilter(eventType, true);
+        String normalizedPlatform = normalizeOptionalFilter(platform, true);
+
+        return authSessionAuditRepository.findMonitoringTrend(since, "hour", normalizedEventType, normalizedPlatform)
+                .stream()
+                .map(point -> new AdminMonitoringTrendPointResponse(
+                        point.getBucket(),
+                        point.getTotal(),
+                        point.getWarning(),
+                        point.getError()
+                ))
                 .toList();
     }
 
@@ -145,15 +186,21 @@ public class AdminMonitoringService {
     }
 
     private Instant resolveSince(Integer windowHours, Instant now) {
-        int safeWindowHours = windowHours == null ? DEFAULT_WINDOW_HOURS : Math.max(MIN_WINDOW_HOURS, Math.min(windowHours, MAX_WINDOW_HOURS));
+        int safeWindowHours = windowHours == null
+                ? DEFAULT_WINDOW_HOURS
+                : Math.max(MIN_WINDOW_HOURS, Math.min(windowHours, MAX_WINDOW_HOURS));
         return now.minusSeconds(safeWindowHours * 60L * 60L);
     }
 
-    private String normalizeOptionalFilter(String value) {
+    private String normalizeOptionalFilter(String value, boolean uppercase) {
         if (!StringUtils.hasText(value)) {
             return null;
         }
-        return value.trim();
+        String normalized = value.trim();
+        if (normalized.equalsIgnoreCase("ALL")) {
+            return null;
+        }
+        return uppercase ? normalized.toUpperCase(Locale.ROOT) : normalized;
     }
 
     private String normalizeEmail(String email) {
