@@ -10,13 +10,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -36,9 +38,15 @@ class AiInteractionControllerTest {
         SecurityContextHolder.clearContext();
     }
 
+    private void authenticateTestUser() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("user-1", null, java.util.Collections.emptyList())
+        );
+    }
+
     @Test
     void interactWithMascot_shouldReturnGracefulFallbackWhenProvidersFail() {
-        SecurityContextHolder.getContext().setAuthentication(new TestingAuthenticationToken("user-1", null));
+        authenticateTestUser();
         AiInteractionController controller = new AiInteractionController(geminiAiService, chatService);
         AiChatRequest request = AiChatRequest.builder()
                 .prompt("hello")
@@ -62,8 +70,19 @@ class AiInteractionControllerTest {
     }
 
     @Test
+    void interactWithMascot_shouldRequireAuthenticatedUserBeforeFallback() {
+        AiInteractionController controller = new AiInteractionController(geminiAiService, chatService);
+        AiChatRequest request = AiChatRequest.builder()
+                .prompt("hello")
+                .analyzeIntent(true)
+                .build();
+
+        assertThrows(InsufficientAuthenticationException.class, () -> controller.interactWithMascot(request));
+    }
+
+    @Test
     void interactWithMascot_shouldPreserveLocalCallCommandWhenProvidersFail() {
-        SecurityContextHolder.getContext().setAuthentication(new TestingAuthenticationToken("user-1", null));
+        authenticateTestUser();
         AiInteractionController controller = new AiInteractionController(geminiAiService, chatService);
         AiChatRequest request = AiChatRequest.builder()
                 .prompt("call video for this friend")
@@ -87,7 +106,7 @@ class AiInteractionControllerTest {
 
     @Test
     void interactWithMascot_shouldDetectVietnameseAccentedCallIntentWhenProvidersFail() {
-        SecurityContextHolder.getContext().setAuthentication(new TestingAuthenticationToken("user-1", null));
+        authenticateTestUser();
         AiInteractionController controller = new AiInteractionController(geminiAiService, chatService);
         AiChatRequest request = AiChatRequest.builder()
                 .prompt("Hãy gọi video cho mẹ giúp mình")
