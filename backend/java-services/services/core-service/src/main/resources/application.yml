@@ -149,7 +149,7 @@ logging:
 
 app:
   sync-policy:
-    enforce-web-restriction: false
+    enforce-web-restriction: ${APP_SYNC_POLICY_ENFORCE_WEB_RESTRICTION:false}
   admin:
     monitoring:
       allowed-emails: ${ADMIN_MONITORING_ALLOWED_EMAILS:}
