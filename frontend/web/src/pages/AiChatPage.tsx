@@ -78,6 +78,58 @@ type ActionFeedbackState = {
   tone: 'info' | 'success' | 'warning' | 'error'
   message: string
 }
+
+function resolveErrorPresentation(error: unknown): { message: string; providerStatus: ProviderStatus; degraded: boolean } {
+  const response = (error as { response?: { status?: number; data?: unknown } } | undefined)?.response
+  const status = response?.status ?? null
+  const extracted = extractMessage(response?.data) || extractMessage(error)
+
+  if (status === 401) {
+    return {
+      message: extracted || 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để tiếp tục dùng Trợ lý AI.',
+      providerStatus: null,
+      degraded: false,
+    }
+  }
+
+  if (status === 403) {
+    return {
+      message: extracted || 'Bạn chưa có quyền truy cập Trợ lý AI từ phiên đăng nhập hiện tại.',
+      providerStatus: null,
+      degraded: false,
+    }
+  }
+
+  if (status === 404) {
+    return {
+      message: extracted || 'Đường dẫn AI trên máy chủ chưa sẵn sàng hoặc đang cấu hình sai. Vui lòng kiểm tra deploy gateway.',
+      providerStatus: null,
+      degraded: false,
+    }
+  }
+
+  if (status === 429) {
+    return {
+      message: extracted || 'AI đang quá tải hoặc chạm giới hạn tạm thời. Hãy thử lại sau ít phút.',
+      providerStatus: 'AI_PROVIDER_UNAVAILABLE',
+      degraded: true,
+    }
+  }
+
+  if (status === 503) {
+    return {
+      message: extracted || 'Nhà cung cấp AI hiện chưa sẵn sàng. Hãy thử lại sau ít phút.',
+      providerStatus: 'AI_PROVIDER_UNAVAILABLE',
+      degraded: true,
+    }
+  }
+
+  return {
+    message: extracted || 'Đã xảy ra lỗi khi kết nối tới Trợ lý AI. Vui lòng thử lại sau.',
+    providerStatus: null,
+    degraded: false,
+  }
+}
 const STORAGE_KEY = 'vnalo_ai_chat_history'
 const LEGACY_STORAGE_KEY = STORAGE_KEY
 const DRAFT_KEY_PREFIX = 'vnalo_ai_web_compose_draft:'
@@ -646,17 +698,14 @@ export function AiChatPage() {
       }
     } catch (error) {
       console.error('AI chat failed:', error)
-      const fallbackText =
-        extractMessage((error as { response?: { data?: unknown } })?.response?.data) ||
-        extractMessage(error) ||
-        'Đã xảy ra lỗi khi kết nối tới Trợ lý AI. Vui lòng thử lại sau.'
+      const errorPresentation = resolveErrorPresentation(error)
 
       const errorMessage: AiMessage = {
         role: 'assistant',
-        content: fallbackText,
+        content: errorPresentation.message,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        degraded: true,
-        providerStatus: 'AI_PROVIDER_UNAVAILABLE',
+        degraded: errorPresentation.degraded,
+        providerStatus: errorPresentation.providerStatus,
       }
 
       if (!isUnmountedRef.current) {
