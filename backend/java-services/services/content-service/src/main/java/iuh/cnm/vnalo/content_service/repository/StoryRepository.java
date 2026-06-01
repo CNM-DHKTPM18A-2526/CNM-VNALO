@@ -3,8 +3,6 @@ package iuh.cnm.vnalo.content_service.repository;
 import iuh.cnm.vnalo.content_service.model.entity.Story;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.time.OffsetDateTime;
-import java.util.List;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -15,15 +13,15 @@ import java.util.UUID;
 
 public interface StoryRepository extends JpaRepository<Story, UUID> {
 
-    @Query(value = "SELECT * FROM content.story s WHERE s.status = :status AND s.expires_at > :now AND (" +
-            " s.author_id = :userId OR " +
-            " s.visibility = 'PUBLIC' OR " +
-            " s.visibility = 'FRIENDS' " +
-            ") ORDER BY s.created_at DESC", nativeQuery = true)
-    List<Story> findActiveStoriesForUser(
+    @Query("""
+            SELECT s FROM Story s
+            WHERE s.status = :status
+              AND s.expiresAt > :now
+            ORDER BY s.createdAt DESC
+            """)
+    List<Story> findActiveStories(
             @Param("status") String status,
-            @Param("now") OffsetDateTime now,
-            @Param("userId") UUID userId
+            @Param("now") OffsetDateTime now
     );
 
     List<Story> findByStatusAndExpiresAtAfterOrderByCreatedAtDesc(

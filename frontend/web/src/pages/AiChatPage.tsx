@@ -1077,9 +1077,7 @@ export function AiChatPage() {
                 <span className='ai-message-role'>{message.role === 'assistant' ? 'VNALO AI' : 'Bạn'}</span>
                 {message.role === 'assistant' && message.providerStatus ? <span className='ai-message-status'>{message.providerStatus === 'FALLBACK_PROVIDER_ACTIVE' ? 'Fallback' : message.providerStatus === 'LIVE_PROVIDER_ACTIVE' ? 'Live' : 'Tạm gián đoạn'}</span> : null}
               </div>
-              <p className='text-[14.5px] whitespace-pre-wrap' style={{ margin: 0 }}>
-                {message.content}
-              </p>
+              <p className='ai-message-text'>{message.content}</p>
               {message.role === 'assistant' && message.actionCommand ? (
                 <div className='ai-action-row'>
                   <button
@@ -1092,9 +1090,7 @@ export function AiChatPage() {
                   </button>
                 </div>
               ) : null}
-              <div className='text-[10px] opacity-60 text-right mt-1.5' style={{ marginTop: '6px' }}>
-                {message.timestamp}
-              </div>
+              <div className='ai-message-time'>{message.timestamp}</div>
             </div>
           ))}
           {isLoading && (

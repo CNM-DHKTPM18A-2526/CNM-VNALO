@@ -3,7 +3,7 @@ import { UserAvatar } from '../../../shared/components/UserAvatar'
 import { formatPresence } from '../utils/presenceUtils'
 import { getGroupCollageData } from '../../../shared/utils/avatarUtils'
 import { useUserStore } from '../context/UserStoreContext'
-import { formatMessagePreview } from '../utils/messageUtils'
+import { formatMessagePreview, formatReactionSyncPreview } from '../utils/messageUtils'
 
 import { useAuth } from '../../auth/useAuth'
 
@@ -73,6 +73,14 @@ export function ChatItem({ conversation, active, onSelect }: ChatItemProps) {
 
               // Defensive: if message looks like raw JSON system action, apply formatting
               if (typeof msg === 'string' && msg.trim().startsWith('{') && msg.includes('"action":')) {
+                const actorName = conversation.lastMessageSenderId === user?.id
+                  ? 'Bạn'
+                  : userMap[conversation.lastMessageSenderId || '']?.displayName
+                const reactionSyncPreview = formatReactionSyncPreview(msg, actorName)
+                if (reactionSyncPreview) {
+                  return reactionSyncPreview
+                }
+
                 try {
                   const parsed = JSON.parse(msg)
                   if (parsed.action) {

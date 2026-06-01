@@ -12,6 +12,9 @@ spring:
     username: ${DB_USER:postgres}
     password: ${DB_PASS:postgres}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      # friendship nằm ở schema public; story ở content
+      connection-init-sql: SET search_path TO content, public
 
   jpa:
     hibernate:
@@ -34,6 +37,16 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+
+# JWT — must match core-service (same secret as đăng nhập web/server)
+jwt:
+  secret: ${JWT_SECRET}
+  issuer: ${JWT_ISSUER:vnalo}
+
+# Khi chạy content local nhưng user đăng nhập vnalo.fit → lấy danh sách bạn từ core
+app:
+  core-service:
+    base-url: ${CORE_SERVICE_URL:}
 
 logging:
   level:
