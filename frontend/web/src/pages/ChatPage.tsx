@@ -1017,8 +1017,8 @@ export default function ChatPage() {
       for (const row of rows) {
         let reactionKey = EMOJI_TO_REACTION_KEY[row.emoji]
 
-        // Handle poll votes (vote:prefix)
-        if (!reactionKey && row.emoji.startsWith('vote:')) {
+        // Handle poll votes (vote:/v: prefixes)
+        if (!reactionKey && (row.emoji.startsWith('vote:') || row.emoji.startsWith('v:'))) {
           reactionKey = row.emoji as ReactionKey
         }
 
@@ -1983,6 +1983,11 @@ export default function ChatPage() {
         return
       }
 
+      const message = (messagesByConversationRef.current[selectedConversationId] ?? []).find(
+        (item) => item.id === messageId,
+      )
+      const isPollMultipleChoice = Boolean(message?.type === 'poll' && message.pollData?.allowMultiple)
+
       let emoji = REACTION_OPTIONS.find((item) => item.key === reactionKey)?.emoji
       if (!emoji) {
         if (typeof reactionKey === 'string' && (reactionKey.startsWith('vote:') || reactionKey.startsWith('v:'))) {
@@ -1999,17 +2004,19 @@ export default function ChatPage() {
             const current = prev[messageId] || { reactions: {} };
             const nextReactions = { ...current.reactions };
 
-            // In poll voting, remove any other poll-related reactions (vote: or v:) from this user
-            Object.keys(nextReactions).forEach(key => {
-              const r = nextReactions[key as ReactionKey];
-              if ((key.startsWith('vote:') || key.startsWith('v:')) && r?.myCount > 0) {
-                nextReactions[key as ReactionKey] = {
-                  count: Math.max(0, r.count - 1),
-                  myCount: 0,
-                  userIds: r.userIds.filter(id => id !== user.id)
-                };
-              }
-            });
+            if (!isPollMultipleChoice) {
+              // Single-choice poll: remove any other poll-related reactions from this user
+              Object.keys(nextReactions).forEach(key => {
+                const r = nextReactions[key as ReactionKey];
+                if ((key.startsWith('vote:') || key.startsWith('v:')) && r?.myCount > 0) {
+                  nextReactions[key as ReactionKey] = {
+                    count: Math.max(0, r.count - 1),
+                    myCount: 0,
+                    userIds: r.userIds.filter(id => id !== user.id)
+                  };
+                }
+              });
+            }
 
             const currentCount = nextReactions[reactionKey as ReactionKey]?.count || 0;
             const currentUserIds = nextReactions[reactionKey as ReactionKey]?.userIds || [];
