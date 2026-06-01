@@ -17,12 +17,59 @@ type ServiceProbe = {
 type SessionAudit = {
   auditId?: string
   eventType?: string
-  fromStatus?: string
-  toStatus?: string
-  deviceId?: string
+  sessionType?: string
+  trustLevel?: string
   platform?: string
-  reason?: string
+  deviceName?: string
+  deviceIdMasked?: string
+  detail?: string
   createdAt?: string
+}
+
+type MonitoringSummary = {
+  generatedAt?: string
+  accessMode?: string
+  accounts?: {
+    total?: number
+    active?: number
+    locked?: number
+    disabled?: number
+    pendingVerification?: number
+    withFailedLogins?: number
+    failedLoginAttemptsTotal?: number
+  }
+  sessions?: {
+    activeRefreshTokens?: number
+    revokedLast24Hours?: number
+    activeMobileSessions?: number
+  }
+  audits?: {
+    totalEvents?: number
+    last24Hours?: number
+    loginSuccessLast24Hours?: number
+    loginFailureLast24Hours?: number
+    logoutLast24Hours?: number
+    qrApprovalLast24Hours?: number
+  }
+  otp?: {
+    last24Hours?: number
+    registerLast24Hours?: number
+    resetPasswordLast24Hours?: number
+    verifiedLast24Hours?: number
+  }
+  ai?: {
+    messagesLast24Hours?: number
+    userPromptsLast24Hours?: number
+    assistantRepliesLast24Hours?: number
+    distinctActiveUsersLast24Hours?: number
+  }
+  qr?: {
+    createdLast24Hours?: number
+    pendingNow?: number
+    approvedLast24Hours?: number
+    consumedLast24Hours?: number
+    rejectedTotal?: number
+  }
 }
 
 const timeoutMs = 4500
@@ -53,6 +100,12 @@ function extractArray(payload: unknown): unknown[] {
   return []
 }
 
+function extractData<T>(payload: unknown): T | null {
+  if (!payload || typeof payload !== 'object') return null
+  const obj = payload as Record<string, unknown>
+  return (obj.data ?? payload) as T
+}
+
 function isLikelyAdmin(email?: string | null) {
   if (!email) return false
   return /(^admin@|\.admin@|@admin\.)/i.test(email)
@@ -62,6 +115,7 @@ export function AdminMonitoringPage() {
   const { language } = useLanguage()
   const { user, accessToken } = useAuth()
   const [services, setServices] = React.useState<ServiceProbe[]>([])
+  const [summary, setSummary] = React.useState<MonitoringSummary | null>(null)
   const [audits, setAudits] = React.useState<SessionAudit[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [lastUpdated, setLastUpdated] = React.useState<Date | null>(null)
@@ -69,10 +123,11 @@ export function AdminMonitoringPage() {
     ? {
         title: 'Giám sát vận hành',
         subtitle: 'Theo dõi trạng thái dịch vụ, sự kiện phiên đăng nhập và các rủi ro cần kiểm tra mà không hiển thị dữ liệu nhạy cảm.',
-        accessNote: 'Trang này là dashboard MVP. Backend cần bổ sung role admin/API tổng hợp để khóa quyền nghiêm ngặt ở production.',
+        accessNote: 'Trang này là dashboard MVP có API metadata thật. Backend production vẫn cần bổ sung role admin để khóa quyền nghiêm ngặt.',
         refresh: 'Làm mới',
         serviceHealth: 'Trạng thái dịch vụ',
         sessionAudits: 'Sự kiện phiên gần đây',
+        summary: 'Tổng quan 24 giờ',
         dataGuard: 'Nguyên tắc dữ liệu an toàn',
         noAudits: 'Chưa có sự kiện phiên hoặc API chưa trả dữ liệu.',
         updated: 'Cập nhật',
@@ -80,10 +135,11 @@ export function AdminMonitoringPage() {
     : {
         title: 'Operations Monitoring',
         subtitle: 'Monitor service status, session events, and risks without exposing sensitive user data.',
-        accessNote: 'This is an MVP dashboard. Backend admin roles/summary APIs should enforce strict production access.',
+        accessNote: 'This MVP dashboard uses real metadata APIs. Production backend still needs strict admin role enforcement.',
         refresh: 'Refresh',
         serviceHealth: 'Service health',
         sessionAudits: 'Recent session events',
+        summary: '24-hour summary',
         dataGuard: 'Safe data guardrails',
         noAudits: 'No session events yet or the API returned no data.',
         updated: 'Updated',
@@ -102,9 +158,7 @@ export function AdminMonitoringPage() {
       probes.map(async (probe): Promise<ServiceProbe> => {
         try {
           const response = await fetchWithTimeout(probe.url, accessToken)
-          if (response.ok) {
-            return { ...probe, status: 'ok', detail: `${response.status}` }
-          }
+          if (response.ok) return { ...probe, status: 'ok', detail: `${response.status}` }
           return { ...probe, status: response.status >= 500 ? 'error' : 'warning', detail: `${response.status}` }
         } catch (error) {
           return { ...probe, status: 'error', detail: error instanceof Error ? error.message : 'unreachable' }
@@ -113,10 +167,16 @@ export function AdminMonitoringPage() {
     )
 
     try {
-      const response = await fetchWithTimeout(`${API_BASE_URL}/auth/session-audit?limit=12`, accessToken)
-      const payload = (await response.json().catch(() => null)) as unknown
-      setAudits(extractArray(payload) as SessionAudit[])
+      const [summaryResponse, eventsResponse] = await Promise.all([
+        fetchWithTimeout(`${API_BASE_URL}/admin/monitoring/summary`, accessToken),
+        fetchWithTimeout(`${API_BASE_URL}/admin/monitoring/events?limit=12`, accessToken),
+      ])
+      const summaryPayload = (await summaryResponse.json().catch(() => null)) as unknown
+      const eventsPayload = (await eventsResponse.json().catch(() => null)) as unknown
+      setSummary(extractData<MonitoringSummary>(summaryPayload))
+      setAudits(extractArray(eventsPayload) as SessionAudit[])
     } catch {
+      setSummary(null)
       setAudits([])
     }
 
@@ -131,6 +191,14 @@ export function AdminMonitoringPage() {
 
   const okCount = services.filter((service) => service.status === 'ok').length
   const issueCount = services.filter((service) => service.status !== 'ok').length
+  const summaryCards = [
+    { label: language === 'vi' ? 'Tài khoản hoạt động' : 'Active accounts', value: summary?.accounts?.active ?? 0 },
+    { label: language === 'vi' ? 'Refresh token còn hiệu lực' : 'Active refresh tokens', value: summary?.sessions?.activeRefreshTokens ?? 0 },
+    { label: language === 'vi' ? 'AI messages 24h' : 'AI messages 24h', value: summary?.ai?.messagesLast24Hours ?? 0 },
+    { label: language === 'vi' ? 'Login fail 24h' : 'Login failures 24h', value: summary?.audits?.loginFailureLast24Hours ?? 0 },
+    { label: language === 'vi' ? 'OTP xác thực 24h' : 'OTP verified 24h', value: summary?.otp?.verifiedLast24Hours ?? 0 },
+    { label: language === 'vi' ? 'QR pending' : 'QR pending', value: summary?.qr?.pendingNow ?? 0 },
+  ]
 
   return (
     <div className='admin-monitoring-page'>
@@ -144,6 +212,7 @@ export function AdminMonitoringPage() {
       </header>
 
       {!isLikelyAdmin(user?.email) ? <div className='admin-monitoring-note'>{labels.accessNote}</div> : null}
+      {summary?.accessMode ? <div className='admin-monitoring-note'>Access mode: {summary.accessMode}</div> : null}
 
       <section className='admin-monitoring-grid'>
         <article className='admin-monitoring-card'>
@@ -158,6 +227,15 @@ export function AdminMonitoringPage() {
           <span>{language === 'vi' ? 'Sự kiện phiên' : 'Session events'}</span>
           <strong>{audits.length}</strong>
         </article>
+      </section>
+
+      <section className='admin-monitoring-grid'>
+        {summaryCards.map((card) => (
+          <article className='admin-monitoring-card' key={card.label}>
+            <span>{card.label}</span>
+            <strong>{card.value}</strong>
+          </article>
+        ))}
       </section>
 
       <section className='admin-monitoring-panel'>
@@ -181,6 +259,30 @@ export function AdminMonitoringPage() {
 
       <section className='admin-monitoring-panel'>
         <div className='admin-monitoring-panel-title'>
+          <h2>{labels.summary}</h2>
+          {summary?.generatedAt ? <span>{new Date(summary.generatedAt).toLocaleString()}</span> : null}
+        </div>
+        <div className='admin-monitoring-event-list'>
+          <div className='admin-monitoring-event-row'>
+            <strong>{language === 'vi' ? 'Tổng tài khoản' : 'Total accounts'}</strong>
+            <span>{language === 'vi' ? 'Active / locked / disabled / pending' : 'Active / locked / disabled / pending'}</span>
+            <time>{summary?.accounts?.total ?? 0}</time>
+          </div>
+          <div className='admin-monitoring-event-row'>
+            <strong>{language === 'vi' ? 'Failed login count' : 'Failed login count'}</strong>
+            <span>{language === 'vi' ? 'Tổng failed_login_count hiện tại' : 'Current accumulated failed_login_count'}</span>
+            <time>{summary?.accounts?.failedLoginAttemptsTotal ?? 0}</time>
+          </div>
+          <div className='admin-monitoring-event-row'>
+            <strong>{language === 'vi' ? 'QR approved 24h' : 'QR approved 24h'}</strong>
+            <span>{language === 'vi' ? 'Lượt QR approval gần đây' : 'Recent QR approvals'}</span>
+            <time>{summary?.qr?.approvedLast24Hours ?? 0}</time>
+          </div>
+        </div>
+      </section>
+
+      <section className='admin-monitoring-panel'>
+        <div className='admin-monitoring-panel-title'>
           <h2>{labels.sessionAudits}</h2>
         </div>
         {audits.length === 0 ? (
@@ -189,8 +291,8 @@ export function AdminMonitoringPage() {
           <div className='admin-monitoring-event-list'>
             {audits.map((audit, index) => (
               <div className='admin-monitoring-event-row' key={audit.auditId ?? index}>
-                <strong>{audit.eventType ?? `${audit.fromStatus ?? '-'} → ${audit.toStatus ?? '-'}`}</strong>
-                <span>{audit.platform ?? 'WEB'} · {audit.reason ?? 'session update'}</span>
+                <strong>{audit.eventType ?? 'SESSION_EVENT'}</strong>
+                <span>{audit.platform ?? 'WEB'} · {audit.deviceName ?? 'Unknown device'} · {audit.detail ?? 'session update'}</span>
                 <time>{audit.createdAt ? new Date(audit.createdAt).toLocaleString() : '-'}</time>
               </div>
             ))}
