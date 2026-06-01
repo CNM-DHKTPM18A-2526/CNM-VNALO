@@ -370,6 +370,9 @@ class AiAssistantProvider with ChangeNotifier {
   bool _isSessionActive = false;
   bool _isSttInitialized = false;
   bool _isPipelineLocked = false;
+  String? _queuedTextPrompt;
+  String? _queuedTextPromptSource;
+  AiResponseSurface? _queuedTextPromptSurface;
   int _operationToken = 0;
   String _activeTraceId = '';
   String? _resolvedLocaleId;
@@ -1793,6 +1796,18 @@ class AiAssistantProvider with ChangeNotifier {
       await stopCurrentPipeline(reason: '$source.preempt');
     }
 
+    if (_isPipelineLocked) {
+      _queuedTextPrompt = normalized;
+      _queuedTextPromptSource = source;
+      _queuedTextPromptSurface = surface;
+      _logEvent(
+        'PIPELINE_QUEUE',
+        level: 'INFO',
+        data: {'source': source, 'text': normalized},
+      );
+      return;
+    }
+
     await _handleCommand(normalized, parentTraceId: _newTraceId(source));
   }
 
@@ -1988,6 +2003,23 @@ class AiAssistantProvider with ChangeNotifier {
           _scheduleIdleAutoHide(reason: 'pipeline_complete_empty');
         }
         notifyListeners();
+
+        final queuedTextPrompt = _queuedTextPrompt;
+        final queuedTextPromptSource = _queuedTextPromptSource;
+        final queuedTextPromptSurface = _queuedTextPromptSurface;
+        _queuedTextPrompt = null;
+        _queuedTextPromptSource = null;
+        _queuedTextPromptSurface = null;
+
+        if (queuedTextPrompt != null && queuedTextPrompt.trim().isNotEmpty) {
+          unawaited(
+            submitTextPrompt(
+              queuedTextPrompt,
+              source: queuedTextPromptSource ?? 'chat_board',
+              surface: queuedTextPromptSurface,
+            ),
+          );
+        }
       }
     }
   }

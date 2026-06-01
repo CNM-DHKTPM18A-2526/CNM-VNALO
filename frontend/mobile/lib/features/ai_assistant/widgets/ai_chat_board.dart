@@ -842,6 +842,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
                           controller: _inputController,
                           focusNode: _inputFocusNode,
                           textInputAction: TextInputAction.send,
+                          onTapOutside: (_) => _inputFocusNode.unfocus(),
                           onSubmitted: (_) => _submitTextPrompt(),
                           minLines: 1,
                           maxLines: 3,

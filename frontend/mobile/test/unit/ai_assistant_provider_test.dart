@@ -242,6 +242,47 @@ void main() {
   );
 
   test(
+    'submitTextPrompt queues latest prompt while pipeline is busy',
+    () async {
+      final provider = _buildProvider(
+        responses: {
+          'Prompt dau': {'textReply': 'Phan hoi dau.', 'emotion': 'neutral'},
+          'Prompt sau': {'textReply': 'Phan hoi sau.', 'emotion': 'neutral'},
+        },
+        responseDelay: const Duration(milliseconds: 120),
+      );
+
+      final firstSubmit = provider.submitTextPrompt(
+        'Prompt dau',
+        source: 'chat_board_test',
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+
+      await provider.submitTextPrompt(
+        'Prompt sau',
+        source: 'chat_board_test',
+        surface: AiResponseSurface.bubble,
+      );
+
+      await firstSubmit;
+      await Future<void>.delayed(const Duration(milliseconds: 180));
+
+      expect(provider.lastUserPrompt, 'Prompt sau');
+      expect(provider.aiResponse, 'Phan hoi sau.');
+      expect(
+        provider.conversationHistory.where(
+          (entry) =>
+              entry.role == AiConversationRole.user &&
+              (entry.text == 'Prompt dau' || entry.text == 'Prompt sau'),
+        ),
+        hasLength(2),
+      );
+
+      provider.dispose();
+    },
+  );
+
+  test(
     'submitTextPrompt surface override takes precedence over source',
     () async {
       final provider = _buildProvider(
