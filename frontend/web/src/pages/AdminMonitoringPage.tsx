@@ -163,8 +163,8 @@ function buildTrendQuery(filters: { windowHours: number; eventType: string; plat
 
 function formatWindowLabel(hours: number, language: string) {
   if (language === 'vi') {
-    if (hours === 168) return '7 ngÃ y gáº§n nháº¥t'
-    return `${hours} giá» gáº§n nháº¥t`
+    if (hours === 168) return '7 ngày gần nhất'
+    return `${hours} giờ gần nhất`
   }
   if (hours === 168) return 'Last 7 days'
   return `Last ${hours} hours`
@@ -206,7 +206,7 @@ function downloadCsv(csv: string, filename: string) {
 }
 
 function TrendBars({ points, language }: { points: EventTrendPoint[]; language: string }) {
-  if (points.length === 0) return <p className='admin-monitoring-empty'>{language === 'vi' ? 'ChÆ°a cÃ³ dá»¯ liá»‡u trend.' : 'No trend data yet.'}</p>
+  if (points.length === 0) return <p className='admin-monitoring-empty'>{language === 'vi' ? 'Chưa có dữ liệu trend.' : 'No trend data yet.'}</p>
   const maxValue = Math.max(...points.map((point) => point.total), 1)
 
   return (
@@ -249,43 +249,43 @@ export function AdminMonitoringPage() {
 
   const labels = language === 'vi'
     ? {
-        title: 'GiÃ¡m sÃ¡t váº­n hÃ nh',
-        subtitle: 'Theo dÃµi sá»©c khá»e dá»‹ch vá»¥, hÃ nh vi Ä‘Äƒng nháº­p vÃ  tÃ­n hiá»‡u rá»§i ro mÃ  khÃ´ng lá»™ dá»¯ liá»‡u nháº¡y cáº£m.',
-        accessNote: 'Trang n?y y?u c?u quy?n ADMIN_MONITORING_VIEW trong RBAC. Backend l? l?p ki?m so?t quy?n b?t bu?c.',
-        refresh: 'LÃ m má»›i',
-        refreshing: 'Äang táº£i...',
-        exportCsv: 'Xuáº¥t CSV',
-        serviceHealth: 'Tráº¡ng thÃ¡i dá»‹ch vá»¥',
-        sessionAudits: 'Sá»± kiá»‡n gáº§n Ä‘Ã¢y',
-        summary: 'Tá»•ng quan',
-        trend: 'Xu hÆ°á»›ng sá»± kiá»‡n',
-        dataGuard: 'NguyÃªn táº¯c dá»¯ liá»‡u an toÃ n',
-        healthyServices: 'Dá»‹ch vá»¥ khá»e máº¡nh',
-        needsAttention: 'Cáº§n chÃº Ã½',
-        sessionEvents: 'Sá»± kiá»‡n Ä‘ang hiá»ƒn thá»‹',
-        updated: 'Cáº­p nháº­t',
-        noAudits: 'ChÆ°a cÃ³ sá»± kiá»‡n phÃ¹ há»£p vá»›i bá»™ lá»c hiá»‡n táº¡i.',
-        totalAccounts: 'TÃ i khoáº£n toÃ n há»‡ thá»‘ng',
-        failedLoginCount: 'Tá»•ng sá»‘ láº§n Ä‘Äƒng nháº­p lá»—i',
-        failedLoginDetail: 'Theo dÃµi rá»§i ro brute-force vÃ  lockout',
-        qrApproved: 'QR Ä‘Æ°á»£c duyá»‡t',
-        qrApprovedDetail: 'Sá»‘ phiÃªn QR duyá»‡t trong khung thá»i gian Ä‘Ã£ chá»n',
-        consentFresh: 'Consent má»›i',
-        activeAccounts: 'TÃ i khoáº£n hoáº¡t Ä‘á»™ng',
-        activeRefreshTokens: 'Refresh token hoáº¡t Ä‘á»™ng',
-        loginFailures: 'Login lá»—i',
-        otpVerified: 'OTP xÃ¡c thá»±c',
-        consentGranted: 'Consent Ä‘Ã£ cáº¥p',
-        filters: 'Bá»™ lá»c',
-        range: 'Khung thá»i gian',
-        eventType: 'Loáº¡i sá»± kiá»‡n',
-        platform: 'Ná»n táº£ng',
-        autoRefresh: 'Tá»± lÃ m má»›i 30s',
-        accessMode: 'Cháº¿ Ä‘á»™ truy cáº­p',
-        keySignals: 'TÃ­n hiá»‡u chÃ­nh',
-        serviceSummary: 'TÃ³m táº¯t dá»‹ch vá»¥',
-        eventSummary: 'TÃ³m táº¯t sá»± kiá»‡n',
-        previousPage: 'Trang trÆ°á»›c',
+        title: 'Giám sát vận hành',
+        subtitle: 'Theo dõi sức khỏe dịch vụ, hành vi đăng nhập và tín hiệu rủi ro bằng metadata an toàn.',
+        accessNote: 'Trang này yêu cầu quyền ADMIN_MONITORING_VIEW trong RBAC. Backend là lớp kiểm soát quyền bắt buộc.',
+        refresh: 'Làm mới',
+        refreshing: 'Đang tải...',
+        exportCsv: 'Xuất CSV',
+        serviceHealth: 'Trạng thái dịch vụ',
+        sessionAudits: 'Sự kiện gần đây',
+        summary: 'Tổng quan',
+        trend: 'Xu hướng sự kiện',
+        dataGuard: 'Nguyên tắc dữ liệu an toàn',
+        healthyServices: 'Dịch vụ ổn định',
+        needsAttention: 'Cần chú ý',
+        sessionEvents: 'Sự kiện đăng nhập',
+        updated: 'Cập nhật',
+        noAudits: 'Chưa có sự kiện phù hợp với bộ lọc hiện tại.',
+        totalAccounts: 'Tổng tài khoản',
+        failedLoginCount: 'Tổng số lần đăng nhập lỗi',
+        failedLoginDetail: 'Theo dõi rủi ro brute-force và lockout',
+        qrApproved: 'QR được duyệt',
+        qrApprovedDetail: 'Số phiên QR được duyệt trong khung thời gian đã chọn',
+        consentFresh: 'Consent mới',
+        activeAccounts: 'Tài khoản hoạt động',
+        activeRefreshTokens: 'Refresh token hoạt động',
+        loginFailures: 'Đăng nhập lỗi',
+        otpVerified: 'OTP xác thực',
+        consentGranted: 'Consent đã cấp',
+        filters: 'Bộ lọc',
+        range: 'Khung thời gian',
+        eventType: 'Loại sự kiện',
+        platform: 'Nền tảng',
+        autoRefresh: 'Tự làm mới 30s',
+        accessMode: 'Chế độ truy cập',
+        keySignals: 'Tín hiệu chính',
+        serviceSummary: 'Tóm tắt dịch vụ',
+        eventSummary: 'Tóm tắt sự kiện',
+        previousPage: 'Trang trước',
         nextPage: 'Trang sau',
         page: 'Trang',
       }
@@ -601,7 +601,7 @@ export function AdminMonitoringPage() {
                     <strong>{audit.eventType ?? 'SESSION_EVENT'}</strong>
                     <span className={`admin-monitoring-severity ${audit.severity ?? 'info'}`}>{audit.severity ?? 'info'}</span>
                   </div>
-                  <span>{audit.platform ?? 'WEB'} â€¢ {audit.deviceName ?? 'Unknown device'} â€¢ {audit.detail ?? 'session update'}</span>
+                  <span>{audit.platform ?? 'WEB'} · {audit.deviceName ?? 'Unknown device'} · {audit.detail ?? 'session update'}</span>
                 </div>
                 <div className='admin-monitoring-event-meta'>
                   <small>{audit.deviceIdMasked ?? 'N/A'}</small>
@@ -621,9 +621,9 @@ export function AdminMonitoringPage() {
       <section className='admin-monitoring-panel'>
         <h2>{labels.dataGuard}</h2>
         <ul className='admin-monitoring-guardrails'>
-          <li>{language === 'vi' ? 'KhÃ´ng hiá»ƒn thá»‹ máº­t kháº©u, OTP, token, ná»™i dung riÃªng tÆ° hoáº·c embedding khuÃ´n máº·t.' : 'Do not expose passwords, OTPs, tokens, private content, or face embeddings.'}</li>
-          <li>{language === 'vi' ? 'Chá»‰ hiá»ƒn thá»‹ metadata tá»‘i thiá»ƒu phá»¥c vá»¥ váº­n hÃ nh, báº£o máº­t vÃ  Ä‘iá»u tra lá»—i.' : 'Expose only the minimum metadata needed for operations, security, and incident analysis.'}</li>
-          <li>{language === 'vi' ? 'PhÃ¢n quyá»n production pháº£i tiáº¿p tá»¥c Ä‘Æ°á»£c kiá»ƒm soÃ¡t á»Ÿ backend thay vÃ¬ chá»‰ áº©n UI.' : 'Production authorization must remain backend-enforced instead of being UI-only.'}</li>
+          <li>{language === 'vi' ? 'Không hiển thị mật khẩu, OTP, token, nội dung riêng tư hoặc embedding khuôn mặt.' : 'Do not expose passwords, OTPs, tokens, private content, or face embeddings.'}</li>
+          <li>{language === 'vi' ? 'Chỉ hiển thị metadata tối thiểu phục vụ vận hành, bảo mật và điều tra lỗi.' : 'Expose only the minimum metadata needed for operations, security, and incident analysis.'}</li>
+          <li>{language === 'vi' ? 'Phân quyền production phải tiếp tục được kiểm soát ở backend thay vì chỉ ẩn UI.' : 'Production authorization must remain backend-enforced instead of being UI-only.'}</li>
         </ul>
       </section>
     </div>
