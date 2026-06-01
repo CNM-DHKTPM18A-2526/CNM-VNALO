@@ -78,6 +78,9 @@ import { formatMessage, renderSystemMessage, formatMessagePreview, formatMessage
 import { useUserStore } from '../features/chat/context/UserStoreContext'
 
 // Fallback toast object to prevent crashes if toast library is missing
+const AI_PENDING_PROMPT_KEY = 'vnalo_ai_web_pending_prompt'
+const AI_ASSISTANT_USER_ID = '__vnalo_ai__'
+
 const toast = {
   success: (msg: string) => console.log('SUCCESS:', msg),
   error: (msg: string) => console.error('ERROR:', msg),
@@ -4305,6 +4308,22 @@ export default function ChatPage() {
   const handleSend = useCallback(
     async (draft: ChatComposePayload) => {
       const conversationId = selectedConversationIdRef.current || selectedConversationId || routedConversationId
+      const mentionsAiAssistant = draft.mentions?.some((mention) => mention.userId === AI_ASSISTANT_USER_ID) || /(^|\s)@VNALO(\s|$)/i.test(draft.text ?? '')
+
+      if (mentionsAiAssistant) {
+        const cleanedPrompt = (draft.text ?? '')
+          .replace(/\u200B@VNALO\|__vnalo_ai__\u200B/gi, '')
+          .replace(/(^|\s)@VNALO(\s|$)/gi, ' ')
+          .trim()
+        const conversationName = selectedConversation?.name?.trim() || 'hội thoại hiện tại'
+        const prompt = cleanedPrompt
+          ? 'Trong ngữ cảnh "' + conversationName + '", ' + cleanedPrompt
+          : 'Hỗ trợ tôi trong ngữ cảnh hội thoại "' + conversationName + '".'
+
+        window.localStorage.setItem(AI_PENDING_PROMPT_KEY, prompt)
+        navigate('/chat-ai')
+        return
+      }
 
       if (!conversationId || !user || !accessToken) {
         console.warn('[ChatPage.send] Precondition failed:', {

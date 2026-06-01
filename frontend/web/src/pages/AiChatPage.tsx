@@ -151,6 +151,7 @@ function resolveErrorPresentation(error: unknown): { message: string; providerSt
 const STORAGE_KEY = 'vnalo_ai_chat_history'
 const LEGACY_STORAGE_KEY = STORAGE_KEY
 const DRAFT_KEY_PREFIX = 'vnalo_ai_web_compose_draft:'
+const PENDING_PROMPT_KEY = 'vnalo_ai_web_pending_prompt'
 const MAX_API_HISTORY = 20
 
 const MOJIBAKE_CODEPOINTS = [0x00C3, 0x00C4, 0x00C2, 0x00C6, 0x00C5, 0x00D0]
@@ -580,6 +581,17 @@ export function AiChatPage() {
     return () => {
       isUnmountedRef.current = true
     }
+  }, [])
+
+  useEffect(() => {
+    const pendingPrompt = localStorage.getItem(PENDING_PROMPT_KEY)
+    if (!pendingPrompt?.trim()) return
+
+    localStorage.removeItem(PENDING_PROMPT_KEY)
+    setInputValue(pendingPrompt.trim())
+    setTimeout(() => {
+      inputRef.current?.focus()
+    }, 50)
   }, [])
 
   useEffect(() => {

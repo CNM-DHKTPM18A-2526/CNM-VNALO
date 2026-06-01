@@ -100,6 +100,7 @@ export type ChatComposePayload = {
   sticker?: ChatSticker | null
   replyTo?: ReplyMetadata | null
   poll?: PollMetadata | null
+  mentions?: Array<{ displayName: string; userId: string }>
 }
 
 export type ChatMessage = {
