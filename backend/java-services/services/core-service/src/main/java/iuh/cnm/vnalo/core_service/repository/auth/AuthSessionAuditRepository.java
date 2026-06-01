@@ -21,4 +21,18 @@ public interface AuthSessionAuditRepository extends JpaRepository<AuthSessionAud
 
     @Query("SELECT COUNT(a) FROM AuthSessionAudit a WHERE a.createdAt >= :since AND a.eventType = :eventType")
     long countByEventTypeSince(@Param("eventType") String eventType, @Param("since") Instant since);
+
+    @Query("""
+            SELECT a FROM AuthSessionAudit a
+            WHERE (:since IS NULL OR a.createdAt >= :since)
+              AND (:eventType IS NULL OR a.eventType = :eventType)
+              AND (:platform IS NULL OR LOWER(a.platform) = LOWER(:platform))
+            ORDER BY a.createdAt DESC
+            """)
+    List<AuthSessionAudit> findMonitoringEvents(
+            @Param("since") Instant since,
+            @Param("eventType") String eventType,
+            @Param("platform") String platform,
+            Pageable pageable
+    );
 }

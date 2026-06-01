@@ -12,5 +12,6 @@ public record AdminMonitoringEventResponse(
         String deviceName,
         String deviceIdMasked,
         String detail,
+        String severity,
         Instant createdAt
 ) {}

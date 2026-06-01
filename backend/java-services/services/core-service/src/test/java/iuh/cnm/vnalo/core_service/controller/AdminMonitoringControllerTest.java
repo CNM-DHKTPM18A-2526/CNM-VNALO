@@ -30,14 +30,14 @@ class AdminMonitoringControllerTest {
 
     @Test
     void shouldRejectSummaryWhenPrincipalIsMissing() {
-        ApiException exception = assertThrows(ApiException.class, () -> controller.getSummary(null));
+        ApiException exception = assertThrows(ApiException.class, () -> controller.getSummary(null, 24));
 
         assertEquals(ErrorCode.UNAUTHORIZED, exception.getErrorCode());
     }
 
     @Test
     void shouldRejectEventsWhenPrincipalIsMissing() {
-        ApiException exception = assertThrows(ApiException.class, () -> controller.getRecentEvents(null, 12));
+        ApiException exception = assertThrows(ApiException.class, () -> controller.getRecentEvents(null, 12, 24, null, null));
 
         assertEquals(ErrorCode.UNAUTHORIZED, exception.getErrorCode());
     }
@@ -56,27 +56,27 @@ class AdminMonitoringControllerTest {
                 new AdminMonitoringSummaryResponse.QrStats(0, 0, 0, 0, 0),
                 new AdminMonitoringSummaryResponse.ConsentStats(0, 0, 0, 0, 0)
         );
-        when(adminMonitoringService.getSummary(principal.getId())).thenReturn(summary);
+        when(adminMonitoringService.getSummary(principal.getId(), 24)).thenReturn(summary);
 
-        ResponseEntity<ApiResponse<AdminMonitoringSummaryResponse>> response = controller.getSummary(principal);
+        ResponseEntity<ApiResponse<AdminMonitoringSummaryResponse>> response = controller.getSummary(principal, 24);
 
         assertEquals(200, response.getStatusCode().value());
         assertNotNull(response.getBody());
         assertEquals(summary, response.getBody().getData());
-        verify(adminMonitoringService).getSummary(principal.getId());
+        verify(adminMonitoringService).getSummary(principal.getId(), 24);
     }
 
     @Test
     void shouldPassAuthenticatedUserIdToEventsService() {
         UserPrincipal principal = principal(UUID.randomUUID());
-        when(adminMonitoringService.getRecentEvents(principal.getId(), 20)).thenReturn(List.of());
+        when(adminMonitoringService.getRecentEvents(principal.getId(), 20, 72, "LOGIN_FAILED", "WEB")).thenReturn(List.of());
 
-        ResponseEntity<ApiResponse<List<AdminMonitoringEventResponse>>> response = controller.getRecentEvents(principal, 20);
+        ResponseEntity<ApiResponse<List<AdminMonitoringEventResponse>>> response = controller.getRecentEvents(principal, 20, 72, "LOGIN_FAILED", "WEB");
 
         assertEquals(200, response.getStatusCode().value());
         assertNotNull(response.getBody());
         assertEquals(List.of(), response.getBody().getData());
-        verify(adminMonitoringService).getRecentEvents(principal.getId(), 20);
+        verify(adminMonitoringService).getRecentEvents(principal.getId(), 20, 72, "LOGIN_FAILED", "WEB");
     }
 
     private UserPrincipal principal(UUID id) {

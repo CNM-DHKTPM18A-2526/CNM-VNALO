@@ -79,7 +79,7 @@ class AdminMonitoringServiceTest {
         account.setId(adminId);
         when(authAccountRepository.findById(adminId)).thenReturn(Optional.of(account));
 
-        ApiException exception = assertThrows(ApiException.class, () -> service.getSummary(adminId));
+        ApiException exception = assertThrows(ApiException.class, () -> service.getSummary(adminId, 24));
 
         assertEquals(ErrorCode.ACCESS_DENIED, exception.getErrorCode());
     }
@@ -130,7 +130,7 @@ class AdminMonitoringServiceTest {
         when(authLegalConsentRepository.countByConsentTypeAndGrantedTrueAndGrantedAtAfter(eq("TERMS_OF_USE"), any(Instant.class))).thenReturn(4L);
         when(authLegalConsentRepository.countByConsentTypeAndGrantedTrueAndGrantedAtAfter(eq("PRIVACY_POLICY"), any(Instant.class))).thenReturn(4L);
 
-        AdminMonitoringSummaryResponse summary = service.getSummary(adminId);
+        AdminMonitoringSummaryResponse summary = service.getSummary(adminId, 24);
 
         assertNotNull(summary.generatedAt());
         assertEquals("ADMIN_ALLOWLIST", summary.accessMode());
@@ -159,13 +159,13 @@ class AdminMonitoringServiceTest {
                 .detail("x".repeat(180))
                 .build();
         when(authAccountRepository.findById(adminId)).thenReturn(Optional.of(account));
-        when(authSessionAuditRepository.findAllByOrderByCreatedAtDesc(any(Pageable.class))).thenReturn(List.of(audit));
+        when(authSessionAuditRepository.findMonitoringEvents(any(Instant.class), eq("LOGIN_FAILED"), eq("WEB"), any(Pageable.class))).thenReturn(List.of(audit));
 
-        List<AdminMonitoringEventResponse> events = service.getRecentEvents(adminId, 1000);
+        List<AdminMonitoringEventResponse> events = service.getRecentEvents(adminId, 1000, 24, "LOGIN_FAILED", "WEB");
 
         assertEquals(1, events.size());
         assertEquals("dev***456", events.get(0).deviceIdMasked());
         assertTrue(events.get(0).detail().endsWith("..."));
-        verify(authSessionAuditRepository).findAllByOrderByCreatedAtDesc(any(Pageable.class));
+        verify(authSessionAuditRepository).findMonitoringEvents(any(Instant.class), eq("LOGIN_FAILED"), eq("WEB"), any(Pageable.class));
     }
 }
