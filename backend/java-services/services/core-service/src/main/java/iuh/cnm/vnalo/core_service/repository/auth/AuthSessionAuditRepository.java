@@ -3,12 +3,66 @@ package iuh.cnm.vnalo.core_service.repository.auth;
 import iuh.cnm.vnalo.core_service.model.entity.auth.AuthSessionAudit;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
 @Repository
 public interface AuthSessionAuditRepository extends JpaRepository<AuthSessionAudit, UUID> {
+    interface MonitoringTrendProjection {
+        Instant getBucket();
+        long getTotal();
+        long getWarning();
+        long getError();
+    }
+
     List<AuthSessionAudit> findByAccountIdOrderByCreatedAtDesc(UUID accountId, Pageable pageable);
+
+    List<AuthSessionAudit> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    long countByCreatedAtAfter(Instant since);
+
+    @Query("SELECT COUNT(a) FROM AuthSessionAudit a WHERE a.createdAt >= :since AND a.eventType = :eventType")
+    long countByEventTypeSince(@Param("eventType") String eventType, @Param("since") Instant since);
+
+    @Query("""
+            SELECT a FROM AuthSessionAudit a
+            WHERE (:since IS NULL OR a.createdAt >= :since)
+              AND (:eventType IS NULL OR a.eventType = :eventType)
+              AND (:platform IS NULL OR LOWER(a.platform) = LOWER(:platform))
+            ORDER BY a.createdAt DESC
+            """)
+    List<AuthSessionAudit> findMonitoringEvents(
+            @Param("since") Instant since,
+            @Param("eventType") String eventType,
+            @Param("platform") String platform,
+            Pageable pageable
+    );
+
+    @Query(value = """
+            SELECT date_trunc(:bucketUnit, created_at) AS bucket,
+                   COUNT(*) AS total,
+                   SUM(CASE WHEN upper(coalesce(event_type, '')) LIKE '%REVOKED%'
+                             OR upper(coalesce(event_type, '')) LIKE '%PENDING%'
+                             OR upper(coalesce(event_type, '')) LIKE '%CHALLENGE%' THEN 1 ELSE 0 END) AS warning,
+                   SUM(CASE WHEN upper(coalesce(event_type, '')) LIKE '%FAILED%'
+                             OR upper(coalesce(event_type, '')) LIKE '%REJECTED%'
+                             OR upper(coalesce(event_type, '')) LIKE '%LOCKED%' THEN 1 ELSE 0 END) AS error
+            FROM auth_session_audit
+            WHERE created_at >= :since
+              AND (:eventType IS NULL OR event_type = :eventType)
+              AND (:platform IS NULL OR lower(platform) = lower(:platform))
+            GROUP BY bucket
+            ORDER BY bucket ASC
+            """, nativeQuery = true)
+    List<MonitoringTrendProjection> findMonitoringTrend(
+            @Param("since") Instant since,
+            @Param("bucketUnit") String bucketUnit,
+            @Param("eventType") String eventType,
+            @Param("platform") String platform
+    );
 }
