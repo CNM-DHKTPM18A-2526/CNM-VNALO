@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -27,28 +28,46 @@ public class StoryService {
     private final StoryRepository storyRepository;
     private final StoryViewRepository storyViewRepository;
     private final StoryReactionRepository storyReactionRepository;
-
+    private final FriendshipChecker friendshipChecker;
 
     private String normalizeVisibility(String visibility) {
         if (visibility == null || visibility.isBlank()) {
-            return "PUBLIC";
+            return "FRIENDS";
         }
 
         String normalized = visibility.trim().toUpperCase();
         return switch (normalized) {
             case "PUBLIC", "FRIENDS", "PRIVATE" -> normalized;
-            default -> "PUBLIC";
+            default -> "FRIENDS";
+        };
+    }
+
+    private String readVisibility(String visibility) {
+        if (visibility == null || visibility.isBlank()) {
+            return "FRIENDS";
+        }
+        return visibility.trim().toUpperCase();
+    }
+
+    public boolean canViewStory(Story story, UUID userId, Set<UUID> friendIds) {
+        UUID authorId = story.getAuthorId();
+        if (authorId == null || userId == null) {
+            return false;
+        }
+        if (authorId.equals(userId)) {
+            return true;
+        }
+
+        return switch (readVisibility(story.getVisibility())) {
+            case "PUBLIC" -> true;
+            case "FRIENDS" -> friendIds.contains(authorId);
+            case "PRIVATE" -> false;
+            default -> false;
         };
     }
 
     public boolean canViewStory(Story story, UUID userId) {
-        if (story.getAuthorId().equals(userId)) return true;
-
-        return switch (story.getVisibility()) {
-            case "PUBLIC", "FRIENDS" -> true;
-            case "PRIVATE" -> false;
-            default -> false;
-        };
+        return canViewStory(story, userId, friendshipChecker.findFriendIds(userId));
     }
 
     @Transactional
@@ -68,13 +87,13 @@ public class StoryService {
 
     @Transactional(readOnly = true)
     public List<StoryResponse> getActiveStories(UUID userId) {
-        List<Story> stories = storyRepository.findActiveStoriesForUser(
-                "ACTIVE",
-                OffsetDateTime.now(),
-                userId
-        );
+        Set<UUID> friendIds = friendshipChecker.findFriendIds(userId);
+        List<Story> stories = storyRepository.findActiveStories("ACTIVE", OffsetDateTime.now());
 
-        return stories.stream().map(this::map).toList();
+        return stories.stream()
+                .filter(story -> canViewStory(story, userId, friendIds))
+                .map(this::map)
+                .toList();
     }
 
     @Transactional
