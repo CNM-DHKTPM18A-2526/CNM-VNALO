@@ -598,7 +598,13 @@ class _AiFloatingBubbleState extends State<AiFloatingBubble>
       220.0,
       availableHeight - padding.top - padding.bottom - 24.0,
     );
-    final boardHeight = min(392.0, compactHeightLimit);
+    final prefersTallBoard =
+        aiProvider.clarificationState != null ||
+        MediaQuery.textScalerOf(context).scale(1) > 1.25;
+    final boardHeight = min(
+      prefersTallBoard ? 456.0 : 392.0,
+      compactHeightLimit,
+    );
 
     final prefersRightDock = _position.dx < screenSize.width / 2;
     final desiredLeft =

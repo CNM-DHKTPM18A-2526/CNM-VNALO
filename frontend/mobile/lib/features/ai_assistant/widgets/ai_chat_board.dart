@@ -309,6 +309,7 @@ class _AiChatBoardState extends State<AiChatBoard> {
                             .map(
                               (candidate) => _BoardActionChip(
                                 label: candidate,
+                                key: ValueKey('ai_board_chip_$candidate'),
                                 onTap:
                                     () => context
                                         .read<AiAssistantProvider>()
@@ -451,10 +452,11 @@ class _AiChatBoardState extends State<AiChatBoard> {
       width: 40,
       height: 40,
     );
+    final transcriptLimit = clarification == null ? 4 : 3;
     final transcriptEntries =
-        aiProvider.conversationHistory.length > 4
+        aiProvider.conversationHistory.length > transcriptLimit
             ? aiProvider.conversationHistory.sublist(
-              aiProvider.conversationHistory.length - 4,
+              aiProvider.conversationHistory.length - transcriptLimit,
             )
             : aiProvider.conversationHistory;
 
@@ -926,27 +928,23 @@ class _BoardActionChip extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
 
-  const _BoardActionChip({required this.label, required this.onTap});
+  const _BoardActionChip({super.key, required this.label, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AiAssistantTokens.pillRadius),
-      child: Ink(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(AiAssistantTokens.pillRadius),
-          border: Border.all(color: AppColors.primary.withValues(alpha: 0.16)),
-        ),
-        child: Text(
-          label,
-          style: AppTypography.bodySmall.copyWith(
-            color: AppColors.primary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+    return ActionChip(
+      label: Text(label),
+      onPressed: onTap,
+      visualDensity: VisualDensity.compact,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      labelStyle: AppTypography.bodySmall.copyWith(
+        color: AppColors.primary,
+        fontWeight: FontWeight.w600,
+      ),
+      backgroundColor: AppColors.primary.withValues(alpha: 0.08),
+      side: BorderSide(color: AppColors.primary.withValues(alpha: 0.16)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AiAssistantTokens.pillRadius),
       ),
     );
   }

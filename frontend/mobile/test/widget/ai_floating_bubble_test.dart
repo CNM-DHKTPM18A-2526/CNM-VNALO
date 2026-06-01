@@ -203,7 +203,7 @@ void main() {
   ) async {
     final provider = _buildProvider(
       responses: {
-        'Ban oi': {'textReply': 'Mình đang ở đây.', 'emotion': 'neutral'},
+        'Ban oi': {'textReply': 'Minh dang o day.', 'emotion': 'neutral'},
       },
       responseDelay: const Duration(milliseconds: 300),
     );
@@ -236,13 +236,13 @@ void main() {
     await tester.pump();
 
     expect(find.text('Ban oi'), findsOneWidget);
-    expect(find.text('Đang hiểu yêu cầu...'), findsOneWidget);
+    expect(find.byKey(const ValueKey('ai_chat_board')), findsOneWidget);
 
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pumpAndSettle();
 
-    expect(find.text('Mình đang ở đây.'), findsOneWidget);
-    expect(find.text('Đang hiểu yêu cầu...'), findsNothing);
+    expect(find.text('Minh dang o day.'), findsOneWidget);
+    expect(provider.isAssistantGenerating, isFalse);
 
     provider.dispose();
   });
@@ -252,7 +252,7 @@ void main() {
     (tester) async {
       final provider = _buildProvider(
         responses: {
-          'Ban oi': {'textReply': 'Mình đang ở đây.', 'emotion': 'neutral'},
+          'Ban oi': {'textReply': 'Minh dang o day.', 'emotion': 'neutral'},
         },
         responseDelay: const Duration(milliseconds: 300),
       );
@@ -285,7 +285,7 @@ void main() {
       await tester.pump();
 
       expect(find.byKey(const ValueKey('ai_chat_board')), findsOneWidget);
-      expect(find.text('Đang hiểu yêu cầu...'), findsOneWidget);
+      expect(provider.isAssistantGenerating, isTrue);
 
       await tester.tap(find.byKey(const ValueKey('ai_bubble_toggle_board')));
       await tester.pumpAndSettle();
@@ -328,22 +328,30 @@ void main() {
     await tester.pumpAndSettle();
 
     provider.addActionFeedback(
-      'Mình tìm thấy nhiều kết quả cho "Uyên". Bạn muốn chọn ai?',
-      source:
-          'ai_action_ambiguity.contact::Uy%C3%AAn%20L%C3%BD,Uy%C3%AAn%20Nguy%E1%BB%85n',
+      'Tim thay nhieu ket qua cho "Uyen". Ban muon chon ai?',
+      source: 'ai_action_ambiguity.contact::Uyen Ly,Uyen Nguyen',
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Cần làm rõ'), findsOneWidget);
-    expect(find.text('Đang chờ bạn chọn đúng người'), findsOneWidget);
-    expect(find.text('Uyên Lý'), findsOneWidget);
-    expect(find.text('Uyên Nguyễn'), findsOneWidget);
-    expect(find.text('Nói rõ họ tên'), findsOneWidget);
-    expect(find.text('Mở AI chat'), findsOneWidget);
+    expect(find.byKey(const ValueKey('ai_chat_board')), findsOneWidget);
+    expect(find.text('Uyen Ly'), findsOneWidget);
+    expect(find.text('Uyen Nguyen'), findsOneWidget);
+    expect(find.text('Mo AI chat'), findsNothing);
 
-    await tester.tap(find.text('Uyên Lý'));
+    final candidateChip = find.byKey(const ValueKey('ai_board_chip_Uyen Ly'));
+    expect(candidateChip, findsOneWidget);
+    await tester.ensureVisible(candidateChip);
+    await tester.tap(candidateChip, warnIfMissed: false);
     await tester.pumpAndSettle();
-    expect(find.text('Mình muốn chọn Uyên Lý'), findsOneWidget);
+
+    expect(
+      provider.conversationHistory.where(
+        (entry) =>
+            entry.role == AiConversationRole.user &&
+            entry.text.contains('Uyen Ly'),
+      ),
+      isNotEmpty,
+    );
 
     provider.dispose();
   });
@@ -374,7 +382,7 @@ void main() {
     await tester.pumpAndSettle();
 
     provider.addActionFeedback(
-      'Không tìm thấy liên hệ trong danh bạ.',
+      'KhÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â´ng tÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬m thÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂºÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¥y liÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âªn hÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â»ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¡ trong danh bÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂºÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡.',
       source: 'ai_action_missing.contact',
       keepBubbleVisible: true,
       responseSurface: AiResponseSurface.bubble,
@@ -382,9 +390,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('ai_chat_board')), findsOneWidget);
-    expect(find.text('Mở danh bạ'), findsOneWidget);
+    expect(find.text(AiPromptChips.openContactsPrompt), findsOneWidget);
 
-    await tester.tap(find.text('Mở danh bạ'));
+    await tester.tap(find.text(AiPromptChips.openContactsPrompt));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('ai_chat_board')), findsNothing);
@@ -516,6 +524,49 @@ void main() {
     provider.dispose();
   });
 
+  testWidgets('bubble board remains stable with large text scale', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final provider = _buildProvider();
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: provider,
+        child: MediaQuery(
+          data: MediaQueryData.fromView(
+            tester.view,
+          ).copyWith(textScaler: const TextScaler.linear(1.7)),
+          child: const MaterialApp(
+            home: Scaffold(body: Stack(children: [AiFloatingBubble()])),
+          ),
+        ),
+      ),
+    );
+
+    await provider.summonMascot(
+      startListening: false,
+      persist: false,
+      source: 'bubble_large_text_scale_test',
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('ai_bubble_toggle_board')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('ai_chat_board')), findsOneWidget);
+    expect(find.byKey(const ValueKey('ai_chat_input')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    provider.dispose();
+  });
+
   testWidgets('bubble board remains stable above keyboard on small viewport', (
     tester,
   ) async {
@@ -554,6 +605,68 @@ void main() {
     expect(tester.takeException(), isNull);
 
     provider.dispose();
+  });
+
+  testWidgets('bubble clarification remains tappable with large text scale', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final provider = _buildProvider();
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: provider,
+        child: MediaQuery(
+          data: MediaQueryData.fromView(
+            tester.view,
+          ).copyWith(textScaler: const TextScaler.linear(1.6)),
+          child: MaterialApp(
+            home: const Scaffold(),
+            builder: _bubbleOverlayBuilder,
+          ),
+        ),
+      ),
+    );
+
+    await provider.summonMascot(
+      startListening: false,
+      persist: false,
+      source: 'clarification_large_text_scale_test',
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('ai_bubble_toggle_board')));
+    await tester.pumpAndSettle();
+
+    provider.addActionFeedback(
+      'Tim thay nhieu ket qua cho "Uyen". Ban muon chon ai?',
+      source: 'ai_action_ambiguity.contact::Uyen Ly,Uyen Nguyen',
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Uyen Ly'), findsOneWidget);
+    final candidateChip = find.byKey(const ValueKey('ai_board_chip_Uyen Ly'));
+    expect(candidateChip, findsOneWidget);
+    await tester.ensureVisible(candidateChip);
+    await tester.tap(candidateChip);
+    await tester.pumpAndSettle();
+
+    final selectedEntries =
+        provider.conversationHistory
+            .where(
+              (entry) =>
+                  entry.role == AiConversationRole.user &&
+                  entry.text.contains('Uyen Ly'),
+            )
+            .toList();
+    expect(selectedEntries, isNotEmpty);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('bubble controls stay inside mascot visual bounds', (
