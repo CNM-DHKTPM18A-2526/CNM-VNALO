@@ -1124,10 +1124,42 @@ export async function sendAiChatMessage(
   degraded?: boolean
   providerStatus?: string
 }> {
+  const ACCESS_TOKEN_KEY = 'vnalo_access_token'
+
+  const resolveLatestWebToken = (fallbackToken: string) => {
+    if (typeof window === 'undefined') {
+      return fallbackToken
+    }
+
+    const latestToken = window.localStorage.getItem(ACCESS_TOKEN_KEY)?.trim()
+    return latestToken || fallbackToken
+  }
+
+  const postChat = async (accessToken: string) => {
+    return aiApi.post('chat', { prompt, history }, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    })
+  }
+
   try {
-    const response = await aiApi.post('chat', { prompt, history }, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const firstToken = resolveLatestWebToken(token)
+    let response
+
+    try {
+      response = await postChat(firstToken)
+    } catch (error) {
+      const status = (error as { response?: { status?: number } } | undefined)?.response?.status
+      const latestToken = resolveLatestWebToken(token)
+      const shouldRetryWithFreshToken = (status === 401 || status === 403) && latestToken && latestToken !== firstToken
+
+      if (!shouldRetryWithFreshToken) {
+        throw error
+      }
+
+      console.warn('[sendAiChatMessage] retrying with refreshed web token after auth failure')
+      response = await postChat(latestToken)
+    }
+
     const data = response.data?.data;
     return {
       textReply: data?.textReply ?? '',
