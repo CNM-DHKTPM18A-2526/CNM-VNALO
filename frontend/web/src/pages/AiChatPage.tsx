@@ -558,7 +558,11 @@ function buildActionSuccessFeedback(command: AiActionCommand) {
   return 'Đã mở đúng cuộc trò chuyện đích.'
 }
 
-export function AiChatPage() {
+type AiChatPageProps = {
+  embedded?: boolean
+}
+
+export function AiChatPage({ embedded = false }: AiChatPageProps = {}) {
   const { accessToken, user } = useAuth()
   const navigate = useNavigate()
   const historyStorageKey = useMemo(() => buildAiStorageKey(user?.id as string | number | undefined), [user?.id])
@@ -1006,7 +1010,7 @@ export function AiChatPage() {
   }
 
   return (
-    <div className='ai-chat-layout'>
+    <div className={embedded ? 'ai-chat-layout ai-chat-layout-embedded' : 'ai-chat-layout'}>
       <aside className='ai-chat-sidebar'>
         <div className='ai-chat-sidebar-scroll'>
           <section className='ai-assistant-card ai-context-card' aria-label='Ngữ cảnh trợ lý AI'>

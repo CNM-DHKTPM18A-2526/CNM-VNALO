@@ -7,7 +7,7 @@ import { Icon } from '../shared/components/Icon'
 import { UserAvatar } from '../shared/components/UserAvatar'
 
 const adminNavItems = [
-  { to: '/admin/monitoring', label: 'Dashboard', icon: 'database' as const },
+  { to: '/admin/monitoring', label: 'Dashboard', icon: 'layoutDashboard' as const },
 ]
 
 export function AdminLayout() {

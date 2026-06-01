@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 
+import { AdminRoute } from './features/auth/AdminRoute'
 import { ProtectedRoute } from './features/auth/ProtectedRoute'
 import { useAuth } from './features/auth/useAuth'
 import { MainLayout } from './layouts/MainLayout'
@@ -14,7 +15,6 @@ import ChatPage from './pages/ChatPage'
 import CallPage from './pages/CallPage'
 import { ContactsPage } from './pages/ContactsPage'
 import { ProfilePage } from './pages/ProfilePage'
-import { AiChatPage } from './pages/AiChatPage'
 import SocialPage from './features/social/pages/SocialPage'
 import CreateStoryPage from './features/social/pages/CreateStoryPage'
 import StoryViewerPage from './features/social/pages/StoryViewerPage'
@@ -47,7 +47,7 @@ function App() {
             <Route path='chat/:conversationId?' element={<ChatPage />} />
             <Route path='contacts' element={<ContactsPage />} />
             <Route path='profile' element={<ProfilePage />} />
-            <Route path='chat-ai' element={<AiChatPage />} />
+            <Route path='chat-ai' element={<Navigate replace to='/chat/vnalo-ai-assistant' />} />
             <Route path='social' element={<SocialPage />} />
 
             <Route path='stories/create' element={<CreateStoryPage />} />
@@ -57,9 +57,9 @@ function App() {
           <Route
             path='/admin'
             element={
-              <ProtectedRoute>
+              <AdminRoute>
                 <AdminLayout />
-              </ProtectedRoute>
+              </AdminRoute>
             }
           >
             <Route index element={<Navigate replace to='/admin/monitoring' />} />

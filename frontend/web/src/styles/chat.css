@@ -5033,3 +5033,26 @@
     display: none !important;
   }
 }
+
+/* AI assistant embedded as a regular chat conversation */
+.chat-layout > .ai-chat-layout-embedded {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.ai-chat-layout-embedded {
+  display: block !important;
+  background: var(--chat-window-bg) !important;
+}
+
+.ai-chat-layout-embedded .ai-chat-sidebar {
+  display: none !important;
+}
+
+.ai-chat-layout-embedded .ai-chat-main {
+  height: 100% !important;
+  min-height: 0 !important;
+  grid-template-rows: 64px minmax(0, 1fr) auto !important;
+}

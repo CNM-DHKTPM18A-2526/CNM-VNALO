@@ -5,6 +5,8 @@ export type AuthUser = {
   name: string
   email: string
   phone?: string | null
+  roles?: string[]
+  permissions?: string[]
   avatarUrl?: string | null
   coverUrl?: string | null
   bio?: string | null

@@ -8,6 +8,7 @@ import { SearchMessagesPanel } from '../features/chat/components/SearchMessagesP
 import { SearchGlobalPanel } from '../features/chat/components/SearchGlobalPanel'
 import { MessageShareModal } from '../features/chat/components/MessageShareModal'
 import { ChatWindow } from '../features/chat/components/ChatWindow'
+import { AiChatPage } from './AiChatPage'
 import { UserProfileModal } from '../features/chat/components/UserProfileModal'
 import { useGroupCall } from '../features/chat/components/GroupCallModal'
 import { IncomingCallBanner } from '../features/chat/components/PremiumCallUI'
@@ -80,6 +81,7 @@ import { useUserStore } from '../features/chat/context/UserStoreContext'
 // Fallback toast object to prevent crashes if toast library is missing
 const AI_PENDING_PROMPT_KEY = 'vnalo_ai_web_pending_prompt'
 const AI_ASSISTANT_USER_ID = '__vnalo_ai__'
+const AI_ASSISTANT_CONVERSATION_ID = 'vnalo-ai-assistant'
 
 const toast = {
   success: (msg: string) => console.log('SUCCESS:', msg),
@@ -507,6 +509,12 @@ export default function ChatPage() {
     localStorage.setItem('vnalo_chat_sidebar_content', rightSidebarContent || 'none')
   }, [rightSidebarContent])
 
+  useEffect(() => {
+    if ((routedConversationId || selectedConversationId) === AI_ASSISTANT_CONVERSATION_ID) {
+      setRightSidebarContent(null)
+    }
+  }, [routedConversationId, selectedConversationId])
+
   const [jumpToMessageId, setJumpToMessageId] = useState<string | null>(null)
   const [pinnedMessageIds, setPinnedMessageIds] = useState<Record<string, string[]>>({})
   const [pinnedMessages, setPinnedMessages] = useState<Record<string, ChatMessage[]>>({})
@@ -647,6 +655,22 @@ export default function ChatPage() {
     conversationsRef.current = conversations
   }, [conversations])
 
+  const aiAssistantConversation = useMemo<ConversationSummary>(() => ({
+    id: AI_ASSISTANT_CONVERSATION_ID,
+    userId: AI_ASSISTANT_USER_ID,
+    name: 'VNALO AI Assistant',
+    avatarUrl: null,
+    isGroup: false,
+    lastMessage: 'Sẵn sàng hỗ trợ',
+    unreadCount: 0,
+    online: true,
+    isOnline: true,
+    participantUserIds: [AI_ASSISTANT_USER_ID],
+    memberCount: 2,
+    lastMessageAt: new Date(0).toISOString(),
+    updatedAt: new Date(0).toISOString(),
+  }), [])
+
   const myDocumentsConversation = useMemo<ConversationSummary>(() => {
     // Try to get last message from local storage for preview
     let lastMsgText = 'Lưu và đồng bộ dữ liệu giữa các thiết bị';
@@ -688,10 +712,11 @@ export default function ChatPage() {
   const selectedConversation = useMemo(
     () => {
       const targetId = routedConversationId || selectedConversationId;
+      if (targetId === AI_ASSISTANT_CONVERSATION_ID) return aiAssistantConversation;
       if (targetId === 'my-documents') return myDocumentsConversation;
       return conversations.find((conversation) => conversation.id === targetId);
     },
-    [conversations, routedConversationId, selectedConversationId, myDocumentsConversation],
+    [conversations, routedConversationId, selectedConversationId, myDocumentsConversation, aiAssistantConversation],
   )
   const selectedMessages = useMemo(() => {
     const resolvedConversationId = routedConversationId || selectedConversationId
@@ -3429,6 +3454,9 @@ export default function ChatPage() {
 
 
         const finalMappedItems = [...mappedItems];
+        if (!finalMappedItems.some(c => c.id === AI_ASSISTANT_CONVERSATION_ID)) {
+          finalMappedItems.push(aiAssistantConversation);
+        }
         if (!finalMappedItems.some(c => c.id === 'my-documents' || c.isCloud)) {
           finalMappedItems.push(myDocumentsConversation);
         }
@@ -3454,10 +3482,13 @@ export default function ChatPage() {
           if (preferredConversationId) {
             return preferredConversationId
           }
-          if (routedConversationIdRef.current && mappedItems.some((item) => item.id === routedConversationIdRef.current)) {
+          if (routedConversationIdRef.current === AI_ASSISTANT_CONVERSATION_ID) {
+            return AI_ASSISTANT_CONVERSATION_ID
+          }
+          if (routedConversationIdRef.current && finalMappedItems.some((item) => item.id === routedConversationIdRef.current)) {
             return routedConversationIdRef.current
           }
-          if (prev && mappedItems.some((item) => item.id === prev)) {
+          if (prev && finalMappedItems.some((item) => item.id === prev)) {
             return prev
           }
           return ''
@@ -3470,7 +3501,7 @@ export default function ChatPage() {
         setIsLoadingConversations(false)
       }
     },
-    [(user ? user.id : ""), user?.name, upsertUser],
+    [(user ? user.id : ""), user?.name, upsertUser, aiAssistantConversation, myDocumentsConversation],
   )
 
 
@@ -3819,6 +3850,11 @@ export default function ChatPage() {
       navigate('/chat/' + conversationId)
 
       // Proactively refresh metadata for the selected conversation
+      if (conversationId === AI_ASSISTANT_CONVERSATION_ID) {
+        setRightSidebarContent(null)
+        return
+      }
+
       if (accessToken && conversationId && conversationId !== 'my-documents') {
         try {
           const detailRaw = await fetchConversation(accessToken, conversationId).catch(() => null);
@@ -5342,6 +5378,9 @@ export default function ChatPage() {
 
   const sortedConversations = useMemo(() => {
     const list = [...conversations];
+    if (!list.some(c => c.id === AI_ASSISTANT_CONVERSATION_ID)) {
+      list.push(aiAssistantConversation);
+    }
     if (!list.some(c => c.id === 'my-documents' || c.isCloud)) {
       list.push(myDocumentsConversation);
     }
@@ -5373,7 +5412,7 @@ export default function ChatPage() {
       const timeB = new Date(b.lastMessageAt || b.updatedAt || 0).getTime()
       return timeB - timeA
     })
-  }, [conversations, deletedTimestamps, pinnedConversationIds, t])
+  }, [conversations, deletedTimestamps, pinnedConversationIds, t, aiAssistantConversation, myDocumentsConversation])
 
   const visibleConversations = useMemo(() => {
     return sortedConversations.map(conv => ({
@@ -5450,6 +5489,9 @@ export default function ChatPage() {
         onSelectConversation={handleSelectConversation}
         onCreateGroupClick={handleOpenCreateGroupModal}
       />
+      {(routedConversationId || selectedConversationId) === AI_ASSISTANT_CONVERSATION_ID ? (
+        <AiChatPage embedded />
+      ) : (
       <ChatWindow
         conversation={selectedConversation}
         messages={selectedMessages}
@@ -5484,6 +5526,7 @@ export default function ChatPage() {
         onInitiateCall={handleInitiateCall}
         onOpenAddMembers={() => setIsAddMembersOpen(true)}
       />
+      )}
 
       <CreateGroupModal
         isOpen={isCreateGroupOpen}

@@ -17,13 +17,10 @@ export function Sidebar({ onOpenSettingsModal, onOpenCaptureModal, onOpenAccount
   const { t } = useLanguage()
   const { user } = useAuth()
   const { unreadMessageCount, pendingFriendRequestCount } = useNotifications()
-  const canSeeMonitoring = Boolean(user)
-
   const primaryNav: Array<{ to: string; labelKey: string; icon: any; badge: number }> = [
     { to: '/chat', labelKey: 'sidebar.chat', icon: 'chat' as const, badge: unreadMessageCount },
     { to: '/contacts', labelKey: 'sidebar.contacts', icon: 'addressBook' as const, badge: pendingFriendRequestCount },
     { to: '/social', labelKey: 'sidebar.social', icon: 'clock' as const, badge: 0 },
-    { to: '/chat-ai', labelKey: 'sidebar.ai', icon: 'bot' as const, badge: 0 },
   ]
 
   const secondaryNav = [
@@ -35,7 +32,6 @@ export function Sidebar({ onOpenSettingsModal, onOpenCaptureModal, onOpenAccount
     { to: '/chat/my-documents', labelKey: 'sidebar.documents', icon: 'folder' as const },
     { labelKey: 'sidebar.todo', icon: 'capture' as const, onClick: onOpenCaptureModal },
     { to: '/tools', labelKey: 'sidebar.tools', icon: 'briefcase' as const },
-    ...(canSeeMonitoring ? [{ to: '/admin/monitoring', labelKey: 'sidebar.monitoring', icon: 'database' as const }] : []),
   ]
 
   const handleOpenSettings = () => {
