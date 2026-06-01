@@ -17,11 +17,7 @@ export function Sidebar({ onOpenSettingsModal, onOpenCaptureModal, onOpenAccount
   const { t } = useLanguage()
   const { user } = useAuth()
   const { unreadMessageCount, pendingFriendRequestCount } = useNotifications()
-  const adminMonitoringEmails = (import.meta.env.VITE_ADMIN_MONITORING_ALLOWED_EMAILS ?? '')
-    .split(',')
-    .map((email: string) => email.trim().toLowerCase())
-    .filter(Boolean)
-  const canSeeMonitoring = Boolean(user?.email && adminMonitoringEmails.includes(user.email.toLowerCase()))
+  const canSeeMonitoring = Boolean(user)
 
   const primaryNav: Array<{ to: string; labelKey: string; icon: any; badge: number }> = [
     { to: '/chat', labelKey: 'sidebar.chat', icon: 'chat' as const, badge: unreadMessageCount },

@@ -113,7 +113,7 @@ const rangeOptions = [
 ]
 const eventTypeOptions = ['ALL', 'LOGIN_SUCCESS', 'LOGIN_FAILED', 'QR_LOGIN_APPROVED', 'SESSION_REVOKED_LOGOUT', 'SESSION_REVOKED_LOGOUT_ALL']
 const platformOptions = ['ALL', 'WEB', 'ANDROID', 'IOS']
-const roleOptions = ['SUPER_ADMIN', 'ADMIN_MONITORING', 'ADMIN_RBAC_MANAGER']
+const roleOptions = ['ADMIN_MONITORING_VIEWER', 'ADMIN_MONITORING_ANALYST', 'SUPER_ADMIN']
 
 async function fetchWithTimeout(url: string, token?: string | null, init: RequestInit = {}) {
   const controller = new AbortController()
@@ -264,7 +264,7 @@ export function AdminMonitoringPage() {
   const [rbacError, setRbacError] = React.useState<string | null>(null)
   const [rbacMessage, setRbacMessage] = React.useState<string | null>(null)
   const [rbacEmail, setRbacEmail] = React.useState('')
-  const [rbacRole, setRbacRole] = React.useState('ADMIN_MONITORING')
+  const [rbacRole, setRbacRole] = React.useState('ADMIN_MONITORING_VIEWER')
   const [rbacExpiresAt, setRbacExpiresAt] = React.useState('')
 
   const labels = language === 'vi'
@@ -310,6 +310,7 @@ export function AdminMonitoringPage() {
         page: 'Trang',
         rbacTitle: 'Quản trị quyền admin',
         rbacSubtitle: 'Cấp hoặc thu hồi vai trò vận hành bằng RBAC ở backend.',
+        rbacHelp: 'SUPER_ADMIN có quyền quản trị RBAC. ANALYST có thêm quyền xuất dữ liệu. VIEWER chỉ xem dashboard.',
         rbacEmail: 'Email tài khoản',
         rbacRole: 'Vai trò',
         rbacExpiresAt: 'Hết hạn (tùy chọn)',
@@ -319,6 +320,8 @@ export function AdminMonitoringPage() {
         noAssignments: 'Chưa có phân quyền admin nào.',
         expiresNever: 'Không hết hạn',
         grantedAt: 'Cấp lúc',
+        assignmentCount: 'phân quyền',
+        confirmRevoke: 'Thu hồi quyền này?',
       }
     : {
         title: 'Operations Monitoring',
@@ -362,6 +365,7 @@ export function AdminMonitoringPage() {
         page: 'Page',
         rbacTitle: 'Admin access control',
         rbacSubtitle: 'Grant or revoke operational roles through backend RBAC.',
+        rbacHelp: 'SUPER_ADMIN can manage RBAC. ANALYST can export monitoring data. VIEWER can only view the dashboard.',
         rbacEmail: 'Account email',
         rbacRole: 'Role',
         rbacExpiresAt: 'Expires at (optional)',
@@ -371,6 +375,8 @@ export function AdminMonitoringPage() {
         noAssignments: 'No admin assignments yet.',
         expiresNever: 'Never expires',
         grantedAt: 'Granted at',
+        assignmentCount: 'assignments',
+        confirmRevoke: 'Revoke this role assignment?',
       }
 
   const load = React.useCallback(async () => {
@@ -468,7 +474,7 @@ export function AdminMonitoringPage() {
         body: JSON.stringify({
           email: rbacEmail.trim(),
           roleCode: rbacRole,
-          expiresAt: rbacExpiresAt ? new Date(rbacExpiresAt).toISOString() : null,
+          ...(rbacExpiresAt ? { expiresAt: new Date(rbacExpiresAt).toISOString() } : {}),
         }),
       })
       if (!response.ok) throw new Error(resolveApiError(response, 'Grant role failed'))
@@ -484,6 +490,7 @@ export function AdminMonitoringPage() {
   }
 
   const handleRevokeRole = async (assignment: AdminRoleAssignment) => {
+    if (!window.confirm(`${labels.confirmRevoke} ${assignment.email} / ${assignment.roleCode}`)) return
     setIsRbacLoading(true)
     setRbacError(null)
     setRbacMessage(null)
@@ -600,6 +607,7 @@ export function AdminMonitoringPage() {
           <div>
             <h2>{labels.rbacTitle}</h2>
             <span>{labels.rbacSubtitle}</span>
+            <small className='admin-monitoring-panel-help'>{labels.rbacHelp}</small>
           </div>
           <button className='admin-monitoring-secondary-button' type='button' onClick={() => void loadRbacAssignments()} disabled={isRbacLoading}>
             {isRbacLoading ? labels.refreshing : labels.refresh}
@@ -624,7 +632,11 @@ export function AdminMonitoringPage() {
           </label>
           <button type='submit' disabled={isRbacLoading || !rbacEmail.trim()}>{labels.grantRole}</button>
         </form>
-        <div className='admin-monitoring-rbac-list' aria-label={labels.activeAssignments}>
+        <div className='admin-monitoring-rbac-list-heading'>
+          <strong>{labels.activeAssignments}</strong>
+          <span>{roleAssignments.length} {labels.assignmentCount}</span>
+        </div>
+        <div className='admin-monitoring-rbac-list' aria-label={labels.activeAssignments} aria-busy={isRbacLoading}>
           {roleAssignments.length === 0 ? (
             <p className='admin-monitoring-empty'>{labels.noAssignments}</p>
           ) : roleAssignments.map((assignment) => (

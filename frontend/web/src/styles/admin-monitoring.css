@@ -547,3 +547,35 @@
     grid-template-columns: 1fr;
   }
 }
+
+.admin-monitoring-panel-help {
+  display: block;
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.admin-monitoring-rbac-list-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+  margin-bottom: 10px;
+}
+
+.admin-monitoring-rbac-list-heading strong {
+  font-size: 15px;
+  color: #0f172a;
+}
+
+.admin-monitoring-rbac-list-heading span {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.admin-monitoring-rbac-list[aria-busy='true'] {
+  opacity: 0.72;
+}
