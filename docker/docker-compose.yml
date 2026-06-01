@@ -410,12 +410,14 @@ services:
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_NAME: ${CONTENT_DB_NAME:-vnalo_content}
+      # Dùng vnalo_core: schema content + bảng friendship (public) cùng DB
+      DB_NAME: ${CONTENT_DB_NAME:-vnalo_core}
       DB_USER: ${DB_USER:-postgres}
       DB_PASS: ${DB_PASS:-postgres}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      CORE_SERVICE_URL: ${CORE_SERVICE_URL:-https://vnalo.fit/api/v1}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xss256k"
     depends_on:
