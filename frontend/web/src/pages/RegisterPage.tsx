@@ -152,6 +152,11 @@ export function RegisterPage() {
         otpCode,
         dob: form.dob || undefined,
         gender: form.gender || undefined,
+        acceptedTerms: form.acceptLegal,
+        acceptedPrivacy: form.acceptLegal,
+        legalVersion: '2026-06-01',
+        deviceName: 'VNALO Web',
+        platform: 'WEB',
       })
 
       setSuccessMessage('Đăng ký thành công! Đang chuyển hướng...')

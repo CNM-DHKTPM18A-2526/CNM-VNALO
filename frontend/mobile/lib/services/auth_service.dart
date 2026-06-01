@@ -89,6 +89,11 @@ class AuthService {
     required String otp,
     required String password,
     required String displayName,
+    required bool acceptedTerms,
+    required bool acceptedPrivacy,
+    String? legalVersion,
+    String? deviceName,
+    String? platform,
     String? gender,
     String? dob, // ISO 8601 string
   }) async {
@@ -100,6 +105,11 @@ class AuthService {
       'password': password,
       'displayName': displayName,
       'display_name': displayName,
+      'acceptedTerms': acceptedTerms,
+      'acceptedPrivacy': acceptedPrivacy,
+      'legalVersion': (legalVersion == null || legalVersion.trim().isEmpty) ? '2026-06-01' : legalVersion.trim(),
+      'deviceName': deviceName ?? 'VNALO Mobile',
+      'platform': platform ?? 'ANDROID',
     };
     if (gender != null) {
       body['gender'] = gender.toUpperCase();
