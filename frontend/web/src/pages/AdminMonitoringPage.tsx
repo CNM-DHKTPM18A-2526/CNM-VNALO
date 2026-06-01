@@ -5,7 +5,7 @@ import { useAuth } from '../features/auth/useAuth'
 import { useLanguage } from '../shared/i18n/LanguageContext'
 import '../styles/admin-monitoring.css'
 
-type MonitorStatus = 'ok' | 'warning' | 'error' | 'checking'
+type MonitorStatus = 'ok' | 'warning' | 'error'
 
 type ServiceProbe = {
   name: string
@@ -106,6 +106,11 @@ function extractData<T>(payload: unknown): T | null {
   return (obj.data ?? payload) as T
 }
 
+function resolveApiError(response: Response, fallback: string) {
+  if (response.status === 401) return 'Authentication required. Please sign in again.'
+  if (response.status === 403) return 'Access denied by backend allowlist. Check ADMIN_MONITORING_ALLOWED_EMAILS.'
+  return `${fallback} (${response.status})`
+}
 
 export function AdminMonitoringPage() {
   const { language } = useLanguage()
@@ -114,17 +119,18 @@ export function AdminMonitoringPage() {
     .split(',')
     .map((email: string) => email.trim().toLowerCase())
     .filter(Boolean)
-  const canRequestMonitoring = Boolean(user?.email && adminMonitoringEmails.includes(user.email.toLowerCase()))
+  const hasUiHintAccess = Boolean(user?.email && adminMonitoringEmails.includes(user.email.toLowerCase()))
   const [services, setServices] = React.useState<ServiceProbe[]>([])
   const [summary, setSummary] = React.useState<MonitoringSummary | null>(null)
   const [audits, setAudits] = React.useState<SessionAudit[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [lastUpdated, setLastUpdated] = React.useState<Date | null>(null)
+  const [monitoringError, setMonitoringError] = React.useState<string | null>(null)
   const labels = language === 'vi'
     ? {
         title: 'Giám sát vận hành',
-        subtitle: 'Theo dõi trạng thái dịch vụ, sự kiện phiên đăng nhập và các rủi ro cần kiểm tra mà không hiển thị dữ liệu nhạy cảm.',
-        accessNote: 'Trang này yêu cầu quyền admin allowlist phía backend và chỉ hiển thị metadata.',
+        subtitle: 'Theo dõi trạng thái dịch vụ, sự kiện phiên đăng nhập và rủi ro vận hành mà không hiển thị dữ liệu nhạy cảm.',
+        accessNote: 'Trang này yêu cầu email nằm trong allowlist admin ở backend. UI chỉ là gợi ý, backend vẫn là lớp kiểm soát chính.',
         refresh: 'Làm mới',
         serviceHealth: 'Trạng thái dịch vụ',
         sessionAudits: 'Sự kiện phiên gần đây',
@@ -132,11 +138,23 @@ export function AdminMonitoringPage() {
         dataGuard: 'Nguyên tắc dữ liệu an toàn',
         noAudits: 'Chưa có sự kiện phiên hoặc API chưa trả dữ liệu.',
         updated: 'Cập nhật',
+        healthyServices: 'Dịch vụ OK',
+        needsAttention: 'Cần kiểm tra',
+        sessionEvents: 'Sự kiện phiên',
+        totalAccounts: 'Tổng tài khoản',
+        failedLoginCount: 'Failed login count',
+        failedLoginDetail: 'Tổng failed_login_count hiện tại',
+        qrApproved: 'QR approved 24h',
+        qrApprovedDetail: 'Lượt QR approval gần đây',
+        activeAccounts: 'Tài khoản hoạt động',
+        activeRefreshTokens: 'Refresh token còn hiệu lực',
+        loginFailures: 'Login fail 24h',
+        otpVerified: 'OTP xác thực 24h',
       }
     : {
         title: 'Operations Monitoring',
-        subtitle: 'Monitor service status, session events, and risks without exposing sensitive user data.',
-        accessNote: 'This dashboard requires backend admin allowlist access and only displays metadata.',
+        subtitle: 'Monitor service status, session events, and operational risks without exposing sensitive user data.',
+        accessNote: 'This page requires backend admin allowlist access. The UI hint is not the security boundary; the backend is authoritative.',
         refresh: 'Refresh',
         serviceHealth: 'Service health',
         sessionAudits: 'Recent session events',
@@ -144,19 +162,33 @@ export function AdminMonitoringPage() {
         dataGuard: 'Safe data guardrails',
         noAudits: 'No session events yet or the API returned no data.',
         updated: 'Updated',
+        healthyServices: 'Healthy services',
+        needsAttention: 'Needs attention',
+        sessionEvents: 'Session events',
+        totalAccounts: 'Total accounts',
+        failedLoginCount: 'Failed login count',
+        failedLoginDetail: 'Current accumulated failed_login_count',
+        qrApproved: 'QR approved 24h',
+        qrApprovedDetail: 'Recent QR approvals',
+        activeAccounts: 'Active accounts',
+        activeRefreshTokens: 'Active refresh tokens',
+        loginFailures: 'Login failures 24h',
+        otpVerified: 'OTP verified 24h',
       }
 
   const load = React.useCallback(async () => {
-    if (!canRequestMonitoring) {
+    if (!accessToken) {
       setServices([])
       setSummary(null)
       setAudits([])
       setLastUpdated(null)
+      setMonitoringError(null)
       setIsLoading(false)
       return
     }
 
     setIsLoading(true)
+    setMonitoringError(null)
     const probes = [
       { name: 'core-service', url: `${API_BASE_URL}/actuator/health` },
       { name: 'message-service', url: `${MESSAGE_API_URL}/health` },
@@ -181,19 +213,23 @@ export function AdminMonitoringPage() {
         fetchWithTimeout(`${API_BASE_URL}/admin/monitoring/summary`, accessToken),
         fetchWithTimeout(`${API_BASE_URL}/admin/monitoring/events?limit=12`, accessToken),
       ])
+      if (!summaryResponse.ok) throw new Error(resolveApiError(summaryResponse, 'Monitoring summary failed'))
+      if (!eventsResponse.ok) throw new Error(resolveApiError(eventsResponse, 'Monitoring events failed'))
+
       const summaryPayload = (await summaryResponse.json().catch(() => null)) as unknown
       const eventsPayload = (await eventsResponse.json().catch(() => null)) as unknown
       setSummary(extractData<MonitoringSummary>(summaryPayload))
       setAudits(extractArray(eventsPayload) as SessionAudit[])
-    } catch {
+    } catch (error) {
       setSummary(null)
       setAudits([])
+      setMonitoringError(error instanceof Error ? error.message : 'Monitoring API unavailable')
     }
 
     setServices(serviceResults)
     setLastUpdated(new Date())
     setIsLoading(false)
-  }, [accessToken, canRequestMonitoring])
+  }, [accessToken])
 
   React.useEffect(() => {
     void load()
@@ -202,12 +238,12 @@ export function AdminMonitoringPage() {
   const okCount = services.filter((service) => service.status === 'ok').length
   const issueCount = services.filter((service) => service.status !== 'ok').length
   const summaryCards = [
-    { label: language === 'vi' ? 'Tài khoản hoạt động' : 'Active accounts', value: summary?.accounts?.active ?? 0 },
-    { label: language === 'vi' ? 'Refresh token còn hiệu lực' : 'Active refresh tokens', value: summary?.sessions?.activeRefreshTokens ?? 0 },
-    { label: language === 'vi' ? 'AI messages 24h' : 'AI messages 24h', value: summary?.ai?.messagesLast24Hours ?? 0 },
-    { label: language === 'vi' ? 'Login fail 24h' : 'Login failures 24h', value: summary?.audits?.loginFailureLast24Hours ?? 0 },
-    { label: language === 'vi' ? 'OTP xác thực 24h' : 'OTP verified 24h', value: summary?.otp?.verifiedLast24Hours ?? 0 },
-    { label: language === 'vi' ? 'QR pending' : 'QR pending', value: summary?.qr?.pendingNow ?? 0 },
+    { label: labels.activeAccounts, value: summary?.accounts?.active ?? 0 },
+    { label: labels.activeRefreshTokens, value: summary?.sessions?.activeRefreshTokens ?? 0 },
+    { label: 'AI messages 24h', value: summary?.ai?.messagesLast24Hours ?? 0 },
+    { label: labels.loginFailures, value: summary?.audits?.loginFailureLast24Hours ?? 0 },
+    { label: labels.otpVerified, value: summary?.otp?.verifiedLast24Hours ?? 0 },
+    { label: 'QR pending', value: summary?.qr?.pendingNow ?? 0 },
   ]
 
   return (
@@ -221,20 +257,21 @@ export function AdminMonitoringPage() {
         <button type='button' onClick={() => void load()} disabled={isLoading}>{isLoading ? '...' : labels.refresh}</button>
       </header>
 
-      {!canRequestMonitoring ? <div className='admin-monitoring-note admin-monitoring-denied'>{labels.accessNote}</div> : null}
+      {!hasUiHintAccess ? <div className='admin-monitoring-note admin-monitoring-denied'>{labels.accessNote}</div> : null}
+      {monitoringError ? <div className='admin-monitoring-note admin-monitoring-error'>{monitoringError}</div> : null}
       {summary?.accessMode ? <div className='admin-monitoring-note'>Access mode: {summary.accessMode}</div> : null}
 
       <section className='admin-monitoring-grid'>
         <article className='admin-monitoring-card'>
-          <span>{language === 'vi' ? 'Dịch vụ OK' : 'Healthy services'}</span>
+          <span>{labels.healthyServices}</span>
           <strong>{okCount}/{services.length || 4}</strong>
         </article>
         <article className='admin-monitoring-card'>
-          <span>{language === 'vi' ? 'Cần kiểm tra' : 'Needs attention'}</span>
+          <span>{labels.needsAttention}</span>
           <strong>{issueCount}</strong>
         </article>
         <article className='admin-monitoring-card'>
-          <span>{language === 'vi' ? 'Sự kiện phiên' : 'Session events'}</span>
+          <span>{labels.sessionEvents}</span>
           <strong>{audits.length}</strong>
         </article>
       </section>
@@ -274,18 +311,18 @@ export function AdminMonitoringPage() {
         </div>
         <div className='admin-monitoring-event-list'>
           <div className='admin-monitoring-event-row'>
-            <strong>{language === 'vi' ? 'Tổng tài khoản' : 'Total accounts'}</strong>
-            <span>{language === 'vi' ? 'Active / locked / disabled / pending' : 'Active / locked / disabled / pending'}</span>
+            <strong>{labels.totalAccounts}</strong>
+            <span>Active / locked / disabled / pending</span>
             <time>{summary?.accounts?.total ?? 0}</time>
           </div>
           <div className='admin-monitoring-event-row'>
-            <strong>{language === 'vi' ? 'Failed login count' : 'Failed login count'}</strong>
-            <span>{language === 'vi' ? 'Tổng failed_login_count hiện tại' : 'Current accumulated failed_login_count'}</span>
+            <strong>{labels.failedLoginCount}</strong>
+            <span>{labels.failedLoginDetail}</span>
             <time>{summary?.accounts?.failedLoginAttemptsTotal ?? 0}</time>
           </div>
           <div className='admin-monitoring-event-row'>
-            <strong>{language === 'vi' ? 'QR approved 24h' : 'QR approved 24h'}</strong>
-            <span>{language === 'vi' ? 'Lượt QR approval gần đây' : 'Recent QR approvals'}</span>
+            <strong>{labels.qrApproved}</strong>
+            <span>{labels.qrApprovedDetail}</span>
             <time>{summary?.qr?.approvedLast24Hours ?? 0}</time>
           </div>
         </div>
@@ -302,7 +339,7 @@ export function AdminMonitoringPage() {
             {audits.map((audit, index) => (
               <div className='admin-monitoring-event-row' key={audit.auditId ?? index}>
                 <strong>{audit.eventType ?? 'SESSION_EVENT'}</strong>
-                <span>{audit.platform ?? 'WEB'} · {audit.deviceName ?? 'Unknown device'} · {audit.detail ?? 'session update'}</span>
+                <span>{audit.platform ?? 'WEB'} - {audit.deviceName ?? 'Unknown device'} - {audit.detail ?? 'session update'}</span>
                 <time>{audit.createdAt ? new Date(audit.createdAt).toLocaleString() : '-'}</time>
               </div>
             ))}
@@ -315,7 +352,7 @@ export function AdminMonitoringPage() {
         <ul className='admin-monitoring-guardrails'>
           <li>{language === 'vi' ? 'Không hiển thị mật khẩu, OTP, token, nội dung tin nhắn riêng tư hoặc embedding khuôn mặt.' : 'Do not expose passwords, OTPs, tokens, private message content, or face embeddings.'}</li>
           <li>{language === 'vi' ? 'Chỉ log metadata tối thiểu cần cho vận hành, bảo mật và điều tra lỗi.' : 'Log only the minimum metadata needed for operations, security, and debugging.'}</li>
-          <li>{language === 'vi' ? 'Các API admin production cần kiểm tra role phía backend, không chỉ ẩn UI.' : 'Production admin APIs must enforce roles on the backend, not only hide UI.'}</li>
+          <li>{language === 'vi' ? 'API admin production phải kiểm tra quyền ở backend, không chỉ ẩn UI.' : 'Production admin APIs must enforce roles on the backend, not only hide UI.'}</li>
         </ul>
       </section>
     </div>

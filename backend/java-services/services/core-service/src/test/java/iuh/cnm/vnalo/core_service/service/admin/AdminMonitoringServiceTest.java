@@ -156,7 +156,7 @@ class AdminMonitoringServiceTest {
 
         assertEquals(1, events.size());
         assertEquals("dev***456", events.get(0).deviceIdMasked());
-        assertTrue(events.get(0).detail().endsWith("…"));
+        assertTrue(events.get(0).detail().endsWith("..."));
         verify(authSessionAuditRepository).findAllByOrderByCreatedAtDesc(any(Pageable.class));
     }
 }

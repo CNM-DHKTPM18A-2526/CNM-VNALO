@@ -135,7 +135,7 @@ public class AdminMonitoringService {
 
     private String sanitizeDeviceName(String deviceName) {
         if (deviceName == null || deviceName.isBlank()) return "Unknown device";
-        return deviceName.length() > 48 ? deviceName.substring(0, 48) + "…" : deviceName;
+        return deviceName.length() > 48 ? deviceName.substring(0, 48) + "..." : deviceName;
     }
 
     private String maskDeviceId(String deviceId) {
@@ -146,7 +146,7 @@ public class AdminMonitoringService {
 
     private String sanitizeDetail(String detail) {
         if (detail == null || detail.isBlank()) return "";
-        return detail.length() > 120 ? detail.substring(0, 120) + "…" : detail;
+        return detail.length() > 120 ? detail.substring(0, 120) + "..." : detail;
     }
 
     private long coalesce(Long value) {

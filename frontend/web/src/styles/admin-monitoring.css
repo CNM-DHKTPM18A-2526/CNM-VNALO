@@ -1,4 +1,4 @@
-﻿.admin-monitoring-page {
+.admin-monitoring-page {
   width: 100%;
   min-height: 100%;
   padding: 28px;
@@ -61,6 +61,12 @@
   color: #92400e;
   background: #fffbeb;
   border-color: #fde68a;
+}
+
+.admin-monitoring-error {
+  color: #991b1b;
+  background: #fef2f2;
+  border-color: #fecaca;
 }
 
 .admin-monitoring-grid {
