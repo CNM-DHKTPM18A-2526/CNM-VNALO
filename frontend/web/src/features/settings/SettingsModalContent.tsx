@@ -1,4 +1,5 @@
 import React, { type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { changePassword } from '../auth/auth.api'
 import { useAuth } from '../auth/useAuth'
@@ -70,6 +71,7 @@ export function SettingsModalContent({
   showChangePasswordButton = true,
 }: SettingsModalContentProps) {
   const { accessToken, logout } = useAuth()
+  const navigate = useNavigate()
   const { theme, toggleTheme } = useTheme()
   const { language, setLanguage, t } = useLanguage()
   const { notificationsEnabled, toggleNotifications } = useNotifications()
@@ -84,6 +86,10 @@ export function SettingsModalContent({
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
   const [successMessage, setSuccessMessage] = React.useState<string | null>(null)
+
+  const openAdminDashboard = () => {
+    navigate('/admin/monitoring')
+  }
 
   const closeChangePasswordModal = () => {
     if (isSubmitting) {
@@ -226,6 +232,17 @@ export function SettingsModalContent({
                 title={t('settings.startup')}
                 description={t('settings.startupDesc')}
                 action={<span className='settings-window-pill'>{t('settings.comingSoon')}</span>}
+              />
+
+              <SettingsRow
+                title={t('settings.adminDashboard')}
+                description={t('settings.adminDashboardDesc')}
+                action={
+                  <button className='settings-window-action-btn' type='button' onClick={openAdminDashboard}>
+                    <span aria-hidden='true'>↗</span>
+                    {t('settings.openDashboard')}
+                  </button>
+                }
               />
             </section>
           )}
