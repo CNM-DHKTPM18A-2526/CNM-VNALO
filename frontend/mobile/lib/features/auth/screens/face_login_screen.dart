@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
@@ -18,7 +19,7 @@ class FaceLoginScreen extends StatefulWidget {
 }
 
 class _FaceLoginScreenState extends State<FaceLoginScreen> {
-  final _userIdController = TextEditingController();
+  final _identifierController = TextEditingController();
   final _imagePicker = ImagePicker();
   final _faceService = FaceAuthService();
 
@@ -26,26 +27,35 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
   bool _serviceAvailable = true;
   String? _errorMsg;
 
+  Future<void> checkService() async {
+    try {
+      final available = await _faceService.isServiceAvailable();
+      if (mounted) {
+        setState(() => _serviceAvailable = available);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _serviceAvailable = false);
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    void _checkService() async {
-      final available = await _faceService.isServiceAvailable();
-      if (mounted) setState(() => _serviceAvailable = available);
-    }
-    _checkService();
+    checkService();
   }
 
   @override
   void dispose() {
-    _userIdController.dispose();
+    _identifierController.dispose();
     super.dispose();
   }
 
   Future<void> _captureAndVerify() async {
-    final userId = _userIdController.text.trim();
-    if (userId.isEmpty) {
-      setState(() => _errorMsg = 'Vui lòng nhập ID tài khoản');
+    final identifier = _identifierController.text.trim();
+    if (identifier.isEmpty) {
+      setState(() => _errorMsg = 'Vui lòng nhập số điện thoại hoặc email');
       return;
     }
 
@@ -68,25 +78,24 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
 
       final imageFile = File(pickedFile.path);
 
-      final liveness = await _faceService.checkLiveness(imageFile);
-      if (!liveness.pass) {
-        setState(() {
-          _isLoading = false;
-          _errorMsg = 'Không xác định được khuôn mặt thật. Vui lòng thử lại với ảnh rõ ràng.';
-        });
-        return;
-      }
+      // Backend now enforces liveness check internally during /face/verify.
+      // We no longer call /face/liveness-check here to avoid uploading the image twice.
 
-      final verify = await _faceService.verifyFace(
+      final userId = await _faceService.lookupUserId(identifier);
+
+      final verifyResult = await _faceService.verifyFace(
         imageFile,
         userId,
-        livenessScore: liveness.score,
       );
 
-      if (!verify.verified) {
+      if (!mounted) return;
+
+      if (!verifyResult.verified || verifyResult.verificationToken == null) {
         setState(() {
           _isLoading = false;
-          _errorMsg = 'Khuôn mặt không khớp với tài khoản. Vui lòng kiểm tra lại ID.';
+          _errorMsg = verifyResult.decision == 'SPOOF_DETECTED'
+              ? 'Phát hiện ảnh giả mạo. Vui lòng sử dụng khuôn mặt thật.'
+              : 'Khuôn mặt không khớp với tài khoản. Vui lòng thử lại.';
         });
         return;
       }
@@ -94,7 +103,7 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
       final auth = context.read<AuthProvider>();
       final info = await DeviceInfoUtil.getDeviceInfo();
       final success = await auth.loginWithFace(
-        userId: userId,
+        verificationToken: verifyResult.verificationToken!,
         deviceId: info.deviceId,
         deviceName: info.deviceName,
         platform: info.platform,
@@ -118,7 +127,11 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMsg = e is ApiException ? e.message : 'Đã xảy ra lỗi. Vui lòng thử lại.';
+          if (e is TimeoutException) {
+            _errorMsg = 'Quá thời gian chờ máy chủ. Vui lòng thử lại.';
+          } else {
+            _errorMsg = e is ApiException ? e.message : 'Đã xảy ra lỗi. Vui lòng thử lại.';
+          }
         });
       }
     }
@@ -165,13 +178,13 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
                   icon: Icons.face_rounded,
                   iconColor: primaryColor,
                   title: 'Xác thực bằng khuôn mặt',
-                  subtitle: 'Nhập ID tài khoản và chụp ảnh khuôn mặt để đăng nhập nhanh.',
+                  subtitle: 'Nhập số điện thoại hoặc email đã đăng ký và chụp ảnh khuôn mặt để đăng nhập nhanh.',
                   bgColor: primaryColor.withValues(alpha: 0.08),
                   isDark: isDarkMode,
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  'ID Tài khoản',
+                  'Số điện thoại hoặc Email',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -180,10 +193,11 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
                 ),
                 const SizedBox(height: 8),
                 TextField(
-                  controller: _userIdController,
+                  controller: _identifierController,
+                  keyboardType: TextInputType.emailAddress,
                   style: TextStyle(color: textColor),
                   decoration: InputDecoration(
-                    hintText: 'Nhập ID tài khoản (xem trong Cài đặt > Tài khoản)',
+                    hintText: 'Nhập số điện thoại hoặc email',
                     hintStyle: TextStyle(color: hintColor, fontSize: 14),
                     filled: true,
                     fillColor: isDarkMode ? DarkColors.surface : Colors.grey.shade50,
@@ -196,7 +210,7 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Bạn có thể xem ID tài khoản trong mục Cài đặt > Tài khoản trên app.',
+                  'Bạn cần đã đăng ký khuôn mặt trước đó trong mục Cài đặt.',
                   style: TextStyle(fontSize: 12, color: hintColor),
                 ),
                 if (_errorMsg != null) ...[
@@ -204,17 +218,17 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.red.shade50,
+                      color: isDarkMode ? Colors.red.shade900.withValues(alpha: 0.2) : Colors.red.shade50,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                        Icon(Icons.error_outline, color: isDarkMode ? Colors.red.shade200 : Colors.red.shade700, size: 20),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             _errorMsg!,
-                            style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+                            style: TextStyle(color: isDarkMode ? Colors.red.shade200 : Colors.red.shade700, fontSize: 13),
                           ),
                         ),
                       ],
@@ -269,18 +283,18 @@ class _FaceLoginScreenState extends State<FaceLoginScreen> {
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: Colors.amber.shade50,
+                      color: isDarkMode ? Colors.amber.shade900.withValues(alpha: 0.2) : Colors.amber.shade50,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.amber.shade200),
+                      border: Border.all(color: isDarkMode ? Colors.amber.shade900.withValues(alpha: 0.5) : Colors.amber.shade200),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.science_outlined, color: Colors.amber.shade700, size: 20),
+                        Icon(Icons.science_outlined, color: isDarkMode ? Colors.amber.shade300 : Colors.amber.shade700, size: 20),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             'Tính năng đang trong giai đoạn thử nghiệm.',
-                            style: TextStyle(fontSize: 13, color: Colors.amber.shade900),
+                            style: TextStyle(fontSize: 13, color: isDarkMode ? Colors.amber.shade200 : Colors.amber.shade900),
                           ),
                         ),
                       ],

@@ -276,7 +276,9 @@ class ChatService {
         final res = await _apiService.get(_coreBase, '/users/$uid');
         final uData = res['data'] ?? res;
         if (uData is Map<String, dynamic>) results[uid] = uData;
-      } catch (_) {}
+      } catch (_) {
+        // Silently skip users that cannot be fetched; callers handle missing data.
+      }
     }));
     return results;
   }

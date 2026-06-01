@@ -68,6 +68,36 @@ public class JwtTokenProvider {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
     }
 
+    public String generateFaceVerificationToken(UUID userId) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("type", "FACE_VERIFY");
+
+        Instant now = Instant.now();
+        Instant expiry = now.plusSeconds(60); // 60 seconds validity
+
+        return Jwts.builder()
+                .claims(claims)
+                .subject(userId.toString())
+                .issuer(jwtConfig.getIssuer())
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(expiry))
+                .signWith(secretKey, Jwts.SIG.HS512)
+                .compact();
+    }
+
+    public UUID validateFaceVerificationToken(String token) {
+        try {
+            Claims claims = Jwts.parser().verifyWith(secretKey).build().parseSignedClaims(token).getPayload();
+            if (!"FACE_VERIFY".equals(claims.get("type"))) {
+                throw new IllegalArgumentException("Invalid token type");
+            }
+            return UUID.fromString(claims.getSubject());
+        } catch (Exception e) {
+            log.warn("Face verification token validation failed: {}", e.getMessage());
+            return null;
+        }
+    }
+
     public boolean validateToken(String token) {
         try {
             Jwts.parser().verifyWith(secretKey).build().parseSignedClaims(token);

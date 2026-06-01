@@ -4,6 +4,7 @@ import iuh.cnm.vnalo.core_service.config.OtpConfig;
 import iuh.cnm.vnalo.core_service.exception.ApiException;
 import iuh.cnm.vnalo.core_service.exception.ErrorCode;
 import iuh.cnm.vnalo.core_service.model.dto.request.ChangePasswordRequest;
+import iuh.cnm.vnalo.core_service.model.dto.request.FaceLoginRequest;
 import iuh.cnm.vnalo.core_service.model.dto.request.ForgotPasswordRequest;
 import iuh.cnm.vnalo.core_service.model.dto.request.LoginRequest;
 import iuh.cnm.vnalo.core_service.model.dto.request.RefreshTokenRequest;
@@ -16,6 +17,7 @@ import iuh.cnm.vnalo.core_service.model.dto.response.OtpResponse;
 import iuh.cnm.vnalo.core_service.security.UserPrincipal;
 import iuh.cnm.vnalo.core_service.service.AuthService;
 import iuh.cnm.vnalo.core_service.service.SessionAuditService;
+import iuh.cnm.vnalo.core_service.service.face.RateLimitService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,6 +29,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * REST Controller for authentication endpoints.
@@ -39,6 +42,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final SessionAuditService sessionAuditService;
+    private final RateLimitService rateLimitService;
     private final OtpConfig otpConfig;
 
     /**
@@ -223,6 +227,54 @@ public class AuthController {
     public ResponseEntity<Void> verifyOtp(@RequestBody Map<String, String> body) {
         authService.verifyRegistrationOtp(body.get("email"), body.get("otp"));
         return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Face login — caller must first call /face/verify to get verified=true with a userId.
+     * This endpoint creates a session for the verified userId.
+     */
+    @PostMapping("/face-login")
+    @Operation(summary = "Face login", description = "Create session after face verification succeeded")
+    public ResponseEntity<ApiResponse<AuthResponse>> faceLogin(
+            @Valid @RequestBody FaceLoginRequest request,
+            HttpServletRequest httpRequest) {
+
+        AuthResponse response = authService.faceLogin(
+                request.getVerificationToken(),
+                httpRequest,
+                request.getDeviceId(),
+                request.getDeviceName(),
+                request.getPlatform()
+        );
+        return ResponseEntity.ok(ApiResponse.success("Face login successful", response));
+    }
+
+    /**
+     * Lookup a user account by phone number or email, returning the userId.
+     * Used by the face login flow to resolve an identifier to a UUID.
+     */
+    @GetMapping("/lookup")
+    @Operation(summary = "Lookup user by identifier", description = "Resolve phone or email to userId for face login")
+    public ResponseEntity<ApiResponse<Map<String, String>>> lookupByIdentifier(
+            @RequestParam("identifier") String identifier,
+            HttpServletRequest request) {
+
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip != null && !ip.isBlank()) {
+            ip = ip.split(",")[0].trim();
+        } else {
+            ip = request.getRemoteAddr();
+        }
+
+        if (rateLimitService.isLookupRateLimited(ip)) {
+            throw new ApiException(ErrorCode.AUTH_TOO_MANY_REQUESTS, "Quá nhiều yêu cầu tra cứu. Vui lòng thử lại sau.");
+        }
+
+        UUID userId = authService.resolveAccountToUserId(identifier);
+        return ResponseEntity.ok(ApiResponse.success(
+                "User found",
+                Map.of("userId", userId.toString())
+        ));
     }
 
     /**

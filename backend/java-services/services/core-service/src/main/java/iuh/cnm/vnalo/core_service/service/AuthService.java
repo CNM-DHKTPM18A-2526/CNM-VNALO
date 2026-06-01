@@ -3,6 +3,7 @@ package iuh.cnm.vnalo.core_service.service;
 import iuh.cnm.vnalo.core_service.exception.ApiException;
 import iuh.cnm.vnalo.core_service.exception.ErrorCode;
 import iuh.cnm.vnalo.core_service.model.dto.request.ChangePasswordRequest;
+import iuh.cnm.vnalo.core_service.model.dto.request.FaceLoginRequest;
 import iuh.cnm.vnalo.core_service.model.dto.request.ForgotPasswordRequest;
 import iuh.cnm.vnalo.core_service.model.dto.request.LoginRequest;
 import iuh.cnm.vnalo.core_service.model.dto.request.RefreshTokenRequest;
@@ -399,6 +400,77 @@ public class AuthService {
         log.info("Password reset successfully for email: {}", maskEmail(email));
     }
 
+    /**
+     * Login via face verification — the caller (frontend) has already verified
+     * the face via /face/verify and obtained the userId. This method creates
+     * a session just like password login, recording the audit trail.
+     */
+    @Transactional
+    public AuthResponse faceLogin(
+            String verificationToken,
+            HttpServletRequest httpRequest,
+            String deviceId,
+            String deviceName,
+            String platform
+    ) {
+        UUID accountId = jwtTokenProvider.validateFaceVerificationToken(verificationToken);
+        if (accountId == null) {
+            throw new ApiException(ErrorCode.AUTH_INVALID_CREDENTIALS, "Invalid or expired face verification token");
+        }
+
+        AuthAccount account = authAccountRepository.findById(accountId)
+                .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
+
+        if (!account.isActive()) {
+            throw new ApiException(ErrorCode.AUTH_ACCOUNT_DISABLED);
+        }
+
+        final String normalizedPlatform = resolvePlatform(platform, httpRequest);
+
+        account.onLoginSuccess(deviceId);
+        authAccountRepository.save(account);
+
+        UserProfile profile = userProfileRepository.findById(account.getId())
+                .orElseThrow(() -> new ApiException(ErrorCode.USER_PROFILE_NOT_FOUND));
+
+        if (deviceId != null) {
+            refreshTokenRepository.revokeByAccountIdAndDeviceId(account.getId(), deviceId, Instant.now());
+        }
+
+        UserPrincipal userPrincipal = UserPrincipal.create(account);
+        IssuedRefreshToken issuedRefreshToken = generateAndSaveRefreshToken(
+            account.getId(),
+            httpRequest,
+            deviceId,
+            deviceName,
+            normalizedPlatform,
+            false
+        );
+
+        final UserSetting setting = userSettingRepository.findById(account.getId())
+                .orElseGet(() -> UserSetting.createDefault(account.getId()));
+        final boolean restrictedWebMode = isWebRestrictedForSession(setting, normalizedPlatform, deviceId);
+
+        String accessToken = buildAccessTokenForSession(
+                userPrincipal,
+                deviceId,
+                normalizedPlatform,
+                false,
+                restrictedWebMode
+        );
+
+        sessionAuditService.record(
+                account.getId(),
+                issuedRefreshToken.token(),
+                "LOGIN_SUCCESS",
+                resolveSessionType(issuedRefreshToken.token()),
+                resolveTrustLevel(issuedRefreshToken.token()),
+                "Face login succeeded"
+        );
+
+        return buildAuthResponse(accessToken, issuedRefreshToken.rawToken(), account, profile);
+    }
+
     private IssuedRefreshToken generateAndSaveRefreshToken(
         UUID accountId,
         HttpServletRequest request,
@@ -666,6 +738,17 @@ public class AuthService {
         String encodedName = URLEncoder.encode(safeName, StandardCharsets.UTF_8);
         return "https://api.dicebear.com/9.x/initials/png?seed=" + encodedName
                 + "&radius=50&size=256&chars=2&fontFamily=Arial&fontWeight=600&backgroundType=gradientLinear";
+    }
+
+    /**
+     * Resolves an account identifier (phone/email) to a userId (UUID).
+     * Used by face login to translate user-friendly identifier to internal UUID.
+     */
+    @Transactional(readOnly = true)
+    public UUID resolveAccountToUserId(String identifier) {
+        return resolveAccountByIdentifier(identifier)
+                .orElseThrow(() -> new ApiException(ErrorCode.AUTH_INVALID_CREDENTIALS))
+                .getId();
     }
 
     public record LoginDeviceInfo(

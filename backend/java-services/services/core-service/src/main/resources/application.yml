@@ -53,11 +53,19 @@ spring:
           timeout: ${SMTP_READ_TIMEOUT_MS:5000}
           writetimeout: ${SMTP_WRITE_TIMEOUT_MS:5000}
 
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 10MB
+
 server:
   port: 8081
   forward-headers-strategy: framework
   servlet:
     context-path: /api/v1
+  tomcat:
+    max-http-form-post-size: 10MB
 
 # JWT Configuration - REQUIRED for all profiles
 jwt:
@@ -110,6 +118,17 @@ otp:
     enabled: ${OTP_TEST_MODE:false}
     mock-otp: "123456"
     log-otp: true
+
+# Face Authentication Configuration
+face:
+  auth:
+    enabled: ${FACE_AUTH_ENABLED:false}
+    enrollment-enabled: ${FACE_ENROLLMENT_ENABLED:true}
+    verification-enabled: ${FACE_VERIFICATION_ENABLED:true}
+    model-path: ${FACE_MODEL_PATH:classpath:models}
+    verification-threshold: ${FACE_VERIFICATION_THRESHOLD:0.65}
+    liveness-threshold: ${FACE_LIVENESS_THRESHOLD:0.70}
+    encryption-key: ${FACE_ENCRYPTION_KEY:}
 
 ---
 # =============================================================================

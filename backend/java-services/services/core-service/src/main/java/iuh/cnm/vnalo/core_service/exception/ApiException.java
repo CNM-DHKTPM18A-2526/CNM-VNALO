@@ -44,7 +44,10 @@ public class ApiException extends RuntimeException {
                  AUTH_REFRESH_TOKEN_REVOKED -> HttpStatus.UNAUTHORIZED;
             case AUTH_ACCOUNT_DISABLED, AUTH_ACCOUNT_LOCKED -> HttpStatus.FORBIDDEN;
             case AUTH_PHONE_ALREADY_EXISTS, SOCIAL_ALREADY_FRIENDS,
-                 SOCIAL_REQUEST_ALREADY_SENT, SOCIAL_ALREADY_BLOCKED -> HttpStatus.CONFLICT;
+                 SOCIAL_REQUEST_ALREADY_SENT, SOCIAL_ALREADY_BLOCKED,
+                 FACE_ALREADY_ENROLLED -> HttpStatus.CONFLICT;
+            case FACE_RATE_LIMITED -> HttpStatus.TOO_MANY_REQUESTS;
+            case FACE_SERVICE_UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;
             default -> HttpStatus.BAD_REQUEST;
         };
     }

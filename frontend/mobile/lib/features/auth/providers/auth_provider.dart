@@ -6,8 +6,7 @@ import 'package:vnalo_mobile/services/auth_events.dart';
 import 'package:vnalo_mobile/services/auth_service.dart';
 import 'package:vnalo_mobile/services/socket_service.dart';
 import 'package:vnalo_mobile/services/storage_service.dart';
-import 'package:vnalo_mobile/services/face_auth_service.dart'
-    show FaceAuthService;
+import 'package:vnalo_mobile/services/face_auth_service.dart' show FaceAuthService;
 
 import 'package:vnalo_mobile/services/local_sync_service.dart';
 import 'package:vnalo_mobile/core/utils/device_info_util.dart';
@@ -29,7 +28,6 @@ class AuthProvider extends ChangeNotifier {
 
   /// Cached access token for synchronous access (e.g. image loading headers).
   String? _accessToken;
-  String? _scopedUserId;
 
   /// Set when the user is kicked out by another device.
   String? _kickoutReason;
@@ -45,7 +43,6 @@ class AuthProvider extends ChangeNotifier {
 
   /// Current access token (cached in memory for synchronous access).
   String? get accessToken => _accessToken;
-  String? get scopedUserId => _user?.id ?? _scopedUserId;
 
   String? get kickoutReason => _kickoutReason;
 
@@ -62,20 +59,8 @@ class AuthProvider extends ChangeNotifier {
     };
   }
 
-  bool _isFatalAuthFailure(Object error) {
-    if (error is UnauthorizedException) {
-      return true;
-    }
-
-    if (error is ApiException) {
-      return error.statusCode == 401 || error.statusCode == 403;
-    }
-
-    return false;
-  }
   // Initialize the provider by checking if there's a valid token and fetching user info
   Future<void> initialize() async {
-    _scopedUserId = await _storageService.getUserId();
     final token = await _storageService.getAccessToken();
     if (token != null) {
       _accessToken = token;
@@ -84,15 +69,14 @@ class AuthProvider extends ChangeNotifier {
 
       try {
         _user = await _authService.getMe();
-        _scopedUserId = _user?.id ?? _scopedUserId;
         debugPrint('[Auth] Success: Profile hydrated.');
         // Trigger sync after successful hydration
         _localSyncService.syncRecently();
       } catch (e) {
         debugPrint('[Auth] Error: Fetching profile failed: $e');
-        if (_isFatalAuthFailure(e)) {
-          await logout();
-        }
+        // If profile fetch fails, we might still be able to function if local cache exists,
+        // but if it's an auth error, we should clear.
+        // For now, keep the session but log the error.
       }
     }
     _isInitialized = true;
@@ -127,11 +111,9 @@ class AuthProvider extends ChangeNotifier {
 
       if (data['user'] != null) {
         await _storageService.saveUserId(data['user']['id']);
-        _scopedUserId = data['user']['id']?.toString();
         _user = User.fromJson(data['user']);
       } else {
         _user = await _authService.getMe();
-        _scopedUserId = _user?.id;
         await _storageService.saveUserId(_user!.id);
       }
 
@@ -222,6 +204,10 @@ class AuthProvider extends ChangeNotifier {
     return _authService.getQrLoginSessionPreview(token);
   }
 
+  Future<FaceEnrollResult> enrollFace(File imageFile, String token) async {
+    return _faceAuthService.enrollFace(imageFile, token);
+  }
+
   Future<void> approveQrLoginSession({
     required String token,
     String? deviceId,
@@ -285,7 +271,6 @@ class AuthProvider extends ChangeNotifier {
         displayName: displayName,
       );
       _user = hydrated.user;
-      _scopedUserId = _user?.id;
       await _storageService.saveUserId(_user!.id);
       if (hydrated.warning != null) {
         _warning = hydrated.warning;
@@ -561,7 +546,6 @@ class AuthProvider extends ChangeNotifier {
     await _storageService.clearAll();
     _user = null;
     _accessToken = null;
-    _scopedUserId = null;
     notifyListeners();
   }
 
@@ -615,7 +599,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<bool> loginWithFace({
-    required String userId,
+    required String verificationToken,
     required String deviceId,
     required String deviceName,
     required String platform,
@@ -628,7 +612,7 @@ class AuthProvider extends ChangeNotifier {
       // Import lazily to avoid circular deps
       final faceService = FaceAuthService();
       final result = await faceService.faceLogin(
-        userId: userId,
+        verificationToken: verificationToken,
         deviceId: deviceId,
         deviceName: deviceName,
         platform: platform,
@@ -641,7 +625,6 @@ class AuthProvider extends ChangeNotifier {
       _accessToken = result.accessToken;
 
       _user = await _authService.getMe();
-      _scopedUserId = _user?.id;
       await _storageService.saveUserId(_user!.id);
 
       _socketService.connect(result.accessToken);
@@ -657,6 +640,40 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  /// Enroll face for the currently logged-in user.
+  Future<dynamic> enrollFace(File imageFile) async {
+    final token = _accessToken ?? await _storageService.getAccessToken();
+    if (token == null || token.isEmpty) {
+      throw ApiException(statusCode: 401, message: 'Vui lòng đăng nhập trước khi đăng ký khuôn mặt.');
+    }
+    final faceService = FaceAuthService();
+    return faceService.enrollFace(
+      imageFile,
+      token,
+      deviceInfo: 'MOBILE',
+    );
+  }
+
+  /// Delete face enrollment for the currently logged-in user.
+  Future<void> deleteFaceEnrollment() async {
+    final token = _accessToken ?? await _storageService.getAccessToken();
+    if (token == null || token.isEmpty) {
+      throw ApiException(statusCode: 401, message: 'Vui lòng đăng nhập trước.');
+    }
+    final faceService = FaceAuthService();
+    await faceService.deleteEnrollment(token);
+  }
+
+  /// Check enrollment status for the current user.
+  Future<Map<String, dynamic>> getFaceEnrollmentStatus() async {
+    final token = _accessToken ?? await _storageService.getAccessToken();
+    if (token == null || token.isEmpty) {
+      throw ApiException(statusCode: 401, message: 'Vui lòng đăng nhập trước.');
+    }
+    final faceService = FaceAuthService();
+    return faceService.getEnrollmentStatus(token);
   }
 }
 

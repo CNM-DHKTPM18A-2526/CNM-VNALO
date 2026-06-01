@@ -24,7 +24,7 @@ class FaceAuthService {
       contentType: MediaType('image', 'jpeg'),
     ));
 
-    final streamed = await request.send();
+    final streamed = await request.send().timeout(const Duration(seconds: 15));
     final response = await http.Response.fromStream(streamed);
     return _parseResponse(response);
   }
@@ -34,14 +34,43 @@ class FaceAuthService {
     final response = await http.post(
       uri,
       headers: {'Content-Type': 'application/json'},
-      body: body.entries.map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value.toString())}').join('&'),
-    );
+      body: jsonEncode(body),
+    ).timeout(const Duration(seconds: 15));
     return _parseResponse(response);
   }
 
   Future<Map<String, dynamic>> _get(String endpoint) async {
     final uri = Uri.parse('$_base$endpoint');
-    final response = await http.get(uri);
+    final response = await http.get(uri).timeout(const Duration(seconds: 15));
+    return _parseResponse(response);
+  }
+
+  Future<Map<String, dynamic>> _getWithAuth(String endpoint, String accessToken) async {
+    final uri = Uri.parse('$_base$endpoint');
+    final response = await http.get(
+      uri,
+      headers: {'Authorization': 'Bearer $accessToken'},
+    ).timeout(const Duration(seconds: 15));
+    return _parseResponse(response);
+  }
+
+  Future<Map<String, dynamic>> _postMultipartWithAuth(
+    String endpoint, {
+    required File file,
+    required Map<String, String> fields,
+    required String accessToken,
+  }) async {
+    final uri = Uri.parse('$_base$endpoint');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers['Authorization'] = 'Bearer $accessToken';
+    request.fields.addAll(fields);
+    request.files.add(await http.MultipartFile.fromPath(
+      'image',
+      file.path,
+      contentType: MediaType('image', 'jpeg'),
+    ));
+    final streamed = await request.send().timeout(const Duration(seconds: 15));
+    final response = await http.Response.fromStream(streamed);
     return _parseResponse(response);
   }
 
@@ -64,10 +93,15 @@ class FaceAuthService {
   }
 
   dynamic _tryParse(String raw) {
-    if (raw.trim().isEmpty) return {};
-    return (raw.startsWith('{') || raw.startsWith('['))
-        ? (jsonDecode(raw) as Map<String, dynamic>)
-        : {'data': raw};
+    if (raw.trim().isEmpty) return <String, dynamic>{};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is List) return <String, dynamic>{'errors': decoded};
+      return <String, dynamic>{'data': decoded};
+    } catch (_) {
+      return <String, dynamic>{'data': raw};
+    }
   }
 
   /// Check if face auth service is healthy.
@@ -84,17 +118,52 @@ class FaceAuthService {
   /// Check if user has enrolled a face (requires auth token).
   Future<bool> isEnrolled(String accessToken) async {
     try {
-      final uri = Uri.parse('$_base/face/status');
-      final response = await http.get(
-        uri,
-        headers: {'Authorization': 'Bearer $accessToken'},
-      );
-      final data = Map<String, dynamic>.from(_tryParse(response.body));
+      final data = await _getWithAuth('/face/status', accessToken);
       final d = data['data'] as Map<String, dynamic>? ?? data;
       return d['enrolled'] == true;
     } catch (_) {
       return false;
     }
+  }
+
+  /// Get full enrollment status (requires auth token).
+  Future<Map<String, dynamic>> getEnrollmentStatus(String accessToken) async {
+    final data = await _getWithAuth('/face/status', accessToken);
+    return data['data'] as Map<String, dynamic>? ?? data;
+  }
+
+  /// Enroll face for an authenticated user.
+  Future<FaceEnrollResult> enrollFace(File image, String accessToken, {String? deviceInfo}) async {
+    final fields = <String, String>{};
+    if (deviceInfo != null) fields['deviceInfo'] = deviceInfo;
+    final data = await _postMultipartWithAuth(
+      '/face/enroll',
+      file: image,
+      fields: fields,
+      accessToken: accessToken,
+    );
+    final d = data['data'] as Map<String, dynamic>? ?? data;
+    final success = d['success'] == true;
+    if (!success) {
+      // Note: Backend currently returns 400 on failure, so ApiException is thrown early in _parseResponse.
+      // This block acts as a fallback just in case backend returns 200 OK with success=false.
+      final msg = data['message']?.toString() ?? 'Đăng ký thất bại.';
+      throw ApiException(statusCode: 400, message: msg);
+    }
+    return FaceEnrollResult(
+      enrolledAt: d['enrolledAt']?.toString(),
+      version: (d['version'] as num?)?.toInt() ?? 1,
+    );
+  }
+
+  /// Delete face enrollment (requires auth token).
+  Future<void> deleteEnrollment(String accessToken) async {
+    final uri = Uri.parse('$_base/face/enrollment');
+    final response = await http.delete(
+      uri,
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+    _parseResponse(response);
   }
 
   /// Perform liveness check on a captured image.
@@ -113,12 +182,20 @@ class FaceAuthService {
     );
   }
 
-  /// Verify a face image against a known userId.
-  Future<FaceVerifyResult> verifyFace(File image, String userId, {double? livenessScore}) async {
-    final fields = <String, String>{'userId': userId};
-    if (livenessScore != null) {
-      fields['livenessScore'] = livenessScore.toString();
+  /// Lookup userId by phone or email.
+  Future<String> lookupUserId(String identifier) async {
+    final data = await _get('/auth/lookup?identifier=${Uri.encodeComponent(identifier)}');
+    final d = data['data'] as Map<String, dynamic>? ?? data;
+    final userId = d['userId']?.toString();
+    if (userId == null || userId.isEmpty) {
+      throw ApiException(statusCode: 404, message: 'Không tìm thấy tài khoản.');
     }
+    return userId;
+  }
+
+  /// Verify a face image against a known userId.
+  Future<FaceVerifyResult> verifyFace(File image, String userId) async {
+    final fields = <String, String>{'userId': userId};
     final data = await _postMultipart('/face/verify', file: image, fields: fields);
     final d = data['data'] as Map<String, dynamic>? ?? data;
     return FaceVerifyResult(
@@ -126,18 +203,19 @@ class FaceAuthService {
       confidence: (d['confidence'] as num?)?.toDouble(),
       threshold: (d['threshold'] as num?)?.toDouble(),
       decision: d['decision']?.toString(),
+      verificationToken: d['verificationToken']?.toString(),
     );
   }
 
   /// Create a session after face verification succeeded.
   Future<FaceLoginResult> faceLogin({
-    required String userId,
+    required String verificationToken,
     required String deviceId,
     required String deviceName,
     required String platform,
   }) async {
     final data = await _postJson('/auth/face-login', {
-      'userId': userId,
+      'verificationToken': verificationToken,
       'deviceId': deviceId,
       'deviceName': deviceName,
       'platform': platform,
@@ -173,11 +251,13 @@ class FaceVerifyResult {
   final double? confidence;
   final double? threshold;
   final String? decision;
+  final String? verificationToken;
   FaceVerifyResult({
     required this.verified,
     this.confidence,
     this.threshold,
     this.decision,
+    this.verificationToken,
   });
 }
 
@@ -190,7 +270,14 @@ class FaceLoginResult {
 class ApiException implements Exception {
   final int statusCode;
   final String message;
-  ApiException({required this.statusCode, required this.message});
+  final String? code;
+  ApiException({required this.statusCode, required this.message, this.code});
   @override
   String toString() => 'ApiException($statusCode): $message';
+}
+
+class FaceEnrollResult {
+  final String? enrolledAt;
+  final int version;
+  FaceEnrollResult({this.enrolledAt, required this.version});
 }

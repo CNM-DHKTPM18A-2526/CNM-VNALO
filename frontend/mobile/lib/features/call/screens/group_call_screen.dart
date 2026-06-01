@@ -105,13 +105,15 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
       ));
       if (mounted) setState(() => _isConnecting = false);
     } else {
-      // Callee: just listen for signals, don't init media yet
-      // Media init happens in acceptCall()
+      // Callee: play ringtone while waiting for user to accept/decline
+      _ringtoneService.startRinging();
     }
 
     try {
       await WakelockPlus.enable();
-    } catch (_) {}
+    } catch (_) {
+      // Wakelock may not be available on this platform.
+    }
 
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   }
@@ -278,7 +280,9 @@ class _GroupCallScreenState extends State<GroupCallScreen> {
     }
     try {
       WakelockPlus.disable();
-    } catch (_) {}
+    } catch (_) {
+      // Wakelock may not have been enabled or already released.
+    }
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
