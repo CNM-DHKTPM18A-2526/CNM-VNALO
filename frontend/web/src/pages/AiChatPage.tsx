@@ -112,7 +112,7 @@ function tryDecodeUtf8Mojibake(value: string) {
   return new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(bytes))
 }
 
-function fixMojibakeText(value: string) {
+function normalizeIncomingText(value: string) {
   let best = value
   let bestScore = mojibakeScore(value)
 
@@ -145,6 +145,7 @@ const PRESET_PROMPTS = [
   'Tóm tắt nhanh các tính năng chính của VNALO',
   'Giúp tôi soạn một tin nhắn từ chối lịch hẹn lịch sự',
   'Mở cuộc trò chuyện với một người trong danh bạ',
+  'Giải thích ngắn gọn một tính năng bảo mật trong ứng dụng',
 ]
 
 const INITIAL_ASSISTANT_MESSAGE: AiMessage = {
@@ -190,7 +191,7 @@ function normalizeStoredMessages(payload: unknown): AiMessage[] {
       if (!item || typeof item !== 'object') return null
       const value = item as Record<string, unknown>
       const role = value.role === 'assistant' ? 'assistant' : value.role === 'user' ? 'user' : null
-      const content = typeof value.content === 'string' ? fixMojibakeText(value.content).trim() : ''
+      const content = typeof value.content === 'string' ? normalizeIncomingText(value.content).trim() : ''
       const timestamp = typeof value.timestamp === 'string' && value.timestamp.trim() ? value.timestamp : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       if (!role || !content) return null
 
@@ -641,6 +642,7 @@ export function AiChatPage() {
 
       if (!isUnmountedRef.current) {
         saveMessages([...updatedMessages, assistantMessage])
+        setRetryPrompt('')
       }
     } catch (error) {
       console.error('AI chat failed:', error)
@@ -908,7 +910,7 @@ export function AiChatPage() {
             <div className='ai-avatar-glow'>
               <Sparkles size={28} />
             </div>
-            <h3>{fixMojibakeText('VNALO AI Assistant')}</h3>
+            <h3>VNALO AI Assistant</h3>
             <p>Hỗ trợ trả lời câu hỏi, giải thích nhanh và gợi ý thao tác an toàn trong VNALO.</p>
           </section>
 
@@ -916,13 +918,13 @@ export function AiChatPage() {
             <span className='ai-presets-title'>Gợi ý câu hỏi</span>
             {PRESET_PROMPTS.map((prompt) => (
               <button
-                key={fixMojibakeText(prompt)}
+                key={prompt}
                 type='button'
                 className='ai-preset-btn'
-                onClick={() => void handleSend(fixMojibakeText(prompt))}
+                onClick={() => void handleSend(prompt)}
                 disabled={isAssistantBusy}
               >
-                {fixMojibakeText(prompt)}
+                {prompt}
               </button>
             ))}
           </section>
@@ -947,17 +949,17 @@ export function AiChatPage() {
           <div className='ai-header-stack'>
             <div className='ai-header-info'>
               <div className={runtimeState.badgeClassName} />
-              <strong className='text-[15px] font-semibold'>{fixMojibakeText(runtimeState.label)}</strong>
+              <strong className='text-[15px] font-semibold'>{runtimeState.label}</strong>
             </div>
-            <span className='ai-header-helper'>{fixMojibakeText(runtimeState.helper)}</span>
+            <span className='ai-header-helper'>{runtimeState.helper}</span>
           </div>
         </header>
 
         <div className='ai-chat-messages' ref={messagesContainerRef} role='log' aria-live='polite' aria-relevant='additions text'>
-          {runtimeState.degraded && <div className={runtimeState.bannerClassName}>{fixMojibakeText(runtimeState.banner)}</div>}
+          {runtimeState.degraded && <div className={runtimeState.bannerClassName}>{runtimeState.banner}</div>}
           {actionFeedback ? (
             <div className={`ai-runtime-banner ai-runtime-banner-${actionFeedback.tone}`}>
-              <span>{fixMojibakeText(actionFeedback.message)}</span>
+              <span>{actionFeedback.message}</span>
               {actionFeedback.tone === 'error' && retryPrompt ? (
                 <button type='button' className='ai-banner-action' onClick={handleRetry} disabled={isAssistantBusy}>
                   Thử lại
@@ -976,7 +978,7 @@ export function AiChatPage() {
                 {message.role === 'assistant' && message.providerStatus ? <span className='ai-message-status'>{message.providerStatus === 'FALLBACK_PROVIDER_ACTIVE' ? 'Fallback' : message.providerStatus === 'LIVE_PROVIDER_ACTIVE' ? 'Live' : 'Tạm gián đoạn'}</span> : null}
               </div>
               <p className='text-[14.5px] whitespace-pre-wrap' style={{ margin: 0 }}>
-                {fixMojibakeText(message.content)}
+                {message.content}
               </p>
               {message.role === 'assistant' && message.actionCommand ? (
                 <div className='ai-action-row'>
@@ -1042,8 +1044,8 @@ export function AiChatPage() {
           <div className='modal-card ai-resolution-modal' onClick={(event) => event.stopPropagation()}>
             <div className='modal-header'>
               <div>
-                <h3 id='ai-action-review-title'>{fixMojibakeText(pendingActionReview.title)}</h3>
-                <p>{fixMojibakeText(pendingActionReview.description)}</p>
+                <h3 id='ai-action-review-title'>{pendingActionReview.title}</h3>
+                <p>{pendingActionReview.description}</p>
                 {renderActionPreview(pendingActionReview.preview)}
               </div>
               <button className='modal-close-btn' type='button' onClick={() => setPendingActionReview(null)} aria-label='Close'>
@@ -1055,7 +1057,7 @@ export function AiChatPage() {
                 Hủy
               </button>
               <button className='btn btn-primary' type='button' onClick={confirmPendingActionReview}>
-                {fixMojibakeText(pendingActionReview.confirmLabel)}
+                {pendingActionReview.confirmLabel}
               </button>
             </div>
           </div>

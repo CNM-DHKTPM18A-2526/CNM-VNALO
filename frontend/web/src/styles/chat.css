@@ -3476,6 +3476,35 @@
   color: var(--muted);
 }
 
+.ai-chat-sidebar-scroll {
+  gap: 18px;
+}
+
+.ai-presets-container {
+  gap: 8px;
+}
+
+.ai-preset-btn {
+  position: relative;
+  display: block;
+  width: 100%;
+  border-radius: 16px;
+  padding: 12px 13px;
+  background: color-mix(in srgb, var(--surface) 96%, white);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.ai-preset-btn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--primary) 28%, var(--border));
+  background: color-mix(in srgb, var(--primary-soft) 20%, var(--surface));
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+}
+
+.ai-preset-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
 .ai-msg-bubble-ai,
 .ai-msg-bubble-user {
   padding: 14px 16px 12px;
@@ -3484,6 +3513,12 @@
 .ai-msg-bubble-ai[data-role='assistant'] {
   background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 96%, white) 0%, color-mix(in srgb, var(--surface) 92%, #eef4ff) 100%);
   border-color: color-mix(in srgb, var(--primary) 16%, var(--border));
+}
+
+.ai-msg-bubble-ai[data-role='assistant'] p,
+.ai-msg-bubble-user[data-role='user'] p {
+  margin: 0;
+  white-space: pre-wrap;
 }
 
 .ai-msg-bubble-user[data-role='user'] {
@@ -3516,6 +3551,15 @@
   padding: 8px 10px;
   background: color-mix(in srgb, var(--surface) 98%, white);
   box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+}
+
+.ai-input-wrapper:focus-within {
+  border-color: color-mix(in srgb, var(--primary) 34%, var(--border));
+  box-shadow: 0 12px 30px rgba(37, 99, 235, 0.11);
+}
+
+.ai-input-field {
+  caret-color: var(--primary);
 }
 
 .ai-send-btn {
