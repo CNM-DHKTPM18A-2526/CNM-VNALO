@@ -868,8 +868,8 @@ export function AiChatPage() {
         return
       }
 
-      setPendingActionReview(null)
-      setPendingResolution(null)
+      closePendingActionReview()
+      closePendingResolution()
     }
 
     window.addEventListener('keydown', handleEscape)
@@ -881,7 +881,22 @@ export function AiChatPage() {
       return
     }
 
+    setActionFeedback(null)
     void handleSend(retryPrompt)
+  }
+
+  const closePendingActionReview = (reason: 'dismiss' | 'cancel' = 'dismiss') => {
+    setPendingActionReview(null)
+    if (reason === 'cancel') {
+      setActionFeedback({ tone: 'info', message: 'Đã hủy bước xác nhận thao tác AI trên web.' })
+    }
+  }
+
+  const closePendingResolution = (reason: 'dismiss' | 'cancel' = 'dismiss') => {
+    setPendingResolution(null)
+    if (reason === 'cancel') {
+      setActionFeedback({ tone: 'info', message: 'Đã hủy bước chọn cuộc trò chuyện. Bạn có thể thử lại với tên cụ thể hơn.' })
+    }
   }
 
   const handleClearHistory = () => {
@@ -1040,7 +1055,7 @@ export function AiChatPage() {
       </main>
 
       {pendingActionReview ? (
-        <div className='modal-overlay' role='dialog' aria-modal='true' aria-labelledby='ai-action-review-title' onClick={() => setPendingActionReview(null)}>
+        <div className='modal-overlay' role='dialog' aria-modal='true' aria-labelledby='ai-action-review-title' onClick={() => closePendingActionReview('dismiss')}>
           <div className='modal-card ai-resolution-modal' onClick={(event) => event.stopPropagation()}>
             <div className='modal-header'>
               <div>
@@ -1048,12 +1063,12 @@ export function AiChatPage() {
                 <p>{pendingActionReview.description}</p>
                 {renderActionPreview(pendingActionReview.preview)}
               </div>
-              <button className='modal-close-btn' type='button' onClick={() => setPendingActionReview(null)} aria-label='Close'>
+              <button className='modal-close-btn' type='button' onClick={() => closePendingActionReview('dismiss')} aria-label='Đóng'>
                 <X size={18} />
               </button>
             </div>
             <div className='modal-footer'>
-              <button className='btn btn-subtle' type='button' onClick={() => setPendingActionReview(null)}>
+              <button className='btn btn-subtle' type='button' onClick={() => closePendingActionReview('cancel')}>
                 Hủy
               </button>
               <button className='btn btn-primary' type='button' onClick={confirmPendingActionReview}>
@@ -1065,7 +1080,7 @@ export function AiChatPage() {
       ) : null}
 
       {pendingResolution ? (
-        <div className='modal-overlay' role='dialog' aria-modal='true' aria-labelledby='ai-resolution-title' onClick={() => setPendingResolution(null)}>
+        <div className='modal-overlay' role='dialog' aria-modal='true' aria-labelledby='ai-resolution-title' onClick={() => closePendingResolution('dismiss')}>
           <div className='modal-card ai-resolution-modal' onClick={(event) => event.stopPropagation()}>
             <div className='modal-header'>
               <div>
@@ -1073,7 +1088,7 @@ export function AiChatPage() {
                 <p>Hãy xác nhận đúng đối tượng để tránh mở nhầm cuộc trò chuyện hoặc điền nháp sai người.</p>
                 {renderActionPreview({ risk: buildActionRisk(pendingResolution.command), targetLabel: pendingResolution.targetLabel, draft: pendingResolution.draft })}
               </div>
-              <button className='modal-close-btn' type='button' onClick={() => setPendingResolution(null)} aria-label='Close'>
+              <button className='modal-close-btn' type='button' onClick={() => closePendingResolution('dismiss')} aria-label='Đóng'>
                 <X size={18} />
               </button>
             </div>
@@ -1094,7 +1109,7 @@ export function AiChatPage() {
               ))}
             </div>
             <div className='modal-footer'>
-              <button className='btn btn-subtle' type='button' onClick={() => setPendingResolution(null)}>
+              <button className='btn btn-subtle' type='button' onClick={() => closePendingResolution('cancel')}>
                 Hủy
               </button>
             </div>
