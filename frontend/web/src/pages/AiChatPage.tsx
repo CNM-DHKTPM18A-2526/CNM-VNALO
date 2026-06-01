@@ -253,6 +253,14 @@ const KNOWN_ACTION_COMMANDS = new Set<AiActionCommand>([
   'NAVIGATE_TO_TIMELINE',
 ])
 
+function isStaleRawAiError(content: string) {
+  const normalized = content.trim().toLowerCase()
+  return normalized === 'request failed with status code 403'
+    || normalized === 'request failed with status code 401'
+    || normalized === 'request failed with status code 404'
+    || normalized === 'request failed with status code 500'
+}
+
 function normalizeStoredMessages(payload: unknown): AiMessage[] {
   if (!Array.isArray(payload)) return [INITIAL_ASSISTANT_MESSAGE]
 
@@ -263,7 +271,7 @@ function normalizeStoredMessages(payload: unknown): AiMessage[] {
       const role = value.role === 'assistant' ? 'assistant' : value.role === 'user' ? 'user' : null
       const content = typeof value.content === 'string' ? normalizeIncomingText(value.content).trim() : ''
       const timestamp = typeof value.timestamp === 'string' && value.timestamp.trim() ? value.timestamp : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      if (!role || !content) return null
+      if (!role || !content || isStaleRawAiError(content)) return null
 
       return {
         role,
