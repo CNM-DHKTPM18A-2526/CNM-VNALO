@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Send, Sparkles, Trash2, X } from 'lucide-react'
+import { Mic, Paperclip, Send, Sparkles, Trash2, X } from 'lucide-react'
 
 import { extractMessage } from '../api.client'
 import { useAuth } from '../features/auth/useAuth'
@@ -997,16 +997,24 @@ export function AiChatPage() {
     <div className='ai-chat-layout'>
       <aside className='ai-chat-sidebar'>
         <div className='ai-chat-sidebar-scroll'>
-          <section className='ai-assistant-card' aria-label='Thông tin trợ lý AI'>
-            <div className='ai-avatar-glow'>
-              <Sparkles size={28} />
+          <section className='ai-assistant-card ai-context-card' aria-label='Ngữ cảnh trợ lý AI'>
+            <div className='ai-context-card-header'>
+              <div className='ai-avatar-glow'>
+                <Sparkles size={22} />
+              </div>
+              <div>
+                <h3>VNALO AI</h3>
+                <p>Hỏi chung trong hệ thống</p>
+              </div>
             </div>
-            <h3>VNALO AI Assistant</h3>
-            <p>Hỗ trợ trả lời câu hỏi, giải thích nhanh và gợi ý thao tác an toàn trong VNALO.</p>
+            <div className='ai-context-status'>
+              <span className={runtimeState.badgeClassName} />
+              <strong>{runtimeState.label}</strong>
+            </div>
           </section>
 
           <section className='ai-presets-container' aria-label='Gợi ý câu hỏi AI'>
-            <span className='ai-presets-title'>Gợi ý câu hỏi</span>
+            <span className='ai-presets-title'>Gợi ý nhanh</span>
             {PRESET_PROMPTS.map((prompt) => (
               <button
                 key={prompt}
@@ -1015,7 +1023,8 @@ export function AiChatPage() {
                 onClick={() => void handleSend(prompt)}
                 disabled={isAssistantBusy}
               >
-                {prompt}
+                <Sparkles size={14} />
+                <span>{prompt}</span>
               </button>
             ))}
           </section>
@@ -1107,25 +1116,35 @@ export function AiChatPage() {
               void handleSend()
             }}
           >
-            <textarea
-              ref={inputRef}
-              className='ai-input-field'
-              placeholder='Nhắn điều bạn cần cho Trợ lý AI...'
-              value={inputValue}
-              onChange={(event) => setInputValue(event.target.value)}
-              disabled={pendingActionReview !== null || pendingResolution !== null}
-              rows={1}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && !event.shiftKey) {
-                  event.preventDefault()
-                  void handleSend()
-                }
-              }}
-            />
-            <button type='submit' className='ai-send-btn' disabled={isAssistantBusy || !inputValue.trim()} aria-label='Gửi tin nhắn cho trợ lý AI'>
-              <Send size={18} />
+            <button type='button' className='ai-composer-tool-btn' aria-label='Đính kèm ngữ cảnh' disabled>
+              <Paperclip size={18} />
             </button>
-            <span className='ai-input-hint'>Enter để gửi, Shift + Enter để xuống dòng</span>
+            <div className='ai-composer-field'>
+              <textarea
+                ref={inputRef}
+                className='ai-input-field'
+                placeholder='Nhắn điều bạn cần cho Trợ lý AI...'
+                value={inputValue}
+                onChange={(event) => setInputValue(event.target.value)}
+                disabled={pendingActionReview !== null || pendingResolution !== null}
+                rows={1}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault()
+                    void handleSend()
+                  }
+                }}
+              />
+              <span className='ai-input-hint'>Enter để gửi · Shift + Enter để xuống dòng</span>
+            </div>
+            <div className='ai-composer-actions'>
+              <button type='button' className='ai-composer-tool-btn' aria-label='Nhập bằng giọng nói' disabled>
+                <Mic size={18} />
+              </button>
+              <button type='submit' className='ai-send-btn' disabled={isAssistantBusy || !inputValue.trim()} aria-label='Gửi tin nhắn cho trợ lý AI'>
+                <Send size={18} />
+              </button>
+            </div>
           </form>
         </footer>
       </main>
