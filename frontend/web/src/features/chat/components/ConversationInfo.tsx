@@ -196,34 +196,45 @@ export function ConversationInfo({
   return (
     <div className="h-full overflow-y-auto bg-[var(--surface)] pb-20 scrollbar-hide text-[var(--text)]">
       {/* Header */}
-      <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--surface)] px-5 py-4 flex items-center gap-3">
-        {(showGroupManagement || showMembersView || showBulletinView || showLeaderDeputyView) && (
-          <button
-            className="mr-1 p-1.5 rounded-full hover:bg-[var(--surface-hover)] border-0 bg-transparent flex items-center justify-center cursor-pointer transition-colors outline-none"
-            onClick={() => {
-              if (showLeaderDeputyView) {
-                setShowLeaderDeputyView(false);
-                return;
-              }
-              setShowGroupManagement(false);
-              setShowMembersView(false);
-              setShowBulletinView(false);
-            }}
-          >
-            <ChevronLeft size={24} className="text-[var(--text)]" />
-          </button>
-        )}
-        <h3 className="text-[18px] font-bold text-[var(--text)] flex-1">
-          {showBulletinView ? 'Bảng tin nhóm' : 
+      <header className="conversation-info-header sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--surface)] px-4 py-4">
+        <div className="conversation-info-header-leading">
+          {(showGroupManagement || showMembersView || showBulletinView || showLeaderDeputyView) ? (
+            <button
+              className="conversation-info-header-icon-btn"
+              type="button"
+              onClick={() => {
+                if (showLeaderDeputyView) {
+                  setShowLeaderDeputyView(false);
+                  return;
+                }
+                setShowGroupManagement(false);
+                setShowMembersView(false);
+                setShowBulletinView(false);
+              }}
+              aria-label="Quay lại"
+            >
+              <ChevronLeft size={24} className="text-[var(--text)]" />
+            </button>
+          ) : null}
+        </div>
+        <h3 className="conversation-info-title">
+          {showBulletinView ? 'Bảng tin nhóm' :
            showLeaderDeputyView ? 'Trưởng & phó nhóm' :
-           showGroupManagement ? 'Quản lý nhóm' : 
+           showGroupManagement ? 'Quản lý nhóm' :
            showMembersView ? 'Thành viên' : 'Thông tin hội thoại'}
         </h3>
-        {showBulletinView && (
-          <button className="bg-transparent border-none outline-none cursor-pointer flex items-center justify-center p-1.5 hover:bg-[var(--surface-hover)] rounded-full transition-colors" title="Thêm">
-            <Plus size={24} className="text-[var(--text)]" />
-          </button>
-        )}
+        <div className="conversation-info-header-trailing">
+          {showBulletinView ? (
+            <button
+              className="conversation-info-header-icon-btn"
+              type="button"
+              title="Thêm"
+              aria-label="Thêm"
+            >
+              <Plus size={24} className="text-[var(--text)]" />
+            </button>
+          ) : null}
+        </div>
       </header>
 
       {showLeaderDeputyView ? (
