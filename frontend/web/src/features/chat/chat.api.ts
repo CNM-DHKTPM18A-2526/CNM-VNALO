@@ -1,6 +1,6 @@
 export type { ChatAttachment, ChatMessage, ChatMessageType, ConversationSummary, ReplyMetadata } from './chat.types'
 import type { ChatAttachment, ChatMessage, ChatMessageType, ConversationSummary, ReplyMetadata } from './chat.types'
-import { formatMessageContent } from './utils/messageUtils'
+import { formatMessageContent, formatReactionSyncPreview } from './utils/messageUtils'
 import { extractMessage, messageApi, mediaApi, aiApi } from '../../api.client'
 import { resolveMediaUrl } from '../../utils/mediaUtils'
 
@@ -321,8 +321,9 @@ function normalizeInboxPreview(rawPreview?: string | null): string {
     }
   }
 
-  if (preview.startsWith('{"action":"UPDATE_MESSAGE_REACTIONS"')) {
-    return ''; // Hide sync signals
+  const reactionSyncPreview = formatReactionSyncPreview(preview)
+  if (reactionSyncPreview) {
+    return reactionSyncPreview
   }
 
   return preview

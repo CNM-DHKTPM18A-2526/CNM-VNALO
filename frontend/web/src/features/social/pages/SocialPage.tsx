@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth';
 import { useFeed } from '../hooks/useFeed';
 import { StoryBar } from '../components/StoryBar';
@@ -39,9 +40,16 @@ function FeedComposer({ onOpenModal, currentUserProfile }: { onOpenModal: () => 
 }
 
 export default function SocialPage() {
+  const location = useLocation();
   const { accessToken, user } = useAuth();
   const { userMap, ensureUser } = useUserStore();
-  const { posts, stories, isLoading, hasMore, loadMorePosts, setPosts } = useFeed(accessToken);
+  const { posts, stories, isLoading, hasMore, loadMorePosts, setPosts, refreshFeed } = useFeed(accessToken);
+
+  useEffect(() => {
+    if (location.pathname === '/social') {
+      void refreshFeed();
+    }
+  }, [location.pathname, refreshFeed]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
   const observerTarget = useRef<HTMLDivElement>(null);

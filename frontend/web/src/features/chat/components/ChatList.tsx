@@ -217,9 +217,13 @@ export const ChatList = React.memo(function ChatList({
   return (
     <section className='chat-list-panel'>
       <div className='panel-header'>
-        <h2>{t('chat.conversationTitle')}</h2>
         <div className='chat-toolbar-row'>
-          <SearchInput placeholder={t('chat.searchPlaceholder')} value={keyword} onChange={setKeyword} />
+          <SearchInput
+            className='chat-list-search-input'
+            placeholder={t('chat.searchPlaceholder')}
+            value={keyword}
+            onChange={setKeyword}
+          />
           <div className='chat-toolbar-actions' aria-label={t('chat.quickActions')}>
             <button
               className='chat-toolbar-btn'
@@ -227,7 +231,7 @@ export const ChatList = React.memo(function ChatList({
               title={t('chat.addFriend')}
               type='button'
             >
-              <Icon name='userPlusZalo' size={20} />
+              <Icon name='userPlusZalo' size={22} />
               <span className='chat-toolbar-tooltip'>{t('chat.addFriend')}</span>
             </button>
             <button

@@ -410,7 +410,7 @@ export function MessageInput({
       )}
 
       {replyMessage && (
-        <div className="flex items-center gap-3 bg-[var(--surface)] border-t border-[var(--border)] px-4 py-2 animate-in fade-in slide-in-from-bottom-1">
+        <div className="message-input-reply animate-in fade-in slide-in-from-bottom-1">
           <div className="flex-1 min-w-0 border-l-2 border-blue-500 pl-3">
             <p className="text-xs font-bold text-blue-600 dark:text-sky-400 truncate">
               Đang trả lời {replyMessage.sender === 'me' ? 'chính mình' : replyMessage.senderName}
@@ -423,16 +423,18 @@ export function MessageInput({
             </p>
           </div>
           <button 
+            type="button"
             onClick={onCancelReply}
-            className="p-1 hover:bg-[var(--surface-hover)] rounded-full transition-colors text-[var(--muted)]"
+            className="message-input-icon-btn"
+            aria-label="Hủy trả lời"
           >
             <X size={16} />
           </button>
         </div>
       )}
 
-      <div className="flex flex-col gap-2 rounded-[16px] bg-[var(--surface)] p-2 border border-[var(--border)] shadow-sm">
-        <div className='flex items-center gap-1 overflow-x-auto px-1 [scrollbar-width:none]'>
+      <div className="message-input-composer">
+        <div className="message-input-toolbar">
           <ToolIconButton ref={stickerTriggerRef} label='Sticker' disabled={disabled} onClick={handleStickerClick} active={isPickerOpen && activeTab === 'STICKER'}>
             <Sticker size={24} />
           </ToolIconButton>
@@ -469,10 +471,10 @@ export function MessageInput({
           <ToolIconButton label='More' disabled={disabled}><Ellipsis size={24} /></ToolIconButton>
         </div>
 
-        <div className={`flex h-[48px] items-center gap-2 rounded-full transition relative ${isFocused ? 'bg-[var(--surface)] ring-1 ring-[#0068ff]/30 shadow-sm' : 'bg-[var(--input-bg)] border-0 shadow-inner'}`}>
+        <div className={`message-input-field-row${isFocused ? ' is-focused' : ''}`}>
           <input
             ref={messageInputRef}
-            className='h-full w-full border-0 bg-transparent text-[15px] outline-none placeholder:text-[var(--muted)] px-3 text-[var(--text)] relative'
+            className="message-input-text"
             placeholder={dynamicPlaceholder}
             value={messageText}
             disabled={disabled}
@@ -486,34 +488,33 @@ export function MessageInput({
               }
             }}
           />
-          <div className="flex items-center gap-1 pr-1">
+          <div className="message-input-field-actions">
             <button
               ref={emojiTriggerRef}
+              type="button"
               onClick={handleEmojiTriggerClick}
-              className={`p-2 rounded-full transition-all border-0
-              ${isPickerOpen
-                  ? 'text-blue-500 bg-blue-50 dark:bg-blue-500/10'
-                  : 'text-slate-600 dark:text-slate-400 bg-white dark:bg-transparent hover:bg-slate-100 dark:hover:bg-white/5'
-                }`}
+              className={`message-input-icon-btn${isPickerOpen ? ' is-active' : ''}`}
+              aria-label="Emoji"
             >
               <Smile size={24} strokeWidth={1.5} />
             </button>
             <button
+              type="button"
               onClick={() => {
                 if (canSend) {
                   submitMessage();
                 } else {
-                  // Send like emoji
                   onSend({
                     text: '👍'
                   });
                 }
               }}
               disabled={disabled}
-              className={`p-2 rounded-full transition-all border-0 bg-transparent ${canSend ? 'text-blue-500 hover:bg-blue-50 hover:scale-105 active:scale-95' : 'text-slate-400 dark:text-slate-600 hover:bg-slate-100 dark:hover:bg-white/5'}`}
+              className={`message-input-icon-btn message-input-send-btn${canSend ? ' is-ready' : ''}`}
+              aria-label={canSend ? 'Gửi tin nhắn' : 'Gửi thích'}
             >
               {canSend ? (
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
                   <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
                 </svg>
               ) : (
@@ -524,7 +525,7 @@ export function MessageInput({
         </div>
       </div>
 
-      {error ? <p className='px-2 text-red-500 text-xs mt-1'>{error}</p> : null}
+      {error ? <p className="message-input-error">{error}</p> : null}
 
       {isPickerOpen && (
         <div
@@ -719,19 +720,29 @@ export function MessageInput({
   )
 }
 
-const ToolIconButton = ({ children, label, disabled = false, className, onClick, active }: any) => {
+const ToolIconButton = React.forwardRef<HTMLButtonElement, {
+  children: React.ReactNode
+  label: string
+  disabled?: boolean
+  className?: string
+  onClick?: () => void
+  active?: boolean
+}>(({ children, label, disabled = false, className, onClick, active }, ref) => {
   return (
     <button
+      ref={ref}
       type='button'
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-0 transition ${active ? 'bg-sky-50 text-sky-600' : 'bg-transparent text-slate-500 hover:bg-slate-100'} ${className ?? ''}`}
+      className={`message-input-tool-btn${active ? ' is-active' : ''}${className ? ` ${className}` : ''}`}
     >
       {children}
     </button>
   )
-}
+})
+
+ToolIconButton.displayName = 'ToolIconButton'
 
 // Standards
 const STANDARD_EMOJI_LIST = [

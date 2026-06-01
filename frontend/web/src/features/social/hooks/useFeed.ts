@@ -130,6 +130,7 @@ export function useFeed(accessToken: string | null) {
     isLoading,
     hasMore,
     loadMorePosts,
-    setPosts
+    setPosts,
+    refreshFeed: fetchInitialData,
   };
 }
