@@ -74,7 +74,7 @@ import {
 } from '../features/chat/searchIndex'
 import { CreateGroupModal } from '../features/chat/components/CreateGroupModal'
 import { EditConversationNameModal } from '../features/chat/components/EditConversationNameModal'
-import { formatMessage, renderSystemMessage, formatMessagePreview, formatMessageTimestamp, normalizeMessage } from '../features/chat/utils/messageUtils'
+import { formatMessage, renderSystemMessage, formatMessagePreview, formatMessageTimestamp, normalizeMessage, formatReactionSyncPreview, buildReactionSyncContent } from '../features/chat/utils/messageUtils'
 import { useUserStore } from '../features/chat/context/UserStoreContext'
 
 // Fallback toast object to prevent crashes if toast library is missing
@@ -237,6 +237,11 @@ function formatConversationPreview(
   if (typeof message !== 'string') {
     const txt = (message.text || '').trim();
     if (message.type === 'system' || (txt.startsWith('{') && txt.includes('"action":'))) {
+      const reactionSyncPreview = formatReactionSyncPreview(txt, senderName)
+      if (reactionSyncPreview) {
+        return reactionSyncPreview
+      }
+
       return getConversationPreview(message, currentUserId, getDisplayName, isModerator)
     }
   }
@@ -254,6 +259,11 @@ function formatConversationPreview(
   // Preserve complex system formatting if content is JSON
   const trimmedText = text.trim();
   if (trimmedText.startsWith('{') && trimmedText.includes('"action":')) {
+    const reactionSyncPreview = formatReactionSyncPreview(trimmedText, senderName)
+    if (reactionSyncPreview) {
+      return reactionSyncPreview
+    }
+
     return renderSystemMessage(trimmedText, currentUserId, getDisplayName);
   }
 
@@ -840,6 +850,28 @@ export default function ChatPage() {
 
         // Inspect last few messages for grouping in sidebar
         const conversationMsgs = conversationMsgsOverride ?? messagesByConversationRef.current[conversationId] ?? [];
+        if (message.text && message.text.includes('UPDATE_MESSAGE_REACTIONS')) {
+          const reactionPreview = formatReactionSyncPreview(
+            message.text,
+            message.senderId === user?.id ? 'Bạn' : senderName,
+          )
+          if (reactionPreview) {
+            finalPreview = reactionPreview
+          } else {
+            try {
+              const signal = JSON.parse(message.text)
+              const reactedMessageId = String(signal.messageId ?? signal.message_id ?? '').trim()
+              const reactedMessage = conversationMsgs.find((item) => item.id === reactedMessageId)
+              if (reactedMessage?.type === 'poll' || signal.isPollVote === true || signal.pollVote === true) {
+                const actorName = message.senderId === user?.id ? 'Bạn' : senderName
+                finalPreview = `${actorName}: ${signal.type === 'REMOVE' ? 'Đã cập nhật bình chọn' : 'Đã bình chọn'}`
+              }
+            } catch {
+              /* ignore malformed reaction sync payload */
+            }
+          }
+        }
+
         if (conversationMsgs.length > 0 && (message.type === 'image' || message.type === 'file')) {
           const lastFew = [...conversationMsgs, message].slice(-5);
           let count = 0;
@@ -1090,7 +1122,7 @@ export default function ChatPage() {
       }
 
       let reactionKey = EMOJI_TO_REACTION_KEY[normalizedEmoji]
-      if (!reactionKey && normalizedEmoji.startsWith('vote:')) {
+      if (!reactionKey && (normalizedEmoji.startsWith('vote:') || normalizedEmoji.startsWith('v:'))) {
         reactionKey = normalizedEmoji as ReactionKey
       }
 
@@ -2071,19 +2103,14 @@ export default function ChatPage() {
 
         // Emit both a system signal (already used by mobile) and a socket reaction event
         if (user?.id) {
-          const reactionSignal = {
-            action: 'UPDATE_MESSAGE_REACTIONS',
+          const reactionContent = buildReactionSyncContent({
             messageId,
-            message_id: messageId,
             conversationId: selectedConversationId,
-            conversation_id: selectedConversationId,
             actorId: user.id,
-            actor_id: user.id,
-            userId: user.id,
-            user_id: user.id,
             type: 'ADD',
-            emoji: emoji
-          };
+            emoji,
+            isPollVote: message?.type === 'poll',
+          })
 
           // Ensure we're in the room before emitting low-level socket event and system signal
           try {
@@ -2091,10 +2118,8 @@ export default function ChatPage() {
             await joinConversation(selectedConversationId)
             const socket = getSocket()
             console.log('[ChatPage.emit] join done for reaction.added', { connected: socket?.connected, socketId: socket?.id, conversationId: selectedConversationId })
-
-            const reactionContent = JSON.stringify(reactionSignal).replace(/\s/g, '')
             try {
-              console.log('[ChatPage.emit] sending reaction via socket primary (ADD)', reactionSignal)
+              console.log('[ChatPage.emit] sending reaction via socket primary (ADD)', { messageId, emoji, isPollVote: message?.type === 'poll' })
               if (socket?.connected) {
                 try {
                   const ack = await emitSendMessage({
@@ -2215,19 +2240,17 @@ export default function ChatPage() {
         await syncMessageReaction(messageId)
 
         if (user?.id) {
-          const reactionSignal = {
-            action: 'UPDATE_MESSAGE_REACTIONS',
+          const reactedMessage = (messagesByConversationRef.current[selectedConversationId] ?? []).find(
+            (item) => item.id === messageId,
+          )
+          const reactionContent = buildReactionSyncContent({
             messageId,
-            message_id: messageId,
             conversationId: selectedConversationId,
-            conversation_id: selectedConversationId,
             actorId: user.id,
-            actor_id: user.id,
-            userId: user.id,
-            user_id: user.id,
             type: 'REMOVE',
-            emoji: emoji
-          };
+            emoji,
+            isPollVote: reactedMessage?.type === 'poll' || emoji.startsWith('vote:') || emoji.startsWith('v:'),
+          })
 
           // Ensure we're in the room before emitting low-level socket event and system signal
           try {
@@ -2235,10 +2258,8 @@ export default function ChatPage() {
             await joinConversation(selectedConversationId)
             const socket = getSocket()
             console.log('[ChatPage.emit] join done for reaction.removed', { connected: socket?.connected, socketId: socket?.id, conversationId: selectedConversationId })
-
-            const reactionContent = JSON.stringify(reactionSignal).replace(/\s/g, '')
             try {
-              console.log('[ChatPage.emit] sending reaction via socket primary (REMOVE)', reactionSignal)
+              console.log('[ChatPage.emit] sending reaction via socket primary (REMOVE)', { messageId, emoji })
               if (socket?.connected) {
                 try {
                   const ack = await emitSendMessage({
@@ -5776,10 +5797,6 @@ function PinnedLogicHooks({
 
   return null;
 }
-
-
-
-
 
 
 
