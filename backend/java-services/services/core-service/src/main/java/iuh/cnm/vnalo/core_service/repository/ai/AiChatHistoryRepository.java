@@ -15,20 +15,11 @@ import java.util.UUID;
 @Repository
 public interface AiChatHistoryRepository extends JpaRepository<AiChatHistory, UUID> {
     Page<AiChatHistory> findByUserIdAndConversationIdOrderByCreatedAtDesc(UUID userId, UUID conversationId, Pageable pageable);
-
     long deleteByUserIdAndConversationId(UUID userId, UUID conversationId);
-
     boolean existsByUserIdAndConversationIdAndRoleAndContentAndCreatedAtBetween(
             UUID userId, UUID conversationId, String role, String content,
-            OffsetDateTime minTime, OffsetDateTime maxTime
+            java.time.OffsetDateTime minTime, java.time.OffsetDateTime maxTime
     );
-
-    long countByCreatedAtAfter(OffsetDateTime since);
-
-    long countByRoleAndCreatedAtAfter(String role, OffsetDateTime since);
-
-    @Query("SELECT COUNT(DISTINCT a.userId) FROM AiChatHistory a WHERE a.createdAt >= :since")
-    long countDistinctUsersSince(@Param("since") OffsetDateTime since);
 
     @Modifying
     @Query(value = "INSERT INTO ai_chat_history "

@@ -323,11 +323,6 @@ export async function register(payload: RegisterPayload): Promise<string> {
       otp: payload.otpCode,
       dob: payload.dob,
       gender: payload.gender,
-      acceptedTerms: payload.acceptedTerms ?? true,
-      acceptedPrivacy: payload.acceptedPrivacy ?? true,
-      legalVersion: payload.legalVersion ?? '2026-06-01',
-      deviceName: payload.deviceName ?? 'VNALO Web',
-      platform: payload.platform ?? 'WEB',
     }),
   })
 

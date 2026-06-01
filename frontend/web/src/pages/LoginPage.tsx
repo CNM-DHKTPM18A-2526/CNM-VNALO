@@ -212,10 +212,6 @@ export function LoginPage() {
 
       <div style={{ textAlign: 'center', marginTop: 20 }}>
           <p style={{ fontSize: 14 }}>{t('auth.dontHaveAccount')} <Link to='/register' style={{ color: '#0068ff', textDecoration: 'none', fontWeight: 600 }}>{t('auth.createAccountLink')}!</Link></p>
-          <p className='auth-legal-consent'>
-            <Link to='/legal/terms'>{t('auth.termsLinkLabel')}</Link>{' '}·{' '}
-            <Link to='/legal/privacy'>{t('auth.privacyLinkLabel')}</Link>
-          </p>
       </div>
 
       <div className='auth-lang-selector'>

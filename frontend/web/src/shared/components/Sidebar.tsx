@@ -17,11 +17,6 @@ export function Sidebar({ onOpenSettingsModal, onOpenCaptureModal, onOpenAccount
   const { t } = useLanguage()
   const { user } = useAuth()
   const { unreadMessageCount, pendingFriendRequestCount } = useNotifications()
-  const adminMonitoringEmails = (import.meta.env.VITE_ADMIN_MONITORING_ALLOWED_EMAILS ?? '')
-    .split(',')
-    .map((email: string) => email.trim().toLowerCase())
-    .filter(Boolean)
-  const canSeeMonitoring = Boolean(user?.email && adminMonitoringEmails.includes(user.email.toLowerCase()))
 
   const primaryNav: Array<{ to: string; labelKey: string; icon: any; badge: number }> = [
     { to: '/chat', labelKey: 'sidebar.chat', icon: 'chat' as const, badge: unreadMessageCount },
@@ -39,7 +34,6 @@ export function Sidebar({ onOpenSettingsModal, onOpenCaptureModal, onOpenAccount
     { to: '/chat/my-documents', labelKey: 'sidebar.documents', icon: 'folder' as const },
     { labelKey: 'sidebar.todo', icon: 'capture' as const, onClick: onOpenCaptureModal },
     { to: '/tools', labelKey: 'sidebar.tools', icon: 'briefcase' as const },
-    ...(canSeeMonitoring ? [{ to: '/admin/monitoring', labelKey: 'sidebar.monitoring', icon: 'database' as const }] : []),
   ]
 
   const handleOpenSettings = () => {

@@ -1,10 +1,10 @@
 package iuh.cnm.vnalo.core_service.repository.auth;
 
 import iuh.cnm.vnalo.core_service.model.entity.auth.AuthRefreshToken;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
@@ -34,30 +34,15 @@ public interface RefreshTokenRepository extends JpaRepository<AuthRefreshToken, 
 
     List<AuthRefreshToken> findByAccountIdAndRevokedAtIsNullAndExpiresAtAfterOrderByCreatedAtAsc(UUID accountId, Instant now);
 
-    boolean existsByAccountIdAndDeviceId(UUID accountId, String deviceId);
+        boolean existsByAccountIdAndDeviceId(UUID accountId, String deviceId);
 
-    @Query("""
-            SELECT CASE WHEN COUNT(t) > 0 THEN true ELSE false END
-            FROM AuthRefreshToken t
-            WHERE t.accountId = :accountId
-                AND t.revokedAt IS NULL
-                AND t.expiresAt > :now
-                AND UPPER(COALESCE(t.platform, 'WEB')) IN ('ANDROID','IOS')
-            """)
-    boolean hasActiveTrustedMobileSession(@Param("accountId") UUID accountId, @Param("now") Instant now);
-
-    @Query("SELECT COUNT(t) FROM AuthRefreshToken t WHERE t.revokedAt IS NULL AND t.expiresAt > :now")
-    long countActiveTokens(@Param("now") Instant now);
-
-    @Query("SELECT COUNT(t) FROM AuthRefreshToken t WHERE t.revokedAt IS NOT NULL AND t.revokedAt >= :since")
-    long countRevokedSince(@Param("since") Instant since);
-
-    @Query("""
-            SELECT COUNT(t)
-            FROM AuthRefreshToken t
-            WHERE t.revokedAt IS NULL
-                AND t.expiresAt > :now
-                AND UPPER(COALESCE(t.platform, 'WEB')) IN ('ANDROID','IOS')
-            """)
-    long countActiveMobileSessions(@Param("now") Instant now);
+        @Query("""
+                SELECT CASE WHEN COUNT(t) > 0 THEN true ELSE false END
+                FROM AuthRefreshToken t
+                WHERE t.accountId = :accountId
+                    AND t.revokedAt IS NULL
+                    AND t.expiresAt > :now
+                    AND UPPER(COALESCE(t.platform, 'WEB')) IN ('ANDROID','IOS')
+                """)
+        boolean hasActiveTrustedMobileSession(@Param("accountId") UUID accountId, @Param("now") Instant now);
 }

@@ -10,7 +10,6 @@ import iuh.cnm.vnalo.core_service.model.entity.user.UserPrivacySetting;
 import iuh.cnm.vnalo.core_service.model.entity.user.UserProfile;
 import iuh.cnm.vnalo.core_service.model.enums.AccountStatus;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthAccountRepository;
-import iuh.cnm.vnalo.core_service.repository.auth.AuthLegalConsentRepository;
 import iuh.cnm.vnalo.core_service.repository.auth.RefreshTokenRepository;
 import iuh.cnm.vnalo.core_service.repository.user.UserPrivacySettingRepository;
 import iuh.cnm.vnalo.core_service.repository.user.UserProfileRepository;
@@ -44,9 +43,6 @@ class AuthServiceTest {
 
     @Mock
     private AuthAccountRepository authAccountRepository;
-
-    @Mock
-    private AuthLegalConsentRepository authLegalConsentRepository;
 
     @Mock
     private RefreshTokenRepository refreshTokenRepository;
@@ -114,8 +110,6 @@ class AuthServiceTest {
                     .otp("123456")
                     .password("password123")
                     .displayName("Test User")
-                    .acceptedTerms(true)
-                    .acceptedPrivacy(true)
                     .build();
             
             when(authAccountRepository.existsByPhone(anyString())).thenReturn(false);
@@ -141,28 +135,6 @@ class AuthServiceTest {
             verify(authAccountRepository).save(any(AuthAccount.class));
             verify(userProfileRepository).save(any(UserProfile.class));
             verify(userPrivacySettingRepository).save(any(UserPrivacySetting.class));
-            verify(authLegalConsentRepository).saveAll(any());
-        }
-
-        @Test
-        @DisplayName("Should reject register when consent is missing")
-        void shouldRejectRegisterWhenConsentMissing() {
-            RegisterRequest request = RegisterRequest.builder()
-                    .phone("+84912345678")
-                    .email("test@example.com")
-                    .otp("123456")
-                    .password("password123")
-                    .displayName("Test User")
-                    .acceptedTerms(false)
-                    .acceptedPrivacy(true)
-                    .build();
-
-            ApiException exception = assertThrows(ApiException.class,
-                    () -> authService.register(request, httpRequest));
-
-            assertEquals(ErrorCode.VALIDATION_ERROR, exception.getErrorCode());
-            verify(otpService, never()).verifyOtp(anyString(), anyString(), any());
-            verify(authLegalConsentRepository, never()).saveAll(any());
         }
 
         @Test
@@ -175,8 +147,6 @@ class AuthServiceTest {
                     .otp("123456")
                     .password("password123")
                     .displayName("Test User")
-                    .acceptedTerms(true)
-                    .acceptedPrivacy(true)
                     .build();
             
             when(authAccountRepository.existsByPhone(anyString())).thenReturn(true);
@@ -200,8 +170,6 @@ class AuthServiceTest {
                     .otp("123456")
                     .password("password123")
                     .displayName("Test User")
-                    .acceptedTerms(true)
-                    .acceptedPrivacy(true)
                     .build();
             
             when(authAccountRepository.existsByPhone(anyString())).thenReturn(false);
