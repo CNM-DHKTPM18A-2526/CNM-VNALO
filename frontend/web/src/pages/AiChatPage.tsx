@@ -4,6 +4,7 @@ import { Bot, Mic, Paperclip, Send, Sparkles, Trash2, X } from 'lucide-react'
 
 import { extractMessage } from '../api.client'
 import { useAuth } from '../features/auth/useAuth'
+import { AI_PENDING_PROMPT_KEY, useAiAssistant } from '../features/ai-assistant/AiAssistantProvider'
 import { fetchInbox, sendAiChatMessage } from '../features/chat/chat.api'
 import type { ConversationSummary } from '../features/chat/chat.types'
 
@@ -151,8 +152,6 @@ function resolveErrorPresentation(error: unknown): { message: string; providerSt
 const STORAGE_KEY = 'vnalo_ai_chat_history'
 const LEGACY_STORAGE_KEY = STORAGE_KEY
 const DRAFT_KEY_PREFIX = 'vnalo_ai_web_compose_draft:'
-const PENDING_PROMPT_KEY = 'vnalo_ai_web_pending_prompt'
-const AI_ASSISTANT_META_KEY_PREFIX = 'vnalo_ai_chat_meta:'
 const MAX_API_HISTORY = 20
 
 const MOJIBAKE_CODEPOINTS = [0x00C3, 0x00C4, 0x00C2, 0x00C6, 0x00C5, 0x00D0]
@@ -207,10 +206,6 @@ function normalizeIncomingText(value: string) {
 }
 
 
-function writeAiAssistantMeta(userId: string | number | undefined | null, meta: { preview: string; timestamp: string }) {
-  if (userId === undefined || userId === null || `${userId}`.trim().length === 0) return
-  localStorage.setItem(`${AI_ASSISTANT_META_KEY_PREFIX}${userId}`, JSON.stringify(meta))
-}
 function buildAiStorageKey(userId?: string | number | null) {
   if (userId === undefined || userId === null || `${userId}`.trim().length === 0) {
     return null
@@ -577,6 +572,7 @@ function getAiMessagePreview(message: AiMessage): string {
 
 export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {}) {
   const { accessToken, user } = useAuth()
+  const { recordActivity: recordAiAssistantActivity, resetMeta: resetAiAssistantMeta } = useAiAssistant()
   const navigate = useNavigate()
   const historyStorageKey = useMemo(() => buildAiStorageKey(user?.id as string | number | undefined), [user?.id])
   const [messages, setMessages] = useState<AiMessage[]>([])
@@ -601,10 +597,10 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
   }, [])
 
   useEffect(() => {
-    const pendingPrompt = localStorage.getItem(PENDING_PROMPT_KEY)
+    const pendingPrompt = localStorage.getItem(AI_PENDING_PROMPT_KEY)
     if (!pendingPrompt?.trim()) return
 
-    localStorage.removeItem(PENDING_PROMPT_KEY)
+    localStorage.removeItem(AI_PENDING_PROMPT_KEY)
     setInputValue(pendingPrompt.trim())
     setTimeout(() => {
       inputRef.current?.focus()
@@ -644,7 +640,7 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
     const latestActivity = [...normalized].reverse().find((message) => message.content.trim())
     if (latestActivity && latestActivity !== INITIAL_ASSISTANT_MESSAGE) {
       const activity = { preview: getAiMessagePreview(latestActivity), timestamp: new Date().toISOString() }
-      writeAiAssistantMeta(user?.id, activity)
+      recordAiAssistantActivity(activity)
       onActivity?.(activity)
     }
     if (!historyStorageKey) {
@@ -673,7 +669,7 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
         localStorage.removeItem(LEGACY_STORAGE_KEY)
       }
       const activity = { preview: getAiMessagePreview(feedbackMessage), timestamp: new Date().toISOString() }
-      writeAiAssistantMeta(user?.id, activity)
+      recordAiAssistantActivity(activity)
       onActivity?.(activity)
       return nextMessages
     })
@@ -1022,6 +1018,7 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
       localStorage.removeItem(historyStorageKey)
     }
     localStorage.removeItem(LEGACY_STORAGE_KEY)
+    resetAiAssistantMeta()
     saveMessages([
       {
         role: 'assistant',

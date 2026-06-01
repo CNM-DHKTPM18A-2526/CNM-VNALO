@@ -2,6 +2,12 @@ import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { getSyncPolicy } from '../features/auth/auth.api'
+import {
+  AI_ASSISTANT_CONVERSATION_ID,
+  AI_ASSISTANT_USER_ID,
+  AI_PENDING_PROMPT_KEY,
+  useAiAssistant,
+} from '../features/ai-assistant/AiAssistantProvider'
 import { ChatList } from '../features/chat/components/ChatList'
 import { ConversationInfo } from '../features/chat/components/ConversationInfo'
 import { SearchMessagesPanel } from '../features/chat/components/SearchMessagesPanel'
@@ -79,35 +85,6 @@ import { formatMessage, renderSystemMessage, formatMessagePreview, formatMessage
 import { useUserStore } from '../features/chat/context/UserStoreContext'
 
 // Fallback toast object to prevent crashes if toast library is missing
-const AI_PENDING_PROMPT_KEY = 'vnalo_ai_web_pending_prompt'
-const AI_ASSISTANT_USER_ID = '__vnalo_ai__'
-const AI_ASSISTANT_CONVERSATION_ID = 'vnalo-ai-assistant'
-const AI_ASSISTANT_META_KEY_PREFIX = 'vnalo_ai_chat_meta:'
-
-
-function buildAiAssistantMetaKey(userId?: string | null) {
-  return userId ? `${AI_ASSISTANT_META_KEY_PREFIX}${userId}` : null
-}
-
-function readAiAssistantMeta(userId?: string | null): { preview: string; timestamp: string } {
-  const fallback = { preview: 'Sẵn sàng hỗ trợ', timestamp: new Date(0).toISOString() }
-  const key = buildAiAssistantMetaKey(userId)
-  if (!key) return fallback
-
-  try {
-    const parsed = JSON.parse(localStorage.getItem(key) || 'null') as Partial<{ preview: string; timestamp: string }> | null
-    if (!parsed?.preview || !parsed?.timestamp) return fallback
-    return { preview: parsed.preview, timestamp: parsed.timestamp }
-  } catch {
-    return fallback
-  }
-}
-
-function writeAiAssistantMeta(userId: string | undefined, meta: { preview: string; timestamp: string }) {
-  const key = buildAiAssistantMetaKey(userId)
-  if (!key) return
-  localStorage.setItem(key, JSON.stringify(meta))
-}
 const toast = {
   success: (msg: string) => console.log('SUCCESS:', msg),
   error: (msg: string) => console.error('ERROR:', msg),
@@ -501,6 +478,7 @@ const isGenericDirectName = (value: string | undefined | null) => {
 export default function ChatPage() {
   const { userMap, upsertUser, ensureUser } = useUserStore()
   const { isBootstrapping, accessToken, user } = useAuth()
+  const { assistantConversation: aiAssistantConversation, recordActivity: recordAiAssistantActivity } = useAiAssistant()
   const currentUserId = user?.id || ''
   const { t } = useLanguage()
   const navigate = useNavigate()
@@ -680,27 +658,6 @@ export default function ChatPage() {
     conversationsRef.current = conversations
   }, [conversations])
 
-  const aiAssistantConversation = useMemo<ConversationSummary>(() => {
-    const meta = readAiAssistantMeta(user?.id)
-
-    return {
-      id: AI_ASSISTANT_CONVERSATION_ID,
-      userId: AI_ASSISTANT_USER_ID,
-      name: 'VNALO AI Assistant',
-      avatarUrl: null,
-      isGroup: false,
-      isAiAssistant: true,
-      lastMessage: meta.preview,
-      unreadCount: 0,
-      online: true,
-      isOnline: true,
-      participantUserIds: [AI_ASSISTANT_USER_ID],
-      memberCount: 2,
-      lastMessageAt: meta.timestamp,
-      updatedAt: meta.timestamp,
-    }
-  }, [user?.id])
-
   const myDocumentsConversation = useMemo<ConversationSummary>(() => {
     // Try to get last message from local storage for preview
     let lastMsgText = 'Lưu và đồng bộ dữ liệu giữa các thiết bị';
@@ -740,7 +697,7 @@ export default function ChatPage() {
   }, [user?.id, messagesByConversation['my-documents']]); // Re-run when messages change
 
   const handleAiAssistantActivity = useCallback((activity: { preview: string; timestamp: string }) => {
-    writeAiAssistantMeta(user?.id, activity)
+    recordAiAssistantActivity(activity)
     setConversations((prev) => {
       const existing = prev.find((conversation) => conversation.id === AI_ASSISTANT_CONVERSATION_ID) ?? aiAssistantConversation
       const updated: ConversationSummary = {
@@ -751,7 +708,7 @@ export default function ChatPage() {
       }
       return [updated, ...prev.filter((conversation) => conversation.id !== AI_ASSISTANT_CONVERSATION_ID)]
     })
-  }, [aiAssistantConversation, user?.id])
+  }, [aiAssistantConversation, recordAiAssistantActivity])
 
   const selectedConversation = useMemo(
     () => {

@@ -20,6 +20,7 @@ import CreateStoryPage from './features/social/pages/CreateStoryPage'
 import StoryViewerPage from './features/social/pages/StoryViewerPage'
 import { UserStoreProvider } from './features/chat/context/UserStoreContext'
 import { NotificationProvider } from './features/notifications/NotificationContext'
+import { AiAssistantProvider } from './features/ai-assistant/AiAssistantProvider'
 import './styles/app.css'
 
 function App() {
@@ -28,6 +29,7 @@ function App() {
   return (
     <UserStoreProvider>
       <NotificationProvider>
+        <AiAssistantProvider>
         <Routes>
           <Route path='/login' element={isAuthenticated ? <Navigate replace to='/chat' /> : <LoginPage />} />
           <Route path='/login/qr' element={isAuthenticated ? <Navigate replace to='/chat' /> : <QrLoginPage />} />
@@ -69,6 +71,7 @@ function App() {
           <Route path='/call/:callId' element={<ProtectedRoute><CallPage /></ProtectedRoute>} />
           <Route path='*' element={<Navigate replace to='/chat' />} />
         </Routes>
+        </AiAssistantProvider>
       </NotificationProvider>
     </UserStoreProvider>
   )
