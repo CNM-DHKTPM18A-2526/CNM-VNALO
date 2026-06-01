@@ -3,8 +3,9 @@ package iuh.cnm.vnalo.core_service.controller;
 import iuh.cnm.vnalo.core_service.exception.ApiException;
 import iuh.cnm.vnalo.core_service.exception.ErrorCode;
 import iuh.cnm.vnalo.core_service.model.dto.response.ApiResponse;
-import iuh.cnm.vnalo.core_service.model.dto.response.admin.AdminMonitoringEventResponse;
+import iuh.cnm.vnalo.core_service.model.dto.response.admin.AdminMonitoringEventPageResponse;
 import iuh.cnm.vnalo.core_service.model.dto.response.admin.AdminMonitoringSummaryResponse;
+import iuh.cnm.vnalo.core_service.model.dto.response.admin.AdminMonitoringTrendPointResponse;
 import iuh.cnm.vnalo.core_service.model.entity.auth.AuthAccount;
 import iuh.cnm.vnalo.core_service.model.enums.AccountStatus;
 import iuh.cnm.vnalo.core_service.security.UserPrincipal;
@@ -37,7 +38,14 @@ class AdminMonitoringControllerTest {
 
     @Test
     void shouldRejectEventsWhenPrincipalIsMissing() {
-        ApiException exception = assertThrows(ApiException.class, () -> controller.getRecentEvents(null, 12, 24, null, null));
+        ApiException exception = assertThrows(ApiException.class, () -> controller.getRecentEvents(null, 20, 0, 24, null, null));
+
+        assertEquals(ErrorCode.UNAUTHORIZED, exception.getErrorCode());
+    }
+
+    @Test
+    void shouldRejectTrendWhenPrincipalIsMissing() {
+        ApiException exception = assertThrows(ApiException.class, () -> controller.getEventTrend(null, 24, null, null));
 
         assertEquals(ErrorCode.UNAUTHORIZED, exception.getErrorCode());
     }
@@ -69,14 +77,29 @@ class AdminMonitoringControllerTest {
     @Test
     void shouldPassAuthenticatedUserIdToEventsService() {
         UserPrincipal principal = principal(UUID.randomUUID());
-        when(adminMonitoringService.getRecentEvents(principal.getId(), 20, 72, "LOGIN_FAILED", "WEB")).thenReturn(List.of());
+        AdminMonitoringEventPageResponse page = new AdminMonitoringEventPageResponse(1, 20, false, List.of());
+        when(adminMonitoringService.getRecentEvents(principal.getId(), 20, 1, 72, "LOGIN_FAILED", "WEB")).thenReturn(page);
 
-        ResponseEntity<ApiResponse<List<AdminMonitoringEventResponse>>> response = controller.getRecentEvents(principal, 20, 72, "LOGIN_FAILED", "WEB");
+        ResponseEntity<ApiResponse<AdminMonitoringEventPageResponse>> response = controller.getRecentEvents(principal, 20, 1, 72, "LOGIN_FAILED", "WEB");
 
         assertEquals(200, response.getStatusCode().value());
         assertNotNull(response.getBody());
-        assertEquals(List.of(), response.getBody().getData());
-        verify(adminMonitoringService).getRecentEvents(principal.getId(), 20, 72, "LOGIN_FAILED", "WEB");
+        assertEquals(page, response.getBody().getData());
+        verify(adminMonitoringService).getRecentEvents(principal.getId(), 20, 1, 72, "LOGIN_FAILED", "WEB");
+    }
+
+    @Test
+    void shouldPassAuthenticatedUserIdToTrendService() {
+        UserPrincipal principal = principal(UUID.randomUUID());
+        List<AdminMonitoringTrendPointResponse> trend = List.of(new AdminMonitoringTrendPointResponse(Instant.now(), 3, 1, 1));
+        when(adminMonitoringService.getEventTrend(principal.getId(), 72, "LOGIN_FAILED", "WEB")).thenReturn(trend);
+
+        ResponseEntity<ApiResponse<List<AdminMonitoringTrendPointResponse>>> response = controller.getEventTrend(principal, 72, "LOGIN_FAILED", "WEB");
+
+        assertEquals(200, response.getStatusCode().value());
+        assertNotNull(response.getBody());
+        assertEquals(trend, response.getBody().getData());
+        verify(adminMonitoringService).getEventTrend(principal.getId(), 72, "LOGIN_FAILED", "WEB");
     }
 
     private UserPrincipal principal(UUID id) {
