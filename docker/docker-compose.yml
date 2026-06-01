@@ -1,5 +1,5 @@
 # =============================================================================
-# VNALO — Docker Compose (Development)
+# VNALO â€” Docker Compose (Development)
 # Usage: docker compose up --build
 # =============================================================================
 
@@ -375,6 +375,7 @@ services:
       REDIS_PORT: 6379
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_API_KEYS: ${GEMINI_API_KEYS:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
       OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}
