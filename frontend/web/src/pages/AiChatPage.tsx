@@ -969,8 +969,12 @@ export function AiChatPage() {
           {messages.map((message, index) => (
             <div
               key={`${message.role}-${message.timestamp}-${index}`}
-              className={message.role === 'assistant' ? 'ai-msg-bubble-ai' : 'ai-msg-bubble-user'}
+              className={message.role === 'assistant' ? 'ai-msg-bubble-ai' : 'ai-msg-bubble-user'} data-role={message.role}
             >
+              <div className='ai-message-meta'>
+                <span className='ai-message-role'>{message.role === 'assistant' ? 'VNALO AI' : 'Bạn'}</span>
+                {message.role === 'assistant' && message.providerStatus ? <span className='ai-message-status'>{message.providerStatus === 'FALLBACK_PROVIDER_ACTIVE' ? 'Fallback' : message.providerStatus === 'LIVE_PROVIDER_ACTIVE' ? 'Live' : 'Tạm gián đoạn'}</span> : null}
+              </div>
               <p className='text-[14.5px] whitespace-pre-wrap' style={{ margin: 0 }}>
                 {fixMojibakeText(message.content)}
               </p>
