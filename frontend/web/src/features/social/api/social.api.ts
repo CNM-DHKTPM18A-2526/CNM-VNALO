@@ -146,7 +146,19 @@ export const socialApi = {
   // Stories
   getStories: async (token: string): Promise<Story[]> => {
     const { data } = await contentApi.get('/stories', { headers: authHeaders(token) });
-    return data;
+    if (Array.isArray(data)) {
+      return data;
+    }
+    if (data && typeof data === 'object') {
+      const wrapped = data as { data?: unknown; items?: unknown };
+      if (Array.isArray(wrapped.data)) {
+        return wrapped.data as Story[];
+      }
+      if (Array.isArray(wrapped.items)) {
+        return wrapped.items as Story[];
+      }
+    }
+    return [];
   },
   createStory: async (token: string, payload: { mediaUrl: string; caption?: string; visibility: string }) => {
     const { data } = await contentApi.post('/stories', payload, { headers: authHeaders(token) });
