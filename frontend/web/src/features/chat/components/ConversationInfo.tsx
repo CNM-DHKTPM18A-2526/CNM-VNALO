@@ -1,3 +1,4 @@
+// File encoding: UTF-8
 import React from 'react';
 import {
   AlarmClock,
@@ -1520,4 +1521,4 @@ function MemberListView({ conversation, currentUserId, onAddMembers, onKickMembe
       </div>
     </div>
   );
-}
+}

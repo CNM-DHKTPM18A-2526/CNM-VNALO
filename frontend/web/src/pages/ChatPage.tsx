@@ -5557,7 +5557,7 @@ export default function ChatPage() {
       <Modal
         isOpen={confirmLeaveGroupOpen}
         onClose={() => setConfirmLeaveGroupOpen(false)}
-        title="Rá»i nhÃ³m vÃ  xÃ³a trÃ² chuyá»‡n"
+        title="Rời nhóm và xóa trò chuyện"
         variant="confirm"
         footer={
           <div className="flex gap-3 justify-end w-full">
@@ -5565,20 +5565,20 @@ export default function ChatPage() {
               className="px-6 py-2 rounded-lg bg-[var(--surface-muted)] text-[var(--text)] font-bold text-[15px] hover:bg-[var(--surface-hover)] border-0 outline-none cursor-pointer"
               onClick={() => setConfirmLeaveGroupOpen(false)}
             >
-              Há»§y
+              Hủy
             </button>
             <button
               className="px-6 py-2 rounded-lg bg-red-600 text-white font-bold text-[15px] hover:bg-red-700 border-0 outline-none cursor-pointer"
               onClick={doLeaveGroup}
             >
-              Rá»i nhÃ³m
+              Rời nhóm
             </button>
           </div>
         }
       >
         <div className="py-2 space-y-5">
           <p className="text-[15px] text-[var(--text)] leading-relaxed">
-            Báº¡n sáº½ khÃ´ng thá»ƒ xem láº¡i tin nháº¯n trong nhÃ³m nÃ y sau khi rá»i nhÃ³m.
+            Bạn sẽ không thể xem lại tin nhắn trong nhóm này sau khi rời nhóm.
           </p>
 
           <div
@@ -5586,8 +5586,8 @@ export default function ChatPage() {
             onClick={() => setLeaveGroupSilently(!leaveGroupSilently)}
           >
             <div className="space-y-1">
-              <p className="text-[15px] font-semibold text-[var(--text)]">Rá»i nhÃ³m trong im láº·ng</p>
-              <p className="text-[13px] text-[var(--text-secondary)]">Chá»‰ trÆ°á»Ÿng/phÃ³ nhÃ³m biáº¿t báº¡n rá»i nhÃ³m.</p>
+              <p className="text-[15px] font-semibold text-[var(--text)]">Rời nhóm trong im lặng</p>
+              <p className="text-[13px] text-[var(--text-secondary)]">Chỉ trưởng/phó nhóm biết bạn rời nhóm.</p>
             </div>
             <div
               className={`relative h-6 w-11 rounded-full transition-all duration-200 ${leaveGroupSilently ? 'bg-[#0091FF]' : 'bg-gray-400 shadow-inner'

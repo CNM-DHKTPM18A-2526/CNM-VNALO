@@ -24,7 +24,14 @@ export function StoryEditor({
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [previewCroppedUrl, setPreviewCroppedUrl] = useState<string | null>(null);
-  const [previewTextUrl, setPreviewTextUrl] = useState<string | null>(null);
+  const dragStateRef = useRef<{
+    startX: number;
+    startY: number;
+    startOverlayX: number;
+    startOverlayY: number;
+    frameWidth: number;
+    frameHeight: number;
+  } | null>(null);
 
   const gradientOptions = [
     'linear-gradient(180deg, #0f172a 0%, #111827 50%, #030712 100%)',
@@ -100,41 +107,36 @@ export function StoryEditor({
   }, [draft.mode, draft.mediaType, draft.mediaUrl, croppedAreaPixels]);
 
   useEffect(() => {
-    let cancelled = false;
+    if (draft.mode !== 'text') return;
 
-    async function updateTextPreview() {
-      if (draft.mode !== 'text' || !draft.caption.trim()) {
-        setPreviewTextUrl(current => {
-          if (current) URL.revokeObjectURL(current);
-          return null;
-        });
-        return;
-      }
+    const handlePointerMove = (event: PointerEvent) => {
+      const dragState = dragStateRef.current;
+      if (!dragState) return;
 
-      try {
-        const blob = await renderTextStoryBlob(draft);
-        if (cancelled) return;
+      const deltaX = ((event.clientX - dragState.startX) / dragState.frameWidth) * 100;
+      const deltaY = ((event.clientY - dragState.startY) / dragState.frameHeight) * 100;
 
-        const nextUrl = URL.createObjectURL(blob);
-        setPreviewTextUrl(current => {
-          if (current) URL.revokeObjectURL(current);
-          return nextUrl;
-        });
-      } catch {
-        if (cancelled) return;
-        setPreviewTextUrl(current => {
-          if (current) URL.revokeObjectURL(current);
-          return null;
-        });
-      }
-    }
+      onDraftChange({
+        ...draft,
+        overlayX: clampPercent(dragState.startOverlayX + deltaX),
+        overlayY: clampPercent(dragState.startOverlayY + deltaY),
+      });
+    };
 
-    void updateTextPreview();
+    const handlePointerEnd = () => {
+      dragStateRef.current = null;
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerEnd);
+    window.addEventListener('pointercancel', handlePointerEnd);
 
     return () => {
-      cancelled = true;
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerEnd);
+      window.removeEventListener('pointercancel', handlePointerEnd);
     };
-  }, [draft]);
+  }, [draft, onDraftChange]);
 
   const publishStory = async () => {
     if (!canPublish || isSaving) return;
@@ -203,10 +205,6 @@ export function StoryEditor({
                     onFontWeightChange={fontWeight => onDraftChange({ ...draft, fontWeight })}
                     textAlign={draft.textAlign}
                     onTextAlignChange={textAlign => onDraftChange({ ...draft, textAlign })}
-                    overlayX={draft.overlayX}
-                    onOverlayXChange={overlayX => onDraftChange({ ...draft, overlayX })}
-                    overlayY={draft.overlayY}
-                    onOverlayYChange={overlayY => onDraftChange({ ...draft, overlayY })}
                   />
                 </div>
               </>
@@ -236,10 +234,6 @@ export function StoryEditor({
                   onFontWeightChange={fontWeight => onDraftChange({ ...draft, fontWeight })}
                   textAlign={draft.textAlign}
                   onTextAlignChange={textAlign => onDraftChange({ ...draft, textAlign })}
-                  overlayX={draft.overlayX}
-                  onOverlayXChange={overlayX => onDraftChange({ ...draft, overlayX })}
-                  overlayY={draft.overlayY}
-                  onOverlayYChange={overlayY => onDraftChange({ ...draft, overlayY })}
                 />
               </>
             ) : (
@@ -253,14 +247,69 @@ export function StoryEditor({
             {draft.mode === 'text' ? (
               <div className="story-preview-section story-preview-section-text">
                 <div className="story-preview-stage story-preview-stage-text">
-                  <div className="story-preview-text-frame">
-                    {previewTextUrl ? (
-                      <img src={previewTextUrl} alt="Story text preview" className="story-preview-media story-preview-media-image" />
+                  <div
+                    className="story-preview-text-frame story-preview-text-frame-live"
+                    style={{ position: 'relative', background: draft.background }}
+                    onClick={event => {
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      const x = ((event.clientX - rect.left) / rect.width) * 100;
+                      const y = ((event.clientY - rect.top) / rect.height) * 100;
+                      onDraftChange({ ...draft, overlayX: clampPercent(x), overlayY: clampPercent(y) });
+                    }}
+                  >
+                    {draft.caption ? (
+                      <div
+                        className="story-preview-caption draggable"
+                        draggable={false}
+                        onDragStart={event => event.preventDefault()}
+                        style={{
+                            color: draft.textColor,
+                          fontSize: `${draft.fontSize}px`,
+                          fontWeight: draft.fontWeight,
+                          textAlign: draft.textAlign,
+                          left: `${draft.overlayX}%`,
+                          top: `${draft.overlayY}%`,
+                          transform: `translate(-50%, -50%) scale(${draft.overlayScale ?? 1}) rotate(${draft.overlayRotation ?? 0}deg)`,
+                          userSelect: 'none',
+                          WebkitUserSelect: 'none',
+                          MozUserSelect: 'none',
+                          msUserSelect: 'none',
+                          touchAction: 'none',
+                          cursor: 'grab',
+                          textShadow: '0 2px 10px rgba(0, 0, 0, 0.45)',
+                        }}
+                        onPointerDown={event => {
+                          event.preventDefault();
+                          event.stopPropagation();
+
+                          const frame = event.currentTarget.parentElement?.getBoundingClientRect();
+                          dragStateRef.current = {
+                            startX: event.clientX,
+                            startY: event.clientY,
+                            startOverlayX: draft.overlayX,
+                            startOverlayY: draft.overlayY,
+                            frameWidth: frame?.width ?? 1,
+                            frameHeight: frame?.height ?? 1,
+                          };
+                          event.currentTarget.setPointerCapture(event.pointerId);
+                          (event.currentTarget as HTMLElement).style.cursor = 'grabbing';
+                        }}
+                        onPointerUp={event => {
+                          dragStateRef.current = null;
+                          (event.currentTarget as HTMLElement).style.cursor = 'grab';
+                        }}
+                        onPointerCancel={event => {
+                          dragStateRef.current = null;
+                          (event.currentTarget as HTMLElement).style.cursor = 'grab';
+                        }}
+                      >
+                        {draft.caption}
+                      </div>
                     ) : null}
                   </div>
                 </div>
               </div>
-            ) : draft.mode === 'media' && draft.mediaUrl ? (
+              ) : draft.mode === 'media' && draft.mediaUrl ? (
               draft.mediaType === 'image' ? (
                 <>
                   <div className="story-cropper-wrap story-cropper-top">
@@ -447,6 +496,10 @@ function drawCaption(
   lines.forEach((line, index) => {
     context.fillText(line, centerX, startY + index * lineHeight);
   });
+}
+
+function clampPercent(value: number) {
+  return Math.min(97, Math.max(3, value));
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
