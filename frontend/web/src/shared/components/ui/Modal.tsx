@@ -1,3 +1,4 @@
+// File encoding: UTF-8
 import React from 'react'
 import { createPortal } from 'react-dom'
 
@@ -49,7 +50,7 @@ export function Modal({
     <div className='modal-overlay' onMouseDown={onClose}>
       <div
         aria-modal='true'
-        className={`modal-card${variant === 'image' ? ' modal-card-image' : ''}`}
+        className={`modal-card${variant === 'image' ? ' modal-card-image' : ''}${variant === 'custom' ? ' modal-card-custom' : ''}`}
         onMouseDown={(event) => event.stopPropagation()}
         role='dialog'
       >
@@ -67,7 +68,7 @@ export function Modal({
         <div className={
           variant === 'confirm' ? 'modal-body-confirm' : 
           variant === 'none' ? 'p-0 overflow-hidden' :
-          variant === 'custom' ? '' :
+          variant === 'custom' ? 'modal-body modal-body-custom' :
           'modal-body'
         }>
           {children}

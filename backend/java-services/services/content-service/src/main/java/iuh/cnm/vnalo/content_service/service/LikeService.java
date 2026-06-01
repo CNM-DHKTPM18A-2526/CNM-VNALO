@@ -20,30 +20,49 @@ public class LikeService {
 
     private final PostRepository postRepository;
     private final PostLikeRepository postLikeRepository;
+    private final PostService postService;
 
     @Transactional
-    public void likePost(UUID postId, UUID userId) {
+    public void likePost(UUID postId, UUID userId, String reactionType) {
         Post post = postRepository.findByPostIdAndStatus(postId, "ACTIVE")
                 .orElseThrow(() -> new ApiException(ErrorCode.POST_NOT_FOUND));
 
-        if (postLikeRepository.existsByPostIdAndUserId(postId, userId)) {
-            return;
+        if (!postService.canViewPost(post, userId)) {
+            throw new ApiException(ErrorCode.FORBIDDEN);
         }
 
-        PostLike postLike = PostLike.builder()
-                .postId(postId)
-                .userId(userId)
-                .build();
+        String normalizedReaction = reactionType == null || reactionType.isBlank()
+                ? "LOVE"
+                : reactionType.trim().toUpperCase();
 
-        postLikeRepository.save(postLike);
-        post.setLikeCount(post.getLikeCount() + 1);
-        postRepository.save(post);
+        postLikeRepository.findByPostIdAndUserId(postId, userId).ifPresentOrElse(
+                existing -> {
+                    existing.setReactionType(normalizedReaction);
+                    postLikeRepository.save(existing);
+                },
+                () -> {
+                    PostLike postLike = PostLike.builder()
+                            .postId(postId)
+                            .userId(userId)
+                            .reactionType(normalizedReaction)
+                            .build();
+
+                    postLikeRepository.save(postLike);
+                    post.setLikeCount(post.getLikeCount() + 1);
+                    postRepository.save(post);
+
+                }
+        );
     }
 
     @Transactional
     public void unlikePost(UUID postId, UUID userId) {
         Post post = postRepository.findByPostIdAndStatus(postId, "ACTIVE")
                 .orElseThrow(() -> new ApiException(ErrorCode.POST_NOT_FOUND));
+
+        if (!postService.canViewPost(post, userId)) {
+            throw new ApiException(ErrorCode.FORBIDDEN);
+        }
 
         postLikeRepository.findByPostIdAndUserId(postId, userId).ifPresent(postLike -> {
             postLikeRepository.delete(postLike);
@@ -53,15 +72,19 @@ public class LikeService {
     }
 
     @Transactional(readOnly = true)
-    public List<PostLikeResponse> getPostLikers(UUID postId) {
-        if (!postRepository.existsByPostIdAndStatus(postId, "ACTIVE")) {
-            throw new ApiException(ErrorCode.POST_NOT_FOUND);
+    public List<PostLikeResponse> getPostLikers(UUID postId, UUID userId) {
+        Post post = postRepository.findByPostIdAndStatus(postId, "ACTIVE")
+                .orElseThrow(() -> new ApiException(ErrorCode.POST_NOT_FOUND));
+
+        if (!postService.canViewPost(post, userId)) {
+            throw new ApiException(ErrorCode.FORBIDDEN);
         }
 
         return postLikeRepository.findByPostIdOrderByCreatedAtDesc(postId)
                 .stream()
                 .map(postLike -> PostLikeResponse.builder()
                         .userId(postLike.getUserId())
+                        .reactionType(postLike.getReactionType())
                         .likedAt(postLike.getCreatedAt())
                         .build())
                 .toList();

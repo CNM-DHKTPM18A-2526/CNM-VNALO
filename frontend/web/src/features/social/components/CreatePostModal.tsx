@@ -39,7 +39,7 @@ export function CreatePostModal({
     if (!isOpen) return;
 
     setContent(editingPost?.contentText ?? '');
-    setVisibility((editingPost?.visibility as string) ?? 'PUBLIC');
+    setVisibility(editingPost?.visibility === 'PRIVATE' ? 'PRIVATE' : 'PUBLIC');
     setMediaUrls(editingPost?.mediaUrls ? [...editingPost.mediaUrls] : []);
     setError(null);
     setIsEmojiPickerOpen(false);
@@ -302,7 +302,6 @@ export function CreatePostModal({
                 style={{ marginTop: '4px', padding: '2px 8px', borderRadius: '6px', border: '1px solid var(--color-border)', background: 'var(--color-surface)', color: 'var(--color-text-primary)', fontSize: '13px' }}
               >
                 <option value="PUBLIC">🌐 Công khai</option>
-                <option value="FRIENDS">👥 Bạn bè</option>
                 <option value="PRIVATE">🔒 Chỉ mình tôi</option>
               </select>
             </div>

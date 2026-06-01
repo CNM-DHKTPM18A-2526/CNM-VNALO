@@ -35,8 +35,8 @@ public class StoryController {
     }
 
     @GetMapping
-    public List<StoryResponse> getStories() {
-        return storyService.getActiveStories();
+    public List<StoryResponse> getStories(Authentication authentication) {
+        return storyService.getActiveStories(currentUserId(authentication));
     }
 
     @DeleteMapping("/{storyId}")
@@ -58,8 +58,11 @@ public class StoryController {
     }
 
     @GetMapping("/{storyId}/views")
-    public List<StoryViewResponse> getStoryViews(@PathVariable UUID storyId) {
-        return storyService.getStoryViews(storyId);
+    public List<StoryViewResponse> getStoryViews(
+            @PathVariable UUID storyId,
+            Authentication authentication
+    ) {
+        return storyService.getStoryViews(storyId, currentUserId(authentication));
     }
 
     @PostMapping("/{storyId}/reactions")
@@ -81,7 +84,10 @@ public class StoryController {
     }
 
     @GetMapping("/{storyId}/reactions")
-    public List<StoryReactionResponse> getStoryReactions(@PathVariable UUID storyId) {
-        return storyService.getStoryReactions(storyId);
+    public List<StoryReactionResponse> getStoryReactions(
+            @PathVariable UUID storyId,
+            Authentication authentication
+    ) {
+        return storyService.getStoryReactions(storyId, currentUserId(authentication));
     }
 }

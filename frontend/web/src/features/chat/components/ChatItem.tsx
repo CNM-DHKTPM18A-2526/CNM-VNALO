@@ -48,6 +48,7 @@ export function ChatItem({ conversation, active, onSelect }: ChatItemProps) {
           imageUrl={(!conversation.isGroup && peerId ? userMap[peerId]?.avatarUrl : conversation?.avatarUrl) ?? conversation?.avatarUrl ?? null} 
           size='md' 
           isGroup={conversation.isGroup}
+          isCloud={conversation.isCloud}
           memberAvatars={collageData.avatars}
           extraCount={collageData.extraCount}
         />

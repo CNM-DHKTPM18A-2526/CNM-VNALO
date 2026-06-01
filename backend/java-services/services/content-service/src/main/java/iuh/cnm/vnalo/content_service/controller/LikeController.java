@@ -25,9 +25,10 @@ public class LikeController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void likePost(
             @PathVariable UUID postId,
+            @RequestParam(defaultValue = "LOVE") String reactionType,
             Authentication authentication
     ) {
-        likeService.likePost(postId, currentUserId(authentication));
+        likeService.likePost(postId, currentUserId(authentication), reactionType);
     }
 
     @DeleteMapping("/like")
@@ -40,7 +41,10 @@ public class LikeController {
     }
 
     @GetMapping("/likes")
-    public List<PostLikeResponse> getPostLikers(@PathVariable UUID postId) {
-        return likeService.getPostLikers(postId);
+    public List<PostLikeResponse> getPostLikers(
+            @PathVariable UUID postId,
+            Authentication authentication
+    ) {
+        return likeService.getPostLikers(postId, currentUserId(authentication));
     }
 }

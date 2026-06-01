@@ -87,6 +87,7 @@ class CommonTexts {
   String get audioAction => _isVi ? 'Âm thanh' : 'Audio';
   String get backgroundTextAction => _isVi ? 'Nền chữ' : 'Text BG';
   String get createNewStory => _isVi ? 'Tạo mới' : 'Create new';
+  String get createPostTitle => _isVi ? 'Tạo bài viết' : 'Create Post';
   String get noPostsYet =>
       _isVi ? 'Chưa có kỷ niệm nào được chia sẻ.' : 'No memories shared yet.';
   String get anonymousUser => _isVi ? 'Người dùng' : 'User';

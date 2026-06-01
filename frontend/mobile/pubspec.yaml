@@ -92,6 +92,10 @@ dependencies:
   speech_to_text: ^7.3.0
   flutter_riverpod: ^3.3.1
   flutter_markdown_plus: ^1.0.6
+  video_player: ^2.11.1
+  chewie: ^1.13.1
+  visibility_detector: ^0.4.0+2
+  photo_manager: ^3.9.0
 
 dev_dependencies:
   flutter_test:
@@ -161,3 +165,7 @@ flutter_launcher_icons:
   min_sdk_android: 21
   adaptive_icon_background: "#FFFFFF"
   adaptive_icon_foreground: assets/icons/app_icon.png
+
+
+dependency_overrides:
+  shared_preferences_android: 2.4.22

@@ -1,5 +1,4 @@
 import React, { type KeyboardEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
 
 import { useLanguage } from '../i18n/LanguageContext'
 import { Icon } from './Icon'
@@ -11,21 +10,21 @@ type TopbarProps = {
   userAvatarUrl?: string | null
   onLogout: () => void
   onOpenSettingsModal?: () => void
+  onOpenAccountModal?: () => void
 }
 
-export function Topbar({ title, userName, userAvatarUrl, onLogout, onOpenSettingsModal }: TopbarProps) {
+export function Topbar({ title, userName, userAvatarUrl, onLogout, onOpenSettingsModal, onOpenAccountModal }: TopbarProps) {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false)
   const menuRef = React.useRef<HTMLDivElement | null>(null)
   const menuItemRefs = React.useRef<Array<HTMLButtonElement | null>>([])
   const { t } = useLanguage()
-  const navigate = useNavigate()
 
   const menuItems = [
     {
       key: 'profile',
       label: t('topbar.menuProfile'),
       icon: 'user' as const,
-      onSelect: () => navigate('/profile'),
+      onSelect: () => onOpenAccountModal?.(),
     },
     {
       key: 'settings',

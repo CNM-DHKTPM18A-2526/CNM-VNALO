@@ -39,6 +39,7 @@ class AppConfig {
     String? mediaServiceUrl,
     String? socketUrl,
     String? aiServiceUrl,
+    String? contentServiceUrl,
   }) {
     switch (env) {
       case Environment.dev:
@@ -54,6 +55,10 @@ class AppConfig {
           mediaServiceUrl:
               _normalizeApiBaseUrl(
                 mediaServiceUrl ?? resolvedCore,
+              ),
+          contentServiceUrl:
+              _normalizeApiBaseUrl(
+                contentServiceUrl ?? resolvedCore,
               ),
           socketUrl: _normalizeSocketUrl(
             socketUrl ?? resolvedCore.replaceAll('/api/v1', ''),
@@ -74,6 +79,7 @@ class AppConfig {
           coreServiceUrl: _normalizeApiBaseUrl(coreServiceUrl ?? base),
           messageServiceUrl: _normalizeApiBaseUrl(messageServiceUrl ?? base),
           mediaServiceUrl: _normalizeApiBaseUrl(mediaServiceUrl ?? base),
+          contentServiceUrl: _normalizeApiBaseUrl(contentServiceUrl ?? base),
           socketUrl: _normalizeSocketUrl(socketUrl ?? socketBase),
           aiServiceUrl: _normalizeApiBaseUrl(aiServiceUrl ?? base),
           enableLogging: env == Environment.staging,

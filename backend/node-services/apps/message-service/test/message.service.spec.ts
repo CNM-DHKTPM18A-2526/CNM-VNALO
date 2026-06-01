@@ -15,6 +15,7 @@ import {
   MemberRole,
 } from '../src/entities/conversation-member.entity';
 import { ConversationService } from '../src/conversation/conversation.service';
+import { KafkaProducerService } from '../src/kafka/kafka-producer.service';
 import {
   ForbiddenException,
   NotFoundException,
@@ -112,10 +113,17 @@ describe('MessageService', () => {
               lastReadSeq: 5,
             }),
             assertCanPinMessage: jest.fn().mockResolvedValue(undefined),
+            assertCanSendMessage: jest.fn().mockResolvedValue(undefined),
           },
         },
         { provide: DataSource, useValue: mockDataSource },
         { provide: IOREDIS_TOKEN, useValue: redisMock },
+        {
+          provide: KafkaProducerService,
+          useValue: {
+            produce: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 

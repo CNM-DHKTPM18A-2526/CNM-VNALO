@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -433,6 +434,17 @@ class MessageBubble extends StatelessWidget {
             }
           }
         } else if (action == 'pin') {
+          if (!canPin) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Bạn không có quyền ghim tin nhắn'),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+            return;
+          }
           final pins = chatProvider.getPinnedMessagesForConversation(
             message.conversationId,
           );
@@ -515,6 +527,22 @@ class MessageBubble extends StatelessWidget {
   }
 
   Widget _renderTypeSpecificContent(BuildContext context, bool isDarkMode) {
+    final isJsonPoll = message.messageType == MessageType.TEXT &&
+        (message.content ?? '').trim().startsWith('{"type":"poll"');
+    if (isJsonPoll) {
+      return PollWidget(
+        message: message,
+        isDarkMode: isDarkMode,
+      );
+    }
+
+    // ── Note message card ──
+    final isJsonNote = message.messageType == MessageType.TEXT &&
+        (message.content ?? '').trim().startsWith('{"type":"note"');
+    if (isJsonNote) {
+      return _buildNoteCard(context, isDarkMode);
+    }
+
     switch (message.messageType) {
       case MessageType.IMAGE:
         return _buildImage(context);
@@ -554,6 +582,72 @@ class MessageBubble extends StatelessWidget {
           ),
         );
     }
+  }
+
+  // ── Note card widget ───────────────────────────────────────────
+  Widget _buildNoteCard(BuildContext context, bool isDarkMode) {
+    Map<String, dynamic>? noteData;
+    try {
+      noteData = jsonDecode(message.content ?? '{}') as Map<String, dynamic>;
+    } catch (_) {}
+    final noteContent = (noteData?['content'] as String?) ?? message.content ?? '';
+    final bgColor = isDarkMode
+        ? (isMine ? const Color(0xFF2A3550) : DarkColors.surface)
+        : (isMine ? const Color(0xFFE3F0FF) : Colors.white);
+    final textColor = isDarkMode ? DarkColors.textPrimary : LightColors.textPrimary;
+
+    return Container(
+      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDarkMode ? Colors.white12 : Colors.grey.shade200,
+          width: 1,
+        ),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(Icons.note_alt_outlined, size: 18, color: AppColors.primary),
+          ),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Ghi chú',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  noteContent,
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    color: textColor,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildCallLogCard(
@@ -929,13 +1023,25 @@ class MessageBubble extends StatelessWidget {
   }
 
   /// Trả về true nếu URL là ảnh GIF (từ Giphy, Tenor hoặc đuôi .gif)
+  /// HOẶC nếu content chứa marker [GIF]
   bool _isGifUrl(String url) {
     final lower = url.toLowerCase();
     return lower.endsWith('.gif') ||
         lower.contains('giphy.com') ||
         lower.contains('tenor.com') ||
         lower.contains('media.tenor') ||
-        lower.contains('media.giphy');
+        lower.contains('media.giphy') ||
+        message.content?.toLowerCase().contains('[gif]') == true ||
+        message.content?.toLowerCase().contains('gif:') == true;
+  }
+
+  /// Kiểm tra message có phải là GIF hay không (dựa vào URL hoặc content)
+  bool _isGifMessage() {
+    final url = message.mediaUrl ?? '';
+    final content = message.content?.toLowerCase() ?? '';
+    return _isGifUrl(url) || 
+           content.contains('[gif]') || 
+           content.contains('gif:');
   }
 
   Widget _buildImage(BuildContext context) {
@@ -966,14 +1072,7 @@ class MessageBubble extends StatelessWidget {
 
     // If it's just an ID and not local, resolve it via MediaService pattern
     String resolvedRaw = rawUrl;
-    if (!useLocalFile &&
-        !rawUrl.contains('/') &&
-        !rawUrl.contains('.') &&
-        !rawUrl.startsWith('http')) {
-      // We don't have direct access to MediaService here easily without context.read,
-      // but we know the pattern from MediaService.getPublicUrl.
-      // However, AvatarResolver.resolveUrl already handles prepending the base.
-      // We just need to make sure it has the /media/public/ prefix if it's an ID.
+    if (!useLocalFile && !rawUrl.contains('/') && !rawUrl.contains('.') && !rawUrl.startsWith('http')) {
       resolvedRaw = '/media/public/$rawUrl';
     }
 
@@ -983,24 +1082,27 @@ class MessageBubble extends StatelessWidget {
             : (AvatarResolver.resolveUrl(resolvedRaw) ?? resolvedRaw);
     final isGif = !useLocalFile && _isGifUrl(url);
 
+    debugPrint('[_buildImage] rawUrl=$rawUrl isLocalFile=$isLocalFile useLocalFile=$useLocalFile resolvedUrl=$url isGif=$isGif');
+
     // GIF hiển thị nhỏ gọn (160×160), ảnh thường thì full width
     final double maxW = isGif ? 160 : MediaQuery.of(context).size.width * 0.75;
     final double maxH = isGif ? 160 : 300;
 
-    debugPrint(
-      '[_buildImage] rawUrl=$rawUrl isLocalFile=$isLocalFile useLocalFile=$useLocalFile resolvedUrl=$url',
-    );
+    final auth = context.read<AuthProvider>();
+    final token = auth.accessToken;
+    final headers = (AvatarResolver.isInternalUrl(url) && token != null)
+        ? {'Authorization': 'Bearer $token'}
+        : <String, String>{};
 
     return GestureDetector(
       onTap: () {
-        final auth = context.read<AuthProvider>();
         Navigator.of(context).push(
           MaterialPageRoute(
             builder:
                 (_) => FullScreenImageViewer(
                   imageUrl: url,
                   isLocal: useLocalFile,
-                  accessToken: auth.accessToken,
+                  accessToken: token,
                 ),
           ),
         );
@@ -1011,34 +1113,67 @@ class MessageBubble extends StatelessWidget {
           constraints: BoxConstraints(maxWidth: maxW, maxHeight: maxH),
           decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
           clipBehavior: Clip.antiAlias,
-          child:
-              useLocalFile
-                  ? Image.file(File(url), fit: BoxFit.cover)
-                  : CachedNetworkImage(
-                    imageUrl: url,
-                    fit: isGif ? BoxFit.contain : BoxFit.cover,
-                    httpHeaders:
-                        (AvatarResolver.isInternalUrl(url))
-                            ? {
-                              'Authorization':
-                                  'Bearer ${context.read<AuthProvider>().accessToken}',
-                            }
-                            : const {},
-                    placeholder:
-                        (context, url) => Container(
+          child: useLocalFile
+              ? Image.file(File(url), fit: isGif ? BoxFit.contain : BoxFit.cover)
+              : isGif
+                  // Sử dụng Image.network trực tiếp cho GIF để đảm bảo animation hoạt động
+                  ? Image.network(
+                      url,
+                      fit: BoxFit.contain,
+                      headers: headers,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Container(
+                          width: 160,
+                          height: 160,
                           color: Colors.grey.shade200,
-                          width: isGif ? 160 : 200,
-                          height: isGif ? 160 : 200,
-                        ),
-                    errorWidget:
-                        (context, url, error) => Container(
-                          color: Colors.grey.shade200,
-                          child: const Icon(
-                            Icons.broken_image,
-                            color: Colors.grey,
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              value: loadingProgress.expectedTotalBytes != null
+                                  ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                  : null,
+                              strokeWidth: 2,
+                            ),
                           ),
-                        ),
-                  ),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        debugPrint('[_buildImage] GIF Error: $error for URL: $url');
+                        return Container(
+                          width: 160,
+                          height: 160,
+                          color: Colors.grey.shade200,
+                          child: const Center(
+                            child: Icon(Icons.broken_image, color: Colors.grey, size: 32),
+                          ),
+                        );
+                      },
+                    )
+                  : CachedNetworkImage(
+                      imageUrl: url,
+                      fit: BoxFit.cover,
+                      httpHeaders: headers,
+                      placeholder: (context, url) => Container(
+                        color: Colors.grey.shade200,
+                        width: 200,
+                        height: 200,
+                        child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                      ),
+                      errorWidget: (context, url, error) {
+                        debugPrint('[_buildImage] ❌ Load Failed: $url - Error: $error');
+                        return Container(
+                          color: Colors.grey.shade200,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.broken_image_outlined, color: Colors.grey, size: 32),
+                              const SizedBox(height: 4),
+                              const Text('Lỗi tải ảnh', style: TextStyle(color: Colors.grey, fontSize: 10)),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
         ),
       ),
     );

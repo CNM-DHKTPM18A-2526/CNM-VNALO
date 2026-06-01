@@ -25,11 +25,16 @@ public class CommentService {
 
     private final CommentRepository commentRepository;
     private final PostRepository postRepository;
+    private final PostService postService;
 
     @Transactional
     public CommentResponse createComment(UUID postId, UUID authorId, CreateCommentRequest request) {
         Post post = postRepository.findByPostIdAndStatus(postId, "ACTIVE")
                 .orElseThrow(() -> new ApiException(ErrorCode.POST_NOT_FOUND));
+
+        if (!postService.canViewPost(post, authorId)) {
+            throw new ApiException(ErrorCode.FORBIDDEN);
+        }
 
         Comment comment = Comment.builder()
                 .postId(postId)
@@ -48,7 +53,14 @@ public class CommentService {
     }
 
     @Transactional(readOnly = true)
-    public CommentPageResponse getCommentsByPost(UUID postId, int page, int size) {
+    public CommentPageResponse getCommentsByPost(UUID postId, UUID userId, int page, int size) {
+        Post post = postRepository.findByPostIdAndStatus(postId, "ACTIVE")
+                .orElseThrow(() -> new ApiException(ErrorCode.POST_NOT_FOUND));
+
+        if (!postService.canViewPost(post, userId)) {
+            throw new ApiException(ErrorCode.FORBIDDEN);
+        }
+
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 50);
 
@@ -79,6 +91,13 @@ public class CommentService {
         Comment comment = commentRepository.findByCommentIdAndStatus(commentId, "ACTIVE")
                 .orElseThrow(() -> new ApiException(ErrorCode.COMMENT_NOT_FOUND));
 
+        Post post = postRepository.findByPostIdAndStatus(comment.getPostId(), "ACTIVE")
+                .orElseThrow(() -> new ApiException(ErrorCode.POST_NOT_FOUND));
+
+        if (!postService.canViewPost(post, userId)) {
+            throw new ApiException(ErrorCode.FORBIDDEN);
+        }
+
         if (!comment.getAuthorId().equals(userId)) {
             throw new ApiException(ErrorCode.FORBIDDEN);
         }
@@ -94,6 +113,13 @@ public class CommentService {
         Comment comment = commentRepository.findByCommentIdAndStatus(commentId, "ACTIVE")
                 .orElseThrow(() -> new ApiException(ErrorCode.COMMENT_NOT_FOUND));
 
+        Post post = postRepository.findByPostIdAndStatus(comment.getPostId(), "ACTIVE")
+                .orElseThrow(() -> new ApiException(ErrorCode.POST_NOT_FOUND));
+
+        if (!postService.canViewPost(post, userId)) {
+            throw new ApiException(ErrorCode.FORBIDDEN);
+        }
+
         if (!comment.getAuthorId().equals(userId)) {
             throw new ApiException(ErrorCode.FORBIDDEN);
         }
@@ -101,9 +127,9 @@ public class CommentService {
         comment.setStatus("DELETED");
         commentRepository.save(comment);
 
-        postRepository.findById(comment.getPostId()).ifPresent(post -> {
-            post.setCommentCount(Math.max(0, post.getCommentCount() - 1));
-            postRepository.save(post);
+        postRepository.findById(comment.getPostId()).ifPresent(p -> {
+            p.setCommentCount(Math.max(0, p.getCommentCount() - 1));
+            postRepository.save(p);
         });
     }
 

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth';
 import { useUserStore } from '../../chat/context/UserStoreContext';
 import { socialApi } from '../api/social.api';
+import { StoriesSidebar } from '../components/story/StoriesSidebar';
 import { StoryViewer } from '../components/story/StoryViewer';
 import { useRealtimeStories } from '../hooks/useRealtimeStories';
 import { storyStore, useStoryStore } from '../store/story.store';
@@ -23,7 +24,6 @@ export default function StoryViewerPage() {
     if (!accessToken) return;
 
     let cancelled = false;
-    setIsLoading(true);
 
     void socialApi.getStories(accessToken)
       .then(async list => {
@@ -51,14 +51,28 @@ export default function StoryViewerPage() {
   const currentUserId = user?.id ?? null;
 
   const story = useMemo(() => stories.find(item => item.storyId === storyId), [stories, storyId]);
-  const storyGroup = useMemo(() => {
-    if (!story) return [];
+  const orderedStories = useMemo(() => {
+    const byAuthor = new Map<string, typeof stories>();
 
-    return stories
-      .filter(item => item.authorId === story.authorId)
-      .slice()
-      .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
-  }, [stories, story]);
+    stories.forEach(item => {
+      const authorStories = byAuthor.get(item.authorId) ?? [];
+      authorStories.push(item);
+      byAuthor.set(item.authorId, authorStories);
+    });
+
+    return [...byAuthor.entries()]
+      .map(([authorId, authorStories]) => ({
+        authorId,
+        latestStoryAt: authorStories.reduce((latest, item) => (item.createdAt > latest ? item.createdAt : latest), authorStories[0]?.createdAt ?? ''),
+        stories: authorStories.slice().sort((left, right) => left.createdAt.localeCompare(right.createdAt)),
+      }))
+      .sort((left, right) => {
+        if (left.authorId === currentUserId && right.authorId !== currentUserId) return -1;
+        if (right.authorId === currentUserId && left.authorId !== currentUserId) return 1;
+        return right.latestStoryAt.localeCompare(left.latestStoryAt);
+      })
+      .flatMap(group => group.stories);
+  }, [stories, currentUserId]);
 
   if (!accessToken) {
     return null;
@@ -81,19 +95,31 @@ export default function StoryViewerPage() {
   }
 
   return (
-    <StoryViewer
-      stories={storyGroup.length > 0 ? storyGroup : stories}
-      sidebarStories={stories}
-      authorProfiles={userMap as Record<string, { displayName: string; avatarUrl: string | null }>}
-      startStoryId={story?.storyId ?? storyId}
-      token={accessToken}
-      currentUserId={currentUserId}
-      onSelectStory={(nextStoryId) => navigate(`/stories/${nextStoryId}`)}
-      onClose={() => navigate('/social')}
-      onDeleteStory={(deletedStoryId) => {
-        storyStore.removeStory(deletedStoryId);
-        navigate('/social');
-      }}
-    />
+    <div className="story-viewer-page-shell" onClick={() => navigate('/social')}>
+      <StoriesSidebar
+        stories={stories}
+        currentStoryId={story?.storyId ?? storyId}
+        currentUserId={currentUserId}
+        authorProfiles={userMap as Record<string, { displayName: string; avatarUrl: string | null }>}
+        onSelectStory={(nextStoryId) => navigate(`/stories/${nextStoryId}`)}
+        onClose={() => navigate('/social')}
+      />
+
+      <main className="story-viewer-page-main" onClick={event => event.stopPropagation()}>
+        <StoryViewer
+          stories={orderedStories}
+          authorProfiles={userMap as Record<string, { displayName: string; avatarUrl: string | null }>}
+          startStoryId={story?.storyId ?? storyId}
+          token={accessToken}
+          currentUserId={currentUserId}
+          onSelectStory={(nextStoryId) => navigate(`/stories/${nextStoryId}`)}
+          onClose={() => navigate('/social')}
+          onDeleteStory={(deletedStoryId) => {
+            storyStore.removeStory(deletedStoryId);
+            navigate('/social');
+          }}
+        />
+      </main>
+    </div>
   );
 }

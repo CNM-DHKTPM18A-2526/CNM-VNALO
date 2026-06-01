@@ -42,17 +42,13 @@ public class PostService {
     }
 
     @Transactional(readOnly = true)
-    public TimelineResponse getTimeline(int page, int size) {
+    public TimelineResponse getTimeline(UUID userId, int page, int size) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 50);
 
-        PageRequest pageable = PageRequest.of(
-                safePage,
-                safeSize,
-                Sort.by(Sort.Direction.DESC, "createdAt")
-        );
+        PageRequest pageable = PageRequest.of(safePage, safeSize);
 
-        Page<Post> result = postRepository.findByStatusOrderByCreatedAtDesc("ACTIVE", pageable);
+        Page<Post> result = postRepository.findTimelineForUser("ACTIVE", userId, pageable);
 
         return TimelineResponse.builder()
                 .items(result.getContent().stream().map(this::toResponse).toList())
@@ -65,9 +61,32 @@ public class PostService {
     }
 
     @Transactional(readOnly = true)
-    public PostResponse getPostById(UUID postId) {
+    public TimelineResponse getUserTimeline(UUID targetUserId, UUID requesterId, int page, int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), 50);
+
+        PageRequest pageable = PageRequest.of(safePage, safeSize);
+
+        Page<Post> result = postRepository.findTimelineForUserProfile("ACTIVE", targetUserId, requesterId, pageable);
+
+        return TimelineResponse.builder()
+                .items(result.getContent().stream().map(this::toResponse).toList())
+                .page(result.getNumber())
+                .size(result.getSize())
+                .totalElements(result.getTotalElements())
+                .totalPages(result.getTotalPages())
+                .last(result.isLast())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public PostResponse getPostById(UUID postId, UUID userId) {
         Post post = postRepository.findByPostIdAndStatus(postId, "ACTIVE")
                 .orElseThrow(() -> new ApiException(ErrorCode.POST_NOT_FOUND));
+
+        if (!canViewPost(post, userId)) {
+            throw new ApiException(ErrorCode.FORBIDDEN);
+        }
 
         return toResponse(post);
     }
@@ -110,6 +129,20 @@ public class PostService {
         postRepository.save(post);
     }
 
+    @Transactional
+    public PostResponse sharePost(UUID postId, UUID userId) {
+        Post post = postRepository.findByPostIdAndStatus(postId, "ACTIVE")
+                .orElseThrow(() -> new ApiException(ErrorCode.POST_NOT_FOUND));
+
+        if (!canViewPost(post, userId)) {
+            throw new ApiException(ErrorCode.FORBIDDEN);
+        }
+
+        post.setShareCount(post.getShareCount() + 1);
+        Post saved = postRepository.saveAndFlush(post);
+        return toResponse(saved);
+    }
+
     private String normalizeVisibility(String visibility) {
         if (visibility == null || visibility.isBlank()) {
             return "PUBLIC";
@@ -119,6 +152,16 @@ public class PostService {
         return switch (normalized) {
             case "PUBLIC", "FRIENDS", "PRIVATE" -> normalized;
             default -> "PUBLIC";
+        };
+    }
+
+    public boolean canViewPost(Post post, UUID userId) {
+        if (post.getAuthorId().equals(userId)) return true;
+        
+        return switch (post.getVisibility()) {
+            case "PUBLIC", "FRIENDS" -> true; // content-service doesn't enforce friends
+            case "PRIVATE" -> false;
+            default -> false;
         };
     }
 

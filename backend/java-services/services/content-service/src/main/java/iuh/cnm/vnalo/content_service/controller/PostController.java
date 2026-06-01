@@ -35,15 +35,29 @@ public class PostController {
 
     @GetMapping("/timeline")
     public TimelineResponse getTimeline(
+            Authentication authentication,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return postService.getTimeline(page, size);
+        return postService.getTimeline(currentUserId(authentication), page, size);
+    }
+
+    @GetMapping("/users/{userId}")
+    public TimelineResponse getUserTimeline(
+            @PathVariable UUID userId,
+            Authentication authentication,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return postService.getUserTimeline(userId, currentUserId(authentication), page, size);
     }
 
     @GetMapping("/{postId}")
-    public PostResponse getPostById(@PathVariable UUID postId) {
-        return postService.getPostById(postId);
+    public PostResponse getPostById(
+            Authentication authentication,
+            @PathVariable UUID postId
+    ) {
+        return postService.getPostById(postId, currentUserId(authentication));
     }
 
     @PutMapping("/{postId}")
@@ -62,5 +76,13 @@ public class PostController {
             Authentication authentication
     ) {
         postService.deletePost(postId, currentUserId(authentication));
+    }
+
+    @PostMapping("/{postId}/share")
+    public PostResponse sharePost(
+            @PathVariable UUID postId,
+            Authentication authentication
+    ) {
+        return postService.sharePost(postId, currentUserId(authentication));
     }
 }

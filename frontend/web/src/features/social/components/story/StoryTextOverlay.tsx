@@ -9,10 +9,6 @@ export function StoryTextOverlay({
   onFontWeightChange,
   textAlign,
   onTextAlignChange,
-  overlayX,
-  onOverlayXChange,
-  overlayY,
-  onOverlayYChange,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -24,10 +20,6 @@ export function StoryTextOverlay({
   onFontWeightChange: (value: number) => void;
   textAlign: 'left' | 'center' | 'right';
   onTextAlignChange: (value: 'left' | 'center' | 'right') => void;
-  overlayX?: number;
-  onOverlayXChange?: (value: number) => void;
-  overlayY?: number;
-  onOverlayYChange?: (value: number) => void;
 }) {
   return (
     <div className="story-text-overlay-editor">
@@ -64,18 +56,7 @@ export function StoryTextOverlay({
             </button>
           </div>
         </div>
-        {typeof overlayX === 'number' && onOverlayXChange && typeof overlayY === 'number' && onOverlayYChange ? (
-          <>
-            <label className="story-field story-field-wide">
-              <span className="story-field-label">Vị trí ngang</span>
-              <input className="story-range-input" type="range" min="0" max="100" value={overlayX} onChange={event => onOverlayXChange(Number(event.target.value))} />
-            </label>
-            <label className="story-field story-field-wide">
-              <span className="story-field-label">Vị trí dọc</span>
-              <input className="story-range-input" type="range" min="0" max="100" value={overlayY} onChange={event => onOverlayYChange(Number(event.target.value))} />
-            </label>
-          </>
-        ) : null}
+        {/* Position sliders removed: use preview click-to-position instead */}
       </div>
     </div>
   );

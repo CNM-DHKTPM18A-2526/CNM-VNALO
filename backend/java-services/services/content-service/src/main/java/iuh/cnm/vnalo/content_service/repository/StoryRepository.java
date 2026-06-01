@@ -5,10 +5,26 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface StoryRepository extends JpaRepository<Story, UUID> {
+
+    @Query(value = "SELECT * FROM content.story s WHERE s.status = :status AND s.expires_at > :now AND (" +
+            " s.author_id = :userId OR " +
+            " s.visibility = 'PUBLIC' OR " +
+            " s.visibility = 'FRIENDS' " +
+            ") ORDER BY s.created_at DESC", nativeQuery = true)
+    List<Story> findActiveStoriesForUser(
+            @Param("status") String status,
+            @Param("now") OffsetDateTime now,
+            @Param("userId") UUID userId
+    );
 
     List<Story> findByStatusAndExpiresAtAfterOrderByCreatedAtDesc(
             String status,

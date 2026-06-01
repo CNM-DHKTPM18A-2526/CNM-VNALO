@@ -5,6 +5,7 @@ class EnvConfig {
   final String coreServiceUrl;
   final String messageServiceUrl;
   final String mediaServiceUrl;
+  final String contentServiceUrl;
   final String socketUrl;
   final String aiServiceUrl;
   final bool enableLogging;
@@ -15,6 +16,7 @@ class EnvConfig {
     required this.coreServiceUrl,
     required this.messageServiceUrl,
     required this.mediaServiceUrl,
+    required this.contentServiceUrl,
     required this.socketUrl,
     required this.aiServiceUrl,
     this.enableLogging = false,

@@ -1017,8 +1017,8 @@ export default function ChatPage() {
       for (const row of rows) {
         let reactionKey = EMOJI_TO_REACTION_KEY[row.emoji]
 
-        // Handle poll votes (vote:prefix)
-        if (!reactionKey && row.emoji.startsWith('vote:')) {
+        // Handle poll votes (vote:/v: prefixes)
+        if (!reactionKey && (row.emoji.startsWith('vote:') || row.emoji.startsWith('v:'))) {
           reactionKey = row.emoji as ReactionKey
         }
 
@@ -1983,6 +1983,11 @@ export default function ChatPage() {
         return
       }
 
+      const message = (messagesByConversationRef.current[selectedConversationId] ?? []).find(
+        (item) => item.id === messageId,
+      )
+      const isPollMultipleChoice = Boolean(message?.type === 'poll' && message.pollData?.allowMultiple)
+
       let emoji = REACTION_OPTIONS.find((item) => item.key === reactionKey)?.emoji
       if (!emoji) {
         if (typeof reactionKey === 'string' && (reactionKey.startsWith('vote:') || reactionKey.startsWith('v:'))) {
@@ -1999,17 +2004,19 @@ export default function ChatPage() {
             const current = prev[messageId] || { reactions: {} };
             const nextReactions = { ...current.reactions };
 
-            // In poll voting, remove any other poll-related reactions (vote: or v:) from this user
-            Object.keys(nextReactions).forEach(key => {
-              const r = nextReactions[key as ReactionKey];
-              if ((key.startsWith('vote:') || key.startsWith('v:')) && r?.myCount > 0) {
-                nextReactions[key as ReactionKey] = {
-                  count: Math.max(0, r.count - 1),
-                  myCount: 0,
-                  userIds: r.userIds.filter(id => id !== user.id)
-                };
-              }
-            });
+            if (!isPollMultipleChoice) {
+              // Single-choice poll: remove any other poll-related reactions from this user
+              Object.keys(nextReactions).forEach(key => {
+                const r = nextReactions[key as ReactionKey];
+                if ((key.startsWith('vote:') || key.startsWith('v:')) && r?.myCount > 0) {
+                  nextReactions[key as ReactionKey] = {
+                    count: Math.max(0, r.count - 1),
+                    myCount: 0,
+                    userIds: r.userIds.filter(id => id !== user.id)
+                  };
+                }
+              });
+            }
 
             const currentCount = nextReactions[reactionKey as ReactionKey]?.count || 0;
             const currentUserIds = nextReactions[reactionKey as ReactionKey]?.userIds || [];
@@ -5435,6 +5442,7 @@ export default function ChatPage() {
         onMessageContextMenuAction={handleMessageContextMenuAction}
         onVotePoll={handleVotePoll}
         onInitiateCall={handleInitiateCall}
+        onOpenAddMembers={() => setIsAddMembersOpen(true)}
       />
 
       <CreateGroupModal
@@ -5556,7 +5564,7 @@ export default function ChatPage() {
       <Modal
         isOpen={confirmLeaveGroupOpen}
         onClose={() => setConfirmLeaveGroupOpen(false)}
-        title="Rá»i nhÃ³m vÃ  xÃ³a trÃ² chuyá»‡n"
+        title="Rời nhóm và xóa trò chuyện"
         variant="confirm"
         footer={
           <div className="flex gap-3 justify-end w-full">
@@ -5564,20 +5572,20 @@ export default function ChatPage() {
               className="px-6 py-2 rounded-lg bg-[var(--surface-muted)] text-[var(--text)] font-bold text-[15px] hover:bg-[var(--surface-hover)] border-0 outline-none cursor-pointer"
               onClick={() => setConfirmLeaveGroupOpen(false)}
             >
-              Há»§y
+              Hủy
             </button>
             <button
               className="px-6 py-2 rounded-lg bg-red-600 text-white font-bold text-[15px] hover:bg-red-700 border-0 outline-none cursor-pointer"
               onClick={doLeaveGroup}
             >
-              Rá»i nhÃ³m
+              Rời nhóm
             </button>
           </div>
         }
       >
         <div className="py-2 space-y-5">
           <p className="text-[15px] text-[var(--text)] leading-relaxed">
-            Báº¡n sáº½ khÃ´ng thá»ƒ xem láº¡i tin nháº¯n trong nhÃ³m nÃ y sau khi rá»i nhÃ³m.
+            Bạn sẽ không thể xem lại tin nhắn trong nhóm này sau khi rời nhóm.
           </p>
 
           <div
@@ -5585,8 +5593,8 @@ export default function ChatPage() {
             onClick={() => setLeaveGroupSilently(!leaveGroupSilently)}
           >
             <div className="space-y-1">
-              <p className="text-[15px] font-semibold text-[var(--text)]">Rá»i nhÃ³m trong im láº·ng</p>
-              <p className="text-[13px] text-[var(--text-secondary)]">Chá»‰ trÆ°á»Ÿng/phÃ³ nhÃ³m biáº¿t báº¡n rá»i nhÃ³m.</p>
+              <p className="text-[15px] font-semibold text-[var(--text)]">Rời nhóm trong im lặng</p>
+              <p className="text-[13px] text-[var(--text-secondary)]">Chỉ trưởng/phó nhóm biết bạn rời nhóm.</p>
             </div>
             <div
               className={`relative h-6 w-11 rounded-full transition-all duration-200 ${leaveGroupSilently ? 'bg-[#0091FF]' : 'bg-gray-400 shadow-inner'

@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:vnalo_mobile/core/localization/common_texts.dart';
 import 'package:vnalo_mobile/core/theme/app_colors.dart';
 import 'package:vnalo_mobile/core/widgets/avatar_widget.dart';
-import 'package:vnalo_mobile/core/widgets/group_avatar.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/chat/providers/chat_provider.dart';
 import 'package:vnalo_mobile/features/chat/screens/add_group_members_screen.dart';
@@ -12,6 +11,8 @@ import 'package:vnalo_mobile/features/chat/screens/group_join_requests_screen.da
 import 'package:vnalo_mobile/features/chat/screens/group_members_screen.dart';
 import 'package:vnalo_mobile/features/chat/screens/group_settings_screen.dart';
 import 'package:vnalo_mobile/features/chat/screens/wallpaper_selection_screen.dart';
+import 'package:vnalo_mobile/features/chat/screens/group_description_screen.dart';
+import 'package:vnalo_mobile/features/chat/screens/group_board_screen.dart';
 import 'package:vnalo_mobile/models/conversation_enums.dart';
 import 'package:vnalo_mobile/models/conversation_member_model.dart';
 import 'package:vnalo_mobile/models/conversation_model.dart';
@@ -41,6 +42,9 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
   }
 
   Future<void> _loadInitialData() async {
+    // Refresh conversation details to ensure description and settings are up-to-date
+    context.read<ChatProvider>().refreshConversation(widget.conversation.id);
+    
     final media = await context.read<ChatProvider>().getSharedMedia(widget.conversation.id, type: 'IMAGE');
     if (mounted) {
       setState(() {
@@ -57,6 +61,23 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
   }
 
   Future<void> _editGroupName() async {
+    final provider = context.read<ChatProvider>();
+    final conv = provider.conversations.firstWhere((c) => c.id == widget.conversation.id, orElse: () => widget.conversation);
+    final userId = context.read<AuthProvider>().user?.id;
+    final myMember = conv.members.firstWhere((m) => m.userId == userId, orElse: () => ConversationMember(conversationId: conv.id, userId: userId ?? '', role: MemberRole.MEMBER, joinedAt: DateTime.now()));
+    final isAdminOrDeputy = myMember.role == MemberRole.ADMIN || myMember.role == MemberRole.DEPUTY;
+    final hasEditPermission = conv.allowMemberEditInfo || isAdminOrDeputy;
+
+    if (!hasEditPermission) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bạn không có quyền đổi tên nhóm'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     final controller = TextEditingController(text: widget.conversation.title ?? '');
     final common = CommonTexts.of(context, listen: false);
 
@@ -88,6 +109,23 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
   }
 
   Future<void> _changeGroupAvatar() async {
+    final provider = context.read<ChatProvider>();
+    final conv = provider.conversations.firstWhere((c) => c.id == widget.conversation.id, orElse: () => widget.conversation);
+    final userId = context.read<AuthProvider>().user?.id;
+    final myMember = conv.members.firstWhere((m) => m.userId == userId, orElse: () => ConversationMember(conversationId: conv.id, userId: userId ?? '', role: MemberRole.MEMBER, joinedAt: DateTime.now()));
+    final isAdminOrDeputy = myMember.role == MemberRole.ADMIN || myMember.role == MemberRole.DEPUTY;
+    final hasEditPermission = conv.allowMemberEditInfo || isAdminOrDeputy;
+
+    if (!hasEditPermission) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bạn không có quyền đổi ảnh nhóm'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     final common = CommonTexts.of(context, listen: false);
     final picker = ImagePicker();
 
@@ -153,7 +191,7 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
     // Safety check: if members list is empty (e.g. after disband), use a dummy to avoid crash
     final myMember = conv.members.isEmpty 
         ? ConversationMember(conversationId: conv.id, userId: 'none', joinedAt: DateTime.now())
-        : conv.members.firstWhere((m) => m.userId == userId, orElse: () => conv.members.first);
+        : conv.members.firstWhere((m) => m.userId == userId, orElse: () => ConversationMember(conversationId: conv.id, userId: userId ?? '', role: MemberRole.MEMBER, joinedAt: DateTime.now()));
 
     return Scaffold(
       backgroundColor: isDarkMode ? DarkColors.scaffold : AppColors.sectionBackground,
@@ -162,6 +200,7 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
         backgroundColor: isDarkMode ? DarkColors.appBarBg : Colors.transparent,
         foregroundColor: Colors.white,
         elevation: 0,
+        centerTitle: false,
         forceMaterialTransparency: !isDarkMode,
         iconTheme: const IconThemeData(color: Colors.white),
         flexibleSpace: isDarkMode
@@ -174,80 +213,74 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
         children: [
           _buildHeader(conv, isDarkMode),
           _buildQuickActions(conv, isDarkMode),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           _buildSection([
-            _buildTile(CupertinoIcons.info, 'Thêm mô tả nhóm', 
-              subtitle: conv.description,
-              onTap: () => _showComingSoon('Mô tả nhóm'),
-              isDarkMode: isDarkMode),
+            _buildTile(
+              Icons.info_outline,
+              (conv.description != null && conv.description!.isNotEmpty)
+                  ? conv.description!
+                  : 'Thêm mô tả nhóm',
+              textColor: (conv.description == null || conv.description!.isEmpty)
+                  ? (isDarkMode ? DarkColors.textHint : Colors.grey.shade500)
+                  : null,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => GroupDescriptionScreen(conversation: conv),
+                  ),
+                );
+              },
+              isDarkMode: isDarkMode,
+            ),
           ], isDarkMode),
-          const SizedBox(height: 8),
-          _buildMediaSection(isDarkMode),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           _buildSection([
-            _buildTile(CupertinoIcons.calendar, 'Lịch nhóm', onTap: () => _showComingSoon('Lịch nhóm'), isDarkMode: isDarkMode),
+            _buildMediaSection(isDarkMode),
             _buildDivider(isDarkMode),
-            _buildTile(CupertinoIcons.pin, 'Tin nhắn đã ghim', onTap: () => _showComingSoon('Ghim tin nhắn'), isDarkMode: isDarkMode),
+            _buildTile(Icons.calendar_today_outlined, 'Lịch nhóm', onTap: () => _showComingSoon('Lịch nhóm'), isDarkMode: isDarkMode),
             _buildDivider(isDarkMode),
-            _buildTile(CupertinoIcons.chart_bar, 'Bình chọn', onTap: () => _showComingSoon('Bình chọn'), isDarkMode: isDarkMode),
+            _buildTile(Icons.push_pin_outlined, 'Tin nhắn đã ghim', 
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => GroupBoardScreen(conversation: conv, initialTabIndex: 0),
+              )), 
+              isDarkMode: isDarkMode,
+            ),
+            _buildDivider(isDarkMode),
+            _buildTile(Icons.bar_chart_outlined, 'Bình chọn', 
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => GroupBoardScreen(conversation: conv, initialTabIndex: 1),
+              )), 
+              isDarkMode: isDarkMode,
+            ),
           ], isDarkMode),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           _buildSection([
-            _buildTile(CupertinoIcons.settings, 'Cài đặt nhóm', 
+            _buildTile(Icons.settings_outlined, 'Cài đặt nhóm', 
               onTap: () => Navigator.push(context, MaterialPageRoute(
                 builder: (_) => GroupSettingsScreen(conversation: conv),
               )),
               isDarkMode: isDarkMode,
             ),
-            _buildDivider(isDarkMode),
-            _buildTile(CupertinoIcons.person_2, 'Xem thành viên (${conv.activeMemberCount})', 
+          ], isDarkMode),
+          const SizedBox(height: 10),
+          _buildSection([
+            _buildTile(Icons.people_outline, 'Xem thành viên (${conv.activeMemberCount})', 
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GroupMembersScreen(conversation: conv))),
               isDarkMode: isDarkMode),
             _buildDivider(isDarkMode),
-            _buildTile(CupertinoIcons.person_badge_plus, 'Duyệt thành viên', 
+            _buildTile(Icons.person_add_alt_1_outlined, 'Duyệt thành viên', 
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GroupJoinRequestsScreen(conversation: conv))),
               isDarkMode: isDarkMode),
             _buildDivider(isDarkMode),
-            _buildTile(CupertinoIcons.link, 'Link nhóm', 
+            _buildTile(Icons.link_outlined, 'Link nhóm', 
               subtitle: conv.joinMode == JoinMode.APPROVAL ? 'Cần phê duyệt' : 'Đã tắt',
               onTap: () => _showComingSoon('Link nhóm'),
               isDarkMode: isDarkMode),
           ], isDarkMode),
-          if (_isAdminOrOwner(conv, context.read<AuthProvider>().user?.id)) ...[
-            const SizedBox(height: 8),
-            _buildSection([
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: Text('QUYỀN CỦA THÀNH VIÊN', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary)),
-              ),
-              _buildTile(CupertinoIcons.person_badge_plus, 'Cho phép mời người mới', 
-                trailing: CupertinoSwitch(
-                  value: conv.allowMemberInvite, 
-                  onChanged: (v) => provider.updateGroupInfo(conv.id, allowMemberInvite: v),
-                  activeTrackColor: AppColors.primary,
-                ),
-                isDarkMode: isDarkMode),
-              _buildDivider(isDarkMode),
-              _buildTile(CupertinoIcons.pin, 'Cho phép ghim tin nhắn', 
-                trailing: CupertinoSwitch(
-                  value: conv.allowMemberPin, 
-                  onChanged: (v) => provider.updateGroupInfo(conv.id, allowMemberPin: v),
-                  activeTrackColor: AppColors.primary,
-                ),
-                isDarkMode: isDarkMode),
-              _buildDivider(isDarkMode),
-              _buildTile(CupertinoIcons.pencil, 'Cho phép sửa thông tin nhóm', 
-                trailing: CupertinoSwitch(
-                  value: conv.allowMemberEditInfo, 
-                  onChanged: (v) => provider.updateGroupInfo(conv.id, allowMemberEditInfo: v),
-                  activeTrackColor: AppColors.primary,
-                ),
-                isDarkMode: isDarkMode),
-            ], isDarkMode),
-          ],
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           _buildSection([
-            _buildTile(CupertinoIcons.pin_fill, 'Ghim trò chuyện', 
+            _buildTile(Icons.push_pin_outlined, 'Ghim trò chuyện', 
               trailing: CupertinoSwitch(
                 value: conv.isPinned, 
                 onChanged: (v) => provider.updateConversationSettings(conversationId: conv.id, isPinned: v),
@@ -255,7 +288,7 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
               ),
               isDarkMode: isDarkMode),
             _buildDivider(isDarkMode),
-            _buildTile(CupertinoIcons.eye_slash, 'Ẩn trò chuyện', 
+            _buildTile(Icons.visibility_off_outlined, 'Ẩn trò chuyện', 
               trailing: CupertinoSwitch(
                 value: conv.isHidden, 
                 onChanged: (v) => provider.updateConversationSettings(conversationId: conv.id, isHidden: v),
@@ -263,41 +296,41 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
               ),
               isDarkMode: isDarkMode),
             _buildDivider(isDarkMode),
-            _buildTile(CupertinoIcons.time, 'Tin nhắn tự xóa', 
+            _buildTile(Icons.access_time_outlined, 'Tin nhắn tự xóa', 
               subtitle: 'Không tự xóa',
               onTap: () => _showComingSoon('Tự xóa'),
               isDarkMode: isDarkMode),
             _buildDivider(isDarkMode),
-            _buildTile(CupertinoIcons.person_crop_circle, 'Cài đặt cá nhân', onTap: () => _showComingSoon('Cài đặt cá nhân'), isDarkMode: isDarkMode),
+            _buildTile(Icons.person_outline, 'Cài đặt cá nhân', onTap: () => _showComingSoon('Cài đặt cá nhân'), isDarkMode: isDarkMode),
           ], isDarkMode),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           _buildSection([
-            _buildTile(CupertinoIcons.exclamationmark_triangle, 'Báo xấu', onTap: () => _showComingSoon('Báo xấu'), isDarkMode: isDarkMode),
+            _buildTile(Icons.warning_amber_outlined, 'Báo xấu', onTap: () => _showComingSoon('Báo xấu'), isDarkMode: isDarkMode),
             _buildDivider(isDarkMode),
-            _buildTile(CupertinoIcons.person_2_square_stack, 'Chuyển quyền trưởng nhóm', 
+            _buildTile(Icons.swap_horiz_outlined, 'Chuyển quyền trưởng nhóm', 
                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GroupMembersScreen(conversation: conv, selectionMode: true))),
                isDarkMode: isDarkMode),
             _buildDivider(isDarkMode),
-            _buildTile(CupertinoIcons.cloud, 'Dung lượng trò chuyện', onTap: () => _showComingSoon('Dung lượng'), isDarkMode: isDarkMode),
+            _buildTile(Icons.pie_chart_outline, 'Dung lượng trò chuyện', onTap: () => _showComingSoon('Dung lượng'), isDarkMode: isDarkMode),
             _buildDivider(isDarkMode),
-            _buildTile(CupertinoIcons.trash, 'Xóa lịch sử trò chuyện', 
+            _buildTile(Icons.delete_outline, 'Xóa lịch sử trò chuyện', 
               textColor: Colors.red,
               onTap: () => _confirmDeleteHistory(conv),
               isDarkMode: isDarkMode),
-          ], isDarkMode),
-          const SizedBox(height: 8),
-          _buildSection([
-            _buildTile(CupertinoIcons.arrow_right_square, 'Rời nhóm', 
-              textColor: Colors.red,
-              onTap: () => _confirmLeaveGroup(conv),
-              isDarkMode: isDarkMode),
             if (myMember.role == MemberRole.ADMIN) ...[
               _buildDivider(isDarkMode),
-              _buildTile(CupertinoIcons.delete, 'Giải tán nhóm', 
+              _buildTile(Icons.delete_forever_outlined, 'Giải tán nhóm', 
                 textColor: Colors.red,
                 onTap: () => _confirmDisbandGroup(conv),
                 isDarkMode: isDarkMode),
             ],
+          ], isDarkMode),
+          const SizedBox(height: 10),
+          _buildSection([
+            _buildTile(Icons.logout_outlined, 'Rời nhóm', 
+              textColor: Colors.red,
+              onTap: () => _confirmLeaveGroup(conv),
+              isDarkMode: isDarkMode),
           ], isDarkMode),
           const SizedBox(height: 32),
         ],
@@ -305,15 +338,14 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
     );
   }
 
-  bool _isAdminOrOwner(Conversation conv, String? userId) {
-    if (userId == null) return false;
-    if (conv.createdBy == userId) return true;
-    if (conv.members.isEmpty) return false;
-    final member = conv.members.firstWhere((m) => m.userId == userId, orElse: () => conv.members.first);
-    return member.role == MemberRole.DEPUTY || member.role == MemberRole.ADMIN;
-  }
-
   Widget _buildHeader(Conversation conv, bool isDarkMode) {
+    final userId = context.read<AuthProvider>().user?.id;
+    final myMember = conv.members.isEmpty 
+        ? ConversationMember(conversationId: conv.id, userId: 'none', joinedAt: DateTime.now())
+        : conv.members.firstWhere((m) => m.userId == userId, orElse: () => ConversationMember(conversationId: conv.id, userId: userId ?? '', role: MemberRole.MEMBER, joinedAt: DateTime.now()));
+    final isAdminOrDeputy = myMember.role == MemberRole.ADMIN || myMember.role == MemberRole.DEPUTY;
+    final hasEditPermission = conv.allowMemberEditInfo || isAdminOrDeputy;
+
     return Container(
       color: isDarkMode ? DarkColors.surface : Colors.white,
       padding: const EdgeInsets.symmetric(vertical: 24),
@@ -327,37 +359,46 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
                       name: conv.title ?? 'Group',
                       size: 100,
                     )
-                  : GroupAvatar(
-                      members: conv.members
-                          .where((m) => m.userId != context.read<ChatProvider>().currentUserId)
-                          .take(3)
-                          .map((m) => (imageUrl: m.user?.avatarUrl, name: m.user?.displayName ?? 'User'))
-                          .toList(),
-                      totalMemberCount: conv.members.length,
-                      size: 100,
+                  : Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        color: isDarkMode ? Colors.white10 : Colors.grey.shade200,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.people, 
+                        size: 54, 
+                        color: isDarkMode ? Colors.white54 : Colors.grey.shade400,
+                      ),
                     ),
-              Positioned(
-                bottom: 0,
-                right: 0,
-                child: GestureDetector(
-                  onTap: _isUpdatingAvatar ? null : _changeGroupAvatar,
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: isDarkMode ? DarkColors.divider : Colors.grey.shade200,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: isDarkMode ? DarkColors.surface : Colors.white, width: 2),
+              if (hasEditPermission)
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: GestureDetector(
+                    onTap: _isUpdatingAvatar ? null : _changeGroupAvatar,
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: isDarkMode ? DarkColors.divider : Colors.grey.shade100,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: isDarkMode ? DarkColors.surface : Colors.white, width: 2),
+                      ),
+                      child: _isUpdatingAvatar
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(
+                              Icons.photo_camera_outlined, 
+                              size: 18, 
+                              color: isDarkMode ? Colors.white : Colors.grey.shade700,
+                            ),
                     ),
-                    child: _isUpdatingAvatar
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Icon(Icons.camera_alt, size: 18, color: isDarkMode ? Colors.white : Colors.blue),
                   ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -377,11 +418,24 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: _editGroupName,
-                child: Icon(Icons.edit_outlined, size: 20, color: isDarkMode ? DarkColors.textHint : Colors.grey.shade600),
-              ),
+              if (hasEditPermission) ...[
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: _editGroupName,
+                  child: Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? Colors.white10 : Colors.grey.shade200,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.edit_outlined, 
+                      size: 16, 
+                      color: isDarkMode ? DarkColors.textHint : Colors.grey.shade700,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ],
@@ -396,15 +450,15 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _buildQuickAction(CupertinoIcons.search, 'Tìm\ntin nhắn', () => _showComingSoon('Tìm kiếm'), isDarkMode),
-          _buildQuickAction(CupertinoIcons.person_badge_plus, 'Thêm\nthành viên', () {
+          _buildQuickAction(Icons.search_outlined, 'Tìm\ntin nhắn', () => _showComingSoon('Tìm kiếm'), isDarkMode),
+          _buildQuickAction(Icons.person_add_alt_1_outlined, 'Thêm\nthành viên', () {
               Navigator.push(context, MaterialPageRoute(builder: (_) => AddGroupMembersScreen(conversation: conv)));
           }, isDarkMode),
-          _buildQuickAction(CupertinoIcons.paintbrush, 'Đổi\nhình nền', () {
+          _buildQuickAction(Icons.format_paint_outlined, 'Đổi\nhình nền', () {
              Navigator.push(context, MaterialPageRoute(builder: (_) => WallpaperSelectionScreen(conversation: conv)));
           }, isDarkMode),
           _buildQuickAction(
-            conv.isMuted ? CupertinoIcons.bell_slash : CupertinoIcons.bell, 
+            conv.isMuted ? Icons.notifications_off_outlined : Icons.notifications_none_outlined, 
             conv.isMuted ? 'Bật\nthông báo' : 'Tắt\nthông báo', 
             () => context.read<ChatProvider>().updateConversationSettings(conversationId: conv.id, isMuted: !conv.isMuted),
             isDarkMode,
@@ -420,18 +474,26 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
-              color: isDarkMode ? Colors.white10 : Colors.grey.shade100,
+              color: isDarkMode ? Colors.white10 : const Color(0xFFF4F5F7),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 24, color: isDarkMode ? Colors.white : Colors.black87),
+            child: Center(
+              child: Icon(icon, size: 22, color: isDarkMode ? Colors.white : const Color(0xFF1E2022)),
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             label,
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: isDarkMode ? DarkColors.textSecondary : Colors.black54),
+            style: TextStyle(
+              fontSize: 12.5, 
+              height: 1.2,
+              fontWeight: FontWeight.w400,
+              color: isDarkMode ? DarkColors.textSecondary : const Color(0xFF1E2022),
+            ),
           ),
         ],
       ),
@@ -443,7 +505,7 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
       color: isDarkMode ? DarkColors.surface : Colors.white,
       child: Column(
         children: [
-          _buildTile(CupertinoIcons.photo, 'Ảnh, file, link', onTap: () => _showComingSoon('Kho tài liệu'), isDarkMode: isDarkMode),
+          _buildTile(Icons.image_outlined, 'Ảnh, file, link', onTap: () => _showComingSoon('Kho tài liệu'), isDarkMode: isDarkMode),
           if (_recentMedia.isNotEmpty)
             Container(
               height: 80,
@@ -470,19 +532,43 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
               ),
             )
           else if (!_isLoadingMedia)
-             Padding(
-               padding: const EdgeInsets.fromLTRB(56, 0, 16, 16),
-               child: Container(
-                 width: double.infinity,
-                 padding: const EdgeInsets.all(12),
-                 decoration: BoxDecoration(
-                   color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.grey.shade50, 
-                   borderRadius: BorderRadius.circular(8),
-                 ),
-                 child: Text('Hình mới nhất của trò chuyện sẽ xuất hiện tại đây', 
-                   style: TextStyle(fontSize: 13, color: isDarkMode ? DarkColors.textHint : Colors.grey.shade500)),
-               ),
-             ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(52, 0, 16, 16),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF4F5F7), 
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: isDarkMode ? Colors.white10 : Colors.white,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Icon(
+                        Icons.image_outlined, 
+                        size: 20, 
+                        color: isDarkMode ? Colors.white70 : const Color(0xFF0068FF),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Hình mới nhất của trò chuyện sẽ xuất hiện tại đây', 
+                        style: TextStyle(
+                          fontSize: 13, 
+                          color: isDarkMode ? DarkColors.textHint : Colors.grey.shade500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -497,13 +583,32 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
 
   Widget _buildTile(IconData icon, String title, {String? subtitle, Widget? trailing, VoidCallback? onTap, Color? textColor, required bool isDarkMode}) {
     return ListTile(
-      leading: Icon(icon, color: textColor ?? (isDarkMode ? DarkColors.textSecondary : Colors.grey.shade700), size: 22),
-      title: Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w400, color: textColor ?? (isDarkMode ? Colors.white : Colors.black87))),
-      subtitle: subtitle != null ? Text(subtitle, style: TextStyle(fontSize: 13, color: isDarkMode ? DarkColors.textHint : Colors.grey.shade500)) : null,
-      trailing: trailing ?? Icon(Icons.chevron_right, size: 20, color: isDarkMode ? DarkColors.textHint : Colors.grey.shade400),
+      leading: Icon(
+        icon, 
+        color: textColor ?? (isDarkMode ? DarkColors.textSecondary : AppColors.iconSubtle), 
+        size: 22,
+      ),
+      title: Text(
+        title, 
+        style: TextStyle(
+          fontSize: 15.5, 
+          fontWeight: FontWeight.w400, 
+          color: textColor ?? (isDarkMode ? Colors.white : const Color(0xFF1E2022)),
+        ),
+      ),
+      subtitle: subtitle != null 
+          ? Text(
+              subtitle, 
+              style: TextStyle(
+                fontSize: 13, 
+                color: isDarkMode ? DarkColors.textHint : Colors.grey.shade500,
+              ),
+            ) 
+          : null,
+      trailing: trailing,
+      minLeadingWidth: 20,
       onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-      visualDensity: VisualDensity.compact,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
     );
   }
 
@@ -511,7 +616,7 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
     return Divider(
       height: 1,
       thickness: 0.5,
-      indent: 56,
+      indent: 52,
       color: isDarkMode ? DarkColors.divider : AppColors.itemDivider,
     );
   }
@@ -540,7 +645,7 @@ class _GroupChatOptionsScreenState extends State<GroupChatOptionsScreen> {
   void _confirmLeaveGroup(Conversation conv) {
     final userId = context.read<AuthProvider>().user?.id;
     if (conv.members.isEmpty) return;
-    final member = conv.members.firstWhere((m) => m.userId == userId, orElse: () => conv.members.first);
+    final member = conv.members.firstWhere((m) => m.userId == userId, orElse: () => ConversationMember(conversationId: conv.id, userId: userId ?? '', role: MemberRole.MEMBER, joinedAt: DateTime.now()));
     
     if (member.role == MemberRole.ADMIN || member.role == MemberRole.DEPUTY) {
       // Rule: Leaders must transfer UNLESS they are the last person in the group

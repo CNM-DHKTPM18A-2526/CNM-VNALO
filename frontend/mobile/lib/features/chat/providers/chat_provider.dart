@@ -255,7 +255,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       _conversations = combined.map((remoteConv) {
         final localConv = _conversations.firstWhere((c) => c.id == remoteConv.id, orElse: () => remoteConv);
         // Use the remoteConv as base, but merge members from localConv if it exists and is different
-        return _mergeAndSanitize(remoteConv, local: localConv == remoteConv ? null : localConv);
+        return _mergeAndSanitize(remoteConv, local: localConv == remoteConv ? null : localConv, isInboxSync: true);
       })
       .whereType<Conversation>()
       // FILTER: Only keep groups where I am currently an active member
@@ -363,7 +363,12 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
         // CRITICAL: Update the in-memory conversation object if ANY change was detected
         // to prevent the next poll from triggering the same notification.
         if (hasChanges) {
-          _conversations[existingIndex] = conv;
+          final merged = _mergeAndSanitize(conv, local: existingConv, isInboxSync: true);
+          if (merged != null) {
+            _conversations[existingIndex] = merged;
+          } else {
+            _conversations[existingIndex] = conv;
+          }
         }
       }
       
@@ -428,7 +433,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Combined helper to merge local optimistic members with remote server data
   /// and then apply standard sanitization (Dual Owner fix, membership check, etc.)
-  Conversation? _mergeAndSanitize(Conversation remote, {Conversation? local}) {
+  Conversation? _mergeAndSanitize(Conversation remote, {Conversation? local, bool isInboxSync = false}) {
     if (local == null) {
       return _sanitizeConversation(remote);
     }
@@ -466,7 +471,26 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       }
     }
 
-    final mergedConv = remote.copyWith(members: mergedMembers);
+    Conversation mergedConv = remote.copyWith(members: mergedMembers);
+    
+    // If this is an inbox sync (polling/pull-to-refresh), preserve local settings & description
+    // because the backend's `/inbox` endpoint omits these fields.
+    if (isInboxSync) {
+      mergedConv = mergedConv.copyWith(
+        description: local.description,
+        joinMode: local.joinMode,
+        memberLimit: local.memberLimit,
+        allowMemberInvite: local.allowMemberInvite,
+        allowMemberPin: local.allowMemberPin,
+        allowMemberEditInfo: local.allowMemberEditInfo,
+        onlyAdminCanPost: local.onlyAdminCanPost,
+        highlightAdminMessages: local.highlightAdminMessages,
+        showHistoryToNewMembers: local.showHistoryToNewMembers,
+        allowMemberCreateNote: local.allowMemberCreateNote,
+        allowMemberCreatePoll: local.allowMemberCreatePoll,
+        wallpaperUrl: local.wallpaperUrl,
+      );
+    }
     
     // 2. Sanitize: Resolve conflicts (like multiple owners) and check active status
     return _sanitizeConversation(mergedConv);
@@ -726,6 +750,9 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
 
     // Then fetch fresh data from API
     await loadMessages(conversationId);
+    
+    // Refresh conversation settings/members in background
+    refreshConversation(conversationId);
 
     // Ensure read state is synced after fresh messages are loaded.
     final latestSeq = _messages[conversationId]
@@ -972,6 +999,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       conversationId: conversationId,
       mediaUrl: gifUrl,
       type: MessageType.IMAGE,
+      content: '[GIF] $gifUrl',
     );
   }
 
@@ -1119,6 +1147,27 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       messageId,
       list[index].copyWith(status: MessageStatus.RECALLED, content: ''),
     );
+  }
+
+  Future<void> editMessage(String messageId, String conversationId, String newContent) async {
+    try {
+      final list = _messages[conversationId] ?? const [];
+      final idx = list.indexWhere((m) => m.id == messageId);
+      if (idx >= 0) {
+        // Optimistic local update
+        final updatedMsg = list[idx].copyWith(content: newContent, isEdited: true, editedAt: DateTime.now());
+        _replaceMessage(conversationId, messageId, updatedMsg);
+        _db.saveMessage(_toLocal(updatedMsg));
+      }
+      
+      final serverMsg = await _chatService.editMessage(messageId, newContent);
+      _replaceMessage(conversationId, messageId, serverMsg);
+      _db.saveMessage(_toLocal(serverMsg));
+      notifyListeners();
+    } catch (e) {
+      debugPrint('[ChatProvider] editMessage error: $e');
+      rethrow;
+    }
   }
 
   Future<void> downloadFile(Message message) async {
@@ -1349,6 +1398,11 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
         final updated = List<Message>.from(msgList);
         final oldMessage = updated[optimisticIndex];
 
+        // Remove optimistic message record from Local SQLite DB
+        if (_currentUserId != null) {
+          _db.deleteMessage(oldMessage.id, _currentUserId!);
+        }
+
         // MERGE metadata: Keep reply info if already present in optimistic but missing in resolved
         Message merged = resolvedMessage;
         if (oldMessage.replyToMessageId != null && merged.replyToMessageId == null) {
@@ -1510,17 +1564,73 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
   void _handleGroupSettingsChangedEvent(Map<String, dynamic> data) {
     final String? conversationId = data['conversationId'];
     if (conversationId == null) return;
-    debugPrint('[ChatProvider] EVENT: Group settings changed: $conversationId');
-    
-    // Optional: Show notification if actor info is available
-    final String? actorId = data['actorId'];
-    if (actorId != null) {
+    debugPrint('[ChatProvider] EVENT: Group settings changed: $conversationId data=$data');
+
+    // ── Inline optimistic apply from socket payload ─────────────────────────
+    // The gateway sends the full updated conversation in `data['conversation']`.
+    // We apply it immediately for instant UI (0 extra round-trip for members).
+    final dynamic convData = data['conversation'];
+    if (convData != null && convData is Map) {
+      try {
+        final updatedConv = Conversation.fromJson(Map<String, dynamic>.from(convData));
+        final idx = _conversations.indexWhere((c) => c.id == conversationId);
+        if (idx >= 0) {
+          // Preserve local-only fields (wallpaper, unread count, last message)
+          final local = _conversations[idx];
+          _conversations[idx] = updatedConv.copyWith(
+            wallpaperUrl: local.wallpaperUrl,
+            personalWallpaperUrl: local.personalWallpaperUrl,
+            unreadCount: local.unreadCount,
+            lastMessage: local.lastMessage,
+            members: updatedConv.members.isNotEmpty ? updatedConv.members : local.members,
+          );
+          notifyListeners();
+          debugPrint('[ChatProvider] Group settings applied inline from socket payload');
+        }
+      } catch (e) {
+        debugPrint('[ChatProvider] Could not parse inline conversation from settingsChanged: $e');
+      }
+    } else {
+      // Fallback: apply changes map individually
+      final dynamic changesData = data['changes'];
+      if (changesData != null && changesData is Map) {
+        final changes = Map<String, dynamic>.from(changesData);
+        final idx = _conversations.indexWhere((c) => c.id == conversationId);
+        if (idx >= 0) {
+          final local = _conversations[idx];
+          _conversations[idx] = local.copyWith(
+            title: changes['title'] as String? ?? local.title,
+            description: changes['description'] as String? ?? local.description,
+            avatarUrl: changes['avatarUrl'] as String? ?? local.avatarUrl,
+            joinMode: changes['joinMode'] != null
+                ? enumFromString(JoinMode.values, changes['joinMode'].toString())
+                : local.joinMode,
+            allowMemberInvite: changes['allowMemberInvite'] as bool? ?? local.allowMemberInvite,
+            allowMemberPin: changes['allowMemberPin'] as bool? ?? local.allowMemberPin,
+            allowMemberEditInfo: changes['allowMemberEditInfo'] as bool? ?? local.allowMemberEditInfo,
+            onlyAdminCanPost: changes['onlyAdminCanPost'] as bool? ?? local.onlyAdminCanPost,
+            highlightAdminMessages: changes['highlightAdminMessages'] as bool? ?? local.highlightAdminMessages,
+            showHistoryToNewMembers: changes['showHistoryToNewMembers'] as bool? ?? local.showHistoryToNewMembers,
+            allowMemberCreateNote: changes['allowMemberCreateNote'] as bool? ?? local.allowMemberCreateNote,
+            allowMemberCreatePoll: changes['allowMemberCreatePoll'] as bool? ?? local.allowMemberCreatePoll,
+          );
+          notifyListeners();
+          debugPrint('[ChatProvider] Group settings applied inline from changes map');
+        }
+      }
+    }
+
+    // Notify other members (only if actor is NOT the current user — they already updated optimistically)
+    final String? actorId = data['actorId'] ?? data['updatedBy'];
+    if (actorId != null && actorId != _currentUserId) {
       final actorName = getSenderName(conversationId, actorId);
       _sendSystemNotification(conversationId, '$actorName đã cập nhật thiết lập nhóm');
     }
 
+    // Always do a server refresh to guarantee consistency (non-blocking)
     refreshConversation(conversationId);
   }
+
 
   void _handleGroupMemberAddedEvent(Map<String, dynamic> data) {
     final String? conversationId = data['conversationId'];
@@ -1967,13 +2077,17 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     });
 
     // Check after a short delay if message was confirmed by server
-    Timer(const Duration(milliseconds: 800), () async {
+    Timer(const Duration(milliseconds: 1500), () async {
+      if (_activeConversationId != message.conversationId) {
+        debugPrint('[ChatProvider] Conversation ${message.conversationId} is no longer active. Cancelling socket confirmation timer fallback.');
+        return;
+      }
       final existing = _messages[message.conversationId] ?? [];
       final wasConfirmed = existing.any(
         (m) => m.clientMessageId == clientMessageId && !m.id.startsWith('local-'),
       );
       if (!wasConfirmed) {
-        debugPrint('[ChatProvider] Socket not confirmed in 800ms, falling back to HTTP');
+        debugPrint('[ChatProvider] Socket not confirmed in 1500ms, falling back to HTTP');
         await _sendViaHttp(message);
       }
     });
@@ -1991,6 +2105,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
         mediaUrl: message.mediaUrl,
         mediaThumbnailUrl: message.mediaThumbnailUrl,
         replyToMessageId: message.replyToMessageId,
+        clientMessageId: clientMessageId,
       );
 
       // Replace optimistic message with server message (match by clientMessageId)
@@ -1999,6 +2114,12 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       if (idx >= 0) {
         debugPrint('[ChatProvider] _sendViaHttp: REPLACING optimistic id=local-$clientMessageId with server id=${serverMessage.id}');
         final updated = List<Message>.from(existing);
+        
+        // Remove optimistic message record from Local SQLite DB
+        if (_currentUserId != null) {
+          _db.deleteMessage(updated[idx].id, _currentUserId!);
+        }
+
         updated[idx] = serverMessage;
         _messages[message.conversationId] = updated;
         notifyListeners();
@@ -2097,13 +2218,17 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     );
 
     // Check after a short delay if message was confirmed
-    Timer(const Duration(milliseconds: 800), () {
+    Timer(const Duration(milliseconds: 1500), () {
+      if (_activeConversationId != message.conversationId) {
+        debugPrint('[ChatProvider] Media conversation ${message.conversationId} is no longer active. Cancelling media confirmation timer fallback.');
+        return;
+      }
       final existing = _messages[message.conversationId] ?? [];
       final wasConfirmed = existing.any(
         (m) => m.clientMessageId == clientMessageId && !m.id.startsWith('local-'),
       );
       if (!wasConfirmed) {
-        debugPrint('[ChatProvider] Media socket not confirmed in 800ms, falling back to HTTP');
+        debugPrint('[ChatProvider] Media socket not confirmed in 1500ms, falling back to HTTP');
         _sendMediaViaHttp(message);
       }
     });
@@ -2121,12 +2246,19 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
         mediaUrl: message.mediaUrl,
         mediaThumbnailUrl: message.mediaThumbnailUrl,
         replyToMessageId: message.replyToMessageId,
+        clientMessageId: clientMessageId,
       );
 
       final existing = _messages[message.conversationId] ?? [];
       final idx = existing.indexWhere((m) => m.clientMessageId == clientMessageId);
       if (idx >= 0) {
         final updated = List<Message>.from(existing);
+        
+        // Remove optimistic media message record from Local SQLite DB
+        if (_currentUserId != null) {
+          _db.deleteMessage(updated[idx].id, _currentUserId!);
+        }
+
         updated[idx] = serverMessage;
         _messages[message.conversationId] = updated;
         notifyListeners();
@@ -2507,6 +2639,7 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
     }
 
     try {
+      // 1. Build the REST mutation payload
       final Map<String, dynamic> body = {};
       if (title != null) body['title'] = title;
       if (description != null) body['description'] = description;
@@ -2520,14 +2653,31 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       if (showHistoryToNewMembers != null) body['showHistoryToNewMembers'] = showHistoryToNewMembers;
       if (allowMemberCreateNote != null) body['allowMemberCreateNote'] = allowMemberCreateNote;
       if (allowMemberCreatePoll != null) body['allowMemberCreatePoll'] = allowMemberCreatePoll;
-      
+
+      // 2. ALWAYS write to the database via standard REST HTTP (100% reliable)
       await _chatService.updateGroupInfo(conversationId, body);
 
-      // Restore Optimistic UI Notification
-      if (title != null) {
-        await _sendSystemNotification(conversationId, '$userName đã đổi tên nhóm thành "$title"');
-      } else if (avatarUrl == null) {
-        await _sendSystemNotification(conversationId, '$userName đã cập nhật thiết lập nhóm');
+      // 3. Trigger a local refresh from server to ensure UI state is perfectly in sync with DB
+      await refreshConversation(conversationId);
+
+      // 4. If socket is connected, emit settings update so backend broadcasts real-time changes to other members
+      final socketConnected = _socketService.isConnected();
+      if (socketConnected) {
+        _socketService.emitGroupUpdateSettings(
+          conversationId: conversationId,
+          title: title,
+          description: description,
+          avatarUrl: avatarUrl,
+          joinMode: joinMode,
+          allowMemberInvite: allowMemberInvite,
+          allowMemberPin: allowMemberPin,
+          allowMemberEditInfo: allowMemberEditInfo,
+          onlyAdminCanPost: onlyAdminCanPost,
+          highlightAdminMessages: highlightAdminMessages,
+          showHistoryToNewMembers: showHistoryToNewMembers,
+          allowMemberCreateNote: allowMemberCreateNote,
+          allowMemberCreatePoll: allowMemberCreatePoll,
+        );
       }
     } catch (e) {
       debugPrint('updateGroupInfo error: $e');
@@ -3018,6 +3168,30 @@ class ChatProvider extends ChangeNotifier with WidgetsBindingObserver {
       debugPrint('[ChatProvider] pinMessage REST FAILED: $e');
       // Fallback to socket
       _socketService.pinMessage(messageId, convId);
+    });
+  }
+
+  /// Pin a message using an explicit [conversationId] — no reliance on [_activeConversationId].
+  /// Use this from screens that navigate away from the main chat (e.g. CreateNoteScreen).
+  void pinMessageInConversation(String messageId, String conversationId) {
+    debugPrint('[ChatProvider] pinMessageInConversation: messageId=$messageId convId=$conversationId');
+    _chatService.pinMessage(conversationId, messageId).then((pinData) async {
+      debugPrint('[ChatProvider] pinMessageInConversation REST SUCCESS: $pinData');
+      final messageData = pinData['message'];
+      if (messageData != null && messageData is Map) {
+        final msg = Message.fromJson(Map<String, dynamic>.from(messageData));
+        final resolvedName = getSenderName(conversationId, msg.senderId);
+        final resolvedMsg = msg.copyWith(senderName: resolvedName);
+        final currentPins = _pinnedMessages[conversationId] ?? [];
+        if (!currentPins.any((m) => m.id == resolvedMsg.id)) {
+          _pinnedMessages[conversationId] = [resolvedMsg, ...currentPins];
+          notifyListeners();
+        }
+      }
+      _socketService.pinMessage(messageId, conversationId);
+    }).catchError((e) {
+      debugPrint('[ChatProvider] pinMessageInConversation FAILED: $e');
+      _socketService.pinMessage(messageId, conversationId);
     });
   }
 

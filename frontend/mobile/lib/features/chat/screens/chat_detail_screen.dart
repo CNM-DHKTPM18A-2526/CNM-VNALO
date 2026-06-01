@@ -219,7 +219,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             conv.type == ConversationType.DIRECT || widget.friendUser != null;
         final wallpaperUrl = conv.personalWallpaperUrl ?? conv.wallpaperUrl;
 
-        final isRestrictedSending = conv.type == ConversationType.GROUP && chat.isReadOnlyForMembers(conv.id);
+        final isRestrictedSending = conv.type == ConversationType.GROUP && (conv.onlyAdminCanPost || chat.isReadOnlyForMembers(conv.id));
         final myMember = conv.members.isEmpty 
             ? ConversationMember(conversationId: conv.id, userId: 'none', joinedAt: DateTime.now())
             : conv.members.firstWhere((m) => m.userId == currentUserId, orElse: () => conv.members.first);
@@ -935,10 +935,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 text: TextSpan(
                   style: TextStyle(fontSize: 14, color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade700, height: 1.4),
                   children: const [
-                    TextSpan(text: 'Chá»‰ '),
-                    TextSpan(text: 'trÆ°á»Ÿng vÃ  phÃ³ cá»™ng Ä‘á»“ng', style: TextStyle(fontWeight: FontWeight.bold)),
-                    TextSpan(text: ' Ä‘Æ°á»£c gá»­i tin nháº¯n vÃ o cá»™ng Ä‘á»“ng. '),
-                    TextSpan(text: 'TÃ¬m hiá»ƒu thÃªm', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.w500)),
+                    TextSpan(text: 'Bạn không có quyền ', style: TextStyle(fontWeight: FontWeight.bold)),
+                    TextSpan(text: 'gửi tin nhắn vào nhóm này.'),
                   ],
                 ),
               ),

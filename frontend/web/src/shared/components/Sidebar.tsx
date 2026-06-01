@@ -10,9 +10,10 @@ import { SettingsMenu } from './SettingsMenu'
 type SidebarProps = {
   onOpenSettingsModal?: () => void
   onOpenCaptureModal?: () => void
+  onOpenAccountModal?: () => void
 }
 
-export function Sidebar({ onOpenSettingsModal, onOpenCaptureModal }: SidebarProps) {
+export function Sidebar({ onOpenSettingsModal, onOpenCaptureModal, onOpenAccountModal }: SidebarProps) {
   const { t } = useLanguage()
   const { user } = useAuth()
   const { unreadMessageCount, pendingFriendRequestCount } = useNotifications()
@@ -24,8 +25,8 @@ export function Sidebar({ onOpenSettingsModal, onOpenCaptureModal }: SidebarProp
 
   const primaryNav: Array<{ to: string; labelKey: string; icon: any; badge: number }> = [
     { to: '/chat', labelKey: 'sidebar.chat', icon: 'chat' as const, badge: unreadMessageCount },
-    { to: '/social', labelKey: 'sidebar.social', icon: 'clock' as const, badge: 0 },
     { to: '/contacts', labelKey: 'sidebar.contacts', icon: 'addressBook' as const, badge: pendingFriendRequestCount },
+    { to: '/social', labelKey: 'sidebar.social', icon: 'clock' as const, badge: 0 },
     { to: '/chat-ai', labelKey: 'sidebar.ai', icon: 'spark' as const, badge: 0 },
   ]
 
@@ -48,9 +49,14 @@ export function Sidebar({ onOpenSettingsModal, onOpenCaptureModal }: SidebarProp
   return (
     <aside className='sidebar'>
       <div className='sidebar-top'>
-        <NavLink className='sidebar-profile-link' title={t('sidebar.profile')} to='/profile'>
+        <button
+          type='button'
+          className='sidebar-profile-link'
+          onClick={onOpenAccountModal}
+          title={t('sidebar.profile')}
+        >
           <UserAvatar imageUrl={user?.avatarUrl} name={user?.name ?? user?.email ?? 'VNALO User'} size='md' />
-        </NavLink>
+        </button>
       </div>
 
       <nav className='sidebar-nav primary-nav'>

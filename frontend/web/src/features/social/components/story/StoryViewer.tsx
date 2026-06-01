@@ -1,16 +1,20 @@
-import { useEffect, useMemo, useRef, useState, useLayoutEffect } from 'react';
-import { type Story, type StoryViewer as StoryViewerEntry, socialApi } from '../../api/social.api';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { type Story, type StoryReaction, type StoryViewer as StoryViewerEntry, socialApi } from '../../api/social.api';
 import { StoryViewerListModal } from './StoryViewerListModal';
 import { storyStore } from '../../store/story.store';
 import { useUserStore } from '../../../chat/context/UserStoreContext';
-import { UserAvatar } from '../../../../shared/components/UserAvatar';
+import { StoryHeader } from './StoryHeader';
+import { StoryProgress } from './StoryProgress';
+import { StoryNavigation } from './StoryNavigation';
+import { StoryContent } from './StoryContent';
+import { formatStoryAge } from '../../utils/storyTime';
 
 export function StoryViewer({
   stories,
   startStoryId,
   token,
   currentUserId,
-  sidebarStories = stories,
   authorProfiles = {},
   onSelectStory,
   onClose,
@@ -20,28 +24,52 @@ export function StoryViewer({
   startStoryId: string;
   token: string;
   currentUserId: string | null;
-  sidebarStories?: Story[];
   authorProfiles?: Record<string, { displayName: string; avatarUrl: string | null }>;
   onSelectStory?: (storyId: string) => void;
   onClose: () => void;
   onDeleteStory: (storyId: string) => void;
 }) {
+  const navigate = useNavigate();
   const initialIndex = Math.max(0, stories.findIndex(story => story.storyId === startStoryId));
   const [index, setIndex] = useState(initialIndex >= 0 ? initialIndex : 0);
   const [isPaused, setIsPaused] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
+  const [isOptionsOpen, setIsOptionsOpen] = useState(false);
   const [viewers, setViewers] = useState<StoryViewerEntry[]>([]);
-  
+  const [reactions, setReactions] = useState<StoryReaction[]>([]);
+
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const { ensureUser, userMap } = useUserStore();
-
-  // Refs and state to compute available area for the media so it can be vertically centered
-  const bodyRef = useRef<HTMLDivElement | null>(null);
-  const headerRef = useRef<HTMLDivElement | null>(null);
-  const progressRef = useRef<HTMLDivElement | null>(null);
-  const [mediaHeight, setMediaHeight] = useState<number | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const optionsMenuRef = useRef<HTMLDivElement | null>(null);
 
   const story = stories[index];
+  const isVideoStory = Boolean(story && /\.(mp4|webm|ogg)(\?.*)?$/i.test(story.mediaUrl));
+  const storyAuthor = story ? (authorProfiles[story.authorId] ?? null) : null;
+  const activeAuthorStories = useMemo(() => {
+    if (!story) return [];
+
+    return stories
+      .filter(item => item.authorId === story.authorId)
+      .slice()
+      .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+  }, [stories, story?.authorId]);
+  const activeAuthorStoryIndex = useMemo(
+    () => activeAuthorStories.findIndex(item => item.storyId === story?.storyId),
+    [activeAuthorStories, story?.storyId],
+  );
+  const storyName = useMemo(() => {
+    if (!story) return 'Story';
+    if (currentUserId && story.authorId === currentUserId) return 'Bạn';
+    return storyAuthor?.displayName?.trim() || userMap[story.authorId]?.displayName?.trim() || `User ${story.authorId.substring(0, 4)}`;
+  }, [story, storyAuthor, currentUserId, userMap]);
+  const storyAvatar = storyAuthor?.avatarUrl ?? userMap[story?.authorId ?? '']?.avatarUrl ?? null;
+  const elapsedLabel = useMemo(() => formatStoryAge(story?.createdAt ?? ''), [story?.createdAt]);
+  const isReactedByCurrentUser = useMemo(
+    () => Boolean(currentUserId && reactions.some(reaction => reaction.userId === currentUserId)),
+    [currentUserId, reactions],
+  );
 
   useEffect(() => {
     // When the desired startStoryId or the stories list changes, update the active index
@@ -59,93 +87,45 @@ export function StoryViewer({
     }
   }, [startStoryId, stories]);
 
-  // Measure available media area and update on resize / content change
-  useLayoutEffect(() => {
-    const measure = () => {
-      const bodyEl = bodyRef.current;
-      if (!bodyEl) return setMediaHeight(null);
+  // Keep track of the last startStoryId we observed so we can detect when the
+  // parent/route initiated a change (clicking sidebar) vs when the viewer
+  // itself changed the active story (next/prev or auto-advance). If the
+  // parent changed `startStoryId`, skip navigating back to avoid a toggle loop.
+  const prevStartRef = useRef<string | null>(startStoryId ?? null);
 
-      const bodyRect = bodyEl.getBoundingClientRect();
-      const headerH = headerRef.current?.getBoundingClientRect().height ?? 0;
-      const progressH = progressRef.current?.getBoundingClientRect().height ?? 0;
+  useEffect(() => {
+    if (!story) return;
 
-      // Reserve a few pixels of breathing room
-      const reserved = Math.ceil(headerH + progressH + 24);
-      const available = Math.max(0, Math.floor(bodyRect.height - reserved));
-      setMediaHeight(available > 0 ? available : null);
-    };
-
-    measure();
-
-    // Observe size changes on body, header, and progress to recompute when layout shifts
-    const observers: ResizeObserver[] = [];
-    try {
-      const ro = new ResizeObserver(measure);
-      if (bodyRef.current) ro.observe(bodyRef.current);
-      if (headerRef.current) ro.observe(headerRef.current);
-      if (progressRef.current) ro.observe(progressRef.current);
-      observers.push(ro);
-    } catch (e) {
-      // ResizeObserver may not be available in some envs; fallback to window resize
-      window.addEventListener('resize', measure);
-      return () => window.removeEventListener('resize', measure);
-    }
-
-    return () => {
-      observers.forEach(o => o.disconnect());
-    };
-  }, [stories.length, index]);
-
-  const canDelete = useMemo(() => Boolean(story && currentUserId && story.authorId === currentUserId), [story, currentUserId]);
-
-  const authorName = useMemo(() => {
-    if (!story) return 'Story';
-    if (currentUserId && story.authorId === currentUserId) return 'Bạn';
-    return userMap[story.authorId]?.displayName?.trim() || `User ${story.authorId.substring(0, 4)}`;
-  }, [story, userMap]);
-
-  const elapsedLabel = useMemo(() => formatStoryAge(story?.createdAt ?? ''), [story?.createdAt]);
-
-  const canSeeViewers = canDelete;
-
-  const sidebarGroups = useMemo(() => {
-    const byAuthor = new Map<string, Story[]>();
-
-    sidebarStories.forEach(item => {
-      const items = byAuthor.get(item.authorId) ?? [];
-      items.push(item);
-      byAuthor.set(item.authorId, items);
-    });
-
-    return [...byAuthor.entries()]
-      .map(([authorId, authorStories]) => ({
-        authorId,
-        stories: authorStories.sort((left, right) => left.createdAt.localeCompare(right.createdAt)),
-        latestStoryAt: authorStories.reduce((latest, item) => (item.createdAt > latest ? item.createdAt : latest), authorStories[0]?.createdAt ?? ''),
-      }))
-      .sort((left, right) => right.latestStoryAt.localeCompare(left.latestStoryAt));
-  }, [sidebarStories]);
-
-  // Ensure current user's group appears first
-  const orderedSidebarGroups = useMemo(() => {
-    if (!currentUserId) return sidebarGroups;
-    const idx = sidebarGroups.findIndex(g => g.authorId === currentUserId);
-    if (idx <= 0) return sidebarGroups;
-    const copy = sidebarGroups.slice();
-    const [me] = copy.splice(idx, 1);
-    copy.unshift(me);
-    return copy;
-  }, [sidebarGroups, currentUserId]);
-
-  const openStory = (storyId: string) => {
-    if (onSelectStory) {
-      onSelectStory(storyId);
+    // If the active story already matches the requested startStoryId, update
+    // our prevStartRef and do nothing.
+    if (story.storyId === startStoryId) {
+      prevStartRef.current = startStoryId;
       return;
     }
 
-    const nextIndex = stories.findIndex(item => item.storyId === storyId);
-    if (nextIndex >= 0) setIndex(nextIndex);
-  };
+    // If the startStoryId prop recently changed (parent/route initiated the
+    // navigation) then skip navigating here — the parent will control the
+    // route. We detect that by comparing the incoming startStoryId with the
+    // last observed value.
+    if (startStoryId && startStoryId !== prevStartRef.current) {
+      prevStartRef.current = startStoryId;
+      return;
+    }
+
+    // Otherwise, this change was initiated inside the viewer (next/prev/auto),
+    // so inform the parent or update the route.
+    if (onSelectStory) {
+      onSelectStory(story.storyId);
+    } else {
+      navigate(`/stories/${story.storyId}`, { replace: false });
+    }
+
+    prevStartRef.current = story.storyId;
+  }, [onSelectStory, story?.storyId, startStoryId, navigate]);
+
+  const canDelete = useMemo(() => Boolean(story && currentUserId && story.authorId === currentUserId), [story, currentUserId]);
+
+  const canSeeViewers = canDelete;
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -161,6 +141,23 @@ export function StoryViewer({
   useEffect(() => {
     if (!story || !token) return;
     storyStore.setActiveStory(story.storyId);
+    if (currentUserId) {
+      const existing = storyStore.getState().viewersByStoryId[story.storyId] ?? [];
+      if (!existing.some(viewer => viewer.viewerId === currentUserId)) {
+        const optimisticViewer: StoryViewerEntry = {
+          viewId: `${story.storyId}:${currentUserId}:local`,
+          storyId: story.storyId,
+          viewerId: currentUserId,
+          viewedAt: new Date().toISOString(),
+        };
+        storyStore.setViewers(story.storyId, [optimisticViewer, ...existing]);
+      }
+      try {
+        localStorage.setItem(`story:viewed:${currentUserId}:${story.storyId}`, '1');
+      } catch {
+        // ignore storage errors
+      }
+    }
     void socialApi.viewStory(token, story.storyId).catch(() => null);
     void socialApi.getStoryViews(token, story.storyId)
       .then(list => {
@@ -169,9 +166,46 @@ export function StoryViewer({
         void Promise.all(list.map(viewer => ensureUser(token, viewer.viewerId).catch(() => null)));
       })
       .catch(() => setViewers([]));
+    void socialApi.getStoryReactions(token, story.storyId)
+      .then(list => {
+        setReactions(list);
+        void Promise.all(list.map(reaction => ensureUser(token, reaction.userId).catch(() => null)));
+      })
+      .catch(() => setReactions([]));
 
     // reactions endpoint removed — do not call
   }, [story?.storyId, token, ensureUser]);
+
+  useEffect(() => {
+    setIsOptionsOpen(false);
+    setIsPaused(false);
+    setIsMuted(true);
+  }, [story?.storyId]);
+
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      if (optionsMenuRef.current && !optionsMenuRef.current.contains(target)) {
+        setIsOptionsOpen(false);
+      }
+    };
+
+    window.addEventListener('pointerdown', handlePointerDown);
+    return () => window.removeEventListener('pointerdown', handlePointerDown);
+  }, []);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !isVideoStory) return;
+
+    if (isPaused) {
+      video.pause();
+      return;
+    }
+
+    void video.play().catch(() => null);
+  }, [isPaused, isVideoStory, story?.storyId]);
 
   useEffect(() => {
     if (!story || isPaused) return;
@@ -197,135 +231,76 @@ export function StoryViewer({
     }
   };
 
+  const toggleReaction = async () => {
+    if (!story || !token || !currentUserId) return;
+
+    if (isReactedByCurrentUser) {
+      await socialApi.unreactStory(token, story.storyId).catch(() => null);
+      setReactions(current => current.filter(reaction => reaction.userId !== currentUserId));
+      return;
+    }
+
+    try {
+      const reaction = await socialApi.reactStory(token, story.storyId, 'LOVE');
+      setReactions(current => [reaction, ...current.filter(item => item.userId !== reaction.userId)]);
+    } catch {
+      // ignore reaction errors
+    }
+  };
+
   // reactions removed — no toggleReaction
 
   return (
-    <div className="story-viewer-overlay" onClick={onClose}>
-      <div className="story-viewer-shell" onClick={event => event.stopPropagation()} onMouseEnter={() => setIsPaused(true)} onMouseLeave={() => setIsPaused(false)}>
-        <aside className="story-viewer-sidebar">
-          <div className="story-viewer-sidebar-header">
-            <div className="story-viewer-sidebar-title">Tin</div>
-            <button type="button" className="story-btn ghost" onClick={onClose}>Đóng</button>
-          </div>
+    <div className="story-viewer-stage-shell">
+      <StoryNavigation direction="left" onClick={() => setIndex(current => Math.max(0, current - 1))} />
 
-          <div className="story-viewer-sidebar-list">
-            {orderedSidebarGroups.map(group => {
-              const activeStory = group.stories.some(item => item.storyId === story.storyId);
-              const profile = authorProfiles[group.authorId] ?? null;
+      <section className="story-viewer-stage">
+        <div className="story-viewer-backdrop">
+          {isVideoStory ? (
+            <video key={story.storyId} src={story.mediaUrl} className="story-viewer-backdrop-media" muted playsInline autoPlay loop />
+          ) : (
+            <img key={story.storyId} src={story.mediaUrl} className="story-viewer-backdrop-media" alt="Story background" />
+          )}
+        </div>
 
-              const displayName = (group.authorId === currentUserId) ? 'Bạn' : (profile?.displayName || `User ${group.authorId.substring(0, 4)}`);
+        <div className="story-viewer-frame">
+          <StoryProgress stories={activeAuthorStories} activeIndex={Math.max(0, activeAuthorStoryIndex)} isPaused={isPaused} />
+          <StoryHeader
+            avatarUrl={storyAvatar}
+            title={storyName}
+            subtitle={elapsedLabel}
+            isMuted={isMuted}
+            isPaused={isPaused}
+            canDelete={canDelete}
+            isOptionsOpen={isOptionsOpen}
+            onToggleMuted={() => setIsMuted(prev => !prev)}
+            onTogglePaused={() => setIsPaused(prev => !prev)}
+            onToggleOptions={() => setIsOptionsOpen(prev => !prev)}
+            onDelete={() => {
+              setIsOptionsOpen(false);
+              void deleteCurrentStory();
+            }}
+            onClose={onClose}
+            optionsMenuRef={optionsMenuRef}
+          />
+          <StoryContent
+            story={story}
+            isVideoStory={isVideoStory}
+            isMuted={isMuted}
+            videoRef={videoRef}
+            canSeeViewers={canSeeViewers}
+            viewers={viewers}
+            currentUserId={currentUserId}
+            userMap={userMap}
+            onOpenViewers={() => setIsViewerOpen(true)}
+            isReacted={isReactedByCurrentUser}
+            onToggleReaction={() => void toggleReaction()}
+          />
+        </div>
+      </section>
 
-              return (
-                <button
-                  key={group.authorId}
-                  type="button"
-                  className={`story-viewer-sidebar-item ${activeStory ? 'active' : ''}`}
-                  onClick={() => openStory(group.stories[group.stories.length - 1].storyId)}
-                >
-                  <div className="story-viewer-sidebar-avatar-wrap">
-                    <UserAvatar
-                      imageUrl={profile?.avatarUrl ?? null}
-                      name={profile?.displayName || `User ${group.authorId.substring(0, 4)}`}
-                      size="lg"
-                      className="story-viewer-sidebar-avatar"
-                    />
-                  </div>
-                  <div className="story-viewer-sidebar-meta">
-                    <div className="story-viewer-sidebar-name">{displayName}</div>
-                    <div className="story-viewer-sidebar-subtitle">{group.stories.length} thẻ mới · {formatStoryAge(group.latestStoryAt)}</div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </aside>
-
-        <section className="story-viewer-main">
-          <div className="story-viewer-progress" ref={progressRef}>
-            {stories.map((item, storyIndex) => (
-              <div key={item.storyId} className={`story-viewer-progress-bar ${storyIndex === index ? 'active' : ''} ${storyIndex < index ? 'done' : ''}`} />
-            ))}
-          </div>
-
-            <div className="story-viewer-header" ref={headerRef}>
-            <div>
-              <div className="story-viewer-title">{authorName}</div>
-              <div className="story-viewer-subtitle">{elapsedLabel}</div>
-            </div>
-            <div className="story-viewer-header-actions">
-              {/* reaction UI removed */}
-              {/* viewers button moved to bottom-left overlay per UX */}
-              {canDelete && (
-                <button type="button" className="story-btn ghost danger" onClick={deleteCurrentStory} disabled={isDeleting}>
-                  {isDeleting ? 'Đang xóa...' : 'Xóa tin'}
-                </button>
-              )}
-              <button type="button" className="story-btn ghost" onClick={onClose}>Đóng</button>
-            </div>
-          </div>
-
-          <div className="story-viewer-body" ref={bodyRef}>
-            <button type="button" className="story-nav-arrow left" onClick={() => setIndex(current => Math.max(0, current - 1))}>‹</button>
-            <div className="story-viewer-media-wrap" style={mediaHeight ? { height: `${mediaHeight}px` } : undefined}>
-              {story.mediaUrl.endsWith('.mp4') || story.mediaUrl.endsWith('.webm') || story.mediaUrl.endsWith('.ogg') ? (
-                <video src={story.mediaUrl} className="story-viewer-media story-viewer-media-video" controls autoPlay playsInline />
-              ) : (
-                <img src={story.mediaUrl} className="story-viewer-media story-viewer-media-image" alt="Story" />
-              )}
-              {(story.mediaUrl.endsWith('.mp4') || story.mediaUrl.endsWith('.webm') || story.mediaUrl.endsWith('.ogg')) && story.caption ? (
-                <div className="story-viewer-caption">{story.caption}</div>
-              ) : null}
-              {/* Bottom-left viewers button (exclude current user) */}
-              {canSeeViewers && (
-                <button type="button" className="story-viewer-views" onClick={() => setIsViewerOpen(true)}>
-                  <div className="story-viewer-views-count">Đã xem ({viewers.filter(v => v.viewerId !== currentUserId).length})</div>
-                  <div className="story-viewer-views-avatars">
-                    {viewers
-                      .filter(v => v.viewerId !== currentUserId)
-                      .slice(0, 5)
-                      .map(v => (
-                        <img
-                          key={v.viewerId}
-                          src={userMap[v.viewerId]?.avatarUrl ?? undefined}
-                          alt={userMap[v.viewerId]?.displayName ?? v.viewerId}
-                          className="story-viewer-views-avatar"
-                        />
-                      ))}
-                  </div>
-                </button>
-              )}
-            </div>
-            <button type="button" className="story-nav-arrow right" onClick={() => setIndex(current => Math.min(stories.length - 1, current + 1))}>›</button>
-          </div>
-        </section>
-      </div>
-
-      {isViewerOpen && <StoryViewerListModal viewers={viewers.filter(v => v.viewerId !== currentUserId)} onClose={() => setIsViewerOpen(false)} />}
+      <StoryNavigation direction="right" onClick={() => setIndex(current => Math.min(stories.length - 1, current + 1))} />
+      {isViewerOpen && <StoryViewerListModal viewers={viewers.filter(v => v.viewerId !== currentUserId)} reactions={reactions} onClose={() => setIsViewerOpen(false)} />}
     </div>
   );
-}
-
-function formatStoryAge(createdAt: string) {
-  const time = new Date(createdAt).getTime();
-  if (Number.isNaN(time)) return '';
-
-  const elapsed = Date.now() - time;
-  if (elapsed < 60_000) return 'Vừa xong';
-
-  const minutes = Math.floor(elapsed / 60_000);
-  if (minutes < 60) return `${minutes} phút`;
-
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} giờ`;
-
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days} ngày`;
-
-  const weeks = Math.floor(days / 7);
-  if (weeks < 5) return `${weeks} tuần`;
-
-  const months = Math.floor(days / 30);
-  if (months < 12) return `${months} tháng`;
-
-  return `${Math.floor(days / 365)} năm`;
 }

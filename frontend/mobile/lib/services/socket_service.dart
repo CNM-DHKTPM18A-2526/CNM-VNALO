@@ -830,6 +830,40 @@ class SocketService with ChangeNotifier {
     });
   }
 
+  /// Emit group.updateSettings via WebSocket so backend broadcasts to all members.
+  /// Prefer this over REST updateGroupInfo to get real-time sync.
+  void emitGroupUpdateSettings({
+    required String conversationId,
+    String? title,
+    String? description,
+    String? avatarUrl,
+    String? joinMode,
+    bool? allowMemberInvite,
+    bool? allowMemberPin,
+    bool? allowMemberEditInfo,
+    bool? onlyAdminCanPost,
+    bool? highlightAdminMessages,
+    bool? showHistoryToNewMembers,
+    bool? allowMemberCreateNote,
+    bool? allowMemberCreatePoll,
+  }) {
+    final payload = <String, dynamic>{'conversationId': conversationId};
+    if (title != null) payload['title'] = title;
+    if (description != null) payload['description'] = description;
+    if (avatarUrl != null) payload['avatarUrl'] = avatarUrl;
+    if (joinMode != null) payload['joinMode'] = joinMode;
+    if (allowMemberInvite != null) payload['allowMemberInvite'] = allowMemberInvite;
+    if (allowMemberPin != null) payload['allowMemberPin'] = allowMemberPin;
+    if (allowMemberEditInfo != null) payload['allowMemberEditInfo'] = allowMemberEditInfo;
+    if (onlyAdminCanPost != null) payload['onlyAdminCanPost'] = onlyAdminCanPost;
+    if (highlightAdminMessages != null) payload['highlightAdminMessages'] = highlightAdminMessages;
+    if (showHistoryToNewMembers != null) payload['showHistoryToNewMembers'] = showHistoryToNewMembers;
+    if (allowMemberCreateNote != null) payload['allowMemberCreateNote'] = allowMemberCreateNote;
+    if (allowMemberCreatePoll != null) payload['allowMemberCreatePoll'] = allowMemberCreatePoll;
+    debugPrint('[SocketService] emitGroupUpdateSettings: $payload');
+    _socket?.emit('group.updateSettings', payload);
+  }
+
   void emitGroupCallMuteState({
     required String conversationId,
     required String callId,

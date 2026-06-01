@@ -24,6 +24,7 @@ type IconName =
   | 'database'
   | 'help'
   | 'close'
+  | 'play'
   | 'layoutSidebar'
   | 'checkSquare'
   | 'capture'
@@ -41,6 +42,9 @@ type IconName =
   | 'clock'
   | 'heart'
   | 'heartFill'
+  | 'pause'
+  | 'volumeOff'
+  | 'volume'
 
 type IconProps = {
   name: IconName
@@ -87,6 +91,24 @@ export function Icon({ name, className, size = 24 }: IconProps) {
     )
   }
 
+
+  if (name === 'play') {
+    return (
+      <svg {...commonProps}>
+        <path d='M8 5v14l11-7Z' />
+      </svg>
+    )
+  }
+  if (name === 'volumeOff') {
+    return (
+      <svg {...commonProps}>
+        <path d='M11 5 6.5 8.5H3v7h3.5L11 19V5Z' />
+        <path d='M15 9a4 4 0 0 1 0 6' />
+        <path d='M17.5 6.5a7 7 0 0 1 0 11' />
+        <line x1='4' y1='4' x2='20' y2='20' />
+      </svg>
+    )
+  }
   if (name === 'bell') {
     return (
       <svg {...commonProps}>
@@ -450,6 +472,25 @@ export function Icon({ name, className, size = 24 }: IconProps) {
     return (
       <svg {...commonProps}>
         <path d='M20.8 4.6c-1.8-1.7-4.6-1.8-6.5-.2L12 6.5l-2.3-2.1C7.9 2.8 5.1 2.9 3.3 4.6A5.6 5.6 0 0 0 3 9c0 3.3 2.7 6 6 9l3 2 3-2c3.3-3 6-5.7 6-9 0-1.6-.6-3.1-1.2-3.4z' fill='currentColor' stroke='none' />
+      </svg>
+    )
+  }
+
+  if (name === 'pause') {
+    return (
+      <svg {...commonProps}>
+        <rect x='6.5' y='4.5' width='4' height='15' rx='1.2' />
+        <rect x='13.5' y='4.5' width='4' height='15' rx='1.2' />
+      </svg>
+    )
+  }
+
+  if (name === 'volume') {
+    return (
+      <svg {...commonProps}>
+        <path d='M11 5 6.5 9H3v6h3.5L11 19V5Z' />
+        <path d='M15 9a4 4 0 0 1 0 6' />
+        <path d='M17.8 6.2a8 8 0 0 1 0 11.6' />
       </svg>
     )
   }
