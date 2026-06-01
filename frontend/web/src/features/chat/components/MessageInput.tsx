@@ -49,7 +49,7 @@ const AI_ASSISTANT_MENTION = {
   displayName: 'VNALO',
   avatarUrl: null,
   icon: 'at',
-  subText: 'HÃ¡Â»Âi trÃ¡Â»Â£ lÃƒÂ½ AI riÃƒÂªng, khÃƒÂ´ng gÃ¡Â»Â­i vÃƒÂ o hÃ¡Â»â„¢i thoÃ¡ÂºÂ¡i',
+  subText: 'Hỏi trợ lý AI riêng, không gửi vào hội thoại',
 }
 
 function getFileIdentity(file: File) {
@@ -125,7 +125,7 @@ export function MessageInput({
       messageInputRef.current?.focus()
     }, 50)
   }, [initialText])
-
+  
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     const pos = e.target.selectionStart || 0;
@@ -141,12 +141,12 @@ export function MessageInput({
           isOpen: true,
           filter: textAfterAt,
           cursorPos: lastAtIdx,
-          left: Math.min(pos * 8, 300)
+          left: Math.min(pos * 8, 300) 
         });
         return;
       }
     }
-
+    
     if (mentionState.isOpen) {
       setMentionState(prev => ({ ...prev, isOpen: false }));
     }
@@ -158,7 +158,7 @@ export function MessageInput({
     const mentionText = `@${member.displayName} `;
     const newText = `${before}${mentionText}${after}`;
     setMessageText(newText);
-
+    
     // Add to mentions list
     setMentions(prev => {
       // Avoid duplicate metadata entries for the exact same display name if it's already there
@@ -168,7 +168,7 @@ export function MessageInput({
     });
 
     setMentionState(prev => ({ ...prev, isOpen: false }));
-
+    
     // Focus back to input
     setTimeout(() => {
       messageInputRef.current?.focus();
@@ -180,7 +180,7 @@ export function MessageInput({
   const stickerTriggerRef = React.useRef<HTMLButtonElement | null>(null)
   const emojiTriggerRef = React.useRef<HTMLButtonElement | null>(null)
 
-  const dynamicPlaceholder = placeholder || `NhÃƒÂ¡Ã‚ÂºÃ‚Â­p @, tin nhÃƒÂ¡Ã‚ÂºÃ‚Â¯n tÃƒÂ¡Ã‚Â»Ã¢â‚¬Âºi ${recipientName?.trim() || 'ngÃƒâ€ Ã‚Â°ÃƒÂ¡Ã‚Â»Ã‚Âi nhÃƒÂ¡Ã‚ÂºÃ‚Â­n'}`
+  const dynamicPlaceholder = placeholder || `Nhập @, tin nhắn tới ${recipientName?.trim() || 'người nhận'}`
   const hasAttachments = selectedFiles.length > 0
 
   const canSend = React.useMemo(() => Boolean(messageText.trim() || hasAttachments), [messageText, hasAttachments])
@@ -236,7 +236,7 @@ export function MessageInput({
         }
       } catch (err) {
         console.error('Failed to load assets:', err)
-        setAssetError('KhÃƒÆ’Ã‚Â´ng tÃƒÂ¡Ã‚ÂºÃ‚Â£i Ãƒâ€žÃ¢â‚¬ËœÃƒâ€ Ã‚Â°ÃƒÂ¡Ã‚Â»Ã‚Â£c dÃƒÂ¡Ã‚Â»Ã‚Â¯ liÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¡u. Vui lÃƒÆ’Ã‚Â²ng thÃƒÂ¡Ã‚Â»Ã‚Â­ lÃƒÂ¡Ã‚ÂºÃ‚Â¡i.')
+        setAssetError('Không tải được dữ liệu. Vui lòng thử lại.')
       } finally {
         setIsLoadingAssets(false)
       }
@@ -268,7 +268,7 @@ export function MessageInput({
     })
 
     if (invalidFile) {
-      setError(invalidFile.type.startsWith('image/') ? 'ÃƒÂ¡Ã‚ÂºÃ‚Â¢nh/Video vÃƒâ€ Ã‚Â°ÃƒÂ¡Ã‚Â»Ã‚Â£t quÃƒÆ’Ã‚Â¡ 8 MB.' : 'TÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¡p vÃƒâ€ Ã‚Â°ÃƒÂ¡Ã‚Â»Ã‚Â£t quÃƒÆ’Ã‚Â¡ 20 MB.')
+      setError(invalidFile.type.startsWith('image/') ? 'Ảnh/Video vượt quá 8 MB.' : 'Tệp vượt quá 20 MB.')
       return
     }
 
@@ -303,8 +303,8 @@ export function MessageInput({
       draft.replyTo = {
         id: replyMessage.id,
         senderId: replyMessage.senderId,
-        senderName: replyMessage.sender === 'me' ? 'BÃƒÂ¡Ã‚ÂºÃ‚Â¡n' : (replyMessage.senderName || 'NgÃƒâ€ Ã‚Â°ÃƒÂ¡Ã‚Â»Ã‚Âi dÃƒÆ’Ã‚Â¹ng'),
-        preview: replyMessage.text?.slice(0, 50) || (replyMessage.type === 'image' ? '[HÃƒÆ’Ã‚Â¬nh ÃƒÂ¡Ã‚ÂºÃ‚Â£nh]' : '[Tin nhÃƒÂ¡Ã‚ÂºÃ‚Â¯n]'),
+        senderName: replyMessage.sender === 'me' ? 'Bạn' : (replyMessage.senderName || 'Người dùng'),
+        preview: replyMessage.text?.slice(0, 50) || (replyMessage.type === 'image' ? '[Hình ảnh]' : '[Tin nhắn]'),
         type: replyMessage.type
       }
       console.log('[MessageInput] Attached replyTo to draft:', draft.replyTo)
@@ -384,7 +384,7 @@ export function MessageInput({
         </div>
       )}
       {mentionState.isOpen && (
-        <MentionPopover
+        <MentionPopover 
           members={mentionOptions}
           filter={mentionState.filter}
           position={{ top: 0, left: mentionState.left }}
@@ -415,7 +415,7 @@ export function MessageInput({
                   className='absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/50 text-white text-xs'
                   onClick={() => removeSelectedFile(item.file)}
                 >
-                  ÃƒÆ’Ã¢â‚¬â€
+                  ×
                 </button>
               </div>
             ))}
@@ -427,20 +427,20 @@ export function MessageInput({
         <div className="message-input-reply animate-in fade-in slide-in-from-bottom-1">
           <div className="flex-1 min-w-0 border-l-2 border-blue-500 pl-3">
             <p className="text-xs font-bold text-blue-600 dark:text-sky-400 truncate">
-              Ãƒâ€žÃ‚Âang trÃƒÂ¡Ã‚ÂºÃ‚Â£ lÃƒÂ¡Ã‚Â»Ã‚Âi {replyMessage.sender === 'me' ? 'chÃƒÆ’Ã‚Â­nh mÃƒÆ’Ã‚Â¬nh' : replyMessage.senderName}
+              Đang trả lời {replyMessage.sender === 'me' ? 'chính mình' : replyMessage.senderName}
             </p>
             <p className="text-sm text-[var(--muted)] truncate">
-              {replyMessage.type === 'image' ? '[HÃƒÆ’Ã‚Â¬nh ÃƒÂ¡Ã‚ÂºÃ‚Â£nh]' :
-               replyMessage.type === 'sticker' ? '[Sticker]' :
-               replyMessage.type === 'file' ? '[TÃƒÂ¡Ã‚Â»Ã¢â‚¬Â¡p tin]' :
+              {replyMessage.type === 'image' ? '[Hình ảnh]' : 
+               replyMessage.type === 'sticker' ? '[Sticker]' : 
+               replyMessage.type === 'file' ? '[Tệp tin]' : 
                replyMessage.text}
             </p>
           </div>
-          <button
+          <button 
             type="button"
             onClick={onCancelReply}
             className="message-input-icon-btn"
-            aria-label="HÃƒÂ¡Ã‚Â»Ã‚Â§y trÃƒÂ¡Ã‚ÂºÃ‚Â£ lÃƒÂ¡Ã‚Â»Ã‚Âi"
+            aria-label="Hủy trả lời"
           >
             <X size={16} />
           </button>
@@ -458,8 +458,8 @@ export function MessageInput({
           <ToolIconButton label='File' disabled={disabled} onClick={() => openFilePicker('file')}>
             <Paperclip size={24} />
           </ToolIconButton>
-          <ToolIconButton
-            label='Mention'
+          <ToolIconButton 
+            label='Mention' 
             disabled={disabled}
             onClick={() => {
               if (disabled) return;
@@ -519,13 +519,13 @@ export function MessageInput({
                   submitMessage();
                 } else {
                   onSend({
-                    text: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬ËœÃ‚Â'
+                    text: '👍'
                   });
                 }
               }}
               disabled={disabled}
               className={`message-input-icon-btn message-input-send-btn${canSend ? ' is-ready' : ''}`}
-              aria-label={canSend ? 'GÃƒÂ¡Ã‚Â»Ã‚Â­i tin nhÃƒÂ¡Ã‚ÂºÃ‚Â¯n' : 'GÃƒÂ¡Ã‚Â»Ã‚Â­i thÃƒÆ’Ã‚Â­ch'}
+              aria-label={canSend ? 'Gửi tin nhắn' : 'Gửi thích'}
             >
               {canSend ? (
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -572,7 +572,7 @@ export function MessageInput({
                 <Search size={14} className='text-slate-400 mr-2' />
                 <input
                   type='text'
-                  placeholder='TÃƒÆ’Ã‚Â¬m kiÃƒÂ¡Ã‚ÂºÃ‚Â¿m sticker'
+                  placeholder='Tìm kiếm sticker'
                   className='bg-transparent border-none outline-none text-[13px] w-full text-slate-600 dark:text-slate-300'
                 />
               </div>
@@ -584,7 +584,7 @@ export function MessageInput({
             {isLoadingAssets ? (
               <div className='flex h-full flex-col items-center justify-center gap-2 text-slate-400 text-sm'>
                 <div className='h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent' />
-                Ãƒâ€žÃ‚Âang tÃƒÂ¡Ã‚ÂºÃ‚Â£i...
+                Đang tải...
               </div>
             ) : assetError ? (
               <div className='flex h-full flex-col items-center justify-center gap-2 p-4 text-center'>
@@ -597,7 +597,7 @@ export function MessageInput({
                   }}
                   className='bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-sky-400 px-4 py-1.5 rounded-full text-sm font-medium hover:bg-blue-100 transition border-0 cursor-pointer'
                 >
-                  ThÃƒÂ¡Ã‚Â»Ã‚Â­ lÃƒÂ¡Ã‚ÂºÃ‚Â¡i
+                  Thử lại
                 </button>
               </div>
             ) : (
@@ -605,7 +605,7 @@ export function MessageInput({
                 {activeTab === 'STICKER' && (
                   <div className='flex flex-col gap-5'>
                     <div>
-                      <h4 className='text-[12px] font-bold text-slate-600 dark:text-slate-400 mb-2 px-1'>GÃƒÂ¡Ã‚ÂºÃ‚Â§n Ãƒâ€žÃ¢â‚¬ËœÃƒÆ’Ã‚Â¢y</h4>
+                      <h4 className='text-[12px] font-bold text-slate-600 dark:text-slate-400 mb-2 px-1'>Gần đây</h4>
                       <div className='grid grid-cols-4 gap-2'>
                         {selectedPack?.stickers?.slice(0, 4).map((item: any) => (
                           <button
@@ -641,7 +641,7 @@ export function MessageInput({
                     {/* Recently Used Section */}
                     {emojis.length > 0 && (
                       <div>
-                        <h4 className='text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3 px-1'>GÃƒÂ¡Ã‚ÂºÃ‚Â§n Ãƒâ€žÃ¢â‚¬ËœÃƒÆ’Ã‚Â¢y</h4>
+                        <h4 className='text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3 px-1'>Gần đây</h4>
                         <div className='grid grid-cols-9 gap-1'>
                           {emojis.slice(0, 9).map((item: any) => (
                             <button
@@ -658,7 +658,7 @@ export function MessageInput({
 
                     {/* Standard Emotions Section (Zalo Style) */}
                     <div>
-                      <h4 className='text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3 px-1'>CÃƒÂ¡Ã‚ÂºÃ‚Â£m xÃƒÆ’Ã‚Âºc</h4>
+                      <h4 className='text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3 px-1'>Cảm xúc</h4>
                       <div className='grid grid-cols-9 gap-1'>
                         {STANDARD_EMOJI_LIST.map((emojiChar, i) => (
                           <button
@@ -698,7 +698,7 @@ export function MessageInput({
                     ))}
                     {gifs.length === 0 && (
                       <div className='col-span-2 flex flex-col items-center justify-center h-40 text-slate-400 dark:text-slate-500 text-sm'>
-                        ChÃƒâ€ Ã‚Â°a cÃƒÆ’Ã‚Â³ GIF nÃƒÆ’Ã‚Â o
+                        Chưa có GIF nào
                       </div>
                     )}
                   </div>
@@ -760,7 +760,7 @@ ToolIconButton.displayName = 'ToolIconButton'
 
 // Standards
 const STANDARD_EMOJI_LIST = [
-  'ÃƒÂ°Ã…Â¸Ã‹Å“Ã¢â€šÂ¬', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã†â€™', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã¢â‚¬Å¾', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã¢â‚¬Â ', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã¢â‚¬Â¦', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã¢â‚¬Å¡', 'ÃƒÂ°Ã…Â¸Ã‚Â¤Ã‚Â£', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã…Â ', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã¢â‚¬Â¡', 'ÃƒÂ°Ã…Â¸Ã¢â€žÂ¢Ã¢â‚¬Å¡', 'ÃƒÂ°Ã…Â¸Ã¢â€žÂ¢Ã†â€™', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã¢â‚¬Â°', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã…â€™', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â', 'ÃƒÂ°Ã…Â¸Ã‚Â¥Ã‚Â°', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‹Å“', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã¢â‚¬â€', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã¢â€žÂ¢', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã…Â¡', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã¢â‚¬Â¹', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã¢â‚¬Âº', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã…â€œ', 'ÃƒÂ°Ã…Â¸Ã‚Â¤Ã‚Âª', 'ÃƒÂ°Ã…Â¸Ã‚Â¤Ã‚Â¨', 'ÃƒÂ°Ã…Â¸Ã‚Â§Ã‚Â', 'ÃƒÂ°Ã…Â¸Ã‚Â¤Ã¢â‚¬Å“', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã…Â½', 'ÃƒÂ°Ã…Â¸Ã‚Â¤Ã‚Â©', 'ÃƒÂ°Ã…Â¸Ã‚Â¥Ã‚Â³', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã¢â‚¬â„¢', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã…Â¾', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã¢â‚¬Â', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã…Â¸', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã¢â‚¬Â¢', 'ÃƒÂ°Ã…Â¸Ã¢â€žÂ¢Ã‚Â', 'ÃƒÂ¢Ã‹Å“Ã‚Â¹ÃƒÂ¯Ã‚Â¸Ã‚Â', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â£', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã¢â‚¬â€œ', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â«', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â©', 'ÃƒÂ°Ã…Â¸Ã‚Â¥Ã‚Âº', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â¢', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â­', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â¤', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â ', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â¡', 'ÃƒÂ°Ã…Â¸Ã‚Â¤Ã‚Â¬', 'ÃƒÂ°Ã…Â¸Ã‚Â¤Ã‚Â¯', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â³', 'ÃƒÂ°Ã…Â¸Ã‚Â¥Ã‚Âµ', 'ÃƒÂ°Ã…Â¸Ã‚Â¥Ã‚Â¶', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â±', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â¨', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â°', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â¥', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã¢â‚¬Å“', 'ÃƒÂ°Ã…Â¸Ã‚Â¤Ã¢â‚¬â€', 'ÃƒÂ°Ã…Â¸Ã‚Â¤Ã¢â‚¬Â', 'ÃƒÂ°Ã…Â¸Ã‚Â¤Ã‚Â­', 'ÃƒÂ°Ã…Â¸Ã‚Â¤Ã‚Â«', 'ÃƒÂ°Ã…Â¸Ã‚Â¤Ã‚Â¥', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â¶', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã¢â‚¬Ëœ', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â¬', 'ÃƒÂ°Ã…Â¸Ã¢â€žÂ¢Ã¢â‚¬Å¾', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â¯', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â¦', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â§', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â®', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â²', 'ÃƒÂ°Ã…Â¸Ã‚Â¥Ã‚Â±', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â´', 'ÃƒÂ°Ã…Â¸Ã‚Â¤Ã‚Â¤', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Âª', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Âµ', 'ÃƒÂ°Ã…Â¸Ã‚Â¤Ã‚Â', 'ÃƒÂ°Ã…Â¸Ã‚Â¥Ã‚Â´', 'ÃƒÂ°Ã…Â¸Ã‚Â¤Ã‚Â¢', 'ÃƒÂ°Ã…Â¸Ã‚Â¤Ã‚Â®', 'ÃƒÂ°Ã…Â¸Ã‚Â¤Ã‚Â§', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â·', 'ÃƒÂ°Ã…Â¸Ã‚Â¤Ã¢â‚¬â„¢', 'ÃƒÂ°Ã…Â¸Ã‚Â¤Ã¢â‚¬Â¢', 'ÃƒÂ°Ã…Â¸Ã‚Â¤Ã¢â‚¬Ëœ', 'ÃƒÂ°Ã…Â¸Ã‚Â¤Ã‚Â ', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‹â€ ', 'ÃƒÂ°Ã…Â¸Ã¢â‚¬ËœÃ‚Â¿', 'ÃƒÂ°Ã…Â¸Ã¢â‚¬ËœÃ‚Â¹', 'ÃƒÂ°Ã…Â¸Ã¢â‚¬ËœÃ‚Âº', 'ÃƒÂ°Ã…Â¸Ã‚Â¤Ã‚Â¡', 'ÃƒÂ°Ã…Â¸Ã¢â‚¬ËœÃ‚Â»', 'ÃƒÂ°Ã…Â¸Ã¢â‚¬â„¢Ã¢â€šÂ¬', 'ÃƒÂ¢Ã‹Å“Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â', 'ÃƒÂ°Ã…Â¸Ã¢â‚¬ËœÃ‚Â½', 'ÃƒÂ°Ã…Â¸Ã¢â‚¬ËœÃ‚Â¾', 'ÃƒÂ°Ã…Â¸Ã‚Â¤Ã¢â‚¬â€œ', 'ÃƒÂ°Ã…Â¸Ã¢â‚¬â„¢Ã‚Â©', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Âº', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â¸', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â»', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â¼', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â½', 'ÃƒÂ°Ã…Â¸Ã¢â€žÂ¢Ã¢â€šÂ¬', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â¿', 'ÃƒÂ°Ã…Â¸Ã‹Å“Ã‚Â¾'
+  '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐', '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕', '🤑', '🤠', '😈', '👿', '👹', '👺', '🤡', '👻', '💀', '☠️', '👽', '👾', '🤖', '💩', '😺', '😸', '😻', '😼', '😽', '🙀', '😿', '😾'
 ];
 
 function openFilePicker(mode: 'image' | 'file') {
