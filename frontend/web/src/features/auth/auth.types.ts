@@ -33,4 +33,9 @@ export type RegisterPayload = {
   otpCode: string
   dob?: string
   gender?: Gender
+  acceptedTerms?: boolean
+  acceptedPrivacy?: boolean
+  legalVersion?: string
+  deviceName?: string
+  platform?: 'WEB' | 'PC'
 }

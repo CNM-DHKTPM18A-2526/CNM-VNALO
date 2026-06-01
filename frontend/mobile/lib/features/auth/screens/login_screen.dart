@@ -5,6 +5,7 @@ import 'package:vnalo_mobile/features/auth/localization/auth_texts.dart';
 import 'package:vnalo_mobile/features/auth/providers/auth_provider.dart';
 import 'package:vnalo_mobile/features/auth/screens/login_password_screen.dart';
 import 'package:vnalo_mobile/features/auth/screens/register_screen.dart';
+import 'package:vnalo_mobile/features/legal/screens/legal_document_screen.dart';
 import 'package:vnalo_mobile/features/auth/widgets/phone_input.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -195,9 +196,52 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 12),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 12,
+                  children: [
+                    _LegalFooterLink(label: t.viewTerms, type: LegalDocumentType.terms),
+                    Text(
+                      '·',
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.white54 : LightColors.textSecondary,
+                      ),
+                    ),
+                    _LegalFooterLink(label: t.viewPrivacy, type: LegalDocumentType.privacy),
+                  ],
+                ),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LegalFooterLink extends StatelessWidget {
+  final String label;
+  final LegalDocumentType type;
+
+  const _LegalFooterLink({required this.label, required this.type});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => LegalDocumentScreen(type: type)),
+        );
+      },
+      child: Text(
+        label,
+        style: TextStyle(
+          color: isDarkMode ? DarkColors.primary : AppColors.primary,
+          fontWeight: FontWeight.w700,
+          fontSize: 14,
         ),
       ),
     );
