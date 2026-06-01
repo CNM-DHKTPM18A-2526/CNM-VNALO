@@ -12,6 +12,7 @@ import iuh.cnm.vnalo.core_service.model.enums.OtpPurpose;
 import iuh.cnm.vnalo.core_service.model.enums.QrLoginSessionStatus;
 import iuh.cnm.vnalo.core_service.repository.ai.AiChatHistoryRepository;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthAccountRepository;
+import iuh.cnm.vnalo.core_service.repository.auth.AuthLegalConsentRepository;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthOtpRepository;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthQrLoginSessionRepository;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthSessionAuditRepository;
@@ -42,6 +43,7 @@ import static org.mockito.Mockito.when;
 class AdminMonitoringServiceTest {
 
     @Mock private AuthAccountRepository authAccountRepository;
+    @Mock private AuthLegalConsentRepository authLegalConsentRepository;
     @Mock private RefreshTokenRepository refreshTokenRepository;
     @Mock private AuthSessionAuditRepository authSessionAuditRepository;
     @Mock private AuthOtpRepository authOtpRepository;
@@ -56,6 +58,7 @@ class AdminMonitoringServiceTest {
         adminId = UUID.randomUUID();
         service = new AdminMonitoringService(
                 authAccountRepository,
+                authLegalConsentRepository,
                 refreshTokenRepository,
                 authSessionAuditRepository,
                 authOtpRepository,
@@ -121,6 +124,11 @@ class AdminMonitoringServiceTest {
         when(authQrLoginSessionRepository.countByStatus(QrLoginSessionStatus.REJECTED)).thenReturn(0L);
         when(authQrLoginSessionRepository.countByApprovedAtAfter(any(Instant.class))).thenReturn(2L);
         when(authQrLoginSessionRepository.countByConsumedAtAfter(any(Instant.class))).thenReturn(2L);
+        when(authLegalConsentRepository.countByGrantedTrue()).thenReturn(18L);
+        when(authLegalConsentRepository.countByConsentTypeAndGrantedTrue("TERMS_OF_USE")).thenReturn(9L);
+        when(authLegalConsentRepository.countByConsentTypeAndGrantedTrue("PRIVACY_POLICY")).thenReturn(9L);
+        when(authLegalConsentRepository.countByConsentTypeAndGrantedTrueAndGrantedAtAfter(eq("TERMS_OF_USE"), any(Instant.class))).thenReturn(4L);
+        when(authLegalConsentRepository.countByConsentTypeAndGrantedTrueAndGrantedAtAfter(eq("PRIVACY_POLICY"), any(Instant.class))).thenReturn(4L);
 
         AdminMonitoringSummaryResponse summary = service.getSummary(adminId);
 
@@ -129,6 +137,7 @@ class AdminMonitoringServiceTest {
         assertEquals(10L, summary.accounts().total());
         assertEquals(7L, summary.ai().messagesLast24Hours());
         assertEquals(1L, summary.qr().pendingNow());
+        assertEquals(18L, summary.consent().grantedTotal());
     }
 
     @Test

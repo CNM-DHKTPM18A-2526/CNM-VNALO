@@ -53,7 +53,8 @@ class AdminMonitoringControllerTest {
                 new AdminMonitoringSummaryResponse.AuditStats(0, 0, 0, 0, 0, 0),
                 new AdminMonitoringSummaryResponse.OtpStats(0, 0, 0, 0),
                 new AdminMonitoringSummaryResponse.AiStats(0, 0, 0, 0),
-                new AdminMonitoringSummaryResponse.QrStats(0, 0, 0, 0, 0)
+                new AdminMonitoringSummaryResponse.QrStats(0, 0, 0, 0, 0),
+                new AdminMonitoringSummaryResponse.ConsentStats(0, 0, 0, 0, 0)
         );
         when(adminMonitoringService.getSummary(principal.getId())).thenReturn(summary);
 

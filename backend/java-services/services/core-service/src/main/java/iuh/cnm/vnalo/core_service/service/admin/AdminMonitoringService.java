@@ -11,6 +11,7 @@ import iuh.cnm.vnalo.core_service.model.enums.OtpPurpose;
 import iuh.cnm.vnalo.core_service.model.enums.QrLoginSessionStatus;
 import iuh.cnm.vnalo.core_service.repository.ai.AiChatHistoryRepository;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthAccountRepository;
+import iuh.cnm.vnalo.core_service.repository.auth.AuthLegalConsentRepository;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthOtpRepository;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthQrLoginSessionRepository;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthSessionAuditRepository;
@@ -31,6 +32,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AdminMonitoringService {
     private final AuthAccountRepository authAccountRepository;
+    private final AuthLegalConsentRepository authLegalConsentRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final AuthSessionAuditRepository authSessionAuditRepository;
     private final AuthOtpRepository authOtpRepository;
@@ -88,6 +90,13 @@ public class AdminMonitoringService {
                         authQrLoginSessionRepository.countByApprovedAtAfter(since24h),
                         authQrLoginSessionRepository.countByConsumedAtAfter(since24h),
                         authQrLoginSessionRepository.countByStatus(QrLoginSessionStatus.REJECTED)
+                ),
+                new AdminMonitoringSummaryResponse.ConsentStats(
+                        authLegalConsentRepository.countByGrantedTrue(),
+                        authLegalConsentRepository.countByConsentTypeAndGrantedTrue("TERMS_OF_USE"),
+                        authLegalConsentRepository.countByConsentTypeAndGrantedTrue("PRIVACY_POLICY"),
+                        authLegalConsentRepository.countByConsentTypeAndGrantedTrueAndGrantedAtAfter("TERMS_OF_USE", since24h),
+                        authLegalConsentRepository.countByConsentTypeAndGrantedTrueAndGrantedAtAfter("PRIVACY_POLICY", since24h)
                 )
         );
     }

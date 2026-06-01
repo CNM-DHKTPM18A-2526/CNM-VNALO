@@ -70,6 +70,13 @@ type MonitoringSummary = {
     consumedLast24Hours?: number
     rejectedTotal?: number
   }
+  consent?: {
+    grantedTotal?: number
+    termsTotal?: number
+    privacyTotal?: number
+    termsLast24Hours?: number
+    privacyLast24Hours?: number
+  }
 }
 
 const timeoutMs = 4500
@@ -150,6 +157,8 @@ export function AdminMonitoringPage() {
         activeRefreshTokens: 'Refresh token còn hiệu lực',
         loginFailures: 'Login fail 24h',
         otpVerified: 'OTP xác thực 24h',
+        consentGranted: 'Consent đã ghi nhận',
+        consentFresh: 'Consent 24h',
       }
     : {
         title: 'Operations Monitoring',
@@ -174,6 +183,8 @@ export function AdminMonitoringPage() {
         activeRefreshTokens: 'Active refresh tokens',
         loginFailures: 'Login failures 24h',
         otpVerified: 'OTP verified 24h',
+        consentGranted: 'Recorded consents',
+        consentFresh: 'Consent 24h',
       }
 
   const load = React.useCallback(async () => {
@@ -243,6 +254,7 @@ export function AdminMonitoringPage() {
     { label: 'AI messages 24h', value: summary?.ai?.messagesLast24Hours ?? 0 },
     { label: labels.loginFailures, value: summary?.audits?.loginFailureLast24Hours ?? 0 },
     { label: labels.otpVerified, value: summary?.otp?.verifiedLast24Hours ?? 0 },
+    { label: labels.consentGranted, value: summary?.consent?.grantedTotal ?? 0 },
     { label: 'QR pending', value: summary?.qr?.pendingNow ?? 0 },
   ]
 
@@ -324,6 +336,11 @@ export function AdminMonitoringPage() {
             <strong>{labels.qrApproved}</strong>
             <span>{labels.qrApprovedDetail}</span>
             <time>{summary?.qr?.approvedLast24Hours ?? 0}</time>
+          </div>
+          <div className='admin-monitoring-event-row'>
+            <strong>{labels.consentFresh}</strong>
+            <span>Terms / Privacy</span>
+            <time>{`${summary?.consent?.termsLast24Hours ?? 0} / ${summary?.consent?.privacyLast24Hours ?? 0}`}</time>
           </div>
         </div>
       </section>
