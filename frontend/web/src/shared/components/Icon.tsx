@@ -21,6 +21,7 @@ type IconName =
   | 'file'
   | 'more'
   | 'spark'
+  | 'bot'
   | 'database'
   | 'help'
   | 'close'
@@ -472,6 +473,20 @@ export function Icon({ name, className, size = 24 }: IconProps) {
     return (
       <svg {...commonProps}>
         <path d='M20.8 4.6c-1.8-1.7-4.6-1.8-6.5-.2L12 6.5l-2.3-2.1C7.9 2.8 5.1 2.9 3.3 4.6A5.6 5.6 0 0 0 3 9c0 3.3 2.7 6 6 9l3 2 3-2c3.3-3 6-5.7 6-9 0-1.6-.6-3.1-1.2-3.4z' fill='currentColor' stroke='none' />
+      </svg>
+    )
+  }
+
+  if (name === 'bot') {
+    return (
+      <svg {...commonProps}>
+        <rect x='5' y='7' width='14' height='11' rx='3' />
+        <path d='M12 7V4' />
+        <circle cx='9.5' cy='12.5' r='1' fill='currentColor' stroke='none' />
+        <circle cx='14.5' cy='12.5' r='1' fill='currentColor' stroke='none' />
+        <path d='M9 16h6' />
+        <path d='M4 11h1' />
+        <path d='M19 11h1' />
       </svg>
     )
   }

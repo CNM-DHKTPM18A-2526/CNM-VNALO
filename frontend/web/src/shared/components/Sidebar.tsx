@@ -23,7 +23,7 @@ export function Sidebar({ onOpenSettingsModal, onOpenCaptureModal, onOpenAccount
     { to: '/chat', labelKey: 'sidebar.chat', icon: 'chat' as const, badge: unreadMessageCount },
     { to: '/contacts', labelKey: 'sidebar.contacts', icon: 'addressBook' as const, badge: pendingFriendRequestCount },
     { to: '/social', labelKey: 'sidebar.social', icon: 'clock' as const, badge: 0 },
-    { to: '/chat-ai', labelKey: 'sidebar.ai', icon: 'spark' as const, badge: 0 },
+    { to: '/chat-ai', labelKey: 'sidebar.ai', icon: 'bot' as const, badge: 0 },
   ]
 
   const secondaryNav = [

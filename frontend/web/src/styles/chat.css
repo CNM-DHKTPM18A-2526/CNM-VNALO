@@ -4708,3 +4708,92 @@
   border-radius: 8px;
   font-size: 12px;
 }
+
+/* AI messages: hard align with regular chat bubbles */
+.ai-chat-messages {
+  gap: 8px !important;
+  font-family: inherit !important;
+  background: var(--chat-window-bg) !important;
+}
+
+.ai-msg-bubble-ai,
+.ai-msg-bubble-user,
+.ai-msg-bubble-ai[data-role='assistant'],
+.ai-msg-bubble-user[data-role='user'] {
+  display: grid !important;
+  gap: 4px !important;
+  max-width: min(70vw, 560px) !important;
+  padding: 8px 10px !important;
+  border-radius: 8px !important;
+  line-height: 1.45 !important;
+  box-shadow: none !important;
+  font-family: inherit !important;
+}
+
+.ai-msg-bubble-ai,
+.ai-msg-bubble-ai[data-role='assistant'] {
+  align-self: flex-start !important;
+  border: 1px solid var(--border) !important;
+  background: var(--surface) !important;
+  color: var(--text) !important;
+}
+
+.ai-msg-bubble-user,
+.ai-msg-bubble-user[data-role='user'] {
+  align-self: flex-end !important;
+  border: 1px solid color-mix(in srgb, var(--primary) 58%, var(--border)) !important;
+  background: var(--primary) !important;
+  color: white !important;
+}
+
+.ai-message-meta {
+  display: block !important;
+  margin: 0 0 2px !important;
+}
+
+.ai-message-role,
+.ai-message-status,
+.ai-msg-bubble-ai .ai-message-role,
+.ai-msg-bubble-ai .ai-message-status,
+.ai-msg-bubble-user .ai-message-role,
+.ai-msg-bubble-user .ai-message-status {
+  display: inline !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  line-height: 1.35 !important;
+  letter-spacing: 0 !important;
+  color: var(--muted) !important;
+}
+
+.ai-msg-bubble-user .ai-message-role,
+.ai-msg-bubble-user .ai-message-status {
+  color: rgba(255,255,255,.82) !important;
+}
+
+.ai-message-text,
+.ai-msg-bubble-ai p,
+.ai-msg-bubble-user p {
+  margin: 0 !important;
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere !important;
+  font-size: 14px !important;
+  line-height: 1.45 !important;
+  font-weight: 400 !important;
+}
+
+.ai-message-time {
+  margin-top: 2px !important;
+  text-align: right !important;
+  font-size: 11px !important;
+  line-height: 1.2 !important;
+  color: var(--muted) !important;
+  opacity: .78 !important;
+}
+
+.ai-msg-bubble-user .ai-message-time {
+  color: rgba(255,255,255,.78) !important;
+}
