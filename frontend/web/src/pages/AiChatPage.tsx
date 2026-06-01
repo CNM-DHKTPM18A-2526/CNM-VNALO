@@ -560,9 +560,16 @@ function buildActionSuccessFeedback(command: AiActionCommand) {
 
 type AiChatPageProps = {
   embedded?: boolean
+  onActivity?: (activity: { preview: string; timestamp: string }) => void
 }
 
-export function AiChatPage({ embedded = false }: AiChatPageProps = {}) {
+function getAiMessagePreview(message: AiMessage): string {
+  const trimmed = message.content.trim().replace(/\s+/g, ' ')
+  if (!trimmed) return 'Sẵn sàng hỗ trợ'
+  return trimmed.length > 96 ? trimmed.slice(0, 93) + '...' : trimmed
+}
+
+export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {}) {
   const { accessToken, user } = useAuth()
   const navigate = useNavigate()
   const historyStorageKey = useMemo(() => buildAiStorageKey(user?.id as string | number | undefined), [user?.id])
@@ -628,6 +635,10 @@ export function AiChatPage({ embedded = false }: AiChatPageProps = {}) {
   const saveMessages = (nextMessages: AiMessage[]) => {
     const normalized = normalizeStoredMessages(nextMessages)
     setMessages(normalized)
+    const latestActivity = [...normalized].reverse().find((message) => message.content.trim())
+    if (latestActivity && latestActivity !== INITIAL_ASSISTANT_MESSAGE) {
+      onActivity?.({ preview: getAiMessagePreview(latestActivity), timestamp: new Date().toISOString() })
+    }
     if (!historyStorageKey) {
       return
     }
@@ -653,6 +664,7 @@ export function AiChatPage({ embedded = false }: AiChatPageProps = {}) {
         localStorage.setItem(historyStorageKey, JSON.stringify(nextMessages))
         localStorage.removeItem(LEGACY_STORAGE_KEY)
       }
+      onActivity?.({ preview: getAiMessagePreview(feedbackMessage), timestamp: new Date().toISOString() })
       return nextMessages
     })
   }
@@ -1056,17 +1068,19 @@ export function AiChatPage({ embedded = false }: AiChatPageProps = {}) {
       </aside>
 
       <main className='ai-chat-main'>
-        <header className='ai-chat-header'>
-          <div className='ai-header-avatar' aria-hidden='true'>
-            <Bot size={20} />
-          </div>
-          <div className='ai-header-stack'>
-            <div className='ai-header-info'>
-              <strong className='text-[15px] font-semibold'>VNALO AI Assistant</strong>
-              <span className={runtimeState.badgeClassName} />
-              <span>{runtimeState.label}</span>
+        <header className={embedded ? 'chat-window-header ai-chat-header ai-chat-header-embedded' : 'ai-chat-header'}>
+          <div className={embedded ? 'chat-window-header-main' : 'ai-header-main'}>
+            <div className='ai-header-avatar' aria-hidden='true'>
+              <Bot size={20} />
             </div>
-            <span className='ai-header-helper'>{runtimeState.helper}</span>
+            <div className={embedded ? 'chat-window-header-copy' : 'ai-header-stack'}>
+              <div className='ai-header-info'>
+                <strong className='text-[15px] font-semibold'>VNALO AI Assistant</strong>
+                <span className={runtimeState.badgeClassName} />
+                <span>{runtimeState.label}</span>
+              </div>
+              <span className='ai-header-helper'>{runtimeState.helper}</span>
+            </div>
           </div>
         </header>
 
@@ -1088,6 +1102,12 @@ export function AiChatPage({ embedded = false }: AiChatPageProps = {}) {
               key={`${message.role}-${message.timestamp}-${index}`}
               className={message.role === 'assistant' ? 'ai-msg-bubble-ai' : 'ai-msg-bubble-user'} data-role={message.role}
             >
+              <div className='ai-message-action-toolbar' aria-label='Thao tác tin nhắn'>
+                <button type='button' className='ai-message-action-btn' onClick={() => void navigator.clipboard?.writeText(message.content)} title='Copy tin nhắn'>Copy</button>
+                {message.role === 'assistant' && message.degraded && retryPrompt ? (
+                  <button type='button' className='ai-message-action-btn' onClick={handleRetry} disabled={isAssistantBusy}>Thử lại</button>
+                ) : null}
+              </div>
               <p className='ai-message-text'>{message.content}</p>
               {message.role === 'assistant' && message.actionCommand ? (
                 <div className='ai-action-row'>

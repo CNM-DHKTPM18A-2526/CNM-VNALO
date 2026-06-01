@@ -709,6 +709,19 @@ export default function ChatPage() {
     };
   }, [user?.id, messagesByConversation['my-documents']]); // Re-run when messages change
 
+  const handleAiAssistantActivity = useCallback((activity: { preview: string; timestamp: string }) => {
+    setConversations((prev) => {
+      const existing = prev.find((conversation) => conversation.id === AI_ASSISTANT_CONVERSATION_ID) ?? aiAssistantConversation
+      const updated: ConversationSummary = {
+        ...existing,
+        lastMessage: activity.preview,
+        lastMessageAt: activity.timestamp,
+        updatedAt: activity.timestamp,
+      }
+      return [updated, ...prev.filter((conversation) => conversation.id !== AI_ASSISTANT_CONVERSATION_ID)]
+    })
+  }, [aiAssistantConversation])
+
   const selectedConversation = useMemo(
     () => {
       const targetId = routedConversationId || selectedConversationId;
@@ -4357,7 +4370,8 @@ export default function ChatPage() {
           : 'Hỗ trợ tôi trong ngữ cảnh hội thoại "' + conversationName + '".'
 
         window.localStorage.setItem(AI_PENDING_PROMPT_KEY, prompt)
-        navigate('/chat-ai')
+        handleAiAssistantActivity({ preview: cleanedPrompt || 'Đã chuyển yêu cầu từ @VNALO', timestamp: new Date().toISOString() })
+        navigate('/chat/' + AI_ASSISTANT_CONVERSATION_ID)
         return
       }
 
@@ -4667,7 +4681,7 @@ export default function ChatPage() {
         }
       }
     },
-    [accessToken, emitSendMessage, isRestrictedMode, routedConversationId, selectedConversationId, updateConversationAfterMessage, user],
+    [accessToken, emitSendMessage, handleAiAssistantActivity, isRestrictedMode, routedConversationId, selectedConversationId, updateConversationAfterMessage, user],
   )
 
   const handleSendPoll = useCallback(
@@ -5490,7 +5504,7 @@ export default function ChatPage() {
         onCreateGroupClick={handleOpenCreateGroupModal}
       />
       {(routedConversationId || selectedConversationId) === AI_ASSISTANT_CONVERSATION_ID ? (
-        <AiChatPage embedded />
+        <AiChatPage embedded onActivity={handleAiAssistantActivity} />
       ) : (
       <ChatWindow
         conversation={selectedConversation}

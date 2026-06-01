@@ -9,12 +9,12 @@ interface MentionPopoverProps {
   position: { top: number; left: number };
 }
 
-export const MentionPopover: React.FC<MentionPopoverProps> = ({ 
-  members, 
-  filter, 
-  onSelect, 
+export const MentionPopover: React.FC<MentionPopoverProps> = ({
+  members,
+  filter,
+  onSelect,
   onClose,
-  position 
+  position
 }) => {
   const [selectedIndex, setSelectedIndex] = React.useState(0);
 
@@ -22,7 +22,7 @@ export const MentionPopover: React.FC<MentionPopoverProps> = ({
     { userId: 'all', displayName: 'All', subText: 'Báo cho cả nhóm', icon: 'at' },
   ];
 
-  const filteredMembers = (members || []).filter(m => 
+  const filteredMembers = (members || []).filter(m =>
     (m.displayName || '').toLowerCase().includes((filter || '').toLowerCase())
   );
 
@@ -60,10 +60,10 @@ export const MentionPopover: React.FC<MentionPopoverProps> = ({
   if (allOptions.length === 0) return null;
 
   return (
-    <div 
+    <div
       className="absolute z-50 bg-white dark:bg-[#1E1E2E] rounded-lg shadow-xl border border-slate-200 dark:border-white/10 w-72 overflow-hidden mb-2"
-      style={{ 
-        bottom: '100%', 
+      style={{
+        bottom: '100%',
         left: position.left,
         maxHeight: '320px'
       }}
@@ -72,21 +72,21 @@ export const MentionPopover: React.FC<MentionPopoverProps> = ({
         {allOptions.map((option, index) => (
           <div
             key={option.userId}
-            className={`flex items-center gap-3 p-3 cursor-pointer transition-colors ${
+            className={`flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors ${
               index === selectedIndex ? 'bg-blue-50 dark:bg-blue-500/10' : 'hover:bg-slate-50 dark:hover:bg-white/5 transition-colors'
             }`}
             onClick={() => onSelect(option)}
             onMouseEnter={() => setSelectedIndex(index)}
           >
             { (option as any).icon === 'at' ? (
-              <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
+              <div className="w-7 h-7 min-w-7 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-sm">
                 @
               </div>
             ) : (
-              <UserAvatar 
-                name={option.displayName} 
-                imageUrl={(option as any).avatarUrl} 
-                size="md" 
+              <UserAvatar
+                name={option.displayName}
+                imageUrl={(option as any).avatarUrl}
+                size="sm"
               />
             )}
             <div className="flex flex-col min-w-0">
