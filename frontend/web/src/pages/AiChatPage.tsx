@@ -79,8 +79,18 @@ type ActionFeedbackState = {
   message: string
 }
 
+const isAxiosLikeError = (error: unknown): error is { response?: { status?: number; data?: unknown } } => {
+  return Boolean(error && typeof error === 'object' && 'response' in error)
+}
+
+const isNetworkError = (error: unknown) => {
+  if (!error || typeof error !== 'object') return false
+  const maybeError = error as { response?: unknown; request?: unknown; code?: string; message?: string }
+  return !maybeError.response && (Boolean(maybeError.request) || maybeError.code === 'ERR_NETWORK' || maybeError.message === 'Network Error')
+}
+
 function resolveErrorPresentation(error: unknown): { message: string; providerStatus: ProviderStatus; degraded: boolean } {
-  const response = (error as { response?: { status?: number; data?: unknown } } | undefined)?.response
+  const response = isAxiosLikeError(error) ? error.response : undefined
   const status = response?.status ?? null
   const extracted = extractMessage(response?.data) || extractMessage(error)
 
@@ -111,7 +121,7 @@ function resolveErrorPresentation(error: unknown): { message: string; providerSt
   if (status === 429) {
     return {
       message: extracted || 'AI đang quá tải hoặc chạm giới hạn tạm thời. Hãy thử lại sau ít phút.',
-      providerStatus: 'AI_PROVIDER_UNAVAILABLE',
+      providerStatus: 'FALLBACK_PROVIDER_ACTIVE',
       degraded: true,
     }
   }
@@ -121,6 +131,14 @@ function resolveErrorPresentation(error: unknown): { message: string; providerSt
       message: extracted || 'Nhà cung cấp AI hiện chưa sẵn sàng. Hãy thử lại sau ít phút.',
       providerStatus: 'AI_PROVIDER_UNAVAILABLE',
       degraded: true,
+    }
+  }
+
+  if (isNetworkError(error)) {
+    return {
+      message: extracted || 'Không kết nối được tới Trợ lý AI. Vui lòng kiểm tra mạng hoặc thử lại sau.',
+      providerStatus: null,
+      degraded: false,
     }
   }
 
@@ -647,8 +665,8 @@ export function AiChatPage() {
         role: 'assistant',
         content: 'Bạn cần đăng nhập lại để dùng Trợ lý AI trên web.',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        degraded: true,
-        providerStatus: 'AI_PROVIDER_UNAVAILABLE',
+        degraded: false,
+        providerStatus: null,
       }
       saveMessages([...messages, authError])
       return
@@ -848,9 +866,10 @@ export function AiChatPage() {
       })
     } catch (error) {
       console.error('AI action execution failed:', error)
-      const errorFeedback = 'Chưa thể thực thi thao tác AI trên web lúc này. Vui lòng thử lại hoặc thao tác thủ công.'
+      const errorPresentation = resolveErrorPresentation(error)
+      const errorFeedback = errorPresentation.message || 'Chưa thể thực thi thao tác AI trên web lúc này. Vui lòng thử lại hoặc thao tác thủ công.'
       setActionFeedback({ tone: 'error', message: errorFeedback })
-      appendAssistantFeedback(errorFeedback, { degraded: true, providerStatus: 'AI_PROVIDER_UNAVAILABLE' })
+      appendAssistantFeedback(errorFeedback, { degraded: false, providerStatus: null })
     } finally {
       setActionBusyIndex(null)
       setActiveActionLabel('')
