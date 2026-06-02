@@ -9,6 +9,8 @@ import { LoginPage } from './pages/LoginPage'
 import { QrLoginPage } from './pages/QrLoginPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
+import { LegalPage } from './pages/LegalPage'
+import { AdminMonitoringPage } from './pages/AdminMonitoringPage'
 import ChatPage from './pages/ChatPage'
 import CallPage from './pages/CallPage'
 import { ContactsPage } from './pages/ContactsPage'
@@ -19,7 +21,6 @@ import StoryViewerPage from './features/social/pages/StoryViewerPage'
 import { UserStoreProvider } from './features/chat/context/UserStoreContext'
 import { NotificationProvider } from './features/notifications/NotificationContext'
 import { AiAssistantProvider } from './features/ai-assistant/AiAssistantProvider'
-import { AdminMonitoringPage } from './pages/AdminMonitoringPage'
 import './styles/app.css'
 
 function App() {
@@ -33,6 +34,8 @@ function App() {
           <Route path='/login' element={isAuthenticated ? <Navigate replace to='/chat' /> : <LoginPage />} />
           <Route path='/login/qr' element={isAuthenticated ? <Navigate replace to='/chat' /> : <QrLoginPage />} />
           <Route path='/register' element={isAuthenticated ? <Navigate replace to='/chat' /> : <RegisterPage />} />
+          <Route path='/legal/terms' element={<LegalPage kind='terms' />} />
+          <Route path='/legal/privacy' element={<LegalPage kind='privacy' />} />
           <Route path='/forgot-password' element={isAuthenticated ? <Navigate replace to='/chat' /> : <ForgotPasswordPage />} />
           <Route
             path='/'

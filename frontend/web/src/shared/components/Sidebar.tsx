@@ -17,7 +17,6 @@ export function Sidebar({ onOpenSettingsModal, onOpenCaptureModal, onOpenAccount
   const { t } = useLanguage()
   const { user } = useAuth()
   const { unreadMessageCount, pendingFriendRequestCount } = useNotifications()
-
   const primaryNav: Array<{ to: string; labelKey: string; icon: any; badge: number }> = [
     { to: '/chat', labelKey: 'sidebar.chat', icon: 'chat' as const, badge: unreadMessageCount },
     { to: '/contacts', labelKey: 'sidebar.contacts', icon: 'addressBook' as const, badge: pendingFriendRequestCount },

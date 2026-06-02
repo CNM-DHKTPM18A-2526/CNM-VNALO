@@ -11,6 +11,7 @@ import iuh.cnm.vnalo.core_service.model.dto.request.ResetPasswordRequest;
 import iuh.cnm.vnalo.core_service.model.dto.response.AuthResponse;
 import iuh.cnm.vnalo.core_service.model.dto.response.UserInfoResponse;
 import iuh.cnm.vnalo.core_service.model.entity.auth.AuthAccount;
+import iuh.cnm.vnalo.core_service.model.entity.auth.AuthLegalConsent;
 import iuh.cnm.vnalo.core_service.model.entity.auth.AuthRefreshToken;
 import iuh.cnm.vnalo.core_service.model.entity.user.UserPrivacySetting;
 import iuh.cnm.vnalo.core_service.model.entity.user.UserProfile;
@@ -18,6 +19,7 @@ import iuh.cnm.vnalo.core_service.model.entity.user.UserSetting;
 import iuh.cnm.vnalo.core_service.model.enums.AccountStatus;
 import iuh.cnm.vnalo.core_service.model.enums.OtpPurpose;
 import iuh.cnm.vnalo.core_service.repository.auth.AuthAccountRepository;
+import iuh.cnm.vnalo.core_service.repository.auth.AuthLegalConsentRepository;
 import iuh.cnm.vnalo.core_service.repository.auth.RefreshTokenRepository;
 import iuh.cnm.vnalo.core_service.repository.user.UserPrivacySettingRepository;
 import iuh.cnm.vnalo.core_service.repository.user.UserProfileRepository;
@@ -54,8 +56,10 @@ public class AuthService {
     private static final int MAX_ACTIVE_MOBILE_DEVICES = 1;
     private static final int MAX_ACTIVE_WEB_DEVICES_STANDARD = 2;
     private static final int MAX_ACTIVE_WEB_DEVICES_WITH_QR = 3;
+    private static final String CURRENT_LEGAL_VERSION = "2026-06-01";
 
     private final AuthAccountRepository authAccountRepository;
+    private final AuthLegalConsentRepository authLegalConsentRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserProfileRepository userProfileRepository;
     private final UserPrivacySettingRepository userPrivacySettingRepository;
@@ -93,6 +97,10 @@ public class AuthService {
     public AuthResponse register(RegisterRequest request, HttpServletRequest httpRequest) {
         final String normalizedEmail = normalizeEmail(request.getEmail());
 
+        if (!request.isAcceptedTerms() || !request.isAcceptedPrivacy()) {
+            throw new ApiException(ErrorCode.VALIDATION_ERROR, "Legal consent is required");
+        }
+
         if (authAccountRepository.existsByPhone(request.getPhone())) {
             throw new ApiException(ErrorCode.AUTH_PHONE_ALREADY_EXISTS);
         }
@@ -126,6 +134,12 @@ public class AuthService {
 
         UserSetting userSetting = UserSetting.createDefault(profile.getId());
         userSettingRepository.save(userSetting);
+
+        final String legalVersion = resolveLegalVersion(request.getLegalVersion());
+        authLegalConsentRepository.saveAll(List.of(
+                buildConsent(account.getId(), "TERMS_OF_USE", legalVersion, request.getPlatform(), request.getDeviceName(), httpRequest),
+                buildConsent(account.getId(), "PRIVACY_POLICY", legalVersion, request.getPlatform(), request.getDeviceName(), httpRequest)
+        ));
 
         IssuedRefreshToken issuedRefreshToken = generateAndSaveRefreshToken(
             account.getId(),
@@ -622,6 +636,35 @@ public class AuthService {
             return "***";
         }
         return trimmed.charAt(0) + "***" + trimmed.substring(at);
+    }
+
+    private AuthLegalConsent buildConsent(UUID accountId, String consentType, String legalVersion, String platform, String deviceName, HttpServletRequest request) {
+        return AuthLegalConsent.builder()
+                .accountId(accountId)
+                .consentType(consentType)
+                .documentVersion(legalVersion)
+                .granted(true)
+                .grantedAt(Instant.now())
+                .ipAddress(resolveClientIp(request))
+                .userAgent(request != null ? request.getHeader("User-Agent") : null)
+                .deviceName(sanitizeDeviceName(deviceName))
+                .platform(normalizePlatform(platform))
+                .build();
+    }
+
+    private String resolveLegalVersion(String version) {
+        if (version == null || version.isBlank()) {
+            return CURRENT_LEGAL_VERSION;
+        }
+        return version.trim();
+    }
+
+    private String sanitizeDeviceName(String deviceName) {
+        if (deviceName == null || deviceName.isBlank()) {
+            return null;
+        }
+        final String trimmed = deviceName.trim();
+        return trimmed.length() > 100 ? trimmed.substring(0, 100) : trimmed;
     }
 
     private String resolveClientIp(HttpServletRequest request) {
