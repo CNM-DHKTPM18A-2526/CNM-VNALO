@@ -1,4 +1,4 @@
-﻿import React from 'react'
+import React from 'react'
 
 import { useAuth } from '../../auth/useAuth'
 import { getOrCreateSocket } from '../chat.socket'
@@ -80,7 +80,7 @@ export function GlobalIncomingCallBridge() {
       const conversationId = (payload.conversationId || payload.roomId)?.toString()
       const peerId = (payload.senderUserId || payload.callerId || payload.fromUserId)?.toString()
 
-      if (!callId || !conversationId || !peerId || peerId === user.id) return
+      if (!callId || !conversationId || !peerId) return
       if (incomingCallRef.current && incomingCallRef.current.callId !== callId) return
       if (processedOffersRef.current.has(callId)) return
 

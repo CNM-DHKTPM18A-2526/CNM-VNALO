@@ -2150,7 +2150,7 @@ export default function ChatPage() {
             actorId: user.id,
             type: 'ADD',
             emoji,
-            isPollVote: message?.type === 'poll',
+            isPollVote: emoji.startsWith('vote:') || emoji.startsWith('v:'),
           })
 
           // Ensure we're in the room before emitting low-level socket event and system signal
@@ -2160,7 +2160,7 @@ export default function ChatPage() {
             const socket = getSocket()
             console.log('[ChatPage.emit] join done for reaction.added', { connected: socket?.connected, socketId: socket?.id, conversationId: selectedConversationId })
             try {
-              console.log('[ChatPage.emit] sending reaction via socket primary (ADD)', { messageId, emoji, isPollVote: message?.type === 'poll' })
+              console.log('[ChatPage.emit] sending reaction via socket primary (ADD)', { messageId, emoji, isPollVote: emoji.startsWith('vote:') || emoji.startsWith('v:') })
               if (socket?.connected) {
                 try {
                   const ack = await emitSendMessage({
