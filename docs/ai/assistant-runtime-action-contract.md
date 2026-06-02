@@ -49,3 +49,5 @@ Tài liệu này chuẩn hóa cách AI Assistant chuyển ý định người d�
 - Mobile không được tạo nhóm nếu resolve còn dưới 2 user khác nhau, kể cả khi AI trả về tên trùng lặp.
 - Web và mobile đều phải dừng action khi target ambiguous thay vì tự chọn ứng viên đầu tiên.
 
+- AI service phải reject CREATE_GROUP nếu memberNames sau normalize/dedupe còn dưới 2 tên distinct.
+

@@ -21,6 +21,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -322,7 +323,7 @@ public class GeminiAiService {
                 if (memberNames.isEmpty()) {
                     memberNames = extractStringList(cp.get("members"));
                 }
-                if (groupName == null || groupName.isBlank() || memberNames.isEmpty()) {
+                if (groupName == null || groupName.isBlank() || memberNames.size() < 2) {
                     valid = false;
                 } else {
                     cp.put("groupName", groupName.trim());
@@ -565,21 +566,31 @@ public class GeminiAiService {
 
     private List<String> extractStringList(Object rawValue) {
         if (rawValue instanceof List<?> rawList) {
-            return rawList.stream()
+            return normalizeDistinctStrings(rawList.stream()
                     .map(String::valueOf)
-                    .map(String::trim)
-                    .filter(item -> !item.isEmpty())
-                    .distinct()
-                    .toList();
+                    .toList());
         }
         if (rawValue instanceof String rawString && !rawString.isBlank()) {
-            return Arrays.stream(rawString.split(","))
-                    .map(String::trim)
-                    .filter(item -> !item.isEmpty())
-                    .distinct()
-                    .toList();
+            return normalizeDistinctStrings(Arrays.stream(rawString.split(","))
+                    .toList());
         }
         return List.of();
+    }
+
+    private List<String> normalizeDistinctStrings(List<String> values) {
+        LinkedHashSet<String> normalizedKeys = new LinkedHashSet<>();
+        List<String> result = new ArrayList<>();
+        for (String value : values) {
+            String trimmed = value == null ? "" : value.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            String normalizedKey = trimmed.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+            if (normalizedKeys.add(normalizedKey)) {
+                result.add(trimmed);
+            }
+        }
+        return result;
     }
 
     private Map<String, Object> createContent(String role, String text) {

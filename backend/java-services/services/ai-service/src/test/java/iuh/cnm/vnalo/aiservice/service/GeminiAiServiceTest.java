@@ -146,6 +146,52 @@ class GeminiAiServiceTest {
     }
 
     @Test
+    void interactWithGemini_blocksCreateGroupWithFewerThanTwoDistinctMembers() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        String rawReply = objectMapper.writeValueAsString(Map.of(
+                "textReply", "I will create the group.",
+                "actionCommand", "CREATE_GROUP",
+                "actionParams", Map.of(
+                        "groupName", "Nhom test",
+                        "memberNames", List.of("An", " an ")
+                ),
+                "emotion", "thinking"
+        ));
+        String responseJson = """
+                {
+                  "candidates": [
+                    {
+                      "content": {
+                        "parts": [
+                          {
+                            "text": %s
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+                """.formatted(objectMapper.writeValueAsString(rawReply));
+
+        when(geminiRestTemplate.exchange(any(String.class), eq(HttpMethod.POST), any(), eq(String.class)))
+                .thenReturn(ResponseEntity.ok(responseJson));
+
+        AiChatResponse response = geminiAiService.interactWithGemini(
+                "user-1",
+                AiChatRequest.builder()
+                        .prompt("Create group with An")
+                        .analyzeIntent(true)
+                        .build()
+        );
+
+        assertNull(response.getActionCommand());
+        assertNull(response.getActionParams());
+        assertFalse(response.getTextReply().toLowerCase().contains("create the group"));
+        assertFalse(response.getRequiresConfirmation());
+        assertEquals("low", response.getRiskLevel());
+    }
+
+    @Test
     void interactWithGemini_blocksInvalidActionSchema() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper();
         String rawReply = objectMapper.writeValueAsString(Map.of(
