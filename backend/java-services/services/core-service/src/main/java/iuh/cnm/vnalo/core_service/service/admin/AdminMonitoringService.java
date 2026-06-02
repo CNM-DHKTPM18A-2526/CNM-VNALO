@@ -159,6 +159,7 @@ public class AdminMonitoringService {
         String normalizedPlatform = normalizeOptionalFilter(platform, true);
 
         return authSessionAuditRepository.findMonitoringTrend(since, "hour", normalizedEventType, normalizedPlatform)
+                .stream()
                 .map(point -> new AdminMonitoringTrendPointResponse(
                         point.getBucket(),
                         point.getTotal(),

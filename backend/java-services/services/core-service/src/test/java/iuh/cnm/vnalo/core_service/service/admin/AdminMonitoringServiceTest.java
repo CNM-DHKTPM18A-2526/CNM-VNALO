@@ -105,7 +105,6 @@ class AdminMonitoringServiceTest {
         when(aiChatHistoryRepository.countByCreatedAtAfter(any(OffsetDateTime.class))).thenReturn(9L);
         when(aiChatHistoryRepository.countByRoleAndCreatedAtAfter(eq("user"), any(OffsetDateTime.class))).thenReturn(4L);
         when(aiChatHistoryRepository.countByRoleAndCreatedAtAfter(eq("assistant"), any(OffsetDateTime.class))).thenReturn(5L);
-        when(aiChatHistoryRepository.countByRoleAndCreatedAtAfter(eq("assistant"), any(OffsetDateTime.class))).thenReturn(5L);
         when(aiChatHistoryRepository.countDistinctUsersSince(any(OffsetDateTime.class))).thenReturn(3L);
         when(authQrLoginSessionRepository.countByCreatedAtAfter(any(Instant.class))).thenReturn(6L);
         when(authQrLoginSessionRepository.countByStatus(QrLoginSessionStatus.PENDING)).thenReturn(2L);
