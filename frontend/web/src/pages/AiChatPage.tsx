@@ -443,6 +443,28 @@ function getFriendDisplayName(friend: Friend) {
   return friend.nickname?.trim() || friend.displayName?.trim() || ''
 }
 
+function extractCreateGroupIntentTargets(text: string) {
+  const normalized = normalizeLookupText(text)
+  if (!normalized.includes('tao nhom')) return []
+
+  const source = text.trim()
+  const match = source.match(/t\u1ea1o\s+nh\u00f3m\s+(?:v\u1edbi|c\u00f9ng|cho|g\u1ed3m)?\s*(.+)$/i)
+    ?? source.match(/tao\s+nhom\s+(?:voi|cung|cho|gom)?\s*(.+)$/i)
+  const rawTarget = match?.[1]?.trim()
+  if (!rawTarget) return []
+
+  const cleaned = rawTarget
+    .replace(/^v\u1edbi\s+/i, '')
+    .replace(/^voi\s+/i, '')
+    .replace(/[.!?]+$/g, '')
+    .trim()
+
+  return cleaned
+    .split(/[,;\n]|\s+v\u00e0\s+|\s+va\s+|\s+and\s+/i)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
 function findFriendMatches(friends: Friend[], target: string) {
   const normalizedTarget = normalizeLookupText(target)
   if (!normalizedTarget) return []
@@ -450,6 +472,27 @@ function findFriendMatches(friends: Friend[], target: string) {
     .map((friend) => ({ friend, score: computeConversationMatchScore(getFriendDisplayName(friend), normalizedTarget) }))
     .filter((item) => item.score >= 0)
     .sort((left, right) => right.score - left.score)
+}
+
+function validateCreateGroupTargets(friends: Friend[], requestedTargets: string[]) {
+  const missingTargets: string[] = []
+  const ambiguousTargets: string[] = []
+
+  requestedTargets.forEach((target) => {
+    const matches = findFriendMatches(friends, target)
+    if (matches.length === 0) {
+      missingTargets.push(target)
+      return
+    }
+
+    const bestScore = matches[0]?.score ?? -1
+    const sameBestMatches = matches.filter((item) => item.score === bestScore)
+    if (sameBestMatches.length > 1) {
+      ambiguousTargets.push(target)
+    }
+  })
+
+  return { missingTargets, ambiguousTargets }
 }
 
 function extractComposeContent(params?: Record<string, unknown> | null) {
@@ -826,6 +869,39 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
       return
     }
 
+    const createGroupIntentTargets = extractCreateGroupIntentTargets(query)
+    if (createGroupIntentTargets.length > 0) {
+      const userMessage: AiMessage = {
+        role: 'user',
+        content: query,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      }
+
+      if (!textToSend) {
+        setInputValue('')
+      }
+
+      const friends = await getFriends(accessToken)
+      const { missingTargets, ambiguousTargets } = validateCreateGroupTargets(friends, createGroupIntentTargets)
+
+      if (missingTargets.length > 0 || ambiguousTargets.length > 0) {
+        const assistantText = missingTargets.length > 0
+          ? `Không tìm thấy ${missingTargets.map((target) => `"${target}"`).join(', ')} trong danh bạ. Mình sẽ không tạo nhóm hoặc mở luồng tạo nhóm để tránh chọn nhầm người.`
+          : `Có nhiều liên hệ khớp với ${ambiguousTargets.map((target) => `"${target}"`).join(', ')}. Hãy nói rõ hơn hoặc tự chọn thủ công trong modal tạo nhóm.`
+        const assistantMessage: AiMessage = {
+          role: 'assistant',
+          content: assistantText,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          providerStatus: null,
+          degraded: false,
+        }
+        saveMessages([...messages, userMessage, assistantMessage])
+        setActionFeedback({ tone: 'warning', message: assistantText })
+        setRetryPrompt('')
+        return
+      }
+    }
+
     if (!textToSend) {
       setInputValue('')
     }
@@ -926,22 +1002,7 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
 
         if (requestedTargets.length > 0) {
           const friends = await getFriends(accessToken)
-          const missingTargets: string[] = []
-          const ambiguousTargets: string[] = []
-
-          requestedTargets.forEach((target) => {
-            const matches = findFriendMatches(friends, target)
-            if (matches.length === 0) {
-              missingTargets.push(target)
-              return
-            }
-
-            const bestScore = matches[0]?.score ?? -1
-            const sameBestMatches = matches.filter((item) => item.score === bestScore)
-            if (sameBestMatches.length > 1) {
-              ambiguousTargets.push(target)
-            }
-          })
+          const { missingTargets, ambiguousTargets } = validateCreateGroupTargets(friends, requestedTargets)
 
           if (missingTargets.length > 0) {
             const messageText = `Không tìm thấy ${missingTargets.map((target) => `"${target}"`).join(', ')} trong danh bạ. Mình sẽ không mở tạo nhóm để tránh chọn nhầm người.`
@@ -1281,6 +1342,18 @@ export function AiChatPage({ embedded = false, onActivity }: AiChatPageProps = {
                 <p>{runtimeState.degraded ? runtimeState.label : 'Đang hoạt động'}</p>
               </div>
             </div>
+          </div>
+          <div className='chat-window-header-actions ai-chat-header-actions'>
+            <button
+              type='button'
+              className='chat-window-icon-btn ai-header-clear-btn'
+              onClick={handleClearHistory}
+              disabled={isAssistantBusy}
+              title='Xóa lịch sử chat AI'
+              aria-label='Xóa lịch sử chat AI'
+            >
+              <Trash2 size={18} />
+            </button>
           </div>
         </header>
 

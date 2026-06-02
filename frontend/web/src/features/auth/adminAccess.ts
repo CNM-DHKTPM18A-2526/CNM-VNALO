@@ -15,6 +15,15 @@ const ADMIN_PERMISSION_KEYS = new Set([
   'ADMIN_MONITORING_RBAC_MANAGE',
 ])
 
+const ADMIN_PROFILE_ROLE_KEYS = new Set([
+  'ROLE_SUPER_ADMIN',
+  'SUPER_ADMIN',
+  'ROLE_ADMIN_MONITORING_VIEWER',
+  'ADMIN_MONITORING_VIEWER',
+  'ROLE_ADMIN_MONITORING_ANALYST',
+  'ADMIN_MONITORING_ANALYST',
+])
+
 type JwtClaims = {
   roles?: unknown
   authorities?: unknown
@@ -73,4 +82,10 @@ export function canAccessAdminMonitoring(user: AuthUser | null, accessToken?: st
   ].map((permission) => permission.toUpperCase())
 
   return roles.some((role) => ADMIN_ROLE_KEYS.has(role)) || permissions.some((permission) => ADMIN_PERMISSION_KEYS.has(permission))
+}
+
+export function hasAdminMonitoringProfileAccess(user: AuthUser | null): boolean {
+  const roles = normalizeValues(user?.roles).map((role) => role.toUpperCase())
+
+  return roles.some((role) => ADMIN_PROFILE_ROLE_KEYS.has(role))
 }
